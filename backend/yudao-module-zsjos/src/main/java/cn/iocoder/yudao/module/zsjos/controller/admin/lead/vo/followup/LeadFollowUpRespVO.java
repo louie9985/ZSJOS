@@ -10,6 +10,8 @@ public class LeadFollowUpRespVO {
     private Long id;
     private Long leadId;
     private Long assignmentHistoryId;
+    private Long opportunityId;
+    private String recordScope;
     private Long operatorUserId;
     private String operatorName;
     private LocalDateTime occurredAt;

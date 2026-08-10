@@ -19,3 +19,8 @@ SOURCE script/sql/mysql/02-bootstrap-zsjos-seed.sql;
 SOURCE script/sql/mysql/03-bootstrap-dictionary-types.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
+
+INSERT IGNORE INTO `zsjos_module_schema_version`
+  (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+SELECT 'core', `version`, `description`, SHA2(COALESCE(`checksum`, `version`), 256), 'baseline', `installed_at`
+FROM `zsjos_schema_version`;

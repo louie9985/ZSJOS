@@ -27,4 +27,8 @@ public interface LeadIntendedProductMapper extends BaseMapperX<LeadIntendedProdu
                 .in(LeadIntendedProductDO::getLeadId, leadIds)
                 .orderByAsc(LeadIntendedProductDO::getSort));
     }
+
+    default void deleteByLeadId(Long leadId) {
+        delete(LeadIntendedProductDO::getLeadId, leadId);
+    }
 }

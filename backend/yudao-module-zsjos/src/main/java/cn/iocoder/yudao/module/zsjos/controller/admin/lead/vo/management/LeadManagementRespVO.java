@@ -27,6 +27,9 @@ public class LeadManagementRespVO {
     private String status;
     private String assignmentStatus;
     private String handlingStage;
+    private String qualificationStatus;
+    private String followUpStatus;
+    private String operationalStatus;
     private String dispatchMode;
     private Long ownerUserId;
     private String ownerUserName;
@@ -44,6 +47,7 @@ public class LeadManagementRespVO {
     private Long qualifiedByUserId;
     private String qualifiedByUserName;
     private LocalDateTime qualifiedAt;
+    private String validDescription;
     private LocalDateTime convertedAt;
     private String invalidReason;
     private String invalidReasonLabelSnapshot;
@@ -60,6 +64,26 @@ public class LeadManagementRespVO {
     private LeadProductVO primaryProduct;
     private List<LeadProductVO> intendedProducts;
     private List<LeadAttachmentVO> attachments;
+    private OpportunityVO opportunity;
+    private List<ActionVO> availableActions;
+
+    @Data
+    public static class OpportunityVO {
+        private Long id;
+        private String status;
+        private LocalDateTime nextFollowUpAt;
+    }
+
+    @Data
+    public static class ActionVO {
+        private String code;
+        private Boolean enabled;
+
+        public ActionVO(String code, Boolean enabled) {
+            this.code = code;
+            this.enabled = enabled;
+        }
+    }
 
     @Data
     public static class LeadProductVO {

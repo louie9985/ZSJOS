@@ -92,6 +92,19 @@ SELECT 'business_notify_v011' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V011'), 'PASS', 'FAIL') AS result;
 SELECT 'business_notify_templates_v016' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V016'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_invalid_remark_v017' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V017'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_actions_v018' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V018'), 'PASS', 'FAIL') AS result;
+SELECT 'historical_valid_leads_v019' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V019'), 'PASS', 'FAIL') AS result;
+SELECT 'unified_schema_migration_v020' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V020'), 'PASS', 'FAIL') AS result;
+SELECT 'module_schema_versions' AS check_name,
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020'))=5, 'PASS', 'FAIL') AS result;
+SELECT 'enabled_crm_schema' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+           AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_v013' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V013'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_appeal_v015' AS check_name,
@@ -157,6 +170,8 @@ FROM (
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
   UNION ALL SELECT 'zsjos_lead_follow_up_record' UNION ALL SELECT 'zsjos_lead_follow_up_image'
   UNION ALL SELECT 'system_notify_rule' UNION ALL SELECT 'system_area'
+  UNION ALL SELECT 'crm_owner_record' UNION ALL SELECT 'crm_performance_config'
+  UNION ALL SELECT 'zsjos_module_schema_version'
 ) expected
 LEFT JOIN information_schema.tables actual
   ON actual.table_schema=DATABASE() AND actual.table_name=expected.table_name;

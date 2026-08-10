@@ -47,6 +47,7 @@ public class LeadDO extends TenantBaseDO {
     private LocalDateTime suspendedAt;
     private Long qualifiedByUserId;
     private LocalDateTime qualifiedAt;
+    private String validDescription;
     private String invalidReasonLabelSnapshot;
     private String invalidDescription;
     private String invalidEvidenceRefs;

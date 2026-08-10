@@ -9,4 +9,5 @@ public class LeadQualificationCommandReqVO {
     @NotBlank
     @Size(max = 40)
     private String idempotencyKey;
+
 }

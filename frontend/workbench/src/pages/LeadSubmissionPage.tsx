@@ -1,19 +1,19 @@
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Card, Cascader, Checkbox, Col, Divider, Form, Image, Input, Radio, Row, Select, Space, Spin, Tag, Typography, Upload } from 'antd'
+import { Alert, App, Button, Card, Cascader, Col, Divider, Form, Image, Input, Radio, Row, Select, Space, Spin, Typography, Upload } from 'antd'
 import type { UploadFile, UploadProps } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DICT_TYPE, LEAD_ASSIGNMENT_MODE, LEAD_ASSIGNMENT_OPTIONS, PHONE_PATTERN } from '../constants'
-import { api, type AreaNode, type LeadAttachment, type LeadCatalog, type LeadCategoryNode } from '../services/api'
+import { api, type AreaNode, type LeadAttachment, type LeadCatalog } from '../services/api'
 import { buildLeadAreaOptions, normalizeLeadAreaPath } from '../services/area'
+import LeadIntendedProductEditor, { type IntendedProductSelection } from '../components/LeadIntendedProductEditor'
 
-const { Text, Title } = Typography
+const { Title } = Typography
 type Option = { label: string; value: string }
 type FormValues = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
   sourceChannel: string; leadCategory: string; remark?: string; dispatchMode: 'auto' | 'specified'; specifiedSalesUserId?: number
 }
 type RemoteState = { loading: boolean; error?: string }
-type Intention = { key: string; spuRef?: string; skuRef?: string; spuUnknown: boolean; skuUnknown: boolean; spuName: string; skuName: string; path: string; price?: number }
 
 export default function LeadSubmissionPage() {
   const [form] = Form.useForm<FormValues>()
@@ -32,13 +32,7 @@ export default function LeadSubmissionPage() {
   const [salesState, setSalesState] = useState<RemoteState>({ loading: false })
   const salesLoaded = useRef(false)
   const assignmentMode = Form.useWatch('dispatchMode', form)
-  const [categoryPathIds, setCategoryPathIds] = useState<number[]>([])
-  const [spuUnknown, setSpuUnknown] = useState(false)
-  const [spuRef, setSpuRef] = useState<string>()
-  const [attrValues, setAttrValues] = useState<Record<string, string>>({})
-  const [skuRef, setSkuRef] = useState<string>()
-  const [skuUnknown, setSkuUnknown] = useState(false)
-  const [intentions, setIntentions] = useState<Intention[]>([])
+  const [intentions, setIntentions] = useState<IntendedProductSelection[]>([])
   const [primaryKey, setPrimaryKey] = useState<string>()
 
   const loadOptions = useCallback(async () => {
@@ -76,29 +70,6 @@ export default function LeadSubmissionPage() {
 
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
 
-  const selectedCategoryId = categoryPathIds.at(-1)
-  const categoryOptions = useMemo(() => catalog.categoryTree.map(function mapCategory(item: LeadCategoryNode): any {
-    return { label: item.name, value: item.id, children: item.children?.length ? item.children.map(mapCategory) : undefined }
-  }), [catalog.categoryTree])
-  const spuOptions = useMemo(() => catalog.spus.filter(item => item.categoryId === selectedCategoryId).map(item => ({ label: item.spuName, value: item.spuRef })), [catalog.spus, selectedCategoryId])
-  const selectedSpu = catalog.spus.find(item => item.spuRef === spuRef)
-  const selectedSpuSkus = useMemo(() => catalog.skus.filter(sku => sku.spuRef === spuRef), [catalog.skus, spuRef])
-  const matchedSku = selectedSpuSkus.find(sku => selectedSpu?.attrs.every(attr => !attr.required || sku.attrValues[attr.attrKey] === attrValues[attr.attrKey]))
-  const selectedSku = selectedSpuSkus.find(sku => sku.skuRef === (selectedSpu?.attrs.length ? matchedSku?.skuRef : skuRef))
-  const canAdd = spuUnknown || Boolean(selectedSpu && (skuUnknown || selectedSku))
-
-  const resetDraft = () => { setCategoryPathIds([]); setSpuUnknown(false); setSpuRef(undefined); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(false) }
-  const addIntention = () => {
-    if (!canAdd) return
-    const unknown = spuUnknown
-    const key = unknown ? 'UNKNOWN' : `${selectedSpu!.spuRef}|${skuUnknown ? 'UNKNOWN' : selectedSku!.skuRef}`
-    if (intentions.some(item => item.key === key)) return message.warning('该意向课程已经添加')
-    const item: Intention = unknown
-      ? { key, spuUnknown: true, skuUnknown: true, spuName: '未明确课程', skuName: '未明确具体班次/方案', path: '未明确课程' }
-      : { key, spuRef: selectedSpu!.spuRef, skuRef: skuUnknown ? undefined : selectedSku!.skuRef, spuUnknown: false, skuUnknown, spuName: selectedSpu!.spuName, skuName: skuUnknown ? '未明确具体班次/方案' : selectedSku!.skuName, path: selectedSpu!.categoryPath.map(node => node.name).join(' / '), price: skuUnknown ? undefined : selectedSku!.price }
-    setIntentions(current => [...current, item]); setPrimaryKey(current => current || key); resetDraft()
-  }
-  const removeIntention = (key: string) => { setIntentions(current => { const next = current.filter(item => item.key !== key); if (primaryKey === key) setPrimaryKey(next[0]?.key); return next }) }
 
   const uploadProps: UploadProps<LeadAttachment> = {
     accept: '.jpg,.jpeg,.png,.webp', listType: 'picture-card', fileList: files, maxCount: 9,
@@ -128,7 +99,7 @@ export default function LeadSubmissionPage() {
         dispatchMode: values.dispatchMode, specifiedSalesUserId: values.specifiedSalesUserId, idempotencyKey: idempotencyKeyRef.current
       })
       message.success(result.outcome === 'created' ? '客资已提交' : '重复客资已记录为再次激活')
-      form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined); resetDraft(); idempotencyKeyRef.current = crypto.randomUUID()
+      form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined); idempotencyKeyRef.current = crypto.randomUUID()
     } catch (error) { message.error(error instanceof Error ? error.message : '提交失败') }
     finally { submittingRef.current = false; setSubmitting(false) }
   }
@@ -147,20 +118,8 @@ export default function LeadSubmissionPage() {
           <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市" /></Form.Item></Col>
         </Row>
         <Divider /><Title level={5}>意向课程</Title>
-        <Row gutter={[12, 0]} align="bottom">
-          <Col xs={24} md={8}><Form.Item label="课程分类"><Cascader disabled={spuUnknown} value={categoryPathIds} options={categoryOptions} changeOnSelect={false} showSearch onChange={value => { setCategoryPathIds(Array.from(value) as number[]); setSpuRef(undefined); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(false) }} placeholder="请选择课程分类" /></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item label="课程 SPU"><Select disabled={!selectedCategoryId || spuUnknown} value={spuRef} options={spuOptions} onChange={value => { setSpuRef(value); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(false) }} /></Form.Item></Col>
-          <Col xs={24} md={6}><Form.Item><Button block type="primary" disabled={!canAdd} onClick={addIntention}>添加意向课程</Button></Form.Item></Col>
-          <Col xs={24}><Checkbox checked={spuUnknown} onChange={event => { setSpuUnknown(event.target.checked); if (event.target.checked) { setCategoryPathIds([]); setSpuRef(undefined); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(true) } }}>未明确课程</Checkbox></Col>
-          {selectedSpu?.attrs.map(attr => <Col xs={24} md={6} key={attr.attrKey}><Form.Item label={attr.attrName} required={attr.required}><Select disabled={skuUnknown} value={attrValues[attr.attrKey]} options={attr.values.map(value => ({ label: value.label, value: value.value }))} onChange={value => setAttrValues(current => ({ ...current, [attr.attrKey]: value }))} /></Form.Item></Col>)}
-          {selectedSpu && !selectedSpu.attrs.length && <Col xs={24} md={8}><Form.Item label="具体 SKU"><Select disabled={skuUnknown} value={skuRef} options={selectedSpuSkus.map(sku => ({ label: `${sku.skuName}（¥${sku.price}）`, value: sku.skuRef }))} onChange={setSkuRef} /></Form.Item></Col>}
-          {selectedSpu && <Col xs={24} md={8}><Form.Item label="方案状态"><Checkbox checked={skuUnknown} onChange={event => { setSkuUnknown(event.target.checked); if (event.target.checked) { setSkuRef(undefined); setAttrValues({}) } }}>未明确具体班次/方案</Checkbox></Form.Item></Col>}
-        </Row>
-        <Radio.Group value={primaryKey} onChange={event => setPrimaryKey(event.target.value)} className="w-full">
-          <Space direction="vertical" className="w-full">
-            {intentions.map(item => <Card key={item.key} size="small"><div style={{ display: 'flex', justifyContent: 'space-between', gap: 16 }}><div><Radio value={item.key}>主意向</Radio><strong>{item.spuName}</strong><div><Text type="secondary">{item.path} · {item.skuName}</Text></div><div>{item.price == null ? <Tag>价格待确认</Tag> : <Tag color="green">¥{item.price.toFixed(2)}</Tag>}</div></div><Button danger type="text" onClick={() => removeIntention(item.key)}>删除</Button></div></Card>)}
-          </Space>
-        </Radio.Group>
+        <LeadIntendedProductEditor catalog={catalog} value={intentions} primaryKey={primaryKey}
+          onChange={setIntentions} onPrimaryChange={setPrimaryKey}/>
         <Divider /><Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
           <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
@@ -169,7 +128,7 @@ export default function LeadSubmissionPage() {
         </Row>
         <Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
         {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><Select loading={salesState.loading} options={sales} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}
-        <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined); resetDraft() }}>重置</Button><Button type="primary" htmlType="submit" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading}>提交客资</Button></Space></div>
+        <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined) }}>重置</Button><Button type="primary" htmlType="submit" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading}>提交客资</Button></Space></div>
       </Form>
     </Spin></Card>
   </section>

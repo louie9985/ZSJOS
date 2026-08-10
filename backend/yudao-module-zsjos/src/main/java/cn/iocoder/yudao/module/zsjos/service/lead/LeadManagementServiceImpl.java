@@ -12,13 +12,16 @@ import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import lombok.Data;
@@ -43,6 +46,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_O
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_SUBMITTER;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_SUBMITTED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 
 @Service
 public class LeadManagementServiceImpl implements LeadManagementService {
@@ -65,6 +69,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private LeadInboxFilterConfigService inboxFilterConfigService;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private DeptApi deptApi;
+    @Resource private OpportunityMapper opportunityMapper;
+    @Resource private LeadBasicInfoService leadBasicInfoService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -121,6 +127,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<LeadIntendedProductDO> products = intendedProductMapper.selectListByLeadId(id);
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
         return convert(lead, userId, users, products, attachments, resolveAttachmentUrls(attachments), true);
+    }
+
+    @Override
+    public void updateBasicInfo(Long id, Long userId, LeadBasicInfoUpdateReqVO reqVO) {
+        leadBasicInfoService.update(id, userId, reqVO);
     }
 
     @Override
@@ -204,13 +215,51 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setRelationTypes(relationTypes);
         result.setPrimaryProduct(products.stream().filter(item -> Boolean.TRUE.equals(item.getIsPrimary()))
                 .findFirst().map(this::convertProduct).orElse(null));
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+        result.setQualificationStatus(LeadStateProjection.qualification(lead));
+        result.setFollowUpStatus(LeadStateProjection.followUp(lead, opportunity));
+        result.setOperationalStatus(LeadStateProjection.operational(lead));
         if (detail) {
             result.setIntendedProducts(products.stream().map(this::convertProduct).toList());
             result.setAttachments(attachments.stream()
                     .map(attachment -> convertAttachment(attachment, attachmentUrls)).toList());
             result.setInvalidEvidence(convertEvidence(lead.getInvalidEvidenceRefs()));
+            if (opportunity != null) {
+                LeadManagementRespVO.OpportunityVO opportunityVO = new LeadManagementRespVO.OpportunityVO();
+                opportunityVO.setId(opportunity.getId()); opportunityVO.setStatus(opportunity.getStatus());
+                opportunityVO.setNextFollowUpAt(opportunity.getNextFollowUpAt()); result.setOpportunity(opportunityVO);
+            }
+            result.setAvailableActions(resolveActions(lead, opportunity, currentUserId));
         }
         return result;
+    }
+
+    private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,
+                                                                Long currentUserId) {
+        if (!Objects.equals(currentUserId, lead.getOwnerUserId())
+                || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return List.of();
+        List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
+        boolean canUpdate = securityFrameworkService.hasPermission("zsjos:lead:update");
+        boolean canFollow = securityFrameworkService.hasPermission("zsjos:lead-follow-up:create");
+        boolean canQualify = securityFrameworkService.hasPermission("zsjos:lead:qualify");
+        if (STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
+            if (canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
+            if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
+            if (lead.getQualificationDeadlineAt() != null && canQualify) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_VALID, true));
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
+            }
+        } else if (STATUS_INVALID.equals(lead.getStatus())) {
+            if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
+        } else if ((STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()))
+                && (opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+                .contains(opportunity.getStatus()))) {
+            if (canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
+            if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
+            if (canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, false));
+        }
+        return actions;
     }
 
     private LeadManagementRespVO.LeadProductVO convertProduct(LeadIntendedProductDO source) {

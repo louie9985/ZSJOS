@@ -58,18 +58,23 @@ export type ManagedLead = {
   id: number; personId: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
   sourceType: string; sourceUserId?: number; sourceUserName?: string; sourceChannel?: string
   provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string; leadCategory?: string
-  remark?: string; status: string; assignmentStatus: string; handlingStage: string; dispatchMode?: string
+  remark?: string; status: string; assignmentStatus: string; handlingStage: string
+  qualificationStatus: 'pending' | 'valid' | 'invalid'
+  followUpStatus?: 'first_follow_pending' | 'following' | 'deal_pending_approval' | 'won'
+  operationalStatus: 'active' | 'suspended'; dispatchMode?: string
   ownerUserId?: number; ownerUserName?: string; pendingAssigneeUserId?: number; pendingAssigneeUserName?: string
   pendingExpiresAt?: Timestamp; assignmentAttemptCount?: number; publicPoolAt?: Timestamp; submittedAt: Timestamp
   currentAssignmentFirstFollowUpAt?: Timestamp; currentAssignmentFirstFollowUpDeadlineAt?: Timestamp
   qualificationStartedAt?: Timestamp; qualificationDeadlineAt?: Timestamp; suspendedAt?: Timestamp
-  qualifiedByUserId?: number; qualifiedByUserName?: string; qualifiedAt?: Timestamp
+  qualifiedByUserId?: number; qualifiedByUserName?: string; qualifiedAt?: Timestamp; validDescription?: string
   convertedAt?: Timestamp; invalidReason?: string; invalidReasonLabelSnapshot?: string; invalidDescription?: string
   invalidEvidence?: LeadAppealEvidence[]
   recycleSourceOwnerUserId?: number; recycleSourceOwnerUserName?: string
   appealDeadlineAt?: Timestamp; closedAt?: Timestamp; closeReason?: string
   createTime: Timestamp; updateTime: Timestamp; relationTypes: Array<'submitter' | 'owner'>
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
+  opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL'; enabled: boolean }>
 }
 export type LeadQualificationException = {
   id: number; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
@@ -91,14 +96,18 @@ export type ManagedLeadPageParams = {
 }
 export type LeadFollowUpImage = { infraFileId: number; originalName: string; contentType: string; fileSize: number; sort: number; url?: string }
 export type LeadFollowUp = {
-  id: number; leadId: number; assignmentHistoryId: number; operatorUserId: number; operatorName?: string
+  id: number; leadId: number; assignmentHistoryId?: number; opportunityId?: number; recordScope: 'lead' | 'opportunity'; operatorUserId: number; operatorName?: string
   occurredAt: Timestamp; firstInAssignment: boolean; method: string; methodLabel: string; result: string; resultLabel: string
-  categoryBefore: string; categoryBeforeLabel: string; categoryAfter: string; categoryAfterLabel: string
+  categoryBefore?: string; categoryBeforeLabel?: string; categoryAfter?: string; categoryAfterLabel?: string
   remark?: string; nextFollowUpAt?: Timestamp; images: LeadFollowUpImage[]
 }
 export type LeadFollowUpCreateRequest = {
-  method: string; result: string; leadCategory: string; remark?: string; nextFollowUpAt?: Timestamp
+  method: string; result: string; leadCategory?: string; remark?: string; nextFollowUpAt?: Timestamp
   images: Array<{ infraFileId: number }>; idempotencyKey: string
+}
+export type LeadBasicInfoUpdateRequest = {
+  name: string; mobile?: string; wechatId?: string; provinceCode: string; cityCode: string; leadCategory?: string
+  intendedProducts: LeadCreateRequest['intendedProducts']; reason: string
 }
 export type LeadAppealEvidence = { infraFileId: number; fileUrl?: string; originalName: string; contentType: string; fileSize: number; sort?: number }
 export type LeadAppeal = {
@@ -277,14 +286,16 @@ export const api = {
     unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/page`, { params })),
   managedLead: async (id: number) => unwrap<ManagedLead>(await http.get('/zsjos/lead/get', { params: { id } })),
   managedLeadStatusCounts: async () => unwrap<Record<string, number>>(await http.get('/zsjos/lead/status-counts')),
-  judgeLeadValid: async (id: number, idempotencyKey: string) =>
-    unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-valid`, { idempotencyKey })),
+  judgeLeadValid: async (id: number, data: { leadCategory?: string; remark: string; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-valid`, data)),
   judgeLeadInvalid: async (id: number, data: { reasonCode: string; description: string; attachments: Array<{ infraFileId: number }>; idempotencyKey: string }) =>
     unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-invalid`, data)),
   uploadLeadQualificationImage: async (file: File) => {
     const data = new FormData(); data.append('file', file)
     return unwrap<LeadAttachment>(await http.post('/zsjos/lead/qualification/attachment/upload', data))
   },
+  updateLeadBasicInfo: async (id: number, data: LeadBasicInfoUpdateRequest) =>
+    unwrap<boolean>(await http.put(`/zsjos/lead/${id}/basic-info`, data)),
   qualificationExceptionPage: async (type: 'suspended' | 'recycle_pending', params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<LeadQualificationException>>(await http.get('/zsjos/lead/qualification-exception/page', { params: { type, ...params } })),
   leadTransferCandidates: async (id: number) =>

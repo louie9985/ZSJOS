@@ -50,6 +50,13 @@ rebel.xml
 
 application-my.yaml
 
+# Production deployment secrets and local database backups
+/deploy/production/.env
+/deploy/production/.env.*
+!/deploy/production/.env.example
+/deploy/production/secrets/
+/backups/
+
 /yudao-ui-app/unpackage/
 .DS_Store
 **/.DS_Store

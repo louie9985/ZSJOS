@@ -1,0 +1,37 @@
+name: Database migrations
+
+on:
+  pull_request:
+    paths:
+      - "script/sql/mysql/**"
+      - "deploy/production/**"
+      - "zsjos-db"
+      - "zsjos-db.ps1"
+      - ".github/workflows/database-migrations.yml"
+  workflow_dispatch:
+
+jobs:
+  mysql:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.7"
+      - name: Static migration checks
+        run: python script/sql/mysql/tools/zsjos_db.py check
+      - name: Fresh database test
+        run: python script/sql/mysql/tools/zsjos_db.py test-fresh
+      - name: Upgrade and repeatability test
+        run: python script/sql/mysql/tools/zsjos_db.py test-upgrade
+      - name: Drift and checksum guardrails
+        run: python script/sql/mysql/tools/zsjos_db.py test-guardrails
+      - name: Validate production Compose
+        run: |
+          mkdir -p deploy/production/secrets
+          printf '%s' 'ci-root-password-00000001' > deploy/production/secrets/mysql-root-password
+          printf '%s' 'ci-migration-password-0001' > deploy/production/secrets/mysql-migration-password
+          printf '%s' 'ci-application-password-0001' > deploy/production/secrets/mysql-app-password
+          cp deploy/production/.env.example deploy/production/.env
+          docker compose --env-file deploy/production/.env -f deploy/production/compose.database.yml config --quiet

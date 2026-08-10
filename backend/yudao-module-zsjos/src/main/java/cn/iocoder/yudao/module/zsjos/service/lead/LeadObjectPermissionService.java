@@ -43,11 +43,15 @@ public class LeadObjectPermissionService {
             case "pending-read", "accept", "reject" -> ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
                     && Objects.equals(userId, lead.getPendingAssigneeUserId());
             case "owner-read" -> Objects.equals(userId, lead.getOwnerUserId());
-            case "follow-up-create" -> ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                    && STATUS_SUBMITTED.equals(lead.getStatus())
-                    && Objects.equals(userId, lead.getOwnerUserId());
-            case "qualify" -> ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                    && Objects.equals(userId, lead.getOwnerUserId());
+            case "follow-up-create" -> Objects.equals(userId, lead.getOwnerUserId())
+                    && (STATUS_INVALID.equals(lead.getStatus())
+                    || STATUS_VALID.equals(lead.getStatus())
+                    || "converted".equals(lead.getStatus())
+                    || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
+            case "qualify" -> Objects.equals(userId, lead.getOwnerUserId())
+                    && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                    || STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()));
+            case "basic-info-update" -> Objects.equals(userId, lead.getOwnerUserId());
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.
             case "qualification-manage" -> canManageQualificationException(lead, userId);

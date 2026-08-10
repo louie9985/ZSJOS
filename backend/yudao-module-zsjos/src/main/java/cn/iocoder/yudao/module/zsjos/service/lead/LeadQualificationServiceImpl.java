@@ -15,9 +15,12 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAtt
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -43,27 +46,40 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
+    @Resource private OpportunityMapper opportunityMapper;
+    @Resource private LeadIntendedProductMapper intendedProductMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualify")
-    public void judgeValid(Long leadId, Long userId, LeadQualificationCommandReqVO reqVO) {
+    public void judgeValid(Long leadId, Long userId, LeadJudgeValidReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = commandKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_QUALIFIED_VALID)) return;
         requireQualificationPending(lead, userId);
+        String category = normalizeCategory(reqVO.getLeadCategory());
         LocalDateTime now = LocalDateTime.now();
-        lead.setStatus(STATUS_VALID);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setPersonId(lead.getPersonId()); opportunity.setType(OPPORTUNITY_TYPE_INITIAL_CONVERSION);
+        opportunity.setLeadId(leadId); opportunity.setStatus(OPPORTUNITY_STATUS_OPEN);
+        opportunity.setOwnerUserId(userId); opportunity.setExpectedProductSummary(
+                LeadBasicInfoService.productSummary(intendedProductMapper.selectListByLeadId(leadId)));
+        opportunity.setVersion(0); opportunityMapper.insert(opportunity);
+        lead.setStatus("converted"); lead.setAssignmentStatus(ASSIGNMENT_CLOSED);
         lead.setQualifiedByUserId(userId);
         lead.setQualifiedAt(now);
+        lead.setConvertedAt(now);
+        lead.setLeadCategory(category);
+        lead.setValidDescription(reqVO.getRemark().trim());
         lead.setInvalidReason(null);
         lead.setInvalidReasonLabelSnapshot(null);
         lead.setInvalidDescription(null);
         lead.setInvalidEvidenceRefs(null);
         leadMapper.updateById(lead);
         lifecycleTaskService.completeQualificationTask(leadId, lead.getQualificationRoundNo(), now);
-        addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, STATUS_VALID,
-                null, key, Map.of("roundNo", lead.getQualificationRoundNo()));
+        addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, "converted",
+                reqVO.getRemark().trim(), key, Map.of("roundNo", lead.getQualificationRoundNo(),
+                        "opportunityId", opportunity.getId()));
     }
 
     @Override
@@ -73,7 +89,12 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = commandKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_QUALIFIED_INVALID)) return;
-        requireQualificationPending(lead, userId);
+        boolean converted = "converted".equals(lead.getStatus()) || STATUS_VALID.equals(lead.getStatus());
+        if (converted) {
+            if (!Objects.equals(userId, lead.getOwnerUserId())) throw exception(LEAD_QUALIFICATION_STATE_INVALID);
+        } else {
+            requireQualificationPending(lead, userId);
+        }
         DictDataRespDTO reason = dictDataApi.getDictDataList(DICT_INVALID_REASON).stream()
                 .filter(item -> Objects.equals(item.getValue(), reqVO.getReasonCode()))
                 .filter(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()))
@@ -86,9 +107,19 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setInvalidReasonLabelSnapshot(reason.getLabel());
         lead.setInvalidDescription(reqVO.getDescription().trim());
         lead.setInvalidEvidenceRefs(buildEvidenceJson(reqVO.getAttachments(), userId));
+        lead.setValidDescription(null);
         leadMapper.updateById(lead);
-        lifecycleTaskService.completeQualificationTask(leadId, lead.getQualificationRoundNo(), now);
-        addEvent(EVENT_LEAD_QUALIFIED_INVALID, lead, userId, STATUS_SUBMITTED, STATUS_INVALID,
+        if (converted) {
+            OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+            if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+                    .contains(opportunity.getStatus())) throw exception(LEAD_QUALIFICATION_STATE_INVALID);
+            opportunity.setStatus(OPPORTUNITY_STATUS_LOST); opportunity.setLostAt(now);
+            opportunity.setLostReason(reason.getLabel() + "：" + reqVO.getDescription().trim());
+            opportunityMapper.updateById(opportunity);
+        } else {
+            lifecycleTaskService.completeQualificationTask(leadId, lead.getQualificationRoundNo(), now);
+        }
+        addEvent(EVENT_LEAD_QUALIFIED_INVALID, lead, userId, converted ? "converted" : STATUS_SUBMITTED, STATUS_INVALID,
                 reqVO.getDescription().trim(), key,
                 Map.of("roundNo", lead.getQualificationRoundNo(), "reasonCode", reason.getValue(),
                         "reasonLabel", reason.getLabel()));
@@ -285,6 +316,16 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 || lead.getQualificationDeadlineAt() == null || !Objects.equals(userId, lead.getOwnerUserId())) {
             throw exception(LEAD_QUALIFICATION_STATE_INVALID);
         }
+    }
+
+    private String normalizeCategory(String value) {
+        if (value == null || value.isBlank()) return null;
+        String normalized = value.trim();
+        DictDataRespDTO category = dictDataApi.getDictDataList(DICT_CATEGORY).stream()
+                .filter(item -> Objects.equals(item.getValue(), normalized))
+                .filter(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()))
+                .findFirst().orElseThrow(() -> exception(LEAD_FOLLOW_UP_DICT_INVALID));
+        return category.getValue();
     }
 
     private LeadDO requireLeadForUpdate(Long leadId) {

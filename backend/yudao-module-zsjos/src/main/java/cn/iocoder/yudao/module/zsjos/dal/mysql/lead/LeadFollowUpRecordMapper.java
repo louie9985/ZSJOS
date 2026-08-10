@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO;
 import org.apache.ibatis.annotations.Mapper;
+import java.util.List;
 
 @Mapper
 public interface LeadFollowUpRecordMapper extends BaseMapperX<LeadFollowUpRecordDO> {
@@ -23,5 +24,12 @@ public interface LeadFollowUpRecordMapper extends BaseMapperX<LeadFollowUpRecord
                         .eq(LeadFollowUpRecordDO::getLeadId, leadId)
                         .orderByDesc(LeadFollowUpRecordDO::getOccurredAt)
                         .orderByDesc(LeadFollowUpRecordDO::getId));
+    }
+
+    default List<LeadFollowUpRecordDO> selectListByLeadId(Long leadId) {
+        return selectList(new LambdaQueryWrapperX<LeadFollowUpRecordDO>()
+                .eq(LeadFollowUpRecordDO::getLeadId, leadId)
+                .orderByDesc(LeadFollowUpRecordDO::getOccurredAt)
+                .orderByDesc(LeadFollowUpRecordDO::getId));
     }
 }

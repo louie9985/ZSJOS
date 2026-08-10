@@ -1,0 +1,86 @@
+name: ${COMPOSE_PROJECT_NAME:-zsjos}
+
+services:
+  mysql:
+    image: ${MYSQL_IMAGE:-mysql:8}
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_DATABASE: ${ZSJOS_DB_NAME:-zsjos}
+      MYSQL_ROOT_PASSWORD_FILE: /run/secrets/mysql-root-password
+      ZSJOS_DB_MIGRATION_USER: ${ZSJOS_DB_MIGRATION_USER:-zsjos_migrator}
+      ZSJOS_DB_APP_USER: ${ZSJOS_DB_APP_USER:-zsjos_app}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --explicit-defaults-for-timestamp=true
+      - --default-time-zone=+08:00
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./mysql/01-create-users.sh:/docker-entrypoint-initdb.d/01-create-users.sh:ro
+    secrets:
+      - mysql-root-password
+      - mysql-migration-password
+      - mysql-app-password
+    healthcheck:
+      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -uroot --password=$$(cat /run/secrets/mysql-root-password) --batch --skip-column-names --execute 'SELECT 1' $${MYSQL_DATABASE} >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    networks: [database]
+
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [database]
+
+  db-migrator:
+    profiles: [tools]
+    image: ${ZSJOS_DB_MIGRATOR_IMAGE:-zsjos-db-migrator:local}
+    build:
+      context: ../..
+      dockerfile: deploy/production/db-migrator/Dockerfile
+    environment:
+      TZ: Asia/Shanghai
+      ZSJOS_DB_HOST: mysql
+      ZSJOS_DB_PORT: 3306
+      ZSJOS_DB_NAME: ${ZSJOS_DB_NAME:-zsjos}
+      ZSJOS_DB_MIGRATION_USER: ${ZSJOS_DB_MIGRATION_USER:-zsjos_migrator}
+      ZSJOS_DB_PASSWORD_FILE: /run/secrets/mysql-migration-password
+      ZSJOS_DB_RELEASE_VERSION: ${ZSJOS_DB_RELEASE_VERSION:-development}
+      ZSJOS_DB_MODULES: ${ZSJOS_DB_MODULES:-core}
+      ZSJOS_DB_BACKUP_DIR: /backups
+    volumes:
+      - mysql-backups:/backups
+    secrets:
+      - mysql-migration-password
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks: [database]
+
+volumes:
+  mysql-data:
+  mysql-backups:
+  redis-data:
+
+networks:
+  database:
+    internal: true
+
+secrets:
+  mysql-root-password:
+    file: ${MYSQL_ROOT_PASSWORD_FILE:-./secrets/mysql-root-password}
+  mysql-migration-password:
+    file: ${MYSQL_MIGRATION_PASSWORD_FILE:-./secrets/mysql-migration-password}
+  mysql-app-password:
+    file: ${MYSQL_APP_PASSWORD_FILE:-./secrets/mysql-app-password}

@@ -28,11 +28,12 @@ export function tryStartLeadPageRequest(
 }
 
 export function canJudgeLeadQualification(
-  lead: Pick<import('./api').ManagedLead, 'handlingStage'>,
+  lead: Pick<import('./api').ManagedLead, 'qualificationStatus' | 'followUpStatus' | 'operationalStatus'>,
   audience: 'submitter' | 'owner',
   hasPermission: boolean
 ): boolean {
-  return audience === 'owner' && hasPermission && lead.handlingStage === 'qualification_pending'
+  return audience === 'owner' && hasPermission && lead.qualificationStatus === 'pending'
+    && lead.followUpStatus === 'following' && lead.operationalStatus === 'active'
 }
 
 export function applyInvalidRemarkTemplate(_currentRemark: string, templateLabel: string): string {

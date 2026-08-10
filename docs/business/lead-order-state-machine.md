@@ -354,7 +354,9 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 派单时为当前候选销售创建 `lead_assignment_accept` 任务；接受时完成，拒绝、超时、转派或进入抢单池时取消。销售通过接单、抢单或管理员转派取得归属时，在同一事务内创建 `lead_first_follow_up` 任务。首次跟进任务按对应分配历史编号幂等，payload 固化跟进规则版本和归属开始时间；本阶段逾期只形成任务逾期事实，不自动回收客资。
 
-客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；首次记录完成当前归属周期的 `lead_first_follow_up`，并创建 `lead_qualification` 任务。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。判定有效只开放后续转化入口，不自动创建 Opportunity 或订单。
+客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；首次记录完成当前归属周期的 `lead_first_follow_up`，并创建 `lead_qualification` 任务。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
+
+判定有效在同一事务内完成判定任务、保存必填有效备注、创建唯一 `initial_conversion` Opportunity，并将 Lead 改为 `converted + closed`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时把未结束 Opportunity 改为 `lost`。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
 
 ### 7.13 业务事件 `BusinessEvent`
 
@@ -500,15 +502,15 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | 提交已有客资 | 无 | 不创建新 Lead | 任一标识命中同一 Person；创建 LeadActivation 并按当前关系发送激活通知 |
 | 提交身份冲突 | 无 | 校验失败 | 手机号和微信号指向不同 Person；不创建任何 Person、Lead 或 LeadActivation |
 | 首次跟进 | `submitted + owned` | 主状态不变 | 完成首跟任务并创建判定任务；迟到首跟仍允许提交 |
-| 判定有效 | `submitted + owned + 待判定` | `valid` | 完成判定任务并开放转化入口，不自动创建 Opportunity 或订单 |
-| 判定无效 | `submitted + owned + 待判定` | `invalid` | 原因字典值与说明均必填；保留销售归属但销售只读 |
+| 判定有效 | `submitted + owned + 待判定` | `converted + closed` | 完成判定任务，保存有效备注并原子创建唯一 `initial_conversion` Opportunity；不创建订单 |
+| 判定无效 | `submitted + owned + 待判定` / `converted` | `invalid` | 原因字典值与说明均必填；有效后判无效还会把 Opportunity 改为 `lost`，并保留销售归属和证据跟进入口 |
 | 判定超时扫描 | `submitted + owned + 判定截止已到` | `suspended + owned` | 行锁下重新校验；扫描提交前仍允许人工判定 |
 | 恢复原销售 | `suspended + owned` | `submitted + owned` | 校验原销售仍启用，跳过新首跟并创建新判定轮次 |
 | 转派 | `suspended + owned` / `recycle_pending` | `submitted + owned` | 新销售直接进入待判定并重新计时；挂起转派不得选择原销售 |
 | 回收 | `suspended + owned` | `submitted + recycle_pending` | 清除当前销售并保留回收来源销售 |
 | 释放到抢单池 | `suspended + owned` / `recycle_pending` | `submitted + public_pool` | 被抢后重新进入待首跟 |
-| 申诉改判 | `invalid` | `valid` | 结束申诉并记录改判事件 |
-| 创建首次销售转化机会 | `valid` | `converted` | 原子创建唯一 `initial_conversion` Opportunity，分配状态改为 `closed` |
+| 申诉改判 | `invalid` | `converted + closed` | 结束申诉，原子创建唯一 `initial_conversion` Opportunity，并以裁决理由保存有效备注 |
+| 创建首次销售转化机会 | `submitted + owned + 待判定` | `converted` | 与判有效合并为同一事务，分配状态改为 `closed` |
 | 关闭 | `invalid` / `valid` | `closed` | 记录关闭原因，分配状态改为 `closed` |
 
 一般派单、接单、拒单、公海释放和认领只改变 `assignment_status`、负责人和分配历史。判定超时挂起是新增例外：扫描把 `Lead.status` 从 `submitted` 改为 `suspended`；恢复、转派、回收或释放再将主状态恢复为 `submitted`。无效申诉由 `LeadAppeal.status` 表达，不增加 `Lead.status.appealing`。
@@ -675,7 +677,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 - 跟进提醒：机会 `next_follow_up_at` 到期且机会未结束。
 - 逾期：任务 `due_at < 当前时间` 且任务状态不是 `completed`、`cancelled`。
 
-客资页面使用后端统一投影的 `handlingStage` 展示待接单、待首跟、待判定、挂起与回收待处理，前端不得依据字段组合自行推断。该字段只读且不反向驱动业务。其他页面可以计算醒目标签，但必须同时允许查看各对象真实状态。
+客资页面使用后端正交投影展示有效状态、跟进状态、分配状态和挂起控制状态，并使用 `availableActions` 决定头部写操作。前端不得依据字段组合自行推断阶段或按钮。`availableActions` 仅向当前负责人投影：首次跟进前为修改基础信息、跟进；首次跟进后增加判有效、判无效；已判有效且跟进中的客资为修改基础信息、跟进、判无效和禁用的录入成交；无效后仅保留跟进；其他状态和查看者为空。该投影只读且不反向驱动业务。
 
 ### 11.1 客资收件箱筛选投影
 
@@ -695,7 +697,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 | `invalid` | 无效客资 | `lead.status = invalid` |
 | `closed` | 已关闭客资 | `lead.status = closed` |
 
-提交人默认可以继续按 `assignment_status` 筛选待分配、待接单、抢单池、回收待处理和已归属；负责人默认显示归属自己的客资，并使用服务端 `handlingStage` 区分待首跟、待判定与挂起。有效客资可按 `valid` 与 `converted` 区分已判有效和已进入销售转化。申诉中、暂缓成交、成交审核和已成交等尚未实现的选项不得以零计数静态选项或前端推断提前暴露。
+提交人默认可以继续按 `assignment_status` 筛选待分配、待接单、抢单池、回收待处理和已归属；负责人默认显示归属自己的客资，并使用服务端正交状态区分有效性、跟进和挂起。新判有效或申诉改判均创建唯一 `initial_conversion` Opportunity；V019 负责补齐历史 `valid` 客资。成交审核和已成交仅作为预留跟进状态，由未来订单/BPM投影驱动；本期不提供暂缓成交入口。
 
 ## 12. 完整场景
 

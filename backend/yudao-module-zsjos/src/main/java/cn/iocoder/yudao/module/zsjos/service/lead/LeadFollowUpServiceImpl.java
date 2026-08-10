@@ -17,10 +17,16 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpImageDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRecordDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityFollowUpRecordDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityFollowUpImageDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpImageMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpImageMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +53,9 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
+    @Resource private OpportunityMapper opportunityMapper;
+    @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
+    @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -54,10 +63,10 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         LocalDateTime occurredAt = LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                || !STATUS_SUBMITTED.equals(lead.getStatus())
-                || !Objects.equals(operatorUserId, lead.getOwnerUserId())
-                || lead.getCurrentAssignmentHistoryId() == null) {
+        if (!Objects.equals(operatorUserId, lead.getOwnerUserId())) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
+        if (!canFollow(lead)) {
             throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         }
         LeadFollowUpRecordDO existing = recordMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
@@ -68,6 +77,13 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             return convert(existing, imageMapper.selectListByRecordIds(List.of(existing.getId())),
                     adminUserApi.getUserMap(List.of(existing.getOperatorUserId())), null);
         }
+        OpportunityFollowUpRecordDO existingOpportunity = opportunityRecordMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
+        if (existingOpportunity != null) {
+            if (!Objects.equals(existingOpportunity.getLeadId(), leadId)) throw exception(LEAD_FOLLOW_UP_IDEMPOTENCY_CONFLICT);
+            return convertOpportunity(existingOpportunity,
+                    opportunityImageMapper.selectListByRecordIds(List.of(existingOpportunity.getId())),
+                    adminUserApi.getUserMap(List.of(existingOpportunity.getOperatorUserId())), null);
+        }
         if (reqVO.getNextFollowUpAt() != null && !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
             throw exception(LEAD_FOLLOW_UP_TIME_INVALID);
         }
@@ -75,10 +91,17 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         DictDataRespDTO method = requireEnabledDict(DICT_FOLLOW_UP_METHOD, reqVO.getMethod());
         DictDataRespDTO result = requireEnabledDict(DICT_FOLLOW_UP_RESULT, reqVO.getResult());
         DictDataRespDTO beforeCategory = findDict(DICT_CATEGORY, lead.getLeadCategory());
-        DictDataRespDTO afterCategory = Objects.equals(lead.getLeadCategory(), reqVO.getLeadCategory())
-                ? beforeCategory : requireEnabledDict(DICT_CATEGORY, reqVO.getLeadCategory());
+        String categoryAfter = reqVO.getLeadCategory() == null || reqVO.getLeadCategory().isBlank()
+                ? null : reqVO.getLeadCategory().trim();
+        DictDataRespDTO afterCategory = Objects.equals(lead.getLeadCategory(), categoryAfter)
+                ? beforeCategory : categoryAfter == null ? null : requireEnabledDict(DICT_CATEGORY, categoryAfter);
         AdminUserRespDTO operator = adminUserApi.getUser(operatorUserId);
         Map<Long, FileInfoRespDTO> files = attachmentService.validateReferences(reqVO.getImages(), operatorUserId);
+
+            if ("converted".equals(lead.getStatus()) || STATUS_VALID.equals(lead.getStatus())) {
+            return createOpportunityFollowUp(lead, operatorUserId, reqVO, occurredAt, method, result,
+                    beforeCategory, afterCategory, categoryAfter, operator, files);
+        }
 
         LeadFollowUpRecordDO record = new LeadFollowUpRecordDO();
         record.setLeadId(leadId);
@@ -92,8 +115,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         record.setResultLabelSnapshot(result.getLabel());
         record.setCategoryBefore(lead.getLeadCategory());
         record.setCategoryBeforeLabelSnapshot(labelOf(beforeCategory, lead.getLeadCategory()));
-        record.setCategoryAfter(reqVO.getLeadCategory());
-        record.setCategoryAfterLabelSnapshot(labelOf(afterCategory, reqVO.getLeadCategory()));
+        record.setCategoryAfter(categoryAfter);
+        record.setCategoryAfterLabelSnapshot(labelOf(afterCategory, categoryAfter));
         record.setRemark(reqVO.getRemark());
         record.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         record.setOccurredAt(occurredAt);
@@ -113,17 +136,18 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             imageMapper.insert(image);
         }
 
-        if (!Objects.equals(lead.getLeadCategory(), reqVO.getLeadCategory())) {
+        if (!Objects.equals(lead.getLeadCategory(), categoryAfter)) {
             BusinessEventDO categoryEvent = addEvent(EVENT_LEAD_CATEGORY_CHANGED, lead, operatorUserId, record.getId(), occurredAt,
-                    lead.getLeadCategory(), reqVO.getLeadCategory());
+                    lead.getLeadCategory(), categoryAfter);
             Map<String, Object> categoryContext = eventContext(lead, operatorUserId);
             categoryContext.put("category.before", record.getCategoryBeforeLabelSnapshot());
             categoryContext.put("category.after", record.getCategoryAfterLabelSnapshot());
             notifyEventPublisher.publish(CATEGORY_CHANGED, leadId, categoryEvent.getIdempotencyKey(), operatorUserId,
                     occurredAt, categoryContext);
-            lead.setLeadCategory(reqVO.getLeadCategory());
+            lead.setLeadCategory(categoryAfter);
         }
-        boolean first = lifecycleTaskService.completeFirstFollowUpTask(
+        boolean invalid = STATUS_INVALID.equals(lead.getStatus());
+        boolean first = !invalid && lifecycleTaskService.completeFirstFollowUpTask(
                 lead.getCurrentAssignmentHistoryId(), occurredAt);
         if (first) {
             record.setFirstInAssignment(true);
@@ -131,7 +155,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
             lifecycleTaskService.createQualificationTask(lead, operatorUserId, occurredAt);
         }
-        lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId, record.getId(),
+        if (!invalid) lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         lead.setLastFollowUpAt(occurredAt);
         lead.setLastFollowUpRecordId(record.getId());
@@ -148,23 +172,86 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         notifyEventPublisher.publish(FOLLOW_UP_RECORDED, leadId, followUpEvent.getIdempotencyKey(), operatorUserId,
                 occurredAt, followUpContext);
         return convert(record, imageMapper.selectListByRecordIds(List.of(record.getId())),
-                Map.of(operatorUserId, operator), null);
+                operator == null ? Map.of() : Map.of(operatorUserId, operator), null);
     }
 
     @Override
     public PageResult<LeadFollowUpRespVO> getPage(Long leadId, int pageNo, int pageSize) {
-        PageResult<LeadFollowUpRecordDO> page = recordMapper.selectPageByLeadId(leadId, pageNo, pageSize);
-        List<Long> recordIds = page.getList().stream().map(LeadFollowUpRecordDO::getId).toList();
-        List<LeadFollowUpImageDO> images = imageMapper.selectListByRecordIds(recordIds);
-        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(page.getList().stream()
-                .map(LeadFollowUpRecordDO::getOperatorUserId).collect(Collectors.toSet()));
-        List<Long> fileIds = images.stream().map(LeadFollowUpImageDO::getInfraFileId).distinct().toList();
+        List<LeadFollowUpRecordDO> leadRecords = recordMapper.selectListByLeadId(leadId);
+        List<OpportunityFollowUpRecordDO> opportunityRecords = opportunityRecordMapper.selectListByLeadId(leadId);
+        List<LeadFollowUpImageDO> leadImages = imageMapper.selectListByRecordIds(
+                leadRecords.stream().map(LeadFollowUpRecordDO::getId).toList());
+        List<OpportunityFollowUpImageDO> opportunityImages = opportunityImageMapper.selectListByRecordIds(
+                opportunityRecords.stream().map(OpportunityFollowUpRecordDO::getId).toList());
+        Set<Long> userIds = new HashSet<>();
+        leadRecords.forEach(x -> userIds.add(x.getOperatorUserId()));
+        opportunityRecords.forEach(x -> userIds.add(x.getOperatorUserId()));
+        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(userIds);
+        List<Long> fileIds = new ArrayList<>();
+        leadImages.forEach(x -> fileIds.add(x.getInfraFileId()));
+        opportunityImages.forEach(x -> fileIds.add(x.getInfraFileId()));
         Map<Long, String> urls = fileIds.isEmpty() ? Map.of()
-                : fileApi.presignGetUrls(fileIds, ATTACHMENT_URL_EXPIRATION_SECONDS);
-        Map<Long, List<LeadFollowUpImageDO>> imagesByRecord = images.stream()
+                : fileApi.presignGetUrls(fileIds.stream().distinct().toList(), ATTACHMENT_URL_EXPIRATION_SECONDS);
+        Map<Long, List<LeadFollowUpImageDO>> leadImagesByRecord = leadImages.stream()
                 .collect(Collectors.groupingBy(LeadFollowUpImageDO::getFollowUpRecordId));
-        return new PageResult<>(page.getList().stream().map(record -> convert(record,
-                imagesByRecord.getOrDefault(record.getId(), List.of()), users, urls)).toList(), page.getTotal());
+        Map<Long, List<OpportunityFollowUpImageDO>> opportunityImagesByRecord = opportunityImages.stream()
+                .collect(Collectors.groupingBy(OpportunityFollowUpImageDO::getFollowUpRecordId));
+        List<LeadFollowUpRespVO> merged = new ArrayList<>();
+        leadRecords.forEach(record -> merged.add(convert(record,
+                leadImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls)));
+        opportunityRecords.forEach(record -> merged.add(convertOpportunity(record,
+                opportunityImagesByRecord.getOrDefault(record.getId(), List.of()), users, urls)));
+        merged.sort(Comparator.comparing(LeadFollowUpRespVO::getOccurredAt).reversed()
+                .thenComparing(LeadFollowUpRespVO::getId, Comparator.reverseOrder()));
+        int from = Math.min((pageNo - 1) * pageSize, merged.size());
+        int to = Math.min(from + pageSize, merged.size());
+        return new PageResult<>(merged.subList(from, to), (long) merged.size());
+    }
+
+    private boolean canFollow(LeadDO lead) {
+        return STATUS_INVALID.equals(lead.getStatus())
+                  || "converted".equals(lead.getStatus())
+                  || STATUS_VALID.equals(lead.getStatus())
+                || STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                && lead.getCurrentAssignmentHistoryId() != null;
+    }
+
+    private LeadFollowUpRespVO createOpportunityFollowUp(LeadDO lead, Long operatorUserId,
+            LeadFollowUpCreateReqVO reqVO, LocalDateTime occurredAt, DictDataRespDTO method,
+            DictDataRespDTO result, DictDataRespDTO beforeCategory, DictDataRespDTO afterCategory,
+            String categoryAfter, AdminUserRespDTO operator, Map<Long, FileInfoRespDTO> files) {
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+        if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+                .contains(opportunity.getStatus())) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
+        OpportunityFollowUpRecordDO record = new OpportunityFollowUpRecordDO();
+        record.setOpportunityId(opportunity.getId()); record.setLeadId(lead.getId());
+        record.setOperatorUserId(operatorUserId); record.setOwnerUserIdSnapshot(lead.getOwnerUserId());
+        record.setOwnerDeptIdSnapshot(operator == null ? null : operator.getDeptId());
+        record.setMethodValue(method.getValue()); record.setMethodLabelSnapshot(method.getLabel());
+        record.setResultValue(result.getValue()); record.setResultLabelSnapshot(result.getLabel());
+        record.setCategoryBefore(lead.getLeadCategory());
+        record.setCategoryBeforeLabelSnapshot(labelOf(beforeCategory, lead.getLeadCategory()));
+        record.setCategoryAfter(categoryAfter); record.setCategoryAfterLabelSnapshot(labelOf(afterCategory, categoryAfter));
+        record.setRemark(reqVO.getRemark()); record.setNextFollowUpAt(reqVO.getNextFollowUpAt());
+        record.setOccurredAt(occurredAt); record.setIdempotencyKey(reqVO.getIdempotencyKey());
+        opportunityRecordMapper.insert(record);
+        for (int i = 0; i < reqVO.getImages().size(); i++) {
+            FileInfoRespDTO file = files.get(reqVO.getImages().get(i).getInfraFileId());
+            OpportunityFollowUpImageDO image = new OpportunityFollowUpImageDO();
+            image.setFollowUpRecordId(record.getId()); image.setInfraFileId(file.getId());
+            image.setOriginalName(file.getName()); image.setContentType(file.getType());
+            image.setFileSize(file.getSize()); image.setSort(i); opportunityImageMapper.insert(image);
+        }
+        lead.setLeadCategory(categoryAfter); lead.setLastFollowUpAt(occurredAt);
+        lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
+        lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
+        leadMapper.updateById(lead);
+        opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        opportunity.setNextFollowUpAt(reqVO.getNextFollowUpAt()); opportunityMapper.updateById(opportunity);
+        lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId, record.getId(),
+                reqVO.getNextFollowUpAt(), occurredAt);
+        return convertOpportunity(record, opportunityImageMapper.selectListByRecordIds(List.of(record.getId())),
+                operator == null ? Map.of() : Map.of(operatorUserId, operator), null);
     }
 
     private DictDataRespDTO requireEnabledDict(String type, String value) {
@@ -216,6 +303,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                                        Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
         result.setId(record.getId()); result.setLeadId(record.getLeadId());
+        result.setRecordScope("lead");
         result.setAssignmentHistoryId(record.getAssignmentHistoryId());
         result.setOperatorUserId(record.getOperatorUserId());
         AdminUserRespDTO user = users.get(record.getOperatorUserId());
@@ -234,6 +322,27 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             item.setContentType(image.getContentType()); item.setFileSize(image.getFileSize());
             item.setSort(image.getSort()); item.setUrl(urls == null ? null : urls.get(image.getInfraFileId()));
             return item;
+        }).toList());
+        return result;
+    }
+
+    private LeadFollowUpRespVO convertOpportunity(OpportunityFollowUpRecordDO record,
+            List<OpportunityFollowUpImageDO> images, Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
+        LeadFollowUpRespVO result = new LeadFollowUpRespVO();
+        result.setId(record.getId()); result.setLeadId(record.getLeadId()); result.setOpportunityId(record.getOpportunityId());
+        result.setRecordScope("opportunity"); result.setOperatorUserId(record.getOperatorUserId());
+        AdminUserRespDTO user = users.get(record.getOperatorUserId());
+        result.setOperatorName(user == null ? null : user.getNickname()); result.setOccurredAt(record.getOccurredAt());
+        result.setFirstInAssignment(false); result.setMethod(record.getMethodValue()); result.setMethodLabel(record.getMethodLabelSnapshot());
+        result.setResult(record.getResultValue()); result.setResultLabel(record.getResultLabelSnapshot());
+        result.setCategoryBefore(record.getCategoryBefore()); result.setCategoryBeforeLabel(record.getCategoryBeforeLabelSnapshot());
+        result.setCategoryAfter(record.getCategoryAfter()); result.setCategoryAfterLabel(record.getCategoryAfterLabelSnapshot());
+        result.setRemark(record.getRemark()); result.setNextFollowUpAt(record.getNextFollowUpAt());
+        result.setImages(images.stream().map(image -> {
+            LeadFollowUpRespVO.ImageVO item = new LeadFollowUpRespVO.ImageVO();
+            item.setInfraFileId(image.getInfraFileId()); item.setOriginalName(image.getOriginalName());
+            item.setContentType(image.getContentType()); item.setFileSize(image.getFileSize()); item.setSort(image.getSort());
+            item.setUrl(urls == null ? null : urls.get(image.getInfraFileId())); return item;
         }).toList());
         return result;
     }

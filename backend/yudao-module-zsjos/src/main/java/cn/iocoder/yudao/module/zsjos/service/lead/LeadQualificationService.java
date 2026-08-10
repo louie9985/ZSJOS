@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.*;
 import java.util.List;
 
 public interface LeadQualificationService {
-    void judgeValid(Long leadId, Long userId, LeadQualificationCommandReqVO reqVO);
+    void judgeValid(Long leadId, Long userId, LeadJudgeValidReqVO reqVO);
     void judgeInvalid(Long leadId, Long userId, LeadJudgeInvalidReqVO reqVO);
     PageResult<LeadQualificationExceptionRespVO> getExceptionPage(LeadQualificationExceptionPageReqVO reqVO,
                                                                   Long userId);

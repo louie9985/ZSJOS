@@ -1,0 +1,28 @@
+{
+  "code": "core",
+  "description": "Enabled ZSJ-OS runtime modules",
+  "dependsOn": [],
+  "schema": "schema/core.sql",
+  "baseline": "00-bootstrap-schema.sql",
+  "migrations": "migrations",
+  "verify": "verify/core.sql",
+  "enabledJavaModules": [
+    "yudao-module-system",
+    "yudao-module-infra",
+    "yudao-module-bpm",
+    "yudao-module-pay",
+    "yudao-module-crm",
+    "yudao-module-ai",
+    "yudao-module-zsjos"
+  ],
+  "ignoredMappedTables": [
+    "yudao_demo01_contact",
+    "yudao_demo02_category",
+    "yudao_demo03_course",
+    "yudao_demo03_grade",
+    "yudao_demo03_student"
+  ],
+  "allowedExtraTables": [
+    "zsjos_schema_version"
+  ]
+}

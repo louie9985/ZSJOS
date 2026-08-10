@@ -4,6 +4,12 @@ Use one immutable, forward-only SQL file per schema change. Each file must be
 repeatable, explain its dependency and rollback limitation, and avoid bulk
 deletion. Record successful versions in `zsjos_schema_version`.
 
+`V020__unified_schema_migration_and_crm_tables.sql` introduces
+`zsjos_module_schema_version`, the version table used by `zsjos-db`. The legacy
+`zsjos_schema_version` remains for compatibility and its existing rows are mapped
+to the Core module. New applied migrations are identified by module, version, and
+SHA-256; editing an applied file blocks the next deployment.
+
 Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds only follow-up configuration and permission metadata; it does not backfill historical leads or create tasks for existing ownership rows. `V007__split_lead_inbox_audiences.sql` hides the mixed workbench route and adds fixed submitter/owner routes without changing lead rows.
 `V008__lead_follow_up_and_today_tasks.sql` adds append-only pre-qualification follow-up records, Lead summary fields and the employee task entry. It backfills only a determinable current assignment-history ID and ends with a read-only verification list for unresolved owned leads; it does not fabricate follow-ups or tasks.
 `V009__online_round_robin_dispatch.sql` adds only the persistent per-sales-user automatic-intake preference used by online Redis round-robin dispatch. It defaults to paused by absence of a row and does not seed sales users or alter lead ownership.

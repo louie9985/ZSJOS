@@ -171,7 +171,7 @@ function toSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
 function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: WorkbenchMenu; permissions: string[]; onOpenAssignment: () => void }) {
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
-  if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner" canQualify={permissions.includes('zsjos:lead:qualify')}/>
+  if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
   if (menu?.path === APP_ROUTES.LEAD_ASSIGNMENT) return <LeadAssignmentPage/>
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>

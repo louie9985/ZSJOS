@@ -40,7 +40,7 @@ public class LeadQualificationController {
     @Operation(summary = "判定客资有效")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:qualify')")
     public CommonResult<Boolean> judgeValid(@PathVariable("id") Long id,
-                                             @Valid @RequestBody LeadQualificationCommandReqVO reqVO) {
+                                             @Valid @RequestBody LeadJudgeValidReqVO reqVO) {
         qualificationService.judgeValid(id, getLoginUserId(), reqVO);
         return success(true);
     }

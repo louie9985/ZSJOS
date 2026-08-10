@@ -1,5 +1,19 @@
 # MySQL initialization
 
+For all new development and production upgrades, use the repository-root
+`zsjos-db` command. It owns module ordering, migration checksums, schema drift,
+backup, migration locking, and verification. Direct execution remains documented
+below only for controlled bootstrap troubleshooting.
+
+```text
+python script/sql/mysql/tools/zsjos_db.py check
+python script/sql/mysql/tools/zsjos_db.py test-fresh
+python script/sql/mysql/tools/zsjos_db.py test-upgrade
+```
+
+Production operators use the immutable migrator image through
+`deploy/production/zsjos-db`; see `docs/operations/database-migrations.md`.
+
 `bootstrap.sql` is the fresh-environment entry point. Run it with the MySQL
 client from the repository root so its `SOURCE` paths resolve:
 

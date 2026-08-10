@@ -211,7 +211,7 @@ otherwise
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询和数量统计只消费已发布版本；保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
 - 管理端只能从后端返回的条件能力白名单选择字段和值，不得提交 SQL、列名或任意表达式。当前白名单只包含客资主状态与分配状态。
 - 收件箱归类是对客资主状态和分配状态的只读投影，不是新的持久化状态。前端只能展示服务端返回的筛选项，不得自行补齐尚未实现的跟进、申诉、机会或订单状态。
-- 客资当前处理阶段由后端 `handlingStage` 统一投影。待首跟、待判定、挂起、回收待处理和待接单不得由 React 或 Vue 根据多个字段自行拼装。
+- 客资状态由后端拆分投影：`qualificationStatus` 表示待判定/已判有效/已判无效，`followUpStatus` 表示待首跟/跟进中/成交待审核/已成交，`assignmentStatus` 表示分配生命周期，`operationalStatus` 表示挂起等控制状态。前端不得根据 `status`、分配字段或机会状态自行拼装按钮和用户状态；写操作只能消费 `availableActions`。
 - Full submitted mobile and WeChat values are returned to an authorized submitter,
   owner, or `query-all` administrator. Frontends must not broaden that authorization.
 - `query-all` is an explicit permission-based bypass for the current tenant; it is

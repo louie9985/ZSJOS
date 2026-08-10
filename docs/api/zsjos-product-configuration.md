@@ -15,7 +15,7 @@ SPU 只能挂在叶子分类；已挂 SPU 的分类不能新增子分类，有�
 
 ## 客资端
 
-- `GET /admin-api/zsjos/lead/product/catalog` 返回 `{ categoryTree, spus, skus }`。分类树可直接作为 Cascader 数据源；SPU 返回 `categoryId/categoryName/categoryPath`，并暂时保留旧两级字段兼容。
+- `GET /admin-api/zsjos/lead/product/catalog` 返回 `{ categoryTree, spus, skus }`。该只读目录同时服务“提交客资”和“修改基础信息”，调用者持有 `zsjos:lead:submit` 或 `zsjos:lead:update` 任一权限即可读取；保存动作仍由各自命令权限和对象权限独立校验。分类树可直接作为 Cascader 数据源；SPU 返回 `categoryId/categoryName/categoryPath`，并暂时保留旧两级字段兼容。
 - `POST /admin-api/zsjos/lead/create` 使用 `intendedProducts` 提交已经点击“添加意向课程”的项目。
 
 请求示例：

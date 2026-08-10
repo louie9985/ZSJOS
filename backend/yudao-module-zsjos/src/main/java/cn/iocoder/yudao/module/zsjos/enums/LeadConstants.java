@@ -9,6 +9,7 @@ public interface LeadConstants {
     String DICT_FOLLOW_UP_QUICK_NOTE = "zsjos_lead_follow_up_quick_note";
     String DICT_INVALID_REASON = "zsjos_lead_invalid_reason";
     String DICT_INVALID_REMARK_TEMPLATE = "zsjos_lead_invalid_remark_template";
+    String DICT_VALID_REMARK_TEMPLATE = "zsjos_lead_valid_remark_template";
     String REGION_OTHER = "OTHER";
 
     String SOURCE_INTERNAL_NEW_MEDIA = "internal_new_media";
@@ -21,6 +22,27 @@ public interface LeadConstants {
     String ASSIGNMENT_OWNED = "owned";
     String ASSIGNMENT_PUBLIC_POOL = "public_pool";
     String ASSIGNMENT_RECYCLE_PENDING = "recycle_pending";
+    String ASSIGNMENT_CLOSED = "closed";
+    String OPPORTUNITY_TYPE_INITIAL_CONVERSION = "initial_conversion";
+    String OPPORTUNITY_STATUS_OPEN = "open";
+    String OPPORTUNITY_STATUS_FOLLOWING = "following";
+    String OPPORTUNITY_STATUS_LOST = "lost";
+    String OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL = "deal_pending_approval";
+    String OPPORTUNITY_STATUS_WON = "won";
+    String QUALIFICATION_PENDING = "pending";
+    String QUALIFICATION_VALID = "valid";
+    String QUALIFICATION_INVALID = "invalid";
+    String FOLLOW_UP_FIRST_PENDING = "first_follow_pending";
+    String FOLLOW_UP_FOLLOWING = "following";
+    String FOLLOW_UP_DEAL_PENDING_APPROVAL = "deal_pending_approval";
+    String FOLLOW_UP_WON = "won";
+    String OPERATIONAL_ACTIVE = "active";
+    String OPERATIONAL_SUSPENDED = "suspended";
+    String ACTION_EDIT_BASIC = "EDIT_BASIC_INFO";
+    String ACTION_ADD_FOLLOW_UP = "ADD_FOLLOW_UP";
+    String ACTION_JUDGE_VALID = "JUDGE_VALID";
+    String ACTION_JUDGE_INVALID = "JUDGE_INVALID";
+    String ACTION_ENTER_DEAL = "ENTER_DEAL";
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";

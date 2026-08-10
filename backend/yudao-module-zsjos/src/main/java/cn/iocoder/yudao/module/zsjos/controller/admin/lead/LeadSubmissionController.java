@@ -38,7 +38,7 @@ public class LeadSubmissionController {
 
     @GetMapping("/product/catalog")
     @Operation(summary = "获得课程 SPU/SKU 目录")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:submit')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:update')")
     public CommonResult<LeadProductCatalogRespVO> getProductCatalog() {
         return success(skuService.getLeadCatalog());
     }

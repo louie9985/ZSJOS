@@ -105,3 +105,12 @@ Verification is proportional to risk, but evidence is mandatory:
 - The initial administrator password may be stored only as a BCrypt hash in SQL. Plaintext passwords, tokens, and personal data MUST NOT be added to `AGENTS.md`, logs, or operational documentation.
 - Local and production must use the same schema baseline and migration order. A read-only verification script and schema-difference check are required before release.
 - Database scripts must document dependencies, execution order, repeatability, rollback limitations, and the exact data scope they seed.
+
+## 8. AI handoff log
+
+- Every completed AI task turn **MUST** append one structured delivery entry to the repository-root `HANDOFF.md` before sending the final response.
+- A task turn means one user request and its final AI response. Commentary updates, tool calls, and intermediate messages **MUST NOT** be recorded as separate entries.
+- Appending an entry to `HANDOFF.md` is the only standing exception to the read-only rule in section 2. For discussion, analysis, diagnosis, inspection, review, or explanation requests, the AI **MUST NOT** modify any other file unless the user separately authorizes implementation.
+- Each entry **MUST** include the Beijing time, user goal, key decisions, execution or analysis result, changed files, verification evidence, and remaining work. Use `None` when a field has no applicable content.
+- Entries **MUST** be appended in chronological order. Existing entries **MUST NOT** be rewritten or deleted; corrections must be recorded in a new entry.
+- Entries **MUST NOT** contain passwords, tokens, personal data, complete sensitive payloads, or unnecessary conversation transcripts.

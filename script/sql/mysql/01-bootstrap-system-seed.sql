@@ -1605,6 +1605,9 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 (6807,'质控处理申诉','zsjos:lead:appeal:review-quality',3,2,6804,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
 (6808,'董事长终审申诉','zsjos:lead:appeal:review-chairman',3,3,6804,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
 
+INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6809,'修改客资基础信息','zsjos:lead:update',3,14,6770,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0');
+
 INSERT IGNORE INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`) VALUES
 (3006,6804,'quick-init',NOW(),'quick-init',NOW(),b'0',1),(3006,6806,'quick-init',NOW(),'quick-init',NOW(),b'0',1),
 (3022,6804,'quick-init',NOW(),'quick-init',NOW(),b'0',1),(3022,6807,'quick-init',NOW(),'quick-init',NOW(),b'0',1),
@@ -1625,6 +1628,10 @@ WHERE NOT EXISTS (SELECT 1 FROM `system_dict_type` WHERE `type`='zsjos_lead_assi
 INSERT INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT '客资无效原因','zsjos_lead_invalid_reason',0,'管理员维护；初始化不提供业务选项','1',NOW(),'1',NOW(),b'0'
 WHERE NOT EXISTS (SELECT 1 FROM `system_dict_type` WHERE `type`='zsjos_lead_invalid_reason' AND `deleted`=b'0');
+
+INSERT INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT '客资有效快捷备注','zsjos_lead_valid_remark_template',0,'管理员维护；初始化不提供业务选项','1',NOW(),'1',NOW(),b'0'
+WHERE NOT EXISTS (SELECT 1 FROM `system_dict_type` WHERE `type`='zsjos_lead_valid_remark_template' AND `deleted`=b'0');
 
 INSERT INTO `system_dict_data` (`sort`,`label`,`value`,`dict_type`,`status`,`color_type`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 SELECT seed.sort,seed.label,seed.value,seed.dict_type,0,seed.color_type,'1',NOW(),'1',NOW(),b'0'
@@ -1864,7 +1871,7 @@ UPDATE system_dept SET leader_user_id=1 WHERE id=1001 AND tenant_id=1;
 
 INSERT IGNORE INTO system_users (id, username, password, nickname, remark, dept_id, post_ids, email, mobile, sex, avatar, status, login_ip, login_date, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (1, 'admin', '$2b$10$mjvXuXyqrpJp0lcpiqvgSuk9F91dslH/jnPWwHaIjb3WguW14X0Ki', 'admin', 'initial super administrator', 1001, '[2029]', '', '', 0, '', 0, '', NULL, '1', NOW(), '1', NOW(), b'0', 1);
 
-INSERT IGNORE INTO system_user_role (id, user_id, role_id, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (1, 1, 1, '1', NOW(), '1', NOW(), b'0', 1);
+INSERT IGNORE INTO system_user_role (id, user_id, role_id, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (1, 1, 3999, '1', NOW(), '1', NOW(), b'0', 1);
 
 INSERT IGNORE INTO system_user_post (id, user_id, post_id, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (1, 1, 2029, '1', NOW(), '1', NOW(), b'0', 1);
 

@@ -13,9 +13,11 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInb
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,6 +27,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
@@ -59,6 +62,8 @@ class LeadManagementServiceImplTest {
     private DeptApi deptApi;
     @Mock
     private LeadObjectPermissionService leadObjectPermissionService;
+    @Mock
+    private OpportunityMapper opportunityMapper;
 
     @Test
     void pageRestrictsOrdinaryUserToRelatedLeads() {
@@ -105,6 +110,50 @@ class LeadManagementServiceImplTest {
 
         assertEquals(List.of("submitter", "owner"), result.getRelationTypes());
         assertEquals("销售一号", result.getOwnerUserName());
+    }
+
+    @Test
+    void detailProjectsOwnerActionsForEachLifecycleStage() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:update")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:qualify")).thenReturn(true);
+
+        assertActions(actionLead("submitted", "owned", false), null,
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP");
+        assertActions(actionLead("submitted", "owned", true), null,
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_VALID", "JUDGE_INVALID");
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("open");
+        assertActions(actionLead("converted", "closed", true), opportunity,
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "ENTER_DEAL");
+        assertActions(actionLead("valid", "owned", true), null,
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "ENTER_DEAL");
+        assertActions(actionLead("invalid", "owned", true), null, "ADD_FOLLOW_UP");
+        assertActions(actionLead("submitted", "public_pool", false), null);
+    }
+
+    @Test
+    void detailProjectsQualificationAndFollowUpIndependently() {
+        LeadDO firstFollow = actionLead("submitted", "owned", false);
+        assertProjection(firstFollow, null, "pending", "first_follow_pending", "active");
+        LeadDO following = actionLead("submitted", "owned", true);
+        assertProjection(following, null, "pending", "following", "active");
+        assertProjection(actionLead("valid", "owned", true), null, "valid", "following", "active");
+        assertProjection(actionLead("invalid", "owned", true), null, "invalid", null, "active");
+        LeadDO suspended = actionLead("suspended", "owned", true);
+        assertProjection(suspended, null, "pending", "following", "suspended");
+    }
+
+    @Test
+    void detailNeverProjectsWriteActionsForNonOwnerViewer() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canRead(lead, 99L)).thenReturn(true);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+
+        assertEquals(List.of(), service.getLead(1L, 99L).getAvailableActions());
     }
 
     @Test
@@ -276,6 +325,44 @@ class LeadManagementServiceImplTest {
         lead.setSourceUserId(sourceUserId);
         lead.setOwnerUserId(ownerUserId);
         return lead;
+    }
+
+    private LeadDO actionLead(String status, String assignmentStatus, boolean qualificationPending) {
+        LeadDO lead = lead(1L, 10L, 20L);
+        lead.setStatus(status); lead.setAssignmentStatus(assignmentStatus);
+        lead.setQualificationDeadlineAt(qualificationPending ? java.time.LocalDateTime.now().plusHours(1) : null);
+        return lead;
+    }
+
+    private void assertActions(LeadDO lead, OpportunityDO opportunity, String... expected) {
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canRead(lead, 20L)).thenReturn(true);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+
+        LeadManagementRespVO result = service.getLead(1L, 20L);
+
+        assertEquals(List.of(expected), result.getAvailableActions().stream()
+                .map(LeadManagementRespVO.ActionVO::getCode).toList());
+        if (Set.of(expected).contains("ENTER_DEAL")) {
+            assertEquals(false, result.getAvailableActions().getLast().getEnabled());
+        }
+    }
+
+    private void assertProjection(LeadDO lead, OpportunityDO opportunity, String qualification,
+                                  String followUp, String operational) {
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canRead(lead, 20L)).thenReturn(true);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        LeadManagementRespVO result = service.getLead(1L, 20L);
+        assertEquals(qualification, result.getQualificationStatus());
+        assertEquals(followUp, result.getFollowUpStatus());
+        assertEquals(operational, result.getOperationalStatus());
     }
 
     private static LeadInboxFilterConfigVO filterConfig() {

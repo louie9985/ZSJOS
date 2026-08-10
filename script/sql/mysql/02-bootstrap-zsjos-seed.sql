@@ -115,6 +115,9 @@ INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V000_BASELINE', 'ZSJOS empty database baseline', 'bootstrap-v1');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V001', 'Allow lead intended product without a product reference', 'lead-product-ref-nullable-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V002', 'Add read-only lead management menu and permissions', 'lead-management-menu-v1');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
@@ -144,6 +147,11 @@ INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`upd
 SELECT DISTINCT source.role_id,target.menu_id,'1',NOW(),'1',NOW(),b'0',source.tenant_id FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission IN ('zsjos:lead:claim','zsjos:lead:accept') AND m.deleted=b'0'
 CROSS JOIN (SELECT 6781 menu_id UNION ALL SELECT 6782) target WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=target.menu_id AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
 
+INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT DISTINCT source.role_id,6809,'1',NOW(),'1',NOW(),b'0',source.tenant_id
+FROM `system_role_menu` source JOIN `system_menu` m ON m.id=source.menu_id AND m.permission='zsjos:lead-follow-up:create' AND m.deleted=b'0'
+WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_role_menu` x WHERE x.role_id=source.role_id AND x.menu_id=6809 AND x.tenant_id=source.tenant_id AND x.deleted=b'0');
+
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V008', 'Add lead follow-up records and today tasks', 'lead-follow-up-today-tasks-v1');
 
@@ -162,3 +170,15 @@ INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V015', 'Add three-level lead appeal workflow', 'lead-three-level-appeal-v1');
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V016', 'Complete default templates for registered lead notification scenes', 'complete-lead-notify-templates-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V017', 'Add lead-invalid quick remark template dictionary', 'lead-invalid-remark-template-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V018', 'Add lead actions and opportunity follow-ups', 'lead-actions-opportunity-followups-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V019', 'Normalize historical valid leads with initial opportunities', 'normalize-historical-valid-leads-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V020', 'Add unified schema migration metadata and missing CRM tables', 'unified-schema-migration-v1');

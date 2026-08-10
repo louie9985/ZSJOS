@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -16,6 +17,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Map;
 
@@ -64,6 +68,15 @@ public class LeadManagementController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
     public CommonResult<LeadManagementRespVO> getLead(@RequestParam("id") Long id) {
         return success(leadManagementService.getLead(id, getLoginUserId()));
+    }
+
+    @PutMapping("/{id}/basic-info")
+    @Operation(summary = "修改客资基础信息")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:update')")
+    public CommonResult<Boolean> updateBasicInfo(@PathVariable("id") Long id,
+                                                  @Valid @RequestBody LeadBasicInfoUpdateReqVO reqVO) {
+        leadManagementService.updateBasicInfo(id, getLoginUserId(), reqVO);
+        return success(true);
     }
 
     @GetMapping("/status-counts")

@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+DEPLOY_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="${ZSJOS_ENV_FILE:-$DEPLOY_DIR/.env}"
+COMPOSE_FILE="$DEPLOY_DIR/compose.database.yml"
+
+if [[ ! -f "$ENV_FILE" ]]; then
+  echo "Missing $ENV_FILE; create it from .env.example and create the referenced secret files." >&2
+  exit 1
+fi
+
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" run --rm db-migrator "$@"

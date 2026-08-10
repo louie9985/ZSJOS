@@ -65,7 +65,13 @@
 
 跟进提交完成当前分配历史对应的 `lead_first_follow_up`，并按可选的下次跟进时间替换 `lead_follow_up_reminder`。`nextFollowUpAt` 必须使用 epoch 毫秒数且换算后的服务端时间晚于提交时刻。`GET /zsjos/business-task/my-summary` 与 `GET /zsjos/business-task/my-page` 只返回当前用户的 ZSJOS 任务，使用 `unscheduled`、`overdue`、`today`、`future` 分组；任务没有通用完成接口，只能由接单或填写跟进等业务动作完成。
 
-首次跟进成功后创建 `lead_qualification` 任务。客资响应由服务端返回 `handlingStage`、首跟截止、判定截止、挂起时间、判定结果与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断阶段。判无效请求同时提交启用的 `zsjos_lead_invalid_reason` 字典值、必填备注和最多 9 个已上传附件引用。`zsjos_lead_invalid_remark_template` 仅提供管理员维护的快捷备注填充文案，初始化为空，接口保存销售最终编辑后的备注文本，不保存或校验模板编码。判定命令及四种主管处置命令都携带不超过 40 字符的幂等键。
+首次跟进成功后创建 `lead_qualification` 任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
+
+`POST /zsjos/lead/{id}/judge-valid` 请求为 `{ leadCategory?: string | null, remark, idempotencyKey }`。非空分类必须是启用的 `zsjos_lead_category` 字典值，备注必填且最长 2000 字。接口在一个事务内完成判定任务、保存备注、创建唯一 `initial_conversion` Opportunity，将 Lead 改为 `converted` 并结束分配周期；`zsjos_lead_valid_remark_template` 只提供管理员维护的快捷备注，初始化为空。判无效请求同时提交启用的 `zsjos_lead_invalid_reason` 字典值、必填备注和最多 9 个已上传附件引用；入口同时适用于待判定 Lead 与推进中的 Opportunity，后者会在同一事务改为 `lost`。`zsjos_lead_invalid_remark_template` 仅提供快捷文案，接口只保存销售最终编辑文本。
+
+统一跟进接口按状态路由：`submitted` 写 Lead 跟进并维护首跟、判定和提醒任务；`converted` 写 Opportunity 跟进并维护机会状态和提醒；`invalid` 写 Lead 证据记录，不创建任何任务。分类在三类请求中都可保留、修改或清空。分页查询合并 Lead 与 Opportunity 跟进，按发生时间倒序返回，并通过 `recordScope` 标识 `lead` 或 `opportunity`。
+
+`PUT /zsjos/lead/{id}/basic-info` 仅供当前负责人使用，接受姓名、手机号、微信号、地区、可空客资分类、至少一项且唯一主意向的课程快照以及必填修改原因。手机号与微信号至少保留一个；身份冲突、无效地区、无效字典或产品目录引用均拒绝且事务回滚。联系人同步到 Person 和当前 Lead，事件只记录变更字段名和修改原因，不记录完整联系方式。
 
 每分钟按租户扫描已到判定截止时间的 `submitted + owned` 客资，并在行锁下再次校验后改为 `suspended`。截止时间已到但扫描尚未提交时，当前销售仍可判定；扫描先提交后，跟进、判定、资料修改、转派和建单均由服务端拒绝。恢复与转派创建新判定轮次；回收进入 `recycle_pending` 并清除销售；释放进入抢单池，被抢后重新创建首跟任务。
 
@@ -76,8 +82,8 @@
 ## 部署顺序
 
 1. 评审并备份目标库，确认历史 `zsjos_lead` 兼容空值策略。
-2. 单独确认后按版本顺序执行至 `script/sql/mysql/migrations/V017__lead_invalid_remark_templates.sql`；代码实现不会自动执行迁移。
-3. 配置 `zsjos_lead_category`、`zsjos_lead_invalid_reason` 与 `zsjos_lead_invalid_remark_template` 字典数据及岗位对应菜单权限；无效原因和无效快捷备注字典类型初始化为空。
+2. 单独确认后按版本顺序执行至 `script/sql/mysql/migrations/V018__lead_actions_and_opportunity_followups.sql`；代码实现不会自动执行迁移。
+3. 配置 `zsjos_lead_category`、`zsjos_lead_invalid_reason`、`zsjos_lead_invalid_remark_template` 与 `zsjos_lead_valid_remark_template` 字典数据及岗位对应菜单权限；快捷备注字典类型初始化为空。
 4. 接入并验证真实产品 SDK 适配器后才开放提交入口。
 5. 使用真实 MySQL、Redis、文件存储和 WebSocket 验证提交、超时转派、并发接单、业务任务及抢单。
 6. JVM、MySQL 连接会话和产品展示统一使用 `Asia/Shanghai`。MySQL Connector/J 8 连接必须配置 `connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true`，并通过 `script/sql/mysql/verify-zsjos-time-contract.sql` 只读核验 `@@session.time_zone` 和历史异常。

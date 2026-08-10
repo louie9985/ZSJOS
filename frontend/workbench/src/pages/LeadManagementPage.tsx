@@ -20,12 +20,11 @@ import {
   Typography
 } from 'antd'
 import { message } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
 import { api, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
 import {
   applyInvalidRemarkTemplate,
-  canJudgeLeadQualification,
   defaultInboxStage,
   mergeUniqueLeads,
   tryStartLeadPageRequest
@@ -34,11 +33,13 @@ import {
   DICT_TYPE,
   LEAD_ASSIGNMENT_STATUS_LABELS,
   LEAD_DISPATCH_MODE_LABELS,
-  LEAD_HANDLING_STAGE_LABELS
+  LEAD_QUALIFICATION_STATUS_LABELS,
+  LEAD_FOLLOW_UP_STATUS_LABELS
 } from '../constants'
 import LeadFollowUpPanel from '../components/LeadFollowUpPanel'
 import LeadAppealPanel from '../components/LeadAppealPanel'
 import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
+import LeadBasicInfoModal from '../components/LeadBasicInfoModal'
 import type { LeadAppealEvidence } from '../services/api'
 import { defaultLeadDetailTab, shouldBlockLeadSwitch, type LeadDetailTab } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
@@ -54,15 +55,25 @@ function productText(lead: ManagedLead) {
   return product ? [product.spuName || '未明确课程', product.skuName].filter(Boolean).join(' / ') : '未填写意向产品'
 }
 
-function LeadDetail({ lead, categoryLabel, channelLabel, audience, autoExpandFollowUp, onDirtyChange, onChanged, canQualify }: {
+function LeadStateTags({ lead }: { lead: ManagedLead }) {
+  return <Space size={4} wrap>
+    <Tag color={lead.qualificationStatus === 'invalid' ? 'red' : lead.qualificationStatus === 'valid' ? 'green' : 'gold'}>
+      {LEAD_QUALIFICATION_STATUS_LABELS[lead.qualificationStatus] || '待判定'}
+    </Tag>
+    {lead.followUpStatus && <Tag color="blue">{LEAD_FOLLOW_UP_STATUS_LABELS[lead.followUpStatus] || lead.followUpStatus}</Tag>}
+    {lead.operationalStatus === 'suspended' && <Tag color="orange">已挂起</Tag>}
+  </Space>
+}
+
+function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, autoExpandFollowUp, onDirtyChange, onChanged }: {
   lead: ManagedLead
+  categories: DictData[]
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
   audience: 'submitter' | 'owner'
   autoExpandFollowUp: boolean
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
-  canQualify?: boolean
 }) {
   const [activeTab, setActiveTab] = useState<LeadDetailTab>(defaultLeadDetailTab(autoExpandFollowUp))
   const [followUpTotal, setFollowUpTotal] = useState(0)
@@ -77,15 +88,34 @@ function LeadDetail({ lead, categoryLabel, channelLabel, audience, autoExpandFol
   const [invalidDescription, setInvalidDescription] = useState('')
   const [invalidEvidence, setInvalidEvidence] = useState<LeadAppealEvidence[]>([])
   const [qualificationSaving, setQualificationSaving] = useState(false)
-  const canJudge = canJudgeLeadQualification(lead, audience, Boolean(canQualify))
+  const [followUpOpen, setFollowUpOpen] = useState(autoExpandFollowUp)
+  const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
+  const [basicInfoOpen, setBasicInfoOpen] = useState(false)
+  const [basicInfoDirty, setBasicInfoDirty] = useState(false)
+  const [validOpen, setValidOpen] = useState(false)
+  const [validCategory, setValidCategory] = useState<string | undefined>(lead.leadCategory)
+  const [validRemark, setValidRemark] = useState('')
+  const [validTemplates, setValidTemplates] = useState<DictData[]>([])
+  const [validTemplateError, setValidTemplateError] = useState('')
+  const actions = new Map((lead.availableActions || []).map(item => [item.code, item]))
+  useEffect(() => { onDirtyChange(followUpFormDirty || basicInfoDirty) },
+    [basicInfoDirty, followUpFormDirty, onDirtyChange])
 
   const judgeValid = async () => {
+    if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
     setQualificationSaving(true)
     try {
-      await api.judgeLeadValid(lead.id, crypto.randomUUID())
+      await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey: crypto.randomUUID() })
       message.success('已判定为有效客资')
+      setValidOpen(false); setValidRemark('')
       onChanged()
     } finally { setQualificationSaving(false) }
+  }
+
+  const openValid = async () => {
+    setValidCategory(lead.leadCategory); setValidRemark(''); setValidOpen(true); setValidTemplateError('')
+    try { setValidTemplates(await api.dictDataByType(DICT_TYPE.LEAD_VALID_REMARK_TEMPLATE)) }
+    catch (error) { setValidTemplates([]); setValidTemplateError(error instanceof Error ? error.message : '快捷备注加载失败') }
   }
 
   const loadInvalidReasons = async () => {
@@ -134,20 +164,27 @@ function LeadDetail({ lead, categoryLabel, channelLabel, audience, autoExpandFol
   useEffect(() => {
     setActiveTab(defaultLeadDetailTab(autoExpandFollowUp))
     setFollowUpTotal(0)
+    setFollowUpOpen(autoExpandFollowUp)
   }, [autoExpandFollowUp, lead.id])
 
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
       <Avatar size={48}>{lead.submittedName.slice(0, 1)}</Avatar>
       <div className="lead-detail-title">
-        <Space wrap><Typography.Title level={4}>{lead.submittedName}</Typography.Title><Tag color="blue">{LEAD_HANDLING_STAGE_LABELS[lead.handlingStage] || lead.handlingStage}</Tag></Space>
+        <Space wrap><Typography.Title level={4}>{lead.submittedName}</Typography.Title><LeadStateTags lead={lead}/></Space>
         <Typography.Text type="secondary">{lead.submittedMobile || '无手机号'} · {lead.submittedWechatId || '无微信号'} · 客资 #{lead.id}</Typography.Text>
       </div>
+      <Space wrap className="lead-detail-actions">
+        {actions.has('EDIT_BASIC_INFO') && <Button icon={<EditOutlined/>} onClick={() => setBasicInfoOpen(true)}>修改基础信息</Button>}
+        {actions.has('ADD_FOLLOW_UP') && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setFollowUpOpen(true)}>跟进</Button>}
+        {actions.has('JUDGE_VALID') && <Button icon={<CheckOutlined/>} onClick={() => void openValid()}>判有效</Button>}
+        {actions.has('JUDGE_INVALID') && <Button danger icon={<CloseOutlined/>} onClick={() => void openInvalid()}>判无效</Button>}
+        {actions.has('ENTER_DEAL') && <Button icon={<FileAddOutlined/>} disabled>录入成交</Button>}
+      </Space>
     </div>
-    {lead.handlingStage === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
+    {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
     {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReasonLabelSnapshot || lead.invalidReason, lead.invalidDescription].filter(Boolean).join('：')}/>} 
-    {lead.handlingStage === 'qualification_pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}
-      action={canJudge ? <Space><Button type="primary" loading={qualificationSaving} onClick={() => void judgeValid()}>判有效</Button><Button danger onClick={() => void openInvalid()}>判无效</Button></Space> : undefined}/>} 
+    {lead.qualificationStatus === 'pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}/>}
     <Tabs
       className="lead-detail-tabs"
       activeKey={activeTab}
@@ -171,7 +208,8 @@ function LeadDetail({ lead, categoryLabel, channelLabel, audience, autoExpandFol
                 <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
                   <Descriptions.Item label="客资分类">{categoryLabel(lead.leadCategory)}</Descriptions.Item>
                   <Descriptions.Item label="来源渠道">{channelLabel(lead.sourceChannel)}</Descriptions.Item>
-                  <Descriptions.Item label="当前阶段">{LEAD_HANDLING_STAGE_LABELS[lead.handlingStage] || lead.handlingStage}</Descriptions.Item>
+                  <Descriptions.Item label="客资有效状态">{LEAD_QUALIFICATION_STATUS_LABELS[lead.qualificationStatus] || lead.qualificationStatus}</Descriptions.Item>
+                  <Descriptions.Item label="客资跟进状态">{lead.followUpStatus ? LEAD_FOLLOW_UP_STATUS_LABELS[lead.followUpStatus] || lead.followUpStatus : '-'}</Descriptions.Item>
                   <Descriptions.Item label="分配状态">{LEAD_ASSIGNMENT_STATUS_LABELS[lead.assignmentStatus] || lead.assignmentStatus}</Descriptions.Item>
                   <Descriptions.Item label="提交备注" span={2}>{lead.remark || '-'}</Descriptions.Item>
                   {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{lead.invalidReasonLabelSnapshot || lead.invalidReason}</Descriptions.Item>}
@@ -230,8 +268,8 @@ function LeadDetail({ lead, categoryLabel, channelLabel, audience, autoExpandFol
           label: `跟进记录 (${followUpTotal})`,
           forceRender: true,
           children: <div className="lead-detail-tab-content lead-detail-follow-up">
-            <LeadFollowUpPanel lead={lead} editable={audience === 'owner' && lead.status === 'submitted'} autoExpand={autoExpandFollowUp}
-              onDirtyChange={onDirtyChange} onChanged={onChanged} onTotalChange={setFollowUpTotal}/>
+            <LeadFollowUpPanel lead={lead} open={followUpOpen} onClose={() => setFollowUpOpen(false)}
+              onDirtyChange={setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/>
           </div>
         },
         ...(audience === 'submitter' ? [{
@@ -259,10 +297,25 @@ function LeadDetail({ lead, categoryLabel, channelLabel, audience, autoExpandFol
           disabled={qualificationSaving} uploadImage={api.uploadLeadQualificationImage}/>
       </Space>
     </Modal>
+    <Modal title="判定为有效客资" open={validOpen} confirmLoading={qualificationSaving}
+      onOk={() => void judgeValid()} onCancel={() => setValidOpen(false)} okText="确认判有效">
+      <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+        <Typography.Text strong>客资分类</Typography.Text>
+        <Select allowClear value={validCategory} onChange={setValidCategory} placeholder="可不选择"
+          options={categories.map(item => ({ value: item.value, label: item.label }))} style={{ width: '100%' }}/>
+        <Typography.Text strong>有效备注</Typography.Text>
+        {validTemplateError && <Alert type="error" showIcon message={validTemplateError}/>}
+        {validTemplates.length > 0 && <Space wrap>{validTemplates.map(template => <Button size="small" key={template.value}
+          onClick={() => setValidRemark(current => [current.trim(), template.label].filter(Boolean).join('\n'))}>{template.label}</Button>)}</Space>}
+        <Input.TextArea value={validRemark} onChange={event => setValidRemark(event.target.value)} rows={4} maxLength={2000} showCount/>
+      </Space>
+    </Modal>
+    <LeadBasicInfoModal lead={lead} open={basicInfoOpen} onClose={() => setBasicInfoOpen(false)}
+      onDirtyChange={setBasicInfoDirty} onChanged={onChanged}/>
   </div>
 }
 
-export default function LeadManagementPage({ audience, canQualify = false }: { audience: 'submitter' | 'owner'; canQualify?: boolean }) {
+export default function LeadManagementPage({ audience }: { audience: 'submitter' | 'owner' }) {
   const location = useLocation()
   const routeState = location.state as { leadId?: number; openFollowUp?: boolean } | null
   const requestedLeadId = routeState?.leadId
@@ -322,7 +375,8 @@ export default function LeadManagementPage({ audience, canQualify = false }: { a
       setItems(current => replace ? result.list : mergeUniqueLeads(current, result.list))
       setTotal(result.total)
       setPageNo(targetPage)
-      if (replace) setSelectedId(current => requestedLeadId || current || result.list[0]?.id)
+      if (replace) setSelectedId(current => requestedLeadId
+        || (current && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
     } catch (loadError) {
       if (version === requestVersion.current) {
         setError(loadError instanceof Error ? loadError.message : '客资列表加载失败')
@@ -362,6 +416,11 @@ export default function LeadManagementPage({ audience, canQualify = false }: { a
     else setDetail(undefined)
   }, [loadDetail, selectedId])
 
+  const refreshAfterLeadChange = useCallback(async (id: number) => {
+    const version = ++requestVersion.current
+    await Promise.all([loadMetadata(), loadPage(1, true, version), loadDetail(id)])
+  }, [loadDetail, loadMetadata, loadPage])
+
   const activeGroup = useMemo(
     () => filterProfile.groups.find(item => item.key === inboxGroup),
     [filterProfile.groups, inboxGroup]
@@ -377,7 +436,7 @@ export default function LeadManagementPage({ audience, canQualify = false }: { a
   const hasMore = items.length < total
 
   const selectLead = (id: number) => {
-    if (shouldBlockLeadSwitch(followUpDirty) && !window.confirm('当前跟进记录尚未提交，切换客资将丢失已填写内容。确定继续吗？')) return
+    if (shouldBlockLeadSwitch(followUpDirty) && !window.confirm('当前表单尚未提交，切换客资将丢失已填写内容。确定继续吗？')) return
     setFollowUpDirty(false)
     setSelectedId(id)
   }
@@ -396,9 +455,9 @@ export default function LeadManagementPage({ audience, canQualify = false }: { a
     : detailError
       ? <Alert type="error" showIcon message={detailError} action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
       : detail
-        ? <LeadDetail lead={detail} categoryLabel={categoryLabel} channelLabel={channelLabel}
+        ? <LeadDetail lead={detail} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           audience={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
-          onDirtyChange={setFollowUpDirty} onChanged={() => void loadDetail(detail.id)} canQualify={canQualify}/>
+          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)}/>
         : <Empty description="从左侧选择一条客资"/>
 
   return <section className="workspace-page lead-management-page">
@@ -447,7 +506,7 @@ export default function LeadManagementPage({ audience, canQualify = false }: { a
               <div className="lead-inbox-item-main">
                 <Avatar>{item.submittedName.slice(0, 1)}</Avatar>
                 <div className="lead-inbox-item-copy">
-                  <div className="lead-inbox-item-title"><strong>{item.submittedName}</strong><Tag color="blue">{LEAD_HANDLING_STAGE_LABELS[item.handlingStage] || item.handlingStage}</Tag></div>
+                  <div className="lead-inbox-item-title"><strong>{item.submittedName}</strong><LeadStateTags lead={item}/></div>
                   <span>{productText(item)}</span>
                   <span>{item.submittedMobile || '无手机号'} · {item.submittedWechatId || '无微信号'}</span>
                 </div>

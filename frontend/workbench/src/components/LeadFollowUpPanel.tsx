@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, App, Button, Card, DatePicker, Empty, Form, Image, Input, Select, Space, Spin, Tag, Timeline, Typography, Upload } from 'antd'
-import { CameraOutlined, DownOutlined, PlusOutlined, UpOutlined } from '@ant-design/icons'
+import { Alert, App, Button, Card, DatePicker, Empty, Form, Image, Input, Modal, Select, Space, Spin, Tag, Timeline, Typography, Upload } from 'antd'
+import { CameraOutlined } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import { api, type DictData, type LeadAttachment, type LeadFollowUp, type ManagedLead } from '../services/api'
 import { DICT_TYPE } from '../constants'
@@ -11,15 +11,14 @@ import { formatTimestamp } from '../services/time'
 const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 const PAGE_SIZE = 10
 
-type Values = { method: string; result: string; leadCategory: string; remark?: string; nextFollowUpAt?: dayjs.Dayjs }
+type Values = { method: string; result: string; leadCategory?: string; remark?: string; nextFollowUpAt?: dayjs.Dayjs }
 
-export default function LeadFollowUpPanel({ lead, editable, autoExpand = false, onChanged, onDirtyChange, onTotalChange }: {
-  lead: ManagedLead; editable: boolean; autoExpand?: boolean; onChanged?: () => void
+export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDirtyChange, onTotalChange }: {
+  lead: ManagedLead; open: boolean; onClose: () => void; onChanged?: () => void
   onDirtyChange?: (dirty: boolean) => void; onTotalChange?: (total: number) => void
 }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
-  const [expanded, setExpanded] = useState(autoExpand)
   const [dirty, setDirty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -56,8 +55,8 @@ export default function LeadFollowUpPanel({ lead, editable, autoExpand = false, 
       setMethods(methodData); setResults(resultData); setCategories(categoryData); setQuickNotes(notes)
     }).catch(() => setError('跟进字典加载失败，请重试'))
     form.setFieldsValue({ leadCategory: lead.leadCategory })
-    setExpanded(autoExpand); setDirty(false); setImages([])
-  }, [autoExpand, form, lead.id, lead.leadCategory, loadRecords])
+    setDirty(false); setImages([])
+  }, [form, lead.id, lead.leadCategory, loadRecords])
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault() }
@@ -78,7 +77,7 @@ export default function LeadFollowUpPanel({ lead, editable, autoExpand = false, 
         nextFollowUpAt: values.nextFollowUpAt?.valueOf(),
         images: images.map(image => ({ infraFileId: image.infraFileId })), idempotencyKey: crypto.randomUUID()
       })
-      reset(); await loadRecords(); onChanged?.(); message.success('跟进记录已提交')
+      reset(); await loadRecords(); onChanged?.(); onClose(); message.success('跟进记录已提交')
     } catch (submitError) { message.error(submitError instanceof Error ? submitError.message : '提交失败') }
     finally { setSubmitting(false) }
   }
@@ -99,15 +98,13 @@ export default function LeadFollowUpPanel({ lead, editable, autoExpand = false, 
   }
 
   return <section className="lead-follow-up-panel">
-    {editable && <Card size="small" title="跟进操作" className={`lead-follow-up-card${expanded ? '' : ' lead-follow-up-card-collapsed'}`} extra={<Space>
-      <Button type="primary" icon={<PlusOutlined/>} onClick={() => setExpanded(value => !value)}>新增跟进</Button>
-      <Button type="text" icon={expanded ? <UpOutlined/> : <DownOutlined/>} aria-label={expanded ? '收起跟进表单' : '展开跟进表单'} onClick={() => setExpanded(value => !value)}/>
-    </Space>}>
-    {expanded && <Form form={form} layout="vertical" className="follow-up-form" onFinish={submit} onValuesChange={() => setDirty(true)}>
+    <Modal title="新增跟进" open={open} onCancel={onClose} footer={null} destroyOnHidden width={760}>
+    {lead.status === 'invalid' && <Alert type="info" showIcon message="本次跟进仅作为客资证据记录，下次跟进时间不会生成待办。"/>}
+    <Form form={form} layout="vertical" className="follow-up-form" onFinish={submit} onValuesChange={() => setDirty(true)}>
       <div className="follow-up-field-grid">
         <Form.Item name="method" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}><Select options={methods.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
         <Form.Item name="result" label="跟进结果" rules={[{ required: true, message: '请选择跟进结果' }]}><Select options={results.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
-        <Form.Item name="leadCategory" label="客资分类" rules={[{ required: true, message: '请选择客资分类' }]}><Select options={categories.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
+        <Form.Item name="leadCategory" label="客资分类"><Select allowClear options={categories.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
       </div>
       {quickNotes.length > 0 && <Space wrap className="follow-up-quick-notes">{quickNotes.map(note => <Button size="small" key={note.value} onClick={() => appendNote(note.label)}>{note.label}</Button>)}</Space>}
       <Form.Item name="remark" label="跟进备注"><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
@@ -122,8 +119,8 @@ export default function LeadFollowUpPanel({ lead, editable, autoExpand = false, 
         <Image.PreviewGroup><div className="follow-up-image-strip">{images.map((image, index) => <div key={image.infraFileId}><Image src={image.fileUrl}/><Button size="small" danger onClick={() => { setImages(current => current.filter((_, itemIndex) => itemIndex !== index)); setDirty(true) }}>移除</Button></div>)}</div></Image.PreviewGroup>
       </div>
       <Space><Button type="primary" htmlType="submit" loading={submitting}>提交跟进</Button><Button onClick={reset}>重置</Button></Space>
-    </Form>}
-    </Card>}
+    </Form>
+    </Modal>
 
     <Card size="small" title="跟进时间线" className="lead-follow-up-card">
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadRecords()}>重试</Button>}/>} 
@@ -131,7 +128,7 @@ export default function LeadFollowUpPanel({ lead, editable, autoExpand = false, 
       children: <div className="follow-up-timeline-item">
         <Space wrap><Typography.Text strong>{record.operatorName || `用户 #${record.operatorUserId}`}</Typography.Text><span>{formatTimestamp(record.occurredAt)}</span>{record.firstInAssignment && <Tag color="green">本轮首次跟进</Tag>}</Space>
         <div><Tag>{record.methodLabel}</Tag><Tag color="blue">{record.resultLabel}</Tag></div>
-        {record.categoryBefore !== record.categoryAfter && <Typography.Text>分类：{record.categoryBeforeLabel} → {record.categoryAfterLabel}</Typography.Text>}
+        {record.categoryBefore !== record.categoryAfter && <Typography.Text>分类：{record.categoryBeforeLabel || '未分类'} → {record.categoryAfterLabel || '未分类'}</Typography.Text>}
         {record.remark && <Typography.Paragraph>{record.remark}</Typography.Paragraph>}
         {record.nextFollowUpAt && <Typography.Text type="secondary">下次跟进：{formatTimestamp(record.nextFollowUpAt)}</Typography.Text>}
         {record.images.length > 0 && <Image.PreviewGroup><div className="follow-up-record-images">{record.images.map(image => <Image key={image.infraFileId} src={image.url} alt={image.originalName}/>)}</div></Image.PreviewGroup>}

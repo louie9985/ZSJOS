@@ -62,6 +62,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_APPEAL_PERMISSION_DENIED = new ErrorCode(1_900_003_041, "无权查看或处理该申诉");
     ErrorCode LEAD_APPEAL_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_042, "申诉幂等键已被其他请求使用");
     ErrorCode LEAD_APPEAL_PROCESS_UNAVAILABLE = new ErrorCode(1_900_003_043, "客资申诉流程尚未部署或暂不可用");
+    ErrorCode LEAD_BASIC_INFO_STATE_INVALID = new ErrorCode(1_900_003_044, "当前客资状态不允许修改基础信息");
+    ErrorCode LEAD_BASIC_INFO_CONTACT_CONFLICT = new ErrorCode(1_900_003_045, "手机号或微信号已属于其他客户");
+    ErrorCode LEAD_OPPORTUNITY_NOT_EXISTS = new ErrorCode(1_900_003_046, "销售机会不存在");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");

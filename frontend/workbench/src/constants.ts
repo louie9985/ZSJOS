@@ -67,7 +67,8 @@ export const DICT_TYPE = {
   LEAD_FOLLOW_UP_RESULT: 'zsjos_lead_follow_up_result',
   LEAD_FOLLOW_UP_QUICK_NOTE: 'zsjos_lead_follow_up_quick_note',
   LEAD_INVALID_REASON: 'zsjos_lead_invalid_reason',
-  LEAD_INVALID_REMARK_TEMPLATE: 'zsjos_lead_invalid_remark_template'
+  LEAD_INVALID_REMARK_TEMPLATE: 'zsjos_lead_invalid_remark_template',
+  LEAD_VALID_REMARK_TEMPLATE: 'zsjos_lead_valid_remark_template'
 } as const
 
 // ========== Lead Management ==========
@@ -90,7 +91,7 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
   suspended: '已挂起',
   valid: '有效',
   invalid: '无效',
-  converted: '已转换',
+  converted: '已判有效',
   closed: '已关闭'
 }
 
@@ -112,8 +113,16 @@ export const LEAD_HANDLING_STAGE_LABELS: Record<string, string> = {
   unassigned: '未分配',
   valid: '有效',
   invalid: '无效',
-  converted: '已转换',
+  converted: '已判有效',
   closed: '已关闭'
+}
+
+export const LEAD_QUALIFICATION_STATUS_LABELS: Record<string, string> = {
+  pending: '待判定', valid: '已判有效', invalid: '已判无效'
+}
+
+export const LEAD_FOLLOW_UP_STATUS_LABELS: Record<string, string> = {
+  first_follow_pending: '待首跟', following: '跟进中', deal_pending_approval: '成交待审核', won: '已成交'
 }
 
 export const LEAD_DISPATCH_MODE_LABELS: Record<string, string> = {

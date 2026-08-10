@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 
 public interface LeadManagementService {
@@ -10,6 +11,8 @@ public interface LeadManagementService {
     PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId);
 
     LeadManagementRespVO getLead(Long id, Long userId);
+
+    void updateBasicInfo(Long id, Long userId, LeadBasicInfoUpdateReqVO reqVO);
 
     java.util.Map<String, Long> getStatusCounts(Long userId);
 

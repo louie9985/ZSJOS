@@ -10,6 +10,9 @@ const lead = (id: number, name: string): ManagedLead => ({
   status: 'submitted',
   assignmentStatus: 'owned',
   handlingStage: 'first_follow_pending',
+  qualificationStatus: 'pending',
+  followUpStatus: 'first_follow_pending',
+  operationalStatus: 'active',
   submittedAt: 1786154400000,
   createTime: 1786154400000,
   updateTime: 1786154400000,
@@ -41,12 +44,13 @@ describe('lead management paging helpers', () => {
     expect(defaultInboxStage(groups, 'closed')).toBe('all')
   })
 
-  it('allows qualification only from the server-projected pending stage', () => {
-    expect(canJudgeLeadQualification({ handlingStage: 'qualification_pending' }, 'owner', true)).toBe(true)
-    expect(canJudgeLeadQualification({ handlingStage: 'first_follow_pending' }, 'owner', true)).toBe(false)
-    expect(canJudgeLeadQualification({ handlingStage: 'suspended' }, 'owner', true)).toBe(false)
-    expect(canJudgeLeadQualification({ handlingStage: 'qualification_pending' }, 'submitter', true)).toBe(false)
-    expect(canJudgeLeadQualification({ handlingStage: 'qualification_pending' }, 'owner', false)).toBe(false)
+  it('allows qualification only from the server-projected pending follow-up state', () => {
+    const pending = { qualificationStatus: 'pending' as const, followUpStatus: 'following' as const, operationalStatus: 'active' as const }
+    expect(canJudgeLeadQualification(pending, 'owner', true)).toBe(true)
+    expect(canJudgeLeadQualification({ ...pending, followUpStatus: 'first_follow_pending' }, 'owner', true)).toBe(false)
+    expect(canJudgeLeadQualification({ ...pending, operationalStatus: 'suspended' }, 'owner', true)).toBe(false)
+    expect(canJudgeLeadQualification(pending, 'submitter', true)).toBe(false)
+    expect(canJudgeLeadQualification(pending, 'owner', false)).toBe(false)
   })
 
   it('replaces the current invalid remark with the selected independent template', () => {

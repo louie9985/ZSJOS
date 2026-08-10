@@ -22,10 +22,13 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAtt
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -57,6 +60,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private PermissionApi permissionApi;
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private BpmProcessTaskApi processTaskApi;
+    @Resource private OpportunityMapper opportunityMapper;
+    @Resource private LeadIntendedProductMapper intendedProductMapper;
 
     @Override
     public List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId) {
@@ -197,7 +202,25 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         appeal.setDecidedAt(now);
         appealMapper.updateById(appeal);
         if (overturn) {
-            lead.setStatus(STATUS_VALID);
+            OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+            boolean createOpportunity = opportunity == null;
+            if (createOpportunity) {
+                opportunity = new OpportunityDO();
+                opportunity.setPersonId(lead.getPersonId());
+                opportunity.setType(OPPORTUNITY_TYPE_INITIAL_CONVERSION);
+                opportunity.setLeadId(lead.getId());
+                opportunity.setOwnerUserId(lead.getOwnerUserId());
+                opportunity.setExpectedProductSummary(
+                        LeadBasicInfoService.productSummary(intendedProductMapper.selectListByLeadId(lead.getId())));
+                opportunity.setVersion(0);
+            }
+            opportunity.setStatus(OPPORTUNITY_STATUS_OPEN);
+            opportunity.setLostAt(null);
+            opportunity.setLostReason(null);
+            if (createOpportunity) opportunityMapper.insert(opportunity);
+            else opportunityMapper.updateById(opportunity);
+            lead.setStatus("converted");
+            lead.setAssignmentStatus(ASSIGNMENT_CLOSED);
             lead.setInvalidReason(null);
             lead.setInvalidReasonLabelSnapshot(null);
             lead.setInvalidDescription(null);
@@ -205,6 +228,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             lead.setAppealDeadlineAt(null);
             lead.setQualifiedByUserId(userId);
             lead.setQualifiedAt(now);
+            lead.setConvertedAt(now);
+            lead.setValidDescription(reqVO.getReason().trim());
             leadMapper.updateById(lead);
         }
         String eventType = overturn ? EVENT_LEAD_APPEAL_OVERTURNED : EVENT_LEAD_APPEAL_UPHELD;
