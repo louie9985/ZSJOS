@@ -60,6 +60,7 @@ The following require separate, explicit confirmation even when related to the t
 - Overwriting a large directory or replacing a runtime implementation wholesale.
 - Changing real account permissions or other shared external state.
 - Starting, stopping, or reconfiguring an external/shared service.
+- Creating, deleting, or switching Git branches or worktrees, or rebasing or merging branches.
 - Creating commits, pushing branches, or publishing artifacts.
 
 - **MUST** identify exact targets and expected impact before requesting confirmation.
@@ -106,11 +107,23 @@ Verification is proportional to risk, but evidence is mandatory:
 - Local and production must use the same schema baseline and migration order. A read-only verification script and schema-difference check are required before release.
 - Database scripts must document dependencies, execution order, repeatability, rollback limitations, and the exact data scope they seed.
 
-## 8. AI handoff log
+## 8. Parallel development and workstream isolation
 
-- Every completed AI task turn **MUST** append one structured delivery entry to the repository-root `HANDOFF.md` before sending the final response.
+- Every new parallel workstream **MUST** use its own Git branch and worktree. AI-owned branches **MUST** use the `codex/<workstream-id>` naming convention.
+- A worktree **MUST** belong to exactly one workstream and **MUST NOT** be shared by concurrent AI tasks. New feature work **MUST NOT** run directly in the primary `main` worktree unless the user explicitly designates it as a transitional or integration workstream.
+- A new workstream **MUST** start from a committed base. It **MUST NOT** depend on another workstream's uncommitted changes.
+- Before changing files, each workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan in `handoff/<workstream-id>.md`.
+- Each file **MUST** have one active workstream owner. When workstreams need the same file, they **MUST** name a primary owner and integration order before either line changes it; otherwise the work must be serialized.
+- A workstream **MUST NOT** modify files outside its recorded scope without first updating its handoff record and coordinating any affected workstream.
+- Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`. After integration, affected checks **MUST** be rerun on the integration branch before the workstream is marked `merged`.
+- Branch, worktree, commit, rebase, merge, push, and publication operations remain subject to the explicit-confirmation requirements in sections 2 and 4.
+
+## 9. AI handoff log
+
+- The repository-root `HANDOFF.md` is the stable handoff guide and legacy-log archive. It **MUST NOT** receive per-turn entries or a dynamically maintained workstream index.
+- Every completed AI task turn **MUST** append one structured delivery entry to the active workstream's `handoff/<workstream-id>.md` before sending the final response. Only that workstream's owner may append to the file.
 - A task turn means one user request and its final AI response. Commentary updates, tool calls, and intermediate messages **MUST NOT** be recorded as separate entries.
-- Appending an entry to `HANDOFF.md` is the only standing exception to the read-only rule in section 2. For discussion, analysis, diagnosis, inspection, review, or explanation requests, the AI **MUST NOT** modify any other file unless the user separately authorizes implementation.
-- Each entry **MUST** include the Beijing time, user goal, key decisions, execution or analysis result, changed files, verification evidence, and remaining work. Use `None` when a field has no applicable content.
+- Appending an entry to the active workstream handoff file is the only standing exception to the read-only rule in section 2. For discussion, analysis, diagnosis, inspection, review, or explanation requests, the AI **MUST NOT** modify any other file unless the user separately authorizes implementation.
+- Each entry **MUST** include Beijing time, branch, worktree, HEAD commit, user goal, key decisions, execution or analysis result, changed files, verification evidence, dependency or integration impact, and remaining work. Use `None` when a field has no applicable content.
 - Entries **MUST** be appended in chronological order. Existing entries **MUST NOT** be rewritten or deleted; corrections must be recorded in a new entry.
-- Entries **MUST NOT** contain passwords, tokens, personal data, complete sensitive payloads, or unnecessary conversation transcripts.
+- Handoff files **MUST NOT** contain passwords, tokens, personal data, complete sensitive payloads, or unnecessary conversation transcripts.
