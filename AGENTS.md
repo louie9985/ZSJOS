@@ -1,0 +1,107 @@
+# ZSJ-OS Repository Instructions
+
+This file defines durable repository-wide rules for AI-assisted development. A nested
+`AGENTS.md` adds rules for its subtree and takes precedence when it is more specific.
+
+## 1. Instruction priority
+
+Use this order when repository guidance conflicts:
+
+1. The user's current, explicit request.
+2. The nearest `AGENTS.md` in the target file's directory tree.
+3. Parent `AGENTS.md` files, up to this root file.
+4. Approved architecture, contract, and decision documents.
+5. Module documentation.
+6. The current implementation, which is evidence of behavior but not automatically the desired design.
+
+- **MUST** report a concrete conflict before changing behavior or documentation.
+- **MUST** follow the direction confirmed by the user and synchronize directly affected documentation.
+- **MUST NOT** silently choose whichever source is easiest to implement.
+
+## 2. Read before acting
+
+- Requests to discuss, analyze, diagnose, inspect, review, or explain are read-only. **MUST NOT** edit files unless the user subsequently authorizes implementation.
+- Before any behavior change, **MUST** state the known facts, assumptions, non-goals, affected scope, and verification plan, then wait for confirmation.
+- A purely mechanical correction with no behavior change may be made directly only when the user explicitly asks for that correction.
+- Before editing, **MUST** inspect the relevant implementation, public interfaces, database or configuration sources, similar repository patterns, and current Git changes.
+- **MUST** preserve user changes. Do not reset, overwrite, reformat, stage, commit, push, switch branches, or clean unrelated work unless explicitly requested.
+- **SHOULD** keep changes limited to the requested behavior and its tests or directly affected documentation.
+
+## 3. Sources of truth
+
+- Server-owned menus, permissions, dictionaries, departments, posts, users, visibility, and ordering are authoritative.
+- **MUST NOT** create frontend mock data, static option arrays, duplicate menu trees, or inferred permissions as a substitute for an available backend source.
+- **MUST NOT** infer roles, organization structure, menu depth, routes, fields, or permissions from names or UI labels.
+- Administrator-maintained data **MUST** come from a dictionary or business API in production flows.
+- The workbench may call existing system and business APIs. New ZSJOS-owned backend behavior belongs in `yudao-module-zsjos`, but existing system or CRM capabilities **MUST NOT** be copied there merely to centralize calls.
+
+Read only the architecture documents relevant to the task:
+
+- Cross-runtime or startup work: `docs/architecture/system-overview.md`
+- Authentication, tenant, menu, dictionary, organization, or permission work: `docs/architecture/data-and-permission-flow.md`
+- New modules, APIs, SQL, configuration, or cross-module work: `docs/architecture/ownership-and-change-boundaries.md`
+
+### Yudao alignment and reusable facilities
+
+- ZSJOS modules **MUST** align with established Yudao Maven, package, Controller -> Service -> DAL/API, VO/DO, response-wrapper, error-code, validation, transaction, tenant, logical-delete, audit-field, and test conventions unless an approved ZSJOS requirement needs a documented exception.
+- `yudao-framework`, `yudao-module-system`, `yudao-module-infra`, and `yudao-module-bpm` are approved foundational facilities for ZSJOS. When they already provide a required capability, implementations **MUST** prefer their framework mechanism or public API over a parallel ZSJOS implementation.
+- Foundational status does not require every ZSJOS module to depend on every facility. Dependencies remain demand-driven and subject to the dependency review in section 5.
+- Workflow definitions, process instances, approval tasks, assignees, countersigning, rejection, cancellation, copy recipients, and workflow history **MUST** use `yudao-module-bpm`. ZSJOS owns its business records, business state, snapshots, and BPM reference identifiers, and consumes BPM through its public API and status-event boundary.
+- `yudao-module-pay`, `yudao-module-report`, and `yudao-module-member` are optional shared capabilities, not default infrastructure. Their adoption requires feature-specific ownership and dependency confirmation.
+- CRM, ERP, WMS, MES, Mall, AI, IoT, IM, and MP are domain modules, not foundational facilities. Their presence in the repository **MUST NOT** create an implicit ZSJOS runtime dependency or authorize reuse of their tables, DAL, or domain services.
+- Alignment with another Yudao module means reusing engineering patterns and approved facilities. It **MUST NOT** be interpreted as copying that module's domain model, database schema, static data, or private implementation.
+
+## 4. Risk and external state
+
+The following require separate, explicit confirmation even when related to the task:
+
+- Clearing or deleting database data, accounts, roles, permissions, or files in bulk.
+- Rewriting an applied migration or performing an irreversible schema change.
+- Overwriting a large directory or replacing a runtime implementation wholesale.
+- Changing real account permissions or other shared external state.
+- Starting, stopping, or reconfiguring an external/shared service.
+- Creating commits, pushing branches, or publishing artifacts.
+
+- **MUST** identify exact targets and expected impact before requesting confirmation.
+- SQL that deletes or rebuilds data **MUST** state deletion scope, insertion order, relationships, repeatability, and recovery approach.
+- **MUST NOT** include tokens, passwords, personal data, or complete sensitive payloads in logs, documentation, or final reports.
+
+## 5. Dependencies, code, and documentation
+
+- Before adding an npm or Maven dependency, **MUST** show why existing dependencies are insufficient and explain maintenance, size, and security impact; add it only after confirmation.
+- **SHOULD** follow existing framework and module patterns before introducing an abstraction.
+- **SHOULD** keep one clear responsibility per file and avoid unrelated refactors or speculative shared utilities.
+- Comments **MUST** explain non-obvious business reasons, boundaries, invariants, authorization, transaction behavior, or compatibility. **MUST NOT** narrate self-explanatory code.
+- Directly affected architecture, API, navigation, development, and operational documentation **MUST** be updated with behavior changes.
+- The AI **MAY** proactively update the applicable `AGENTS.md` and constraint documentation when an explicit user correction establishes a durable, reusable repository rule. It **MUST** place the rule in the narrowest applicable scope, preserve higher-priority instructions, and report the update in the final response.
+- The AI **MUST NOT** turn a one-time request, temporary workaround, credential, environment value, or unconfirmed preference into a durable constraint.
+- User-visible active product surfaces and delivery documentation **MUST** use the Zhongshijian product context. **MUST NOT** blindly rename upstream package names, dependencies, database identifiers, or internal framework symbols.
+
+## 6. Verification and delivery
+
+Verification is proportional to risk, but evidence is mandatory:
+
+- Pure logic: focused unit tests plus type or compile checks.
+- API behavior: focused tests plus a real request or contract verification when an environment is available.
+- Permission behavior: authorized and unauthorized cases, including empty and failure states.
+- UI behavior: tests, typecheck, production build, and browser checks at desktop and mobile widths.
+- SQL or initialization: syntax, relationship/order review, repeatability, and a controlled execution plan; destructive execution still requires confirmation.
+- Runtime wiring: module build and, when relevant, application startup or endpoint discovery.
+
+- Remote-data views **MUST** handle loading, success, empty, error, retry, and unauthorized states as applicable.
+- Distinct actionable failures **MUST NOT** be collapsed into one generic error when the backend exposes a stable distinction.
+- **MUST NOT** claim a fix is complete without the corresponding verification evidence.
+- If a check cannot run, **MUST** report it as unverified, explain why, and state the remaining risk.
+- Long tasks **SHOULD** report milestones as: diagnosis, change scope, then verification result. Repeated failure requires a root-cause update before another attempt.
+
+## 7. Database initialization and synchronization
+
+- MySQL initialization artifacts belong under `script/sql/mysql/`; `bootstrap.sql` is the fresh-environment entry point.
+- The bootstrap is non-destructive: it MUST NOT drop databases or tables, delete business rows in bulk, or rewrite an applied migration.
+- Existing environments are upgraded only through numbered files under `script/sql/mysql/migrations/`; each migration must be repeatable and record its version in `zsjos_schema_version` where applicable.
+- Dictionary types and dictionary data are separate concerns. The bootstrap may include system-owned dictionary data, but ZSJOS business dictionary data requires a separately reviewed file and explicit confirmation before synchronization.
+- The bootstrap must create empty `zsjos_lead_category` and `zsjos_lead_source_channel` types without inventing business options.
+- Fresh-environment seeds must not include local leads, products, SKUs, orders, uploaded files, test accounts, tokens, or machine-specific configuration.
+- The initial administrator password may be stored only as a BCrypt hash in SQL. Plaintext passwords, tokens, and personal data MUST NOT be added to `AGENTS.md`, logs, or operational documentation.
+- Local and production must use the same schema baseline and migration order. A read-only verification script and schema-difference check are required before release.
+- Database scripts must document dependencies, execution order, repeatability, rollback limitations, and the exact data scope they seed.

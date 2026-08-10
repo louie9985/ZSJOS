@@ -1,0 +1,84 @@
+package cn.iocoder.yudao.module.zsjos.enums;
+
+import cn.iocoder.yudao.framework.common.exception.ErrorCode;
+
+public interface ZsjosErrorCodeConstants {
+
+    ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
+    ErrorCode LEAD_ASSIGNMENT_TARGET_INVALID = new ErrorCode(1_900_001_002, "所选销售不存在、已停用或不属于销售专员岗位");
+    ErrorCode LEAD_ASSIGNMENT_SCOPE_DENIED = new ErrorCode(1_900_001_003, "无权配置该员工的派单关系");
+    ErrorCode LEAD_ASSIGNMENT_MODE_INVALID = new ErrorCode(1_900_001_004, "不支持的派单关系操作模式");
+
+    ErrorCode USER_RELATION_SCENE_NOT_EXISTS = new ErrorCode(1_900_002_001, "用户关系场景不存在");
+    ErrorCode USER_RELATION_SCENE_DISABLED = new ErrorCode(1_900_002_002, "用户关系场景已停用");
+    ErrorCode USER_RELATION_SCENE_CODE_DUPLICATE = new ErrorCode(1_900_002_003, "用户关系场景编码已存在");
+    ErrorCode USER_RELATION_SCENE_CODE_IMMUTABLE = new ErrorCode(1_900_002_004, "用户关系场景编码创建后不可修改");
+    ErrorCode USER_RELATION_SCENE_IN_USE = new ErrorCode(1_900_002_005, "用户关系场景已有关系或操作日志，不能删除，请改为停用");
+    ErrorCode USER_RELATION_SCENE_POST_INVALID = new ErrorCode(1_900_002_006, "用户关系场景引用的岗位不存在");
+    ErrorCode USER_RELATION_SOURCE_INVALID = new ErrorCode(1_900_002_007, "来源用户不存在、已停用或不符合场景岗位要求");
+    ErrorCode USER_RELATION_TARGET_INVALID = new ErrorCode(1_900_002_008, "目标用户不存在、已停用或不符合场景岗位要求");
+    ErrorCode USER_RELATION_MODE_INVALID = new ErrorCode(1_900_002_009, "不支持的用户关系操作模式");
+
+    ErrorCode LEAD_CONTACT_REQUIRED = new ErrorCode(1_900_003_001, "手机号和微信号至少填写一个");
+    ErrorCode LEAD_CONTACT_CONFLICT = new ErrorCode(1_900_003_002, "手机号和微信号分别属于不同客户，请核对后重试");
+    ErrorCode LEAD_REGION_INVALID = new ErrorCode(1_900_003_003, "客户省市地区无效或层级不匹配");
+    ErrorCode LEAD_PRODUCT_REQUIRED = new ErrorCode(1_900_003_004, "至少选择一个意向课程且必须指定一个主意向课程");
+    ErrorCode LEAD_PRODUCT_DUPLICATE = new ErrorCode(1_900_003_005, "意向课程不能重复选择");
+    ErrorCode LEAD_PRODUCT_CATALOG_UNAVAILABLE = new ErrorCode(1_900_003_006, "产品配置服务暂不可用，请稍后重试");
+    ErrorCode LEAD_ATTACHMENT_INVALID = new ErrorCode(1_900_003_007, "客资附件不存在或不符合图片限制");
+    ErrorCode LEAD_SUBMISSION_DUPLICATE = new ErrorCode(1_900_003_008, "该提交请求已处理");
+    ErrorCode LEAD_NOT_EXISTS = new ErrorCode(1_900_003_009, "客资不存在");
+    ErrorCode LEAD_ASSIGNMENT_ALREADY_HANDLED = new ErrorCode(1_900_003_010, "该派单已处理或已超时");
+    ErrorCode LEAD_ASSIGNMENT_REJECT_FORBIDDEN = new ErrorCode(1_900_003_011, "指定派单不能拒绝");
+    ErrorCode LEAD_CLAIM_ALREADY_TAKEN = new ErrorCode(1_900_003_012, "该客资已被其他销售抢走");
+    ErrorCode LEAD_PERMISSION_DENIED = new ErrorCode(1_900_003_013, "无权访问或操作该客资");
+    ErrorCode LEAD_RULE_NOT_EXISTS = new ErrorCode(1_900_003_014, "客资派单规则不存在");
+    ErrorCode LEAD_RULE_INVALID = new ErrorCode(1_900_003_015, "客资派单规则参数无效");
+    ErrorCode LEAD_SPECIFIED_SALES_REQUIRED = new ErrorCode(1_900_003_016, "指定派单必须选择可派销售");
+    ErrorCode LEAD_MOBILE_INVALID = new ErrorCode(1_900_003_017, "手机号格式不正确");
+    ErrorCode LEAD_DISPATCH_MODE_INVALID = new ErrorCode(1_900_003_018, "派单模式无效");
+    ErrorCode LEAD_INBOX_FILTER_NOT_EXISTS = new ErrorCode(1_900_003_019, "客资筛选方案不存在或尚未发布");
+    ErrorCode LEAD_INBOX_FILTER_INVALID = new ErrorCode(1_900_003_020, "客资筛选方案配置无效");
+    ErrorCode LEAD_INBOX_FILTER_VERSION_NOT_EXISTS = new ErrorCode(1_900_003_021, "客资筛选方案版本不存在");
+    ErrorCode LEAD_FOLLOW_UP_RULE_NOT_EXISTS = new ErrorCode(1_900_003_022, "客资跟进规则不存在");
+    ErrorCode LEAD_FOLLOW_UP_RULE_INVALID = new ErrorCode(1_900_003_023, "客资跟进规则参数无效");
+    ErrorCode LEAD_FOLLOW_UP_STATE_INVALID = new ErrorCode(1_900_003_024, "当前客资状态不允许填写跟进记录");
+    ErrorCode LEAD_FOLLOW_UP_DICT_INVALID = new ErrorCode(1_900_003_025, "跟进方式、跟进结果或客资分类无效");
+    ErrorCode LEAD_FOLLOW_UP_TIME_INVALID = new ErrorCode(1_900_003_026, "下次跟进时间必须晚于当前时间");
+    ErrorCode LEAD_FOLLOW_UP_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_027, "跟进请求幂等键已被其他客资使用");
+    ErrorCode BUSINESS_TASK_BUCKET_INVALID = new ErrorCode(1_900_003_028, "待办时间分组无效");
+    ErrorCode LEAD_QUALIFICATION_STATE_INVALID = new ErrorCode(1_900_003_029, "当前客资状态不允许进行有效性判定");
+    ErrorCode LEAD_INVALID_REASON_INVALID = new ErrorCode(1_900_003_030, "无效原因不存在或已停用");
+    ErrorCode LEAD_QUALIFICATION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_031, "判定或处置请求幂等键已被其他客资使用");
+    ErrorCode LEAD_QUALIFICATION_EXCEPTION_TYPE_INVALID = new ErrorCode(1_900_003_032, "异常客资类型无效");
+    ErrorCode LEAD_QUALIFICATION_DISPOSITION_INVALID = new ErrorCode(1_900_003_033, "当前客资状态不允许执行该处置");
+    ErrorCode LEAD_QUALIFICATION_TRANSFER_TARGET_INVALID = new ErrorCode(1_900_003_034, "目标销售无效、不在管理范围内或与当前销售相同");
+    ErrorCode LEAD_QUALIFICATION_RESTORE_OWNER_INVALID = new ErrorCode(1_900_003_035, "原销售已停用或不再具备销售专员资格，请改用转派、回收或释放");
+    ErrorCode LEAD_APPEAL_STATE_INVALID = new ErrorCode(1_900_003_036, "当前客资状态或申诉轮次不允许提交申诉");
+    ErrorCode LEAD_APPEAL_NOT_EXISTS = new ErrorCode(1_900_003_037, "客资申诉不存在");
+    ErrorCode LEAD_APPEAL_ALREADY_HANDLED = new ErrorCode(1_900_003_038, "该申诉已由其他人员处理");
+    ErrorCode LEAD_APPEAL_REVIEWER_NOT_CONFIGURED = new ErrorCode(1_900_003_039, "申诉处理人员配置缺失或无效");
+    ErrorCode LEAD_APPEAL_CHAIRMAN_INVALID = new ErrorCode(1_900_003_040, "boss 角色必须且只能配置一名启用用户");
+    ErrorCode LEAD_APPEAL_PERMISSION_DENIED = new ErrorCode(1_900_003_041, "无权查看或处理该申诉");
+    ErrorCode LEAD_APPEAL_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_042, "申诉幂等键已被其他请求使用");
+    ErrorCode LEAD_APPEAL_PROCESS_UNAVAILABLE = new ErrorCode(1_900_003_043, "客资申诉流程尚未部署或暂不可用");
+
+    ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
+    ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");
+    ErrorCode PRODUCT_REF_IMMUTABLE = new ErrorCode(1_900_004_003, "产品稳定编号创建后不可修改");
+    ErrorCode PRODUCT_NOT_ENABLE = new ErrorCode(1_900_004_004, "产品未启用或已下架");
+    ErrorCode PRODUCT_IN_USE = new ErrorCode(1_900_004_005, "产品已被客资引用，不能删除，请改为停用");
+    ErrorCode PRODUCT_REFS_INVALID = new ErrorCode(1_900_004_006, "存在无效、停用或不属于当前租户的产品");
+    ErrorCode PRODUCT_CATEGORY_NOT_EXISTS = new ErrorCode(1_900_004_007, "产品分类不存在");
+    ErrorCode PRODUCT_CATEGORY_LEVEL_INVALID = new ErrorCode(1_900_004_008, "分类父级无效、已挂课程、形成循环或超过 10 层");
+    ErrorCode PRODUCT_CATEGORY_NAME_DUPLICATE = new ErrorCode(1_900_004_009, "同一上级下分类名称已存在");
+    ErrorCode PRODUCT_CATEGORY_IN_USE = new ErrorCode(1_900_004_010, "分类存在下级分类或产品，不能删除，请改为停用");
+    ErrorCode PRODUCT_CATEGORY_STATUS_INVALID = new ErrorCode(1_900_004_011, "产品分类状态无效");
+    ErrorCode PRODUCT_SKU_NOT_EXISTS = new ErrorCode(1_900_004_012, "课程 SKU 不存在");
+    ErrorCode PRODUCT_SKU_INVALID = new ErrorCode(1_900_004_013, "课程 SKU 已停用、属性无效或不属于所选课程");
+    ErrorCode PRODUCT_SKU_DUPLICATE = new ErrorCode(1_900_004_014, "同一课程下已存在相同属性组合的 SKU");
+    ErrorCode PRODUCT_SKU_IN_USE = new ErrorCode(1_900_004_015, "课程 SKU 已被客资引用，不能删除，请改为停用");
+    ErrorCode PRODUCT_PRICE_INVALID = new ErrorCode(1_900_004_016, "课程 SKU 价格不能小于 0");
+    ErrorCode PRODUCT_ATTR_INVALID = new ErrorCode(1_900_004_017, "课程销售属性或属性值无效");
+
+}

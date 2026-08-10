@@ -1,0 +1,93 @@
+package cn.iocoder.yudao.module.zsjos.enums;
+
+public interface LeadConstants {
+
+    String DICT_SOURCE_CHANNEL = "zsjos_lead_source_channel";
+    String DICT_CATEGORY = "zsjos_lead_category";
+    String DICT_FOLLOW_UP_METHOD = "zsjos_lead_follow_up_method";
+    String DICT_FOLLOW_UP_RESULT = "zsjos_lead_follow_up_result";
+    String DICT_FOLLOW_UP_QUICK_NOTE = "zsjos_lead_follow_up_quick_note";
+    String DICT_INVALID_REASON = "zsjos_lead_invalid_reason";
+    String DICT_INVALID_REMARK_TEMPLATE = "zsjos_lead_invalid_remark_template";
+    String REGION_OTHER = "OTHER";
+
+    String SOURCE_INTERNAL_NEW_MEDIA = "internal_new_media";
+    String STATUS_SUBMITTED = "submitted";
+    String STATUS_SUSPENDED = "suspended";
+    String STATUS_VALID = "valid";
+    String STATUS_INVALID = "invalid";
+    String ASSIGNMENT_UNASSIGNED = "unassigned";
+    String ASSIGNMENT_PENDING = "pending_acceptance";
+    String ASSIGNMENT_OWNED = "owned";
+    String ASSIGNMENT_PUBLIC_POOL = "public_pool";
+    String ASSIGNMENT_RECYCLE_PENDING = "recycle_pending";
+    String INBOX_AUDIENCE_SUBMITTER = "submitter";
+    String INBOX_AUDIENCE_OWNER = "owner";
+    String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
+    String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
+    String INBOX_FILTER_FIELD_STATUS = "status";
+    String INBOX_FILTER_FIELD_ASSIGNMENT_STATUS = "assignment_status";
+    String DISPATCH_AUTO = "auto";
+    String DISPATCH_SPECIFIED = "specified";
+
+    String RULE_DEFAULT = "default";
+    String FOLLOW_UP_RULE_DEFAULT = "default";
+    String STRATEGY_GLOBAL_ROUND_ROBIN = "global_round_robin";
+    String SALES_POST_CODE = "sales_specialist";
+
+    String ACTION_DISPATCH = "dispatch";
+    String ACTION_ACCEPT = "accept";
+    String ACTION_REJECT = "reject";
+    String ACTION_TIMEOUT = "timeout";
+    String ACTION_PUBLIC_POOL = "public_pool";
+    String ACTION_CLAIM = "claim";
+    String ACTION_TRANSFER = "transfer";
+    String ACTION_RESTORE = "restore";
+    String ACTION_RECYCLE = "recycle";
+    String ACTION_RELEASE = "release_to_claim_pool";
+
+    String WS_MESSAGE_TYPE = "zsjos_lead_assignment";
+    String TASK_TYPE_ASSIGNMENT_ACCEPT = "lead_assignment_accept";
+    String TASK_TYPE_FIRST_FOLLOW_UP = "lead_first_follow_up";
+    String TASK_TYPE_FOLLOW_UP_REMINDER = "lead_follow_up_reminder";
+    String TASK_TYPE_QUALIFICATION = "lead_qualification";
+    String TASK_STATUS_PENDING = "pending";
+    String ASSIGNEE_TYPE_USER = "user";
+    String BIZ_TYPE_LEAD = "lead";
+    String EVENT_LEAD_ACCEPTED = "lead_assignment_accepted";
+    String EVENT_LEAD_CLAIMED = "lead_claimed";
+    String EVENT_LEAD_TRANSFERRED = "lead_transferred";
+    String EVENT_LEAD_FOLLOW_UP_RECORDED = "lead_follow_up_recorded";
+    String EVENT_LEAD_CATEGORY_CHANGED = "lead_category_changed";
+    String EVENT_LEAD_QUALIFICATION_STARTED = "lead_qualification_started";
+    String EVENT_LEAD_QUALIFIED_VALID = "lead_qualified_valid";
+    String EVENT_LEAD_QUALIFIED_INVALID = "lead_qualified_invalid";
+    String EVENT_LEAD_SUSPENDED = "lead_suspended";
+    String EVENT_LEAD_RESTORED = "lead_restored";
+    String EVENT_LEAD_RECYCLED = "lead_recycled";
+    String EVENT_LEAD_RELEASED = "lead_released_to_claim_pool";
+    String EVENT_LEAD_APPEAL_SUBMITTED = "lead_appeal_submitted";
+    String EVENT_LEAD_APPEAL_OVERTURNED = "lead_appeal_overturned";
+    String EVENT_LEAD_APPEAL_UPHELD = "lead_appeal_upheld";
+    String APPEAL_PROCESS_DEFINITION_KEY = "zsjos_lead_appeal_review";
+    String APPEAL_TASK_DEFINITION_KEY = "appealReview";
+    String APPEAL_BUSINESS_KEY_PREFIX = "lead-appeal:";
+    String APPEAL_STAGE_SALES_MANAGER = "sales_manager";
+    String APPEAL_STAGE_QUALITY = "quality";
+    String APPEAL_STAGE_CHAIRMAN = "chairman";
+    String APPEAL_STATUS_SALES_MANAGER_REVIEWING = "sales_manager_reviewing";
+    String APPEAL_STATUS_QUALITY_REVIEWING = "quality_reviewing";
+    String APPEAL_STATUS_CHAIRMAN_REVIEWING = "chairman_reviewing";
+    String APPEAL_STATUS_OVERTURNED = "overturned";
+    String APPEAL_STATUS_UPHELD = "upheld";
+    String ROLE_QUALITY_MANAGER = "quality_manager";
+    String ROLE_QUALITY_SPECIALIST = "quality_specialist";
+    String ROLE_CHAIRMAN = "boss";
+    String PERMISSION_APPEAL_REVIEW_SALES_MANAGER = "zsjos:lead:appeal:review-sales-manager";
+    String PERMISSION_APPEAL_REVIEW_QUALITY = "zsjos:lead:appeal:review-quality";
+    String PERMISSION_APPEAL_REVIEW_CHAIRMAN = "zsjos:lead:appeal:review-chairman";
+    int MAX_ATTACHMENTS = 9;
+    long MAX_ATTACHMENT_SIZE = 10L * 1024 * 1024;
+    int ATTACHMENT_URL_EXPIRATION_SECONDS = 600;
+
+}

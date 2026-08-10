@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             targetNamespace="https://zsjos.com/bpm">
+  <process id="zsjos_lead_appeal_review" name="客资申诉复核" isExecutable="true">
+    <startEvent id="StartEvent" name="提交申诉"/>
+    <sequenceFlow id="flow_start_review" sourceRef="StartEvent" targetRef="appealReview"/>
+    <userTask id="appealReview" name="客资申诉裁决" flowable:assignee="${assignee}">
+      <extensionElements>
+        <flowable:candidateStrategy>35</flowable:candidateStrategy>
+        <flowable:approveType>1</flowable:approveType>
+        <flowable:approveMethod>3</flowable:approveMethod>
+        <flowable:reasonRequire>true</flowable:reasonRequire>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${coll_userList}" flowable:elementVariable="assignee">
+        <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+    <sequenceFlow id="flow_review_end" sourceRef="appealReview" targetRef="EndEvent"/>
+    <endEvent id="EndEvent" name="完成"/>
+  </process>
+</definitions>
