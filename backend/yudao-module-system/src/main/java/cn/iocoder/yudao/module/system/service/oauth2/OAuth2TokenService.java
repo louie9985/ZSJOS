@@ -29,6 +29,14 @@ public interface OAuth2TokenService {
      */
     OAuth2AccessTokenDO createAccessToken(Long userId, Integer userType, String clientId, List<String> scopes);
 
+    OAuth2AccessTokenDO createAccessToken(Long userId, Integer userType, String clientId, List<String> scopes,
+                                          Integer refreshTokenValiditySeconds);
+
+    void removeExcessAccessTokens(Long userId, Integer userType, String clientId, int maxDevices);
+
+    OAuth2AccessTokenDO createAccessTokenWithLimit(Long userId, Integer userType, String clientId, List<String> scopes,
+                                                   Integer refreshTokenValiditySeconds, int maxDevices);
+
     /**
      * 刷新访问令牌
      *

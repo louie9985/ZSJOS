@@ -8,6 +8,31 @@ export function sumStatusCounts(counts: Record<string, number>): number {
   return Object.values(counts).reduce((total, count) => total + count, 0)
 }
 
+export function dictionaryDisplayLabel(
+  options: Array<{ value: string; label: string }>,
+  value?: string,
+  loadFailed = false
+): string {
+  if (!value) return '-'
+  const label = options.find(item => item.value === value)?.label
+  if (label) return label
+  return loadFailed ? '标签加载失败' : '标签未配置'
+}
+
+export function resolvedDisplayLabel(label?: string, value?: string): string {
+  if (!value) return '-'
+  return label || '标签未配置'
+}
+
+export function protocolDisplayLabel(
+  labels: Record<string, string>,
+  value: string | undefined,
+  unknownLabel: string
+): string {
+  if (!value) return '-'
+  return labels[value] || unknownLabel
+}
+
 export function defaultInboxStage(
   groups: Array<{ key: string; sections: Array<{ options: Array<{ key: string }> }> }>,
   groupKey: string

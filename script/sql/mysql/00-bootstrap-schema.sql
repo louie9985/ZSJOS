@@ -3008,6 +3008,8 @@ CREATE TABLE IF NOT EXISTS `system_notify_rule` (
   `recipient_roles` text NOT NULL,
   `specified_user_ids` text NOT NULL,
   `action_type` varchar(32) NOT NULL,
+  `timing_stage` varchar(16) DEFAULT NULL COMMENT '提醒阶段：advance/due/overdue',
+  `timing_offset_minutes` int DEFAULT NULL COMMENT '相对截止时间偏移分钟数',
   `status` tinyint NOT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -3513,6 +3515,16 @@ CREATE TABLE IF NOT EXISTS `zsjos_business_task` (
   KEY `idx_tenant_assignee_status_due` (`tenant_id`,`assignee_type`,`assignee_id`,`status`,`due_at`),
   KEY `idx_tenant_biz` (`tenant_id`,`biz_type`,`biz_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 非 BPM 业务任务';
+
+CREATE TABLE IF NOT EXISTS `zsjos_business_task_notify_stage` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `task_id` bigint NOT NULL, `notify_rule_id` bigint NOT NULL,
+  `stage` varchar(16) NOT NULL, `emitted_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_task_stage` (`tenant_id`,`task_id`,`stage`),
+  KEY `idx_tenant_rule` (`tenant_id`,`notify_rule_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务任务提醒阶段幂等记录';
 
 -- zsjos_customer_account
 CREATE TABLE IF NOT EXISTS `zsjos_customer_account` (
@@ -4590,5 +4602,30 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`),
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 用户关系场景表';
+
+-- ZSJOS 登录安全默认客户端与配置（可重复执行）
+INSERT INTO system_oauth2_client
+    (client_id, secret, name, logo, description, status, access_token_validity_seconds,
+     refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes,
+     auto_approve_scopes, authorities, resource_ids, additional_information)
+SELECT 'zsjos-pc', '$2a$10$K8KpY7uGvCx7m8VJQ5hWQe3tQg5yDYr2yAYlF6FQq5FzHj7qXqz6K', 'ZSJOS 电脑端', '', '中世健电脑端登录', 0, 7200, 604800,
+       '[]', '["password","refresh_token"]', '[]', '[]', '[]', '[]', '{}'
+WHERE NOT EXISTS (SELECT 1 FROM system_oauth2_client WHERE client_id = 'zsjos-pc' AND deleted = b'0');
+INSERT INTO system_oauth2_client
+    (client_id, secret, name, logo, description, status, access_token_validity_seconds,
+     refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes,
+     auto_approve_scopes, authorities, resource_ids, additional_information)
+SELECT 'zsjos-mobile', '$2a$10$K8KpY7uGvCx7m8VJQ5hWQe3tQg5yDYr2yAYlF6FQq5FzHj7qXqz6K', 'ZSJOS 手机端', '', '中世健手机端登录', 0, 7200, 604800,
+       '[]', '["password","refresh_token"]', '[]', '[]', '[]', '[]', '{}'
+WHERE NOT EXISTS (SELECT 1 FROM system_oauth2_client WHERE client_id = 'zsjos-mobile' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '电脑端最大登录设备数', 'zsjos.auth.pc.max-devices', '1', b'1', '正整数，最大 20'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.pc.max-devices' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '手机端最大登录设备数', 'zsjos.auth.mobile.max-devices', '1', b'1', '正整数，最大 20'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.mobile.max-devices' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '免密登录天数', 'zsjos.auth.remember-days', '7', b'1', '正整数，最大 365 天'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.remember-days' AND deleted = b'0');
 
 SET FOREIGN_KEY_CHECKS=1;

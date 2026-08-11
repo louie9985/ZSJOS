@@ -3008,6 +3008,8 @@ CREATE TABLE IF NOT EXISTS `system_notify_rule` (
   `recipient_roles` text NOT NULL,
   `specified_user_ids` text NOT NULL,
   `action_type` varchar(32) NOT NULL,
+  `timing_stage` varchar(16) DEFAULT NULL COMMENT '提醒阶段：advance/due/overdue',
+  `timing_offset_minutes` int DEFAULT NULL COMMENT '相对截止时间偏移分钟数',
   `status` tinyint NOT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -3513,6 +3515,16 @@ CREATE TABLE IF NOT EXISTS `zsjos_business_task` (
   KEY `idx_tenant_assignee_status_due` (`tenant_id`,`assignee_type`,`assignee_id`,`status`,`due_at`),
   KEY `idx_tenant_biz` (`tenant_id`,`biz_type`,`biz_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 非 BPM 业务任务';
+
+CREATE TABLE IF NOT EXISTS `zsjos_business_task_notify_stage` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `task_id` bigint NOT NULL, `notify_rule_id` bigint NOT NULL,
+  `stage` varchar(16) NOT NULL, `emitted_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_task_stage` (`tenant_id`,`task_id`,`stage`),
+  KEY `idx_tenant_rule` (`tenant_id`,`notify_rule_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务任务提醒阶段幂等记录';
 
 -- zsjos_customer_account
 CREATE TABLE IF NOT EXISTS `zsjos_customer_account` (

@@ -12,7 +12,7 @@ import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferr
 const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 const PAGE_SIZE = 10
 
-type Values = { method: string; result: string; leadCategory?: string; remark?: string; nextFollowUpAt?: dayjs.Dayjs }
+type Values = { method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
 
 export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDirtyChange, onTotalChange }: {
   lead: ManagedLead; open: boolean; onClose: () => void; onChanged?: () => void
@@ -90,7 +90,6 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
 
   return <section className="lead-follow-up-panel">
     <Modal title="新增跟进" open={open} onCancel={onClose} footer={null} destroyOnHidden width={760}>
-    {lead.status === 'invalid' && <Alert type="info" showIcon message="本次跟进仅作为客资证据记录，下次跟进时间不会生成待办。"/>}
     <Form form={form} layout="vertical" className="follow-up-form" onFinish={submit} onValuesChange={() => setDirty(true)}>
       <div className="follow-up-field-grid">
         <Form.Item name="method" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}><Select options={methods.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
@@ -98,8 +97,8 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
         <Form.Item name="leadCategory" label="客资分类"><Select allowClear options={categories.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
       </div>
       {quickNotes.length > 0 && <Space wrap className="follow-up-quick-notes">{quickNotes.map(note => <Button size="small" key={note.value} onClick={() => appendNote(note.label)}>{note.label}</Button>)}</Space>}
-      <Form.Item name="remark" label="跟进备注"><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
-      <Form.Item name="nextFollowUpAt" label="下次跟进时间">
+      <Form.Item name="remark" label="跟进备注" rules={[{ required: true, whitespace: true, message: '请输入跟进备注' }]}><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
+      <Form.Item name="nextFollowUpAt" label="下次跟进时间" rules={[{ required: true, message: '请选择下次跟进时间' }, { validator: (_, value) => !value || value.isAfter(dayjs()) ? Promise.resolve() : Promise.reject(new Error('下次跟进时间必须晚于当前时间')) }]}>
         <DatePicker showTime format="YYYY-MM-DD HH:mm" disabledDate={date => date.endOf('day').isBefore(dayjs())}/>
       </Form.Item>
       <Space wrap className="follow-up-day-shortcuts">{QUICK_DAYS.map(days => <Button size="small" key={days} onClick={() => { form.setFieldValue('nextFollowUpAt', dayjs().add(days, 'day')); setDirty(true) }}>+{days} 天</Button>)}</Space>

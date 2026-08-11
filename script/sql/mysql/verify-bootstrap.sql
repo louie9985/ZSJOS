@@ -41,11 +41,24 @@ SELECT 'claim_pool_v003' AS check_name,
 SELECT 'lead_filter_schemes' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=2, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_menu' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6773 AND permission='zsjos:lead-filter:query' AND component='zsjos/leadFilter/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_v005' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V005'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_filter_keys_v032' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V032')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_lead_inbox_filter_scheme
+            WHERE audience='reviewer' AND deleted=b'0'
+              AND (draft_config_json LIKE '%\"key\":\"registrationReview\"%'
+                OR draft_config_json LIKE '%\"key\": \"registrationReview\"%'
+                OR draft_config_json LIKE '%\"key\":\"financeReview\"%'
+                OR draft_config_json LIKE '%\"key\": \"financeReview\"%'
+                OR published_config_json LIKE '%\"key\":\"registrationReview\"%'
+                OR published_config_json LIKE '%\"key\": \"registrationReview\"%'
+                OR published_config_json LIKE '%\"key\":\"financeReview\"%'
+                OR published_config_json LIKE '%\"key\": \"financeReview\"%')),
+          'PASS', 'FAIL') AS result;
 SELECT 'default_follow_up_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_accept_permission' AS check_name,
@@ -248,6 +261,7 @@ FROM (
   UNION ALL SELECT 'zsjos_lead' UNION ALL SELECT 'zsjos_product' UNION ALL SELECT 'zsjos_product_sku'
   UNION ALL SELECT 'zsjos_lead_inbox_filter_scheme' UNION ALL SELECT 'zsjos_lead_inbox_filter_version'
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
+  UNION ALL SELECT 'zsjos_business_task_notify_stage'
   UNION ALL SELECT 'zsjos_lead_follow_up_record' UNION ALL SELECT 'zsjos_lead_follow_up_image'
   UNION ALL SELECT 'system_notify_rule' UNION ALL SELECT 'system_area'
   UNION ALL SELECT 'crm_owner_record' UNION ALL SELECT 'crm_performance_config'

@@ -38,6 +38,9 @@ public class NotifyBusinessEventProcessor {
             return;
         }
         for (NotifyRuleDO rule : notifyRuleService.getEnabledRules(event.getSceneCode())) {
+            if (event.getTargetRuleId() != null && !event.getTargetRuleId().equals(rule.getId())) {
+                continue;
+            }
             try {
                 String channelCode = rule.getChannelCode() == null || rule.getChannelCode().isBlank()
                         ? NotifyChannelType.IN_APP : rule.getChannelCode();

@@ -89,6 +89,8 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
   }, [open, lead.id, orderId])
 
   const options = (type: string) => (dicts[type] || []).map(item => ({ value: item.value, label: item.label }))
+  const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
+    ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const submit = async (values: Values) => {
     const validationError = validateSalesOrderSubmission(values.mobile, values.wechatId, total, vouchers.length)
     if (validationError) { message.warning(validationError); return }
@@ -136,8 +138,8 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentNature" label="学员性质" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_NATURE)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号"><Input maxLength={64}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市"/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">报名与服务</Divider>

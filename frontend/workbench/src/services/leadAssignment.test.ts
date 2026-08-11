@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import type { PendingLead } from './api'
-import { formatCountdown, isPendingLeadExpired, shouldShowAssignmentModal, sortPendingLeads } from './leadAssignment'
+import {
+  ASSIGNMENT_REFRESH_RETRY_DELAYS_MS,
+  formatCountdown,
+  hasPendingLead,
+  isPendingLeadExpired,
+  shouldFocusAssignmentEvent,
+  shouldShowAssignmentModal,
+  sortPendingLeads
+} from './leadAssignment'
 
 const pending = (id: number, remainingSeconds?: number, submittedAt = 1786240800000): PendingLead => ({
   id, dispatchMode: remainingSeconds == null ? 'specified' : 'auto', maskedName: `客户 ${id}`,
@@ -28,5 +36,19 @@ describe('lead assignment queue', () => {
   it('does not show the assignment modal over a business editing overlay', () => {
     expect(shouldShowAssignmentModal(true, 1)).toBe(false)
     expect(shouldShowAssignmentModal(true, 0)).toBe(true)
+  })
+
+  it('focuses only events that create a new pending assignment', () => {
+    expect(shouldFocusAssignmentEvent('assigned')).toBe(true)
+    expect(shouldFocusAssignmentEvent('reassigned')).toBe(true)
+    expect(shouldFocusAssignmentEvent('transferred')).toBe(true)
+    expect(shouldFocusAssignmentEvent('accepted')).toBe(false)
+    expect(shouldFocusAssignmentEvent('expired')).toBe(false)
+  })
+
+  it('retries a targeted refresh until the assigned lead becomes visible', () => {
+    expect(ASSIGNMENT_REFRESH_RETRY_DELAYS_MS).toEqual([0, 300, 900])
+    expect(hasPendingLead([pending(1), pending(2)], 2)).toBe(true)
+    expect(hasPendingLead([pending(1)], 2)).toBe(false)
   })
 })

@@ -29,6 +29,19 @@
 - Dependency / integration impact: Future workstreams must begin from committed state and use separate branches, worktrees, and handoff files. No branch, worktree, commit, merge, or push operation was performed.
 - Remaining work: None.
 
+### 2026-08-11 16:47:59 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Fix the Workbench login Network Error and consolidate duplicate port 5174 development servers.
+- Key decisions: Use the existing same-origin `/admin-api` Vite proxy to backend port 48080; keep Admin port 80 and backend port 48080 unchanged; replace both old Workbench Vite instances with one strict port 5174 process.
+- Execution or analysis result: Changed the local Workbench API base from the inactive absolute port 48081 to `/admin-api`, stopped the duplicate Vite processes, and started one hidden Workbench Vite instance on `0.0.0.0:5174`.
+- Changed files: Untracked local configuration `frontend/workbench/.env.local`; `handoff/20260810-main-existing.md`.
+- Verification evidence: `OPTIONS http://127.0.0.1:5174/admin-api/system/auth/login` returned HTTP 204 through the proxy; port 5174 has exactly one listener (PID 30688); backend port 48080 remains listening; port 48081 is not listening; no `48081` reference remains in Workbench environment/source files.
+- Dependency / integration impact: Local development configuration and process state only. No production configuration, dependency, database, permission, backend port, commit, or push changed.
+- Remaining work: None. The local `.env.local` intentionally remains untracked.
+
 ### 2026-08-10 19:19:14 +08:00
 
 - Branch: `main`
@@ -444,3 +457,94 @@
 - Verification evidence: `git diff --check` passed before the handoff append; targeted rule search confirmed the file-change trigger, explicit add/delete/modify scope, and no-change exclusion. A final diff check is required after this entry.
 - Dependency / integration impact: Repository workflow policy only. No application behavior, dependency, branch, worktree, commit, push, or external state changed.
 - Remaining work: None.
+
+### 2026-08-11 17:02:48 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Audit Workbench forms so Ant Design's visible English `optional` and default `Cancel` text are Chinese, and show “手机号、微信号必填其中一个” as a persistent form hint rather than a validation error.
+- Key decisions: Configure the existing global `ConfigProvider` with Ant Design `zh_CN`; keep `requiredMark="optional"` and `onCancel` as internal API identifiers; place the contact requirement in the mobile field's persistent `extra` text; use “请填写手机号或微信号” only for missing-contact validation.
+- Execution or analysis result: Global Ant Design defaults now render “（可选）” and “取消”. Lead submission, lead basic-information editing, and sales-order entry display the contact requirement persistently. Basic-information and sales-order forms now validate the mobile/WeChat pair symmetrically.
+- Changed files: `frontend/workbench/src/components/Theme/ThemeProvider.tsx`; `frontend/workbench/src/pages/LeadSubmissionPage.tsx`; `frontend/workbench/src/components/LeadBasicInfoModal.tsx`; `frontend/workbench/src/components/SalesOrderEntryModal.tsx`; `frontend/workbench/src/services/salesOrder.ts`; `frontend/workbench/src/services/salesOrder.test.ts`; this handoff entry.
+- Verification evidence: Workbench `npm test` passed 56/56; `npm run typecheck` passed; `npm run build` passed with the existing bundle-size warning; locale inspection confirmed modal `cancelText` is “取消” and form optional text is “（可选）”; targeted source search found no old contact message or visible hard-coded `Cancel`; `git diff --check` passed before this entry. Browser checks at desktop and 390x844 were attempted, but the current account redirects `/zsjos/leads/submit` to `/zsjos/appeals` because it lacks form-page permission.
+- Dependency / integration impact: No new dependency, API, schema, service, port, branch, worktree, commit, or external-state change. Existing `.env.local` and prior handoff edits were preserved.
+- Remaining work: Recheck the three forms in a browser with an account authorized for客资提交、客资基础信息编辑和成交录入; implementation checks are otherwise complete.
+
+### 2026-08-11 18:02:26 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Make newly assigned leads open the Workbench assignment modal immediately without requiring the user to open the message center.
+- Key decisions: Treat `assigned`, `reassigned`, and `transferred` WebSocket events as modal-opening signals; focus and undefer the event lead; query immediately and retry after 300 ms and 900 ms; keep the existing business-overlay exclusion and 15-second polling fallback; accept only the latest pending-list response; refresh once whenever WebSocket reconnects.
+- Execution or analysis result: The global assignment host now consumes the assignment event payload directly, performs a targeted retry sequence until the assigned lead is queryable, prevents older requests from overwriting newer state, and refreshes after WebSocket connection recovery. Other assignment event types still refresh the queue without forcing a modal. Message-center navigation remains an optional fallback rather than a prerequisite.
+- Changed files: `frontend/workbench/src/components/LeadAssignmentHost.tsx`; `frontend/workbench/src/services/leadAssignment.ts`; `frontend/workbench/src/services/leadAssignment.test.ts`; this handoff entry.
+- Verification evidence: Workbench focused tests passed 10/10; complete `npm test` passed 58/58; `npm run typecheck` passed; `npm run build` passed with the existing bundle-size warning; `git diff --check` passed before this entry. Browser smoke testing confirmed the local login surface loads and has no horizontal overflow at 390x844, but a real assignment modal could not be exercised because the isolated browser session had no authenticated account or seeded assignment.
+- Dependency / integration impact: No new dependency, backend behavior, API, schema, database data, service configuration, branch, worktree, commit, push, or external-state change. Existing unrelated Workbench and local environment changes were preserved.
+- Remaining work: Perform one authenticated end-to-end automatic assignment and one specified assignment to verify live WebSocket delivery and modal opening in the deployed runtime.
+
+### 2026-08-11 18:52:02 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Implement independent PC/mobile login-device limits and an administrator-configurable password-free refresh-token period.
+- Key decisions: Use explicit `PC`/`MOBILE` login platform values mapped to OAuth2 clients `zsjos-pc` and `zsjos-mobile`; count valid refresh-token sessions per user and client; serialize replacement with a Redis compare-and-delete lock; evict the oldest same-client session before issuing the new token; use Infra system configuration for limits and remember days; preserve legacy `default` client refresh compatibility when no stored client ID exists; never persist the account password.
+- Execution or analysis result: PC and mobile logins now have independent configurable limits with defaults of one device each, and excess logins revoke the oldest same-platform access and refresh tokens. Refresh-token lifetime defaults to seven days and is configurable up to 365 days. Configuration failures fall back to explicit defaults with a searchable warning. The Admin and Workbench clients persist the returned OAuth2 client ID for refresh, clear it on logout, and omit it for legacy sessions. Workbench password caching and the old remember-password control were removed. Existing Infra configuration management exposes the three protected `ZSJOS登录安全` system entries through `infra:config:query`/`infra:config:update`.
+- Changed files: `backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/enums/ErrorCodeConstants.java`; `backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/service/config/ConfigServiceImpl.java`; `backend/yudao-module-infra/src/test/java/cn/iocoder/yudao/module/infra/service/config/ConfigServiceImplTest.java`; System auth/OAuth2 controller, VO, constant, mapper, service, and focused test files under `backend/yudao-module-system`; `frontend/admin/src/api/login/index.ts`; `frontend/admin/src/api/login/types.ts`; `frontend/admin/src/config/axios/service.ts`; `frontend/admin/src/utils/auth.ts`; `frontend/workbench/src/constants.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/services/api.ts`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/migrations/V030__zsjos_login_security.sql`; `docs/architecture/data-and-permission-flow.md`; this handoff entry.
+- Verification evidence: Focused Maven reactor tests passed 46/46: `ConfigServiceImplTest` 15, `AdminAuthServiceImplTest` 17, and `OAuth2TokenServiceImplTest` 14. Workbench `npm test` passed 58/58, `npm run typecheck` passed, and `npm run build` passed with the existing bundle-size warning. Admin `pnpm build:local` passed with the existing legacy CSS minifier warning. The earlier full Admin `vue-tsc` check remains red only on unrelated pre-existing `PostSimpleVO`, CRM funnel, user, and workstation type errors. `git diff --check` passed. V030 uses guarded inserts and records `V030` in `zsjos_schema_version` with an idempotent duplicate-key update.
+- Dependency / integration impact: No new dependency. Adds two OAuth2 client records and three Infra configuration records when V030 is applied. No migration, database write, service restart, account/permission change, branch operation, commit, push, or publication was performed. Unrelated Workbench and local `.env.local` changes were preserved.
+- Remaining work: Migration continuity still lacks `V022`, so V030 must not be applied until the numbered sequence is resolved and reviewed. After controlled migration and backend/frontend deployment, perform authenticated PC-PC, mobile-mobile, PC-mobile, concurrent-login, refresh-expiry, current-device logout, and unauthorized/runtime 401 checks using real sessions.
+
+### 2026-08-11 20:25:44 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Make follow-up remark and next-follow-up time mandatory, cancel pending follow-up reminders when a lead becomes invalid or an order becomes effective, and implement the confirmed unified in-app/WebSocket notification matrix without a fictitious education-department approval role.
+- Key decisions: Require a future next-follow-up time; block follow-ups for invalid leads; preserve follow-up history while clearing current reminder timestamps and canceling pending tasks; model timed reminders as tenant-configurable `advance`/`due`/`overdue` notification rules; send only the most urgent currently applicable stage and mark earlier applicable stages handled; use only the current department leader for `direct_leader`; resolve all eligible sales through assignment eligibility; notify actual sales-order reviewer snapshots and the order submitter; derive approval labels from configured departments with `报名履约中心审批` and `财务结算中心审批` fallbacks while retaining internal BPM keys; route workbench notification clicks to permission-checked business destinations.
+- Execution or analysis result: Implemented backend validation and lifecycle cancellation, timed-task scanning and stage idempotency, System notification timing configuration/API support, lead qualification-result and sales-order scenes, recipient resolution, dynamic approval labels, workbench message navigation, Admin timing controls, additive V031 bootstrap/migration/schema artifacts, and directly affected documentation. Final review fixed lost `targetRuleId` propagation so a timed event addresses only its configured rule, guarded null approval department IDs, and verified qualification due-stage emission happens before task cancellation. The old standalone qualification-suspended notification is no longer emitted.
+- Changed files: System notification DTO/API/rule/processor/provider files and focused tests under `backend/yudao-module-system`; BPM notification scene constructor compatibility; ZSJOS follow-up VO/service, lead management/qualification/lifecycle/notification/filter services, business-task mapper/model/reminder scheduler/service, sales-order notification/service files, and focused tests under `backend/yudao-module-zsjos`; `frontend/workbench/src/components/LeadFollowUpPanel.tsx`; `frontend/workbench/src/components/NotifyMessageProvider.tsx`; Admin notification-rule API/view; `script/sql/mysql/migrations/V031__timed_business_notifications.sql`; bootstrap/core schema, seed, verification, migration README, architecture/API documentation; this handoff entry. Existing unrelated authentication, assignment, form, local environment, V030, and generated metadata changes were preserved.
+- Verification evidence: Backend ZSJOS reactor compile passed. Focused backend suite passed 31/31 in the final broad run (System 7 and ZSJOS 24), followed by a final reminder regression run passing 10/10 (System 1 and ZSJOS 9). Workbench `npm test -- --run` passed 58/58, `npm run typecheck` passed, and `npm run build` passed. Admin scoped notification ESLint and `pnpm build:local` passed. SQL static checks confirmed exactly one V031 migration/version record, timing columns and stage table in both schema files, and bootstrap inclusion. `git diff --check` passed before this entry. Full Maven reactor execution remains blocked by the unrelated pre-existing Infra `CodegenEngineUniappTest.testExecute_treeSearch`; global Admin `pnpm ts:check` remains blocked by five unrelated pre-existing BPM/MES/CRM/Post type errors.
+- Dependency / integration impact: No new dependency. V031 adds System notification timing columns, the ZSJOS task-stage idempotency table, templates, and per-tenant default rules when applied. No migration, database write, service restart, BPM deployment, account/permission change, branch/worktree operation, commit, push, or publication was performed.
+- Remaining work: Run the controlled migration only after migration continuity is approved, then restart/deploy and perform authenticated desktop/mobile notification and WebSocket checks with seeded due tasks and approval actors. The existing System business-event listener is AFTER_COMMIT asynchronous best-effort; a process crash after stage commit but before event consumption is not durably retried. Guaranteed delivery requires a separately approved persistent outbox/delivery-retry design rather than claiming reliability from the current stage table.
+
+### 2026-08-11 21:09:54 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Audit all lead inbox filter configurations for conflicting fields and apply a unified fix.
+- Key decisions: Keep BPM task-definition values `registrationReview` / `financeReview` unchanged; normalize only filter option keys to `registration_review` / `finance_review`; validate condition fields explicitly by `audience`; require the top-level `all` group only for submitter and owner schemes; preserve immutable version snapshots and the applied V029 migration; add a forward-only V032 migration for current reviewer draft/published JSON.
+- Execution or analysis result: Fixed the reviewer seed/key validation conflict, removed the frontend's incorrect reviewer `all`-group requirement, added duplicate/format/count validation before submission, enforced audience-specific backend fields and full structural bounds, normalized legacy reviewer keys on read/save/publish/rollback, corrected the expected initial filter-version count from two to three, and synchronized architecture and migration documentation.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadInboxFilterConfigServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadInboxFilterConfigServiceImplTest.java`; `frontend/admin/src/views/zsjos/leadFilter/index.vue`; `script/sql/mysql/02-bootstrap-zsjos-seed.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/V032__normalize_lead_inbox_filter_keys.sql`; `script/sql/mysql/migrations/README.md`; `docs/architecture/data-and-permission-flow.md`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Focused Maven reactor test passed 8 tests with 0 failures/errors; target Vue ESLint passed; Admin `pnpm build:local` passed; `git diff --check` passed. Full Admin `pnpm ts:check` remains blocked by five unrelated existing type errors in BPM designer, CRM funnel, MES workstation, and System user files. Browser reached the local Admin login page but protected-page verification was blocked by the running environment error `请求的租户标识未传递`; no shared service or login configuration was changed. SQL was reviewed for scope, ordering, repeatability, JSON spacing variants, preserved BPM values, and unchanged immutable snapshots; it was not executed.
+- Dependency / integration impact: No new dependency, permission, BPM key, or historical version change. Deploying the backend/frontend and applying V032 are required for existing environments; migration execution remains separately approval-gated.
+- Remaining work: Apply V032 through the controlled deployment migration flow, rebuild/restart the application, fix the unrelated Admin typecheck baseline, and repeat authenticated desktop/mobile browser verification when tenant login is operational.
+
+### 2026-08-11 21:11:18 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Record the final broad-test result for the completed lead inbox filter consistency fix.
+- Key decisions: Preserve the previous delivery entry and append this correction as required; do not modify unrelated timed-notification work to make a direct-module test command pass.
+- Execution or analysis result: The direct full ZSJOS module test command did not reach test execution because JUnit discovery could not load the unrelated uninstalled System DTO `NotifyTimingRuleRespDTO` referenced by `BusinessTaskReminderServiceTest`.
+- Changed files: `handoff/20260810-main-existing.md` only for this appended correction.
+- Verification evidence: `mvn -f backend/yudao-module-zsjos/pom.xml test` ran 0 tests and failed during discovery with `NoClassDefFoundError: cn/iocoder/yudao/module/system/api/notify/dto/NotifyTimingRuleRespDTO`. The reactor-based focused filter suite remains valid and passed 8/8 because it built current System dependencies before ZSJOS.
+- Dependency / integration impact: None for the filter fix. The broad direct-module test requires the current System module artifacts to be installed or the full reactor to be run after unrelated work is integrated.
+- Remaining work: Re-run the complete ZSJOS suite through a current reactor/install once the timed-notification dependency state is integrated; retain the previously listed deployment, migration, and authenticated browser checks.
+
+### 2026-08-11 21:45:37 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6417d6daba30bf53011ce2711557674045fb5ef5`
+- User goal: Fix all lead-detail surfaces that display stable dictionary or protocol keys instead of user-facing labels.
+- Key decisions: Preserve dictionary keys as the write and transport source of truth; split pending/claim-pool response keys from optional server-resolved labels; never invent business dictionary options; show explicit label-loading, label-missing, or unknown-status text instead of presenting a key as a label; prefer the persisted invalid-reason label snapshot.
+- Execution or analysis result: Workbench submitted/owned lead details now distinguish dictionary load failures from missing entries, unknown protocol states no longer expose raw keys, pending-assignment and claim-pool views consume separate label fields, and both Workbench and Admin invalid-reason details use the stored label snapshot. The pending and claim-pool API now keeps `sourceChannel` and `leadCategory` as stable keys and returns `sourceChannelLabel` and `leadCategoryLabel` separately.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/dispatch/LeadPendingRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadDispatchServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadDispatchServiceImplTest.java`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/services/leadManagement.ts`; `frontend/workbench/src/services/leadManagement.test.ts`; `frontend/workbench/src/components/LeadAssignmentHost.tsx`; `frontend/workbench/src/pages/LeadClaimPoolPage.tsx`; `frontend/workbench/src/pages/LeadManagementPage.tsx`; `frontend/admin/src/views/zsjos/lead/index.vue`; `docs/api/zsjos-lead-submission-dispatch.md`; this handoff entry.
+- Verification evidence: Focused backend reactor tests passed 8/8; complete Workbench tests passed 61/61; final focused label tests passed 9/9; Workbench `npm run typecheck` and `npm run build` passed with the existing bundle-size warning; Admin `pnpm build:local` passed with the existing legacy CSS minifier warning; scoped Admin Prettier check passed. Full Admin `pnpm ts:check` remains blocked by five unrelated existing BPM/MES/CRM/Post type errors. Browser smoke checks loaded the Workbench login surface at desktop and 390x844, with mobile `scrollWidth` equal to viewport width; authenticated lead details could not be exercised because the isolated browser had no login session. `git diff --check` passed before this entry apart from one corrected trailing space.
+- Dependency / integration impact: No new dependency, dictionary data, schema, migration, database write, permission, service configuration, branch/worktree operation, commit, push, or publication. API consumers of pending and claim-pool responses should use the new optional label fields for display; stable key fields retain their original semantic meaning.
+- Remaining work: Deploy backend and frontends together, then run authenticated desktop/mobile checks for submitted leads, owned leads, pending assignment, claim pool, and Admin details with one configured dictionary value and one historical missing value. The existing unrelated Admin typecheck baseline still needs separate repair.

@@ -17,6 +17,9 @@ import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileTypeUtils;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.*;
@@ -32,6 +35,7 @@ import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -47,6 +51,7 @@ import java.util.*;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
@@ -69,6 +74,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private LeadInboxFilterConfigService inboxFilterConfigService;
+    @Resource private LeadLifecycleTaskService lifecycleTaskService;
+    @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Resource private DeptApi deptApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -311,7 +319,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         OpportunityDO opportunity = opportunityMapper.selectById(order.getOpportunityId());
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_APPROVED); order.setStatus(STATUS_EFFECTIVE); order.setEffectiveAt(now);
-            if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_WON); opportunity.setWonAt(now); opportunityMapper.updateById(opportunity); }
+            if (opportunity != null) {
+                opportunity.setStatus(OPPORTUNITY_STATUS_WON); opportunity.setWonAt(now);
+                opportunity.setNextFollowUpAt(null); opportunityMapper.updateById(opportunity);
+            }
+            LeadDO lead = leadMapper.selectById(order.getLeadId());
+            if (lead != null) {
+                lead.setNextFollowUpAt(null);
+                leadMapper.updateById(lead);
+            }
+            lifecycleTaskService.cancelFirstFollowUpTasks(order.getLeadId(), now, "成交订单已生效");
+            lifecycleTaskService.cancelFollowUpReminders(order.getLeadId(), now, "成交订单已生效");
         } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
@@ -320,6 +338,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
         }
         round.setCompletedAt(now); roundMapper.updateById(round); orderMapper.updateById(order);
+        publishOrderNotification(BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)
+                        ? EFFECTIVE : BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus) ? REJECTED : CANCELLED,
+                order, "sales-order-result:" + round.getId(), List.of(), reason, now);
     }
 
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
@@ -350,6 +371,26 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         round.setSubmittedAt(now); round.setSubmissionIdempotencyKey(idempotencyKey); roundMapper.insert(round);
         order.setCurrentApprovalRoundId(round.getId()); order.setSubmittedAt(now); orderMapper.updateById(order);
         opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL); opportunityMapper.updateById(opportunity);
+        publishOrderNotification(SUBMITTED, order, "sales-order-submitted:" + round.getId(),
+                java.util.stream.Stream.concat(registrationUsers.stream(), financeUsers.stream()).distinct().toList(),
+                null, now);
+    }
+
+    private void publishOrderNotification(String sceneCode, SalesOrderDO order, String sourceEventKey,
+                                          List<Long> reviewers, String reason, LocalDateTime occurredAt) {
+        SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
+        List<String> departments = config == null ? List.of() : java.util.stream.Stream.of(
+                        config.getRegistrationDeptId(), config.getFinanceDeptId())
+                .filter(Objects::nonNull).map(deptApi::getDept)
+                .filter(Objects::nonNull).map(item -> item.getName()).filter(Objects::nonNull).toList();
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("reviewerUserIds", reviewers); payload.put("submitterUserId", order.getSubmitterUserId());
+        payload.put("approvalDepartments", String.join("、", departments));
+        payload.put("decisionReason", StrUtil.blankToDefault(reason, ""));
+        notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
+                .tenantId(TenantContextHolder.getRequiredTenantId()).sceneCode(sceneCode).sourceEventKey(sourceEventKey)
+                .bizType("sales_order").bizId(order.getId()).operatorUserId(null).occurredAt(occurredAt)
+                .payload(payload).build());
     }
 
     private LeadDO requireEligibleLead(Long leadId, Long userId) {

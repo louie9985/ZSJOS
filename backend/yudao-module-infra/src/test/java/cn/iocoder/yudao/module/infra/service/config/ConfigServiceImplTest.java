@@ -68,6 +68,30 @@ public class ConfigServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testCreateConfig_zsjosLoginValueMustBePositiveInteger() {
+        ConfigSaveReqVO reqVO = randomPojo(ConfigSaveReqVO.class, o -> o.setId(null)
+                .setKey("zsjos.auth.pc.max-devices").setValue("0"));
+
+        assertServiceException(() -> configService.createConfig(reqVO), CONFIG_VALUE_INVALID);
+    }
+
+    @Test
+    public void testCreateConfig_zsjosLoginValueMustNotExceedLimit() {
+        ConfigSaveReqVO reqVO = randomPojo(ConfigSaveReqVO.class, o -> o.setId(null)
+                .setKey("zsjos.auth.mobile.max-devices").setValue("21"));
+
+        assertServiceException(() -> configService.createConfig(reqVO), CONFIG_VALUE_INVALID);
+    }
+
+    @Test
+    public void testCreateConfig_zsjosLoginValueMustBeNumeric() {
+        ConfigSaveReqVO reqVO = randomPojo(ConfigSaveReqVO.class, o -> o.setId(null)
+                .setKey("zsjos.auth.remember-days").setValue("seven"));
+
+        assertServiceException(() -> configService.createConfig(reqVO), CONFIG_VALUE_INVALID);
+    }
+
+    @Test
     public void testDeleteConfig_success() {
         // mock 数据
         ConfigDO dbConfig = randomConfigDO(o -> {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, mergeUniqueLeads, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -27,6 +27,27 @@ describe('lead management paging helpers', () => {
 
   it('sums server status counts', () => {
     expect(sumStatusCounts({ submitted: 3, converted: 2 })).toBe(5)
+  })
+
+  it('distinguishes dictionary labels, missing configuration, and loading failures', () => {
+    const options = [{ value: 'douyin', label: '抖音' }]
+
+    expect(dictionaryDisplayLabel(options, 'douyin')).toBe('抖音')
+    expect(dictionaryDisplayLabel(options, 'legacy')).toBe('标签未配置')
+    expect(dictionaryDisplayLabel([], 'douyin', true)).toBe('标签加载失败')
+    expect(dictionaryDisplayLabel(options)).toBe('-')
+  })
+
+  it('uses server-resolved labels without exposing raw keys as labels', () => {
+    expect(resolvedDisplayLabel('抖音', 'douyin')).toBe('抖音')
+    expect(resolvedDisplayLabel(undefined, 'douyin')).toBe('标签未配置')
+    expect(resolvedDisplayLabel(undefined, undefined)).toBe('-')
+  })
+
+  it('does not expose unknown protocol keys as user-facing statuses', () => {
+    expect(protocolDisplayLabel({ owned: '已归属' }, 'owned', '未知分配状态')).toBe('已归属')
+    expect(protocolDisplayLabel({ owned: '已归属' }, 'new_state', '未知分配状态')).toBe('未知分配状态')
+    expect(protocolDisplayLabel({}, undefined, '未知分配状态')).toBe('-')
   })
 
   it('prevents duplicate requests for the same filter version and page', () => {

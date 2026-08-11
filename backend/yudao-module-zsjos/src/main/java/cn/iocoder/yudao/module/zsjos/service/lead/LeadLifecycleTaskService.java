@@ -166,6 +166,12 @@ public class LeadLifecycleTaskService {
         }
     }
 
+    public Long getQualificationTaskId(Long leadId, Integer roundNo) {
+        if (roundNo == null) return null;
+        BusinessTaskDO task = taskMapper.selectByIdempotencyKey(qualificationTaskKey(leadId, roundNo));
+        return task == null ? null : task.getId();
+    }
+
     private String qualificationTaskKey(Long leadId, int roundNo) {
         return "lead-qualification:" + leadId + ":" + roundNo;
     }

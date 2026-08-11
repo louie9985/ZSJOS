@@ -4,7 +4,7 @@ import type { SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
   it('requires mobile or WeChat', () => {
-    expect(validateSalesOrderSubmission(' ', undefined, 0, 0)).toBe('手机号和微信号至少填写一个')
+    expect(validateSalesOrderSubmission(' ', undefined, 0, 0)).toBe('请填写手机号或微信号')
   })
 
   it('requires a voucher for non-zero orders', () => {

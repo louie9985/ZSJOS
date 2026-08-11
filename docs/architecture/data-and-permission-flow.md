@@ -22,6 +22,20 @@ The workbench HTTP client centralizes:
 - Authentication storage cleanup on logout or failed recovery.
 - Unwrapping the backend's standard response envelope.
 
+ZSJOS employee login separates computer and mobile sessions with the OAuth2 clients
+`zsjos-pc` and `zsjos-mobile`. The login request sends an explicit `platform` value; the
+backend does not infer it from a URL, IP address, or user-agent string. Each client has an
+independent per-user session limit. A new login beyond that limit revokes the oldest valid
+refresh-token session for the same client, while the other client remains unaffected.
+
+The administrator-owned Infra configuration keys `zsjos.auth.pc.max-devices`,
+`zsjos.auth.mobile.max-devices`, and `zsjos.auth.remember-days` control the two limits and
+the refresh-token lifetime. Defaults are one computer, one mobile device, and seven days.
+Values are validated as positive integers with limits of 20 devices and 365 days. Access
+tokens remain short lived; an unexpired refresh token allows automatic entry, while an
+expired or revoked refresh token requires account-password authentication again. Clients
+store opaque tokens and must not persist the account password for this behavior.
+
 Tenant values come from environment configuration. A current local default is not a
 license to hard-code tenant assumptions into business components.
 
@@ -205,11 +219,11 @@ otherwise
   types in the response.
 - Page, status-count, and single-record queries apply the same rule. A direct detail
   request cannot bypass row visibility.
-- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案，通过 `/zsjos/sales-order/approval/filter-profile` 和 `inbox-page` 消费待处理/已处理及教务/财务审批环节；页面不允许用前端选项扩大服务端返回的任务范围。
+- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案，通过 `/zsjos/sales-order/approval/filter-profile` 和 `inbox-page` 消费待处理/已处理及报名履约中心/财务结算中心审批环节；页面不允许用前端选项扩大服务端返回的任务范围。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询和数量统计只消费已发布版本；保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
-- 管理端只能从后端返回的条件能力白名单选择字段和值，不得提交 SQL、列名或任意表达式。当前白名单只包含客资主状态与分配状态。
+- 管理端只能从后端按视角返回的条件能力白名单选择字段和值，不得提交 SQL、列名或任意表达式。`submitter` 与 `owner` 只允许客资主状态和分配状态；`reviewer` 只允许处理状态和 BPM 任务节点。不同视角的字段不得混用。
 - 收件箱归类是对客资主状态和分配状态的只读投影，不是新的持久化状态。前端只能展示服务端返回的筛选项，不得自行补齐尚未实现的跟进、申诉、机会或订单状态。
 - 客资状态由后端拆分投影：`qualificationStatus` 表示待判定/已判有效/已判无效，`followUpStatus` 表示待首跟/跟进中/成交待审核/已成交，`assignmentStatus` 表示分配生命周期，`operationalStatus` 表示挂起等控制状态。前端不得根据 `status`、分配字段或机会状态自行拼装按钮和用户状态；写操作只能消费 `availableActions`。
 - Full submitted mobile and WeChat values are returned to an authorized submitter,
@@ -255,6 +269,8 @@ lead-category labels, remark, and attachment images.
 - Acquiring ownership creates a `lead_first_follow_up` task from the currently enabled tenant follow-up rule. The task payload freezes the rule ID, version, timeout and ownership start time.
 - Before qualification, append-only follow-up records belong to Lead. Only the current owner can create them; the submitter, current owner, leaders of the owner's department hierarchy, and `zsjos:lead:query-all` may read them. After qualification creates an Opportunity, subsequent sales follow-up belongs to Opportunity instead.
 - `lead_first_follow_up` and `lead_follow_up_reminder` are completed or replaced only by the lead follow-up transaction. The employee today-task APIs are assignee-scoped and expose stable action codes rather than a generic completion endpoint.
+- 跟进备注和下次跟进时间均为必填，下次时间必须晚于当前时间。无效客资不再允许新增跟进；判无效及成交订单最终生效会取消未完成的首次跟进、下次跟进和适用的判定任务，并清空 Lead/Opportunity 当前下次跟进投影，历史跟进记录保持不变。
+- 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 阶段配置。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。直属主管只取销售当前部门负责人，不向上级部门递归。
 - Business editing overlays have presentation priority over assignment prompts. An assignment may continue to expire on the server while the workbench defers its modal, so reconnect, focus refresh and polling always reload server truth.
 
 ### Lead appeal routing (V015)
@@ -273,7 +289,8 @@ lead-category labels, remark, and attachment images.
 - `zsjos:sales-order:create` exposes direct order entry only when the backend `availableActions` projection enables `ENTER_DEAL`; the Service rechecks current ownership, valid qualification, suspension, opportunity state, active-order uniqueness and enabled SKU state under a tenant-scoped row lock.
 - Sales-order field options come from System dictionaries and the enabled ZSJOS product/SKU catalog. The workbench does not keep static business options or infer product hierarchy from labels.
 - `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. Each approval round snapshots all enabled users in each root department and its children; department names, role names and frontend menus are not reviewer sources.
+- 成交订单提交/补正只通知本轮两个配置部门解析出的实际审批人；最终通过、拒绝或取消只通知订单提交销售。通知显示配置根部门名称，内部任务键仍保持 `registrationReview` / `financeReview`。
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`.
-- 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
+- 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。筛选项稳定编码使用小写下划线格式 `registration_review` / `finance_review`，与保持 BPM 契约的驼峰条件值相互独立；读取历史配置时兼容旧筛选项编码，并在下一次保存或发布时规范化。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
 - 工作台业务附件选择后先保留本地文件和预览地址，确认提交时才通过 Infra 文件 API 上传 COS；任一上传失败都不会发送业务命令，成功引用和失败项会保留以便重试。删除只移除当前表单引用，不物理删除已上传文件。

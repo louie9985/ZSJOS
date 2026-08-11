@@ -10,6 +10,9 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadInboxFilterSchemeDO
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadInboxFilterVersionDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadInboxFilterSchemeMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadInboxFilterVersionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalConfigMapper;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +26,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
@@ -34,6 +38,11 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_I
 public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigService {
 
     private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER, INBOX_AUDIENCE_REVIEWER);
+    private static final Pattern CONFIG_KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{1,63}");
+    private static final Map<String, Set<String>> ALLOWED_FIELDS_BY_AUDIENCE = Map.of(
+            INBOX_AUDIENCE_SUBMITTER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS),
+            INBOX_AUDIENCE_OWNER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS),
+            INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY));
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
             INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "converted", "invalid", "closed")),
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
@@ -45,12 +54,20 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     private LeadInboxFilterSchemeMapper schemeMapper;
     @Resource
     private LeadInboxFilterVersionMapper versionMapper;
+    @Resource private SalesOrderApprovalConfigMapper approvalConfigMapper;
+    @Resource private DeptApi deptApi;
 
     @Override
     public LeadInboxFilterAdminRespVO getAdminConfig(String audience) {
         LeadInboxFilterSchemeDO scheme = requireScheme(audience);
+        LeadInboxFilterConfigVO draft = parse(scheme.getDraftConfigJson());
+        normalizeAndValidate(draft, audience);
+        LeadInboxFilterConfigVO published = parseNullable(scheme.getPublishedConfigJson());
+        if (!published.getGroups().isEmpty()) {
+            normalizeAndValidate(published, audience);
+        }
         return new LeadInboxFilterAdminRespVO(audience, audienceLabel(audience),
-                parse(scheme.getDraftConfigJson()).getGroups(), parseNullable(scheme.getPublishedConfigJson()).getGroups(),
+                draft.getGroups(), published.getGroups(),
                 scheme.getPublishedVersion(), scheme.getPublishedAt(), scheme.getUpdateTime());
     }
 
@@ -59,7 +76,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         validateAudience(reqVO.getAudience());
         LeadInboxFilterConfigVO config = new LeadInboxFilterConfigVO();
         config.setGroups(reqVO.getGroups());
-        normalizeAndValidate(config);
+        normalizeAndValidate(config, reqVO.getAudience());
         LeadInboxFilterSchemeDO scheme = requireScheme(reqVO.getAudience());
         LeadInboxFilterSchemeDO update = new LeadInboxFilterSchemeDO();
         update.setId(scheme.getId());
@@ -72,7 +89,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     public Integer publish(String audience, Long userId) {
         LeadInboxFilterSchemeDO scheme = requireScheme(audience);
         LeadInboxFilterConfigVO config = parse(scheme.getDraftConfigJson());
-        normalizeAndValidate(config);
+        normalizeAndValidate(config, audience);
         return publishVersion(scheme, config, userId);
     }
 
@@ -85,7 +102,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             throw exception(LEAD_INBOX_FILTER_VERSION_NOT_EXISTS);
         }
         LeadInboxFilterConfigVO config = parse(history.getConfigJson());
-        normalizeAndValidate(config);
+        normalizeAndValidate(config, scheme.getAudience());
         return publishVersion(scheme, config, userId);
     }
 
@@ -106,11 +123,15 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     public List<LeadInboxFilterCapabilityRespVO> getCapabilities(String audience) {
         validateAudience(audience);
         if (INBOX_AUDIENCE_REVIEWER.equals(audience)) {
+            var config = approvalConfigMapper.selectCurrent();
+            String registrationLabel = approvalLabel(config == null ? null : config.getRegistrationDeptId(), "报名履约中心");
+            String financeLabel = approvalLabel(config == null ? null : config.getFinanceDeptId(), "财务结算中心");
             return List.of(
                     capability(INBOX_FILTER_FIELD_HANDLED, "处理状态", List.of(
                             value("todo", "待处理"), value("done", "已处理"))),
                     capability(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, "审批环节", List.of(
-                            value("registrationReview", "教务审批"), value("financeReview", "财务审批"))));
+                            value("registrationReview", registrationLabel + "审批"),
+                            value("financeReview", financeLabel + "审批"))));
         }
         return List.of(
                 capability(INBOX_FILTER_FIELD_STATUS, "客资主状态", List.of(
@@ -128,7 +149,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             throw exception(LEAD_INBOX_FILTER_NOT_EXISTS);
         }
         LeadInboxFilterConfigVO config = parse(scheme.getPublishedConfigJson());
-        normalizeAndValidate(config);
+        normalizeAndValidate(config, audience);
         return config;
     }
 
@@ -205,7 +226,8 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         return parse(json);
     }
 
-    private static void normalizeAndValidate(LeadInboxFilterConfigVO config) {
+    private static void normalizeAndValidate(LeadInboxFilterConfigVO config, String audience) {
+        validateAudience(audience);
         if (config.getGroups() == null || config.getGroups().isEmpty() || config.getGroups().size() > 20) {
             throw exception(LEAD_INBOX_FILTER_INVALID);
         }
@@ -216,15 +238,18 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         config.getGroups().sort(Comparator.comparing(LeadInboxFilterConfigVO.GroupVO::getSort));
         Set<String> groupKeys = new HashSet<>();
         boolean hasAll = false;
-        boolean reviewerConfig = false;
         for (LeadInboxFilterConfigVO.GroupVO group : config.getGroups()) {
-            if (!groupKeys.add(group.getKey()) || group.getLabel() == null || group.getSort() == null || group.getEnabled() == null) {
+            if (!isValidKey(group.getKey()) || !groupKeys.add(group.getKey()) || isInvalidLabel(group.getLabel())
+                    || group.getSort() == null || group.getEnabled() == null
+                    || group.getSectionLabel() != null && group.getSectionLabel().length() > 20) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
             group.setConditions(nonNull(group.getConditions()));
             group.setOptions(nonNull(group.getOptions()));
-            validateConditions(group.getConditions());
-            reviewerConfig |= containsReviewerField(group.getConditions());
+            if (group.getConditions().size() > 2 || group.getOptions().size() > 20) {
+                throw exception(LEAD_INBOX_FILTER_INVALID);
+            }
+            validateConditions(group.getConditions(), audience);
             if ("all".equals(group.getKey())) {
                 hasAll = Boolean.TRUE.equals(group.getEnabled()) && group.getConditions().isEmpty();
             }
@@ -234,13 +259,16 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             group.getOptions().sort(Comparator.comparing(LeadInboxFilterConfigVO.OptionVO::getSort));
             Set<String> optionKeys = new HashSet<>();
             for (LeadInboxFilterConfigVO.OptionVO option : group.getOptions()) {
-                if (!optionKeys.add(option.getKey()) || option.getLabel() == null
+                normalizeLegacyOptionKey(option);
+                if (!isValidKey(option.getKey()) || !optionKeys.add(option.getKey()) || isInvalidLabel(option.getLabel())
                         || option.getSort() == null || option.getEnabled() == null) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
                 }
                 option.setConditions(nonNull(option.getConditions()));
-                validateConditions(option.getConditions());
-                reviewerConfig |= containsReviewerField(option.getConditions());
+                if (option.getConditions().size() > 2) {
+                    throw exception(LEAD_INBOX_FILTER_INVALID);
+                }
+                validateConditions(option.getConditions(), audience);
                 LeadInboxFilterQuery combined = compileCombined(group.getConditions(), option.getConditions());
                 if (combined.matchNone()) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
@@ -251,17 +279,22 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
         }
-        if (!hasAll && !reviewerConfig) {
+        if (!INBOX_AUDIENCE_REVIEWER.equals(audience) && !hasAll) {
             throw exception(LEAD_INBOX_FILTER_INVALID);
         }
     }
 
-    private static void validateConditions(List<LeadInboxFilterConfigVO.ConditionVO> conditions) {
+    private static void validateConditions(List<LeadInboxFilterConfigVO.ConditionVO> conditions, String audience) {
         Set<String> fields = new HashSet<>();
         for (LeadInboxFilterConfigVO.ConditionVO condition : conditions) {
+            if (condition == null || !ALLOWED_FIELDS_BY_AUDIENCE.get(audience).contains(condition.getField())) {
+                throw exception(LEAD_INBOX_FILTER_INVALID);
+            }
             Set<String> allowed = ALLOWED_VALUES.get(condition.getField());
             if (allowed == null || !fields.add(condition.getField()) || condition.getValues() == null
-                    || condition.getValues().isEmpty() || !allowed.containsAll(condition.getValues())) {
+                    || condition.getValues().isEmpty() || condition.getValues().size() > 20
+                    || condition.getValues().stream().anyMatch(value -> value == null || value.isBlank())
+                    || !allowed.containsAll(condition.getValues())) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
             condition.setValues(condition.getValues().stream().distinct().toList());
@@ -292,9 +325,20 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                 Map.copyOf(valuesByField));
     }
 
-    private static boolean containsReviewerField(List<LeadInboxFilterConfigVO.ConditionVO> conditions) {
-        return conditions.stream().anyMatch(item -> INBOX_FILTER_FIELD_HANDLED.equals(item.getField())
-                || INBOX_FILTER_FIELD_TASK_DEFINITION_KEY.equals(item.getField()));
+    private static void normalizeLegacyOptionKey(LeadInboxFilterConfigVO.OptionVO option) {
+        if ("registrationReview".equals(option.getKey())) {
+            option.setKey("registration_review");
+        } else if ("financeReview".equals(option.getKey())) {
+            option.setKey("finance_review");
+        }
+    }
+
+    private static boolean isValidKey(String key) {
+        return key != null && CONFIG_KEY_PATTERN.matcher(key).matches();
+    }
+
+    private static boolean isInvalidLabel(String label) {
+        return label == null || label.isBlank() || label.length() > 20;
     }
 
     private static <T> List<T> nonNull(List<T> values) {
@@ -313,5 +357,10 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
 
     private static LeadInboxFilterCapabilityRespVO.ValueVO value(String value, String label) {
         return new LeadInboxFilterCapabilityRespVO.ValueVO(value, label);
+    }
+
+    private String approvalLabel(Long deptId, String fallback) {
+        DeptRespDTO dept = deptId == null ? null : deptApi.getDept(deptId);
+        return dept == null || dept.getName() == null || dept.getName().isBlank() ? fallback : dept.getName();
     }
 }

@@ -8,7 +8,6 @@ import {
   Breadcrumb,
   Button,
   Card,
-  Checkbox,
   Dropdown,
   Input,
   Layout,
@@ -59,11 +58,6 @@ import SalesOrderApprovalPage from './pages/SalesOrderApprovalPage'
 import MySalesOrderPage from './pages/MySalesOrderPage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { APP_ROUTES, STORAGE_KEYS } from './constants'
-import {
-  clearLoginFormCache,
-  loadLoginFormCache,
-  saveLoginFormCache
-} from './services/loginFormCache'
 import ThemeProvider from './components/Theme/ThemeProvider'
 import ThemeSwitcher from './components/Theme/ThemeSwitcher'
 import { useTheme } from './components/Theme/ThemeContext'
@@ -87,10 +81,8 @@ class RuntimeBoundary extends React.Component<React.PropsWithChildren, { error?:
 }
 
 function Login({ onLogin, initialError = '' }: { onLogin: () => void; initialError?: string }) {
-  const rememberedLogin = useMemo(() => loadLoginFormCache(), [])
-  const [username, setUsername] = useState(rememberedLogin?.username ?? '')
-  const [password, setPassword] = useState(rememberedLogin?.password ?? '')
-  const [rememberMe, setRememberMe] = useState(Boolean(rememberedLogin))
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -100,13 +92,8 @@ function Login({ onLogin, initialError = '' }: { onLogin: () => void; initialErr
     setLoading(true)
     setError('')
     try {
-      await api.login(username, password)
-      try {
-        if (rememberMe) saveLoginFormCache(username, password)
-        else clearLoginFormCache()
-      } catch {
-        clearLoginFormCache()
-      }
+      const platform = window.location.pathname.startsWith('/zsjos/mobile') ? 'MOBILE' : 'PC'
+      await api.login(username, password, platform)
       onLogin()
     } catch (loginError: any) {
       setError(loginError.response?.data?.msg || loginError.message || '登录失败')
@@ -122,14 +109,6 @@ function Login({ onLogin, initialError = '' }: { onLogin: () => void; initialErr
     {error && <Alert className="form-alert" type="error" showIcon message={error}/>} 
     <Input placeholder="用户名" size="large" value={username} onChange={event => setUsername(event.target.value)} className="login-input"/>
     <Input.Password placeholder="密码" size="large" value={password} onChange={event => setPassword(event.target.value)} onPressEnter={login} className="login-input"/>
-    <Checkbox
-      className="login-remember"
-      checked={rememberMe}
-      onChange={event => {
-        setRememberMe(event.target.checked)
-        if (!event.target.checked) clearLoginFormCache()
-      }}
-    >记住我</Checkbox>
     <Button type="primary" block size="large" loading={loading} onClick={login}>登录</Button>
   </Card></div>
 }

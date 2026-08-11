@@ -82,19 +82,15 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void invalidFollowUpStaysOnLeadAndCreatesNoTasks() {
+    void invalidLeadRejectsNewFollowUp() {
         LeadDO lead = validLead();
         lead.setStatus("invalid"); lead.setAssignmentStatus("owned");
-        stubSuccessfulCreate(lead);
-        doAnswer(invocation -> {
-            invocation.<LeadFollowUpRecordDO>getArgument(0).setId(40L);
-            return 1;
-        }).when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
 
-        LeadFollowUpRespVO result = withTenant(() -> service.create(1L, 20L, request(null)));
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1)))));
 
-        assertEquals("lead", result.getRecordScope());
-        verify(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+        assertEquals(LEAD_FOLLOW_UP_STATE_INVALID.getCode(), error.getCode());
         verifyNoInteractions(lifecycleTaskService);
     }
 
@@ -176,6 +172,7 @@ class LeadFollowUpServiceImplTest {
     private LeadFollowUpCreateReqVO request(LocalDateTime nextAt) {
         LeadFollowUpCreateReqVO request = new LeadFollowUpCreateReqVO();
         request.setMethod("phone"); request.setResult("interested"); request.setLeadCategory("a");
+        request.setRemark("已联系客户");
         request.setNextFollowUpAt(nextAt); request.setIdempotencyKey("request-1");
         return request;
     }

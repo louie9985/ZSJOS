@@ -70,6 +70,8 @@ public interface AdminAuthService {
      */
     AuthLoginRespVO refreshToken(String refreshToken);
 
+    AuthLoginRespVO refreshToken(String refreshToken, String clientId);
+
     /**
      * 用户注册
      *

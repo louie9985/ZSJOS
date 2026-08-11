@@ -84,7 +84,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                     opportunityImageMapper.selectListByRecordIds(List.of(existingOpportunity.getId())),
                     adminUserApi.getUserMap(List.of(existingOpportunity.getOperatorUserId())), null);
         }
-        if (reqVO.getNextFollowUpAt() != null && !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
+        if (reqVO.getNextFollowUpAt() == null || !reqVO.getNextFollowUpAt().isAfter(occurredAt)) {
             throw exception(LEAD_FOLLOW_UP_TIME_INVALID);
         }
 
@@ -146,8 +146,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                     occurredAt, categoryContext);
             lead.setLeadCategory(categoryAfter);
         }
-        boolean invalid = STATUS_INVALID.equals(lead.getStatus());
-        boolean first = !invalid && lifecycleTaskService.completeFirstFollowUpTask(
+        boolean first = lifecycleTaskService.completeFirstFollowUpTask(
                 lead.getCurrentAssignmentHistoryId(), occurredAt);
         if (first) {
             record.setFirstInAssignment(true);
@@ -155,7 +154,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
             lifecycleTaskService.createQualificationTask(lead, operatorUserId, occurredAt);
         }
-        if (!invalid) lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId,
+        lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         lead.setLastFollowUpAt(occurredAt);
@@ -210,8 +209,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     }
 
     private boolean canFollow(LeadDO lead) {
-        return STATUS_INVALID.equals(lead.getStatus())
-                  || "converted".equals(lead.getStatus())
+        return "converted".equals(lead.getStatus())
                   || STATUS_VALID.equals(lead.getStatus())
                 || STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 && lead.getCurrentAssignmentHistoryId() != null;

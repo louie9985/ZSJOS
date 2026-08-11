@@ -123,6 +123,23 @@ public class NotifyRuleServiceImpl implements NotifyRuleService {
         if (reqVO.getSpecifiedUserIds() != null) {
             adminUserService.validateUserList(reqVO.getSpecifiedUserIds());
         }
+        validateTiming(reqVO, scene);
+    }
+
+    private void validateTiming(NotifyRuleSaveReqVO reqVO, NotifySceneRespDTO scene) {
+        if (!Boolean.TRUE.equals(scene.getTimed())) {
+            reqVO.setTimingStage(null);
+            reqVO.setTimingOffsetMinutes(null);
+            return;
+        }
+        if (!Set.of("advance", "due", "overdue").contains(reqVO.getTimingStage())) {
+            throw exception(NOTIFY_RULE_ACTION_INVALID);
+        }
+        int offset = reqVO.getTimingOffsetMinutes() == null ? 0 : reqVO.getTimingOffsetMinutes();
+        if (offset < 0 || offset > 10080 || ("due".equals(reqVO.getTimingStage()) && offset != 0)) {
+            throw exception(NOTIFY_RULE_ACTION_INVALID);
+        }
+        reqVO.setTimingOffsetMinutes(offset);
     }
 
     private void normalizeRecipients(NotifyRuleDO rule) {

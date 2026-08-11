@@ -33,7 +33,7 @@ public class BpmNotifySceneProvider implements NotifySceneProvider {
                         new NotifySceneVariableRespDTO("reason", "审批原因", false),
                         new NotifySceneVariableRespDTO("detailUrl", "详情地址", false)),
                 List.of(new NotifySceneRoleRespDTO(TARGET_USER, "事件接收人")),
-                List.of(NotifyActionType.NONE, NotifyActionType.MESSAGE_DETAIL));
+                List.of(NotifyActionType.NONE, NotifyActionType.MESSAGE_DETAIL), false);
     }
 
     @Override

@@ -31,6 +31,7 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Override
     public Long createConfig(ConfigSaveReqVO createReqVO) {
+        validateZsjosLoginConfig(createReqVO.getKey(), createReqVO.getValue());
         // 校验参数配置 key 的唯一性
         validateConfigKeyUnique(null, createReqVO.getKey());
 
@@ -43,6 +44,7 @@ public class ConfigServiceImpl implements ConfigService {
 
     @Override
     public void updateConfig(ConfigSaveReqVO updateReqVO) {
+        validateZsjosLoginConfig(updateReqVO.getKey(), updateReqVO.getValue());
         // 校验自己存在
         validateConfigExists(updateReqVO.getId());
         // 校验参数配置 key 的唯一性
@@ -51,6 +53,25 @@ public class ConfigServiceImpl implements ConfigService {
         // 更新参数配置
         ConfigDO updateObj = ConfigConvert.INSTANCE.convert(updateReqVO);
         configMapper.updateById(updateObj);
+    }
+
+    private void validateZsjosLoginConfig(String key, String value) {
+        int max = switch (key) {
+            case "zsjos.auth.pc.max-devices", "zsjos.auth.mobile.max-devices" -> 20;
+            case "zsjos.auth.remember-days" -> 365;
+            default -> 0;
+        };
+        if (max == 0) {
+            return;
+        }
+        try {
+            int parsed = Integer.parseInt(value);
+            if (parsed < 1 || parsed > max) {
+                throw exception(CONFIG_VALUE_INVALID);
+            }
+        } catch (NumberFormatException ex) {
+            throw exception(CONFIG_VALUE_INVALID);
+        }
     }
 
     @Override

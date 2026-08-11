@@ -40,6 +40,7 @@ export const APP_CONFIG = {
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'zsjos_access_token',
   REFRESH_TOKEN: 'zsjos_refresh_token',
+  CLIENT_ID: 'zsjos_client_id',
   EXPIRES_TIME: 'zsjos_expires_time',
   LOGIN_FORM: 'zsjos_login_form',
   THEME: 'crm-theme'

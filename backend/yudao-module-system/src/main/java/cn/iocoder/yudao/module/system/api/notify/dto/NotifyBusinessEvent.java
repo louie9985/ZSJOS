@@ -16,6 +16,7 @@ public class NotifyBusinessEvent {
     Long tenantId;
     String sceneCode;
     String sourceEventKey;
+    Long targetRuleId;
     String bizType;
     Long bizId;
     Long operatorUserId;

@@ -39,7 +39,8 @@ export type LeadCreateResult = { leadId: number; outcome: 'created' | 'activated
 export type PendingLead = {
   id: number; dispatchMode: 'auto' | 'specified'; maskedName: string; maskedMobile?: string; maskedWechatId?: string
   provinceName: string; cityName: string; intendedProducts: string[]; primaryIntendedProduct?: string
-  sourceChannel: string; leadCategory: string; remark?: string; attachmentUrls: string[]
+  sourceChannel: string; sourceChannelLabel?: string; leadCategory: string; leadCategoryLabel?: string
+  remark?: string; attachmentUrls: string[]
   submittedAt: Timestamp; expiresAt?: Timestamp
   remainingSeconds?: number; rejectable: boolean; deferrable: boolean; assignmentHistoryId?: number
 }
@@ -195,6 +196,7 @@ export class AuthenticationError extends Error {
 export const clearAuthStorage = () => {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN)
+  localStorage.removeItem(STORAGE_KEYS.CLIENT_ID)
   localStorage.removeItem(STORAGE_KEYS.EXPIRES_TIME)
 }
 
@@ -245,10 +247,13 @@ async function refreshToken(): Promise<string | null> {
   const refresh = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
   if (!refresh) return null
   try {
-    const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}`, undefined, { headers: { 'tenant-id': APP_CONFIG.DEFAULT_TENANT_ID }, timeout: 30000 })
-    const result = unwrap<{ accessToken: string; refreshToken: string }>(response)
+    const clientId = localStorage.getItem(STORAGE_KEYS.CLIENT_ID)
+    const clientIdParam = clientId ? `&clientId=${encodeURIComponent(clientId)}` : ''
+    const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`, undefined, { headers: { 'tenant-id': APP_CONFIG.DEFAULT_TENANT_ID }, timeout: 30000 })
+    const result = unwrap<{ accessToken: string; refreshToken: string; clientId?: string }>(response)
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken)
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
+    if (result.clientId) localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId)
     return result.accessToken
   } catch { return null }
 }
@@ -279,11 +284,12 @@ export function buildMenuTree(rawMenus: RawMenu[], parentPath = '/'): WorkbenchM
 }
 
 export const api = {
-  login: async (username: string, password: string) => {
-    const result = unwrap<{ accessToken: string; refreshToken: string; expiresTime: string }>(await http.post('/system/auth/login', { username, password }))
+  login: async (username: string, password: string, platform: 'PC' | 'MOBILE' = 'PC') => {
+    const result = unwrap<{ accessToken: string; refreshToken: string; expiresTime: string; clientId?: string }>(await http.post('/system/auth/login', { username, password, platform }))
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken)
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
     localStorage.setItem(STORAGE_KEYS.EXPIRES_TIME, result.expiresTime)
+    localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId || (platform === 'MOBILE' ? 'zsjos-mobile' : 'zsjos-pc'))
     return result
   },
   logout: async () => {

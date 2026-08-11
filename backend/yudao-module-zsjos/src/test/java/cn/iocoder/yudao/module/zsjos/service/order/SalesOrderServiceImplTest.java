@@ -7,6 +7,8 @@ import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
@@ -21,6 +23,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -61,6 +64,9 @@ class SalesOrderServiceImplTest {
     @Mock private DictDataApi dictDataApi;
     @Mock private BpmProcessInstanceApi processInstanceApi;
     @Mock private BpmProcessTaskApi processTaskApi;
+    @Mock private LeadLifecycleTaskService lifecycleTaskService;
+    @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Mock private DeptApi deptApi;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -160,6 +166,7 @@ class SalesOrderServiceImplTest {
         assertEquals(STATUS_EFFECTIVE, order.getStatus()); assertNotNull(order.getEffectiveAt());
         assertEquals(ROUND_APPROVED, round.getStatus()); assertEquals(OPPORTUNITY_STATUS_WON, opportunity.getStatus());
         verify(orderMapper).updateById(order); verify(roundMapper).updateById(round); verify(opportunityMapper).updateById(opportunity);
+        verify(lifecycleTaskService).cancelFollowUpReminders(eq(order.getLeadId()), any(), eq("成交订单已生效"));
     }
 
     @Test

@@ -26,7 +26,9 @@ import { api, type DictData, type LeadInboxFilterProfile, type ManagedLead } fro
 import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
+  dictionaryDisplayLabel,
   mergeUniqueLeads,
+  protocolDisplayLabel,
   tryStartLeadPageRequest
 } from '../services/leadManagement'
 import {
@@ -60,9 +62,9 @@ function productText(lead: ManagedLead) {
 function LeadStateTags({ lead }: { lead: ManagedLead }) {
   return <Space size={4} wrap>
     <Tag color={lead.qualificationStatus === 'invalid' ? 'red' : lead.qualificationStatus === 'valid' ? 'green' : 'gold'}>
-      {LEAD_QUALIFICATION_STATUS_LABELS[lead.qualificationStatus] || '待判定'}
+      {protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}
     </Tag>
-    {lead.followUpStatus && <Tag color="blue">{LEAD_FOLLOW_UP_STATUS_LABELS[lead.followUpStatus] || lead.followUpStatus}</Tag>}
+    {lead.followUpStatus && <Tag color="blue">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Tag>}
     {lead.operationalStatus === 'suspended' && <Tag color="orange">已挂起</Tag>}
   </Space>
 }
@@ -191,7 +193,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       </Space>
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
-    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReasonLabelSnapshot || lead.invalidReason, lead.invalidDescription].filter(Boolean).join('：')}/>} 
+    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReasonLabelSnapshot || (lead.invalidReason ? '标签未配置' : undefined), lead.invalidDescription].filter(Boolean).join('：')}/>}
     {lead.qualificationStatus === 'pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}/>}
     <Tabs
       className="lead-detail-tabs"
@@ -216,11 +218,11 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                 <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
                   <Descriptions.Item label="客资分类">{categoryLabel(lead.leadCategory)}</Descriptions.Item>
                   <Descriptions.Item label="来源渠道">{channelLabel(lead.sourceChannel)}</Descriptions.Item>
-                  <Descriptions.Item label="客资有效状态">{LEAD_QUALIFICATION_STATUS_LABELS[lead.qualificationStatus] || lead.qualificationStatus}</Descriptions.Item>
-                  <Descriptions.Item label="客资跟进状态">{lead.followUpStatus ? LEAD_FOLLOW_UP_STATUS_LABELS[lead.followUpStatus] || lead.followUpStatus : '-'}</Descriptions.Item>
-                  <Descriptions.Item label="分配状态">{LEAD_ASSIGNMENT_STATUS_LABELS[lead.assignmentStatus] || lead.assignmentStatus}</Descriptions.Item>
+                  <Descriptions.Item label="客资有效状态">{protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}</Descriptions.Item>
+                  <Descriptions.Item label="客资跟进状态">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Descriptions.Item>
+                  <Descriptions.Item label="分配状态">{protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, lead.assignmentStatus, '未知分配状态')}</Descriptions.Item>
                   <Descriptions.Item label="提交备注" span={2}>{lead.remark || '-'}</Descriptions.Item>
-                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{lead.invalidReasonLabelSnapshot || lead.invalidReason}</Descriptions.Item>}
+                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{lead.invalidReasonLabelSnapshot || '标签未配置'}</Descriptions.Item>}
                   {lead.invalidDescription && <Descriptions.Item label="备注" span={2}>{lead.invalidDescription}</Descriptions.Item>}
                   {lead.status === 'invalid' && <Descriptions.Item label="附件" span={2}>
                     {lead.invalidEvidence?.length ? <Image.PreviewGroup><Space wrap>
@@ -252,7 +254,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                 <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
                   <Descriptions.Item label="提交人">{userText(lead.sourceUserId, lead.sourceUserName)}</Descriptions.Item>
                   <Descriptions.Item label="负责人">{userText(lead.ownerUserId, lead.ownerUserName)}</Descriptions.Item>
-                  <Descriptions.Item label="派单方式">{lead.dispatchMode ? LEAD_DISPATCH_MODE_LABELS[lead.dispatchMode] || lead.dispatchMode : '-'}</Descriptions.Item>
+                  <Descriptions.Item label="派单方式">{protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, lead.dispatchMode, '未知派单方式')}</Descriptions.Item>
                   <Descriptions.Item label="待接单人">{userText(lead.pendingAssigneeUserId, lead.pendingAssigneeUserName)}</Descriptions.Item>
                   <Descriptions.Item label="提交时间">{formatTimestamp(lead.submittedAt)}</Descriptions.Item>
                   <Descriptions.Item label="更新时间">{formatTimestamp(lead.updateTime)}</Descriptions.Item>
@@ -342,6 +344,8 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const [metadataError, setMetadataError] = useState('')
   const [categories, setCategories] = useState<DictData[]>([])
   const [channels, setChannels] = useState<DictData[]>([])
+  const [categoryError, setCategoryError] = useState(false)
+  const [channelError, setChannelError] = useState(false)
   const [selectedId, setSelectedId] = useState<number | undefined>(requestedLeadId)
   const [detail, setDetail] = useState<ManagedLead>()
   const [detailLoading, setDetailLoading] = useState(false)
@@ -354,6 +358,8 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
     setMetadataError('')
+    setCategoryError(false)
+    setChannelError(false)
     setFilterLoading(true)
     const results = await Promise.allSettled([
       api.leadInboxFilterProfile(audience),
@@ -363,7 +369,9 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     if (version !== metadataVersion.current) return
     if (results[0].status === 'fulfilled') setFilterProfile(results[0].value)
     if (results[1].status === 'fulfilled') setCategories(results[1].value)
+    else { setCategories([]); setCategoryError(true) }
     if (results[2].status === 'fulfilled') setChannels(results[2].value)
+    else { setChannels([]); setChannelError(true) }
     if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和状态统计。')
     setFilterLoading(false)
   }, [audience])
@@ -441,8 +449,14 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     setInboxGroup(firstGroup.key)
     setInboxStage(defaultInboxStage(filterProfile.groups, firstGroup.key))
   }, [filterProfile.groups, inboxGroup])
-  const categoryLabel = useCallback((value?: string) => categories.find(item => item.value === value)?.label || value || '-', [categories])
-  const channelLabel = useCallback((value?: string) => channels.find(item => item.value === value)?.label || value || '-', [channels])
+  const categoryLabel = useCallback(
+    (value?: string) => dictionaryDisplayLabel(categories, value, categoryError),
+    [categories, categoryError]
+  )
+  const channelLabel = useCallback(
+    (value?: string) => dictionaryDisplayLabel(channels, value, channelError),
+    [channelError, channels]
+  )
   const hasMore = items.length < total
 
   const selectLead = (id: number) => {

@@ -16,7 +16,7 @@
 - `GET /zsjos/sales-order/my-page`：本人提交订单的轻量分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。
 - `GET /zsjos/sales-order/my-status-counts`：本人订单的全部、待审核、已驳回待修改、已通过数量。
 - `GET /zsjos/sales-order/my/{id}`：本人订单完整详情；已驳回订单包含最新轮次 `decisionReason` 和 `canRevise`。
-- `GET /zsjos/sales-order/approval/filter-profile`：返回当前租户已发布的审批人视角筛选方案。默认分为“待处理/已处理”两组，每组包含“全部/教务审批/财务审批”；管理员可调整名称、顺序和显隐。
+- `GET /zsjos/sales-order/approval/filter-profile`：返回当前租户已发布的审批人视角筛选方案。默认分为“待处理/已处理”两组，每组包含“全部/报名履约中心审批/财务结算中心审批”；管理员可调整名称、顺序和显隐。
 - `GET /zsjos/sales-order/approval/inbox-page?groupKey=pending&optionKey=all&keyword=`：按当前用户审批任务、处理状态和审批环节分页查询轻量订单列表，支持订单号、学员姓名和手机号搜索；`handled` 仍可作为兼容参数。返回任务 Key、状态、意见和处理时间，选中后再读取完整订单详情。
 - `PUT /zsjos/sales-order/{id}/approve`、`/reject`：处理当前 BPM 任务，必须提交 `taskId` 和审批意见。
 - `POST /zsjos/sales-order/voucher/upload`：上传 JPG、PNG、WebP 或 PDF，最多 10 MB；最终提交最多引用 9 个文件。工作台选择文件时只在浏览器本地暂存和预览，用户确认提交后才调用此接口；上传失败会保留表单和成功引用，重试只上传失败或尚未上传的文件。

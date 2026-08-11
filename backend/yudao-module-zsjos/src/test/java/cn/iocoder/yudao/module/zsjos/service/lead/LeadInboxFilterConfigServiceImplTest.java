@@ -45,6 +45,58 @@ class LeadInboxFilterConfigServiceImplTest {
     }
 
     @Test
+    void saveDraftRejectsConditionFieldFromAnotherAudience() {
+        LeadInboxFilterSaveReqVO reqVO = validRequest();
+        reqVO.getGroups().get(1).setConditions(List.of(condition("handled", "todo")));
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.saveDraft(reqVO));
+
+        assertEquals(LEAD_INBOX_FILTER_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void saveDraftRequiresAllGroupForLeadAudience() {
+        LeadInboxFilterSaveReqVO reqVO = validRequest();
+        reqVO.setGroups(List.of(reqVO.getGroups().get(1)));
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.saveDraft(reqVO));
+
+        assertEquals(LEAD_INBOX_FILTER_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void saveDraftAcceptsReviewerWithoutAllGroupAndNormalizesLegacyOptionKeys() {
+        LeadInboxFilterSaveReqVO reqVO = reviewerRequest();
+        LeadInboxFilterSchemeDO scheme = scheme(reqVO);
+        scheme.setAudience("reviewer");
+        when(schemeMapper.selectByAudience("reviewer")).thenReturn(scheme);
+
+        service.saveDraft(reqVO);
+
+        ArgumentCaptor<LeadInboxFilterSchemeDO> updateCaptor = ArgumentCaptor.forClass(LeadInboxFilterSchemeDO.class);
+        verify(schemeMapper).updateById(updateCaptor.capture());
+        LeadInboxFilterConfigVO saved = JsonUtils.parseObject(updateCaptor.getValue().getDraftConfigJson(),
+                LeadInboxFilterConfigVO.class);
+        assertEquals("registration_review", saved.getGroups().getFirst().getOptions().get(1).getKey());
+        assertEquals("registrationReview",
+                saved.getGroups().getFirst().getOptions().get(1).getConditions().getFirst().getValues().getFirst());
+    }
+
+    @Test
+    void getAdminConfigNormalizesLegacyReviewerOptionKeys() {
+        LeadInboxFilterSaveReqVO config = reviewerRequest();
+        LeadInboxFilterSchemeDO scheme = scheme(config);
+        scheme.setAudience("reviewer");
+        when(schemeMapper.selectByAudience("reviewer")).thenReturn(scheme);
+
+        var result = service.getAdminConfig("reviewer");
+
+        assertEquals("registration_review", result.getDraftGroups().getFirst().getOptions().get(1).getKey());
+        assertEquals("registrationReview", result.getDraftGroups().getFirst().getOptions().get(1)
+                .getConditions().getFirst().getValues().getFirst());
+    }
+
+    @Test
     void publishCreatesImmutableVersionSnapshot() {
         LeadInboxFilterSaveReqVO config = validRequest();
         LeadInboxFilterSchemeDO scheme = scheme(config);
@@ -112,6 +164,19 @@ class LeadInboxFilterConfigServiceImplTest {
         owned.setConditions(List.of(condition("assignment_status", "owned")));
         pending.setOptions(List.of(allOption, owned));
         config.setGroups(List.of(all, pending));
+        return config;
+    }
+
+    private static LeadInboxFilterSaveReqVO reviewerRequest() {
+        LeadInboxFilterSaveReqVO config = new LeadInboxFilterSaveReqVO();
+        config.setAudience("reviewer");
+        LeadInboxFilterConfigVO.GroupVO todo = group("todo", "待处理", 10);
+        todo.setConditions(List.of(condition("handled", "todo")));
+        LeadInboxFilterConfigVO.OptionVO all = option("all", "全部", 0);
+        LeadInboxFilterConfigVO.OptionVO registration = option("registrationReview", "报名履约中心审批", 10);
+        registration.setConditions(List.of(condition("task_definition_key", "registrationReview")));
+        todo.setOptions(List.of(all, registration));
+        config.setGroups(List.of(todo));
         return config;
     }
 

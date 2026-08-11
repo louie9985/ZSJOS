@@ -40,6 +40,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     @Resource private AdminUserApi adminUserApi;
     @Resource private PermissionApi permissionApi;
     @Resource private DeptApi deptApi;
+    @Resource private LeadAssignmentService assignmentService;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
@@ -50,23 +51,27 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(REASSIGNED, "重新派单", ROLE_PENDING_SALES, ROLE_SUBMITTER),
                 scene(ACCEPTED, "接单成功", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(REJECTED, "拒绝接单", ROLE_PENDING_SALES, ROLE_SUBMITTER, ROLE_OPERATOR),
-                scene(EXPIRED, "接单超时", ROLE_PENDING_SALES, ROLE_SUBMITTER),
-                scene(PUBLIC_POOL, "进入抢单池", ROLE_SUBMITTER, ROLE_OPERATOR),
+                scene(EXPIRED, "接单超时", ROLE_PENDING_SALES, ROLE_DIRECT_LEADER),
+                scene(PUBLIC_POOL, "进入抢单池", ROLE_ALL_ELIGIBLE_SALES),
                 scene(CLAIMED, "抢单成功", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(TRANSFERRED, "管理员转派", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(FOLLOW_UP_RECORDED, "新增跟进", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(CATEGORY_CHANGED, "客资分类变化", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(QUALIFICATION_SUSPENDED, "客资判定超时挂起", ROLE_OWNER, ROLE_QUALIFICATION_MANAGERS),
+                scene(QUALIFIED_VALID, "客资判定有效", ROLE_SUBMITTER),
+                scene(QUALIFIED_INVALID, "客资判定无效", ROLE_SUBMITTER),
                 scene(QUALIFICATION_RESTORED, "挂起客资恢复", ROLE_OWNER, ROLE_OPERATOR, ROLE_QUALIFICATION_MANAGERS),
                 scene(QUALIFICATION_TRANSFERRED, "异常客资转派", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER,
                         ROLE_OPERATOR, ROLE_QUALIFICATION_MANAGERS),
                 scene(QUALIFICATION_RECYCLED, "挂起客资回收", ROLE_PREVIOUS_OWNER, ROLE_OPERATOR,
                         ROLE_QUALIFICATION_MANAGERS),
-                scene(QUALIFICATION_RELEASED, "异常客资释放到抢单池", ROLE_PREVIOUS_OWNER, ROLE_OPERATOR,
-                        ROLE_QUALIFICATION_MANAGERS),
-                scene(APPEAL_SUBMITTED, "客资申诉待处理", ROLE_APPEAL_REVIEWERS),
-                scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER),
-                scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER));
+                scene(QUALIFICATION_RELEASED, "异常客资释放到抢单池", ROLE_PREVIOUS_OWNER, ROLE_ALL_ELIGIBLE_SALES),
+                scene(APPEAL_SUBMITTED, "客资申诉待处理", ROLE_APPEAL_REVIEWERS, ROLE_OWNER),
+                scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
+                scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
+                timedScene(FIRST_FOLLOW_UP_REMINDER, "首次跟进时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
+                timedScene(NEXT_FOLLOW_UP_REMINDER, "下次跟进提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
+                timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER));
     }
 
     @Override
@@ -80,6 +85,17 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             }
             if (ROLE_APPEAL_REVIEWERS.equals(role)) {
                 users.addAll(longValues(payload.get("appeal.reviewerUserIds")));
+                continue;
+            }
+            if (ROLE_DIRECT_LEADER.equals(role)) {
+                Long ownerId = longValue(payload.get("ownerUserId"));
+                AdminUserRespDTO owner = ownerId == null ? null : adminUserApi.getUser(ownerId);
+                DeptRespDTO dept = owner == null || owner.getDeptId() == null ? null : deptApi.getDept(owner.getDeptId());
+                if (dept != null && dept.getLeaderUserId() != null) users.add(dept.getLeaderUserId());
+                continue;
+            }
+            if (ROLE_ALL_ELIGIBLE_SALES.equals(role)) {
+                assignmentService.getEligibleSalesUsers().forEach(user -> users.add(user.getId()));
                 continue;
             }
             Long id = switch (role) {
@@ -145,13 +161,20 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                     "category.before", "category.after", "followUp.method", "followUp.result",
                     "followUp.remark", "followUp.nextAt", "qualification.reason", "appeal.id",
                     "appeal.roundNo", "appeal.stage", "appeal.reason", "appeal.decisionReason");
+            copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
         }
         return values;
     }
 
     private NotifySceneRespDTO scene(String code, String name, String... roles) {
         return new NotifySceneRespDTO(code, name, variables(code), Arrays.stream(roles)
-                .map(role -> new NotifySceneRoleRespDTO(role, roleLabel(role))).toList(), ACTIONS);
+                .map(role -> new NotifySceneRoleRespDTO(role, roleLabel(role))).toList(), ACTIONS, false);
+    }
+
+    private NotifySceneRespDTO timedScene(String code, String name, String... roles) {
+        NotifySceneRespDTO scene = scene(code, name, roles);
+        scene.setTimed(true);
+        return scene;
     }
 
     private List<NotifySceneVariableRespDTO> variables(String sceneCode) {
@@ -174,6 +197,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 variable("pendingSales.id", "待接销售编号"), variable("pendingSales.name", "待接销售"),
                 variable("operator.id", "操作人编号"), variable("operator.name", "操作人"),
                 variable("event.time", "事件时间"), variable("event.scene", "事件场景")));
+        if (Set.of(FIRST_FOLLOW_UP_REMINDER, NEXT_FOLLOW_UP_REMINDER, QUALIFICATION_REMINDER).contains(sceneCode)) {
+            variables.add(variable("reminder.stage", "提醒阶段"));
+            variables.add(variable("reminder.dueAt", "截止时间"));
+        }
         if (ASSIGNED.equals(sceneCode) || REASSIGNED.equals(sceneCode)) {
             variables.add(variable("assignment.attempt", "派单轮次"));
             variables.add(variable("assignment.reason", "分配原因"));
@@ -215,6 +242,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             case ROLE_PREVIOUS_OWNER -> "原负责人"; case ROLE_NEW_OWNER -> "新负责人";
             case ROLE_QUALIFICATION_MANAGERS -> "原销售部门及上级部门负责人";
             case ROLE_APPEAL_REVIEWERS -> "本轮申诉处理人";
+            case ROLE_DIRECT_LEADER -> "销售直属主管";
+            case ROLE_ALL_ELIGIBLE_SALES -> "全部符合分配关系的销售";
             default -> role;
         };
     }

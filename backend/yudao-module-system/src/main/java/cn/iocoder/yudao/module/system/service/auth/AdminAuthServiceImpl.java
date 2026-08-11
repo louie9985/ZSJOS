@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.enums.logger.LoginLogTypeEnum;
 import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
 import cn.iocoder.yudao.module.system.enums.oauth2.OAuth2ClientConstants;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.system.enums.sms.SmsSceneEnum;
 import cn.iocoder.yudao.module.system.service.logger.LoginLogService;
 import cn.iocoder.yudao.module.system.service.member.MemberService;
@@ -35,6 +36,7 @@ import jakarta.validation.Validator;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -69,6 +71,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     private CaptchaService captchaService;
     @Resource
     private SmsCodeApi smsCodeApi;
+    @Autowired(required = false)
+    private ConfigApi configApi;
 
     /**
      * 验证码的开关，默认为 true
@@ -110,7 +114,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
                     reqVO.getSocialType(), reqVO.getSocialCode(), reqVO.getSocialState()));
         }
         // 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user, reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+        return createTokenAfterLoginSuccess(user, reqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME,
+                resolveClientId(reqVO.getPlatform()));
     }
 
     @Override
@@ -143,7 +148,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         }
 
         // 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user, reqVO.getMobile(), LoginLogTypeEnum.LOGIN_MOBILE);
+        return createTokenAfterLoginSuccess(user, reqVO.getMobile(), LoginLogTypeEnum.LOGIN_MOBILE,
+                OAuth2ClientConstants.CLIENT_ID_DEFAULT);
     }
 
     private void createLoginLog(Long userId, String username,
@@ -181,7 +187,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         }
 
         // 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user, user.getUsername(), LoginLogTypeEnum.LOGIN_SOCIAL);
+        return createTokenAfterLoginSuccess(user, user.getUsername(), LoginLogTypeEnum.LOGIN_SOCIAL,
+                OAuth2ClientConstants.CLIENT_ID_DEFAULT);
     }
 
     @VisibleForTesting
@@ -206,15 +213,26 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         return captchaService.verification(captchaVO);
     }
 
-    private AuthLoginRespVO createTokenAfterLoginSuccess(AdminUserDO user, String username, LoginLogTypeEnum logType) {
+    private AuthLoginRespVO createTokenAfterLoginSuccess(AdminUserDO user, String username, LoginLogTypeEnum logType,
+                                                         String clientId) {
         // 统一校验用户状态，避免短信、社交等登录方式遗漏
         validateUserStatus(user, username, logType);
 
         // 插入登陆日志
         createLoginLog(user.getId(), username, logType, LoginResultEnum.SUCCESS);
         // 创建访问令牌
-        OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.createAccessToken(user.getId(), getUserType().getValue(),
-                OAuth2ClientConstants.CLIENT_ID_DEFAULT, null);
+        OAuth2AccessTokenDO accessTokenDO;
+        if (OAuth2ClientConstants.CLIENT_ID_DEFAULT.equals(clientId)) {
+            accessTokenDO = oauth2TokenService.createAccessToken(user.getId(), getUserType().getValue(), clientId, null);
+        } else {
+            int maxDevices = getPositiveConfig(clientId.equals(OAuth2ClientConstants.CLIENT_ID_ZSJOS_MOBILE)
+                    ? OAuth2ClientConstants.CONFIG_MOBILE_MAX_DEVICES : OAuth2ClientConstants.CONFIG_PC_MAX_DEVICES,
+                    OAuth2ClientConstants.DEFAULT_MAX_DEVICES, OAuth2ClientConstants.MAX_DEVICE_LIMIT);
+            int rememberDays = getPositiveConfig(OAuth2ClientConstants.CONFIG_REMEMBER_DAYS,
+                    OAuth2ClientConstants.DEFAULT_REMEMBER_DAYS, OAuth2ClientConstants.MAX_REMEMBER_DAYS);
+            accessTokenDO = oauth2TokenService.createAccessTokenWithLimit(user.getId(), getUserType().getValue(),
+                    clientId, null, rememberDays * 24 * 60 * 60, maxDevices);
+        }
         // 构建返回结果
         return BeanUtils.toBean(accessTokenDO, AuthLoginRespVO.class);
     }
@@ -228,8 +246,38 @@ public class AdminAuthServiceImpl implements AdminAuthService {
 
     @Override
     public AuthLoginRespVO refreshToken(String refreshToken) {
-        OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.refreshAccessToken(refreshToken, OAuth2ClientConstants.CLIENT_ID_DEFAULT);
+        return refreshToken(refreshToken, OAuth2ClientConstants.CLIENT_ID_DEFAULT);
+    }
+
+    @Override
+    public AuthLoginRespVO refreshToken(String refreshToken, String clientId) {
+        OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.refreshAccessToken(refreshToken,
+                ObjectUtil.defaultIfNull(clientId, OAuth2ClientConstants.CLIENT_ID_DEFAULT));
         return BeanUtils.toBean(accessTokenDO, AuthLoginRespVO.class);
+    }
+
+    private String resolveClientId(String platform) {
+        if ("MOBILE".equalsIgnoreCase(platform)) {
+            return OAuth2ClientConstants.CLIENT_ID_ZSJOS_MOBILE;
+        }
+        if (platform == null) {
+            return OAuth2ClientConstants.CLIENT_ID_DEFAULT;
+        }
+        if ("PC".equalsIgnoreCase(platform)) {
+            return OAuth2ClientConstants.CLIENT_ID_ZSJOS_PC;
+        }
+        throw exception(AUTH_LOGIN_BAD_CREDENTIALS, "不支持的登录端类型");
+    }
+
+    private int getPositiveConfig(String key, int defaultValue, int maxValue) {
+        try {
+            String value = configApi == null ? null : configApi.getConfigValueByKey(key);
+            int parsed = Integer.parseInt(value);
+            return parsed >= 1 && parsed <= maxValue ? parsed : defaultValue;
+        } catch (Exception ex) {
+            log.warn("[getPositiveConfig][key({})] 配置读取失败或值无效，使用默认值 {}", key, defaultValue, ex);
+            return defaultValue;
+        }
     }
 
     @Override
@@ -281,7 +329,8 @@ public class AdminAuthServiceImpl implements AdminAuthService {
         AdminUserDO user = userService.registerUser(registerReqVO);
 
         // 3. 创建 Token 令牌，记录登录日志
-        return createTokenAfterLoginSuccess(user, registerReqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME);
+        return createTokenAfterLoginSuccess(user, registerReqVO.getUsername(), LoginLogTypeEnum.LOGIN_USERNAME,
+                OAuth2ClientConstants.CLIENT_ID_DEFAULT);
     }
 
     @VisibleForTesting

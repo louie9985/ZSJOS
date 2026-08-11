@@ -36,5 +36,7 @@ public class NotifyRuleDO extends TenantBaseDO {
     @TableField(typeHandler = Jackson3TypeHandler.class)
     private List<Long> specifiedUserIds;
     private String actionType;
+    private String timingStage;
+    private Integer timingOffsetMinutes;
     private Integer status;
 }

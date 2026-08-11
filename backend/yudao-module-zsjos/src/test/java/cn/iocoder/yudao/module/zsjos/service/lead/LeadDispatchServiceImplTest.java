@@ -120,12 +120,33 @@ class LeadDispatchServiceImplTest {
         assertNotEquals("wechat-full", item.getMaskedWechatId());
         assertEquals(List.of("课程 A"), item.getIntendedProducts());
         assertEquals("课程 A", item.getPrimaryIntendedProduct());
-        assertEquals("抖音", item.getSourceChannel());
-        assertEquals("成人学历", item.getLeadCategory());
+        assertEquals("douyin", item.getSourceChannel());
+        assertEquals("抖音", item.getSourceChannelLabel());
+        assertEquals("adult", item.getLeadCategory());
+        assertEquals("成人学历", item.getLeadCategoryLabel());
         assertEquals(List.of("https://example.test/a.jpg"), item.getAttachmentUrls());
         verify(assignmentService, never()).getEligibleSalesUsers();
         verify(productMapper, never()).selectListByLeadId(1L);
         verify(attachmentMapper, never()).selectListByLeadId(1L);
+    }
+
+    @Test
+    void claimPoolPreservesKeysAndLeavesMissingLabelsEmpty() {
+        LeadClaimPoolPageReqVO reqVO = request();
+        LeadDO lead = lead();
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        when(leadMapper.selectPublicPoolPage(reqVO)).thenReturn(new PageResult<>(List.of(lead), 1L));
+        when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
+        when(dictDataApi.getDictDataList(DICT_SOURCE_CHANNEL)).thenReturn(List.of());
+        when(dictDataApi.getDictDataList(DICT_CATEGORY)).thenReturn(List.of());
+
+        LeadPendingRespVO item = service.getClaimPoolPage(reqVO, 99L).getList().getFirst();
+
+        assertEquals("douyin", item.getSourceChannel());
+        assertEquals(null, item.getSourceChannelLabel());
+        assertEquals("adult", item.getLeadCategory());
+        assertEquals(null, item.getLeadCategoryLabel());
     }
 
     @Test

@@ -35,6 +35,9 @@ public class NotifyRuleSaveReqVO {
     @NotEmpty(message = "点击动作不能为空")
     private String actionType;
 
+    private String timingStage;
+    private Integer timingOffsetMinutes;
+
     @NotNull(message = "状态不能为空")
     @InEnum(value = CommonStatusEnum.class, message = "状态必须是 {value}")
     private Integer status;

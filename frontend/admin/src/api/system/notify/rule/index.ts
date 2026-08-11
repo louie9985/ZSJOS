@@ -19,6 +19,7 @@ export interface NotifySceneVO {
   variables: NotifySceneVariableVO[]
   recipientRoles: NotifySceneRoleVO[]
   allowedActions: Array<'none' | 'message_detail' | 'business_detail'>
+  timed?: boolean
 }
 
 export interface NotifyRuleVO {
@@ -30,6 +31,8 @@ export interface NotifyRuleVO {
   recipientRoles: string[]
   specifiedUserIds: number[]
   actionType: 'none' | 'message_detail' | 'business_detail'
+  timingStage?: 'advance' | 'due' | 'overdue'
+  timingOffsetMinutes?: number
   status: number
   createTime?: Date
 }

@@ -59,6 +59,9 @@
       <el-table-column label="点击动作" width="120">
         <template #default="scope">{{ actionName(scope.row.actionType) }}</template>
       </el-table-column>
+      <el-table-column label="提醒时间" width="150">
+        <template #default="scope">{{ timingName(scope.row) }}</template>
+      </el-table-column>
       <el-table-column label="启用" width="90">
         <template #default="scope">
           <el-switch
@@ -163,6 +166,19 @@
           >
         </el-radio-group>
       </el-form-item>
+      <template v-if="currentScene?.timed">
+        <el-form-item label="提醒阶段" prop="timingStage">
+          <el-radio-group v-model="form.timingStage" @change="timingStageChanged">
+            <el-radio-button value="advance">提前</el-radio-button>
+            <el-radio-button value="due">到期</el-radio-button>
+            <el-radio-button value="overdue">逾期</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.timingStage !== 'due'" label="偏移分钟" prop="timingOffsetMinutes">
+          <el-input-number v-model="form.timingOffsetMinutes" :min="1" :max="10080" />
+          <span class="ml-10px text-12px text-gray-500">最大 7 天</span>
+        </el-form-item>
+      </template>
       <el-form-item label="状态" prop="status">
         <el-switch
           v-model="form.status"
@@ -201,6 +217,11 @@ const templateName = (id?: number) =>
   templates.value.find((template) => template.id === id)?.name || `#${id}`
 const actionName = (action: string) =>
   ({ none: '无操作', message_detail: '消息详情', business_detail: '客资详情' })[action] || action
+const timingName = (rule: RuleApi.NotifyRuleVO) => {
+  if (!rule.timingStage) return '-'
+  if (rule.timingStage === 'due') return '到期时'
+  return `${rule.timingStage === 'advance' ? '提前' : '逾期'} ${rule.timingOffsetMinutes || 0} 分钟`
+}
 const channels = [
   { value: 'in_app', label: '站内信（含实时提醒）' },
   { value: 'wecom', label: '企业微信（待配置）' }, { value: 'sms', label: '短信（待配置）' }
@@ -248,6 +269,8 @@ const emptyForm = (): RuleApi.NotifyRuleVO => ({
   recipientRoles: [],
   specifiedUserIds: [],
   actionType: 'message_detail',
+  timingStage: undefined,
+  timingOffsetMinutes: undefined,
   status: CommonStatusEnum.ENABLE
 })
 const form = ref<RuleApi.NotifyRuleVO>(emptyForm())
@@ -272,6 +295,11 @@ const sceneChanged = () => {
   form.value.actionType = currentScene.value?.allowedActions.includes('message_detail')
     ? 'message_detail'
     : 'none'
+  form.value.timingStage = currentScene.value?.timed ? 'advance' : undefined
+  form.value.timingOffsetMinutes = currentScene.value?.timed ? 30 : undefined
+}
+const timingStageChanged = () => {
+  form.value.timingOffsetMinutes = form.value.timingStage === 'due' ? 0 : 30
 }
 const channelChanged = () => { form.value.templateId = undefined }
 const openForm = async (id?: number) => {

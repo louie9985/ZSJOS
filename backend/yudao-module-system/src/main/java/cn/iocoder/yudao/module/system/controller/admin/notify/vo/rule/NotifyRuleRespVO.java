@@ -18,6 +18,8 @@ public class NotifyRuleRespVO {
     private List<String> recipientRoles;
     private List<Long> specifiedUserIds;
     private String actionType;
+    private String timingStage;
+    private Integer timingOffsetMinutes;
     private Integer status;
     private LocalDateTime createTime;
 }
