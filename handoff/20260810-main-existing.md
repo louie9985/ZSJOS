@@ -184,3 +184,16 @@
 - Verification: Inspected `LeadAppealServiceImpl.resolveReviewers`, BPM process creation validation, exact timestamp log context, and current listener PID (`4824`) without stopping it. No implementation or external-state verification was performed.
 - Dependency / integration impact: None.
 - Remaining work: In tenant `1`, verify department `1021` leader is enabled user `233` and that the user has the sales-manager appeal review permission. After that, retry submission; only if reviewer validation passes should the active BPM definition `zsjos_lead_appeal_review` and task `appealReview` be checked.
+
+### 2026-08-11 09:40:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `e826b4b277`
+- User goal: Merge all active workstream branches into `main`.
+- Key decisions: Committed the existing `main`, lead-appeal, and sales-order worktree changes separately; merged `codex/lead-appeal-routing` first and `codex/sales-order-dual-approval` second; resolved overlapping tests, schema/bootstrap V021 plus V023 checks, database tooling, and generated frontend metadata. The untracked lead-worktree `.env.local` was inspected by variable name only and deliberately excluded.
+- Result: Both feature branches are merged into `main`; merge commits and the post-build metadata refresh are present. `main` is clean and ahead of `origin/main` by six commits.
+- Changed files: Git history and conflict resolutions across the two feature workstreams; no additional product behavior was introduced during merge resolution.
+- Verification: Merged-worktree ZSJOS focused tests passed 24/24; frontend tests passed 52/52; frontend production build passed; `git diff --check` passed; route registration includes both lead appeal and sales-order approval pages. Database check reports the expected missing `V022` gap in the current migration baseline.
+- Dependency / integration impact: `V023` remains ordered after `V021` and requires `V022` integration before database continuity checks pass. No push, migration execution, BPM deployment, service restart, or branch deletion was performed.
+- Remaining work: Integrate or provide `V022`, rerun database verification, and separately decide whether to retain or remove the merged feature branches. The lead-appeal worktree still contains its excluded local `.env.local` file.
