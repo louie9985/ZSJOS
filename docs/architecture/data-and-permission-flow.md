@@ -263,4 +263,6 @@ lead-category labels, remark, and attachment images.
 - Round 2 resolves all enabled users in the `quality_manager` or `quality_specialist` roles. BPM owns the parallel any-sign task; the first completed task closes the others and stale clicks return a stable handled error.
 - Round 3 requires exactly one enabled `boss` role user and `zsjos:lead:appeal:review-chairman`; missing or multiple users reject submission.
 - The dedicated React “申诉处理” menu is an extracted BPM business inbox. It does not move or mark messages in the ordinary message center. A reviewer must satisfy feature permission, BPM task ownership, stage permission and lead object permission together.
+- The server-owned menu path remains authoritative. The workbench resolves the approved `zsjos/leadAppeal/index` component metadata through a local component registry, and replaces an inaccessible route retained from another account with that account's first authorized internal page.
+- Empty BPM todo and done pages return an empty business inbox without querying process instances with an empty identifier set.
 - There is no deadline, automatic escalation or fourth appeal. Notifications are published through the system business-notification API while the appeal inbox reads ZSJOS records plus BPM task APIs.
