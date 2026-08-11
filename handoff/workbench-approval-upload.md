@@ -12,7 +12,7 @@
 - Dependencies: Existing sales-order dual-approval, lead-filter, Infra file, product catalog, and BPM APIs in base commit `a02d1012bb`; V021-V028 migration chain remains an integration prerequisite.
 - Integration order: Integrate this workstream after the committed baseline; rerun frontend, BPM, ZSJOS, and SQL checks on the integration branch.
 - Verification plan: Focused TypeScript/service tests; workbench `npm test`, `npm run typecheck`, `npm run build`; BPM and ZSJOS focused Maven tests/compile; SQL diff/continuity/repeatability checks; browser checks at desktop/mobile widths when runtime is available.
-- Status: `ready-to-merge`
+- Status: `merged`
 - Final commit: `1f026e9958a360b1073119a15171c85f9decd01c`
 - Verification evidence: Workbench tests, typecheck and production build passed; focused BPM/ZSJOS compile and tests passed; `git diff --check` passed; V029 was inspected without execution.
 - Unresolved risks: Live COS/BPM behavior and authenticated desktop/mobile approval and lead-submission UI checks require an authorized runtime; Admin full typecheck remains blocked by baseline auto-import errors; V029 execution requires release approval and V021-V028 continuity.
@@ -58,3 +58,17 @@
 - Verification evidence: Workstream verification is recorded above; worktree is clean except for this readiness update.
 - Dependency or integration impact: V029 remains additive and unexecuted; live COS/BPM and authorized browser validation remain release-environment responsibilities.
 - Remaining work: Commit this readiness record, merge into `main`, rerun affected checks, mark the workstream `merged`, and remove merged worktrees/branches.
+
+## Integration Complete
+
+- Beijing time: `2026-08-11 16:11:52 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `b44292d84412e62f67003048b29c04199e33711a`
+- User goal: Merge all local branches and worktrees into the primary worktree and remove merged workstream infrastructure.
+- Key decisions: Preserve the existing main policy edits in commit `91859fbc62`; preserve implementation history in `1f026e9958` and readiness history in `6db196a7d7`; merge with a non-fast-forward integration commit; retain the local environment file outside Git; do not push.
+- Execution result: `codex/workbench-approval-upload` merged into `main` without conflicts as `b44292d844`; previously integrated lead-appeal and sales-order branches required no additional merge.
+- Changed files: `handoff/workbench-approval-upload.md`; integration also brought the recorded workstream implementation into `main`.
+- Verification evidence: On `main`, Workbench `npm test` passed 56 tests, `npm run typecheck` passed, `npm run build` passed, BPM/ZSJOS Maven compile passed, focused Maven tests passed 14 tests, and `git diff --check` passed.
+- Dependency or integration impact: V029 remains unexecuted; no service restart, BPM deployment, permission change, database action, or remote push occurred.
+- Remaining work: Preserve `frontend/workbench/.env.local`, remove the four secondary worktrees, delete the three merged `codex/*` branches, and verify only the primary worktree and `main` remain.
