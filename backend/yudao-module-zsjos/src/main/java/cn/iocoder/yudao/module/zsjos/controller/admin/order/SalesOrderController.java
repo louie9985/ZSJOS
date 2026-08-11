@@ -80,6 +80,12 @@ public class SalesOrderController {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 
+    @GetMapping("/approval/filter-profile")
+    @Operation(summary = "获得成交审批筛选方案")
+    public CommonResult<SalesOrderApprovalFilterProfileRespVO> getApprovalFilterProfile() {
+        return success(orderService.getApprovalFilterProfile(WebFrameworkUtils.getLoginUserId()));
+    }
+
     @PutMapping("/{id}/approve")
     @Operation(summary = "通过当前中心会签任务")
     public CommonResult<Boolean> approve(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {

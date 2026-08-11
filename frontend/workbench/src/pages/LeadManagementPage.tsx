@@ -39,6 +39,7 @@ import {
 import LeadFollowUpPanel from '../components/LeadFollowUpPanel'
 import LeadAppealPanel from '../components/LeadAppealPanel'
 import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
+import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import LeadBasicInfoModal from '../components/LeadBasicInfoModal'
 import SalesOrderEntryModal from '../components/SalesOrderEntryModal'
 import type { LeadAppealEvidence } from '../services/api'
@@ -87,7 +88,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidRemarkTemplateError, setInvalidRemarkTemplateError] = useState('')
   const [invalidReason, setInvalidReason] = useState<string>()
   const [invalidDescription, setInvalidDescription] = useState('')
-  const [invalidEvidence, setInvalidEvidence] = useState<LeadAppealEvidence[]>([])
+  const [invalidEvidence, setInvalidEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const [qualificationSaving, setQualificationSaving] = useState(false)
   const [followUpOpen, setFollowUpOpen] = useState(autoExpandFollowUp)
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
@@ -153,7 +154,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     }
     setQualificationSaving(true)
     try {
-      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: invalidEvidence.map(item => ({ infraFileId: item.infraFileId })), idempotencyKey: crypto.randomUUID() })
+      const uploadResult = await uploadDeferredFiles(invalidEvidence, api.uploadLeadQualificationImage, setInvalidEvidence)
+      if (uploadResult.failed) { message.error('有判定附件上传失败，请重试失败项'); return }
+      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
       message.success('已判定为无效客资')
       setInvalidOpen(false)
       setInvalidReason(undefined)
@@ -298,8 +301,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         </Space> : !invalidRemarkTemplateError && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无快捷备注"/>}
         <Input.TextArea value={invalidDescription} onChange={event => setInvalidDescription(event.target.value)} rows={4} maxLength={2000} showCount placeholder="填写无效判定备注"/>
         <Typography.Text strong>附件</Typography.Text>
-        <LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence}
-          disabled={qualificationSaving} uploadImage={api.uploadLeadQualificationImage}/>
+        <LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence} disabled={qualificationSaving}/>
       </Space>
     </Modal>
     <Modal title="判定为有效客资" open={validOpen} confirmLoading={qualificationSaving}

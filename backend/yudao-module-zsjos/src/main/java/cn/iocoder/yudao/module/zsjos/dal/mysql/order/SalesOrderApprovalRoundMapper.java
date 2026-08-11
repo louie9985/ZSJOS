@@ -4,6 +4,10 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalRoundDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
 
 @Mapper
 public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApprovalRoundDO> {
@@ -18,4 +22,13 @@ public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApp
     default SalesOrderApprovalRoundDO selectByIdempotencyKey(String key) {
         return selectOne(SalesOrderApprovalRoundDO::getSubmissionIdempotencyKey, key);
     }
+
+    @Select("SELECT DISTINCT r.process_instance_id FROM zsjos_order o "
+            + "JOIN zsjos_order_approval_round r ON r.order_id = o.id AND r.deleted = b'0' "
+            + "WHERE o.tenant_id = #{tenantId} AND o.deleted = b'0' "
+            + "AND (o.order_no LIKE CONCAT('%', #{keyword}, '%') "
+            + "OR o.student_name LIKE CONCAT('%', #{keyword}, '%') "
+            + "OR o.student_mobile LIKE CONCAT('%', #{keyword}, '%'))")
+    List<String> selectProcessInstanceIdsByKeyword(@Param("tenantId") Long tenantId,
+                                                    @Param("keyword") String keyword);
 }

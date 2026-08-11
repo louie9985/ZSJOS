@@ -10,6 +10,6 @@ import lombok.EqualsAndHashCode;
 public class LeadInboxFilterSaveReqVO extends LeadInboxFilterConfigVO {
 
     @NotBlank(message = "客资收件箱视角不能为空")
-    @Pattern(regexp = "submitter|owner", message = "客资收件箱视角不正确")
+    @Pattern(regexp = "submitter|owner|reviewer", message = "收件箱视角不正确")
     private String audience;
 }

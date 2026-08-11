@@ -15,6 +15,7 @@ public interface SalesOrderService {
     PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId);
     SalesOrderStatusCountsRespVO getMyStatusCounts(Long userId);
     PageResult<SalesOrderListItemRespVO> getInboxPage(SalesOrderPageReqVO reqVO, Long userId);
+    SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId);
     void approve(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
     void reject(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
     LeadAttachmentUploadRespVO uploadVoucher(Long userId, MultipartFile file) throws IOException;

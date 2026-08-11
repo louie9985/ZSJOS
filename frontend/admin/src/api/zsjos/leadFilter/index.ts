@@ -1,7 +1,7 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
 
-export type LeadFilterAudience = 'submitter' | 'owner'
+export type LeadFilterAudience = 'submitter' | 'owner' | 'reviewer'
 export interface LeadFilterConditionVO {
   field: string
   values: string[]
@@ -45,8 +45,8 @@ export interface LeadFilterVersionVO {
 export const getConfig = (audience: LeadFilterAudience): Promise<LeadFilterAdminVO> =>
   request.get({ url: '/zsjos/lead/inbox-filter/get', params: { audience } })
 
-export const getCapabilities = (): Promise<LeadFilterCapabilityVO[]> =>
-  request.get({ url: '/zsjos/lead/inbox-filter/capabilities' })
+export const getCapabilities = (audience: LeadFilterAudience): Promise<LeadFilterCapabilityVO[]> =>
+  request.get({ url: '/zsjos/lead/inbox-filter/capabilities', params: { audience } })
 
 export const getVersions = (audience: LeadFilterAudience): Promise<LeadFilterVersionVO[]> =>
   request.get({ url: '/zsjos/lead/inbox-filter/versions', params: { audience } })

@@ -3,7 +3,7 @@
     <div class="filter-heading">
       <div>
         <h3>客资筛选方案</h3>
-        <p>分别维护提交人和负责人的收件箱分组。只有发布后的版本会影响员工工作台。</p>
+        <p>分别维护提交人、负责人和审批人的收件箱分组。只有发布后的版本会影响员工工作台。</p>
       </div>
       <div class="heading-actions">
         <el-tag v-if="config" type="success" effect="plain"
@@ -16,9 +16,9 @@
 
   <ContentWrap>
     <div class="audience-toolbar">
-      <el-segmented v-model="audience" :options="audienceOptions" @change="loadConfig" />
+      <el-segmented v-model="audience" :options="audienceOptions" @change="loadAll" />
       <span class="toolbar-note">{{
-        audience === 'submitter' ? '员工查看自己提交的客资' : '销售查看自己负责的客资'
+        audience === 'submitter' ? '员工查看自己提交的客资' : audience === 'owner' ? '销售查看自己负责的客资' : '审批人查看自己待办或已办的成交订单'
       }}</span>
     </div>
 
@@ -281,7 +281,8 @@ const message = useMessage()
 const audience = ref<LeadFilterApi.LeadFilterAudience>('submitter')
 const audienceOptions = [
   { label: '提交人视角', value: 'submitter' },
-  { label: '负责人视角', value: 'owner' }
+  { label: '负责人视角', value: 'owner' },
+  { label: '审批人视角', value: 'reviewer' }
 ]
 const config = ref<LeadFilterApi.LeadFilterAdminVO>()
 const groups = ref<LeadFilterApi.LeadFilterGroupVO[]>([])
@@ -326,7 +327,7 @@ const loadConfig = async () => {
 }
 const loadAll = async () => {
   try {
-    capabilities.value = await LeadFilterApi.getCapabilities()
+    capabilities.value = await LeadFilterApi.getCapabilities(audience.value)
     await loadConfig()
   } catch (loadError: any) {
     error.value = loadError?.msg || loadError?.message || '筛选能力加载失败'

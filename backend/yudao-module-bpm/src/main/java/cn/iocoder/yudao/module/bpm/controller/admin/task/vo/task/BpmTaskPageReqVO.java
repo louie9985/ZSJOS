@@ -9,6 +9,7 @@ import lombok.Data;
 import org.springframework.format.annotation.DateTimeFormat;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "管理后台 - 流程任务的的分页 Request VO") // 待办、已办，都使用该分页
 @Data
@@ -22,6 +23,10 @@ public class BpmTaskPageReqVO extends PageParam {
 
     @Schema(description = "流程定义的标识", example = "2048")
     private String processDefinitionKey; // 精准匹配
+
+    private String taskDefinitionKey;
+
+    private List<String> processInstanceIds;
 
     @Schema(description = "审批状态", example = "1")
     @InEnum(BpmTaskStatusEnum.class)
