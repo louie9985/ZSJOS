@@ -40,6 +40,7 @@ import LeadFollowUpPanel from '../components/LeadFollowUpPanel'
 import LeadAppealPanel from '../components/LeadAppealPanel'
 import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
 import LeadBasicInfoModal from '../components/LeadBasicInfoModal'
+import SalesOrderEntryModal from '../components/SalesOrderEntryModal'
 import type { LeadAppealEvidence } from '../services/api'
 import { defaultLeadDetailTab, shouldBlockLeadSwitch, type LeadDetailTab } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
@@ -97,6 +98,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [validRemark, setValidRemark] = useState('')
   const [validTemplates, setValidTemplates] = useState<DictData[]>([])
   const [validTemplateError, setValidTemplateError] = useState('')
+  const [salesOrderOpen, setSalesOrderOpen] = useState(false)
   const actions = new Map((lead.availableActions || []).map(item => [item.code, item]))
   useEffect(() => { onDirtyChange(followUpFormDirty || basicInfoDirty) },
     [basicInfoDirty, followUpFormDirty, onDirtyChange])
@@ -179,7 +181,10 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         {actions.has('ADD_FOLLOW_UP') && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setFollowUpOpen(true)}>跟进</Button>}
         {actions.has('JUDGE_VALID') && <Button icon={<CheckOutlined/>} onClick={() => void openValid()}>判有效</Button>}
         {actions.has('JUDGE_INVALID') && <Button danger icon={<CloseOutlined/>} onClick={() => void openInvalid()}>判无效</Button>}
-        {actions.has('ENTER_DEAL') && <Button icon={<FileAddOutlined/>} disabled>录入成交</Button>}
+        {actions.has('ENTER_DEAL') && <Button icon={<FileAddOutlined/>}
+          disabled={!actions.get('ENTER_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>录入成交</Button>}
+        {actions.has('REVISE_DEAL') && <Button icon={<FileAddOutlined/>}
+          disabled={!actions.get('REVISE_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>补正成交</Button>}
       </Space>
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
@@ -312,6 +317,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     </Modal>
     <LeadBasicInfoModal lead={lead} open={basicInfoOpen} onClose={() => setBasicInfoOpen(false)}
       onDirtyChange={setBasicInfoDirty} onChanged={onChanged}/>
+    <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined}
+      open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)}
+      onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
   </div>
 }
 

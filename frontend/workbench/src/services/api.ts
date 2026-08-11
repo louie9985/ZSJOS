@@ -74,7 +74,8 @@ export type ManagedLead = {
   createTime: Timestamp; updateTime: Timestamp; relationTypes: Array<'submitter' | 'owner'>
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL'; enabled: boolean }>
+  activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL'; enabled: boolean }>
 }
 export type LeadQualificationException = {
   id: number; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
@@ -118,6 +119,28 @@ export type LeadAppeal = {
   processInstanceId?: string; taskId?: string; reviewerUserId?: number; reviewerUserName?: string
   decisionReason?: string; decisionEvidence: LeadAppealEvidence[]; submittedAt: Timestamp; decidedAt?: Timestamp
   canSubmitNextRound: boolean
+}
+export type SalesOrderVoucher = LeadAttachment
+export type SalesOrderSubmitRequest = {
+  buyerName?: string; studentName: string; studentNature: string; studentMobile?: string; studentWechatId?: string
+  provinceCode: string; provinceName: string; cityCode: string; cityName: string
+  agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string
+  customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string
+  studentSpecialRequirements?: string; materialDeliveryContact?: string
+  items: Array<{ spuRef: string; skuRef: string; actualAmount: number }>
+  paymentVouchers: Array<{ infraFileId: number }>; idempotencyKey: string
+}
+export type SalesOrder = {
+  id: number; orderNo: string; leadId: number; opportunityId: number; status: 'pending_approval' | 'revision_required' | 'effective'
+  submitterUserId: number; buyerName: string; studentName: string; studentNature: string
+  studentMobile?: string; studentWechatId?: string; provinceCode: string; provinceName: string; cityCode: string; cityName: string
+  agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string; totalAmount: number
+  customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string
+  studentSpecialRequirements?: string; materialDeliveryContact?: string
+  items: Array<{ id: number; productRef: string; skuRef: string; productName: string; skuName: string; categoryPath: string[]; attrValues: Record<string, string>; actualAmount: number }>
+  paymentVouchers: SalesOrderVoucher[]; approvalRoundNo: number; approvalRoundStatus: string
+  processInstanceId?: string; taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'
+  submittedAt: Timestamp; effectiveAt?: Timestamp
 }
 export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
@@ -329,6 +352,20 @@ export const api = {
   uploadLeadAppealImage: async (file: File) => {
     const data = new FormData(); data.append('file', file)
     return unwrap<LeadAttachment>(await http.post('/zsjos/lead/appeal/attachment/upload', data))
+  },
+  salesOrderCatalog: async () => unwrap<LeadCatalog>(await http.get('/zsjos/sales-order/product/catalog')),
+  submitSalesOrder: async (leadId: number, data: SalesOrderSubmitRequest) =>
+    unwrap<number>(await http.post(`/zsjos/sales-order/lead/${leadId}/submit`, data)),
+  resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
+  salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
+  salesOrderApprovalInbox: async (handled: boolean, params: { pageNo: number; pageSize: number }) =>
+    unwrap<PageResult<SalesOrder>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params: { handled, ...params } })),
+  decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string }) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
+  uploadSalesOrderVoucher: async (file: File) => {
+    const data = new FormData(); data.append('file', file)
+    return unwrap<SalesOrderVoucher>(await http.post('/zsjos/sales-order/voucher/upload', data))
   },
   businessTaskSummary: async () => unwrap<BusinessTaskSummary>(await http.get('/zsjos/business-task/my-summary')),
   businessTaskPage: async (bucket: BusinessTaskBucket, params: { pageNo: number; pageSize: number }) =>

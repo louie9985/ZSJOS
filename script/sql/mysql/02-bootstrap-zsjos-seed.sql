@@ -185,3 +185,32 @@ VALUES ('V020', 'Add unified schema migration metadata and missing CRM tables', 
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V021', 'Make lead intended-product uniqueness active-row only', 'lead-intended-product-active-unique-key-v1');
+
+INSERT INTO `zsjos_order_approval_config` (`registration_dept_id`,`finance_dept_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT 1030,1040,'quick-init',NOW(),'quick-init',NOW(),b'0',1
+WHERE EXISTS(SELECT 1 FROM `system_dept` WHERE id=1030 AND tenant_id=1 AND deleted=b'0')
+  AND EXISTS(SELECT 1 FROM `system_dept` WHERE id=1040 AND tenant_id=1 AND deleted=b'0')
+  AND NOT EXISTS(SELECT 1 FROM `zsjos_order_approval_config` WHERE tenant_id=1 AND deleted=b'0');
+
+INSERT INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT seed.name,seed.type,0,'成交订单字段字典','quick-init',NOW(),'quick-init',NOW(),b'0' FROM (
+ SELECT '学员性质' name,'zsjos_order_student_nature' type UNION ALL SELECT '服务周期','zsjos_order_service_period' UNION ALL
+ SELECT '学生来源','zsjos_order_student_source' UNION ALL SELECT '缴费方式','zsjos_order_fee_mode' UNION ALL SELECT '支付方式','zsjos_order_payment_method'
+) seed WHERE NOT EXISTS(SELECT 1 FROM `system_dict_type` d WHERE d.type=seed.type AND d.deleted=b'0');
+
+INSERT INTO `system_dict_data` (`sort`,`label`,`value`,`dict_type`,`status`,`color_type`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT seed.sort,seed.label,seed.value,seed.dict_type,0,'default','quick-init',NOW(),'quick-init',NOW(),b'0' FROM (
+ SELECT 50 sort,'畅学卡' label,'learning_card' value,'zsjos_order_student_nature' dict_type UNION ALL SELECT 40,'老学员','existing_student','zsjos_order_student_nature' UNION ALL SELECT 30,'新学员','new_student','zsjos_order_student_nature' UNION ALL SELECT 20,'老带新','existing_referral','zsjos_order_student_nature' UNION ALL SELECT 10,'大客户代理','key_account_agent','zsjos_order_student_nature' UNION ALL
+ SELECT 80,'1年','one_year','zsjos_order_service_period' UNION ALL SELECT 70,'2年','two_year','zsjos_order_service_period' UNION ALL SELECT 60,'3年','three_year','zsjos_order_service_period' UNION ALL SELECT 50,'4年','four_year','zsjos_order_service_period' UNION ALL SELECT 40,'5年','five_year','zsjos_order_service_period' UNION ALL SELECT 30,'仅限当期','current_term_only','zsjos_order_service_period' UNION ALL SELECT 20,'当期有效（可免费复训一期）','current_term_plus_retrain','zsjos_order_service_period' UNION ALL SELECT 10,'长期有效','long_term','zsjos_order_service_period' UNION ALL
+ SELECT 40,'直接招生','direct_enrollment','zsjos_order_student_source' UNION ALL SELECT 30,'代理推荐','agent_referral','zsjos_order_student_source' UNION ALL SELECT 20,'合作伙伴','partner','zsjos_order_student_source' UNION ALL SELECT 10,'大客户低价','key_account_low_price','zsjos_order_student_source' UNION ALL
+ SELECT 30,'零售缴费','retail','zsjos_order_fee_mode' UNION ALL SELECT 20,'预付款扣费','prepaid_deduction','zsjos_order_fee_mode' UNION ALL SELECT 10,'底价缴费','floor_price','zsjos_order_fee_mode' UNION ALL
+ SELECT 70,'学习二维码','learning_qr','zsjos_order_payment_method' UNION ALL SELECT 60,'公司二维码','company_qr','zsjos_order_payment_method' UNION ALL SELECT 50,'财务微信','finance_wechat','zsjos_order_payment_method' UNION ALL SELECT 40,'公司支付宝','company_alipay','zsjos_order_payment_method' UNION ALL SELECT 30,'等价/退差价换课','course_exchange','zsjos_order_payment_method' UNION ALL SELECT 20,'余额抵扣现金','balance_cash','zsjos_order_payment_method' UNION ALL SELECT 10,'充值预扣','prepaid_recharge','zsjos_order_payment_method'
+) seed WHERE NOT EXISTS(SELECT 1 FROM `system_dict_data` d WHERE d.dict_type=seed.dict_type AND d.value=seed.value AND d.deleted=b'0');
+
+INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6810,'成交审批','zsjos:sales-order:review',2,17,6735,'sales-order-approvals','ep:finished','zsjos/salesOrderApproval/index','ZsjosSalesOrderApproval',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6811,'录入成交','zsjos:sales-order:create',3,15,6770,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6812,'查询成交订单','zsjos:sales-order:query',3,1,6810,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V023', 'Add direct sales-order entry and dual-center approval', 'sales-order-dual-approval-v1');

@@ -84,4 +84,18 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PRODUCT_PRICE_INVALID = new ErrorCode(1_900_004_016, "课程 SKU 价格不能小于 0");
     ErrorCode PRODUCT_ATTR_INVALID = new ErrorCode(1_900_004_017, "课程销售属性或属性值无效");
 
+    ErrorCode SALES_ORDER_NOT_EXISTS = new ErrorCode(1_900_005_001, "成交订单不存在");
+    ErrorCode SALES_ORDER_ENTRY_FORBIDDEN = new ErrorCode(1_900_005_002, "当前客资状态或归属不允许录入成交");
+    ErrorCode SALES_ORDER_ACTIVE_DUPLICATE = new ErrorCode(1_900_005_003, "该客资已有未完成成交订单");
+    ErrorCode SALES_ORDER_CONTACT_REQUIRED = new ErrorCode(1_900_005_004, "手机号和微信号至少填写一个");
+    ErrorCode SALES_ORDER_AMOUNT_INVALID = new ErrorCode(1_900_005_005, "订单金额与成交课程金额不一致");
+    ErrorCode SALES_ORDER_VOUCHER_REQUIRED = new ErrorCode(1_900_005_006, "已付款的非零订单必须上传缴费凭证");
+    ErrorCode SALES_ORDER_ATTACHMENT_INVALID = new ErrorCode(1_900_005_007, "缴费凭证不存在或文件类型不支持");
+    ErrorCode SALES_ORDER_APPROVAL_CONFIG_INVALID = new ErrorCode(1_900_005_008, "报名履约或财务结算审批部门未配置有效人员");
+    ErrorCode SALES_ORDER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_005_009, "成交订单会签流程尚未部署或暂不可用");
+    ErrorCode SALES_ORDER_STATE_INVALID = new ErrorCode(1_900_005_010, "当前订单状态不允许执行该操作");
+    ErrorCode SALES_ORDER_PERMISSION_DENIED = new ErrorCode(1_900_005_011, "无权查看或处理该成交订单");
+    ErrorCode SALES_ORDER_ALREADY_HANDLED = new ErrorCode(1_900_005_012, "该审批任务已由其他人员处理");
+    ErrorCode SALES_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_005_013, "成交订单请求幂等键已被其他请求使用");
+
 }

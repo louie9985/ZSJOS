@@ -14,10 +14,12 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadIn
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -64,6 +66,8 @@ class LeadManagementServiceImplTest {
     private LeadObjectPermissionService leadObjectPermissionService;
     @Mock
     private OpportunityMapper opportunityMapper;
+    @Mock
+    private SalesOrderMapper salesOrderMapper;
 
     @Test
     void pageRestrictsOrdinaryUserToRelatedLeads() {
@@ -117,6 +121,7 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission("zsjos:lead:update")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:lead:qualify")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:sales-order:create")).thenReturn(true);
 
         assertActions(actionLead("submitted", "owned", false), null,
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP");
@@ -128,6 +133,16 @@ class LeadManagementServiceImplTest {
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "ENTER_DEAL");
         assertActions(actionLead("valid", "owned", true), null,
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "ENTER_DEAL");
+        SalesOrderDO pendingOrder = new SalesOrderDO();
+        pendingOrder.setId(40L); pendingOrder.setStatus("pending_approval");
+        assertActions(actionLead("valid", "owned", true), null, pendingOrder,
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID");
+        SalesOrderDO revisionOrder = new SalesOrderDO();
+        revisionOrder.setId(41L); revisionOrder.setStatus("revision_required");
+        LeadManagementRespVO revisionResult = assertActions(actionLead("valid", "owned", true), null, revisionOrder,
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "REVISE_DEAL");
+        assertEquals(41L, revisionResult.getActiveSalesOrderId());
+        assertEquals("revision_required", revisionResult.getActiveSalesOrderStatus());
         assertActions(actionLead("invalid", "owned", true), null, "ADD_FOLLOW_UP");
         assertActions(actionLead("submitted", "public_pool", false), null);
     }
@@ -334,21 +349,29 @@ class LeadManagementServiceImplTest {
         return lead;
     }
 
-    private void assertActions(LeadDO lead, OpportunityDO opportunity, String... expected) {
+    private LeadManagementRespVO assertActions(LeadDO lead, OpportunityDO opportunity, String... expected) {
+        return assertActions(lead, opportunity, null, expected);
+    }
+
+    private LeadManagementRespVO assertActions(LeadDO lead, OpportunityDO opportunity,
+                                                SalesOrderDO activeOrder, String... expected) {
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(leadObjectPermissionService.canRead(lead, 20L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(salesOrderMapper.selectActiveByLeadId(org.mockito.ArgumentMatchers.eq(1L), anyCollection()))
+                .thenReturn(activeOrder);
 
         LeadManagementRespVO result = service.getLead(1L, 20L);
 
         assertEquals(List.of(expected), result.getAvailableActions().stream()
                 .map(LeadManagementRespVO.ActionVO::getCode).toList());
-        if (Set.of(expected).contains("ENTER_DEAL")) {
-            assertEquals(false, result.getAvailableActions().getLast().getEnabled());
+        if (Set.of(expected).contains("ENTER_DEAL") || Set.of(expected).contains("REVISE_DEAL")) {
+            assertEquals(true, result.getAvailableActions().getLast().getEnabled());
         }
+        return result;
     }
 
     private void assertProjection(LeadDO lead, OpportunityDO opportunity, String qualification,

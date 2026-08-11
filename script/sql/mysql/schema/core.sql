@@ -3998,9 +3998,30 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单状态',
   `submitter_user_id` bigint DEFAULT NULL COMMENT '本次订单提交人',
   `submitter_center_type` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交中心类型',
+  `buyer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '购买方快照',
+  `student_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员姓名快照',
+  `student_nature` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员性质字典值',
+  `student_mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员手机号快照',
+  `student_wechat_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员微信号快照',
+  `province_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '省编码快照',
+  `province_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '省名称快照',
+  `city_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '市编码快照',
+  `city_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '市名称快照',
+  `agreed_exam_time` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商定考试时间文本',
+  `class_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '开通班种文本',
+  `service_period` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '服务周期字典值',
+  `student_source` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生来源字典值',
   `total_amount` decimal(18,2) NOT NULL COMMENT '订单总额',
   `discount_amount` decimal(18,2) NOT NULL DEFAULT '0.00' COMMENT '优惠金额',
   `payable_amount` decimal(18,2) NOT NULL COMMENT '应付金额',
+  `customer_paid_at` datetime DEFAULT NULL COMMENT '客户实际付款时间',
+  `fee_mode` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '缴费方式字典值',
+  `payment_method` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '支付方式字典值',
+  `remark` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '订单备注',
+  `student_special_requirements` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生特殊要求',
+  `material_delivery_contact` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '教材邮递联系',
+  `payment_voucher_refs` json DEFAULT NULL COMMENT '缴费凭证文件快照',
+  `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次提交幂等键',
   `contract_refs` json DEFAULT NULL COMMENT '合同或附件引用',
   `current_approval_round_id` bigint DEFAULT NULL COMMENT '当前审批轮次编号',
   `submitted_at` datetime DEFAULT NULL COMMENT '提交时间',
@@ -4016,10 +4037,13 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  `active_lead_id` bigint GENERATED ALWAYS AS (CASE WHEN (`deleted` = b'0' AND `status` IN ('pending_approval','revision_required')) THEN `lead_id` ELSE NULL END) STORED COMMENT '活动成交单客资唯一键',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_no` (`tenant_id`,`order_no`),
   UNIQUE KEY `uk_tenant_source_payment_order` (`tenant_id`,`source_payment_order_id`),
   UNIQUE KEY `uk_tenant_opportunity` (`tenant_id`,`opportunity_id`),
+  UNIQUE KEY `uk_tenant_order_submit_key` (`tenant_id`,`submission_idempotency_key`),
+  UNIQUE KEY `uk_tenant_active_lead_order` (`tenant_id`,`active_lead_id`),
   KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`),
   KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 业务订单';
@@ -4037,6 +4061,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   `submitted_at` datetime NOT NULL COMMENT '本轮提交时间',
   `completed_at` datetime DEFAULT NULL COMMENT '本轮完成时间',
   `rejected_bpm_task_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '驳回任务引用，由 BPM 任务事件提供',
+  `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本轮提交幂等键',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
@@ -4046,8 +4071,24 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_round` (`tenant_id`,`order_id`,`round_no`),
   UNIQUE KEY `uk_tenant_process_instance` (`tenant_id`,`process_instance_id`),
+  UNIQUE KEY `uk_tenant_order_round_submit_key` (`tenant_id`,`submission_idempotency_key`),
   KEY `idx_tenant_order_status` (`tenant_id`,`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 订单审批轮次与 BPM 引用';
+
+-- zsjos_order_approval_config
+CREATE TABLE IF NOT EXISTS `zsjos_order_approval_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `registration_dept_id` bigint NOT NULL COMMENT '报名履约中心根部门',
+  `finance_dept_id` bigint NOT NULL COMMENT '财务结算中心根部门',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_order_approval_config` (`tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成交订单审批部门配置';
 
 -- zsjos_order_item
 CREATE TABLE IF NOT EXISTS `zsjos_order_item` (
@@ -4055,6 +4096,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_item` (
   `order_id` bigint NOT NULL COMMENT '订单编号',
   `product_id` bigint DEFAULT NULL COMMENT '产品模块产品编号',
   `sku_id` bigint DEFAULT NULL COMMENT '产品模块 SKU 编号',
+  `product_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '产品稳定编号快照',
+  `sku_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'SKU 稳定编号快照',
   `quantity` decimal(18,4) NOT NULL DEFAULT '1.0000' COMMENT '数量',
   `unit_price` decimal(18,2) NOT NULL COMMENT '单价',
   `discount_amount` decimal(18,2) NOT NULL DEFAULT '0.00' COMMENT '订单项优惠金额',
