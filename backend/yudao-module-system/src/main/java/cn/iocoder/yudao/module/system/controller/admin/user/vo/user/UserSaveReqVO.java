@@ -56,6 +56,10 @@ public class UserSaveReqVO {
     @DiffLogField(name = "手机号码")
     private String mobile;
 
+    @Schema(description = "企业微信应用消息 userid")
+    @Size(max = 64, message = "企业微信 userid 不能超过 64 个字符")
+    private String wecomUserId;
+
     @Schema(description = "用户性别，参见 SexEnum 枚举类", example = "1")
     @DiffLogField(name = "用户性别", function = SexParseFunction.NAME)
     private Integer sex;

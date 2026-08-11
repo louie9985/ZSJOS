@@ -44,6 +44,9 @@
       <el-table-column label="业务场景" min-width="160">
         <template #default="scope">{{ sceneName(scope.row.sceneCode) }}</template>
       </el-table-column>
+      <el-table-column label="通知渠道" width="110">
+        <template #default="scope">{{ channelName(scope.row.channelCode) }}</template>
+      </el-table-column>
       <el-table-column label="模板" min-width="160">
         <template #default="scope">{{ templateName(scope.row.templateId) }}</template>
       </el-table-column>
@@ -106,6 +109,11 @@
             :label="scene.name"
             :value="scene.code"
           />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="通知渠道" prop="channelCode">
+        <el-select v-model="form.channelCode" class="!w-100%" @change="channelChanged">
+          <el-option v-for="item in channels" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="消息模板" prop="templateId">
@@ -193,6 +201,11 @@ const templateName = (id?: number) =>
   templates.value.find((template) => template.id === id)?.name || `#${id}`
 const actionName = (action: string) =>
   ({ none: '无操作', message_detail: '消息详情', business_detail: '客资详情' })[action] || action
+const channels = [
+  { value: 'in_app', label: '站内信（含实时提醒）' },
+  { value: 'wecom', label: '企业微信（待配置）' }, { value: 'sms', label: '短信（待配置）' }
+]
+const channelName = (code?: string) => channels.find((item) => item.value === code)?.label || '站内信'
 const roleNames = (rule: RuleApi.NotifyRuleVO) => {
   const scene = scenes.value.find((item) => item.code === rule.sceneCode)
   return rule.recipientRoles
@@ -230,6 +243,7 @@ const formRef = ref()
 const emptyForm = (): RuleApi.NotifyRuleVO => ({
   name: '',
   sceneCode: '',
+  channelCode: 'in_app',
   templateId: undefined,
   recipientRoles: [],
   specifiedUserIds: [],
@@ -241,11 +255,14 @@ const currentScene = computed(() =>
   scenes.value.find((scene) => scene.code === form.value.sceneCode)
 )
 const sceneTemplates = computed(() =>
-  templates.value.filter((template) => template.sceneCode === form.value.sceneCode)
+  templates.value.filter((template) => template.sceneCode === form.value.sceneCode
+    && (!template.channelCode || template.channelCode === form.value.channelCode
+      || (form.value.channelCode === 'websocket' && template.channelCode === 'in_app')))
 )
 const rules = {
   name: [{ required: true, message: '规则名称不能为空' }],
   sceneCode: [{ required: true, message: '业务场景不能为空' }],
+  channelCode: [{ required: true, message: '通知渠道不能为空' }],
   templateId: [{ required: true, message: '消息模板不能为空' }],
   actionType: [{ required: true, message: '点击动作不能为空' }]
 }
@@ -256,6 +273,7 @@ const sceneChanged = () => {
     ? 'message_detail'
     : 'none'
 }
+const channelChanged = () => { form.value.templateId = undefined }
 const openForm = async (id?: number) => {
   dialogVisible.value = true
   form.value = emptyForm()

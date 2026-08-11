@@ -2956,6 +2956,9 @@ CREATE TABLE IF NOT EXISTS `system_notify_message` (
   `template_params` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模版参数',
   `notify_rule_id` bigint DEFAULT NULL COMMENT '通知规则编号',
   `scene_code` varchar(64) DEFAULT NULL COMMENT '业务场景编码',
+  `channel_code` varchar(32) NOT NULL DEFAULT 'in_app' COMMENT '通知渠道',
+  `sms_template_id` varchar(64) DEFAULT NULL COMMENT '短信模板编号',
+  `wecom_message_type` varchar(16) DEFAULT NULL COMMENT '企微消息类型',
   `source_event_key` varchar(128) DEFAULT NULL COMMENT '来源事件键',
   `action_type` varchar(32) DEFAULT NULL COMMENT '受控点击动作',
   `biz_type` varchar(64) DEFAULT NULL COMMENT '业务类型',
@@ -3000,6 +3003,7 @@ CREATE TABLE IF NOT EXISTS `system_notify_rule` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `name` varchar(64) NOT NULL,
   `scene_code` varchar(64) NOT NULL,
+  `channel_code` varchar(32) NOT NULL DEFAULT 'in_app',
   `template_id` bigint NOT NULL,
   `recipient_roles` text NOT NULL,
   `specified_user_ids` text NOT NULL,
@@ -3426,6 +3430,7 @@ CREATE TABLE IF NOT EXISTS `system_users` (
   `post_ids` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '岗位编号数组',
   `email` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '用户邮箱',
   `mobile` varchar(11) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '手机号码',
+  `wecom_user_id` varchar(64) DEFAULT NULL COMMENT '企业微信 userid',
   `sex` tinyint DEFAULT '0' COMMENT '用户性别',
   `avatar` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '头像地址',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '帐号状态（0正常 1停用）',
@@ -3658,6 +3663,10 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_appeal` (
   `round_no` int NOT NULL COMMENT '申诉轮次',
   `review_stage` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '审核阶段',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '申诉状态',
+  `owner_user_id_snapshot` bigint DEFAULT NULL COMMENT '提交时客资负责人快照',
+  `owner_dept_id_snapshot` bigint DEFAULT NULL COMMENT '提交时负责人部门快照',
+  `reviewer_dept_id_snapshot` bigint DEFAULT NULL COMMENT '提交时审批部门快照',
+  `reviewer_user_ids_snapshot` json DEFAULT NULL COMMENT '本轮审批人快照',
   `applicant_user_id` bigint NOT NULL COMMENT '申请人用户编号',
   `reason` varchar(1000) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '申诉原因',
   `evidence_refs` json DEFAULT NULL COMMENT '证据引用',
@@ -4045,7 +4054,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   UNIQUE KEY `uk_tenant_order_submit_key` (`tenant_id`,`submission_idempotency_key`),
   UNIQUE KEY `uk_tenant_active_lead_order` (`tenant_id`,`active_lead_id`),
   KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`),
-  KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`)
+  KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
+  KEY `idx_tenant_submitter_status_submitted` (`tenant_id`,`submitter_user_id`,`status`,`submitted_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 业务订单';
 
 -- zsjos_order_approval_round
@@ -4061,6 +4071,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   `submitted_at` datetime NOT NULL COMMENT '本轮提交时间',
   `completed_at` datetime DEFAULT NULL COMMENT '本轮完成时间',
   `rejected_bpm_task_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '驳回任务引用，由 BPM 任务事件提供',
+  `decision_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本轮最终非通过原因快照',
   `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本轮提交幂等键',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',

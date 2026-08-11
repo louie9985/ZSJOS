@@ -217,6 +217,7 @@ otherwise
 - `query-all` is an explicit permission-based bypass for the current tenant; it is
   never inferred from a role, post, department, or display name.
 - V007 通过既有菜单权限关系分配固定入口：提交权限映射到“我提交的”，抢单或接单权限映射到“我负责的”，`query-all` 映射到两者；不根据角色名或岗位名推断。
+- V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
 
 ### Qualification exception authorization
 

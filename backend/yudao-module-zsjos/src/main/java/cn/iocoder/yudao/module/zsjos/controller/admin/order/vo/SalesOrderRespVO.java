@@ -42,6 +42,12 @@ public class SalesOrderRespVO {
     private String processInstanceId;
     private String taskId;
     private String taskDefinitionKey;
+    private Integer taskStatus;
+    private String taskReason;
+    private LocalDateTime taskCreateTime;
+    private LocalDateTime taskEndTime;
+    private String decisionReason;
+    private Boolean canRevise;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
 

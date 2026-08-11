@@ -2,6 +2,9 @@
 <definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
              xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
              targetNamespace="https://zsjos.com/bpm">
   <process id="zsjos_lead_appeal_review" name="客资申诉复核" isExecutable="true">
     <startEvent id="StartEvent" name="提交申诉"/>
@@ -20,4 +23,31 @@
     <sequenceFlow id="flow_review_end" sourceRef="appealReview" targetRef="EndEvent"/>
     <endEvent id="EndEvent" name="完成"/>
   </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_zsjos_lead_appeal_review">
+    <bpmndi:BPMNPlane id="BPMNPlane_zsjos_lead_appeal_review" bpmnElement="zsjos_lead_appeal_review">
+      <bpmndi:BPMNShape id="Shape_StartEvent" bpmnElement="StartEvent">
+        <omgdc:Bounds x="120" y="150" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="105" y="193" width="66" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_appealReview" bpmnElement="appealReview">
+        <omgdc:Bounds x="250" y="118" width="160" height="100"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent" bpmnElement="EndEvent">
+        <omgdc:Bounds x="530" y="150" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="530" y="193" width="36" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_flow_start_review" bpmnElement="flow_start_review">
+        <omgdi:waypoint x="156" y="168"/>
+        <omgdi:waypoint x="250" y="168"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_review_end" bpmnElement="flow_review_end">
+        <omgdi:waypoint x="410" y="168"/>
+        <omgdi:waypoint x="530" y="168"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
 </definitions>

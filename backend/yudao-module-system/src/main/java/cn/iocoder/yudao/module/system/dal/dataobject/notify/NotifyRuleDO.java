@@ -29,6 +29,7 @@ public class NotifyRuleDO extends TenantBaseDO {
     private Long id;
     private String name;
     private String sceneCode;
+    private String channelCode;
     private Long templateId;
     @TableField(typeHandler = Jackson3TypeHandler.class)
     private List<String> recipientRoles;

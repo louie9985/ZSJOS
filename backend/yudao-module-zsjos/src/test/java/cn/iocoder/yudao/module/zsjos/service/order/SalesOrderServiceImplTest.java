@@ -9,6 +9,8 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
@@ -175,7 +177,41 @@ class SalesOrderServiceImplTest {
 
         assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
         assertEquals(ROUND_REJECTED, round.getStatus());
+        assertEquals("资料需补正", round.getDecisionReason());
         assertEquals(OPPORTUNITY_STATUS_FOLLOWING, opportunity.getStatus());
+    }
+
+    @Test
+    void myPageUsesSubmitterScopeAndDoesNotLoadHeavyDetails() {
+        SalesOrderMyPageReqVO reqVO = new SalesOrderMyPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setStatus(STATUS_PENDING_APPROVAL); reqVO.setKeyword("测试");
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setCurrentApprovalRoundId(200L); order.setOrderNo("SO-100"); order.setLeadId(1L);
+        order.setStatus(STATUS_PENDING_APPROVAL); order.setStudentName("测试学员"); order.setTotalAmount(BigDecimal.TEN);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setRoundNo(2);
+        when(orderMapper.selectMyPage(20L, reqVO)).thenReturn(new PageResult<>(List.of(order), 1L));
+        when(roundMapper.selectBatchIds(List.of(200L))).thenReturn(List.of(round));
+
+        var result = service.getMyPage(reqVO, 20L);
+
+        assertEquals(1L, result.getTotal()); assertEquals(1, result.getList().size());
+        assertEquals("SO-100", result.getList().getFirst().getOrderNo());
+        assertEquals(2, result.getList().getFirst().getApprovalRoundNo());
+        verify(orderMapper).selectMyPage(20L, reqVO);
+        verifyNoInteractions(itemMapper, fileApi);
+    }
+
+    @Test
+    void myStatusCountsReturnsAllThreeBusinessStates() {
+        when(orderMapper.selectMyCount(20L, null)).thenReturn(7L);
+        when(orderMapper.selectMyCount(20L, STATUS_PENDING_APPROVAL)).thenReturn(2L);
+        when(orderMapper.selectMyCount(20L, STATUS_REVISION_REQUIRED)).thenReturn(1L);
+        when(orderMapper.selectMyCount(20L, STATUS_EFFECTIVE)).thenReturn(4L);
+
+        var result = service.getMyStatusCounts(20L);
+
+        assertEquals(7L, result.getTotal()); assertEquals(2L, result.getPendingApproval());
+        assertEquals(1L, result.getRevisionRequired()); assertEquals(4L, result.getEffective());
     }
 
     @Test

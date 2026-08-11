@@ -214,3 +214,53 @@ INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V023', 'Add direct sales-order entry and dual-center approval', 'sales-order-dual-approval-v1');
+
+SET @zsjos_bpm_form_conf = '{"form":{"labelPosition":"right","labelWidth":"120px","size":"default"},"submitBtn":false,"resetBtn":false}';
+SET @zsjos_bpm_field_appeal_id = '{"type":"input","field":"appealId","title":"申诉编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_order_id = '{"type":"input","field":"orderId","title":"订单编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_lead_id = '{"type":"input","field":"leadId","title":"客资编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_round_no = '{"type":"input","field":"roundNo","title":"审批轮次","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_review_stage = '{"type":"input","field":"reviewStage","title":"复核阶段","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+
+INSERT INTO `bpm_form`
+(`name`,`status`,`conf`,`fields`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT seed.name,0,@zsjos_bpm_form_conf,seed.fields,seed.marker,
+       'quick-init',NOW(),'quick-init',NOW(),b'0',tenant.id
+FROM `system_tenant` tenant
+CROSS JOIN (
+  SELECT '客资申诉流程关联信息' name,
+         JSON_ARRAY(@zsjos_bpm_field_appeal_id,@zsjos_bpm_field_lead_id,
+                    @zsjos_bpm_field_round_no,@zsjos_bpm_field_review_stage) fields,
+         'zsjos-system-form:lead-appeal-review' marker
+  UNION ALL
+  SELECT '成交会签流程关联信息',
+         JSON_ARRAY(@zsjos_bpm_field_order_id,@zsjos_bpm_field_lead_id,@zsjos_bpm_field_round_no),
+         'zsjos-system-form:sales-order-dual-approval'
+) seed
+WHERE tenant.deleted=b'0' AND tenant.status=0
+  AND NOT EXISTS (
+    SELECT 1 FROM `bpm_form` existing
+    WHERE existing.tenant_id=tenant.id AND existing.remark=seed.marker AND existing.deleted=b'0'
+  );
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V024', 'Add read-only BPM forms for ZSJOS workflows', 'zsjos-bpm-readonly-forms-v1');
+
+INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6813,'我的订单','zsjos:sales-order:query-own',2,17,6735,'sales-orders/my','ep:tickets','zsjos/mySalesOrder/index','ZsjosMySalesOrder',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+UPDATE `system_menu` SET `sort`=18 WHERE `id`=6810 AND `deleted`=b'0';
+UPDATE `system_menu` SET `sort`=19 WHERE `id`=6804 AND `deleted`=b'0';
+
+INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT DISTINCT source.role_id,6813,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
+FROM `system_role_menu` source
+WHERE source.menu_id=6811 AND source.deleted=b'0'
+  AND NOT EXISTS(SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id
+    AND existing.menu_id=6813 AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V025', 'Add sales-order workbench personal and approval views', 'sales-order-workbench-views-v1');
+
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V025','Add sales-order workbench personal and approval views',SHA2('sales-order-workbench-views-v1',256),'legacy',NOW());

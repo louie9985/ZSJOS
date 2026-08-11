@@ -1,5 +1,7 @@
 import request from '@/config/axios'
 
+export type NotifyChannelCode = 'in_app' | 'websocket' | 'wecom' | 'sms'
+
 export interface NotifySceneVariableVO {
   key: string
   label: string
@@ -23,6 +25,7 @@ export interface NotifyRuleVO {
   id?: number
   name: string
   sceneCode: string
+  channelCode: NotifyChannelCode
   templateId?: number
   recipientRoles: string[]
   specifiedUserIds: number[]

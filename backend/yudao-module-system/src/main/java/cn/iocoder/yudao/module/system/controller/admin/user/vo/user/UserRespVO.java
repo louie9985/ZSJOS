@@ -48,6 +48,9 @@ public class UserRespVO{
     @ExcelProperty("手机号码")
     private String mobile;
 
+    @Schema(description = "企业微信应用消息 userid")
+    private String wecomUserId;
+
     @Schema(description = "用户性别，参见 SexEnum 枚举类", example = "1")
     @ExcelProperty(value = "用户性别", converter = DictConvert.class)
     @DictFormat(DictTypeConstants.USER_SEX)

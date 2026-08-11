@@ -1,68 +1,82 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Button, Descriptions, Drawer, Empty, Image, Input, List, Modal, Skeleton, Space, Table, Tabs, Tag, Typography, message } from 'antd'
-import { CheckOutlined, CloseOutlined, ReloadOutlined } from '@ant-design/icons'
-import { api, type SalesOrder } from '../services/api'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Alert, Avatar, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { ReloadOutlined } from '@ant-design/icons'
+import { api, type SalesOrder, type SalesOrderListItem } from '../services/api'
+import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
+import { mergeSalesOrderListItems, salesOrderTaskKey } from '../services/salesOrder'
 
-const statusLabel: Record<string, string> = { pending_approval: '待会签', revision_required: '待补正', effective: '已生效' }
-const taskLabel: Record<string, string> = { registrationReview: '报名履约中心', financeReview: '财务结算中心' }
-
+const PAGE_SIZE = 20
 export default function SalesOrderApprovalPage() {
   const [handled, setHandled] = useState(false)
-  const [items, setItems] = useState<SalesOrder[]>([])
-  const [selected, setSelected] = useState<SalesOrder>()
-  const [loading, setLoading] = useState(true)
+  const [items, setItems] = useState<SalesOrderListItem[]>([])
+  const [total, setTotal] = useState(0)
+  const [pageNo, setPageNo] = useState(1)
+  const [selectedKey, setSelectedKey] = useState<string>()
+  const [detail, setDetail] = useState<SalesOrder>()
+  const [loading, setLoading] = useState(false)
+  const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
+  const [detailError, setDetailError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [decision, setDecision] = useState<'approve' | 'reject'>()
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
+  const listVersion = useRef(0)
+  const detailVersion = useRef(0)
+  const activePages = useRef(new Set<string>())
 
-  const load = useCallback(async () => {
-    setLoading(true); setError('')
-    try { const result = await api.salesOrderApprovalInbox(handled, { pageNo: 1, pageSize: 100 }); setItems(result.list); setSelected(current => result.list.find(item => item.id === current?.id) || result.list[0]) }
-    catch (loadError) { setItems([]); setSelected(undefined); setError(loadError instanceof Error ? loadError.message : '成交审批加载失败') }
-    finally { setLoading(false) }
+  const loadPage = useCallback(async (targetPage: number, replace: boolean, version: number) => {
+    const key = `${version}:${targetPage}`; if (activePages.current.has(key)) return
+    activePages.current.add(key); setLoading(true); setError('')
+    try {
+      const result = await api.salesOrderApprovalInbox(handled, { pageNo: targetPage, pageSize: PAGE_SIZE })
+      if (version !== listVersion.current) return
+      setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey)); setTotal(result.total); setPageNo(targetPage)
+      if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
+    } catch (loadError) { if (version === listVersion.current) { setError(loadError instanceof Error ? loadError.message : '成交审批加载失败'); if (replace) { setItems([]); setSelectedKey(undefined) } } }
+    finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
   }, [handled])
-  useEffect(() => { void load() }, [load])
+  const reload = useCallback(() => { const version = ++listVersion.current; setItems([]); setTotal(0); setPageNo(1); setSelectedKey(undefined); void loadPage(1, true, version) }, [loadPage])
+  useEffect(() => { reload() }, [reload])
+
+  const loadDetail = useCallback(async (id: number) => {
+    const version = ++detailVersion.current; setDetailLoading(true); setDetailError('')
+    try { const result = await api.salesOrder(id); if (version === detailVersion.current) setDetail(result) }
+    catch (loadError) { if (version === detailVersion.current) { setDetail(undefined); setDetailError(loadError instanceof Error ? loadError.message : '订单详情加载失败') } }
+    finally { if (version === detailVersion.current) setDetailLoading(false) }
+  }, [])
+  const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey), [items, selectedKey])
+  useEffect(() => { if (selectedItem) void loadDetail(selectedItem.id); else setDetail(undefined) }, [loadDetail, selectedItem])
 
   const submitDecision = async () => {
-    if (!selected?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
+    if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
     setSaving(true)
-    try { await api.decideSalesOrder(selected.id, decision, { taskId: selected.taskId, reason: reason.trim() }); message.success(decision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); await load() }
+    try { await api.decideSalesOrder(selectedItem.id, decision, { taskId: selectedItem.taskId, reason: reason.trim() }); message.success(decision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); reload() }
     catch (saveError) { message.error(saveError instanceof Error ? saveError.message : '审批失败') }
     finally { setSaving(false) }
   }
+  const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
+    : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
+      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={handled ? 'approval-done' : 'approval-todo'} onApprove={() => setDecision('approve')} onReject={() => setDecision('reject')}/>
+        : <Empty description="从左侧选择一条订单"/>
+  const hasMore = items.length < total
 
-  const detail = useMemo(() => selected ? <div className="message-detail-card">
-    <div className="message-detail-header"><div><Typography.Title level={4}>{selected.studentName}</Typography.Title><Typography.Text type="secondary">{selected.orderNo} · 第 {selected.approvalRoundNo} 轮</Typography.Text></div><Tag color={selected.status === 'effective' ? 'green' : selected.status === 'revision_required' ? 'red' : 'gold'}>{statusLabel[selected.status]}</Tag></div>
-    <Descriptions column={{ xs: 1, md: 2 }} layout="vertical" size="small">
-      <Descriptions.Item label="购买方">{selected.buyerName}</Descriptions.Item><Descriptions.Item label="学员性质">{selected.studentNature}</Descriptions.Item>
-      <Descriptions.Item label="联系方式">{[selected.studentMobile, selected.studentWechatId].filter(Boolean).join(' / ')}</Descriptions.Item><Descriptions.Item label="所在省市">{selected.provinceName} / {selected.cityName}</Descriptions.Item>
-      <Descriptions.Item label="商定考试时间">{selected.agreedExamTime || '-'}</Descriptions.Item><Descriptions.Item label="开通班种">{selected.classType || '-'}</Descriptions.Item>
-      <Descriptions.Item label="服务周期">{selected.servicePeriod}</Descriptions.Item><Descriptions.Item label="学生来源">{selected.studentSource}</Descriptions.Item>
-      <Descriptions.Item label="客户付款时间">{formatTimestamp(selected.customerPaidAt)}</Descriptions.Item><Descriptions.Item label="订单总金额">¥{Number(selected.totalAmount).toFixed(2)}</Descriptions.Item>
-      <Descriptions.Item label="缴费方式">{selected.feeMode}</Descriptions.Item><Descriptions.Item label="支付方式">{selected.paymentMethod}</Descriptions.Item>
-      <Descriptions.Item label="订单备注" span={2}>{selected.remark || '-'}</Descriptions.Item><Descriptions.Item label="学生特殊要求" span={2}>{selected.studentSpecialRequirements || '-'}</Descriptions.Item>
-      <Descriptions.Item label="教材邮递联系" span={2}>{selected.materialDeliveryContact || '-'}</Descriptions.Item>
-    </Descriptions>
-    <Typography.Title level={5}>成交课程</Typography.Title>
-    <Table rowKey="id" size="small" pagination={false} dataSource={selected.items} columns={[
-      { title: '课程', render: (_, item) => [item.categoryPath?.join(' / '), item.productName, item.skuName].filter(Boolean).join(' / ') },
-      { title: '实际成交金额', width: 150, render: (_, item) => `¥${Number(item.actualAmount).toFixed(2)}` }
-    ]}/>
-    <Typography.Title level={5}>缴费凭证</Typography.Title>
-    {selected.paymentVouchers.length ? <Space wrap>{selected.paymentVouchers.map(file => file.contentType === 'application/pdf'
-      ? <Button key={file.infraFileId} href={file.fileUrl} target="_blank">{file.originalName}</Button>
-      : <Image key={file.infraFileId} width={88} height={88} src={file.fileUrl} alt={file.originalName}/>)}</Space> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="无缴费凭证"/>}
-    {!handled && selected.taskId && <Space style={{ marginTop: 20 }}><Button type="primary" icon={<CheckOutlined/>} onClick={() => setDecision('approve')}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={() => setDecision('reject')}>驳回</Button></Space>}
-  </div> : <Empty description="请选择成交订单"/>, [handled, selected])
-
-  return <section className="workspace-page message-inbox-page">
-    <header className="message-inbox-header"><Typography.Title level={3}>成交审批</Typography.Title><Tabs activeKey={handled ? 'done' : 'todo'} onChange={key => setHandled(key === 'done')} items={[{ key: 'todo', label: '待处理' }, { key: 'done', label: '已处理' }]}/><Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button></header>
-    {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
-    <div className="message-inbox-layout"><aside className="message-inbox-list-pane"><div className="message-inbox-list">{loading ? <Skeleton active paragraph={{ rows: 8 }}/> : items.length ? <List dataSource={items} renderItem={item => <button type="button" className={`message-inbox-item${selected?.id === item.id ? ' active' : ''}`} onClick={() => { setSelected(item); setDrawerOpen(true) }}><div className="message-inbox-item-main"><Avatar>{item.studentName.slice(0, 1)}</Avatar><div className="message-inbox-item-copy"><div className="message-inbox-item-title"><strong>{item.studentName}</strong><Tag>{taskLabel[item.taskDefinitionKey || ''] || '成交会签'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · {item.items.length} 个课程</span></div></div><div className="message-inbox-item-meta"><span>{formatTimestamp(item.submittedAt)}</span></div></button>}/> : <Empty description="暂无成交审批"/>}</div></aside><main className="message-inbox-detail-pane">{detail}</main></div>
-    <Drawer className="message-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" placement="right" width="100%">{detail}</Drawer>
+  return <section className="workspace-page sales-order-inbox-page">
+    <header className="sales-order-inbox-header"><Typography.Title level={3}>成交审批</Typography.Title><Tabs activeKey={handled ? 'done' : 'todo'} onChange={key => setHandled(key === 'done')} items={[{ key: 'todo', label: '待处理' }, { key: 'done', label: '已处理' }]}/><Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button></header>
+    {error && <Alert
+      className="sales-order-inbox-error" type="error" showIcon message={error}
+      action={<Button size="small" onClick={reload}>重试</Button>}/>
+    }
+    <div className="sales-order-inbox-layout"><aside className="sales-order-list-pane"><div className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(pageNo + 1, false, listVersion.current) }}>
+      {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={`sales-order-list-item${salesOrderTaskKey(item) === selectedKey ? ' active' : ''}`} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
+        <div className="sales-order-list-main"><Avatar>{item.studentName.slice(0, 1)}</Avatar><div className="sales-order-list-copy"><div><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交会签'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
+        <div className="sales-order-list-meta">{formatTimestamp(handled ? item.taskEndTime : item.taskCreateTime || item.submittedAt)}</div>
+      </button>)}
+      {loading && <div className="sales-order-list-loading"><Spin size="small"/> 加载中</div>}
+      {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="sales-order-list-end">已加载全部 {total} 条审批</Typography.Text>}
+    </div></aside><main className="sales-order-detail-pane">{detailContent}</main></div>
+    <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" width="100%">{detailContent}</Drawer>
     <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} confirmLoading={saving} onCancel={() => setDecision(undefined)} onOk={() => void submitDecision()} okText="提交审批"><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="审批意见（必填）"/></Modal>
   </section>
 }

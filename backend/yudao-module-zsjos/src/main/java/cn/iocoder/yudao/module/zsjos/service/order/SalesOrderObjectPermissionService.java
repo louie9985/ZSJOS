@@ -25,7 +25,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class SalesOrderObjectPermissionService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private LeadMapper leadMapper;
-    @Resource private SalesOrderApprovalConfigMapper configMapper;
+    @Resource private SalesOrderApprovalConfigMapper salesOrderApprovalConfigMapper;
     @Resource private DeptApi deptApi;
     @Resource private AdminUserApi adminUserApi;
 
@@ -35,6 +35,7 @@ public class SalesOrderObjectPermissionService {
         Long userId = getLoginUserId();
         boolean allowed = switch (action) {
             case "read" -> canRead(order, userId);
+            case "read-own" -> Objects.equals(order.getSubmitterUserId(), userId);
             case "revise" -> canRevise(order, userId);
             case "review" -> isApprovalPoolMember(userId);
             default -> false;
@@ -57,7 +58,7 @@ public class SalesOrderObjectPermissionService {
     public boolean isApprovalPoolMember(Long userId) {
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) || user.getDeptId() == null) return false;
-        SalesOrderApprovalConfigDO config = configMapper.selectCurrent();
+        SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         return config != null && (belongsTo(config.getRegistrationDeptId(), user.getDeptId())
                 || belongsTo(config.getFinanceDeptId(), user.getDeptId()));
     }

@@ -23,6 +23,9 @@ public class NotifyRuleSaveReqVO {
     @NotEmpty(message = "通知场景不能为空")
     private String sceneCode;
 
+    @NotEmpty(message = "通知渠道不能为空")
+    private String channelCode;
+
     @NotNull(message = "通知模板不能为空")
     private Long templateId;
 

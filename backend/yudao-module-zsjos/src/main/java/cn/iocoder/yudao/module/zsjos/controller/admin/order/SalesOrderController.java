@@ -53,9 +53,30 @@ public class SalesOrderController {
         return success(orderService.get(id, WebFrameworkUtils.getLoginUserId()));
     }
 
+    @GetMapping("/my-page")
+    @Operation(summary = "获得本人提交的成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
+    public CommonResult<PageResult<SalesOrderListItemRespVO>> getMyPage(@Valid SalesOrderMyPageReqVO reqVO) {
+        return success(orderService.getMyPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/my-status-counts")
+    @Operation(summary = "获得本人提交的成交订单状态统计")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
+    public CommonResult<SalesOrderStatusCountsRespVO> getMyStatusCounts() {
+        return success(orderService.getMyStatusCounts(WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/my/{id}")
+    @Operation(summary = "获得本人提交的成交订单详情")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
+    public CommonResult<SalesOrderRespVO> getMyOrder(@PathVariable Long id) {
+        return success(orderService.getOwn(id, WebFrameworkUtils.getLoginUserId()));
+    }
+
     @GetMapping("/approval/inbox-page")
     @Operation(summary = "获得成交订单会签待办或已办")
-    public CommonResult<PageResult<SalesOrderRespVO>> getInboxPage(@Valid SalesOrderPageReqVO reqVO) {
+    public CommonResult<PageResult<SalesOrderListItemRespVO>> getInboxPage(@Valid SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 

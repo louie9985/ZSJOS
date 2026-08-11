@@ -140,8 +140,14 @@ export type SalesOrder = {
   items: Array<{ id: number; productRef: string; skuRef: string; productName: string; skuName: string; categoryPath: string[]; attrValues: Record<string, string>; actualAmount: number }>
   paymentVouchers: SalesOrderVoucher[]; approvalRoundNo: number; approvalRoundStatus: string
   processInstanceId?: string; taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'
+  taskStatus?: number; taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp; decisionReason?: string; canRevise?: boolean
   submittedAt: Timestamp; effectiveAt?: Timestamp
 }
+export type SalesOrderListItem = Pick<SalesOrder, 'id' | 'orderNo' | 'leadId' | 'status' | 'studentName' | 'studentMobile' | 'totalAmount' | 'approvalRoundNo' | 'submittedAt' | 'effectiveAt'> & {
+  taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'; taskStatus?: number
+  taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp
+}
+export type SalesOrderStatusCounts = { total: number; pendingApproval: number; revisionRequired: number; effective: number }
 export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
 export type BusinessTask = {
@@ -359,8 +365,13 @@ export const api = {
   resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
   salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
+  mySalesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
+  mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string }) =>
+    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-page', { params })),
+  mySalesOrderStatusCounts: async () =>
+    unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
   salesOrderApprovalInbox: async (handled: boolean, params: { pageNo: number; pageSize: number }) =>
-    unwrap<PageResult<SalesOrder>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params: { handled, ...params } })),
+    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params: { handled, ...params } })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
   uploadSalesOrderVoucher: async (file: File) => {

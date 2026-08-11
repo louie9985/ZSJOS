@@ -22,6 +22,7 @@ import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
+import cn.iocoder.yudao.module.system.api.notify.NotifyChannelType;
 
 @Service
 @Validated
@@ -81,6 +82,14 @@ public class NotifyRuleServiceImpl implements NotifyRuleService {
     }
 
     private void validateRule(NotifyRuleSaveReqVO reqVO) {
+        String channelCode = reqVO.getChannelCode();
+        if (channelCode == null || channelCode.isBlank()) {
+            reqVO.setChannelCode(NotifyChannelType.IN_APP);
+            channelCode = NotifyChannelType.IN_APP;
+        }
+        if (!NotifyChannelType.ALL.contains(channelCode)) {
+            throw exception(NOTIFY_RULE_ACTION_INVALID);
+        }
         NotifySceneRespDTO scene = sceneRegistry.getScene(reqVO.getSceneCode());
         if (scene == null) {
             throw exception(NOTIFY_SCENE_NOT_EXISTS, reqVO.getSceneCode());
@@ -90,6 +99,12 @@ public class NotifyRuleServiceImpl implements NotifyRuleService {
             throw exception(NOTIFY_TEMPLATE_NOT_EXISTS);
         }
         if (!reqVO.getSceneCode().equals(template.getSceneCode())) {
+            throw exception(NOTIFY_RULE_TEMPLATE_SCENE_MISMATCH);
+        }
+        boolean websocketUsesInAppTemplate = NotifyChannelType.WEBSOCKET.equals(channelCode)
+                && NotifyChannelType.IN_APP.equals(template.getChannelCode());
+        if (template.getChannelCode() != null && !channelCode.equals(template.getChannelCode())
+                && !websocketUsesInAppTemplate) {
             throw exception(NOTIFY_RULE_TEMPLATE_SCENE_MISMATCH);
         }
         Set<String> allowedRoles = new LinkedHashSet<>();

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Cascader, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Select, Space, Spin, Typography, Upload, message, type UploadFile, type UploadProps } from 'antd'
 import { DeleteOutlined, PlusOutlined, ReloadOutlined, UploadOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { api, type AreaNode, type DictData, type LeadCatalog, type ManagedLead, type SalesOrder, type SalesOrderSubmitRequest, type SalesOrderVoucher } from '../services/api'
+import { api, type AreaNode, type DictData, type LeadCatalog, type SalesOrder, type SalesOrderSubmitRequest, type SalesOrderVoucher } from '../services/api'
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
 import { validateSalesOrderSubmission } from '../services/salesOrder'
@@ -24,8 +24,14 @@ function findRegion(areas: AreaNode[], path: string[]) {
   return { provinceName: province?.name || '', cityName: city?.name || '' }
 }
 
+export type SalesOrderEntryLead = {
+  id: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
+  provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string
+  primaryProduct?: { spuRef?: string; skuRef?: string }
+}
+
 export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onSubmitted }: {
-  lead: ManagedLead; orderId?: number; open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
+  lead: SalesOrderEntryLead; orderId?: number; open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
   const [areas, setAreas] = useState<AreaNode[]>([])

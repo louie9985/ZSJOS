@@ -54,6 +54,7 @@ export const APP_ROUTES = {
   TODAY_TASKS: '/zsjos/tasks/today',
   QUALIFICATION_EXCEPTIONS: '/zsjos/leads/qualification-exceptions',
   LEAD_APPEALS: '/zsjos/leads/appeals',
+  MY_SALES_ORDERS: '/zsjos/sales-orders/my',
   SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'

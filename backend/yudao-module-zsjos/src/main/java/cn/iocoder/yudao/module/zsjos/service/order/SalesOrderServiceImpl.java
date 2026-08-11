@@ -54,7 +54,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SalesOrderItemMapper itemMapper;
     @Resource private SalesOrderApprovalRoundMapper roundMapper;
-    @Resource private SalesOrderApprovalConfigMapper configMapper;
+    @Resource private SalesOrderApprovalConfigMapper salesOrderApprovalConfigMapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadAppealMapper leadAppealMapper;
     @Resource private OpportunityMapper opportunityMapper;
@@ -124,23 +124,47 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public SalesOrderRespVO get(Long orderId, Long userId) {
         SalesOrderDO order = orderMapper.selectById(orderId);
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
-        return convert(order, roundMapper.selectLatestByOrderId(orderId), null);
+        return convert(order, roundMapper.selectLatestByOrderId(orderId), null, userId);
     }
 
     @Override
-    public PageResult<SalesOrderRespVO> getInboxPage(SalesOrderPageReqVO reqVO, Long userId) {
+    @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "read-own")
+    public SalesOrderRespVO getOwn(Long orderId, Long userId) {
+        SalesOrderDO order = orderMapper.selectById(orderId);
+        if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
+        return convert(order, roundMapper.selectLatestByOrderId(orderId), null, userId);
+    }
+
+    @Override
+    public PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId) {
+        PageResult<SalesOrderDO> page = orderMapper.selectMyPage(userId, reqVO);
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
+        return new PageResult<>(page.getList().stream()
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList(), page.getTotal());
+    }
+
+    @Override
+    public SalesOrderStatusCountsRespVO getMyStatusCounts(Long userId) {
+        return new SalesOrderStatusCountsRespVO(orderMapper.selectMyCount(userId, null),
+                orderMapper.selectMyCount(userId, STATUS_PENDING_APPROVAL),
+                orderMapper.selectMyCount(userId, STATUS_REVISION_REQUIRED),
+                orderMapper.selectMyCount(userId, STATUS_EFFECTIVE));
+    }
+
+    @Override
+    public PageResult<SalesOrderListItemRespVO> getInboxPage(SalesOrderPageReqVO reqVO, Long userId) {
         if (!permissionService.isApprovalPoolMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
         BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
         taskReq.setPageNo(reqVO.getPageNo()); taskReq.setPageSize(reqVO.getPageSize());
         taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
         PageResult<BpmTaskRespDTO> tasks = Boolean.TRUE.equals(reqVO.getHandled())
                 ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
-        List<SalesOrderRespVO> result = new ArrayList<>();
+        List<SalesOrderListItemRespVO> result = new ArrayList<>();
         for (BpmTaskRespDTO task : tasks.getList()) {
             Long orderId = parseOrderId(task.getBusinessKey());
             SalesOrderDO order = orderId == null ? null : orderMapper.selectById(orderId);
             if (order == null || !permissionService.canRead(order, userId)) continue;
-            result.add(convert(order, roundMapper.selectByProcessInstanceId(task.getProcessInstanceId()), task));
+            result.add(convertListItem(order, roundMapper.selectByProcessInstanceId(task.getProcessInstanceId()), task));
         }
         return new PageResult<>(result, tasks.getTotal());
     }
@@ -203,10 +227,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             round.setStatus(ROUND_APPROVED); order.setStatus(STATUS_EFFECTIVE); order.setEffectiveAt(now);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_WON); opportunity.setWonAt(now); opportunityMapper.updateById(opportunity); }
         } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
-            round.setStatus(ROUND_REJECTED); order.setStatus(STATUS_REVISION_REQUIRED);
+            round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
         } else {
-            round.setStatus(ROUND_REJECTED); order.setStatus(STATUS_REVISION_REQUIRED);
+            round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
         }
         round.setCompletedAt(now); roundMapper.updateById(round); orderMapper.updateById(order);
@@ -214,7 +238,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
                             ValidatedSubmission validated, int roundNo, LocalDateTime now) {
-        SalesOrderApprovalConfigDO config = configMapper.selectCurrent();
+        SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         if (config == null) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
         List<Long> registrationUsers = new ArrayList<>(permissionService.enabledUsers(config.getRegistrationDeptId()));
         List<Long> financeUsers = new ArrayList<>(permissionService.enabledUsers(config.getFinanceDeptId()));
@@ -378,7 +402,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return JsonUtils.toJsonString(snapshot);
     }
 
-    private SalesOrderRespVO convert(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task) {
+    private SalesOrderRespVO convert(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task, Long userId) {
         SalesOrderRespVO result = new SalesOrderRespVO();
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setOpportunityId(order.getOpportunityId()); result.setStatus(order.getStatus()); result.setSubmitterUserId(order.getSubmitterUserId());
@@ -392,8 +416,30 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
         result.setItems(itemMapper.selectListByOrderId(order.getId()).stream().map(this::convertItem).toList());
         result.setPaymentVouchers(convertVouchers(order.getPaymentVoucherRefs()));
-        if (round != null) { result.setApprovalRoundNo(round.getRoundNo()); result.setApprovalRoundStatus(round.getStatus()); result.setProcessInstanceId(round.getProcessInstanceId()); }
-        if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); }
+        if (round != null) { result.setApprovalRoundNo(round.getRoundNo()); result.setApprovalRoundStatus(round.getStatus()); result.setProcessInstanceId(round.getProcessInstanceId()); result.setDecisionReason(round.getDecisionReason()); }
+        if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
+        result.setCanRevise(STATUS_REVISION_REQUIRED.equals(order.getStatus()) && permissionService.canRevise(order, userId));
+        return result;
+    }
+
+    private Map<Long, SalesOrderApprovalRoundDO> getCurrentRounds(List<SalesOrderDO> orders) {
+        List<Long> roundIds = orders.stream().map(SalesOrderDO::getCurrentApprovalRoundId).filter(Objects::nonNull).distinct().toList();
+        if (roundIds.isEmpty()) return Map.of();
+        Map<Long, SalesOrderApprovalRoundDO> result = new HashMap<>();
+        roundMapper.selectBatchIds(roundIds).forEach(round -> result.put(round.getId(), round));
+        return result;
+    }
+
+    private SalesOrderListItemRespVO convertListItem(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task) {
+        SalesOrderListItemRespVO result = new SalesOrderListItemRespVO();
+        result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
+        result.setStatus(order.getStatus()); result.setStudentName(order.getStudentName()); result.setStudentMobile(order.getStudentMobile());
+        result.setTotalAmount(order.getTotalAmount()); result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
+        if (round != null) result.setApprovalRoundNo(round.getRoundNo());
+        if (task != null) {
+            result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus());
+            result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime());
+        }
         return result;
     }
 

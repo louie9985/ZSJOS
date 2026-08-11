@@ -115,6 +115,47 @@ SELECT 'lead_intended_product_active_key_v021' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V021'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_order_dual_approval_v023' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V023'), 'PASS', 'FAIL') AS result;
+SELECT 'zsjos_bpm_readonly_forms_v024' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V024'), 'PASS', 'FAIL') AS result;
+SELECT 'sales_order_workbench_views_v025' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V025'), 'PASS', 'FAIL') AS result;
+SELECT 'sales_order_v025_reason_and_index' AS check_name,
+       IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+            AND table_name='zsjos_order_approval_round' AND column_name='decision_reason')
+          AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+            AND table_name='zsjos_order' AND index_name='idx_tenant_submitter_status_submitted'), 'PASS', 'FAIL') AS result;
+SELECT 'sales_order_v025_menu' AS check_name,
+       IF(EXISTS(SELECT 1 FROM system_menu WHERE id=6813 AND permission='zsjos:sales-order:query-own'
+            AND path='sales-orders/my' AND sort=17 AND deleted=b'0')
+          AND EXISTS(SELECT 1 FROM system_menu WHERE id=6810 AND sort=18 AND deleted=b'0')
+          AND EXISTS(SELECT 1 FROM system_menu WHERE id=6804 AND sort=19 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+SELECT 'zsjos_bpm_readonly_forms' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1
+         FROM system_tenant tenant
+         CROSS JOIN (
+           SELECT 'zsjos-system-form:lead-appeal-review' marker,4 expected_fields
+           UNION ALL
+           SELECT 'zsjos-system-form:sales-order-dual-approval',3
+         ) expected
+         LEFT JOIN bpm_form form
+           ON form.tenant_id=tenant.id AND form.remark=expected.marker AND form.deleted=b'0'
+         WHERE tenant.deleted=b'0' AND tenant.status=0
+         GROUP BY tenant.id,expected.marker,expected.expected_fields
+         HAVING COUNT(form.id)<>1
+            OR MIN(form.status)<>0
+            OR MIN(JSON_VALID(form.conf))<>1
+            OR MIN(JSON_VALID(form.fields))<>1
+            OR MIN(JSON_LENGTH(form.fields))<>expected.expected_fields
+            OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[0]')),'$.props.disabled'))='true'),0)<>1
+            OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[0]')),'$.props.readonly'))='true'),0)<>1
+            OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[1]')),'$.props.disabled'))='true'),0)<>1
+            OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[1]')),'$.props.readonly'))='true'),0)<>1
+            OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[2]')),'$.props.disabled'))='true'),0)<>1
+            OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[2]')),'$.props.readonly'))='true'),0)<>1
+            OR (expected.expected_fields=4 AND COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[3]')),'$.props.disabled'))='true'),0)<>1)
+            OR (expected.expected_fields=4 AND COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[3]')),'$.props.readonly'))='true'),0)<>1)
+       ),'PASS','FAIL') AS result;
 SELECT 'sales_order_v023_columns' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_order'
            AND column_name IN ('buyer_name','student_name','student_nature','student_mobile','student_wechat_id',
@@ -130,7 +171,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
            'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V023'))=7, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V023','V024','V025','V026'))=10, 'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
            AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;
@@ -142,7 +183,17 @@ SELECT 'lead_appeal_columns' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
            AND table_name='zsjos_lead_appeal' AND column_name IN ('round_no','review_stage','status','evidence_refs',
            'invalid_evidence_refs_snapshot','process_instance_id','decision_evidence_refs',
-           'submission_idempotency_key','decision_idempotency_key'))=9, 'PASS', 'FAIL') AS result;
+           'submission_idempotency_key','decision_idempotency_key','owner_user_id_snapshot',
+           'owner_dept_id_snapshot','reviewer_dept_id_snapshot','reviewer_user_ids_snapshot'))=13, 'PASS', 'FAIL') AS result;
+SELECT 'lead_appeal_reviewer_snapshots' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM zsjos_lead_appeal
+         WHERE deleted=b'0' AND status IN ('sales_manager_reviewing','quality_reviewing','chairman_reviewing')
+           AND reviewer_user_ids_snapshot IS NOT NULL
+           AND (JSON_VALID(reviewer_user_ids_snapshot)<>1
+                OR JSON_TYPE(reviewer_user_ids_snapshot)<>'ARRAY'
+                OR JSON_LENGTH(reviewer_user_ids_snapshot)=0)
+       ), 'PASS', 'FAIL') AS result;
 SELECT 'lead_appeal_indexes' AS check_name,
        IF((SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema=DATABASE()
            AND table_name='zsjos_lead_appeal' AND index_name IN ('uk_tenant_lead_round',

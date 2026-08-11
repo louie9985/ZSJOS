@@ -9,6 +9,7 @@ export interface UserVO {
   postIds: string[]
   email: string
   mobile: string
+  wecomUserId?: string
   sex: number
   avatar: string
   loginIp: string

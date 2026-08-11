@@ -25,5 +25,6 @@ public class SalesOrderApprovalRoundDO extends TenantBaseDO {
     private LocalDateTime submittedAt;
     private LocalDateTime completedAt;
     private String rejectedBpmTaskId;
+    private String decisionReason;
     private String submissionIdempotencyKey;
 }
