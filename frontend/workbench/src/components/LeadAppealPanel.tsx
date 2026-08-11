@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Image, Input, Modal, Skeleton, Space, Tag, Timeline, Typography, message } from 'antd'
+import { Alert, Button, Empty, Form, Image, Input, Modal, Skeleton, Space, Tag, Timeline, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type LeadAppeal, type LeadAppealEvidence, type ManagedLead } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
+import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 
 const STAGE_LABELS = { sales_manager: '销售主管复核', quality: '质控复核', chairman: '董事长终审' }
 const STATUS_LABELS = {
@@ -27,7 +28,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
-  const [evidence, setEvidence] = useState<LeadAppealEvidence[]>([])
+  const [evidence, setEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const [saving, setSaving] = useState(false)
 
   const load = useCallback(async () => {
@@ -47,7 +48,9 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
     if (!reason.trim()) { message.warning('请填写申诉理由'); return }
     setSaving(true)
     try {
-      await api.submitLeadAppeal(lead.id, { reason: reason.trim(), attachments: evidence.map(item => ({ infraFileId: item.infraFileId })), idempotencyKey: crypto.randomUUID() })
+      const uploadResult = await uploadDeferredFiles(evidence, api.uploadLeadAppealImage, setEvidence)
+      if (uploadResult.failed) { message.error('有申诉图片上传失败，请重试失败项'); return }
+      await api.submitLeadAppeal(lead.id, { reason: reason.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
       message.success(`第 ${nextRound} 次申诉已提交`)
       setOpen(false); setReason(''); setEvidence([]); await load(); onChanged()
     } finally { setSaving(false) }
@@ -76,8 +79,8 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
     <Modal title={`发起第 ${nextRound} 次申诉`} open={open} confirmLoading={saving} onOk={() => void submit()} onCancel={() => setOpen(false)} okText="提交申诉">
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Alert type="info" showIcon message={nextRound === 1 ? '本轮由销售直属部门负责人处理' : nextRound === 2 ? '本轮由质控部门处理' : '本轮由董事长最终裁决'}/>
-        <Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="申诉理由（必填）"/>
-        <LeadAppealEvidenceUpload value={evidence} onChange={setEvidence} disabled={saving}/>
+        <Form.Item label="申诉理由" required><Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写申诉理由"/></Form.Item>
+        <Form.Item label={`申诉附件${evidence.some(item => item.status === 'uploading') ? '（上传中）' : ''}`}><LeadAppealEvidenceUpload value={evidence} onChange={setEvidence} disabled={saving}/></Form.Item>
       </Space>
     </Modal>
   </div>

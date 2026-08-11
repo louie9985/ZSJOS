@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -29,6 +30,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -65,6 +68,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private DictDataApi dictDataApi;
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private BpmProcessTaskApi processTaskApi;
+    @Resource private LeadInboxFilterConfigService inboxFilterConfigService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -154,19 +158,101 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Override
     public PageResult<SalesOrderListItemRespVO> getInboxPage(SalesOrderPageReqVO reqVO, Long userId) {
         if (!permissionService.isApprovalPoolMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
-        BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
-        taskReq.setPageNo(reqVO.getPageNo()); taskReq.setPageSize(reqVO.getPageSize());
-        taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
-        PageResult<BpmTaskRespDTO> tasks = Boolean.TRUE.equals(reqVO.getHandled())
-                ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+        LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
+        LeadInboxFilterQuery filter;
+        if (reqVO.getGroupKey() == null && reqVO.getHandled() != null) {
+            filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of(
+                    INBOX_FILTER_FIELD_HANDLED, Set.of(Boolean.TRUE.equals(reqVO.getHandled()) ? "done" : "todo")));
+        } else {
+            String groupKey = reqVO.getGroupKey() != null ? reqVO.getGroupKey() : config.getGroups().stream()
+                    .filter(group -> Boolean.TRUE.equals(group.getEnabled())).findFirst()
+                    .orElseThrow(() -> exception(LEAD_INBOX_FILTER_INVALID)).getKey();
+            filter = inboxFilterConfigService.resolveQuery(config, groupKey, reqVO.getOptionKey());
+        }
+        List<String> processIds = searchProcessIds(reqVO.getKeyword());
+        if (processIds != null && processIds.isEmpty()) return PageResult.empty();
+        List<BpmTaskRespDTO> tasks = loadApprovalTasks(userId, reqVO, filter, processIds);
         List<SalesOrderListItemRespVO> result = new ArrayList<>();
-        for (BpmTaskRespDTO task : tasks.getList()) {
+        for (BpmTaskRespDTO task : tasks) {
             Long orderId = parseOrderId(task.getBusinessKey());
             SalesOrderDO order = orderId == null ? null : orderMapper.selectById(orderId);
             if (order == null || !permissionService.canRead(order, userId)) continue;
             result.add(convertListItem(order, roundMapper.selectByProcessInstanceId(task.getProcessInstanceId()), task));
         }
-        return new PageResult<>(result, tasks.getTotal());
+        long total = countApprovalTasks(userId, filter, processIds);
+        return new PageResult<>(result, total);
+    }
+
+    @Override
+    public SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId) {
+        if (!permissionService.isApprovalPoolMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
+        List<SalesOrderApprovalFilterProfileRespVO.GroupVO> groups = config.getGroups().stream()
+                .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
+                .map(group -> {
+                    LeadInboxFilterQuery groupQuery = inboxFilterConfigService.resolveQuery(config, group.getKey(), "all");
+                    List<SalesOrderApprovalFilterProfileRespVO.OptionVO> options = group.getOptions().stream()
+                            .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
+                            .map(option -> new SalesOrderApprovalFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel(),
+                                    countApprovalTasks(userId, inboxFilterConfigService.resolveQuery(config, group.getKey(), option.getKey()), null)))
+                            .toList();
+                    List<SalesOrderApprovalFilterProfileRespVO.SectionVO> sections = options.isEmpty() ? List.of()
+                            : List.of(new SalesOrderApprovalFilterProfileRespVO.SectionVO(
+                                    "approval_stage", group.getSectionLabel() == null ? "审批环节" : group.getSectionLabel(), options));
+                    return new SalesOrderApprovalFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(),
+                            countApprovalTasks(userId, groupQuery, null), sections);
+                }).toList();
+        return new SalesOrderApprovalFilterProfileRespVO(groups);
+    }
+
+    private List<BpmTaskRespDTO> loadApprovalTasks(Long userId, SalesOrderPageReqVO reqVO,
+                                                   LeadInboxFilterQuery filter, List<String> processIds) {
+        Set<String> handled = filter.values(INBOX_FILTER_FIELD_HANDLED);
+        Set<String> taskKeys = filter.values(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY);
+        List<String> handledValues = handled.isEmpty() ? List.of("todo", "done") : new ArrayList<>(handled);
+        List<String> taskValues = taskKeys.isEmpty() ? Collections.singletonList(null) : new ArrayList<>(taskKeys);
+        List<BpmTaskRespDTO> tasks = new ArrayList<>();
+        for (String handledValue : handledValues) {
+            for (String taskKey : taskValues) {
+                BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
+                taskReq.setPageNo(1);
+                taskReq.setPageSize(Math.max(reqVO.getPageNo() * reqVO.getPageSize(), reqVO.getPageSize()));
+                taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
+                taskReq.setTaskDefinitionKey(taskKey);
+                taskReq.setProcessInstanceIds(processIds);
+                PageResult<BpmTaskRespDTO> page = "done".equals(handledValue)
+                        ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+                tasks.addAll(page.getList());
+            }
+        }
+        tasks.sort(Comparator.comparing(BpmTaskRespDTO::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())));
+        int from = Math.min((reqVO.getPageNo() - 1) * reqVO.getPageSize(), tasks.size());
+        int to = Math.min(from + reqVO.getPageSize(), tasks.size());
+        return tasks.subList(from, to);
+    }
+
+    private long countApprovalTasks(Long userId, LeadInboxFilterQuery filter, List<String> processIds) {
+        SalesOrderPageReqVO countReq = new SalesOrderPageReqVO();
+        countReq.setPageNo(1); countReq.setPageSize(1);
+        countReq.setGroupKey("all"); countReq.setOptionKey("all");
+        Set<String> handled = filter.values(INBOX_FILTER_FIELD_HANDLED);
+        Set<String> taskKeys = filter.values(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY);
+        List<String> handledValues = handled.isEmpty() ? List.of("todo", "done") : new ArrayList<>(handled);
+        List<String> taskValues = taskKeys.isEmpty() ? Collections.singletonList(null) : new ArrayList<>(taskKeys);
+        long total = 0;
+        for (String handledValue : handledValues) for (String taskKey : taskValues) {
+            BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO(); taskReq.setPageNo(1); taskReq.setPageSize(1);
+            taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); taskReq.setTaskDefinitionKey(taskKey);
+            taskReq.setProcessInstanceIds(processIds);
+            total += ("done".equals(handledValue) ? processTaskApi.getDoneTaskPage(userId, taskReq)
+                    : processTaskApi.getTodoTaskPage(userId, taskReq)).getTotal();
+        }
+        return total;
+    }
+
+    private List<String> searchProcessIds(String keyword) {
+        if (StrUtil.isBlank(keyword)) return null;
+        return roundMapper.selectProcessInstanceIdsByKeyword(TenantContextHolder.getTenantId(), keyword.trim());
     }
 
     @Override

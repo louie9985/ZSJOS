@@ -3845,7 +3845,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_sales_dispatch_preference` (
 -- zsjos_lead_inbox_filter_scheme
 CREATE TABLE IF NOT EXISTS `zsjos_lead_inbox_filter_scheme` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '筛选方案编号',
-  `audience` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '适用视角：submitter 或 owner',
+  `audience` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '适用视角：submitter、owner 或 reviewer',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '方案名称',
   `draft_config_json` json NOT NULL COMMENT '当前草稿配置',
   `published_config_json` json DEFAULT NULL COMMENT '当前已发布配置',

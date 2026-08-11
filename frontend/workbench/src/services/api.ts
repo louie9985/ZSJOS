@@ -148,6 +148,10 @@ export type SalesOrderListItem = Pick<SalesOrder, 'id' | 'orderNo' | 'leadId' | 
   taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp
 }
 export type SalesOrderStatusCounts = { total: number; pendingApproval: number; revisionRequired: number; effective: number }
+export type SalesOrderApprovalFilterOption = { key: string; label: string; count: number }
+export type SalesOrderApprovalFilterSection = { key: string; label: string; options: SalesOrderApprovalFilterOption[] }
+export type SalesOrderApprovalFilterGroup = { key: string; label: string; count: number; sections: SalesOrderApprovalFilterSection[] }
+export type SalesOrderApprovalFilterProfile = { groups: SalesOrderApprovalFilterGroup[] }
 export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
 export type BusinessTask = {
@@ -370,8 +374,9 @@ export const api = {
     unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-page', { params })),
   mySalesOrderStatusCounts: async () =>
     unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
-  salesOrderApprovalInbox: async (handled: boolean, params: { pageNo: number; pageSize: number }) =>
-    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params: { handled, ...params } })),
+  salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
+  salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean }) =>
+    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
   uploadSalesOrderVoucher: async (file: File) => {

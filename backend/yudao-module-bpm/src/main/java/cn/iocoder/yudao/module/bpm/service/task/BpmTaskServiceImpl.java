@@ -132,6 +132,12 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (StrUtil.isNotEmpty(pageVO.getProcessDefinitionKey())) {
             taskQuery.processDefinitionKey(pageVO.getProcessDefinitionKey());
         }
+        if (StrUtil.isNotEmpty(pageVO.getTaskDefinitionKey())) {
+            taskQuery.taskDefinitionKey(pageVO.getTaskDefinitionKey());
+        }
+        if (CollUtil.isNotEmpty(pageVO.getProcessInstanceIds())) {
+            taskQuery.processInstanceIdIn(pageVO.getProcessInstanceIds());
+        }
         if (ArrayUtil.isNotEmpty(pageVO.getCreateTime())) {
             taskQuery.taskCreatedAfter(DateUtils.of(pageVO.getCreateTime()[0]));
             taskQuery.taskCreatedBefore(DateUtils.of(pageVO.getCreateTime()[1]));
@@ -234,6 +240,15 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                 .orderByHistoricTaskInstanceEndTime().desc(); // 审批时间倒序
         if (StrUtil.isNotBlank(pageVO.getName())) {
             taskQuery.taskNameLike("%" + pageVO.getName() + "%");
+        }
+        if (StrUtil.isNotEmpty(pageVO.getProcessDefinitionKey())) {
+            taskQuery.processDefinitionKey(pageVO.getProcessDefinitionKey());
+        }
+        if (StrUtil.isNotEmpty(pageVO.getTaskDefinitionKey())) {
+            taskQuery.taskDefinitionKey(pageVO.getTaskDefinitionKey());
+        }
+        if (CollUtil.isNotEmpty(pageVO.getProcessInstanceIds())) {
+            taskQuery.processInstanceIdIn(pageVO.getProcessInstanceIds());
         }
         if (pageVO.getStatus() != null) {
             taskQuery.taskVariableValueEquals(BpmnVariableConstants.TASK_VARIABLE_STATUS, pageVO.getStatus());

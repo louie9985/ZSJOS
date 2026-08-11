@@ -1,54 +1,72 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Avatar, Badge, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { api, type SalesOrder, type SalesOrderListItem } from '../services/api'
+import { api, type SalesOrder, type SalesOrderApprovalFilterProfile, type SalesOrderListItem } from '../services/api'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderTaskKey } from '../services/salesOrder'
 
 const PAGE_SIZE = 20
+
 export default function SalesOrderApprovalPage() {
-  const [handled, setHandled] = useState(false)
+  const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [] })
+  const [groupKey, setGroupKey] = useState<string>()
+  const [optionKey, setOptionKey] = useState('all')
+  const [keyword, setKeyword] = useState('')
   const [items, setItems] = useState<SalesOrderListItem[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
   const [selectedKey, setSelectedKey] = useState<string>()
   const [detail, setDetail] = useState<SalesOrder>()
   const [loading, setLoading] = useState(false)
+  const [profileLoading, setProfileLoading] = useState(true)
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
+  const [profileError, setProfileError] = useState('')
   const [detailError, setDetailError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [decision, setDecision] = useState<'approve' | 'reject'>()
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
-  const listVersion = useRef(0)
-  const detailVersion = useRef(0)
-  const activePages = useRef(new Set<string>())
+  const requestVersion = useRef(0)
 
-  const loadPage = useCallback(async (targetPage: number, replace: boolean, version: number) => {
-    const key = `${version}:${targetPage}`; if (activePages.current.has(key)) return
-    activePages.current.add(key); setLoading(true); setError('')
+  const loadProfile = useCallback(async () => {
+    setProfileLoading(true); setProfileError('')
     try {
-      const result = await api.salesOrderApprovalInbox(handled, { pageNo: targetPage, pageSize: PAGE_SIZE })
-      if (version !== listVersion.current) return
+      const next = await api.salesOrderApprovalFilterProfile()
+      setProfile(next)
+      setGroupKey(current => current && next.groups.some(group => group.key === current) ? current : next.groups[0]?.key)
+    } catch (loadError) { setProfileError(loadError instanceof Error ? loadError.message : '审批筛选方案加载失败') }
+    finally { setProfileLoading(false) }
+  }, [])
+
+  const loadPage = useCallback(async (targetPage: number, replace: boolean) => {
+    const version = ++requestVersion.current
+    setLoading(true); setError('')
+    try {
+      const result = await api.salesOrderApprovalInbox({ pageNo: targetPage, pageSize: PAGE_SIZE, groupKey, optionKey, keyword: keyword.trim() || undefined })
+      if (version !== requestVersion.current) return
       setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey)); setTotal(result.total); setPageNo(targetPage)
       if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
-    } catch (loadError) { if (version === listVersion.current) { setError(loadError instanceof Error ? loadError.message : '成交审批加载失败'); if (replace) { setItems([]); setSelectedKey(undefined) } } }
-    finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
-  }, [handled])
-  const reload = useCallback(() => { const version = ++listVersion.current; setItems([]); setTotal(0); setPageNo(1); setSelectedKey(undefined); void loadPage(1, true, version) }, [loadPage])
-  useEffect(() => { reload() }, [reload])
+    } catch (loadError) {
+      if (version === requestVersion.current) { setError(loadError instanceof Error ? loadError.message : '成交审批加载失败'); if (replace) { setItems([]); setSelectedKey(undefined) } }
+    } finally { if (version === requestVersion.current) setLoading(false) }
+  }, [groupKey, keyword, optionKey])
 
-  const loadDetail = useCallback(async (id: number) => {
-    const version = ++detailVersion.current; setDetailLoading(true); setDetailError('')
-    try { const result = await api.salesOrder(id); if (version === detailVersion.current) setDetail(result) }
-    catch (loadError) { if (version === detailVersion.current) { setDetail(undefined); setDetailError(loadError instanceof Error ? loadError.message : '订单详情加载失败') } }
-    finally { if (version === detailVersion.current) setDetailLoading(false) }
-  }, [])
+  useEffect(() => { void loadProfile() }, [loadProfile])
+  useEffect(() => { if (!profileLoading && !profileError && groupKey) void loadPage(1, true) }, [groupKey, optionKey, keyword, profileLoading, profileError, loadPage])
+
+  const selectedGroup = useMemo(() => profile.groups.find(group => group.key === groupKey), [groupKey, profile.groups])
   const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey), [items, selectedKey])
+  const loadDetail = useCallback(async (id: number) => {
+    setDetailLoading(true); setDetailError('')
+    try { setDetail(await api.salesOrder(id)) }
+    catch (loadError) { setDetail(undefined); setDetailError(loadError instanceof Error ? loadError.message : '订单详情加载失败') }
+    finally { setDetailLoading(false) }
+  }, [])
   useEffect(() => { if (selectedItem) void loadDetail(selectedItem.id); else setDetail(undefined) }, [loadDetail, selectedItem])
 
+  const reload = () => { void loadProfile(); if (groupKey) void loadPage(1, true) }
   const submitDecision = async () => {
     if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
     setSaving(true)
@@ -58,25 +76,30 @@ export default function SalesOrderApprovalPage() {
   }
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
-      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={handled ? 'approval-done' : 'approval-todo'} onApprove={() => setDecision('approve')} onReject={() => setDecision('reject')}/>
+      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={groupKey === 'done' ? 'approval-done' : 'approval-todo'} onApprove={() => setDecision('approve')} onReject={() => setDecision('reject')}/>
         : <Empty description="从左侧选择一条订单"/>
   const hasMore = items.length < total
 
-  return <section className="workspace-page sales-order-inbox-page">
-    <header className="sales-order-inbox-header"><Typography.Title level={3}>成交审批</Typography.Title><Tabs activeKey={handled ? 'done' : 'todo'} onChange={key => setHandled(key === 'done')} items={[{ key: 'todo', label: '待处理' }, { key: 'done', label: '已处理' }]}/><Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button></header>
-    {error && <Alert
-      className="sales-order-inbox-error" type="error" showIcon message={error}
-      action={<Button size="small" onClick={reload}>重试</Button>}/>
-    }
-    <div className="sales-order-inbox-layout"><aside className="sales-order-list-pane"><div className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(pageNo + 1, false, listVersion.current) }}>
-      {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={`sales-order-list-item${salesOrderTaskKey(item) === selectedKey ? ' active' : ''}`} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
-        <div className="sales-order-list-main"><Avatar>{item.studentName.slice(0, 1)}</Avatar><div className="sales-order-list-copy"><div><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交会签'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
-        <div className="sales-order-list-meta">{formatTimestamp(handled ? item.taskEndTime : item.taskCreateTime || item.submittedAt)}</div>
-      </button>)}
-      {loading && <div className="sales-order-list-loading"><Spin size="small"/> 加载中</div>}
-      {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="sales-order-list-end">已加载全部 {total} 条审批</Typography.Text>}
-    </div></aside><main className="sales-order-detail-pane">{detailContent}</main></div>
+  return <section className="workspace-page lead-management-page sales-order-approval-page">
+    <header className="lead-inbox-filter-shell">
+      {profileError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={profileError} action={<Button type="link" size="small" onClick={() => void loadProfile()}>重试</Button>}/>}
+      {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.groups.length > 0 ? <>
+        <Tabs className="lead-inbox-group-tabs" activeKey={groupKey} onChange={key => { setGroupKey(key); setOptionKey('all') }} items={profile.groups.map(group => ({ key: group.key, label: <span>{group.label}<small>{group.count}</small></span> }))}/>
+        {selectedGroup?.sections.map(section => <div className="lead-inbox-filter-sections" key={section.key}><div className="lead-inbox-filter-row"><span className="lead-inbox-filter-label">{section.label}</span><div className="lead-inbox-filter-options">{section.options.map(option => <button type="button" key={option.key} className={optionKey === option.key ? 'active' : ''} aria-pressed={optionKey === option.key} onClick={() => setOptionKey(option.key)}>{option.label}<small>{option.count}</small></button>)}</div></div></div>)}
+      </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用审批筛选配置"/>}
+    </header>
+    <div className="lead-inbox-layout"><aside className="lead-inbox-list-pane"><div className="lead-inbox-toolbar"><Input.Search allowClear placeholder="搜索订单号 / 学员姓名 / 手机号" onSearch={value => setKeyword(value.trim())}/></div>
+      {error && <Alert className="lead-list-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(1, true)}>重试</Button>}/>}
+      <div className="lead-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(pageNo + 1, false) }}>
+        {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'lead-inbox-item active' : 'lead-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
+          <div className="lead-inbox-item-main"><Avatar>{item.studentName.slice(0, 1)}</Avatar><div className="lead-inbox-item-copy"><div className="lead-inbox-item-title"><strong>{item.studentName}</strong><Tag>{SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交会签'}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · <Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></span></div></div>
+          <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{formatTimestamp(groupKey === 'done' ? item.taskEndTime : item.taskCreateTime || item.submittedAt)}</span></div>
+        </button>)}
+        {loading && <div className="lead-list-loading"><Spin size="small"/> 加载中</div>}
+        {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="lead-list-end">已加载全部 {total} 条审批</Typography.Text>}
+      </div>
+    </aside><main className="lead-inbox-detail-pane">{detailContent}</main></div>
     <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" width="100%">{detailContent}</Drawer>
-    <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} confirmLoading={saving} onCancel={() => setDecision(undefined)} onOk={() => void submitDecision()} okText="提交审批"><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="审批意见（必填）"/></Modal>
+    <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} confirmLoading={saving} onCancel={() => setDecision(undefined)} onOk={() => void submitDecision()} okText="提交审批"><div><Typography.Text strong>审批意见</Typography.Text><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="填写审批意见（必填）"/></div></Modal>
   </section>
 }

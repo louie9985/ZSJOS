@@ -39,7 +39,7 @@ SELECT 'claim_pool_action' AS check_name,
 SELECT 'claim_pool_v003' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V003'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_schemes' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner') AND published_version=1 AND deleted=b'0')=2, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=2, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_menu' AS check_name,

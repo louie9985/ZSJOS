@@ -205,7 +205,7 @@ otherwise
   types in the response.
 - Page, status-count, and single-record queries apply the same rule. A direct detail
   request cannot bypass row visibility.
-- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。页面不提供视角切换。
+- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案，通过 `/zsjos/sales-order/approval/filter-profile` 和 `inbox-page` 消费待处理/已处理及教务/财务审批环节；页面不允许用前端选项扩大服务端返回的任务范围。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询和数量统计只消费已发布版本；保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
@@ -275,3 +275,5 @@ lead-category labels, remark, and attachment images.
 - `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. Each approval round snapshots all enabled users in each root department and its children; department names, role names and frontend menus are not reviewer sources.
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`.
+- 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
+- 工作台业务附件选择后先保留本地文件和预览地址，确认提交时才通过 Infra 文件 API 上传 COS；任一上传失败都不会发送业务命令，成功引用和失败项会保留以便重试。删除只移除当前表单引用，不物理删除已上传文件。

@@ -63,6 +63,16 @@ INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
 SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
 FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.deleted = b'0';
 
+SET @reviewer_filter = '{"groups":[{"key":"todo","label":"待处理","sort":10,"enabled":true,"sectionLabel":"审批环节","conditions":[{"field":"handled","values":["todo"]}],"options":[{"key":"all","label":"全部","sort":0,"enabled":true,"conditions":[]},{"key":"registrationReview","label":"教务审批","sort":10,"enabled":true,"conditions":[{"field":"task_definition_key","values":["registrationReview"]}]},{"key":"financeReview","label":"财务审批","sort":20,"enabled":true,"conditions":[{"field":"task_definition_key","values":["financeReview"]}]}]},{"key":"done","label":"已处理","sort":20,"enabled":true,"sectionLabel":"审批环节","conditions":[{"field":"handled","values":["done"]}],"options":[{"key":"all","label":"全部","sort":0,"enabled":true,"conditions":[]},{"key":"registrationReview","label":"教务审批","sort":10,"enabled":true,"conditions":[{"field":"task_definition_key","values":["registrationReview"]}]},{"key":"financeReview","label":"财务审批","sort":20,"enabled":true,"conditions":[{"field":"task_definition_key","values":["financeReview"]}]}]}]}';
+INSERT IGNORE INTO `zsjos_lead_inbox_filter_scheme`
+(`audience`, `name`, `draft_config_json`, `published_config_json`, `published_version`, `published_by`, `published_at`, `version`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT 'reviewer', '审批人视角', @reviewer_filter, @reviewer_filter, 1, 1, NOW(), 0, '1', NOW(), '1', NOW(), b'0', t.id
+FROM `system_tenant` t WHERE t.id = 1 AND t.deleted = b'0';
+INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
+(`scheme_id`, `version_no`, `config_json`, `published_by`, `published_at`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
+FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'reviewer' AND s.deleted = b'0';
+
 INSERT INTO `system_role_menu`
 (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id

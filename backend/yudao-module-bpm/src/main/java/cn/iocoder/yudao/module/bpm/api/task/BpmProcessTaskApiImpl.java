@@ -110,7 +110,10 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     private BpmTaskPageReqVO toPageReq(BpmTaskPageReqDTO reqDTO) {
         BpmTaskPageReqVO result = new BpmTaskPageReqVO();
         result.setPageNo(reqDTO.getPageNo()); result.setPageSize(reqDTO.getPageSize());
-        result.setProcessDefinitionKey(reqDTO.getProcessDefinitionKey()); return result;
+        result.setProcessDefinitionKey(reqDTO.getProcessDefinitionKey());
+        result.setTaskDefinitionKey(reqDTO.getTaskDefinitionKey());
+        result.setProcessInstanceIds(reqDTO.getProcessInstanceIds());
+        return result;
     }
 
     private LocalDateTime toLocalDateTime(Date value) {

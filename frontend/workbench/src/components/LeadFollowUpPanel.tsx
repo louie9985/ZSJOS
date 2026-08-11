@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, App, Button, Card, DatePicker, Empty, Form, Image, Input, Modal, Select, Space, Spin, Tag, Timeline, Typography, Upload } from 'antd'
-import { CameraOutlined } from '@ant-design/icons'
+import { Alert, App, Button, Card, DatePicker, Empty, Form, Image, Input, Modal, Select, Space, Spin, Tag, Timeline, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { api, type DictData, type LeadAttachment, type LeadFollowUp, type ManagedLead } from '../services/api'
 import { DICT_TYPE } from '../constants'
 import { useBusinessOverlay } from './OverlayCoordinator'
 import { appendQuickNote } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
+import DeferredAttachmentPicker from './DeferredAttachmentPicker'
+import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 
 const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 const PAGE_SIZE = 10
@@ -21,8 +22,7 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
   const [form] = Form.useForm<Values>()
   const [dirty, setDirty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [images, setImages] = useState<LeadAttachment[]>([])
+  const [images, setImages] = useState<DeferredUploadItem<LeadAttachment>[]>([])
   const [records, setRecords] = useState<LeadFollowUp[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -71,26 +71,17 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
   const submit = async (values: Values) => {
     setSubmitting(true)
     try {
+      const uploadResult = await uploadDeferredFiles(images, file => api.uploadLeadFollowUpImage(lead.id, file), setImages)
+      if (uploadResult.failed) { message.error('有跟进图片上传失败，请重试失败项'); return }
       await api.createLeadFollowUp(lead.id, {
         method: values.method, result: values.result, leadCategory: values.leadCategory,
         remark: values.remark?.trim() || undefined,
         nextFollowUpAt: values.nextFollowUpAt?.valueOf(),
-        images: images.map(image => ({ infraFileId: image.infraFileId })), idempotencyKey: crypto.randomUUID()
+        images: uploadResult.items.filter(image => image.uploaded).map(image => ({ infraFileId: image.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID()
       })
       reset(); await loadRecords(); onChanged?.(); onClose(); message.success('跟进记录已提交')
     } catch (submitError) { message.error(submitError instanceof Error ? submitError.message : '提交失败') }
     finally { setSubmitting(false) }
-  }
-  const upload = async (file: File) => {
-    if (images.length >= 9) { message.warning('最多上传 9 张图片'); return false }
-    setUploading(true)
-    try {
-      const uploaded = await api.uploadLeadFollowUpImage(lead.id, file)
-      setImages(current => [...current, uploaded]); setDirty(true)
-    }
-    catch (uploadError) { message.error(uploadError instanceof Error ? uploadError.message : '上传失败') }
-    finally { setUploading(false) }
-    return false
   }
   const appendNote = (note: string) => {
     const current = form.getFieldValue('remark') || ''
@@ -113,10 +104,9 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
       </Form.Item>
       <Space wrap className="follow-up-day-shortcuts">{QUICK_DAYS.map(days => <Button size="small" key={days} onClick={() => { form.setFieldValue('nextFollowUpAt', dayjs().add(days, 'day')); setDirty(true) }}>+{days} 天</Button>)}</Space>
       <div className="follow-up-upload-row">
-        <Upload accept="image/jpeg,image/png,image/webp" showUploadList={false} beforeUpload={upload} disabled={uploading || images.length >= 9}>
-          <Button icon={<CameraOutlined/>} loading={uploading}>上传图片 {images.length}/9</Button>
-        </Upload>
-        <Image.PreviewGroup><div className="follow-up-image-strip">{images.map((image, index) => <div key={image.infraFileId}><Image src={image.fileUrl}/><Button size="small" danger onClick={() => { setImages(current => current.filter((_, itemIndex) => itemIndex !== index)); setDirty(true) }}>移除</Button></div>)}</div></Image.PreviewGroup>
+        <Form.Item label={`跟进图片${images.some(image => image.status === 'uploading') ? '（上传中）' : ''}`}>
+          <DeferredAttachmentPicker value={images} onChange={value => { setImages(value); setDirty(true) }} accept="image/jpeg,image/png,image/webp"/>
+        </Form.Item>
       </div>
       <Space><Button type="primary" htmlType="submit" loading={submitting}>提交跟进</Button><Button onClick={reset}>重置</Button></Space>
     </Form>

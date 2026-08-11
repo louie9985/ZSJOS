@@ -22,6 +22,8 @@ public interface LeadInboxFilterConfigService {
 
     List<LeadInboxFilterCapabilityRespVO> getCapabilities();
 
+    List<LeadInboxFilterCapabilityRespVO> getCapabilities(String audience);
+
     LeadInboxFilterConfigVO getPublishedConfig(String audience);
 
     LeadInboxFilterQuery resolveQuery(LeadInboxFilterConfigVO config, String groupKey, String optionKey);

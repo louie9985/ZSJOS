@@ -32,3 +32,6 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 Dictionary business data does not belong here; put it under
 `../dictionary-data/` and obtain explicit synchronization approval first.
 V008 contains the explicitly approved system-owned defaults for follow-up method and result; the quick-note type remains empty. Generating the migration does not authorize executing it against a database.
+### V029 - sales-order approval reviewer filter scheme
+
+Adds the non-destructive `reviewer` audience to the shared filter-scheme table with published defaults for pending/completed approval and registration/finance task stages. It depends on the existing filter tables from V005 and the BPM sales-order process from V023. It is repeatable through `NOT EXISTS` guards and does not delete or rewrite existing schemes. Apply after V028 in migration order; rollback is limited to removing the newly inserted reviewer rows in a controlled environment.

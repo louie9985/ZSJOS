@@ -33,11 +33,13 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_I
 @Service
 public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigService {
 
-    private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER);
+    private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER, INBOX_AUDIENCE_REVIEWER);
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
             INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "converted", "invalid", "closed")),
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
-            new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned")));
+            new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned")),
+            INBOX_FILTER_FIELD_HANDLED, new LinkedHashSet<>(List.of("todo", "done")),
+            INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(List.of("registrationReview", "financeReview")));
 
     @Resource
     private LeadInboxFilterSchemeMapper schemeMapper;
@@ -97,6 +99,19 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
 
     @Override
     public List<LeadInboxFilterCapabilityRespVO> getCapabilities() {
+        return getCapabilities(INBOX_AUDIENCE_SUBMITTER);
+    }
+
+    @Override
+    public List<LeadInboxFilterCapabilityRespVO> getCapabilities(String audience) {
+        validateAudience(audience);
+        if (INBOX_AUDIENCE_REVIEWER.equals(audience)) {
+            return List.of(
+                    capability(INBOX_FILTER_FIELD_HANDLED, "处理状态", List.of(
+                            value("todo", "待处理"), value("done", "已处理"))),
+                    capability(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, "审批环节", List.of(
+                            value("registrationReview", "教务审批"), value("financeReview", "财务审批"))));
+        }
         return List.of(
                 capability(INBOX_FILTER_FIELD_STATUS, "客资主状态", List.of(
                         value("submitted", "已提交"), value("valid", "已判有效"), value("converted", "已进入转化"),
@@ -201,6 +216,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         config.getGroups().sort(Comparator.comparing(LeadInboxFilterConfigVO.GroupVO::getSort));
         Set<String> groupKeys = new HashSet<>();
         boolean hasAll = false;
+        boolean reviewerConfig = false;
         for (LeadInboxFilterConfigVO.GroupVO group : config.getGroups()) {
             if (!groupKeys.add(group.getKey()) || group.getLabel() == null || group.getSort() == null || group.getEnabled() == null) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
@@ -208,6 +224,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             group.setConditions(nonNull(group.getConditions()));
             group.setOptions(nonNull(group.getOptions()));
             validateConditions(group.getConditions());
+            reviewerConfig |= containsReviewerField(group.getConditions());
             if ("all".equals(group.getKey())) {
                 hasAll = Boolean.TRUE.equals(group.getEnabled()) && group.getConditions().isEmpty();
             }
@@ -223,6 +240,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                 }
                 option.setConditions(nonNull(option.getConditions()));
                 validateConditions(option.getConditions());
+                reviewerConfig |= containsReviewerField(option.getConditions());
                 LeadInboxFilterQuery combined = compileCombined(group.getConditions(), option.getConditions());
                 if (combined.matchNone()) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
@@ -233,7 +251,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
         }
-        if (!hasAll) {
+        if (!hasAll && !reviewerConfig) {
             throw exception(LEAD_INBOX_FILTER_INVALID);
         }
     }
@@ -270,7 +288,13 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         }
         return new LeadInboxFilterQuery(
                 valuesByField.getOrDefault(INBOX_FILTER_FIELD_STATUS, Set.of()),
-                valuesByField.getOrDefault(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, Set.of()), matchNone);
+                valuesByField.getOrDefault(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, Set.of()), matchNone,
+                Map.copyOf(valuesByField));
+    }
+
+    private static boolean containsReviewerField(List<LeadInboxFilterConfigVO.ConditionVO> conditions) {
+        return conditions.stream().anyMatch(item -> INBOX_FILTER_FIELD_HANDLED.equals(item.getField())
+                || INBOX_FILTER_FIELD_TASK_DEFINITION_KEY.equals(item.getField()));
     }
 
     private static <T> List<T> nonNull(List<T> values) {
@@ -278,7 +302,8 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     }
 
     private static String audienceLabel(String audience) {
-        return INBOX_AUDIENCE_SUBMITTER.equals(audience) ? "提交人视角" : "负责人视角";
+        return INBOX_AUDIENCE_SUBMITTER.equals(audience) ? "提交人视角"
+                : INBOX_AUDIENCE_OWNER.equals(audience) ? "负责人视角" : "审批人视角";
     }
 
     private static LeadInboxFilterCapabilityRespVO capability(String field, String label,
