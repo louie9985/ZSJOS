@@ -155,7 +155,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
             lifecycleTaskService.createQualificationTask(lead, operatorUserId, occurredAt);
         }
-        if (!invalid) lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId, record.getId(),
+        if (!invalid) lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId,
+                FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         lead.setLastFollowUpAt(occurredAt);
         lead.setLastFollowUpRecordId(record.getId());
@@ -248,7 +249,8 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         leadMapper.updateById(lead);
         opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
         opportunity.setNextFollowUpAt(reqVO.getNextFollowUpAt()); opportunityMapper.updateById(opportunity);
-        lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId, record.getId(),
+        lifecycleTaskService.replaceFollowUpReminder(lead.getId(), operatorUserId,
+                FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         return convertOpportunity(record, opportunityImageMapper.selectListByRecordIds(List.of(record.getId())),
                 operator == null ? Map.of() : Map.of(operatorUserId, operator), null);
@@ -303,7 +305,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                                        Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
         result.setId(record.getId()); result.setLeadId(record.getLeadId());
-        result.setRecordScope("lead");
+        result.setRecordScope(FOLLOW_UP_RECORD_SCOPE_LEAD);
         result.setAssignmentHistoryId(record.getAssignmentHistoryId());
         result.setOperatorUserId(record.getOperatorUserId());
         AdminUserRespDTO user = users.get(record.getOperatorUserId());
@@ -330,7 +332,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             List<OpportunityFollowUpImageDO> images, Map<Long, AdminUserRespDTO> users, Map<Long, String> urls) {
         LeadFollowUpRespVO result = new LeadFollowUpRespVO();
         result.setId(record.getId()); result.setLeadId(record.getLeadId()); result.setOpportunityId(record.getOpportunityId());
-        result.setRecordScope("opportunity"); result.setOperatorUserId(record.getOperatorUserId());
+        result.setRecordScope(FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY); result.setOperatorUserId(record.getOperatorUserId());
         AdminUserRespDTO user = users.get(record.getOperatorUserId());
         result.setOperatorName(user == null ? null : user.getNickname()); result.setOccurredAt(record.getOccurredAt());
         result.setFirstInAssignment(false); result.setMethod(record.getMethodValue()); result.setMethodLabel(record.getMethodLabelSnapshot());

@@ -9,6 +9,17 @@ SELECT 'admin_super_admin_role' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_user_role ur JOIN system_role r ON r.id=ur.role_id WHERE ur.user_id=(SELECT id FROM system_users WHERE username='admin' AND tenant_id=1 AND deleted=b'0' LIMIT 1) AND r.code='super_admin' AND ur.deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'product_ref_nullable' AS check_name,
        IF((SELECT is_nullable FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_lead_intended_product' AND column_name='product_ref')='YES', 'PASS', 'FAIL') AS result;
+SELECT 'lead_intended_product_active_key' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+           AND table_name='zsjos_lead_intended_product' AND column_name='active_product_ref'
+           AND extra LIKE '%STORED GENERATED%')=1
+          AND (SELECT CONCAT(MAX(non_unique), ':', GROUP_CONCAT(column_name ORDER BY seq_in_index))
+           FROM information_schema.statistics WHERE table_schema=DATABASE()
+           AND table_name='zsjos_lead_intended_product' AND index_name='uk_tenant_lead_active_product')
+             = '0:tenant_id,lead_id,active_product_ref'
+          AND NOT EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+           AND table_name='zsjos_lead_intended_product' AND index_name='uk_tenant_lead_product'),
+       'PASS', 'FAIL') AS result;
 SELECT 'lead_category_empty' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_category' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'source_channel_empty' AS check_name,
@@ -100,8 +111,10 @@ SELECT 'historical_valid_leads_v019' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V019'), 'PASS', 'FAIL') AS result;
 SELECT 'unified_schema_migration_v020' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V020'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_intended_product_active_key_v021' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V021'), 'PASS', 'FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020'))=5, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021'))=6, 'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
            AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;

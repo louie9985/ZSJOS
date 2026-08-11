@@ -3923,8 +3923,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_intended_product` (
   `category_id` bigint DEFAULT NULL COMMENT '提交时叶子分类编号',
   `category_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交时叶子分类名称快照',
   `category_path_snapshot` json DEFAULT NULL COMMENT '提交时完整分类路径快照',
+  `active_product_ref` varchar(128) GENERATED ALWAYS AS (IF(`deleted` = 0, `product_ref`, NULL)) STORED,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tenant_lead_product` (`tenant_id`,`lead_id`,`product_ref`),
+  UNIQUE KEY `uk_tenant_lead_active_product` (`tenant_id`,`lead_id`,`active_product_ref`),
   KEY `idx_tenant_lead_primary` (`tenant_id`,`lead_id`,`is_primary`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资意向产品';
 

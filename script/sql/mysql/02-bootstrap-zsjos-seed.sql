@@ -182,3 +182,6 @@ VALUES ('V019', 'Normalize historical valid leads with initial opportunities', '
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V020', 'Add unified schema migration metadata and missing CRM tables', 'unified-schema-migration-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V021', 'Make lead intended-product uniqueness active-row only', 'lead-intended-product-active-unique-key-v1');

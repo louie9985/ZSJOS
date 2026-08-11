@@ -74,6 +74,8 @@ public interface LeadConstants {
     String TASK_TYPE_FOLLOW_UP_REMINDER = "lead_follow_up_reminder";
     String TASK_TYPE_QUALIFICATION = "lead_qualification";
     String TASK_STATUS_PENDING = "pending";
+    String FOLLOW_UP_RECORD_SCOPE_LEAD = "lead";
+    String FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY = "opportunity";
     String ASSIGNEE_TYPE_USER = "user";
     String BIZ_TYPE_LEAD = "lead";
     String EVENT_LEAD_ACCEPTED = "lead_assignment_accepted";

@@ -604,7 +604,7 @@ def static_check() -> None:
 
     seed_text = (SQL_ROOT / "02-bootstrap-zsjos-seed.sql").read_text(encoding="utf-8")
     verify_text = (SQL_ROOT / "verify-bootstrap.sql").read_text(encoding="utf-8")
-    for version in ("V001", "V017", "V018", "V019", "V020"):
+    for version in ("V001", "V017", "V018", "V019", "V020", "V021"):
         if version not in seed_text:
             fail(f"Fresh baseline does not register {version}")
         if version not in verify_text:
@@ -891,21 +891,56 @@ def test_upgrade() -> None:
 
     def execute(container: str) -> None:
         docker_mysql_file(container, SQL_ROOT / "bootstrap.sql")
-        docker_mysql_query(container, "DROP TABLE crm_owner_record,crm_performance_config,zsjos_module_schema_version; DELETE FROM zsjos_schema_version WHERE version='V020'")
-        migration = SQL_ROOT / "migrations" / "V020__unified_schema_migration_and_crm_tables.sql"
-        docker_mysql_file(container, migration)
-        checksum = sha256(migration)
+        docker_mysql_query(
+            container,
+            "ALTER TABLE zsjos_lead_intended_product "
+            "DROP INDEX uk_tenant_lead_active_product, DROP COLUMN active_product_ref, "
+            "ADD UNIQUE KEY uk_tenant_lead_product (tenant_id,lead_id,product_ref); "
+            "DROP TABLE crm_owner_record,crm_performance_config,zsjos_module_schema_version; "
+            "DELETE FROM zsjos_schema_version WHERE version IN ('V020','V021')",
+        )
+        migration_v020 = SQL_ROOT / "migrations" / "V020__unified_schema_migration_and_crm_tables.sql"
+        docker_mysql_file(container, migration_v020)
+        checksum = sha256(migration_v020)
         docker_mysql_query(
             container,
             "INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version) VALUES "
             f"('core','V020','upgrade test','{checksum}','test') ON DUPLICATE KEY UPDATE checksum=VALUES(checksum),release_version='test'",
         )
+        docker_mysql_file(container, migration_v020)
+
+        migration_v021 = SQL_ROOT / "migrations" / "V021__lead_intended_product_active_unique_key.sql"
+        docker_mysql_file(container, migration_v021)
+        checksum = sha256(migration_v021)
+        docker_mysql_query(
+            container,
+            "INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version) VALUES "
+            f"('core','V021','upgrade test','{checksum}','test') ON DUPLICATE KEY UPDATE checksum=VALUES(checksum),release_version='test'",
+        )
+        docker_mysql_query(
+            container,
+            "INSERT INTO zsjos_lead_intended_product "
+            "(lead_id,product_ref,product_name_snapshot,is_primary,sort,deleted,tenant_id) "
+            "VALUES (999999,'upgrade-test-course','Upgrade test',b'1',0,b'0',1); "
+            "UPDATE zsjos_lead_intended_product SET deleted=b'1' "
+            "WHERE tenant_id=1 AND lead_id=999999 AND product_ref='upgrade-test-course' AND deleted=b'0'; "
+            "INSERT INTO zsjos_lead_intended_product "
+            "(lead_id,product_ref,product_name_snapshot,is_primary,sort,deleted,tenant_id) "
+            "VALUES (999999,'upgrade-test-course','Upgrade test',b'1',0,b'0',1)",
+        )
+        result = docker_mysql_query(
+            container,
+            "SELECT CONCAT(COUNT(*),':',SUM(deleted=b'0')) FROM zsjos_lead_intended_product "
+            "WHERE tenant_id=1 AND lead_id=999999 AND product_ref='upgrade-test-course'",
+        ).strip()
+        if result != "2:1":
+            fail(f"V021 logical-delete uniqueness check failed: {result}")
         output = docker_mysql_file(container, SQL_ROOT / "verify" / "core.sql").stdout.decode(errors="replace")
         failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
         if failure_lines:
-            fail("V019 to V020 upgrade verification failed:\n" + "\n".join(failure_lines))
-        docker_mysql_file(container, migration)
-        info("PASS: V019-to-V020 upgrade and idempotent migration replay completed.")
+            fail("V019 to V021 upgrade verification failed:\n" + "\n".join(failure_lines))
+        docker_mysql_file(container, migration_v021)
+        info("PASS: V019-to-V021 upgrade, logical-delete uniqueness, and idempotent replay completed.")
 
     with_test_mysql(execute)
 

@@ -83,7 +83,7 @@ public class LeadLifecycleTaskService {
         return taskMapper.completePendingByKey("lead-first-follow-up:" + assignmentHistoryId, completedAt) > 0;
     }
 
-    public void replaceFollowUpReminder(Long leadId, Long assigneeId, Long recordId,
+    public void replaceFollowUpReminder(Long leadId, Long assigneeId, String recordScope, Long recordId,
                                         LocalDateTime dueAt, LocalDateTime changedAt) {
         taskMapper.completePending(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId, changedAt);
         if (dueAt == null) return;
@@ -95,8 +95,10 @@ public class LeadLifecycleTaskService {
         task.setAssigneeType(ASSIGNEE_TYPE_USER);
         task.setAssigneeId(assigneeId);
         task.setDueAt(dueAt);
-        task.setPayload(JsonUtils.toJsonString(Map.of("followUpRecordId", recordId)));
-        task.setIdempotencyKey("lead-follow-up-reminder:" + recordId);
+        task.setPayload(JsonUtils.toJsonString(Map.of(
+                "followUpRecordScope", recordScope,
+                "followUpRecordId", recordId)));
+        task.setIdempotencyKey("lead-follow-up-reminder:" + recordScope + ":" + recordId);
         task.setVersion(0);
         taskMapper.insert(task);
     }

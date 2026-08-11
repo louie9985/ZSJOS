@@ -99,6 +99,21 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
+    void submittedLeadFollowUpUsesLeadReminderScope() {
+        LeadDO lead = validLead();
+        stubSuccessfulCreate(lead);
+        doAnswer(invocation -> {
+            invocation.<LeadFollowUpRecordDO>getArgument(0).setId(40L);
+            return 1;
+        }).when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+
+        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("lead"), eq(40L),
+                any(LocalDateTime.class), any(LocalDateTime.class));
+    }
+
+    @Test
     void convertedFollowUpBelongsToOpportunityAndUpdatesReminder() {
         LeadDO lead = validLead();
         lead.setStatus("converted"); lead.setAssignmentStatus("closed");
@@ -118,7 +133,7 @@ class LeadFollowUpServiceImplTest {
         assertEquals(30L, result.getOpportunityId());
         assertEquals("following", opportunity.getStatus());
         verify(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
-        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq(50L),
+        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("opportunity"), eq(50L),
                 any(LocalDateTime.class), any(LocalDateTime.class));
     }
 

@@ -35,11 +35,13 @@ import {
   buildTwoLevelNavigation,
   findPageByPath,
   findPrimaryByPath,
+  getInaccessiblePathFallback,
   getInitialTarget,
   getPrimaryTarget,
   type PrimaryNavigationItem,
   type SecondaryNavigationItem
 } from './services/menu'
+import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from './services/menuComponentRegistry'
 import LeadSubmissionPage from './pages/LeadSubmissionPage'
 import LeadManagementPage from './pages/LeadManagementPage'
 import LeadAssignmentPage from './pages/LeadAssignmentPage'
@@ -169,6 +171,7 @@ function toSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
 }
 
 function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: WorkbenchMenu; permissions: string[]; onOpenAssignment: () => void }) {
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
   if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
@@ -209,6 +212,10 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
   const menus = useMemo(() => buildMenuTree(info.menus || []), [info.menus])
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
+  const inaccessiblePathFallback = useMemo(
+    () => getInaccessiblePathFallback(navigation, location.pathname),
+    [navigation, location.pathname]
+  )
   const activePrimary = useMemo(
     () => findPrimaryByPath(navigation, location.pathname),
     [navigation, location.pathname]
@@ -217,6 +224,10 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
     () => findPageByPath(navigation, location.pathname),
     [navigation, location.pathname]
   )
+
+  useEffect(() => {
+    if (inaccessiblePathFallback) navigate(inaccessiblePathFallback, { replace: true })
+  }, [inaccessiblePathFallback, navigate])
 
   useEffect(() => {
     if (!activePrimary || location.pathname !== activePrimary.menu.path || activePrimary.pages.length === 0) return
