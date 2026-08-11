@@ -11,6 +11,8 @@
 | `PUT` | `/{appealId}/uphold` | 对应复核权限、BPM 任务和客资对象权限 |
 | `POST` | `/attachment/upload` | 提交或复核权限；仅 JPG/PNG/WebP |
 
+`GET /inbox-page` 在当前用户没有对应 BPM 待办或已办时返回 `list=[]`、`total=0`，空结果不是服务异常。
+
 提交和裁决请求均必须携带非空 `idempotencyKey`；裁决还必须携带当前 BPM `taskId` 与理由。每个环节最多 9 张图片，图片引用只保存基础设施文件 ID 和不可变元数据快照，读取时返回私有预签名地址。
 
 状态按 `sales_manager_reviewing`、`quality_reviewing`、`chairman_reviewing`、`overturned`、`upheld`、`withdrawn` 解释。`upheld` 仅表示当前轮维持无效，第三轮 `upheld` 才是最终无效；没有期限、自动升级或第四轮申诉。
