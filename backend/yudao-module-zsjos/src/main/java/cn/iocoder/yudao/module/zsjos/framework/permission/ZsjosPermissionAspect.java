@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.framework.permission;
 
 import cn.iocoder.yudao.framework.common.util.spring.SpringExpressionUtils;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadObjectPermissionService;
+import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import jakarta.annotation.Resource;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
@@ -17,15 +18,22 @@ public class ZsjosPermissionAspect {
 
     @Resource
     private LeadObjectPermissionService leadObjectPermissionService;
+    @Resource
+    private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
 
     @Before("@annotation(permission)")
     public void check(JoinPoint joinPoint, ZsjosPermission permission) {
         Map<String, Object> values = SpringExpressionUtils.parseExpressions(joinPoint,
                 List.of(permission.bizId()));
         Object value = values.get(permission.bizId());
-        if (!"lead".equals(permission.bizType()) || value == null) {
+        if (value == null) {
             throw new IllegalArgumentException("Unsupported ZSJOS permission target");
         }
-        leadObjectPermissionService.check(Long.valueOf(value.toString()), permission.action());
+        Long bizId = Long.valueOf(value.toString());
+        switch (permission.bizType()) {
+            case "lead" -> leadObjectPermissionService.check(bizId, permission.action());
+            case "sales-order" -> salesOrderObjectPermissionService.check(bizId, permission.action());
+            default -> throw new IllegalArgumentException("Unsupported ZSJOS permission target");
+        }
     }
 }

@@ -65,6 +65,8 @@ public class LeadManagementRespVO {
     private List<LeadProductVO> intendedProducts;
     private List<LeadAttachmentVO> attachments;
     private OpportunityVO opportunity;
+    private Long activeSalesOrderId;
+    private String activeSalesOrderStatus;
     private List<ActionVO> availableActions;
 
     @Data

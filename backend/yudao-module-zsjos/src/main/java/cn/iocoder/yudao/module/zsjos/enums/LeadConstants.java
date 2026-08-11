@@ -43,6 +43,7 @@ public interface LeadConstants {
     String ACTION_JUDGE_VALID = "JUDGE_VALID";
     String ACTION_JUDGE_INVALID = "JUDGE_INVALID";
     String ACTION_ENTER_DEAL = "ENTER_DEAL";
+    String ACTION_REVISE_DEAL = "REVISE_DEAL";
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";

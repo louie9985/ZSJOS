@@ -604,7 +604,7 @@ def static_check() -> None:
 
     seed_text = (SQL_ROOT / "02-bootstrap-zsjos-seed.sql").read_text(encoding="utf-8")
     verify_text = (SQL_ROOT / "verify-bootstrap.sql").read_text(encoding="utf-8")
-    for version in ("V001", "V017", "V018", "V019", "V020"):
+    for version in ("V001", "V017", "V018", "V019", "V020", "V023"):
         if version not in seed_text:
             fail(f"Fresh baseline does not register {version}")
         if version not in verify_text:

@@ -100,6 +100,22 @@ SELECT 'historical_valid_leads_v019' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V019'), 'PASS', 'FAIL') AS result;
 SELECT 'unified_schema_migration_v020' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V020'), 'PASS', 'FAIL') AS result;
+SELECT 'sales_order_dual_approval_v023' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V023'), 'PASS', 'FAIL') AS result;
+SELECT 'sales_order_v023_columns' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_order'
+           AND column_name IN ('buyer_name','student_name','student_nature','student_mobile','student_wechat_id',
+             'province_code','province_name','city_code','city_name','agreed_exam_time','class_type','service_period',
+             'student_source','customer_paid_at','fee_mode','payment_method','remark','student_special_requirements',
+             'material_delivery_contact','payment_voucher_refs','submission_idempotency_key','active_lead_id'))=22,
+          'PASS','FAIL') AS result;
+SELECT 'sales_order_v023_approval_config' AS check_name,
+       IF(EXISTS(SELECT 1 FROM zsjos_order_approval_config WHERE tenant_id=1 AND registration_dept_id=1030 AND finance_dept_id=1040 AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'sales_order_v023_dictionaries' AS check_name,
+       IF((SELECT COUNT(DISTINCT type) FROM system_dict_type WHERE type IN ('zsjos_order_student_nature','zsjos_order_service_period',
+           'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
+          'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020'))=5, 'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,

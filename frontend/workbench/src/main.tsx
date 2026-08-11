@@ -53,6 +53,7 @@ import { NotifyMessageProvider } from './components/NotifyMessageProvider'
 import MessageCenter from './components/MessageCenter'
 import MessageInboxPage from './pages/MessageInboxPage'
 import LeadAppealPage from './pages/LeadAppealPage'
+import SalesOrderApprovalPage from './pages/SalesOrderApprovalPage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { APP_ROUTES, STORAGE_KEYS } from './constants'
 import {
@@ -179,6 +180,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
+  if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
