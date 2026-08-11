@@ -431,3 +431,16 @@
 - Verification evidence: `mvn -pl yudao-module-system,yudao-module-bpm -am -DskipTests compile` passed. `git diff --check` passed.
 - Dependency / integration impact: No new dependency. No migration, service restart, BPM deployment, credential change, or real external send was performed. V028 remains blocked by the pre-existing missing V022 migration continuity issue.
 - Remaining work: The plan is not yet feature-complete: implement encrypted tenant channel-config CRUD, concrete WeCom HTTP/token client, delivery DO/service/controller/retry scheduler and admin delivery/config pages, then add focused retry/isolation/BPM tests and browser verification.
+
+### 2026-08-11 15:41:22 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `a02d1012bba4c1d3d75e016a2539e6788f57e8a0`
+- User goal: Correct the repository handoff rule so every turn that adds, deletes, or modifies any file writes a handoff entry, while turns that make no file changes do not.
+- Key decisions: Use repository file mutation as the sole trigger; include code, tests, scripts, SQL, configuration, documentation, and repository rules; keep read-only discussion, analysis, diagnosis, inspection, review, and explanation turns out of the handoff log.
+- Execution or analysis result: Updated the handoff rule from an unconditional per-turn requirement to a file-change requirement and clarified that all file types are covered. Retained the existing workstream registration and ownership rules for all files.
+- Changed files: `AGENTS.md`; `handoff/20260810-main-existing.md`.
+- Verification evidence: `git diff --check` passed before the handoff append; targeted rule search confirmed the file-change trigger, explicit add/delete/modify scope, and no-change exclusion. A final diff check is required after this entry.
+- Dependency / integration impact: Repository workflow policy only. No application behavior, dependency, branch, worktree, commit, push, or external state changed.
+- Remaining work: None.
