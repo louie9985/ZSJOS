@@ -72,3 +72,17 @@
 - Verification evidence: On `main`, Workbench `npm test` passed 56 tests, `npm run typecheck` passed, `npm run build` passed, BPM/ZSJOS Maven compile passed, focused Maven tests passed 14 tests, and `git diff --check` passed.
 - Dependency or integration impact: V029 remains unexecuted; no service restart, BPM deployment, permission change, database action, or remote push occurred.
 - Remaining work: Preserve `frontend/workbench/.env.local`, remove the four secondary worktrees, delete the three merged `codex/*` branches, and verify only the primary worktree and `main` remain.
+
+## Cleanup Complete
+
+- Beijing time: `2026-08-11 16:16:25 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `61de09930474e7bf79e634a31e88631e7e1def57`
+- User goal: Finish consolidating all branches and worktrees after integration.
+- Key decisions: Move the untracked local workbench environment file to the primary worktree without committing it; delete only worktrees already confirmed clean and branches already merged into `main`; retain no secondary local branch.
+- Execution result: Removed the lead-appeal, sales-order, workbench-approval and detached Codex worktrees; deleted all three merged `codex/*` branches; resolved the Windows long-path residue for the workbench worktree after verifying its exact path; only `D:\ZSJ-OS` on `main` remains.
+- Changed files: `handoff/workbench-approval-upload.md`; local untracked `frontend/workbench/.env.local` was moved from the retired lead-appeal worktree to the primary worktree without content changes.
+- Verification evidence: `git worktree list` reports one worktree; local branch listing reports only `main`; all retired worktree paths no longer exist; `.env.local` exists at the preserved primary-worktree path.
+- Dependency or integration impact: No remote push, migration, service restart, BPM deployment, permission change, or environment-file commit occurred.
+- Remaining work: None for local branch/worktree consolidation. `frontend/workbench/.env.local` intentionally remains untracked.
