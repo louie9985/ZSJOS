@@ -6,6 +6,7 @@ import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LA
 import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderTaskKey } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
+import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 
 const PAGE_SIZE = 20
 
@@ -31,6 +32,8 @@ export default function SalesOrderApprovalPage() {
   const [reason, setReason] = useState('')
   const { submitting: saving, run: runDecision } = useSubmissionGuard()
   const requestVersion = useRef(0)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const closeDecision = () => { setConfirmOpen(false); setDecision(undefined) }
 
   const loadProfile = useCallback(async () => {
     setProfileLoading(true); setProfileError('')
@@ -70,13 +73,18 @@ export default function SalesOrderApprovalPage() {
 
   const reload = () => { void loadProfile(); if (groupKey && center) void loadPage(1, true) }
   const submitDecision = async () => {
-    if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
+    setConfirmOpen(false)
+    if (!selectedItem?.taskId || !decision) return
     const order = selectedItem
     const nextDecision = decision
     await runDecision(async ({ complete }) => {
       await api.decideSalesOrder(order.id, nextDecision, { taskId: order.taskId!, reason: reason.trim() })
       complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); reload()
     }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '审批失败'))
+  }
+  const prepareDecision = () => {
+    if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
+    setConfirmOpen(true)
   }
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
@@ -104,6 +112,6 @@ export default function SalesOrderApprovalPage() {
       </div>
     </aside><main className="lead-inbox-detail-pane">{detailContent}</main></div>
     <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" width="100%">{detailContent}</Drawer>
-    <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} confirmLoading={saving} onCancel={() => setDecision(undefined)} onOk={() => void submitDecision()} okText="提交审批"><div><Typography.Text strong>审批意见</Typography.Text><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="填写审批意见（必填）"/></div></Modal>
+    <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} onCancel={closeDecision} footer={<><Button onClick={closeDecision}>取消</Button><IrreversiblePopconfirm action={`${decision === 'approve' ? '通过' : '驳回'}成交订单「${selectedItem?.orderNo || ''}」`} danger={decision === 'reject'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submitDecision}><Button type="primary" danger={decision === 'reject'} loading={saving} onClick={prepareDecision}>提交审批</Button></IrreversiblePopconfirm></>}><div><Typography.Text strong>审批意见</Typography.Text><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="填写审批意见（必填）"/></div></Modal>
   </section>
 }

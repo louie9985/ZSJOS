@@ -18,15 +18,20 @@
               @click="openCategory(selectedCategory)"
               >编辑</el-button
             >
-            <el-button
+            <ZsjosPopconfirm
               v-if="selectedCategory"
-              link
-              type="danger"
-              :loading="isProcessing(`category-delete:${selectedCategory.id}`)"
-              v-hasPermi="['zsjos:product-category:delete']"
-              @click="removeCategory(selectedCategory)"
-              >删除</el-button
+              :action="`删除产品分类「${selectedCategory.name}」`"
+              danger
+              @confirm="removeCategory(selectedCategory)"
             >
+              <el-button
+                link
+                type="danger"
+                :loading="isProcessing(`category-delete:${selectedCategory.id}`)"
+                v-hasPermi="['zsjos:product-category:delete']"
+                >删除</el-button
+              >
+            </ZsjosPopconfirm>
             <el-button
               link
               type="primary"
@@ -116,14 +121,19 @@
                 :loading="isProcessing(`product-status:${scope.row.id}`)"
                 @click="toggleProduct(scope.row)"
                 >{{ scope.row.status === 0 ? '停用' : '启用' }}</el-button
-              ><el-button
-                link
-                type="danger"
-                :loading="isProcessing(`product-delete:${scope.row.id}`)"
-                v-hasPermi="['zsjos:product:delete']"
-                @click="removeProduct(scope.row)"
-                >删除</el-button
-              ></template
+              ><ZsjosPopconfirm
+                :action="`删除课程 SPU「${scope.row.name}」`"
+                danger
+                @confirm="removeProduct(scope.row)"
+              >
+                <el-button
+                  link
+                  type="danger"
+                  :loading="isProcessing(`product-delete:${scope.row.id}`)"
+                  v-hasPermi="['zsjos:product:delete']"
+                  >删除</el-button
+                >
+              </ZsjosPopconfirm></template
             ></el-table-column
           >
         </el-table>
@@ -167,7 +177,17 @@
     </el-form>
     <template #footer
       ><el-button @click="categoryDialog = false">取消</el-button
-      ><el-button type="primary" :loading="saving" @click="saveCategory">保存</el-button></template
+      ><el-button v-if="!categoryEditing" type="primary" :loading="saving" @click="saveCategory"
+        >保存</el-button
+      ><ZsjosPopconfirm
+        v-else
+        :action="`编辑产品分类「${categoryForm.name}」`"
+        v-model:visible="categoryConfirmVisible"
+        @confirm="saveCategory"
+        ><el-button type="primary" :loading="saving" @click="prepareCategorySave"
+          >保存</el-button
+        ></ZsjosPopconfirm
+      ></template
     >
   </el-dialog>
 
@@ -226,7 +246,17 @@
     </el-form>
     <template #footer
       ><el-button @click="productDialog = false">取消</el-button
-      ><el-button type="primary" :loading="saving" @click="saveProduct">保存</el-button></template
+      ><el-button v-if="!productEditing" type="primary" :loading="saving" @click="saveProduct"
+        >保存</el-button
+      ><ZsjosPopconfirm
+        v-else
+        :action="`编辑课程 SPU「${productForm.name}」`"
+        v-model:visible="productConfirmVisible"
+        @confirm="saveProduct"
+        ><el-button type="primary" :loading="saving" @click="prepareProductSave"
+          >保存</el-button
+        ></ZsjosPopconfirm
+      ></template
     >
   </el-dialog>
 
@@ -260,13 +290,19 @@
           </el-row>
         </div>
         <el-button type="primary" plain @click="addAttr">添加属性</el-button>
-        <el-button
-          type="primary"
-          :loading="saving"
-          v-hasPermi="['zsjos:product:attr-update']"
-          @click="saveAttrs"
-          >保存属性</el-button
+        <ZsjosPopconfirm
+          :action="`保存课程「${currentSpu?.name || ''}」的销售属性`"
+          v-model:visible="attrsConfirmVisible"
+          @confirm="saveAttrs"
         >
+          <el-button
+            type="primary"
+            :loading="saving"
+            v-hasPermi="['zsjos:product:attr-update']"
+            @click="prepareAttrsSave"
+            >保存属性</el-button
+          >
+        </ZsjosPopconfirm>
       </el-tab-pane>
       <el-tab-pane label="SKU与价格" name="skus">
         <div class="mb-16px"
@@ -353,11 +389,15 @@
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus'
 import * as ProductApi from '@/api/zsjos/product'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
 
 defineOptions({ name: 'ZsjosProduct' })
 const message = useMessage()
 const loading = ref(true)
 const saving = ref(false)
+const categoryConfirmVisible = ref(false)
+const productConfirmVisible = ref(false)
+const attrsConfirmVisible = ref(false)
 const processingKeys = ref(new Set<string>())
 const isProcessing = (key: string) => processingKeys.value.has(key)
 const withProcessing = async (key: string, task: () => Promise<void>) => {
@@ -531,6 +571,7 @@ const openCategory = (row?: ProductApi.ZsjosProductCategoryVO) => {
   categoryDialog.value = true
 }
 const saveCategory = async () => {
+  categoryConfirmVisible.value = false
   if (saving.value) return
   if (!(await categoryFormRef.value?.validate())) return
   saving.value = true
@@ -543,6 +584,10 @@ const saveCategory = async () => {
   } finally {
     saving.value = false
   }
+}
+const prepareCategorySave = async () => {
+  if (!(await categoryFormRef.value?.validate())) return
+  categoryConfirmVisible.value = true
 }
 const openProduct = (row?: ProductApi.ZsjosProductVO) => {
   productEditing.value = !!row
@@ -560,6 +605,7 @@ const openProduct = (row?: ProductApi.ZsjosProductVO) => {
   productDialog.value = true
 }
 const saveProduct = async () => {
+  productConfirmVisible.value = false
   if (saving.value) return
   if (!(await productFormRef.value?.validate())) return
   saving.value = true
@@ -573,6 +619,10 @@ const saveProduct = async () => {
     saving.value = false
   }
 }
+const prepareProductSave = async () => {
+  if (!(await productFormRef.value?.validate())) return
+  productConfirmVisible.value = true
+}
 const toggleProduct = async (row: ProductApi.ZsjosProductVO) => {
   await withProcessing(`product-status:${row.id}`, async () => {
     await ProductApi.updateProductStatus({ id: row.id, status: row.status === 0 ? 1 : 0 })
@@ -583,7 +633,6 @@ const toggleProduct = async (row: ProductApi.ZsjosProductVO) => {
 const removeProduct = async (row: ProductApi.ZsjosProductVO) => {
   await withProcessing(`product-delete:${row.id}`, async () => {
     try {
-      await message.delConfirm()
       await ProductApi.deleteProduct(row.id)
       await loadProducts()
       message.success('产品已删除')
@@ -603,7 +652,6 @@ const removeCategory = async (row?: ProductApi.ZsjosProductCategoryVO) => {
   if (!row) return
   await withProcessing(`category-delete:${row.id}`, async () => {
     try {
-      await message.delConfirm()
       await ProductApi.deleteCategory(row.id)
       if (selectedCategory.value?.id === row.id) selectedCategory.value = undefined
       await load()
@@ -636,6 +684,7 @@ const addAttr = () =>
     valuesText: ''
   })
 const saveAttrs = async () => {
+  attrsConfirmVisible.value = false
   if (saving.value) return
   if (!currentSpu.value) return
   const attrs = attrForms.value.map((attr, index) => ({
@@ -658,6 +707,14 @@ const saveAttrs = async () => {
   } finally {
     saving.value = false
   }
+}
+const prepareAttrsSave = () => {
+  if (!currentSpu.value) return
+  const invalid = attrForms.value.some(
+    (attr) => !attr.attrName.trim() || !attr.valuesText.split(',').some((value) => value.trim())
+  )
+  if (invalid) return message.warning('请完整填写属性名称和属性值')
+  attrsConfirmVisible.value = true
 }
 const generateSku = async () => {
   if (!currentSpu.value) return
@@ -714,6 +771,7 @@ onMounted(load)
   margin-bottom: 10px;
   font-weight: 600;
 }
+
 .tree-node {
   display: flex;
   width: 100%;
@@ -721,12 +779,14 @@ onMounted(load)
   justify-content: space-between;
   gap: 8px;
 }
+
 .menu-label {
   flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .attr-card {
   padding: 12px;
   margin-bottom: 12px;

@@ -73,7 +73,21 @@
     </el-form>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :disabled="formLoading" @click="submitForm">确定</el-button>
+      <el-button
+        v-if="formType === 'create'"
+        type="primary"
+        :disabled="formLoading"
+        @click="submitForm"
+        >确定</el-button
+      >
+      <ZsjosPopconfirm
+        v-else
+        :action="`修改用户关系场景「${formData.name}」`"
+        v-model:visible="confirmVisible"
+        @confirm="submitForm"
+      >
+        <el-button type="primary" :disabled="formLoading" @click="prepareSubmit">确定</el-button>
+      </ZsjosPopconfirm>
     </template>
   </Dialog>
 </template>
@@ -81,6 +95,7 @@
 <script lang="ts" setup>
 import * as PostApi from '@/api/system/post'
 import * as UserRelationApi from '@/api/zsjos/userRelation'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
 
 defineOptions({ name: 'ZsjosUserRelationSceneForm' })
 
@@ -89,6 +104,7 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const formLoading = ref(false)
 const formType = ref<'create' | 'update'>('create')
+const confirmVisible = ref(false)
 const formRef = ref()
 const postOptions = ref<PostApi.PostSimpleVO[]>([])
 const formData = ref<UserRelationApi.UserRelationSceneVO>({
@@ -138,7 +154,8 @@ const open = async (type: 'create' | 'update', id?: number) => {
 defineExpose({ open })
 
 const submitForm = async () => {
-  await formRef.value.validate()
+  confirmVisible.value = false
+  if (formType.value === 'create') await formRef.value.validate()
   formLoading.value = true
   try {
     if (formType.value === 'create') {
@@ -153,6 +170,11 @@ const submitForm = async () => {
   } finally {
     formLoading.value = false
   }
+}
+
+const prepareSubmit = async () => {
+  await formRef.value.validate()
+  confirmVisible.value = true
 }
 
 const resetForm = () => {

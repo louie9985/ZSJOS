@@ -107,9 +107,19 @@
     </el-form>
     <template #footer
       ><el-button @click="dialogVisible = false">取消</el-button
-      ><el-button type="primary" :loading="saving" @click="submitAction"
-        >确认处理</el-button
-      ></template
+      ><ZsjosPopconfirm
+        :action="confirmAction"
+        :danger="action === 'recycle' || action === 'release'"
+        v-model:visible="confirmVisible"
+        @confirm="submitAction"
+      >
+        <el-button
+          :type="action === 'recycle' || action === 'release' ? 'danger' : 'primary'"
+          :loading="saving"
+          @click="prepareSubmit"
+          >确认处理</el-button
+        >
+      </ZsjosPopconfirm></template
     >
   </el-dialog>
 </template>
@@ -118,6 +128,7 @@
 import { Refresh } from '@element-plus/icons-vue'
 import * as LeadApi from '@/api/zsjos/leadManagement'
 import { formatZsjosTimestamp } from '@/utils/zsjosTime'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
 
 defineOptions({ name: 'ZsjosLeadQualification' })
 type ExceptionType = 'suspended' | 'recycle_pending'
@@ -138,13 +149,27 @@ const salesUserId = ref<number>()
 const candidates = ref<LeadApi.LeadTransferCandidateVO[]>([])
 const candidateLoading = ref(false)
 const saving = ref(false)
-const idempotencyKey = ref(crypto.randomUUID())
+const confirmVisible = ref(false)
+const idempotencyKey = ref<string>()
 const dialogTitle = computed(
   () =>
     ({ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' })[
       action.value
     ]
 )
+const confirmAction = computed(() => {
+  const leadName = selected.value?.submittedName || '当前客资'
+  const salesName =
+    candidates.value.find((item) => item.id === salesUserId.value)?.nickname || '目标销售'
+  return (
+    {
+      restore: `恢复客资「${leadName}」至原销售`,
+      transfer: `将客资「${leadName}」转派给「${salesName}」`,
+      recycle: `回收客资「${leadName}」`,
+      release: `将客资「${leadName}」释放到抢单池`
+    } as Record<Action, string>
+  )[action.value]
+})
 
 const loadList = async () => {
   loading.value = true
@@ -167,7 +192,7 @@ const loadList = async () => {
 }
 const openAction = async (row: LeadApi.LeadQualificationExceptionVO, nextAction: Action) => {
   if (saving.value) return
-  idempotencyKey.value = crypto.randomUUID()
+  idempotencyKey.value = undefined
   selected.value = row
   action.value = nextAction
   reason.value = ''
@@ -187,10 +212,12 @@ const openAction = async (row: LeadApi.LeadQualificationExceptionVO, nextAction:
   }
 }
 const submitAction = async () => {
+  confirmVisible.value = false
   if (saving.value) return
   if (!selected.value || !reason.value.trim()) return message.warning('请填写处置理由')
   if (action.value === 'transfer' && !salesUserId.value) return message.warning('请选择目标销售')
   saving.value = true
+  idempotencyKey.value ??= crypto.randomUUID()
   const command = { reason: reason.value.trim(), idempotencyKey: idempotencyKey.value }
   try {
     if (action.value === 'restore') await LeadApi.restoreLead(selected.value.id, command)
@@ -204,6 +231,12 @@ const submitAction = async () => {
   } finally {
     saving.value = false
   }
+}
+const prepareSubmit = () => {
+  if (saving.value) return
+  if (!selected.value || !reason.value.trim()) return message.warning('请填写处置理由')
+  if (action.value === 'transfer' && !salesUserId.value) return message.warning('请选择目标销售')
+  confirmVisible.value = true
 }
 const stageLabel = (value: string) =>
   ({ suspended: '已挂起', recycle_pending: '回收待处理' })[value] || '未知处理阶段'
@@ -222,9 +255,11 @@ onMounted(loadList)
   justify-content: space-between;
   gap: 16px;
 }
+
 .toolbar :deep(.el-tabs__header) {
   margin-bottom: 12px;
 }
+
 @media (width <= 768px) {
   .toolbar {
     align-items: stretch;

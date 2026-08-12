@@ -7,6 +7,7 @@ import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import { invalidReasonSnapshotLabel } from '../services/leadManagement'
+import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 const STAGE_LABELS = { sales_manager: '销售主管复核', quality: '质控复核', chairman: '董事长终审' }
 const STATUS_LABELS = {
@@ -32,6 +33,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
   const [reason, setReason] = useState('')
   const [evidence, setEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -46,10 +48,11 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
     && (!latest || (latest.status === 'upheld' && latest.roundNo < 3))
   const nextRound = latest ? latest.roundNo + 1 : 1
 
-  const openAppeal = () => { resetIntent(); setOpen(true) }
+  const openAppeal = () => { resetIntent(); setConfirmOpen(false); setOpen(true) }
+  const closeAppeal = () => { setConfirmOpen(false); setOpen(false) }
 
   const submit = async () => {
-    if (!reason.trim()) { message.warning('请填写申诉理由'); return }
+    setConfirmOpen(false)
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(evidence, api.uploadLeadAppealImage, setEvidence)
       if (uploadResult.failed) { message.error('有申诉图片上传失败，请重试失败项'); return }
@@ -58,6 +61,11 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
       message.success(`第 ${nextRound} 次申诉已提交`)
       setOpen(false); setReason(''); setEvidence([]); await load(); onChanged()
     }).catch(submitError => message.error(submitError instanceof Error ? submitError.message : '申诉提交失败'))
+  }
+
+  const prepareSubmit = () => {
+    if (!reason.trim()) { message.warning('请填写申诉理由'); return }
+    setConfirmOpen(true)
   }
 
   if (loading) return <Skeleton active paragraph={{ rows: 6 }}/>
@@ -80,7 +88,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
       </section>
     }))}/>} 
     {latest?.roundNo === 3 && latest.status === 'upheld' && <Alert type="error" showIcon message="董事长已终审维持无效，该客资不再允许申诉。"/>}
-    <Modal title={`发起第 ${nextRound} 次申诉`} open={open} confirmLoading={saving} onOk={() => void submit()} onCancel={() => setOpen(false)} okText="提交申诉">
+    <Modal title={`发起第 ${nextRound} 次申诉`} open={open} onCancel={closeAppeal} footer={<Space><Button onClick={closeAppeal}>取消</Button><IrreversiblePopconfirm action={`提交客资「${lead.submittedName}」的第 ${nextRound} 次申诉`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={prepareSubmit}>提交申诉</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Alert type="info" showIcon message={nextRound === 1 ? '本轮由销售直属部门负责人处理' : nextRound === 2 ? '本轮由质控部门处理' : '本轮由董事长最终裁决'}/>
         <Form.Item label="申诉理由" required><Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写申诉理由"/></Form.Item>

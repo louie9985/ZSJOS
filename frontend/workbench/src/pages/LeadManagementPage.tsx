@@ -49,6 +49,7 @@ import type { LeadAppealEvidence } from '../services/api'
 import { defaultLeadDetailTab, shouldBlockLeadSwitch, type LeadDetailTab } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
 import { useSubmissionGuard } from '../services/submissionGuard'
+import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 
 const PAGE_SIZE = 20
 
@@ -104,12 +105,16 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [validTemplates, setValidTemplates] = useState<DictData[]>([])
   const [validTemplateError, setValidTemplateError] = useState('')
   const [salesOrderOpen, setSalesOrderOpen] = useState(false)
+  const [validConfirmOpen, setValidConfirmOpen] = useState(false)
+  const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
+  const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
+  const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
   const actions = new Map((lead.availableActions || []).map(item => [item.code, item]))
   useEffect(() => { onDirtyChange(followUpFormDirty || basicInfoDirty) },
     [basicInfoDirty, followUpFormDirty, onDirtyChange])
 
   const judgeValid = async () => {
-    if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
+    setValidConfirmOpen(false)
     await runQualification(async ({ idempotencyKey, complete }) => {
       await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey })
       complete()
@@ -117,6 +122,11 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       setValidOpen(false); setValidRemark('')
       onChanged()
     }).catch(error => message.error(error instanceof Error ? error.message : '有效判定失败'))
+  }
+
+  const prepareJudgeValid = () => {
+    if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
+    setValidConfirmOpen(true)
   }
 
   const openValid = async () => {
@@ -154,14 +164,13 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   }
 
   const judgeInvalid = async () => {
-    if (!invalidReason || !invalidDescription.trim()) {
-      message.warning('请选择无效原因并填写备注')
-      return
-    }
+    setInvalidConfirmOpen(false)
+    const reasonCode = invalidReason
+    if (!reasonCode || !invalidDescription.trim()) return
     await runQualification(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(invalidEvidence, api.uploadLeadQualificationImage, setInvalidEvidence)
       if (uploadResult.failed) { message.error('有判定附件上传失败，请重试失败项'); return }
-      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
+      await api.judgeLeadInvalid(lead.id, { reasonCode, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
       complete()
       message.success('已判定为无效客资')
       setInvalidOpen(false)
@@ -170,6 +179,15 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       setInvalidEvidence([])
       onChanged()
     }).catch(error => message.error(error instanceof Error ? error.message : '无效判定失败'))
+  }
+
+
+  const prepareJudgeInvalid = () => {
+    if (!invalidReason || !invalidDescription.trim()) {
+      message.warning('请选择无效原因并填写备注')
+      return
+    }
+    setInvalidConfirmOpen(true)
   }
 
   useEffect(() => {
@@ -288,7 +306,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         }] : [])
       ]}
     />
-    <Modal title="判定为无效客资" open={invalidOpen} confirmLoading={qualificationSaving} okButtonProps={{ disabled: invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length }} onOk={() => void judgeInvalid()} onCancel={() => setInvalidOpen(false)} okText="确认判无效">
+    <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为无效`} danger open={invalidConfirmOpen} onOpenChange={setInvalidConfirmOpen} onConfirm={judgeInvalid}><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={prepareJudgeInvalid}>确认判无效</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Typography.Text strong>无效原因</Typography.Text>
         {invalidReasonError && <Alert type="error" showIcon message={invalidReasonError} action={<Button size="small" onClick={() => void loadInvalidReasons()}>重试</Button>}/>} 
@@ -304,8 +322,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         <LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence} disabled={qualificationSaving}/>
       </Space>
     </Modal>
-    <Modal title="判定为有效客资" open={validOpen} confirmLoading={qualificationSaving}
-      onOk={() => void judgeValid()} onCancel={() => setValidOpen(false)} okText="确认判有效">
+    <Modal title="判定为有效客资" open={validOpen} onCancel={closeValid} footer={<Space><Button onClick={closeValid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为有效`} open={validConfirmOpen} onOpenChange={setValidConfirmOpen} onConfirm={judgeValid}><Button type="primary" loading={qualificationSaving} onClick={prepareJudgeValid}>确认判有效</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         <Typography.Text strong>客资分类</Typography.Text>
         <Select allowClear value={validCategory} onChange={setValidCategory} placeholder="可不选择"
