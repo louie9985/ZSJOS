@@ -46,6 +46,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private LeadAttachmentMapper attachmentMapper;
     @Resource private LeadAssignmentHistoryMapper historyMapper;
+    @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadAssignmentRuleMapper ruleMapper;
     @Resource private LeadAssignmentService assignmentService;
     @Resource private LeadDispatchRedisRepository dispatchRedisRepository;
@@ -296,6 +297,11 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setCurrentAssignmentFirstFollowUpAt(null);
         lead.setNextFollowUpAt(null);
         leadMapper.updateById(lead);
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+        if (opportunity != null) {
+            opportunity.setOwnerUserId(salesUserId);
+            opportunityMapper.updateById(opportunity);
+        }
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                 leadId, salesUserId, history.getId(), transferredAt, EVENT_LEAD_TRANSFERRED, fromAssignmentStatus));
         leadMapper.updateById(lead);

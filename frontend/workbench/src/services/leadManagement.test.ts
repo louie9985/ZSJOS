@@ -26,7 +26,7 @@ describe('lead management paging helpers', () => {
   })
 
   it('sums server status counts', () => {
-    expect(sumStatusCounts({ submitted: 3, converted: 2 })).toBe(5)
+    expect(sumStatusCounts({ submitted: 3, won: 2 })).toBe(5)
   })
 
   it('distinguishes dictionary labels, missing configuration, and loading failures', () => {

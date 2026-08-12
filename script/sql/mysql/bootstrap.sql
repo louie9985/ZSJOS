@@ -19,6 +19,7 @@ SOURCE script/sql/mysql/02-bootstrap-zsjos-seed.sql;
 SOURCE script/sql/mysql/03-bootstrap-dictionary-types.sql;
 SOURCE script/sql/mysql/migrations/V031__timed_business_notifications.sql;
 SOURCE script/sql/mysql/migrations/V032__normalize_lead_inbox_filter_keys.sql;
+SOURCE script/sql/mysql/migrations/V033__lifecycle_domain_unification.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

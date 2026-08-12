@@ -130,9 +130,9 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void convertedFollowUpBelongsToOpportunityAndUpdatesReminder() {
+    void validLeadFollowUpBelongsToOpportunityAndUpdatesReminder() {
         LeadDO lead = validLead();
-        lead.setStatus("converted"); lead.setAssignmentStatus("closed");
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         stubSuccessfulCreate(lead);
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setStatus("open");

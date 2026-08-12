@@ -98,7 +98,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         AdminUserRespDTO operator = adminUserApi.getUser(operatorUserId);
         Map<Long, FileInfoRespDTO> files = attachmentService.validateReferences(reqVO.getImages(), operatorUserId);
 
-            if ("converted".equals(lead.getStatus()) || STATUS_VALID.equals(lead.getStatus())) {
+        if (STATUS_VALID.equals(lead.getStatus())) {
             return createOpportunityFollowUp(lead, operatorUserId, reqVO, occurredAt, method, result,
                     beforeCategory, afterCategory, categoryAfter, operator, files);
         }
@@ -209,8 +209,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     }
 
     private boolean canFollow(LeadDO lead) {
-        return "converted".equals(lead.getStatus())
-                  || STATUS_VALID.equals(lead.getStatus())
+        return STATUS_VALID.equals(lead.getStatus())
                 || STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 && lead.getCurrentAssignmentHistoryId() != null;
     }

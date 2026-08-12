@@ -89,7 +89,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         duplicateId = findIdempotentOrder(leadId, userId, reqVO.getIdempotencyKey());
         if (duplicateId != null) return duplicateId;
         if (orderMapper.selectActiveByLeadId(leadId, ACTIVE_ORDER_STATUSES) != null) throw exception(SALES_ORDER_ACTIVE_DUPLICATE);
-        OpportunityDO opportunity = requireEligibleOpportunity(leadId);
+        OpportunityDO opportunity = requireEligibleOpportunity(lead);
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
@@ -125,7 +125,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderDO order = requireOrderForUpdate(orderId);
         if (!STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(SALES_ORDER_STATE_INVALID);
         LeadDO lead = requireEligibleLead(order.getLeadId(), userId);
-        OpportunityDO opportunity = requireEligibleOpportunity(lead.getId());
+        OpportunityDO opportunity = requireEligibleOpportunity(lead);
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
         LocalDateTime now = LocalDateTime.now();
         order.setStatus(STATUS_PENDING_APPROVAL); order.setSubmitterUserId(userId);
@@ -373,6 +373,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             }
             LeadDO lead = leadMapper.selectById(order.getLeadId());
             if (lead != null) {
+                lead.setStatus(STATUS_WON);
                 lead.setNextFollowUpAt(null);
                 leadMapper.updateById(lead);
             }
@@ -445,16 +446,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         if (!Objects.equals(lead.getOwnerUserId(), userId) || lead.getSuspendedAt() != null
-                || !Set.of(STATUS_VALID, "converted").contains(lead.getStatus())) throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
+                || !STATUS_VALID.equals(lead.getStatus())) throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
         LeadAppealDO latestAppeal = leadAppealMapper.selectLatestByLeadId(leadId);
         if (latestAppeal != null && Set.of(APPEAL_STATUS_SALES_MANAGER_REVIEWING, APPEAL_STATUS_QUALITY_REVIEWING,
                 APPEAL_STATUS_CHAIRMAN_REVIEWING).contains(latestAppeal.getStatus())) throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
         return lead;
     }
 
-    private OpportunityDO requireEligibleOpportunity(Long leadId) {
-        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
-        if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus())) {
+    private OpportunityDO requireEligibleOpportunity(LeadDO lead) {
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+        if (opportunity == null || !Objects.equals(opportunity.getPersonId(), lead.getPersonId())
+                || !Objects.equals(opportunity.getOwnerUserId(), lead.getOwnerUserId())
+                || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus())) {
             throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
         }
         return opportunity;

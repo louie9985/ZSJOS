@@ -46,11 +46,10 @@ public class LeadObjectPermissionService {
             case "follow-up-create" -> Objects.equals(userId, lead.getOwnerUserId())
                     && (STATUS_INVALID.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
-                    || "converted".equals(lead.getStatus())
                     || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
             case "qualify" -> Objects.equals(userId, lead.getOwnerUserId())
                     && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                    || STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()));
+                    || STATUS_VALID.equals(lead.getStatus()));
             case "basic-info-update" -> Objects.equals(userId, lead.getOwnerUserId());
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.

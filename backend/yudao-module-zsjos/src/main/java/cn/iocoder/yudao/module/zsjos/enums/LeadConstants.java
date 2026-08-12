@@ -17,6 +17,7 @@ public interface LeadConstants {
     String STATUS_SUSPENDED = "suspended";
     String STATUS_VALID = "valid";
     String STATUS_INVALID = "invalid";
+    String STATUS_WON = "won";
     String ASSIGNMENT_UNASSIGNED = "unassigned";
     String ASSIGNMENT_PENDING = "pending_acceptance";
     String ASSIGNMENT_OWNED = "owned";

@@ -46,7 +46,7 @@
 14. 产品规则要求报名服务时，订单生效后才创建报名服务单。报名服务中心记录拉群、合同签署等事实和凭证。
 15. 报名服务完成后，仅为产品规则要求持续学生服务的订单项创建并激活新的学生服务关系；一次性项目只完成报名或履约记录。
 16. 预充值使用独立客户资金账户和只追加账本。余额归 `Person` 本人，可跨本人的多张订单分次使用，不允许转给其他客户或直接提现。
-17. 复购由学生服务与交付中心发起，每次复购创建新的机会和订单。
+17. 复购只新增订单，不创建或覆盖客资、商机和首次成交时间；复购入口和服务端判型在阶段五实施。
 18. 线下动作可以与系统流程同步或提前发生，系统不限制实际操作；系统允许事后补录实际发生时间和凭证。
 19. 审批页面可查看订单全部信息。系统只提供通过和驳回，不规定两个中心具体审核哪些字段。
 
@@ -158,8 +158,7 @@ Partner 0:N Lead（仅兼职来源）
 Lead 0:1 Opportunity（首次销售转化机会）
 Lead 1:N LeadIntendedProduct（提交时课程快照，恰好一个主意向）
 Lead 0:N PaymentOrder
-ServiceRelation 0:N Opportunity（复购来源）
-Opportunity 0:1 Order（正式销售转化订单）
+Opportunity 0:N Order（阶段一只允许一张首购活动订单；复购订单不关联商机）
 PaymentOrder 0:1 PaymentTransaction（当前专属支付链接成功后只形成一笔渠道流水）
 PaymentOrder 0:1 Order（支付成功后幂等自动创建；零元订单无支付单）
 PaymentTransaction N:M Order（通过 OrderPaymentAllocation）
@@ -181,13 +180,13 @@ ServiceRelation 1:N ServiceRecord
 
 补充约束：
 
-- 一个 `Person` 可以有多条历史客资、多个机会、多个订单和多个服务关系。`Person` 是 ZSJOS 自己维护的业务身份，不等同于系统用户，也不等同于 CRM 客户。
+- 一个 `Person` 最多关联一条未逻辑删除的主客资和一条未逻辑删除的商机，可关联多张订单和多个服务关系。系统外历史客户允许只有 Person 与订单。`Person` 是 ZSJOS 自己维护的客户身份主档，不等同于系统用户，也不等同于 CRM 客户。
 - 客资转换后保留，不被订单覆盖；客资只负责首次需求入口。
 - `LeadIntendedProduct` 是客资提交时的原始意向快照。Opportunity 可以继承该快照作为初始意向，但不得覆盖或替代它；后续正式交易仍以订单项及其产品规则快照为准。
-- 同一客资最多创建一个 `initial_conversion` 机会。每个销售购买意向对应一个机会和最多一张订单；产品规则不要求销售机会的订单可以不关联 Opportunity。
+- 同一客户和同一主客资最多保留一个 `initial_conversion` 机会；判有效时创建或恢复该机会，不删除历史。首购订单必须关联同一客户的 Person、Lead 和 Opportunity。
 - V023 成交录入不以支付单为前置；同一客资存在 `pending_approval` 或 `revision_required` 订单时禁止再创建活动订单。
 - 驳回补正仍修改同一订单并新增审批轮次；主动撤回结束当前轮次并返回可编辑状态，不等同于取消订单。
-- 复购必须从已有服务关系或客户发起新的复购机会，不修改原机会、原订单和原服务关系。
+- 复购只关联客户并新增订单，不关联原商机；客资仅可作为发起上下文。该入口在阶段五实施，不修改原机会、原订单和原服务关系。
 - 一张订单包含多个购买服务时，只为产品规则要求持续服务的订单项创建服务关系；每条关系必须能追溯到订单项。
 
 ## 7. 实体字段设计
@@ -257,9 +256,9 @@ ServiceRelation 1:N ServiceRecord
 | 字段 | 类型建议 | 必填 | 含义 |
 | --- | --- | --- | --- |
 | `person_id` | bigint | 是 | 关联 ZSJOS `Person` |
-| `type` | varchar | 是 | 首次销售转化 `initial_conversion` 或复购 `repurchase` |
-| `lead_id` | bigint | 条件必填 | 首次销售转化来源客资，且同一 Lead 最多一条；复购可为空 |
-| `source_service_relation_id` | bigint | 条件必填 | 复购来源服务关系；客户级复购无法指定时可为空 |
+| `type` | varchar | 是 | 阶段一只使用首次销售转化 `initial_conversion`；历史 `repurchase` 值不再作为目标模型 |
+| `lead_id` | bigint | 是 | 首次销售转化来源主客资，且同一 Lead 最多一条 |
+| `source_service_relation_id` | bigint | 否 | 历史兼容字段；阶段一和目标复购订单均不依赖复购商机 |
 | `previous_order_id` | bigint | 否 | 直接关联的上一张订单，便于追溯 |
 | `status` | varchar | 是 | 机会生命周期状态 |
 | `owner_user_id` | bigint | 是 | 当前成交责任人 |
@@ -268,16 +267,16 @@ ServiceRelation 1:N ServiceRecord
 | `shelved_until`、`shelved_reason` | datetime/varchar | 条件必填 | 暂缓期限和原因 |
 | `won_at`、`lost_at`、`lost_reason` | datetime/varchar | 条件必填 | 结果事实 |
 
-首次销售转化机会由销售转化中心负责；复购机会由学生服务与交付中心发起。`initial_conversion` 不表示 Person 的第一次付款。责任部门不能仅按岗位或部门中文名称推断，应由权限和业务分配关系确定。
+首次销售转化机会由销售转化中心负责。复购不创建机会，阶段五从客户上下文新增复购订单。`initial_conversion` 不表示 Person 的第一次付款。责任部门不能仅按岗位或部门中文名称推断，应由权限和业务分配关系确定。
 
 ### 7.8 订单 `Order` 与订单项 `OrderItem`
 
 | 字段 | 类型建议 | 必填 | 含义 |
 | --- | --- | --- | --- |
-| `lead_id` | bigint | 是 | 订单来源客资；必须与支付单绑定客资一致 |
+| `lead_id` | bigint | 首购必填 | 首购来源主客资；复购在阶段五改为可选发起上下文，不作为订单关联 |
 | `source_payment_order_id` | bigint | 条件必填 | 支付成功自动创建的订单必须填写且唯一；授权零元订单为空 |
-| `opportunity_id` | bigint | 条件必填 | 正式销售转化订单必须关联且一对一唯一；产品规则不要求销售机会时可为空 |
-| `person_id` | bigint | 是 | 与 Lead 的 `person_id` 一致；存在机会时还必须与机会 `person_id` 一致 |
+| `opportunity_id` | bigint | 首购必填 | 首购必须关联同一客户唯一商机；复购不关联商机 |
+| `person_id` | bigint | 是 | 客户 ID 的内部持久化字段；首购必须与 Lead、Opportunity 的 `person_id` 一致 |
 | `order_no` | varchar | 是 | 全局或租户内唯一业务编号 |
 | `status` | varchar | 是 | 订单主状态 |
 | `submitter_user_id` | bigint | 条件必填 | 本次订单提交人，补正任务接收人 |
@@ -356,7 +355,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；首次记录完成当前归属周期的 `lead_first_follow_up`，并创建 `lead_qualification` 任务。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
 
-判定有效在同一事务内完成判定任务、保存必填有效备注、创建唯一 `initial_conversion` Opportunity，并将 Lead 改为 `converted + closed`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时把未结束 Opportunity 改为 `lost`。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
+判定有效在同一事务内完成判定任务、保存必填有效备注、创建或恢复唯一 `initial_conversion` Opportunity，并让 Lead 保持 `valid + owned`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时把未结束 Opportunity 改为 `lost`。无效 Lead 可保留历史证据记录，但不创建首跟、判定或提醒任务。
 
 ### 7.13 业务事件 `BusinessEvent`
 
@@ -425,7 +424,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | `zsjos_lead_status` | 20 | 已挂起 | `suspended` | warning | 判定任务超时扫描已执行，销售只读 |
 | `zsjos_lead_status` | 30 | 有效 | `valid` | success | 可以创建并进入首次销售转化机会 |
 | `zsjos_lead_status` | 40 | 无效 | `invalid` | danger | 当前有效性结论为无效，可按规则申诉 |
-| `zsjos_lead_status` | 50 | 已转换 | `converted` | primary | 已创建首次销售转化机会，客资职责结束 |
+| `zsjos_lead_status` | 70 | 已成交 | `won` | success | 首购订单生效，客资与商机同步成交 |
 | `zsjos_lead_status` | 60 | 已关闭 | `closed` | default | 不再处理且未转换为机会 |
 | `zsjos_lead_assignment_status` | 10 | 未分配 | `unassigned` | default | 当前没有销售归属 |
 | `zsjos_lead_assignment_status` | 20 | 待接单 | `pending_acceptance` | warning | 已指定销售，等待接受 |
@@ -440,7 +439,6 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | `zsjos_lead_appeal_status` | 50 | 已维持 | `upheld` | danger | 最终维持无效结论 |
 | `zsjos_lead_appeal_status` | 60 | 已撤回 | `withdrawn` | default | 申请人撤回申诉 |
 | `zsjos_opportunity_type` | 10 | 首次销售转化 | `initial_conversion` | primary | 由有效客资创建的首次正式销售转化机会 |
-| `zsjos_opportunity_type` | 20 | 复购 | `repurchase` | success | 由学生服务关系或已有客户创建的新机会 |
 | `zsjos_opportunity_status` | 10 | 待跟进 | `open` | info | 机会已创建，等待开始跟进 |
 | `zsjos_opportunity_status` | 20 | 跟进中 | `following` | primary | 责任人正在推进本次购买 |
 | `zsjos_opportunity_status` | 30 | 已暂缓 | `shelved` | warning | 暂时停止推进，但允许恢复 |
@@ -502,15 +500,15 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | 提交已有客资 | 无 | 不创建新 Lead | 任一标识命中同一 Person；创建 LeadActivation 并按当前关系发送激活通知 |
 | 提交身份冲突 | 无 | 校验失败 | 手机号和微信号指向不同 Person；不创建任何 Person、Lead 或 LeadActivation |
 | 首次跟进 | `submitted + owned` | 主状态不变 | 完成首跟任务并创建判定任务；迟到首跟仍允许提交 |
-| 判定有效 | `submitted + owned + 待判定` | `converted + closed` | 完成判定任务，保存有效备注并原子创建唯一 `initial_conversion` Opportunity；不创建订单 |
-| 判定无效 | `submitted + owned + 待判定` / `converted` | `invalid` | 原因字典值与说明均必填；有效后判无效还会把 Opportunity 改为 `lost`，并保留销售归属和证据跟进入口 |
+| 判定有效 | `submitted + owned + 待判定` | `valid + owned` | 完成判定任务，保存有效备注并原子创建或恢复唯一 `initial_conversion` Opportunity；不创建订单 |
+| 判定无效 | `submitted + owned + 待判定` / `valid` | `invalid` | 原因字典值与说明均必填；有效后判无效还会把 Opportunity 改为 `lost`，并保留历史证据 |
 | 判定超时扫描 | `submitted + owned + 判定截止已到` | `suspended + owned` | 行锁下重新校验；扫描提交前仍允许人工判定 |
 | 恢复原销售 | `suspended + owned` | `submitted + owned` | 校验原销售仍启用，跳过新首跟并创建新判定轮次 |
 | 转派 | `suspended + owned` / `recycle_pending` | `submitted + owned` | 新销售直接进入待判定并重新计时；挂起转派不得选择原销售 |
 | 回收 | `suspended + owned` | `submitted + recycle_pending` | 清除当前销售并保留回收来源销售 |
 | 释放到抢单池 | `suspended + owned` / `recycle_pending` | `submitted + public_pool` | 被抢后重新进入待首跟 |
-| 申诉改判 | `invalid` | `converted + closed` | 结束申诉，原子创建唯一 `initial_conversion` Opportunity，并以裁决理由保存有效备注 |
-| 创建首次销售转化机会 | `submitted + owned + 待判定` | `converted` | 与判有效合并为同一事务，分配状态改为 `closed` |
+| 申诉改判 | `invalid` | `valid + owned` | 结束申诉，原子创建或恢复唯一 `initial_conversion` Opportunity，并以裁决理由保存有效备注 |
+| 创建首次销售转化机会 | `submitted + owned + 待判定` | `valid` | 与判有效合并为同一事务，正式归属保持不变 |
 | 关闭 | `invalid` / `valid` | `closed` | 记录关闭原因，分配状态改为 `closed` |
 
 一般派单、接单、拒单、公海释放和认领只改变 `assignment_status`、负责人和分配历史。判定超时挂起是新增例外：扫描把 `Lead.status` 从 `submitted` 改为 `suspended`；恢复、转派、回收或释放再将主状态恢复为 `submitted`。无效申诉由 `LeadAppeal.status` 表达，不增加 `Lead.status.appealing`。
@@ -614,9 +612,7 @@ BPM 负责审批任务并发和终态，ZSJOS 监听器仍须使用版本号、�
 
 ### 9.10 复购
 
-创建复购必须生成新的 `Opportunity.type.repurchase`。后续生成新订单、新审批轮次、新报名服务单和新服务关系。原客资保持 `converted`，原机会保持 `won`，原订单保持 `effective`，原服务关系保持其真实状态。
-
-复购链路通过 `person_id`、`source_service_relation_id` 和可选 `previous_order_id` 追溯，不通过修改历史对象来表示。
+复购入口当前尚未实现，属于阶段五。目标行为是直接关联 `person_id` 新增复购订单，不创建或关联商机，不覆盖主客资、原商机、首次成交时间、原订单和原服务关系。
 
 ### 9.11 报名服务、服务关系与任务退出路径
 
@@ -643,7 +639,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 ## 10. 数据不变量与约束
 
 1. 一次全新客资提交必须原子创建 `Person + Lead`；命中已有 Person 时只创建 LeadActivation；交叉身份冲突不得写入三者中的任何一个。
-2. 同一 Lead 最多一条 `Opportunity.type.initial_conversion`；复购机会不得重新打开历史客资，建议关联来源服务关系或上一订单。
+2. 同一 Customer 和同一 Lead 最多一条活动 `Opportunity.type.initial_conversion`；复购不创建商机。
 3. 支付单必须绑定既有 `lead_id`，其 Person 必须与 Lead 一致；支付单创建后不得修改 Lead，正常流程不存在无归属支付。
 4. 同一支付单最多自动创建一张订单，`Order.source_payment_order_id` 必须唯一；支付回调事件 ID、渠道流水号和自动建单业务键必须唯一且幂等。
 5. `Order.lead_id` 必须与来源支付单一致；存在 Opportunity 时，`Opportunity.person_id = Order.person_id`，且一个机会最多一张订单。无机会订单不得驱动任何机会为 `won`。
@@ -693,22 +689,22 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 | --- | --- | --- |
 | `all` | 全部客资 | 当前视角下属于当前用户的全部客资 |
 | `pending_qualification` | 待判定客资 | `lead.status = submitted` |
-| `valid` | 有效客资 | `lead.status in (valid, converted)` |
+| `valid` | 有效客资 | `lead.status in (valid, won)` |
 | `invalid` | 无效客资 | `lead.status = invalid` |
 | `closed` | 已关闭客资 | `lead.status = closed` |
 
-提交人默认可以继续按 `assignment_status` 筛选待分配、待接单、抢单池、回收待处理和已归属；负责人默认显示归属自己的客资，并使用服务端正交状态区分有效性、跟进和挂起。新判有效或申诉改判均创建唯一 `initial_conversion` Opportunity；V019 负责补齐历史 `valid` 客资。成交审核和已成交仅作为预留跟进状态，由未来订单/BPM投影驱动；本期不提供暂缓成交入口。
+提交人默认可以继续按 `assignment_status` 筛选待分配、待接单、抢单池、回收待处理和已归属；负责人默认显示归属自己的客资，并使用服务端正交状态区分有效性、跟进和挂起。新判有效或申诉改判均创建或恢复唯一 `initial_conversion` Opportunity；V019 负责补齐历史 `valid` 客资，V033 将历史 `converted` 归一化为 `valid`。订单生效时 Opportunity 和 Lead 同步进入 `won`；本期不提供暂缓成交入口。
 
 ## 12. 完整场景
 
 ### 12.1 全新客资与首次销售转化
 
 1. 新媒体员工或兼职人员一次提交姓名、手机号、微信号和来源信息。
-2. 手机号和微信号均未命中，系统在同一事务创建 Person 和 Lead；判定有效并完成分配后，销售创建唯一 `initial_conversion` 机会，客资变为 `converted`。
+2. 手机号和微信号均未命中，系统在同一事务创建 Person 和 Lead；判定有效后创建或恢复唯一 `initial_conversion` 机会，客资保持 `valid + owned`。
 3. 销售从全部启用 SKU 中选择成交课程，填写学员、金额、付款方式和缴费凭证并直接提交成交订单。
 4. ZSJOS 在同一事务创建订单、订单项和不可变审批快照，并启动报名履约中心与财务结算中心双会签。
 5. 两个中心都通过后订单生效；任一中心驳回则返回原订单补正，重提时创建新审批轮次和 BPM 实例。
-6. 订单生效时，存在关联机会则机会变为 `won`；产品规则要求报名服务时创建报名服务单。
+6. 订单生效时，订单、关联机会和主客资同时进入成交终态；产品规则要求报名服务时创建报名服务单。
 7. 报名服务中心补录实际动作、时间和凭证并完成服务单。系统只为规则要求持续服务的订单项创建并激活服务关系，一次性项目不创建。
 
 ### 12.2 已有客资再次激活
@@ -734,12 +730,9 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 3. Person 后续购买其他产品时，可以分次使用本人余额；扣款、消费账本和订单资金分配原子完成。
 4. 余额不能转给其他 Person，也不能直接提现；余额退款去向留待支付与退款设计阶段确认。
 
-### 12.5 复购
+### 12.5 复购（阶段五）
 
-1. 学生服务与交付中心从 ZSJOS `Person` 或现有服务关系创建 `repurchase` 机会。
-2. 新机会创建新订单，由该次提交人提交双会签。
-3. 支付、审批、补正、报名和服务分支均执行本次订单固化的产品规则。
-4. 需要持续服务时创建新的活动服务关系，旧订单和旧服务关系不变。
+复购入口当前尚未实现。目标行为是从客户上下文新增订单，不创建或关联商机，不覆盖主客资、商机或首次成交时间，并继续走报名履约中心与财务中心双阶段审批。
 
 ## 13. 旧模型迁移映射
 
@@ -749,7 +742,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 | --- | --- | --- |
 | 客资中的首触、跟进、暂缓、流失 | `Opportunity.status` | 按每次购买意向迁入机会，不能继续留在客资 |
 | 客资中的待付款、已付款、已录单 | 支付单、支付流水、订单资金分配、订单和审批事件 | 不再作为客资状态；需按客资、订单和渠道流水重建事实 |
-| “客资已转订单” | `Lead.status.converted` | 语义改为已创建首次销售转化机会；迁移时必须保留原订单关联 |
+| “客资已转订单” | `Lead.status.valid/won` | 已创建机会归一为 `valid`；已有生效首购订单归一为 `won`，并保留原订单关联 |
 | 订单中的报名中、财务待审 | 审批轮次或报名服务单 | 根据真实发生时间拆分，不能机械一对一改值 |
 | 单一订单审核状态 | ZSJOS `ApprovalRound` + BPM 流程历史 | 缺少双中心历史时标记迁移来源，不伪造 BPM 任务、操作人和审批意见 |
 | 报名 16 步或固定布尔字段 | `RegistrationItem` | 按记录类型迁移实际完成事实和凭证 |
@@ -809,7 +802,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 
 - 产品模块或产品能力的实际所有者、物理表、SKU 规则结构、版本协议和公开 API。
 - 特殊支付异常的业务对象、审批状态、权限、补偿动作和与 BPM 的具体集成方式。
-- 哪些 `Lead.status` 允许创建支付单，以及已关闭、无效或已转换客资被再次激活后允许发起哪些后续业务动作。
+- 哪些 `Lead.status` 允许创建支付单，以及已关闭、无效或已成交客资被再次激活后允许发起哪些后续业务动作。
 - 同一 Person 存在多条历史 Lead 时，LeadActivation 关联哪一条当前 Lead；激活本身是否以及如何影响历史终态。
 - `Person.identity_status`、`Partner.status` 的稳定协议值和合法转换。
 - 现有 `zsjos_lead_source_platform` 字典与本文 `source_channel_id` 的统一口径、稳定值和数据所有者。

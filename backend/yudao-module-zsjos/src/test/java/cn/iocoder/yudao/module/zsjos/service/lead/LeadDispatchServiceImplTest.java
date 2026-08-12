@@ -12,11 +12,13 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentRuleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentRuleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -74,6 +76,8 @@ class LeadDispatchServiceImplTest {
     private LeadAssignmentRuleMapper ruleMapper;
     @Mock
     private LeadDispatchRedisRepository dispatchRedisRepository;
+    @Mock
+    private OpportunityMapper opportunityMapper;
 
     @Test
     void acceptAtomicallyCompletesAssignmentAndCreatesFirstFollowUpTask() {
@@ -235,6 +239,28 @@ class LeadDispatchServiceImplTest {
 
         assertEquals(LEAD_QUALIFICATION_DISPOSITION_INVALID.getCode(), error.getCode());
         verify(leadMapper, never()).updateById(any(LeadDO.class));
+    }
+
+    @Test
+    void adminTransferSynchronizesOpportunityOwner() {
+        LeadDO lead = lead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(10L);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setLeadId(1L); opportunity.setOwnerUserId(10L);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        doAnswer(invocation -> {
+            var history = invocation.getArgument(0, cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class);
+            history.setId(88L);
+            return 1;
+        }).when(historyMapper).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+
+        service.adminTransfer(1L, 20L, 99L);
+
+        assertEquals(20L, lead.getOwnerUserId());
+        assertEquals(20L, opportunity.getOwnerUserId());
+        verify(opportunityMapper).updateById(opportunity);
     }
 
     private static LeadClaimPoolPageReqVO request() {

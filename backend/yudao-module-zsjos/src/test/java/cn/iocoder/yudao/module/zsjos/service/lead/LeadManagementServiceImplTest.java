@@ -131,7 +131,7 @@ class LeadManagementServiceImplTest {
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_VALID", "JUDGE_INVALID");
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setStatus("open");
-        assertActions(actionLead("converted", "closed", true), opportunity,
+        assertActions(actionLead("valid", "owned", true), opportunity,
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "ENTER_DEAL");
         assertActions(actionLead("valid", "owned", true), null,
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "ENTER_DEAL");
@@ -145,7 +145,7 @@ class LeadManagementServiceImplTest {
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "REVISE_DEAL");
         assertEquals(41L, revisionResult.getActiveSalesOrderId());
         assertEquals("revision_required", revisionResult.getActiveSalesOrderStatus());
-        assertActions(actionLead("invalid", "owned", true), null, "ADD_FOLLOW_UP");
+        assertActions(actionLead("invalid", "owned", true), null);
         assertActions(actionLead("submitted", "public_pool", false), null);
     }
 
@@ -280,7 +280,7 @@ class LeadManagementServiceImplTest {
                 Map.of("status", "submitted", "assignment_status", "pending_acceptance", "total", 2L),
                 Map.of("status", "submitted", "assignment_status", "owned", "total", 3L),
                 Map.of("status", "valid", "assignment_status", "owned", "total", 4L),
-                Map.of("status", "converted", "assignment_status", "closed", "total", 1L)));
+                Map.of("status", "won", "assignment_status", "owned", "total", 1L)));
 
         LeadInboxFilterProfileRespVO result = service.getInboxFilterProfile(10L, "submitter");
 
