@@ -52,11 +52,27 @@ export const APP_ROUTES = {
   LEAD_ASSIGNMENT: '/zsjos/leads/assignment-relations',
   LEAD_CLAIM_POOL: '/zsjos/claim-pool',
   TODAY_TASKS: '/zsjos/tasks/today',
+  WORK_PLANS: '/zsjos/work-plans',
+  BPM_TODO: '/bpm/task/todo',
   QUALIFICATION_EXCEPTIONS: '/zsjos/leads/qualification-exceptions',
   LEAD_APPEALS: '/zsjos/leads/appeals',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
 } as const
+
+export const RENDERABLE_APP_ROUTES = new Set([
+  APP_ROUTES.LEAD_SUBMISSION,
+  APP_ROUTES.SUBMITTED_LEADS,
+  APP_ROUTES.OWNED_LEADS,
+  APP_ROUTES.LEAD_ASSIGNMENT,
+  APP_ROUTES.LEAD_CLAIM_POOL,
+  APP_ROUTES.TODAY_TASKS,
+  APP_ROUTES.WORK_PLANS,
+  APP_ROUTES.QUALIFICATION_EXCEPTIONS,
+  APP_ROUTES.LEAD_APPEALS,
+  APP_ROUTES.ALL_MESSAGES,
+  APP_ROUTES.UNREAD_MESSAGES
+])
 
 // ========== Dictionaries ==========
 

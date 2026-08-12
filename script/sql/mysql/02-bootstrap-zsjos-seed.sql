@@ -182,3 +182,30 @@ VALUES ('V019', 'Normalize historical valid leads with initial opportunities', '
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V020', 'Add unified schema migration metadata and missing CRM tables', 'unified-schema-migration-v1');
+
+-- Work plans are authorized explicitly through role management. Bootstrap does not infer grants from role names.
+INSERT IGNORE INTO `system_menu`
+(`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6900,'工作计划','',2,2,6735,'work-plans','ep:calendar','zsjos/workPlan/index','ZsjosWorkPlan',0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6901,'创建工作计划','zsjos:work-plan:create',3,1,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6902,'修改工作计划','zsjos:work-plan:update',3,2,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6903,'发布工作计划','zsjos:work-plan:publish',3,3,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6904,'分派工作任务','zsjos:work-plan:assign',3,4,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6905,'提交完成汇报','zsjos:work-plan:complete',3,5,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6906,'确认任务完成','zsjos:work-plan:review',3,6,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6907,'取消工作计划','zsjos:work-plan:cancel',3,7,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6908,'查看工作计划','zsjos:work-plan:query',3,0,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6910,'计划配置','zsjos:work-plan-config:query',2,3,6735,'work-plan-config','ep:setting','zsjos/workPlanConfig/index','ZsjosWorkPlanConfig',0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6911,'配置类型','zsjos:work-plan-config:create',3,1,6910,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6912,'配置模板','zsjos:work-plan-config:update',3,2,6910,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6913,'发布模板版本','zsjos:work-plan-config:publish',3,3,6910,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6914,'停用模板','zsjos:work-plan-config:disable',3,4,6910,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6915,'分派下级任务','zsjos:work-plan:decompose',3,8,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6916,'提交计划总结','zsjos:work-plan:close',3,9,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6917,'导出计划任务','zsjos:work-plan:export',3,10,6900,'','','',NULL,0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V022', 'Add simplified work-plan task tree, reports, summaries and business-task foundation', 'workbench-foundation-v3');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V023', 'Separate work-plan route and query permission', 'split-work-plan-query-permission-v1');

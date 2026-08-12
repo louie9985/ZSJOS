@@ -118,12 +118,12 @@ Verification is proportional to risk, but evidence is mandatory:
 - Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`. After integration, affected checks **MUST** be rerun on the integration branch before the workstream is marked `merged`.
 - Branch, worktree, commit, rebase, merge, push, and publication operations remain subject to the explicit-confirmation requirements in sections 2 and 4.
 
-## 9. AI handoff log
+## 9. AI file-change handoff log
 
 - The repository-root `HANDOFF.md` is the stable handoff guide and legacy-log archive. It **MUST NOT** receive per-turn entries or a dynamically maintained workstream index.
-- Every completed AI task turn **MUST** append one structured delivery entry to the active workstream's `handoff/<workstream-id>.md` before sending the final response. Only that workstream's owner may append to the file.
-- A task turn means one user request and its final AI response. Commentary updates, tool calls, and intermediate messages **MUST NOT** be recorded as separate entries.
-- Appending an entry to the active workstream handoff file is the only standing exception to the read-only rule in section 2. For discussion, analysis, diagnosis, inspection, review, or explanation requests, the AI **MUST NOT** modify any other file unless the user separately authorizes implementation.
+- Every completed AI task turn that adds, deletes, or modifies any repository file **MUST** append one structured delivery entry to the active workstream's `handoff/<workstream-id>.md` before sending the final response. Only that workstream's owner may append to the file.
+- A file-changing task turn means one user request and its final AI response that changes any repository file, including source code, tests, scripts, SQL, configuration, documentation, or repository rules. Commentary updates, tool calls, and intermediate messages **MUST NOT** be recorded as separate entries.
+- Turns that make no repository file changes **MUST NOT** append a handoff entry. This includes discussion, analysis, diagnosis, inspection, review, and explanation requests that remain read-only under section 2.
 - Each entry **MUST** include Beijing time, branch, worktree, HEAD commit, user goal, key decisions, execution or analysis result, changed files, verification evidence, dependency or integration impact, and remaining work. Use `None` when a field has no applicable content.
 - Entries **MUST** be appended in chronological order. Existing entries **MUST NOT** be rewritten or deleted; corrections must be recorded in a new entry.
 - Handoff files **MUST NOT** contain passwords, tokens, personal data, complete sensitive payloads, or unnecessary conversation transcripts.

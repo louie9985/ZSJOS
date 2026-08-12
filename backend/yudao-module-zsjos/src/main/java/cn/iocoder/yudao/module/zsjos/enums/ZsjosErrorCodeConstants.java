@@ -84,4 +84,21 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PRODUCT_PRICE_INVALID = new ErrorCode(1_900_004_016, "课程 SKU 价格不能小于 0");
     ErrorCode PRODUCT_ATTR_INVALID = new ErrorCode(1_900_004_017, "课程销售属性或属性值无效");
 
+    ErrorCode WORK_PLAN_NOT_EXISTS = new ErrorCode(1_900_005_001, "工作计划不存在");
+    ErrorCode WORK_TASK_NOT_EXISTS = new ErrorCode(1_900_005_002, "工作任务不存在");
+    ErrorCode WORK_PLAN_ITEM_NOT_EXISTS = WORK_TASK_NOT_EXISTS;
+    ErrorCode WORK_PLAN_STATE_INVALID = new ErrorCode(1_900_005_003, "当前工作计划状态不允许该操作");
+    ErrorCode WORK_TASK_STATE_INVALID = new ErrorCode(1_900_005_004, "当前工作任务状态不允许该操作");
+    ErrorCode WORK_PLAN_ITEM_STATE_INVALID = WORK_TASK_STATE_INVALID;
+    ErrorCode WORK_PLAN_VERSION_CONFLICT = new ErrorCode(1_900_005_005, "工作计划已被其他人修改，请刷新后重试");
+    ErrorCode WORK_PLAN_PERMISSION_DENIED = new ErrorCode(1_900_005_006, "无权查看或操作该工作计划对象");
+    ErrorCode WORK_PLAN_PERIOD_INVALID = new ErrorCode(1_900_005_007, "工作计划周期或日期范围无效");
+    ErrorCode WORK_PLAN_CONFIRMER_INVALID = new ErrorCode(1_900_005_008, "确认人不存在、已停用或缺少确认权限");
+    ErrorCode WORK_PLAN_REVIEWER_INVALID = WORK_PLAN_CONFIRMER_INVALID;
+    ErrorCode WORK_PLAN_ASSIGNEE_INVALID = new ErrorCode(1_900_005_009, "责任人不存在或已停用");
+    ErrorCode WORK_PLAN_CHANGE_REASON_REQUIRED = new ErrorCode(1_900_005_010, "责任人、确认责任或取消等关键变更必须填写原因");
+    ErrorCode WORK_PLAN_ATTACHMENT_INVALID = new ErrorCode(1_900_005_011, "工作计划附件无效或无权使用");
+    ErrorCode WORK_PLAN_PROCESS_UNAVAILABLE = new ErrorCode(1_900_005_012, "工作计划发布流程未部署或当前不可用");
+    ErrorCode WORK_PLAN_FIELD_INVALID = new ErrorCode(1_900_005_013, "工作计划自定义字段无效");
+
 }
