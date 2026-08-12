@@ -12,7 +12,7 @@
 - Dependencies: Integrated lifecycle phases one through three; System user/post/department APIs; existing assignment/self-sourced, basic-info/contact duplicate checks, notification, object-permission, file-reference, task, and BPM facilities.
 - Integration order: Phase four follows phase three and must merge before phase five.
 - Verification plan: Focused authorization, identity, submitter-history, urge idempotency/day-boundary, strict contact conflict, complaint queue/concurrency/permission/BPM tests; ZSJOS compile/tests; SQL static consistency; frontend typecheck/build/tests where environment permits; browser and real request checks when an environment is available.
-- Status: `ready-to-merge`
+- Status: `merged`
 
 ## Delivery Entries
 
@@ -28,3 +28,16 @@
 - Verification evidence: Backend reactor compile passed; 57 focused backend tests passed; Workbench typecheck passed; 17 test files / 78 tests passed; Workbench production build passed; `git diff --check` passed; V040 references and baseline table/column presence checked statically in migration, bootstrap, core schema, and seed files.
 - Dependency or integration impact: Requires integrated phases one through three and migration V040 after V039. No role grants are inferred. No database migration, remote push, or shared service change was executed.
 - Remaining work: Commit and merge phase four, rerun integration checks, then implement phase five. Browser desktop/mobile interaction remains unverified because the available browser binding exposed no open-tab operation and had no existing tab.
+
+### 2026-08-13 03:06:44 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `375c7c44ff1c9825d10ade1c331fb04186cf82f9`
+- User goal: Integrate completed phase four and continue automatically to phase five.
+- Key decisions: Preserve the phase-four behavior and migration order exactly as verified on the workstream branch.
+- Execution or analysis result: Merged feature commit `d685df0ff46f80e2854b36b8757d29d02f8ec3b8` into `main` with merge commit `375c7c44ff1c9825d10ade1c331fb04186cf82f9`.
+- Changed files: Merge of all phase-four files listed in the prior delivery entry; this appended integration record.
+- Verification evidence: On `main`, the same 57 focused backend tests passed with zero failures or errors.
+- Dependency or integration impact: Phase five may now start from the integrated V040 baseline. Nothing was pushed and no migration was executed.
+- Remaining work: Commit this integration handoff record, then create and implement phase five. Browser desktop/mobile verification remains outstanding for phase four.
