@@ -85,14 +85,16 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         Map<String, Object> after = new LinkedHashMap<>();
         switch (request.getResultType()) {
             case "new_person" -> {
-                LeadCreateRespVO result = submissionService.createApproved(submission, review.getSubmitterUserId(), null);
+                LeadCreateRespVO result = submissionService.createApprovedFromReview(submission,
+                        review.getSubmitterUserId(), null, review.getSubmissionSourceType(), review.getSubmissionPartnerId());
                 after.put("personId", leadMapper.selectById(result.getLeadId()).getPersonId());
                 after.put("leadId", result.getLeadId());
             }
             case "reuse_person" -> {
                 PersonDO person = requirePersonWithoutLead(request.getMatchedPersonId());
                 before.put("person", person);
-                LeadCreateRespVO result = submissionService.createApproved(submission, review.getSubmitterUserId(), person.getId());
+                LeadCreateRespVO result = submissionService.createApprovedFromReview(submission,
+                        review.getSubmitterUserId(), person.getId(), review.getSubmissionSourceType(), review.getSubmissionPartnerId());
                 after.put("person", personMapper.selectById(person.getId()));
                 after.put("leadId", result.getLeadId());
             }

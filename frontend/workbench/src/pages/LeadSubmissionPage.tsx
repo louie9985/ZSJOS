@@ -17,7 +17,7 @@ type FormValues = {
 }
 type RemoteState = { loading: boolean; error?: string }
 
-export default function LeadSubmissionPage() {
+export default function LeadSubmissionPage({ selfSourced = false }: { selfSourced?: boolean }) {
   const [form] = Form.useForm<FormValues>()
   const { message } = App.useApp()
   const [areas, setAreas] = useState<AreaNode[]>([])
@@ -100,14 +100,15 @@ export default function LeadSubmissionPage() {
       const uploadResult = await uploadDeferredFiles(files, api.uploadLeadAttachment, setFiles)
       if (uploadResult.failed) { message.error('有图片上传失败，请重试失败项'); return }
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
-      const result = await api.createLead({
+      const result = await (selfSourced ? api.createSelfSourcedLead : api.createLead)({
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode,
         intendedProducts: intentions.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown, skuUnknown: item.skuUnknown, primary: item.key === primaryKey })),
         sourceChannel: values.sourceChannel, leadCategory: values.leadCategory, remark: values.remark?.trim() || undefined,
         attachments: uploadResult.items.filter(file => file.uploaded)
           .map(file => ({ infraFileId: file.uploaded!.infraFileId })),
-        dispatchMode: values.dispatchMode, specifiedSalesUserId: values.specifiedSalesUserId, idempotencyKey
+        dispatchMode: selfSourced ? 'auto' : values.dispatchMode,
+        specifiedSalesUserId: selfSourced ? undefined : values.specifiedSalesUserId, idempotencyKey
       })
       if (result.outcome === 'created') message.success('客资已提交')
       if (result.outcome === 'review_pending') message.info(`疑似重复，已进入复核队列 #${result.reviewId}`)
@@ -140,8 +141,8 @@ export default function LeadSubmissionPage() {
           <Col xs={24}><Form.Item name="remark" label="备注信息"><Input.TextArea rows={4} maxLength={1000} showCount /></Form.Item></Col>
           <Col xs={24}><Form.Item label={`附件图片${hasUploading ? '（上传中）' : ''}`} extra="确认提交后上传；最多 9 张，JPG、PNG、WebP，单张不超过 10MB"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp"/></Form.Item></Col>
         </Row>
-        <Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
-        {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><Select loading={salesState.loading} options={sales} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}
+        {!selfSourced && <><Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
+        {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><Select loading={salesState.loading} options={sales} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}</>}
         <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined) }}>重置</Button><IrreversiblePopconfirm action={`提交客资「${pendingValues?.name?.trim() || '当前客户'}」`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading} onClick={() => void prepareSubmit()}>提交客资</Button></IrreversiblePopconfirm></Space></div>
       </Form>
     </Spin></Card>

@@ -5,4 +5,5 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCre
 
 public interface LeadSubmissionService {
     LeadCreateRespVO create(LeadCreateReqVO reqVO, Long submitterUserId);
+    LeadCreateRespVO createSelfSourced(LeadCreateReqVO reqVO, Long salesUserId);
 }

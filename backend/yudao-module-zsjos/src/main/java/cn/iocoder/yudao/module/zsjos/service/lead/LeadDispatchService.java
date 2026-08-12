@@ -11,6 +11,8 @@ import java.util.List;
 
 public interface LeadDispatchService {
     void start(LeadDO lead, Long specifiedSalesUserId, Long submitterUserId);
+    List<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO> getEligibleSalesUsers();
+    List<cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO> getAssignableSalesUsers(Long sourceUserId);
     void notifyActivation(LeadDO lead);
     List<LeadPendingRespVO> getMyPending(Long userId);
     PageResult<LeadPendingRespVO> getClaimPoolPage(LeadClaimPoolPageReqVO reqVO, Long userId);

@@ -72,6 +72,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_SUBMITTED, "客资申诉待处理", ROLE_APPEAL_REVIEWERS, ROLE_OWNER),
                 scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
+                scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
+                scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(FIRST_FOLLOW_UP_REMINDER, "首次跟进时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(NEXT_FOLLOW_UP_REMINDER, "下次跟进提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
@@ -183,6 +185,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                     "followUp.remark", "followUp.nextAt", "qualification.reason", "appeal.id",
                     "appeal.roundNo", "appeal.stage", "appeal.reason", "appeal.decisionReason");
             copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
+            copyContext(values, event.getPayload(), "urge.reason", "complaint.handlerUserId");
             copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
         }
         return values;
@@ -251,6 +254,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("appeal.stage", "审核阶段"));
             variables.add(variable("appeal.reason", "申诉理由"));
             variables.add(variable("appeal.decisionReason", "裁决理由"));
+        } else if (SUBMITTER_URGED.equals(sceneCode)) {
+            variables.add(variable("urge.reason", "催促原因"));
+        } else if (COMPLAINT_FOUNDED.equals(sceneCode)) {
+            variables.add(variable("complaint.handlerUserId", "投诉处理人编号"));
         }
         return List.copyOf(variables);
     }

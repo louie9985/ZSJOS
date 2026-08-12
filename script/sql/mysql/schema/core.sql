@@ -3917,6 +3917,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
 -- zsjos_lead_activation
 CREATE TABLE IF NOT EXISTS `zsjos_lead_duplicate_review` (
   `id` bigint NOT NULL AUTO_INCREMENT, `status` varchar(32) NOT NULL, `submitter_user_id` bigint DEFAULT NULL,
+  `submission_source_type` varchar(32) DEFAULT NULL, `submission_partner_id` bigint DEFAULT NULL,
   `submission_snapshot` json NOT NULL, `match_rules` json NOT NULL, `candidate_snapshot` json NOT NULL,
   `matched_person_id` bigint DEFAULT NULL, `matched_lead_id` bigint DEFAULT NULL, `result_type` varchar(32) DEFAULT NULL,
   `review_opinion` varchar(2000) DEFAULT NULL, `review_attachments` json DEFAULT NULL, `selected_sales_user_id` bigint DEFAULT NULL,
@@ -3931,6 +3932,30 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_duplicate_review` (
   KEY `idx_tenant_person` (`tenant_id`,`matched_person_id`), KEY `idx_tenant_lead` (`tenant_id`,`matched_lead_id`),
   KEY `idx_tenant_reviewer` (`tenant_id`,`reviewer_user_id`,`reviewed_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 重复客资复核';
+
+CREATE TABLE IF NOT EXISTS `zsjos_lead_urge` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `submitter_user_id` bigint NOT NULL,
+  `target_sales_user_id` bigint NOT NULL, `urge_date` date NOT NULL, `reason` varchar(500) NOT NULL,
+  `urged_at` datetime NOT NULL, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_lead_submitter_date` (`tenant_id`,`lead_id`,`submitter_user_id`,`urge_date`),
+  KEY `idx_tenant_target_urged` (`tenant_id`,`target_sales_user_id`,`urged_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资提交人催促记录';
+
+CREATE TABLE IF NOT EXISTS `zsjos_lead_complaint` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `complainant_user_id` bigint NOT NULL,
+  `sales_user_id` bigint NOT NULL, `reason` varchar(1000) NOT NULL, `evidence_refs` json DEFAULT NULL,
+  `status` varchar(32) NOT NULL, `result` varchar(32) DEFAULT NULL, `handler_user_id` bigint DEFAULT NULL,
+  `handler_opinion` varchar(1000) DEFAULT NULL, `handler_evidence_refs` json DEFAULT NULL, `handled_at` datetime DEFAULT NULL,
+  `create_idempotency_key` varchar(128) NOT NULL, `decision_idempotency_key` varchar(128) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_complaint_create_key` (`tenant_id`,`create_idempotency_key`),
+  UNIQUE KEY `uk_tenant_complaint_decision_key` (`tenant_id`,`decision_idempotency_key`),
+  KEY `idx_tenant_complaint_queue` (`tenant_id`,`status`,`create_time`,`id`), KEY `idx_tenant_complaint_lead` (`tenant_id`,`lead_id`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 销售投诉';
 
 -- zsjos_lead_activation
 CREATE TABLE IF NOT EXISTS `zsjos_lead_activation` (

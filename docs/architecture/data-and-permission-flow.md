@@ -231,6 +231,7 @@ otherwise
   does not inherit visibility to the existing Lead from the activation alone.
 - A user who is both submitter and owner receives the Lead once, with both relation
   types in the response.
+- Phase-four submitter commands continue to use immutable `source_user_id` after a post or department transfer, while requiring the system account and the original business subject to remain enabled. Ordinary creation identity is resolved from stable post, department-leader, and partner records rather than role or department display names. Sales self-sourced creation is a separate permission and direct-ownership path. Complaint handling is an independent shared business queue; it does not duplicate BPM tasks or modify sales assignment and performance state.
 - Page, status-count, and single-record queries apply the same team boundary. A direct
   detail request cannot bypass row visibility. A leader of a peer department receives
   no access, while a leader of a parent department may access owners in child departments.

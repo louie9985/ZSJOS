@@ -31,21 +31,21 @@ public class LeadSubmissionController {
 
     @GetMapping("/product/simple-list")
     @Operation(summary = "获得启用课程列表")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:submit')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:submitter-supplement')")
     public CommonResult<List<LeadProductSimpleRespVO>> getProductSimpleList() {
         return success(productService.getEnabledProducts());
     }
 
     @GetMapping("/product/catalog")
     @Operation(summary = "获得课程 SPU/SKU 目录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:update')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead:update', 'zsjos:lead:submitter-supplement')")
     public CommonResult<LeadProductCatalogRespVO> getProductCatalog() {
         return success(skuService.getLeadCatalog());
     }
 
     @PostMapping("/attachment/upload")
     @Operation(summary = "上传客资图片")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:submit')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle')")
     public CommonResult<LeadAttachmentUploadRespVO> uploadAttachment(@RequestParam("file") MultipartFile file)
             throws IOException {
         return success(attachmentService.upload(file));
@@ -56,5 +56,12 @@ public class LeadSubmissionController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:submit')")
     public CommonResult<LeadCreateRespVO> create(@Valid @RequestBody LeadCreateReqVO reqVO) {
         return success(submissionService.create(reqVO, getLoginUserId()));
+    }
+
+    @PostMapping("/self-sourced/create")
+    @Operation(summary = "销售提交自拓客资")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
+    public CommonResult<LeadCreateRespVO> createSelfSourced(@Valid @RequestBody LeadCreateReqVO reqVO) {
+        return success(submissionService.createSelfSourced(reqVO, getLoginUserId()));
     }
 }

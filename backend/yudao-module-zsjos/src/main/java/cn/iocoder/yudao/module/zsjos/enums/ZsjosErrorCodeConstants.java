@@ -85,6 +85,12 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058, "当前客资状态不允许执行该操作");
     ErrorCode SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA = new ErrorCode(1_900_003_059, "客资已在人工公海中");
     ErrorCode LEAD_TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_003_072, "客资转派审批流程尚未部署或暂不可用");
+    ErrorCode LEAD_SUBMITTER_IDENTITY_INVALID = new ErrorCode(1_900_003_073, "当前账号无权使用该客资提交入口");
+    ErrorCode LEAD_URGE_DAILY_LIMIT = new ErrorCode(1_900_003_074, "今日已催促过该客资");
+    ErrorCode LEAD_COMPLAINT_NOT_EXISTS = new ErrorCode(1_900_003_075, "销售投诉不存在");
+    ErrorCode LEAD_COMPLAINT_ALREADY_HANDLED = new ErrorCode(1_900_003_076, "该销售投诉已由其他人员处理");
+    ErrorCode LEAD_COMPLAINT_RESULT_INVALID = new ErrorCode(1_900_003_077, "销售投诉处理结论无效");
+    ErrorCode LEAD_SUBMITTER_ACTION_STATE_INVALID = new ErrorCode(1_900_003_078, "当前客资状态不允许提交人补充、催促或投诉");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");
