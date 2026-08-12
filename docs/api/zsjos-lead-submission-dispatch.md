@@ -70,9 +70,9 @@
 
 首次跟进成功后创建 `lead_qualification` 任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
 
-`POST /zsjos/lead/{id}/judge-valid` 请求为 `{ leadCategory?: string | null, remark, idempotencyKey }`。非空分类必须是启用的 `zsjos_lead_category` 字典值，备注必填且最长 2000 字。接口在一个事务内完成判定任务、保存备注、创建唯一 `initial_conversion` Opportunity，将 Lead 改为 `converted` 并结束分配周期；`zsjos_lead_valid_remark_template` 只提供管理员维护的快捷备注，初始化为空。判无效请求同时提交启用的 `zsjos_lead_invalid_reason` 字典值、必填备注和最多 9 个已上传附件引用；入口同时适用于待判定 Lead 与推进中的 Opportunity，后者会在同一事务改为 `lost`。`zsjos_lead_invalid_remark_template` 仅提供快捷文案，接口只保存销售最终编辑文本。
+`POST /zsjos/lead/{id}/judge-valid` 请求为 `{ leadCategory?: string | null, remark, idempotencyKey }`。非空分类必须是启用的 `zsjos_lead_category` 字典值，备注必填且最长 2000 字。接口在一个事务内完成判定任务、保存备注并创建或恢复该客户唯一的 `initial_conversion` Opportunity；Lead 保持 `valid + owned`，Opportunity 承担后续 `open/following/deal_pending_approval/won/lost` 阶段。恢复旧 Opportunity 时保留历史记录，清除旧流失字段，并把正式负责人同步为 Lead 负责人。`zsjos_lead_valid_remark_template` 只提供管理员维护的快捷备注，初始化为空。判无效请求同时提交启用的 `zsjos_lead_invalid_reason` 字典值、必填备注和最多 9 个已上传附件引用；入口同时适用于待判定 Lead 与推进中的 Opportunity，后者会在同一事务改为 `lost`。`zsjos_lead_invalid_remark_template` 仅提供快捷文案，接口只保存销售最终编辑文本。
 
-统一跟进接口按状态路由：`submitted` 写 Lead 跟进并维护首跟、判定和提醒任务；`converted` 写 Opportunity 跟进并维护机会状态和提醒；`invalid` 写 Lead 证据记录，不创建任何任务。分类在三类请求中都可保留、修改或清空。分页查询合并 Lead 与 Opportunity 跟进，按发生时间倒序返回，并通过 `recordScope` 标识 `lead` 或 `opportunity`。
+统一跟进接口按状态路由：`submitted` 写 Lead 跟进并维护首跟、判定和提醒任务；`valid` 且存在活动 Opportunity 时写 Opportunity 跟进并维护机会状态和提醒；`invalid` 写 Lead 证据记录，不创建任何任务。分类在三类请求中都可保留、修改或清空。分页查询合并 Lead 与 Opportunity 跟进，按发生时间倒序返回，并通过 `recordScope` 标识 `lead` 或 `opportunity`。
 
 `PUT /zsjos/lead/{id}/basic-info` 仅供当前负责人使用，接受姓名、手机号、微信号、地区、可空客资分类、至少一项且唯一主意向的课程快照以及必填修改原因。手机号与微信号至少保留一个；身份冲突、无效地区、无效字典或产品目录引用均拒绝且事务回滚。联系人同步到 Person 和当前 Lead，事件只记录变更字段名和修改原因，不记录完整联系方式。
 

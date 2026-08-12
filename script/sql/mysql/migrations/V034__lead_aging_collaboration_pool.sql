@@ -2,7 +2,7 @@
 -- Dependencies: V032, ZSJOS lead/opportunity/order/assignment history, System users/departments/posts,
 -- notification rules and tenant metadata.
 -- Execution order: add columns, create cycle/event/reminder tables, recover ownership start times from
--- explicit assignment history, register menus and permissions, seed notification templates/rules, record V033.
+-- explicit assignment history, register menus and permissions, seed notification templates/rules, record V034.
 -- Repeatability: guarded DDL, stable menu/template IDs, unique business keys and NOT EXISTS checks.
 -- Data scope: schema/configuration metadata plus deterministic ownership-start recovery. No lead owner,
 -- order, opportunity, follow-up, account or permission rows are deleted or bulk replaced.
@@ -81,7 +81,7 @@ SET @aging_pool_filter = '{"groups":[{"key":"all","label":"全部公海客资","
 INSERT INTO `zsjos_lead_inbox_filter_scheme`
 (`audience`,`name`,`draft_config_json`,`published_config_json`,`published_version`,`published_by`,`published_at`,`version`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT 'agingPool','超期公海视角',@aging_pool_filter,@aging_pool_filter,1,0,NOW(),0,
-       'migration-V033',NOW(),'migration-V033',NOW(),b'0',t.id
+       'migration-V034',NOW(),'migration-V034',NOW(),b'0',t.id
 FROM `system_tenant` t WHERE t.deleted=b'0' AND NOT EXISTS (
   SELECT 1 FROM `zsjos_lead_inbox_filter_scheme` s
   WHERE s.tenant_id=t.id AND s.audience='agingPool' AND s.deleted=b'0');
@@ -89,7 +89,7 @@ FROM `system_tenant` t WHERE t.deleted=b'0' AND NOT EXISTS (
 INSERT INTO `zsjos_lead_inbox_filter_version`
 (`scheme_id`,`version_no`,`config_json`,`published_by`,`published_at`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT s.id,1,s.published_config_json,COALESCE(s.published_by,0),COALESCE(s.published_at,NOW()),
-       'migration-V033',NOW(),'migration-V033',NOW(),b'0',s.tenant_id
+       'migration-V034',NOW(),'migration-V034',NOW(),b'0',s.tenant_id
 FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.audience='agingPool' AND s.deleted=b'0' AND NOT EXISTS (
   SELECT 1 FROM `zsjos_lead_inbox_filter_version` v
   WHERE v.tenant_id=s.tenant_id AND v.scheme_id=s.id AND v.version_no=1 AND v.deleted=b'0');
@@ -127,19 +127,19 @@ JOIN (
   GROUP BY h.tenant_id,h.lead_id
 ) recovered ON recovered.tenant_id=l.tenant_id AND recovered.lead_id=l.id
 SET l.ownership_started_at=recovered.ownership_started_at,
-    l.updater='migration-V033',l.update_time=NOW()
+    l.updater='migration-V034',l.update_time=NOW()
 WHERE l.deleted=b'0' AND l.owner_user_id IS NOT NULL AND l.ownership_started_at IS NULL;
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
 VALUES
-(6794,'超期公海','zsjos:lead-aging-pool:query',2,88,6735,'lead-aging-pool','ep:management','zsjos/leadAgingPool/index','ZsjosLeadAgingPool',0,b'1',b'1',b'1','migration-V033',NOW(),'migration-V033',NOW(),b'0'),
-(6795,'管理部门超期公海','zsjos:lead-aging-pool:manage',3,1,6794,'','','',NULL,0,b'1',b'1',b'1','migration-V033',NOW(),'migration-V033',NOW(),b'0'),
-(6796,'管理全部超期公海','zsjos:lead-aging-pool:manage-all',3,2,6794,'','','',NULL,0,b'1',b'1',b'1','migration-V033',NOW(),'migration-V033',NOW(),b'0');
+(6794,'超期公海','zsjos:lead-aging-pool:query',2,88,6735,'lead-aging-pool','ep:management','zsjos/leadAgingPool/index','ZsjosLeadAgingPool',0,b'1',b'1',b'1','migration-V034',NOW(),'migration-V034',NOW(),b'0'),
+(6795,'管理部门超期公海','zsjos:lead-aging-pool:manage',3,1,6794,'','','',NULL,0,b'1',b'1',b'1','migration-V034',NOW(),'migration-V034',NOW(),b'0'),
+(6796,'管理全部超期公海','zsjos:lead-aging-pool:manage-all',3,2,6794,'','','',NULL,0,b'1',b'1',b'1','migration-V034',NOW(),'migration-V034',NOW(),b'0');
 
 INSERT INTO `system_role_menu`
 (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT grant_row.role_id, menu.id, 'migration-V033',NOW(),'migration-V033',NOW(),b'0',grant_row.tenant_id
+SELECT grant_row.role_id, menu.id, 'migration-V034',NOW(),'migration-V034',NOW(),b'0',grant_row.tenant_id
 FROM `system_role_menu` grant_row
 JOIN `system_menu` source_menu ON source_menu.id=grant_row.menu_id AND source_menu.permission='zsjos:lead:query-owned' AND source_menu.deleted=b'0'
 JOIN `system_menu` menu ON menu.permission='zsjos:lead-aging-pool:query' AND menu.deleted=b'0'
@@ -148,7 +148,7 @@ WHERE grant_row.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu exis
 
 INSERT INTO `system_notify_template`
 (`name`,`code`,`nickname`,`scene_code`,`title`,`summary`,`content`,`type`,`params`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT x.name,x.code,'中世健消息中心',x.scene_code,x.title,x.summary,x.content,2,x.params,0,'V033 超期协同公海模板','migration-V033',NOW(),'migration-V033',NOW(),b'0'
+SELECT x.name,x.code,'中世健消息中心',x.scene_code,x.title,x.summary,x.content,2,x.params,0,'V034 超期协同公海模板','migration-V034',NOW(),'migration-V034',NOW(),b'0'
 FROM (
  SELECT '超期公海提前提醒' name,'ZSJOS_AGING_POOL_REMINDER' code,'zsjos.lead.aging_pool_reminder' scene_code,'客资即将进入超期公海' title,'{{lead.name}}将在{{agingPool.dueAt}}进入超期公海' summary,'客资{{lead.name}}将在{{agingPool.dueAt}}进入超期公海，请及时推进成交。' content,'["lead.name","agingPool.dueAt"]' params
  UNION ALL SELECT '超期公海到期','ZSJOS_AGING_POOL_DUE','zsjos.lead.aging_pool_due','客资已进入超期公海','{{lead.name}}已进入超期公海','客资{{lead.name}}已到期进入超期公海，等待主管指派协同销售。','["lead.name"]'
@@ -160,13 +160,13 @@ FROM (
 
 INSERT INTO `system_notify_rule`
 (`name`,`scene_code`,`channel_code`,`template_id`,`recipient_roles`,`specified_user_ids`,`action_type`,`timing_stage`,`timing_offset_minutes`,`status`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT '超期公海-提前7天','zsjos.lead.aging_pool_reminder','in_app',t.id,'["owner","frozen_dept_leader"]','[]','business_detail','advance',10080,0,'migration-V033',NOW(),'migration-V033',NOW(),b'0',tenant.id
+SELECT '超期公海-提前7天','zsjos.lead.aging_pool_reminder','in_app',t.id,'["owner","frozen_dept_leader"]','[]','business_detail','advance',10080,0,'migration-V034',NOW(),'migration-V034',NOW(),b'0',tenant.id
 FROM system_tenant tenant JOIN system_notify_template t ON t.code='ZSJOS_AGING_POOL_REMINDER' AND t.deleted=b'0'
 WHERE tenant.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_notify_rule r WHERE r.tenant_id=tenant.id AND r.name='超期公海-提前7天' AND r.deleted=b'0');
 
 INSERT INTO `system_notify_rule`
 (`name`,`scene_code`,`channel_code`,`template_id`,`recipient_roles`,`specified_user_ids`,`action_type`,`status`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT x.name,x.scene_code,'in_app',t.id,x.roles,'[]','business_detail',0,'migration-V033',NOW(),'migration-V033',NOW(),b'0',tenant.id
+SELECT x.name,x.scene_code,'in_app',t.id,x.roles,'[]','business_detail',0,'migration-V034',NOW(),'migration-V034',NOW(),b'0',tenant.id
 FROM system_tenant tenant JOIN (
  SELECT '超期公海到期通知' name,'zsjos.lead.aging_pool_due' scene_code,'["owner","frozen_dept_leader"]' roles,'ZSJOS_AGING_POOL_DUE' template_code
  UNION ALL SELECT '超期公海指派通知','zsjos.lead.aging_pool_assigned','["owner","collaborator","frozen_dept_leader"]','ZSJOS_AGING_POOL_ASSIGNED'
@@ -177,8 +177,8 @@ FROM system_tenant tenant JOIN (
 WHERE tenant.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_notify_rule r WHERE r.tenant_id=tenant.id AND r.name=x.name AND r.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
-SELECT 'V033','lead aging collaboration pool','V033__lead_aging_collaboration_pool.sql'
-WHERE NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V033');
+SELECT 'V034','lead aging collaboration pool','V034__lead_aging_collaboration_pool.sql'
+WHERE NOT EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V034');
 
 -- Read-only release check: rows returned here require manual ownership-start review before they can age into the pool.
 SELECT l.tenant_id,l.id lead_id,l.owner_user_id

@@ -117,8 +117,8 @@ export const LEAD_STATUS_LABELS: Record<string, string> = {
   suspended: '已挂起',
   valid: '有效',
   invalid: '无效',
-  converted: '已判有效',
-  closed: '已关闭'
+  closed: '已关闭',
+  won: '已成交'
 }
 
 export const LEAD_ASSIGNMENT_STATUS_LABELS: Record<string, string> = {
@@ -139,8 +139,8 @@ export const LEAD_HANDLING_STAGE_LABELS: Record<string, string> = {
   unassigned: '未分配',
   valid: '有效',
   invalid: '无效',
-  converted: '已判有效',
-  closed: '已关闭'
+  closed: '已关闭',
+  won: '已成交'
 }
 
 export const LEAD_QUALIFICATION_STATUS_LABELS: Record<string, string> = {

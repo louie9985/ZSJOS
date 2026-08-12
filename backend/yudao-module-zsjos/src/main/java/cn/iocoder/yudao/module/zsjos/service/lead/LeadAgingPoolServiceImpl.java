@@ -391,7 +391,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                 || lead.getOwnershipStartedAt().plusDays(rule.getAgingPoolTimeoutDays()).isAfter(now)
                 || cycleMapper.selectActiveByLeadId(lead.getId()) != null) return false;
         if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                || !Set.of(STATUS_VALID, "converted").contains(lead.getStatus())) return false;
+                || !STATUS_VALID.equals(lead.getStatus())) return false;
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
         if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus())

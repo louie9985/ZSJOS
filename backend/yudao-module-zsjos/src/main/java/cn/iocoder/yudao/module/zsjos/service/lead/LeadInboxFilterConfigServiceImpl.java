@@ -46,7 +46,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY),
             INBOX_AUDIENCE_AGING_POOL, Set.of(INBOX_FILTER_FIELD_POOL_STATUS));
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
-            INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "converted", "invalid", "closed")),
+            INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "invalid", "closed", "won")),
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
             new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned")),
             INBOX_FILTER_FIELD_HANDLED, new LinkedHashSet<>(List.of("todo", "done")),
@@ -144,8 +144,8 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         }
         return List.of(
                 capability(INBOX_FILTER_FIELD_STATUS, "客资主状态", List.of(
-                        value("submitted", "已提交"), value("valid", "已判有效"), value("converted", "已进入转化"),
-                        value("invalid", "已判无效"), value("closed", "已关闭"))),
+                        value("submitted", "已提交"), value("valid", "已判有效"), value("invalid", "已判无效"),
+                        value("closed", "已关闭"), value("won", "已成交"))),
                 capability(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, "分配状态", List.of(
                         value("unassigned", "待分配"), value("pending_acceptance", "待接单"),
                         value("public_pool", "抢单池"), value("owned", "已归属"))));

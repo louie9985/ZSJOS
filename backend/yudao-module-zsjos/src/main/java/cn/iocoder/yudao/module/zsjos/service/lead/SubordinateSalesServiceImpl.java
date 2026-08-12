@@ -206,7 +206,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         if (missing > 0) countRows.add(categoryCount("__unconfigured__", "未配置", missing, false));
         row.setCategoryCounts(countRows);
         row.setValidLeadCount(leads.stream().filter(lead -> STATUS_VALID.equals(lead.getStatus())
-                || STATUS_CONVERTED.equals(lead.getStatus())).count());
+                || STATUS_WON.equals(lead.getStatus())).count());
         row.setEffectiveOrderCount((long) orders.size());
         row.setConvertedLeadCount(orders.stream().map(SalesOrderDO::getLeadId).filter(Objects::nonNull).distinct().count());
         row.setEffectiveOrderAmount(orders.stream().map(SalesOrderDO::getTotalAmount).filter(Objects::nonNull)

@@ -302,7 +302,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_VALID, true));
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
             }
-        } else if ((STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()))
+        } else if (STATUS_VALID.equals(lead.getStatus())
                 && (opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus()))) {
             if (agingPoolCycle == null && canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));

@@ -50,12 +50,11 @@ public class LeadObjectPermissionService {
             case "follow-up-create" -> Objects.equals(userId, effectiveSalesUserId(lead))
                     && (STATUS_INVALID.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
-                    || "converted".equals(lead.getStatus())
                     || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
             case "qualify" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
                     && Objects.equals(userId, lead.getOwnerUserId())
                     && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                    || STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()));
+                    || STATUS_VALID.equals(lead.getStatus()));
             case "enter-deal" -> Objects.equals(userId, effectiveSalesUserId(lead));
             case "basic-info-update" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
                     && Objects.equals(userId, lead.getOwnerUserId());

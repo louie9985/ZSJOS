@@ -61,13 +61,21 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         requireQualificationPending(lead, userId);
         String category = normalizeCategory(reqVO.getLeadCategory());
         LocalDateTime now = LocalDateTime.now();
-        OpportunityDO opportunity = new OpportunityDO();
-        opportunity.setPersonId(lead.getPersonId()); opportunity.setType(OPPORTUNITY_TYPE_INITIAL_CONVERSION);
-        opportunity.setLeadId(leadId); opportunity.setStatus(OPPORTUNITY_STATUS_OPEN);
-        opportunity.setOwnerUserId(userId); opportunity.setExpectedProductSummary(
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+        boolean createOpportunity = opportunity == null;
+        if (createOpportunity) {
+            opportunity = new OpportunityDO();
+            opportunity.setPersonId(lead.getPersonId()); opportunity.setType(OPPORTUNITY_TYPE_INITIAL_CONVERSION);
+            opportunity.setLeadId(leadId); opportunity.setVersion(0);
+        }
+        opportunity.setPersonId(lead.getPersonId());
+        opportunity.setStatus(OPPORTUNITY_STATUS_OPEN);
+        opportunity.setOwnerUserId(lead.getOwnerUserId());
+        opportunity.setExpectedProductSummary(
                 LeadBasicInfoService.productSummary(intendedProductMapper.selectListByLeadId(leadId)));
-        opportunity.setVersion(0); opportunityMapper.insert(opportunity);
-        lead.setStatus("converted"); lead.setAssignmentStatus(ASSIGNMENT_CLOSED);
+        opportunity.setLostAt(null); opportunity.setLostReason(null);
+        if (createOpportunity) opportunityMapper.insert(opportunity); else opportunityMapper.updateById(opportunity);
+        lead.setStatus(STATUS_VALID); lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setQualifiedByUserId(userId);
         lead.setQualifiedAt(now);
         lead.setConvertedAt(now);
@@ -79,7 +87,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setInvalidEvidenceRefs(null);
         leadMapper.updateById(lead);
         lifecycleTaskService.completeQualificationTask(leadId, lead.getQualificationRoundNo(), now);
-        addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, "converted",
+        addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, STATUS_VALID,
                 reqVO.getRemark().trim(), key, Map.of("roundNo", lead.getQualificationRoundNo(),
                         "opportunityId", opportunity.getId()));
         notifyEventPublisher.publish(QUALIFIED_VALID, leadId, "notify:" + key, userId, now,
@@ -93,8 +101,8 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LeadDO lead = requireLeadForUpdate(leadId);
         String key = commandKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_QUALIFIED_INVALID)) return;
-        boolean converted = "converted".equals(lead.getStatus()) || STATUS_VALID.equals(lead.getStatus());
-        if (converted) {
+        boolean previouslyValid = STATUS_VALID.equals(lead.getStatus());
+        if (previouslyValid) {
             if (!Objects.equals(userId, lead.getOwnerUserId())) throw exception(LEAD_QUALIFICATION_STATE_INVALID);
         } else {
             requireQualificationPending(lead, userId);
@@ -117,7 +125,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "客资判定无效");
         lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资判定无效");
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "客资判定无效");
-        if (converted) {
+        if (previouslyValid) {
             OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
             if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                     .contains(opportunity.getStatus())) throw exception(LEAD_QUALIFICATION_STATE_INVALID);
@@ -126,7 +134,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
             opportunity.setNextFollowUpAt(null);
             opportunityMapper.updateById(opportunity);
         }
-        addEvent(EVENT_LEAD_QUALIFIED_INVALID, lead, userId, converted ? "converted" : STATUS_SUBMITTED, STATUS_INVALID,
+        addEvent(EVENT_LEAD_QUALIFIED_INVALID, lead, userId, previouslyValid ? STATUS_VALID : STATUS_SUBMITTED, STATUS_INVALID,
                 reqVO.getDescription().trim(), key,
                 Map.of("roundNo", lead.getQualificationRoundNo(), "reasonCode", reason.getValue(),
                         "reasonLabel", reason.getLabel()));

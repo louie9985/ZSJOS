@@ -218,21 +218,21 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             boolean createOpportunity = opportunity == null;
             if (createOpportunity) {
                 opportunity = new OpportunityDO();
-                opportunity.setPersonId(lead.getPersonId());
                 opportunity.setType(OPPORTUNITY_TYPE_INITIAL_CONVERSION);
                 opportunity.setLeadId(lead.getId());
-                opportunity.setOwnerUserId(lead.getOwnerUserId());
                 opportunity.setExpectedProductSummary(
                         LeadBasicInfoService.productSummary(intendedProductMapper.selectListByLeadId(lead.getId())));
                 opportunity.setVersion(0);
             }
+            opportunity.setPersonId(lead.getPersonId());
+            opportunity.setOwnerUserId(lead.getOwnerUserId());
             opportunity.setStatus(OPPORTUNITY_STATUS_OPEN);
             opportunity.setLostAt(null);
             opportunity.setLostReason(null);
             if (createOpportunity) opportunityMapper.insert(opportunity);
             else opportunityMapper.updateById(opportunity);
-            lead.setStatus("converted");
-            lead.setAssignmentStatus(ASSIGNMENT_CLOSED);
+            lead.setStatus(STATUS_VALID);
+            lead.setAssignmentStatus(ASSIGNMENT_OWNED);
             lead.setInvalidReason(null);
             lead.setInvalidReasonLabelSnapshot(null);
             lead.setInvalidDescription(null);

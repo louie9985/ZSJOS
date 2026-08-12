@@ -13,7 +13,7 @@ public final class LeadStateProjection {
 
     public static String qualification(LeadDO lead) {
         if (STATUS_INVALID.equals(lead.getStatus())) return QUALIFICATION_INVALID;
-        if (STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus())) return QUALIFICATION_VALID;
+        if (STATUS_VALID.equals(lead.getStatus()) || STATUS_WON.equals(lead.getStatus())) return QUALIFICATION_VALID;
         return QUALIFICATION_PENDING;
     }
 
@@ -25,7 +25,7 @@ public final class LeadStateProjection {
                 return FOLLOW_UP_DEAL_PENDING_APPROVAL;
             }
         }
-        if (STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus())) return FOLLOW_UP_FOLLOWING;
+        if (STATUS_VALID.equals(lead.getStatus())) return FOLLOW_UP_FOLLOWING;
         if (STATUS_SUSPENDED.equals(lead.getStatus()) && lead.getQualificationDeadlineAt() != null) {
             return FOLLOW_UP_FOLLOWING;
         }

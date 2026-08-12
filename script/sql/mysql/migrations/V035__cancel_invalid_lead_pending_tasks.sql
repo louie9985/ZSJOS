@@ -1,4 +1,4 @@
--- V034: cancel historical pending lifecycle tasks for leads already judged invalid.
+-- V035: cancel historical pending lifecycle tasks for leads already judged invalid.
 -- Dependencies/order: apply after V033; behavior depends on V008 business tasks and V014 lead qualification state.
 -- Data scope: every tenant's non-deleted pending lead_first_follow_up,
 -- lead_follow_up_reminder, and lead_qualification task whose non-deleted lead is invalid.
@@ -14,8 +14,8 @@ JOIN `zsjos_lead` l
  AND l.`deleted` = b'0'
 SET task.`status` = 'cancelled',
     task.`cancelled_at` = NOW(),
-    task.`cancel_reason` = '历史无效客资待办清理（V034）',
-    task.`updater` = 'migration-V034',
+    task.`cancel_reason` = '历史无效客资待办清理（V035）',
+    task.`updater` = 'migration-V035',
     task.`update_time` = NOW(),
     task.`version` = COALESCE(task.`version`, 0) + 1
 WHERE task.`biz_type` = 'lead'
@@ -25,6 +25,6 @@ WHERE task.`biz_type` = 'lead'
   AND l.`status` = 'invalid';
 
 INSERT INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
-VALUES ('V034', 'Cancel pending lifecycle tasks for invalid leads',
+VALUES ('V035', 'Cancel pending lifecycle tasks for invalid leads',
         'cancel-invalid-lead-pending-tasks-v1')
 ON DUPLICATE KEY UPDATE `description` = VALUES(`description`);

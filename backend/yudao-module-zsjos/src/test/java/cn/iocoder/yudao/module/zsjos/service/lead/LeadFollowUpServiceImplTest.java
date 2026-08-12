@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpImageMapp
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -56,6 +57,13 @@ class LeadFollowUpServiceImplTest {
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Mock private OpportunityFollowUpImageMapper opportunityImageMapper;
+    @Mock private LeadAgingPoolService agingPoolService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(agingPoolService.resolveEffectiveSalesUserId(anyLong(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+    }
 
     @Test
     void createRejectsLeadOutsideOwnedSubmittedCycle() {
@@ -130,9 +138,9 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void convertedFollowUpBelongsToOpportunityAndUpdatesReminder() {
+    void validLeadFollowUpBelongsToOpportunityAndUpdatesReminder() {
         LeadDO lead = validLead();
-        lead.setStatus("converted"); lead.setAssignmentStatus("closed");
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         stubSuccessfulCreate(lead);
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setStatus("open");

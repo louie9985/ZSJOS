@@ -95,10 +95,9 @@ public class LeadBasicInfoService {
 
     private boolean canEdit(LeadDO lead) {
         if (STATUS_SUBMITTED.equals(lead.getStatus())) return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
-        if (STATUS_VALID.equals(lead.getStatus())) return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
-        if (!"converted".equals(lead.getStatus())) return false;
+        if (!STATUS_VALID.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) return false;
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
-        return opportunity != null && Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus());
+        return opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus());
     }
 
     private void checkIdentityConflict(Long personId, String mobile, String wechat) {

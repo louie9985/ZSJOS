@@ -212,7 +212,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core'
-           AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V035'))=13,
+           AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037'))=16,
           'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()

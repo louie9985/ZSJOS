@@ -333,7 +333,22 @@ WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existin
  AND existing.menu_id=target.id AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
-VALUES ('V035','Add subordinate-sales management','subordinate-sales-management-v1');
+VALUES ('V034','Lead aging collaboration pool','lead-aging-collaboration-pool-v1'),
+       ('V035','Cancel pending lifecycle tasks for invalid leads','cancel-invalid-lead-pending-tasks-v1');
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V035','Add subordinate-sales management',SHA2('subordinate-sales-management-v1',256),'legacy',NOW());
+VALUES ('core','V034','Lead aging collaboration pool',SHA2('lead-aging-collaboration-pool-v1',256),'legacy',NOW()),
+       ('core','V035','Cancel pending lifecycle tasks for invalid leads',SHA2('cancel-invalid-lead-pending-tasks-v1',256),'legacy',NOW());
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
+VALUES ('V036','Add subordinate-sales management','subordinate-sales-management-v1');
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V036','Add subordinate-sales management',SHA2('subordinate-sales-management-v1',256),'legacy',NOW());
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V037', 'Unify customer lead opportunity and first-purchase lifecycle', 'lifecycle-domain-unification-v1');
+
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V037','Unify customer lead opportunity and first-purchase lifecycle',SHA2('lifecycle-domain-unification-v1',256),'legacy',NOW());

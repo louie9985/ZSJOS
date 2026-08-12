@@ -1638,8 +1638,8 @@ SELECT seed.sort,seed.label,seed.value,seed.dict_type,0,seed.color_type,'1',NOW(
 FROM (
   SELECT 10 sort,'已提交' label,'submitted' value,'zsjos_lead_status' dict_type,'info' color_type UNION ALL
   SELECT 20,'已挂起','suspended','zsjos_lead_status','warning' UNION ALL SELECT 30,'有效','valid','zsjos_lead_status','success' UNION ALL
-  SELECT 40,'无效','invalid','zsjos_lead_status','danger' UNION ALL SELECT 50,'已转换','converted','zsjos_lead_status','primary' UNION ALL
-  SELECT 60,'已关闭','closed','zsjos_lead_status','default' UNION ALL SELECT 10,'未分配','unassigned','zsjos_lead_assignment_status','default' UNION ALL
+  SELECT 40,'无效','invalid','zsjos_lead_status','danger' UNION ALL SELECT 60,'已关闭','closed','zsjos_lead_status','default' UNION ALL
+  SELECT 70,'已成交','won','zsjos_lead_status','success' UNION ALL SELECT 10,'未分配','unassigned','zsjos_lead_assignment_status','default' UNION ALL
   SELECT 20,'待接单','pending_acceptance','zsjos_lead_assignment_status','warning' UNION ALL SELECT 30,'已归属','owned','zsjos_lead_assignment_status','success' UNION ALL
   SELECT 40,'抢单池','public_pool','zsjos_lead_assignment_status','info' UNION ALL SELECT 45,'回收待处理','recycle_pending','zsjos_lead_assignment_status','warning' UNION ALL
   SELECT 50,'已结束','closed','zsjos_lead_assignment_status','default'

@@ -162,21 +162,40 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void approvedProcessMakesOrderEffectiveAndOpportunityWon() {
+    void createRejectsOpportunityFromAnotherCustomer() {
+        mockEligibleLeadAndOpportunity();
+        OpportunityDO mismatched = new OpportunityDO();
+        mismatched.setId(30L); mismatched.setLeadId(1L); mismatched.setPersonId(99L);
+        mismatched.setOwnerUserId(20L); mismatched.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(mismatched);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+
+        assertEquals(SALES_ORDER_ENTRY_FORBIDDEN.getCode(), error.getCode());
+        verify(orderMapper, never()).insert(any(SalesOrderDO.class));
+    }
+
+    @Test
+    void approvedProcessMakesOrderEffectiveAndLeadAndOpportunityWon() {
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
         round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING);
         SalesOrderDO order = new SalesOrderDO();
-        order.setId(100L); order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
         OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setStatus(STATUS_VALID);
         when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         when(opportunityMapper.selectById(30L)).thenReturn(opportunity);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
 
         service.handleProcessResult("process-1", APPROVE.getStatus(), null);
 
         assertEquals(STATUS_EFFECTIVE, order.getStatus()); assertNotNull(order.getEffectiveAt());
         assertEquals(ROUND_APPROVED, round.getStatus()); assertEquals(OPPORTUNITY_STATUS_WON, opportunity.getStatus());
+        assertEquals(STATUS_WON, lead.getStatus());
         verify(orderMapper).updateById(order); verify(roundMapper).updateById(round); verify(opportunityMapper).updateById(opportunity);
+        verify(leadMapper).updateById(lead);
         verify(lifecycleTaskService).cancelFollowUpReminders(eq(order.getLeadId()), any(), eq("成交订单已生效"));
     }
 
@@ -213,7 +232,7 @@ class SalesOrderServiceImplTest {
 
     @Test
     void createRechecksIdempotencyAfterLeadLock() {
-        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(20L); lead.setStatus("converted");
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(20L); lead.setStatus("valid");
         SalesOrderDO existing = new SalesOrderDO();
         existing.setId(100L); existing.setLeadId(1L); existing.setSubmitterUserId(20L);
         when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(null, existing);
@@ -374,8 +393,9 @@ class SalesOrderServiceImplTest {
     }
 
     private void mockEligibleLeadAndOpportunity() {
-        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus("converted");
-        OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setLeadId(1L); opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus("valid");
+        OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setLeadId(1L);
+        opportunity.setPersonId(10L); opportunity.setOwnerUserId(20L); opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         lenient().when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
         AreaRespDTO province = new AreaRespDTO();

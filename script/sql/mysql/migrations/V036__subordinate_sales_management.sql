@@ -1,4 +1,4 @@
--- V035: subordinate-sales management, manual public sea, and operation audit.
+-- V036: subordinate-sales management, manual public sea, and operation audit.
 -- Dependencies/order: apply after V034 and the System department/user/post/menu baseline.
 -- Data scope: additive ZSJOS tables and server-owned menu grants only; no business rows are changed.
 -- Repeatability: IF NOT EXISTS DDL, stable menu IDs, and guarded role-menu inserts.
@@ -31,14 +31,14 @@ CREATE TABLE IF NOT EXISTS `zsjos_subordinate_sales_audit_log` (
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6814,'下属销售','zsjos:subordinate-sales:query',2,20,6735,'subordinate-sales','ep:user','zsjos/subordinateSales/index','ZsjosSubordinateSales',0,b'1',b'1',b'1','migration-V035',NOW(),'migration-V035',NOW(),b'0'),
-(6815,'停启下属账号','zsjos:subordinate-sales:account-status',3,1,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V035',NOW(),'migration-V035',NOW(),b'0'),
-(6816,'修改下属接单','zsjos:subordinate-sales:dispatch-mode',3,2,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V035',NOW(),'migration-V035',NOW(),b'0'),
-(6817,'批量转派客资','zsjos:subordinate-sales:batch-transfer',3,3,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V035',NOW(),'migration-V035',NOW(),b'0'),
-(6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V035',NOW(),'migration-V035',NOW(),b'0');
+(6814,'下属销售','zsjos:subordinate-sales:query',2,20,6735,'subordinate-sales','ep:user','zsjos/subordinateSales/index','ZsjosSubordinateSales',0,b'1',b'1',b'1','migration-V036',NOW(),'migration-V036',NOW(),b'0'),
+(6815,'停启下属账号','zsjos:subordinate-sales:account-status',3,1,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V036',NOW(),'migration-V036',NOW(),b'0'),
+(6816,'修改下属接单','zsjos:subordinate-sales:dispatch-mode',3,2,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V036',NOW(),'migration-V036',NOW(),b'0'),
+(6817,'批量转派客资','zsjos:subordinate-sales:batch-transfer',3,3,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V036',NOW(),'migration-V036',NOW(),b'0'),
+(6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','migration-V036',NOW(),'migration-V036',NOW(),b'0');
 
 INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
-SELECT DISTINCT source.role_id,target.id,'migration-V035',NOW(),'migration-V035',NOW(),b'0',source.tenant_id
+SELECT DISTINCT source.role_id,target.id,'migration-V036',NOW(),'migration-V036',NOW(),b'0',source.tenant_id
 FROM system_role_menu source JOIN system_menu source_menu ON source_menu.id=source.menu_id
   AND source_menu.permission='zsjos:lead:appeal:review-sales-manager' AND source_menu.deleted=b'0'
 JOIN system_menu target ON target.id BETWEEN 6814 AND 6818 AND target.deleted=b'0'
@@ -47,5 +47,5 @@ WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existin
  AND existing.menu_id=target.id AND existing.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
-VALUES ('V035','Add subordinate-sales management','subordinate-sales-management-v1')
+VALUES ('V036','Add subordinate-sales management','subordinate-sales-management-v1')
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`);

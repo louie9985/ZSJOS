@@ -10,7 +10,7 @@
 ## 接口
 
 - `GET /zsjos/sales-order/product/catalog`：全部启用产品/SKU 目录。
-- `POST /zsjos/sales-order/lead/{leadId}/submit`：创建订单、订单项、第一轮快照并启动双中心会签。
+- `POST /zsjos/sales-order/lead/{leadId}/submit`：创建首购订单、订单项、第一轮快照并启动双中心会签。服务端要求 Customer（内部持久化字段 `personId/person_id`）、主客资和商机属于同一客户，且三者均存在；复购入口属于阶段五，本接口当前不承担复购。
 - `PUT /zsjos/sales-order/{id}/resubmit`：修改 `revision_required` 原订单并创建新审批轮次。
 - `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情；`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/姓名及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
 - `GET /zsjos/sales-order/my-page`：本人提交订单的轻量分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。
@@ -29,6 +29,6 @@
 
 - `pending_approval`：当前 BPM 轮次处理中，同一客资禁止新建活动订单。
 - `revision_required`：任一中心驳回或流程取消，原订单可补正重提，同一客资仍禁止新建活动订单。
-- `effective`：两个中心均通过；关联 Opportunity 同事务进入 `won`。
+- `effective`：两个中心均通过；关联 Opportunity 和 Lead 在同一事务进入 `won`。客户主档保留，订单继续以必填 `personId` 关联客户。
 
 审批轮次保存最终非通过原因快照。补正重提创建新的空原因轮次，不覆盖上一轮审计记录。

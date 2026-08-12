@@ -61,8 +61,8 @@ class LeadQualificationServiceImplTest {
 
         withTenant(() -> service.judgeValid(1L, 20L, command("request-1")));
 
-        assertEquals("converted", lead.getStatus());
-        assertEquals("closed", lead.getAssignmentStatus());
+        assertEquals("valid", lead.getStatus());
+        assertEquals("owned", lead.getAssignmentStatus());
         assertEquals("已确认有明确学习意向", lead.getValidDescription());
         assertEquals(20L, lead.getQualifiedByUserId());
         assertNotNull(lead.getQualifiedAt());
@@ -100,9 +100,9 @@ class LeadQualificationServiceImplTest {
     }
 
     @Test
-    void judgeInvalidAfterConversionClosesOpportunity() {
+    void judgeInvalidAfterValidQualificationClosesOpportunity() {
         LeadDO lead = pendingLead();
-        lead.setStatus("converted"); lead.setAssignmentStatus("closed");
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned");
         OpportunityDO opportunity = new OpportunityDO();
         opportunity.setId(30L); opportunity.setStatus("following");
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
@@ -122,6 +122,26 @@ class LeadQualificationServiceImplTest {
         assertNotNull(opportunity.getLostAt());
         verify(opportunityMapper).updateById(opportunity);
         verify(lifecycleTaskService, never()).completeQualificationTask(anyLong(), anyInt(), any());
+    }
+
+    @Test
+    void judgeValidRestoresExistingOpportunityInsteadOfCreatingAnother() {
+        LeadDO lead = pendingLead();
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("lost"); opportunity.setLostAt(LocalDateTime.now());
+        opportunity.setLostReason("历史关闭"); opportunity.setOwnerUserId(99L);
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(eventMapper.selectByIdempotencyKey("lead-qualification:request-restore")).thenReturn(null);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+
+        withTenant(() -> service.judgeValid(1L, 20L, command("request-restore")));
+
+        assertEquals("open", opportunity.getStatus());
+        assertEquals(20L, opportunity.getOwnerUserId());
+        assertNull(opportunity.getLostAt());
+        assertNull(opportunity.getLostReason());
+        verify(opportunityMapper).updateById(opportunity);
+        verify(opportunityMapper, never()).insert(any(OpportunityDO.class));
     }
 
     @Test

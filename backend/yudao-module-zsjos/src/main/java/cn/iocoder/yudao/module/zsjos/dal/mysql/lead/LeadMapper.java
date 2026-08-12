@@ -31,7 +31,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             JOIN zsjos_opportunity o ON o.lead_id=l.id AND o.type='initial_conversion'
               AND o.status IN ('open','following') AND o.deleted=b'0' AND o.tenant_id=l.tenant_id
             WHERE l.tenant_id=#{tenantId} AND l.deleted=b'0' AND l.assignment_status='owned'
-              AND l.status IN ('valid','converted') AND l.owner_user_id IS NOT NULL
+              AND l.status = 'valid' AND l.owner_user_id IS NOT NULL
               AND l.ownership_started_at IS NOT NULL AND l.ownership_started_at <= #{cutoff}
               AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
                 AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
@@ -47,7 +47,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             JOIN zsjos_opportunity o ON o.lead_id=l.id AND o.type='initial_conversion'
               AND o.status IN ('open','following') AND o.deleted=b'0' AND o.tenant_id=l.tenant_id
             WHERE l.tenant_id=#{tenantId} AND l.deleted=b'0' AND l.assignment_status='owned'
-              AND l.status IN ('valid','converted') AND l.owner_user_id IS NOT NULL
+              AND l.status = 'valid' AND l.owner_user_id IS NOT NULL
               AND l.ownership_started_at IS NOT NULL AND l.ownership_started_at <= #{latestStart}
               AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
                 AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
