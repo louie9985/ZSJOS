@@ -266,6 +266,31 @@ lead-category labels, remark, and attachment images.
 - Results are ordered by `public_pool_at ASC, id ASC`, so the oldest waiting lead is
   presented first. Tenant and logical-delete interceptors remain applicable.
 
+### Aging collaboration pool visibility and actions
+
+The aging collaboration pool is independent from the claim pool. An active cycle freezes the
+original owner A and A's direct department at entry. A remains the Lead owner until a collaborator
+B's order becomes effective.
+
+- `zsjos:lead-aging-pool:query` grants feature access only. Rows are limited to enabled eligible
+  sales in the frozen department, the frozen department's direct leader, A, B, or a user with
+  `zsjos:lead-aging-pool:manage-all`.
+- The direct frozen-department leader also needs `zsjos:lead-aging-pool:manage` to assign, reassign,
+  or exit a cycle. `manage-all` is the tenant-wide operational fallback.
+- B must be an enabled eligible sales user in the frozen department and must differ from A.
+- Before assignment neither A nor another salesperson can advance the Lead. After assignment only B
+  may add follow-ups and submit or revise the deal. A remains a read-only nominal owner.
+- Full contact data follows the same server-side pool visibility. Frontends consume
+  `availableActions` and do not infer mutation rights from owner or department labels.
+- The published `agingPool` inbox audience owns the configurable status grouping for the dedicated
+  pool page. It filters cycle status only and does not reinterpret ordinary Lead assignment state.
+- When B's order becomes effective, Lead and Opportunity ownership move to B in the same transaction;
+  the immutable order submitter remains B.
+- A rejected A-owned order is not reassigned in place. B creates a linked continuation order; the A
+  order remains as `superseded` history and only the B order may proceed through the new approval round.
+- Advance reminders use a durable pending/failed/sent stage. The stage becomes sent only after System
+  confirms message persistence; failed attempts retain a stable error code and a bounded retry time.
+
 ### Sales assignment acceptance
 
 - Sales acceptance requires `zsjos:lead:accept`; fresh initialization and V006 grant it to roles that already hold the claim action instead of inferring access from a role or post display name.

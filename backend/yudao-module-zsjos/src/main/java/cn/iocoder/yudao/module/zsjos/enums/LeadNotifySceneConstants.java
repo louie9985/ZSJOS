@@ -27,6 +27,12 @@ public interface LeadNotifySceneConstants {
     String FIRST_FOLLOW_UP_REMINDER = "zsjos.lead.first_follow_up_reminder";
     String NEXT_FOLLOW_UP_REMINDER = "zsjos.lead.next_follow_up_reminder";
     String QUALIFICATION_REMINDER = "zsjos.lead.qualification_reminder";
+    String AGING_POOL_REMINDER = "zsjos.lead.aging_pool_reminder";
+    String AGING_POOL_DUE = "zsjos.lead.aging_pool_due";
+    String AGING_POOL_ASSIGNED_NOTICE = "zsjos.lead.aging_pool_assigned";
+    String AGING_POOL_REASSIGNED_NOTICE = "zsjos.lead.aging_pool_reassigned";
+    String AGING_POOL_REASSIGN_REQUIRED_NOTICE = "zsjos.lead.aging_pool_reassign_required";
+    String AGING_POOL_EXITED_NOTICE = "zsjos.lead.aging_pool_exited";
 
     String ROLE_SUBMITTER = "submitter";
     String ROLE_PENDING_SALES = "pending_sales";
@@ -38,4 +44,7 @@ public interface LeadNotifySceneConstants {
     String ROLE_APPEAL_REVIEWERS = "appeal_reviewers";
     String ROLE_DIRECT_LEADER = "direct_leader";
     String ROLE_ALL_ELIGIBLE_SALES = "all_eligible_sales";
+    String ROLE_COLLABORATOR = "collaborator";
+    String ROLE_PREVIOUS_COLLABORATOR = "previous_collaborator";
+    String ROLE_FROZEN_DEPT_LEADER = "frozen_dept_leader";
 }

@@ -65,6 +65,12 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_BASIC_INFO_STATE_INVALID = new ErrorCode(1_900_003_044, "当前客资状态不允许修改基础信息");
     ErrorCode LEAD_BASIC_INFO_CONTACT_CONFLICT = new ErrorCode(1_900_003_045, "手机号或微信号已属于其他客户");
     ErrorCode LEAD_OPPORTUNITY_NOT_EXISTS = new ErrorCode(1_900_003_046, "销售机会不存在");
+    ErrorCode LEAD_AGING_POOL_NOT_EXISTS = new ErrorCode(1_900_003_047, "超期公海周期不存在");
+    ErrorCode LEAD_AGING_POOL_STATE_INVALID = new ErrorCode(1_900_003_048, "当前超期公海状态不允许执行该操作");
+    ErrorCode LEAD_AGING_POOL_MANAGER_DENIED = new ErrorCode(1_900_003_049, "无权管理该部门的超期公海客资");
+    ErrorCode LEAD_AGING_POOL_SALES_INVALID = new ErrorCode(1_900_003_050, "协同销售无效、不在冻结部门或与原销售相同");
+    ErrorCode LEAD_AGING_POOL_OWNER_INVALID = new ErrorCode(1_900_003_051, "原销售已停用，不能退出超期公海");
+    ErrorCode LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_052, "超期公海请求幂等键已被其他操作使用");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");
@@ -97,5 +103,6 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_PERMISSION_DENIED = new ErrorCode(1_900_005_011, "无权查看或处理该成交订单");
     ErrorCode SALES_ORDER_ALREADY_HANDLED = new ErrorCode(1_900_005_012, "该审批任务已由其他人员处理");
     ErrorCode SALES_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_005_013, "成交订单请求幂等键已被其他请求使用");
+    ErrorCode SALES_ORDER_CONTINUATION_CONFLICT = new ErrorCode(1_900_005_014, "该驳回订单已被接续或当前协同销售无权接续");
 
 }

@@ -3585,6 +3585,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资主状态',
   `assignment_status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资分配状态',
   `owner_user_id` bigint DEFAULT NULL COMMENT '当前主责销售用户编号',
+  `ownership_started_at` datetime DEFAULT NULL COMMENT '当前销售正式持有起点',
   `recycle_source_owner_user_id` bigint DEFAULT NULL COMMENT '回收前销售，用于主管对象范围',
   `current_assignment_history_id` bigint DEFAULT NULL COMMENT '当前归属周期分配历史编号',
   `current_assignment_first_follow_up_at` datetime DEFAULT NULL COMMENT '当前归属周期首次跟进时间',
@@ -3640,7 +3641,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   KEY `idx_tenant_pending_expiry` (`tenant_id`,`assignment_status`,`pending_expires_at`),
   KEY `idx_tenant_public_pool` (`tenant_id`,`assignment_status`,`public_pool_at`),
   KEY `idx_tenant_qualification_deadline` (`tenant_id`,`status`,`assignment_status`,`qualification_deadline_at`),
-  KEY `idx_tenant_recycle_source` (`tenant_id`,`assignment_status`,`recycle_source_owner_user_id`)
+  KEY `idx_tenant_recycle_source` (`tenant_id`,`assignment_status`,`recycle_source_owner_user_id`),
+  KEY `idx_tenant_aging_pool_scan` (`tenant_id`,`assignment_status`,`status`,`ownership_started_at`,`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资';
 
 -- zsjos_lead_activation
@@ -3808,6 +3810,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_rule` (
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则名称',
   `first_follow_up_timeout_minutes` int NOT NULL COMMENT '接单后首次跟进时限（分钟）',
   `qualification_timeout_minutes` int NOT NULL DEFAULT '4320' COMMENT '首次跟进后有效性判定时限（分钟）',
+  `aging_pool_timeout_days` int NOT NULL DEFAULT '90' COMMENT '超期协同公海期限（自然日）',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0 启用，1 停用',
   `version` int NOT NULL DEFAULT '0' COMMENT '乐观锁版本',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
@@ -3819,6 +3822,48 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_rule` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资跟进时效规则';
+
+CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_cycle` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `cycle_no` int NOT NULL,
+  `original_owner_user_id` bigint NOT NULL, `collaborator_user_id` bigint DEFAULT NULL,
+  `frozen_dept_id` bigint NOT NULL, `status` varchar(32) NOT NULL,
+  `ownership_started_at` datetime NOT NULL, `due_at` datetime NOT NULL, `entered_at` datetime NOT NULL,
+  `assigned_at` datetime DEFAULT NULL, `exited_at` datetime DEFAULT NULL, `converted_at` datetime DEFAULT NULL,
+  `exit_reason` varchar(500) DEFAULT NULL, `idempotency_key` varchar(64) NOT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_lead_cycle` (`tenant_id`,`lead_id`,`cycle_no`),
+  UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+  KEY `idx_tenant_dept_status_entered` (`tenant_id`,`frozen_dept_id`,`status`,`entered_at`,`id`),
+  KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资超期协同公海周期';
+
+CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `cycle_id` bigint NOT NULL, `lead_id` bigint NOT NULL,
+  `event_type` varchar(32) NOT NULL, `operator_user_id` bigint DEFAULT NULL,
+  `previous_collaborator_user_id` bigint DEFAULT NULL, `collaborator_user_id` bigint DEFAULT NULL,
+  `reason` varchar(500) DEFAULT NULL, `idempotency_key` varchar(128) NOT NULL, `occurred_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+  KEY `idx_tenant_cycle_time` (`tenant_id`,`cycle_id`,`occurred_at`,`id`),
+  KEY `idx_tenant_lead_time` (`tenant_id`,`lead_id`,`occurred_at`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资超期协同公海事件';
+
+CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_notify_stage` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `cycle_no` int NOT NULL,
+  `notify_rule_id` bigint NOT NULL, `stage` varchar(16) NOT NULL,
+  `status` varchar(16) NOT NULL DEFAULT 'pending', `attempt_count` int NOT NULL DEFAULT 0,
+  `next_retry_at` datetime DEFAULT NULL, `last_error_code` varchar(64) DEFAULT NULL,
+  `sent_at` datetime DEFAULT NULL, `emitted_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_lead_cycle_rule` (`tenant_id`,`lead_id`,`cycle_no`,`notify_rule_id`),
+  KEY `idx_tenant_status_retry` (`tenant_id`,`status`,`next_retry_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 超期公海提前通知幂等阶段';
 
 -- zsjos_lead_assignment_rule
 CREATE TABLE IF NOT EXISTS `zsjos_lead_assignment_rule` (
@@ -3857,7 +3902,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_sales_dispatch_preference` (
 -- zsjos_lead_inbox_filter_scheme
 CREATE TABLE IF NOT EXISTS `zsjos_lead_inbox_filter_scheme` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '筛选方案编号',
-  `audience` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '适用视角：submitter、owner 或 reviewer',
+  `audience` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '适用视角：submitter、owner、reviewer 或 agingPool',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '方案名称',
   `draft_config_json` json NOT NULL COMMENT '当前草稿配置',
   `published_config_json` json DEFAULT NULL COMMENT '当前已发布配置',
@@ -4045,6 +4090,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次提交幂等键',
   `contract_refs` json DEFAULT NULL COMMENT '合同或附件引用',
   `current_approval_round_id` bigint DEFAULT NULL COMMENT '当前审批轮次编号',
+  `supersedes_order_id` bigint DEFAULT NULL COMMENT '接续的原订单编号',
+  `superseded_by_order_id` bigint DEFAULT NULL COMMENT '接续后的新订单编号',
   `submitted_at` datetime DEFAULT NULL COMMENT '提交时间',
   `effective_at` datetime DEFAULT NULL COMMENT '生效时间',
   `cancelled_at` datetime DEFAULT NULL COMMENT '取消时间',
@@ -4062,10 +4109,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_no` (`tenant_id`,`order_no`),
   UNIQUE KEY `uk_tenant_source_payment_order` (`tenant_id`,`source_payment_order_id`),
-  UNIQUE KEY `uk_tenant_opportunity` (`tenant_id`,`opportunity_id`),
+  UNIQUE KEY `uk_tenant_supersedes_order` (`tenant_id`,`supersedes_order_id`),
   UNIQUE KEY `uk_tenant_order_submit_key` (`tenant_id`,`submission_idempotency_key`),
   UNIQUE KEY `uk_tenant_active_lead_order` (`tenant_id`,`active_lead_id`),
   KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`),
+  KEY `idx_tenant_opportunity` (`tenant_id`,`opportunity_id`),
   KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
   KEY `idx_tenant_submitter_status_submitted` (`tenant_id`,`submitter_user_id`,`status`,`submitted_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 业务订单';

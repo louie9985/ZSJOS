@@ -48,6 +48,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private String materialDeliveryContact;
     private String paymentVoucherRefs;
     private Long currentApprovalRoundId;
+    private Long supersedesOrderId;
+    private Long supersededByOrderId;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
     private String submissionIdempotencyKey;

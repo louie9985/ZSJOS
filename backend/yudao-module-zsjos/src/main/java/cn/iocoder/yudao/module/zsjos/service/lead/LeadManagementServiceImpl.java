@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBas
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
@@ -74,6 +75,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadBasicInfoService leadBasicInfoService;
     @Resource private SalesOrderMapper salesOrderMapper;
+    @Resource private LeadAgingPoolService agingPoolService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -113,7 +115,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (lead == null) {
             throw exception(LEAD_NOT_EXISTS);
         }
-        if (!leadObjectPermissionService.canRead(lead, userId)) {
+        if (!leadObjectPermissionService.canRead(lead, userId) && !agingPoolService.canRead(id, userId)) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         Map<Long, AdminUserRespDTO> users = getUserMap(List.of(lead));
@@ -265,7 +267,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,
                                                                 SalesOrderDO activeOrder,
                                                                 Long currentUserId) {
-        if (!Objects.equals(currentUserId, lead.getOwnerUserId())
+        LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
+        if (!Objects.equals(currentUserId, agingPoolService.resolveEffectiveSalesUserId(lead.getId(), lead.getOwnerUserId()))
                 || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return List.of();
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
         boolean canUpdate = securityFrameworkService.hasPermission("zsjos:lead:update");
@@ -281,14 +284,16 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         } else if ((STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()))
                 && (opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus()))) {
-            if (canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
+            if (agingPoolCycle == null && canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
-            if (canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
+            if (agingPoolCycle == null && canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
             boolean canCreateOrder = securityFrameworkService.hasPermission("zsjos:sales-order:create");
             if (activeOrder == null) {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder));
             } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
-                actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL, canCreateOrder));
+                actions.add(new LeadManagementRespVO.ActionVO(
+                        Objects.equals(activeOrder.getSubmitterUserId(), currentUserId)
+                                ? ACTION_REVISE_DEAL : ACTION_CONTINUE_DEAL, canCreateOrder));
             }
         }
         return actions;

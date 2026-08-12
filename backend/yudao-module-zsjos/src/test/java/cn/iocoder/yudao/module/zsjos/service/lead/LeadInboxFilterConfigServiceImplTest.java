@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_INBOX_FILTER_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.AGING_POOL_ASSIGNED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
@@ -141,6 +142,26 @@ class LeadInboxFilterConfigServiceImplTest {
 
         assertEquals(Set.of("submitted"), query.statuses());
         assertEquals(Set.of("owned"), query.assignmentStatuses());
+    }
+
+    @Test
+    void saveDraftAcceptsAgingPoolStatusAudience() {
+        LeadInboxFilterSaveReqVO reqVO = new LeadInboxFilterSaveReqVO();
+        reqVO.setAudience("agingPool");
+        LeadInboxFilterConfigVO.GroupVO all = group("all", "全部公海客资", 0);
+        LeadInboxFilterConfigVO.OptionVO allOption = option("all", "全部", 0);
+        LeadInboxFilterConfigVO.OptionVO assigned = option("assigned", "协同跟进中", 10);
+        assigned.setConditions(List.of(condition("pool_status", AGING_POOL_ASSIGNED)));
+        all.setOptions(List.of(allOption, assigned));
+        reqVO.setGroups(List.of(all));
+        LeadInboxFilterSchemeDO scheme = scheme(reqVO);
+        scheme.setAudience("agingPool");
+        when(schemeMapper.selectByAudience("agingPool")).thenReturn(scheme);
+
+        service.saveDraft(reqVO);
+
+        verify(schemeMapper).updateById(org.mockito.ArgumentMatchers.<LeadInboxFilterSchemeDO>argThat(update ->
+                update.getDraftConfigJson().contains("pool_status")));
     }
 
     private static LeadInboxFilterSchemeDO scheme(LeadInboxFilterConfigVO config) {

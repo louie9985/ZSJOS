@@ -37,18 +37,22 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_I
 @Service
 public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigService {
 
-    private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER, INBOX_AUDIENCE_REVIEWER);
+    private static final Set<String> AUDIENCES = Set.of(INBOX_AUDIENCE_SUBMITTER, INBOX_AUDIENCE_OWNER,
+            INBOX_AUDIENCE_REVIEWER, INBOX_AUDIENCE_AGING_POOL);
     private static final Pattern CONFIG_KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{1,63}");
     private static final Map<String, Set<String>> ALLOWED_FIELDS_BY_AUDIENCE = Map.of(
             INBOX_AUDIENCE_SUBMITTER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS),
             INBOX_AUDIENCE_OWNER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS),
-            INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY));
+            INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY),
+            INBOX_AUDIENCE_AGING_POOL, Set.of(INBOX_FILTER_FIELD_POOL_STATUS));
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
             INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "converted", "invalid", "closed")),
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
             new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned")),
             INBOX_FILTER_FIELD_HANDLED, new LinkedHashSet<>(List.of("todo", "done")),
-            INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(List.of("registrationReview", "financeReview")));
+            INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(List.of("registrationReview", "financeReview")),
+            INBOX_FILTER_FIELD_POOL_STATUS, new LinkedHashSet<>(List.of(AGING_POOL_WAITING_ASSIGNMENT,
+                    AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING)));
 
     @Resource
     private LeadInboxFilterSchemeMapper schemeMapper;
@@ -132,6 +136,11 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                     capability(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, "审批环节", List.of(
                             value("registrationReview", registrationLabel + "审批"),
                             value("financeReview", financeLabel + "审批"))));
+        }
+        if (INBOX_AUDIENCE_AGING_POOL.equals(audience)) {
+            return List.of(capability(INBOX_FILTER_FIELD_POOL_STATUS, "公海状态", List.of(
+                    value(AGING_POOL_WAITING_ASSIGNMENT, "待指派"), value(AGING_POOL_ASSIGNED, "协同跟进中"),
+                    value(AGING_POOL_DEAL_PENDING, "成交审批中"))));
         }
         return List.of(
                 capability(INBOX_FILTER_FIELD_STATUS, "客资主状态", List.of(
@@ -347,7 +356,8 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
 
     private static String audienceLabel(String audience) {
         return INBOX_AUDIENCE_SUBMITTER.equals(audience) ? "提交人视角"
-                : INBOX_AUDIENCE_OWNER.equals(audience) ? "负责人视角" : "审批人视角";
+                : INBOX_AUDIENCE_OWNER.equals(audience) ? "负责人视角"
+                : INBOX_AUDIENCE_REVIEWER.equals(audience) ? "审批人视角" : "超期公海视角";
     }
 
     private static LeadInboxFilterCapabilityRespVO capability(String field, String label,
