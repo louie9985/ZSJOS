@@ -3,9 +3,9 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRuleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class LeadLifecycleTaskServiceTest {
     @InjectMocks private LeadLifecycleTaskService service;
-    @Mock private BusinessTaskMapper taskMapper;
+    @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private BusinessEventMapper eventMapper;
     @Mock private LeadFollowUpRuleService followUpRuleService;
 
@@ -37,13 +37,13 @@ class LeadLifecycleTaskServiceTest {
         service.createFirstFollowUpTask(1L, 10L, 88L, acceptedAt,
                 "lead_assignment_accepted", "pending_acceptance");
 
-        ArgumentCaptor<BusinessTaskDO> taskCaptor = ArgumentCaptor.forClass(BusinessTaskDO.class);
-        verify(taskMapper).insert(taskCaptor.capture());
-        BusinessTaskDO task = taskCaptor.getValue();
-        assertEquals("lead_first_follow_up", task.getTaskType());
-        assertEquals(acceptedAt.plusMinutes(90), task.getDueAt());
-        assertEquals("lead-first-follow-up:88", task.getIdempotencyKey());
-        assertTrue(task.getPayload().contains("\"ruleVersion\":3"));
+        ArgumentCaptor<BusinessTaskCreateCommand> taskCaptor = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(taskCommandService).create(taskCaptor.capture());
+        BusinessTaskCreateCommand task = taskCaptor.getValue();
+        assertEquals("lead_first_follow_up", task.taskType());
+        assertEquals(acceptedAt.plusMinutes(90), task.dueAt());
+        assertEquals("lead-first-follow-up:88", task.idempotencyKey());
+        assertTrue(task.payload().contains("\"ruleVersion\":3"));
 
         ArgumentCaptor<BusinessEventDO> eventCaptor = ArgumentCaptor.forClass(BusinessEventDO.class);
         verify(eventMapper).insert(eventCaptor.capture());
@@ -62,12 +62,12 @@ class LeadLifecycleTaskServiceTest {
 
         service.createQualificationTask(lead, 10L, startedAt);
 
-        ArgumentCaptor<BusinessTaskDO> taskCaptor = ArgumentCaptor.forClass(BusinessTaskDO.class);
-        verify(taskMapper).insert(taskCaptor.capture());
-        BusinessTaskDO task = taskCaptor.getValue();
-        assertEquals("lead_qualification", task.getTaskType());
-        assertEquals(startedAt.plusMinutes(4320), task.getDueAt());
-        assertEquals("lead-qualification:1:3", task.getIdempotencyKey());
+        ArgumentCaptor<BusinessTaskCreateCommand> taskCaptor = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(taskCommandService).create(taskCaptor.capture());
+        BusinessTaskCreateCommand task = taskCaptor.getValue();
+        assertEquals("lead_qualification", task.taskType());
+        assertEquals(startedAt.plusMinutes(4320), task.dueAt());
+        assertEquals("lead-qualification:1:3", task.idempotencyKey());
         assertEquals(3, lead.getQualificationRoundNo());
         assertEquals(startedAt.plusMinutes(4320), lead.getQualificationDeadlineAt());
         assertTrue(lead.getQualificationRuleSnapshot().contains("\"ruleVersion\":4"));

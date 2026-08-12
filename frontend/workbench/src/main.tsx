@@ -33,6 +33,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import { api, AuthenticationError, buildMenuTree, clearAuthStorage, type PermissionInfo, type WorkbenchMenu } from './services/api'
 import {
   buildTwoLevelNavigation,
+  filterRenderableMenus,
   findPageByPath,
   findPrimaryByPath,
   getInitialTarget,
@@ -45,6 +46,7 @@ import LeadManagementPage from './pages/LeadManagementPage'
 import LeadAssignmentPage from './pages/LeadAssignmentPage'
 import LeadClaimPoolPage from './pages/LeadClaimPoolPage'
 import TodayTasksPage from './pages/TodayTasksPage'
+import WorkPlanPage from './pages/WorkPlanPage'
 import LeadQualificationExceptionPage from './pages/LeadQualificationExceptionPage'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
@@ -54,7 +56,7 @@ import MessageCenter from './components/MessageCenter'
 import MessageInboxPage from './pages/MessageInboxPage'
 import LeadAppealPage from './pages/LeadAppealPage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
-import { APP_ROUTES, STORAGE_KEYS } from './constants'
+import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import {
   clearLoginFormCache,
   loadLoginFormCache,
@@ -177,6 +179,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage onOpenAssignment={onOpenAssignment}/>
+  if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
@@ -206,7 +209,10 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0)
   const [openAssignmentRequest, setOpenAssignmentRequest] = useState(0)
 
-  const menus = useMemo(() => buildMenuTree(info.menus || []), [info.menus])
+  const menus = useMemo(
+    () => filterRenderableMenus(buildMenuTree(info.menus || []), RENDERABLE_APP_ROUTES),
+    [info.menus]
+  )
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const activePrimary = useMemo(

@@ -151,7 +151,19 @@ feature permission
 - Object checks run at the Service boundary so alternate controllers, internal callers, and crafted requests cannot bypass them. Batch commands validate every target and make no mutation when any target is unauthorized.
 - ZSJOS object-permission relationships are ZSJOS-owned data. CRM permission tables and CRM-specific public-pool or subordinate behavior are not a source of truth.
 - Administrator bypass and hierarchy behavior must use confirmed system permission APIs and explicit ZSJOS relationships, never role, post, department, or user display names.
-- The current codebase does not yet provide `@ZsjosPermission`; this is a known implementation gap that must be closed before object-bearing ZSJOS workflows are considered permission-complete.
+- `@ZsjosPermission` resolves a registered provider by business type. Unknown or duplicate provider types fail closed; existing lead behavior is retained through its provider adapter.
+
+### Work-plan authorization
+
+- Work-plan Controller methods require the corresponding `zsjos:work-plan:*` feature permission.
+- The `工作计划` route node is permission-free. `zsjos:work-plan:query` belongs to the separate `查看工作计划` button node so role administrators can grant page access without cascading every write action.
+- Work-plan clients treat the query-permitted plan list as the primary page resource. Creation-only templates and user or department options are requested only when the current operation needs them; an optional resource failure must not hide an already authorized plan list.
+- Work-plan lists, statistics, and exports combine the current user's department data scope with explicit plan relationships such as creator, plan owner, task assignee, assigner, and confirmer. Cross-department collaboration is granted only by those persisted relationships; it does not make unrelated department-private plans visible.
+- Single-plan and single-task commands first check the persisted object relationship and required action. After authorization, status, plan period, parent-child ownership, and deadline checks use the already loaded tenant-scoped objects as business facts; they do not reuse list visibility as an existence test.
+- The assignee can read the assigned task as an object relation; completion still requires `zsjos:work-plan:complete`. The explicit confirmer can read and confirm the submitted task; confirmation still requires `zsjos:work-plan:review`.
+- Team visibility uses the assignee department snapshot captured at assignment time and the current user's Yudao department data scope. A later employee transfer does not rewrite history.
+- Creator, plan owner, assignee, assigner, confirmer, and in-scope users receive different server-calculated `availableActions`. Every write repeats object permission and optimistic-version checks at the Service boundary.
+- Attachment submission accepts only Infra file IDs uploaded by the current user under the work-plan directory. A known file ID alone does not grant attachment authority.
 
 ## Business API flow
 

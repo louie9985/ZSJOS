@@ -11,7 +11,13 @@ public class BusinessTaskRespVO {
     private Long bizId;
     private String title;
     private String summary;
+    private String status;
     private LocalDateTime dueAt;
+    private LocalDateTime remindAt;
+    private LocalDateTime completedAt;
+    private LocalDateTime cancelledAt;
+    private LocalDateTime createTime;
     private Boolean overdue;
     private String actionCode;
+    private Boolean actionable;
 }

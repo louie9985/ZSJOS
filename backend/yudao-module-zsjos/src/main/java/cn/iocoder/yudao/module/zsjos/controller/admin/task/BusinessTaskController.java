@@ -3,11 +3,13 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.task;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskSummaryRespVO;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -35,5 +37,12 @@ public class BusinessTaskController {
             @RequestParam(value = "pageNo", defaultValue = "1") int pageNo,
             @RequestParam(value = "pageSize", defaultValue = "20") int pageSize) {
         return success(taskService.getMyPage(getLoginUserId(), bucket, pageNo, pageSize));
+    }
+
+    @GetMapping("/my-task-page")
+    @Operation(summary = "获得我的业务任务分页")
+    @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")
+    public CommonResult<PageResult<BusinessTaskRespVO>> getMyTaskPage(@Valid BusinessTaskPageReqVO reqVO) {
+        return success(taskService.getMyPage(getLoginUserId(), reqVO));
     }
 }
