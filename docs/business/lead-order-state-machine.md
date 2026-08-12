@@ -841,11 +841,11 @@ invalid + 第3次申诉 -> chairman_reviewing      -> overturned | upheld(最终
 waiting_assignment/assigned --主管填写原因退出--> exited
 ```
 
-- 入池冻结 A 的直属部门，A 仍是 Lead 名义负责人；`waiting_assignment` 时 A 只读。
-- 主管只能指派同一冻结部门内、启用且不同于 A 的销售 B。B 失效或调离后自动清空并返回待指派，历史记录不覆盖。
-- `assigned` 时仅 B 可新增跟进、设置下次跟进、录入或补正成交；A 与同部门可见人员只读。
+- 入池记录 A 的直属部门快照用于审计，运行时可见范围按 A 当前直属部门计算；A 仍是 Lead 名义负责人，`waiting_assignment` 时 A 只读。
+- 主管只能指派 A 当前直属部门内、启用且不同于 A 的销售 B。B 失效或调离后自动清空并返回待指派，历史记录不覆盖。
+- `assigned` 时 A 与 B 均可新增跟进、设置下次跟进、录入或补正成交；实际操作人单独记录。
 - B 提交订单后进入 `deal_pending`，禁止换派和退出；驳回或取消回到 `assigned`。
-- 订单最终生效时，订单提交人保持 B，Lead 与 Opportunity 在同一事务转归 B，周期进入 `converted`。
+- 订单最终生效时，订单提交人保持实际操作人，Lead 与 Opportunity 正式归属不变，周期进入 `converted`。
 - 主管退出必须填写原因，且 A 必须仍启用；退出后以退出时间作为 A 新一轮持有起点。
 - 通知只包含一个或多个提前规则和实际入池到期通知，不发送逾期通知。
 ### 超期公海接续成交
@@ -868,5 +868,6 @@ owner=A, status=S, assignment_status=X, public_sea(owner=A, collaborator=B?)
 
 - 释放前后 `owner_user_id`、Lead 主状态和 `assignment_status` 必须相同。
 - `assignment_status=public_pool` 仍专指无归属、可抢单的抢单池；人工公海不得进入抢单列表或领取接口。
-- 本期公海跟进销售只是协作基础信息，不因此获得直接跟进、判定或成交权限。
+- 公海跟进销售获得与正式负责人相同的跟进和建单能力，但不改变正式归属或业绩归属。
+- 配置跟进销售后仍留在公海；只有正式转派、关闭或成交退出。活动订单审批期间冻结转派、退出和协作人替换。
 - 重复释放返回稳定的“已在人工公海”失败；批量中该失败不回滚其他成功项。

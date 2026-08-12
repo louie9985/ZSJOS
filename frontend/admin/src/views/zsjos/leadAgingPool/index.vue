@@ -13,7 +13,7 @@
     <el-alert v-if="error" type="error" :title="error" show-icon :closable="false" class="mb-16px">
       <template #default><el-button link type="primary" @click="getList">重试</el-button></template>
     </el-alert>
-    <el-table v-loading="loading" :data="list" stripe table-layout="fixed" empty-text="暂无超期公海客资">
+    <el-table v-loading="loading" :data="list" stripe table-layout="fixed" empty-text="暂无公海商机">
       <el-table-column label="客资" min-width="150" fixed="left"><template #default="scope"><strong>{{ scope.row.submittedName }}</strong><div class="muted">#{{ scope.row.leadId }}</div></template></el-table-column>
       <el-table-column label="联系方式" min-width="190"><template #default="scope"><div>{{ scope.row.submittedMobile || '-' }}</div><div>{{ scope.row.submittedWechatId || '-' }}</div></template></el-table-column>
       <el-table-column label="状态" width="120"><template #default="scope"><el-tag :type="statusType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag></template></el-table-column>
@@ -36,7 +36,7 @@
     <el-select v-model="salesUserId" filterable placeholder="选择同部门启用销售" style="width:100%"><el-option v-for="item in candidates" :key="item.id" :label="item.nickname" :value="item.id" /></el-select>
     <template #footer><el-button @click="assignVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="submitAssign">确认</el-button></template>
   </el-dialog>
-  <el-dialog v-model="exitVisible" title="退出超期公海" width="520px">
+  <el-dialog v-model="exitVisible" title="退出公海池" width="520px">
     <el-input v-model="exitReason" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="填写退出原因；退出后由A独占推进并重新计时" />
     <template #footer><el-button @click="exitVisible=false">取消</el-button><el-button type="danger" :loading="saving" @click="submitExit">确认退出</el-button></template>
   </el-dialog>
@@ -55,12 +55,12 @@ const assignVisible = ref(false); const exitVisible = ref(false); const exitReas
 const statusOptions = [{ value: 'waiting_assignment', label: '待指派' }, { value: 'assigned', label: '协同跟进中' }, { value: 'deal_pending', label: '成交审批中' }] as const
 const statusLabel = (status: AgingPoolApi.LeadAgingPoolStatus) => statusOptions.find(item => item.value === status)?.label || status
 const statusType = (status: AgingPoolApi.LeadAgingPoolStatus) => status === 'waiting_assignment' ? 'warning' : status === 'deal_pending' ? 'info' : 'success'
-const getList = async () => { loading.value=true; error.value=''; try { const data=await AgingPoolApi.getPage(queryParams); list.value=data.list||[]; total.value=data.total||0 } catch(e:any){ error.value=e?.msg||e?.message||'超期公海加载失败'; list.value=[]; total.value=0 } finally { loading.value=false } }
+const getList = async () => { loading.value=true; error.value=''; try { const data=await AgingPoolApi.getPage(queryParams); list.value=data.list||[]; total.value=data.total||0 } catch(e:any){ error.value=e?.msg||e?.message||'公海池加载失败'; list.value=[]; total.value=0 } finally { loading.value=false } }
 const search = () => { queryParams.pageNo=1; void getList() }; const reset = () => { queryParams.keyword=undefined; queryParams.status=undefined; search() }
 const openAssign = async (row:AgingPoolApi.LeadAgingPoolVO) => { current.value=row; try{candidates.value=await AgingPoolApi.getCandidates(row.cycleId);salesUserId.value=row.collaboratorUserId;assignVisible.value=true}catch(e:any){message.error(e?.msg||e?.message||'候选销售加载失败')} }
 const submitAssign = async () => { if(!current.value||!salesUserId.value){message.warning('请选择协同销售');return} saving.value=true; try{await AgingPoolApi.assign(current.value.cycleId,salesUserId.value);message.success('协同销售已更新');assignVisible.value=false;await getList()}catch(e:any){message.error(e?.msg||e?.message||'协同销售更新失败')}finally{saving.value=false} }
 const openExit = (row:AgingPoolApi.LeadAgingPoolVO) => { current.value=row; exitReason.value=''; exitVisible.value=true }
-const submitExit = async () => { if(!current.value||!exitReason.value.trim()){message.warning('请填写退出原因');return} saving.value=true; try{await AgingPoolApi.exit(current.value.cycleId,exitReason.value.trim());message.success('客资已退出超期公海');exitVisible.value=false;await getList()}catch(e:any){message.error(e?.msg||e?.message||'退出超期公海失败')}finally{saving.value=false} }
+const submitExit = async () => { if(!current.value||!exitReason.value.trim()){message.warning('请填写退出原因');return} saving.value=true; try{await AgingPoolApi.exit(current.value.cycleId,exitReason.value.trim());message.success('商机已退出公海池');exitVisible.value=false;await getList()}catch(e:any){message.error(e?.msg||e?.message||'退出公海池失败')}finally{saving.value=false} }
 onMounted(getList)
 </script>
 

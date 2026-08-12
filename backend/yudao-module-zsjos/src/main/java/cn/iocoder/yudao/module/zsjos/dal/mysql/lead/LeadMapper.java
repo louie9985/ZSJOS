@@ -32,13 +32,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
               AND o.status IN ('open','following') AND o.deleted=b'0' AND o.tenant_id=l.tenant_id
             WHERE l.tenant_id=#{tenantId} AND l.deleted=b'0' AND l.assignment_status='owned'
               AND l.status = 'valid' AND l.owner_user_id IS NOT NULL
-              AND l.ownership_started_at IS NOT NULL AND l.ownership_started_at <= #{cutoff}
+              AND COALESCE((SELECT MAX(ofu.occurred_at) FROM zsjos_opportunity_follow_up_record ofu
+                    WHERE ofu.opportunity_id=o.id AND ofu.tenant_id=l.tenant_id AND ofu.deleted=b'0'),
+                    o.create_time) <= #{cutoff}
               AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
                 AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
                 AND c.status IN ('waiting_assignment','assigned','deal_pending'))
               AND NOT EXISTS (SELECT 1 FROM zsjos_order so WHERE so.lead_id=l.id
                 AND so.tenant_id=l.tenant_id AND so.deleted=b'0' AND so.status='pending_approval')
-            ORDER BY l.ownership_started_at ASC,l.id ASC LIMIT 200
+            ORDER BY o.create_time ASC,l.id ASC LIMIT 200
             """)
     List<LeadDO> selectAgingPoolCandidates(@Param("tenantId") Long tenantId,
                                            @Param("cutoff") LocalDateTime cutoff);
@@ -48,13 +50,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
               AND o.status IN ('open','following') AND o.deleted=b'0' AND o.tenant_id=l.tenant_id
             WHERE l.tenant_id=#{tenantId} AND l.deleted=b'0' AND l.assignment_status='owned'
               AND l.status = 'valid' AND l.owner_user_id IS NOT NULL
-              AND l.ownership_started_at IS NOT NULL AND l.ownership_started_at <= #{latestStart}
+              AND COALESCE((SELECT MAX(ofu.occurred_at) FROM zsjos_opportunity_follow_up_record ofu
+                    WHERE ofu.opportunity_id=o.id AND ofu.tenant_id=l.tenant_id AND ofu.deleted=b'0'),
+                    o.create_time) <= #{latestStart}
               AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
                 AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
                 AND c.status IN ('waiting_assignment','assigned','deal_pending'))
               AND NOT EXISTS (SELECT 1 FROM zsjos_order so WHERE so.lead_id=l.id
                 AND so.tenant_id=l.tenant_id AND so.deleted=b'0' AND so.status='pending_approval')
-            ORDER BY l.ownership_started_at ASC,l.id ASC LIMIT 500
+            ORDER BY o.create_time ASC,l.id ASC LIMIT 500
             """)
     List<LeadDO> selectAgingPoolReminderCandidates(@Param("tenantId") Long tenantId,
                                                    @Param("latestStart") LocalDateTime latestStart);
@@ -209,6 +213,16 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eq(LeadDO::getAssignmentStatus, ASSIGNMENT_UNASSIGNED)
                 .isNotNull(LeadDO::getAssignmentRuleSnapshot)
                 .orderByAsc(LeadDO::getSubmittedAt).last("LIMIT 100"));
+    }
+    default List<LeadDO> selectPreQualificationNoProgressCandidates(LocalDateTime cutoff) {
+        return selectList(new LambdaQueryWrapperX<LeadDO>()
+                .eq(LeadDO::getStatus, "submitted")
+                .eq(LeadDO::getAssignmentStatus, "owned")
+                .isNotNull(LeadDO::getOwnerUserId)
+                .and(query -> query.le(LeadDO::getLastFollowUpAt, cutoff)
+                        .or(nested -> nested.isNull(LeadDO::getLastFollowUpAt)
+                                .le(LeadDO::getOwnershipStartedAt, cutoff)))
+                .orderByAsc(LeadDO::getOwnershipStartedAt).last("LIMIT 200"));
     }
     default int updateUnassignedToPending(Long id, Long assigneeId, LocalDateTime expiresAt, Integer attempt) {
         return update(null, new LambdaUpdateWrapper<LeadDO>()

@@ -31,6 +31,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_ASSIGNMENT_ALREADY_HANDLED = new ErrorCode(1_900_003_010, "该派单已处理或已超时");
     ErrorCode LEAD_ASSIGNMENT_REJECT_FORBIDDEN = new ErrorCode(1_900_003_011, "指定派单不能拒绝");
     ErrorCode LEAD_CLAIM_ALREADY_TAKEN = new ErrorCode(1_900_003_012, "该客资已被其他销售抢走");
+    ErrorCode LEAD_CLAIM_DAILY_LIMIT_REACHED = new ErrorCode(1_900_003_071, "今日主动抢单数量已达上限");
     ErrorCode LEAD_PERMISSION_DENIED = new ErrorCode(1_900_003_013, "无权访问或操作该客资");
     ErrorCode LEAD_RULE_NOT_EXISTS = new ErrorCode(1_900_003_014, "客资派单规则不存在");
     ErrorCode LEAD_RULE_INVALID = new ErrorCode(1_900_003_015, "客资派单规则参数无效");
@@ -83,6 +84,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SUBORDINATE_LEAD_OWNER_CHANGED = new ErrorCode(1_900_003_057, "客资归属已变化，请刷新后重试");
     ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058, "当前客资状态不允许执行该操作");
     ErrorCode SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA = new ErrorCode(1_900_003_059, "客资已在人工公海中");
+    ErrorCode LEAD_TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_003_072, "客资转派审批流程尚未部署或暂不可用");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");

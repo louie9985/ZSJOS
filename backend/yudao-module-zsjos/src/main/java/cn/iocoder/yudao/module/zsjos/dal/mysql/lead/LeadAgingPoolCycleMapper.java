@@ -26,13 +26,15 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
     default LeadAgingPoolCycleDO selectByIdempotencyKey(String key) {
         return selectOne(LeadAgingPoolCycleDO::getIdempotencyKey, key);
     }
-    default PageResult<LeadAgingPoolCycleDO> selectPage(LeadAgingPoolPageReqVO reqVO, List<Long> deptIds,
+    default PageResult<LeadAgingPoolCycleDO> selectPage(LeadAgingPoolPageReqVO reqVO, List<Long> scopedOwnerUserIds,
                                                         Long participantUserId,
                                                         List<String> configuredStatuses, boolean matchNone) {
         LambdaQueryWrapperX<LeadAgingPoolCycleDO> query = new LambdaQueryWrapperX<>();
         if (participantUserId != null) {
             query.and(scope -> {
-                if (deptIds != null && !deptIds.isEmpty()) scope.in(LeadAgingPoolCycleDO::getFrozenDeptId, deptIds).or();
+                if (scopedOwnerUserIds != null && !scopedOwnerUserIds.isEmpty()) {
+                    scope.in(LeadAgingPoolCycleDO::getOriginalOwnerUserId, scopedOwnerUserIds).or();
+                }
                 scope.eq(LeadAgingPoolCycleDO::getOriginalOwnerUserId, participantUserId)
                         .or().eq(LeadAgingPoolCycleDO::getCollaboratorUserId, participantUserId);
             });
@@ -52,11 +54,13 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
         query.orderByAsc(LeadAgingPoolCycleDO::getEnteredAt).orderByAsc(LeadAgingPoolCycleDO::getId);
         return selectPage(reqVO, query);
     }
-    default long selectCountByStatus(List<Long> deptIds, Long participantUserId, String status) {
+    default long selectCountByStatus(List<Long> scopedOwnerUserIds, Long participantUserId, String status) {
         LambdaQueryWrapperX<LeadAgingPoolCycleDO> query = new LambdaQueryWrapperX<>();
         if (participantUserId != null) {
             query.and(scope -> {
-                if (deptIds != null && !deptIds.isEmpty()) scope.in(LeadAgingPoolCycleDO::getFrozenDeptId, deptIds).or();
+                if (scopedOwnerUserIds != null && !scopedOwnerUserIds.isEmpty()) {
+                    scope.in(LeadAgingPoolCycleDO::getOriginalOwnerUserId, scopedOwnerUserIds).or();
+                }
                 scope.eq(LeadAgingPoolCycleDO::getOriginalOwnerUserId, participantUserId)
                         .or().eq(LeadAgingPoolCycleDO::getCollaboratorUserId, participantUserId);
             });

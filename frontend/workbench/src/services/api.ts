@@ -244,7 +244,7 @@ export type LeadAgingPoolItem = {
   leadCategory?: string; sourceChannel?: string; ownershipStartedAt: Timestamp; dueAt: Timestamp; enteredAt: Timestamp
   assignedAt?: Timestamp; lastFollowUpAt?: Timestamp; nextFollowUpAt?: Timestamp
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions: Array<'ASSIGN' | 'EXIT' | 'ADD_FOLLOW_UP' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL'>
+  availableActions: Array<'ASSIGN' | 'EXIT' | 'REQUEST_TRANSFER' | 'ADD_FOLLOW_UP' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL'>
 }
 export type SubordinateTask = { id: number; taskType: string; leadId: number; leadName?: string; dueAt?: Timestamp; overdue: boolean }
 export type SubordinateBatchItem = { leadId: number; success: boolean; code: string; message: string }
@@ -442,6 +442,9 @@ export const api = {
   ),
   exitAgingPool: async (cycleId: number, reason: string) => unwrap<boolean>(
     await http.post(`/zsjos/lead/aging-pool/${cycleId}/exit`, { reason, idempotencyKey: crypto.randomUUID() })
+  ),
+  requestAgingPoolTransfer: async (cycleId: number, reason: string) => unwrap<number>(
+    await http.post(`/zsjos/lead/aging-pool/${cycleId}/transfer-request`, { reason, idempotencyKey: crypto.randomUUID() })
   ),
   managedLeadStatusCounts: async () => unwrap<Record<string, number>>(await http.get('/zsjos/lead/status-counts')),
   judgeLeadValid: async (id: number, data: { leadCategory?: string; remark: string; idempotencyKey: string }) =>

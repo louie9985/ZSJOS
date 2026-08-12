@@ -28,6 +28,8 @@ public class LeadFollowUpRuleServiceImpl implements LeadFollowUpRuleService {
         result.setFirstFollowUpTimeoutMinutes(rule.getFirstFollowUpTimeoutMinutes());
         result.setQualificationTimeoutMinutes(rule.getQualificationTimeoutMinutes());
         result.setAgingPoolTimeoutDays(rule.getAgingPoolTimeoutDays());
+        result.setNoProgressWarningDays(rule.getNoProgressWarningDays());
+        result.setNoProgressGraceDays(rule.getNoProgressGraceDays());
         result.setStatus(rule.getStatus());
         result.setVersion(rule.getVersion());
         return result;
@@ -40,6 +42,8 @@ public class LeadFollowUpRuleServiceImpl implements LeadFollowUpRuleService {
         rule.setFirstFollowUpTimeoutMinutes(reqVO.getFirstFollowUpTimeoutMinutes());
         rule.setQualificationTimeoutMinutes(reqVO.getQualificationTimeoutMinutes());
         rule.setAgingPoolTimeoutDays(reqVO.getAgingPoolTimeoutDays());
+        rule.setNoProgressWarningDays(reqVO.getNoProgressWarningDays());
+        rule.setNoProgressGraceDays(reqVO.getNoProgressGraceDays());
         rule.setVersion(rule.getVersion() == null ? 1 : rule.getVersion() + 1);
         ruleMapper.updateById(rule);
     }
@@ -51,10 +55,14 @@ public class LeadFollowUpRuleServiceImpl implements LeadFollowUpRuleService {
         Integer timeout = rule.getFirstFollowUpTimeoutMinutes();
         Integer qualificationTimeout = rule.getQualificationTimeoutMinutes();
         Integer agingPoolTimeoutDays = rule.getAgingPoolTimeoutDays();
+        Integer warningDays = rule.getNoProgressWarningDays();
+        Integer graceDays = rule.getNoProgressGraceDays();
         if (!CommonStatusEnum.ENABLE.getStatus().equals(rule.getStatus())
                 || timeout == null || timeout < 5 || timeout > 10080
                 || qualificationTimeout == null || qualificationTimeout < 5 || qualificationTimeout > 43200
-                || agingPoolTimeoutDays == null || agingPoolTimeoutDays < 1 || agingPoolTimeoutDays > 3650) {
+                || agingPoolTimeoutDays == null || agingPoolTimeoutDays < 1 || agingPoolTimeoutDays > 3650
+                || warningDays == null || warningDays < 1 || warningDays > 365
+                || graceDays == null || graceDays < 1 || graceDays > 30) {
             throw exception(LEAD_FOLLOW_UP_RULE_INVALID);
         }
         return rule;

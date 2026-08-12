@@ -289,7 +289,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                                                 SalesOrderDO activeOrder,
                                                                 Long currentUserId) {
         LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
-        if (!Objects.equals(currentUserId, agingPoolService.resolveEffectiveSalesUserId(lead.getId(), lead.getOwnerUserId()))
+        if (!agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
                 || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return List.of();
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
         boolean canUpdate = securityFrameworkService.hasPermission("zsjos:lead:update");

@@ -61,8 +61,7 @@ class LeadFollowUpServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        lenient().when(agingPoolService.resolveEffectiveSalesUserId(anyLong(), anyLong()))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
     }
 
     @Test

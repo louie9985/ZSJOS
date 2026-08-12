@@ -21,6 +21,7 @@ public class LeadAgingPoolScheduler {
             runStep(tenantId, "scanDue", () -> service.scanDue(now));
             runStep(tenantId, "clearInvalidCollaborators", () -> service.clearInvalidCollaborators(now));
             runStep(tenantId, "emitAdvanceReminders", () -> service.emitAdvanceReminders(now));
+            runStep(tenantId, "processPreQualificationNoProgress", () -> service.processPreQualificationNoProgress(now));
         });
     }
     private void runStep(Long tenantId, String step, Runnable action) {

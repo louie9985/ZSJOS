@@ -30,4 +30,5 @@ public interface LeadAssignmentHistoryMapper extends BaseMapperX<LeadAssignmentH
                 .forEach(item -> result.putIfAbsent(item.getLeadId(), item));
         return result;
     }
+
 }

@@ -9,4 +9,5 @@ import lombok.Data;
 public class LeadAssignmentRuleUpdateReqVO {
     @NotNull @Min(10) @Max(3600) private Integer acceptTimeoutSeconds;
     @NotNull @Min(1) @Max(20) private Integer maxAttempts;
+    @NotNull @Min(1) @Max(100) private Integer dailyClaimLimit;
 }

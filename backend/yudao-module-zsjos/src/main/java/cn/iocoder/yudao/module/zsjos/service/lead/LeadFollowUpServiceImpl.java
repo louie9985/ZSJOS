@@ -64,9 +64,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         LocalDateTime occurredAt = LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!Objects.equals(operatorUserId, agingPoolService.resolveEffectiveSalesUserId(leadId, lead.getOwnerUserId()))) {
-            throw exception(LEAD_PERMISSION_DENIED);
-        }
+        agingPoolService.requireCanOperateForUpdate(leadId, lead.getOwnerUserId(), operatorUserId);
         if (!canFollow(lead)) {
             throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         }

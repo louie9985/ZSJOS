@@ -7,12 +7,14 @@ export interface LeadAssignmentRuleVO {
   strategyType: 'global_round_robin'
   acceptTimeoutSeconds: number
   maxAttempts: number
+  dailyClaimLimit: number
   status: number
 }
 
 export interface LeadAssignmentRuleUpdateReqVO {
   acceptTimeoutSeconds: number
   maxAttempts: number
+  dailyClaimLimit: number
 }
 
 export const getRule = (): Promise<LeadAssignmentRuleVO> =>

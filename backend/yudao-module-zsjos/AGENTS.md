@@ -48,7 +48,7 @@ ZSJOS business operations **MUST** enforce three independent and cumulative laye
 
 - The legacy ZSJOS technical value `assignment_status=public_pool` means the unowned first-come claim pool (抢单池).
 - The aging collaboration pool and the manually released public sea are owner-preserving collaboration views. They must not reuse the claim-pool assignment value, claim endpoints, direct-claim behavior, or business wording.
-- Manual public-sea release must preserve Lead owner, primary status, and assignment status. An optional public-sea collaborator does not gain follow-up authority unless a separately approved capability explicitly grants it.
+- Manual public-sea release must preserve Lead owner, primary status, and assignment status. The approved Opportunity public-sea collaborator may follow up and create orders, but never becomes the formal or performance owner through collaboration alone.
 
 ## Database and SQL
 

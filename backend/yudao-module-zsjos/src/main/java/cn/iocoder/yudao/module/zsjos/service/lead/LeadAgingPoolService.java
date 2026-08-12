@@ -21,7 +21,9 @@ public interface LeadAgingPoolService {
     boolean tryEnterDueLead(Long leadId, LocalDateTime now);
     int clearInvalidCollaborators(LocalDateTime now);
     int emitAdvanceReminders(LocalDateTime now);
-    Long resolveEffectiveSalesUserId(Long leadId, Long originalOwnerUserId);
+    int processPreQualificationNoProgress(LocalDateTime now);
+    boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
+    void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
     LeadAgingPoolCycleDO getActiveCycle(Long leadId);
     void markDealPending(Long leadId, Long salesUserId, LocalDateTime now);
     void handleOrderRejected(Long leadId, LocalDateTime now);

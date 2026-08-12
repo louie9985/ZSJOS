@@ -40,6 +40,7 @@ public class LeadDO extends TenantBaseDO {
     private LocalDateTime lastFollowUpAt;
     private Long lastFollowUpRecordId;
     private LocalDateTime nextFollowUpAt;
+    private LocalDateTime noProgressWarnedAt;
     private Integer followUpCount;
     private Integer qualificationRoundNo;
     private LocalDateTime qualificationStartedAt;
