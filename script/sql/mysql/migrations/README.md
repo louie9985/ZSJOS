@@ -10,7 +10,9 @@ deletion. Record successful versions in `zsjos_schema_version`.
 to the Core module. New applied migrations are identified by module, version, and
 SHA-256; editing an applied file blocks the next deployment.
 
-`V023__sales_order_dual_approval.sql` adds direct sales-order entry, immutable approval-round snapshots, department-pool configuration, dictionaries and permissions. It intentionally depends on V021 and V022 being integrated first; do not apply V023 to an environment whose schema-version table does not contain both predecessors. The migration is additive and repeatable, seeds no lead/order/payment business rows, and preserves all order and BPM audit history on rollback.
+`V022__reserved_migration_sequence.sql` fills the historical sequence gap before V023. It writes only an idempotent schema-version marker and changes no table structure or business data. Keep the marker once V023 or later has been applied.
+
+`V023__sales_order_dual_approval.sql` adds direct sales-order entry, immutable approval-round snapshots, department-pool configuration, dictionaries and permissions. It depends on V021 and the reserved V022 marker; do not apply V023 to an environment whose schema-version table does not contain both predecessors. The migration is additive and repeatable, seeds no lead/order/payment business rows, and preserves all order and BPM audit history on rollback.
 
 `V024__zsjos_bpm_readonly_forms.sql` adds two enabled, read-only technical BPM forms for every active tenant. The forms expose only stable appeal/order process reference variables for Admin process inspection and model publication; they do not accept business input or create ZSJOS records. Stable system-form markers make the migration repeatable without overwriting administrator changes. Disable the forms for rollback and retain all model, definition, instance, task and audit history. Do not apply V024 while an environment still has the unresolved V022/V023 ordering gap.
 

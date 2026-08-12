@@ -4651,4 +4651,29 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 用户关系场景表';
 
+-- ZSJOS 登录安全默认客户端与配置（可重复执行）
+INSERT INTO system_oauth2_client
+    (client_id, secret, name, logo, description, status, access_token_validity_seconds,
+     refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes,
+     auto_approve_scopes, authorities, resource_ids, additional_information)
+SELECT 'zsjos-pc', '$2a$10$K8KpY7uGvCx7m8VJQ5hWQe3tQg5yDYr2yAYlF6FQq5FzHj7qXqz6K', 'ZSJOS 电脑端', '', '中世健电脑端登录', 0, 7200, 604800,
+       '[]', '["password","refresh_token"]', '[]', '[]', '[]', '[]', '{}'
+WHERE NOT EXISTS (SELECT 1 FROM system_oauth2_client WHERE client_id = 'zsjos-pc' AND deleted = b'0');
+INSERT INTO system_oauth2_client
+    (client_id, secret, name, logo, description, status, access_token_validity_seconds,
+     refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes,
+     auto_approve_scopes, authorities, resource_ids, additional_information)
+SELECT 'zsjos-mobile', '$2a$10$K8KpY7uGvCx7m8VJQ5hWQe3tQg5yDYr2yAYlF6FQq5FzHj7qXqz6K', 'ZSJOS 手机端', '', '中世健手机端登录', 0, 7200, 604800,
+       '[]', '["password","refresh_token"]', '[]', '[]', '[]', '[]', '{}'
+WHERE NOT EXISTS (SELECT 1 FROM system_oauth2_client WHERE client_id = 'zsjos-mobile' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '电脑端最大登录设备数', 'zsjos.auth.pc.max-devices', '1', b'1', '正整数，最大 20'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.pc.max-devices' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '手机端最大登录设备数', 'zsjos.auth.mobile.max-devices', '1', b'1', '正整数，最大 20'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.mobile.max-devices' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '免密登录天数', 'zsjos.auth.remember-days', '7', b'1', '正整数，最大 365 天'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.remember-days' AND deleted = b'0');
+
 SET FOREIGN_KEY_CHECKS=1;

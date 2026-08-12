@@ -20,6 +20,8 @@ SELECT 'lead_intended_product_active_key' AS check_name,
           AND NOT EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
            AND table_name='zsjos_lead_intended_product' AND index_name='uk_tenant_lead_product'),
        'PASS', 'FAIL') AS result;
+SELECT 'reserved_migration_v022' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V022'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_category_empty' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_category' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'source_channel_empty' AS check_name,
@@ -207,7 +209,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
            'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V023','V024','V025','V026'))=10, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026'))=11, 'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
            AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;

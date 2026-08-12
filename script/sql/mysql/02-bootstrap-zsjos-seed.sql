@@ -206,6 +206,9 @@ VALUES ('V020', 'Add unified schema migration metadata and missing CRM tables', 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V021', 'Make lead intended-product uniqueness active-row only', 'lead-intended-product-active-unique-key-v1');
 
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V022', 'Reserve migration sequence before sales-order approval', 'reserved-migration-sequence-v1');
+
 INSERT INTO `zsjos_order_approval_config` (`registration_dept_id`,`finance_dept_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT 1030,1040,'quick-init',NOW(),'quick-init',NOW(),b'0',1
 WHERE EXISTS(SELECT 1 FROM `system_dept` WHERE id=1030 AND tenant_id=1 AND deleted=b'0')
