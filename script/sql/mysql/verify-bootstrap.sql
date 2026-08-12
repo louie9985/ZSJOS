@@ -59,6 +59,17 @@ SELECT 'lead_filter_keys_v032' AS check_name,
                 OR published_config_json LIKE '%\"key\":\"financeReview\"%'
                 OR published_config_json LIKE '%\"key\": \"financeReview\"%')),
           'PASS', 'FAIL') AS result;
+SELECT 'invalid_lead_pending_tasks_v033' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V033')
+          AND NOT EXISTS (
+            SELECT 1
+            FROM zsjos_business_task task
+            JOIN zsjos_lead l ON l.tenant_id=task.tenant_id AND l.id=task.biz_id
+              AND l.deleted=b'0'
+            WHERE task.biz_type='lead'
+              AND task.task_type IN ('lead_first_follow_up','lead_follow_up_reminder','lead_qualification')
+              AND task.status='pending' AND task.deleted=b'0' AND l.status='invalid'),
+          'PASS', 'FAIL') AS result;
 SELECT 'default_follow_up_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_accept_permission' AS check_name,

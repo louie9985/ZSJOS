@@ -21,12 +21,14 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.BUSINE
 @Service
 public class BusinessTaskServiceImpl implements BusinessTaskService {
     private static final Set<String> BUCKETS = Set.of("unscheduled", "overdue", "today", "future");
+    private static final Set<String> INVALID_LEAD_CANCELLED_TASK_TYPES = Set.of(
+            TASK_TYPE_FIRST_FOLLOW_UP, TASK_TYPE_FOLLOW_UP_REMINDER, TASK_TYPE_QUALIFICATION);
     @Resource private BusinessTaskMapper taskMapper;
     @Resource private LeadMapper leadMapper;
 
     @Override
     public BusinessTaskSummaryRespVO getMySummary(Long userId) {
-        List<BusinessTaskDO> tasks = taskMapper.selectMyPending(userId);
+        List<BusinessTaskDO> tasks = selectMyActionablePending(userId);
         return new BusinessTaskSummaryRespVO(count(tasks, "unscheduled"), count(tasks, "overdue"),
                 count(tasks, "today"), count(tasks, "future"));
     }
@@ -34,7 +36,7 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
     @Override
     public PageResult<BusinessTaskRespVO> getMyPage(Long userId, String bucket, int pageNo, int pageSize) {
         if (!BUCKETS.contains(bucket)) throw exception(BUSINESS_TASK_BUCKET_INVALID);
-        List<BusinessTaskDO> matched = taskMapper.selectMyPending(userId).stream()
+        List<BusinessTaskDO> matched = selectMyActionablePending(userId).stream()
                 .filter(task -> inBucket(task, bucket)).sorted(taskComparator()).toList();
         int from = Math.min((pageNo - 1) * pageSize, matched.size());
         int to = Math.min(from + pageSize, matched.size());
@@ -50,6 +52,22 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
 
     private long count(List<BusinessTaskDO> tasks, String bucket) {
         return tasks.stream().filter(task -> inBucket(task, bucket)).count();
+    }
+
+    private List<BusinessTaskDO> selectMyActionablePending(Long userId) {
+        List<BusinessTaskDO> tasks = taskMapper.selectMyPending(userId);
+        List<Long> leadIds = tasks.stream()
+                .filter(task -> BIZ_TYPE_LEAD.equals(task.getBizType()))
+                .filter(task -> INVALID_LEAD_CANCELLED_TASK_TYPES.contains(task.getTaskType()))
+                .map(BusinessTaskDO::getBizId).distinct().toList();
+        if (leadIds.isEmpty()) return tasks;
+        Set<Long> invalidLeadIds = leadMapper.selectBatchIds(leadIds).stream()
+                .filter(lead -> STATUS_INVALID.equals(lead.getStatus()))
+                .map(LeadDO::getId).collect(java.util.stream.Collectors.toSet());
+        if (invalidLeadIds.isEmpty()) return tasks;
+        return tasks.stream().filter(task -> !BIZ_TYPE_LEAD.equals(task.getBizType())
+                || !INVALID_LEAD_CANCELLED_TASK_TYPES.contains(task.getTaskType())
+                || !invalidLeadIds.contains(task.getBizId())).toList();
     }
 
     private boolean inBucket(BusinessTaskDO task, String bucket) {
