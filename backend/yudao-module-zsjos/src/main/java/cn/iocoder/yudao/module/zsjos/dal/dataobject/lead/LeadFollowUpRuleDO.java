@@ -17,6 +17,7 @@ public class LeadFollowUpRuleDO extends TenantBaseDO {
     private String name;
     private Integer firstFollowUpTimeoutMinutes;
     private Integer qualificationTimeoutMinutes;
+    private Integer agingPoolTimeoutDays;
     private Integer status;
     private Integer version;
 }

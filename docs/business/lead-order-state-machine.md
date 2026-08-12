@@ -829,3 +829,29 @@ invalid + 第3次申诉 -> chairman_reviewing      -> overturned | upheld(最终
 ```
 
 `upheld` 表示本轮维持无效，只有第三轮的 `upheld` 才是最终结论；第三轮之后禁止第四次申诉。改判有效统一复用“客资判有效”的后续转换入口，并清理当前无效展示字段，历史事件与申诉记录不变。每次提交和裁决都要求幂等键、必填理由和最多 9 张 JPG/PNG/WebP 图片；第二、三轮不会自动升级，必须由提交人重新提交。
+
+## 18. 超期协同公海状态机（V033）
+
+有效且机会处于 `open/following` 的未成交客资，从 A 正式接手时间起按租户规则计算自然日。默认 90 天；新增跟进不重置计时，修改规则立即影响尚未入池客资。活动成交审批中的客资暂不入池。
+
+```text
+超期 -> waiting_assignment -> assigned -> deal_pending -> converted
+                         |          |             |
+                         +--换派B---+             +--驳回/取消-> assigned
+waiting_assignment/assigned --主管填写原因退出--> exited
+```
+
+- 入池冻结 A 的直属部门，A 仍是 Lead 名义负责人；`waiting_assignment` 时 A 只读。
+- 主管只能指派同一冻结部门内、启用且不同于 A 的销售 B。B 失效或调离后自动清空并返回待指派，历史记录不覆盖。
+- `assigned` 时仅 B 可新增跟进、设置下次跟进、录入或补正成交；A 与同部门可见人员只读。
+- B 提交订单后进入 `deal_pending`，禁止换派和退出；驳回或取消回到 `assigned`。
+- 订单最终生效时，订单提交人保持 B，Lead 与 Opportunity 在同一事务转归 B，周期进入 `converted`。
+- 主管退出必须填写原因，且 A 必须仍启用；退出后以退出时间作为 A 新一轮持有起点。
+- 通知只包含一个或多个提前规则和实际入池到期通知，不发送逾期通知。
+### 超期公海接续成交
+
+- B 补正自己提交的驳回订单时，继续使用原订单并保持 `submitter_user_id` 不变。
+- B 接续 A 提交的驳回订单时，新建 `continuation_sale` 订单；A 的原订单转为 `superseded`。
+- 新旧订单通过 `supersedes_order_id` / `superseded_by_order_id` 双向关联，历史不可覆盖。
+- 同一客资仍只能存在一张 `pending_approval` 或 `revision_required` 活动订单；`superseded`
+  订单退出活动唯一约束但继续保留审计与审批历史。

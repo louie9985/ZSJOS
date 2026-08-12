@@ -55,6 +55,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private FileApi fileApi;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
+    @Resource private LeadAgingPoolService agingPoolService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -183,6 +184,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 null, lead.getAssignmentAttemptCount(), null, null, acceptedAt);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setOwnerUserId(userId);
+        lead.setOwnershipStartedAt(acceptedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPendingAssigneeUserId(null);
         lead.setPendingExpiresAt(null);
@@ -237,6 +239,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.cancelFollowUpReminders(leadId, claimedAt, "客资重新归属");
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setOwnerUserId(userId);
+        lead.setOwnershipStartedAt(claimedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);
@@ -278,12 +281,14 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
+        LocalDateTime transferredAt = LocalDateTime.now();
+        agingPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
         Long pendingAssigneeUserId = lead.getPendingAssigneeUserId();
         String fromAssignmentStatus = lead.getAssignmentStatus();
         lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId);
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
-        LocalDateTime transferredAt = LocalDateTime.now();
+        lead.setOwnershipStartedAt(transferredAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, pendingAssigneeUserId,
                 transferredAt, "管理员转派");
         lifecycleTaskService.cancelFirstFollowUpTasks(leadId, transferredAt, "管理员转派");

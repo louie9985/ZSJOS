@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.notify;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.system.api.notify.NotifyActionType;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyDefaultRuleReqDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRoleRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.rule.NotifyRuleSaveReqVO;
@@ -115,6 +116,39 @@ class NotifyRuleServiceImplTest {
                 () -> service.updateNotifyRuleStatus(1L, CommonStatusEnum.ENABLE.getStatus()));
 
         verify(notifyRuleMapper, never()).updateById(any(NotifyRuleDO.class));
+    }
+
+    @Test
+    void initializeDefaultRulesCreatesMissingRule() {
+        NotifyDefaultRuleReqDTO seed = NotifyDefaultRuleReqDTO.builder().name("default rule")
+                .sceneCode("test.scene").templateCode("TEST_TEMPLATE")
+                .recipientRoles(List.of("owner")).actionType(NotifyActionType.MESSAGE_DETAIL).build();
+        NotifyTemplateDO template = NotifyTemplateDO.builder().id(2L).sceneCode("test.scene").build();
+        when(notifyTemplateService.getNotifyTemplateByCodeFromCache("TEST_TEMPLATE")).thenReturn(template);
+        when(notifyRuleMapper.selectCount(any())).thenReturn(0L);
+        stubValidCatalog();
+
+        service.initializeDefaultRules(List.of(seed));
+
+        ArgumentCaptor<NotifyRuleDO> captor = ArgumentCaptor.forClass(NotifyRuleDO.class);
+        verify(notifyRuleMapper).insert(captor.capture());
+        assertEquals("default rule", captor.getValue().getName());
+        assertEquals("test.scene", captor.getValue().getSceneCode());
+        assertEquals(List.of("owner"), captor.getValue().getRecipientRoles());
+    }
+
+    @Test
+    void initializeDefaultRulesIsIdempotent() {
+        NotifyDefaultRuleReqDTO seed = NotifyDefaultRuleReqDTO.builder().name("default rule")
+                .sceneCode("test.scene").templateCode("TEST_TEMPLATE")
+                .recipientRoles(List.of("owner")).actionType(NotifyActionType.MESSAGE_DETAIL).build();
+        when(notifyTemplateService.getNotifyTemplateByCodeFromCache("TEST_TEMPLATE"))
+                .thenReturn(NotifyTemplateDO.builder().id(2L).sceneCode("test.scene").build());
+        when(notifyRuleMapper.selectCount(any())).thenReturn(1L);
+
+        service.initializeDefaultRules(List.of(seed));
+
+        verify(notifyRuleMapper, never()).insert(any(NotifyRuleDO.class));
     }
 
     private void stubValidCatalog() {

@@ -14,9 +14,11 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -41,6 +43,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     @Resource private PermissionApi permissionApi;
     @Resource private DeptApi deptApi;
     @Resource private LeadAssignmentService assignmentService;
+    @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
@@ -71,7 +74,17 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 timedScene(FIRST_FOLLOW_UP_REMINDER, "首次跟进时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(NEXT_FOLLOW_UP_REMINDER, "下次跟进提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
-                timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER));
+                timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
+                timedScene(AGING_POOL_REMINDER, "超期公海提前提醒", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_DUE, "客资进入超期公海", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_ASSIGNED_NOTICE, "超期公海指派协同销售", ROLE_OWNER, ROLE_COLLABORATOR,
+                        ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_REASSIGNED_NOTICE, "超期公海更换协同销售", ROLE_OWNER,
+                        ROLE_PREVIOUS_COLLABORATOR, ROLE_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_REASSIGN_REQUIRED_NOTICE, "超期公海待重新指派", ROLE_OWNER,
+                        ROLE_PREVIOUS_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_EXITED_NOTICE, "客资退出超期公海", ROLE_OWNER,
+                        ROLE_PREVIOUS_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER));
     }
 
     @Override
@@ -98,6 +111,12 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 assignmentService.getEligibleSalesUsers().forEach(user -> users.add(user.getId()));
                 continue;
             }
+            if (ROLE_FROZEN_DEPT_LEADER.equals(role)) {
+                Long deptId = longValue(payload.get("frozenDeptId"));
+                DeptRespDTO dept = deptId == null ? null : deptApi.getDept(deptId);
+                if (dept != null && dept.getLeaderUserId() != null) users.add(dept.getLeaderUserId());
+                continue;
+            }
             Long id = switch (role) {
                 case ROLE_SUBMITTER -> longValue(payload.get("submitterUserId"));
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
@@ -105,6 +124,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 case ROLE_OPERATOR -> event.getOperatorUserId();
                 case ROLE_PREVIOUS_OWNER -> longValue(payload.get("previousOwnerUserId"));
                 case ROLE_NEW_OWNER -> longValue(payload.get("newOwnerUserId"));
+                case ROLE_COLLABORATOR -> longValue(payload.get("collaboratorUserId"));
+                case ROLE_PREVIOUS_COLLABORATOR -> longValue(payload.get("previousCollaboratorUserId"));
                 default -> null;
             };
             if (id != null && id > 0) users.add(id);
@@ -162,6 +183,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                     "followUp.remark", "followUp.nextAt", "qualification.reason", "appeal.id",
                     "appeal.roundNo", "appeal.stage", "appeal.reason", "appeal.decisionReason");
             copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
+            copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
         }
         return values;
     }
@@ -200,6 +222,12 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         if (Set.of(FIRST_FOLLOW_UP_REMINDER, NEXT_FOLLOW_UP_REMINDER, QUALIFICATION_REMINDER).contains(sceneCode)) {
             variables.add(variable("reminder.stage", "提醒阶段"));
             variables.add(variable("reminder.dueAt", "截止时间"));
+        }
+        if (Set.of(AGING_POOL_REMINDER, AGING_POOL_DUE, AGING_POOL_ASSIGNED_NOTICE,
+                AGING_POOL_REASSIGNED_NOTICE, AGING_POOL_REASSIGN_REQUIRED_NOTICE,
+                AGING_POOL_EXITED_NOTICE).contains(sceneCode)) {
+            variables.add(variable("agingPool.cycleId", "公海周期编号"));
+            variables.add(variable("agingPool.dueAt", "进入公海时间"));
         }
         if (ASSIGNED.equals(sceneCode) || REASSIGNED.equals(sceneCode)) {
             variables.add(variable("assignment.attempt", "派单轮次"));
@@ -244,6 +272,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             case ROLE_APPEAL_REVIEWERS -> "本轮申诉处理人";
             case ROLE_DIRECT_LEADER -> "销售直属主管";
             case ROLE_ALL_ELIGIBLE_SALES -> "全部符合分配关系的销售";
+            case ROLE_COLLABORATOR -> "协同销售";
+            case ROLE_PREVIOUS_COLLABORATOR -> "原协同销售";
+            case ROLE_FROZEN_DEPT_LEADER -> "冻结部门主管";
             default -> role;
         };
     }
@@ -268,7 +299,19 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     private boolean canReadFullContact(LeadDO lead, Long userId) {
         return Objects.equals(userId, lead.getSourceUserId()) || Objects.equals(userId, lead.getOwnerUserId())
                 || permissionApi.hasAnyPermissions(userId, QUERY_ALL_PERMISSION)
-                || managesOwnerDepartment(userId, lead.getOwnerUserId());
+                || managesOwnerDepartment(userId, lead.getOwnerUserId()) || canReadAgingPoolContact(lead.getId(), userId);
+    }
+
+    private boolean canReadAgingPoolContact(Long leadId, Long userId) {
+        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(leadId);
+        if (cycle == null) return false;
+        AdminUserRespDTO user = adminUserApi.getUser(userId);
+        boolean sales = assignmentService.getEligibleSalesUsers().stream()
+                .anyMatch(candidate -> Objects.equals(candidate.getId(), userId));
+        DeptRespDTO dept = deptApi.getDept(cycle.getFrozenDeptId());
+        return Objects.equals(userId, cycle.getCollaboratorUserId())
+                || user != null && sales && Objects.equals(user.getDeptId(), cycle.getFrozenDeptId())
+                || dept != null && Objects.equals(dept.getLeaderUserId(), userId);
     }
 
     private boolean managesOwnerDepartment(Long userId, Long ownerUserId) {

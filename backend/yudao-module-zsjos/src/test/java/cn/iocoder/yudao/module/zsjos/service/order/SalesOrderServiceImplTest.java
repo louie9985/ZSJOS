@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,8 +68,13 @@ class SalesOrderServiceImplTest {
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
     @Mock private DeptApi deptApi;
+    @Mock private LeadAgingPoolService agingPoolService;
 
-    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
+    @BeforeEach void setUp() {
+        TenantContextHolder.setTenantId(1L);
+        lenient().when(agingPoolService.resolveEffectiveSalesUserId(anyLong(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+    }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Test
@@ -247,6 +253,39 @@ class SalesOrderServiceImplTest {
         verify(roundMapper).insert(org.mockito.Mockito.<SalesOrderApprovalRoundDO>argThat(round -> round.getOrderId().equals(100L)
                 && round.getRoundNo() == 2 && "process-2".equals(round.getProcessInstanceId())
                 && round.getOrderSnapshot() != null));
+    }
+
+    @Test
+    void continuationSupersedesAOrderAndCreatesImmutableBOwnedOrder() {
+        SalesOrderDO original = new SalesOrderDO();
+        original.setId(100L); original.setLeadId(1L); original.setOpportunityId(30L);
+        original.setSubmitterUserId(10L); original.setStatus(STATUS_REVISION_REQUIRED);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(original);
+        mockEligibleLeadAndOpportunity();
+        SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
+        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
+        when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
+        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-continuation");
+        when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; })
+                .when(orderMapper).insert(any(SalesOrderDO.class));
+        doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
+                .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
+
+        Long continuationId = service.continueAndSubmit(100L, 20L,
+                request(BigDecimal.ZERO, "13800138000", null));
+
+        assertEquals(101L, continuationId);
+        assertEquals(STATUS_SUPERSEDED, original.getStatus());
+        assertEquals(101L, original.getSupersededByOrderId());
+        ArgumentCaptor<SalesOrderDO> continuation = ArgumentCaptor.forClass(SalesOrderDO.class);
+        verify(orderMapper).insert(continuation.capture());
+        assertEquals(20L, continuation.getValue().getSubmitterUserId());
+        assertEquals(100L, continuation.getValue().getSupersedesOrderId());
+        assertEquals(ORDER_TYPE_CONTINUATION, continuation.getValue().getOrderType());
+        verify(agingPoolService).markDealPending(eq(1L), eq(20L), any());
     }
 
     private void mockEligibleLeadAndOpportunity() {

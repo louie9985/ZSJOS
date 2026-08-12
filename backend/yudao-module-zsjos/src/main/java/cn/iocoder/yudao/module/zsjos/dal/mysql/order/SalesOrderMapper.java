@@ -22,6 +22,9 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     default SalesOrderDO selectByIdempotencyKey(String key) {
         return selectOne(SalesOrderDO::getSubmissionIdempotencyKey, key);
     }
+    default SalesOrderDO selectBySupersedesOrderId(Long orderId) {
+        return selectOne(SalesOrderDO::getSupersedesOrderId, orderId);
+    }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .eq(SalesOrderDO::getSubmitterUserId, userId)

@@ -15,6 +15,8 @@ public class SalesOrderRespVO {
     private Long opportunityId;
     private String status;
     private Long submitterUserId;
+    private Long supersedesOrderId;
+    private Long supersededByOrderId;
     private String buyerName;
     private String studentName;
     private String studentNature;

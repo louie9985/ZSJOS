@@ -27,10 +27,13 @@ class LeadFollowUpRuleServiceImplTest {
         when(ruleMapper.selectByCode("default")).thenReturn(rule);
         LeadFollowUpRuleUpdateReqVO request = new LeadFollowUpRuleUpdateReqVO();
         request.setFirstFollowUpTimeoutMinutes(720);
+        request.setQualificationTimeoutMinutes(4320);
+        request.setAgingPoolTimeoutDays(120);
 
         service.updateRule(request);
 
         assertEquals(720, rule.getFirstFollowUpTimeoutMinutes());
+        assertEquals(120, rule.getAgingPoolTimeoutDays());
         assertEquals(3, rule.getVersion());
         verify(ruleMapper).updateById(rule);
     }
@@ -45,7 +48,8 @@ class LeadFollowUpRuleServiceImplTest {
     private static LeadFollowUpRuleDO rule(int timeout, int version) {
         LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO();
         rule.setId(1L); rule.setCode("default"); rule.setName("默认首次跟进规则");
-        rule.setFirstFollowUpTimeoutMinutes(timeout); rule.setStatus(0); rule.setVersion(version);
+        rule.setFirstFollowUpTimeoutMinutes(timeout); rule.setQualificationTimeoutMinutes(4320);
+        rule.setAgingPoolTimeoutDays(90); rule.setStatus(0); rule.setVersion(version);
         return rule;
     }
 }

@@ -45,6 +45,7 @@ import LeadSubmissionPage from './pages/LeadSubmissionPage'
 import LeadManagementPage from './pages/LeadManagementPage'
 import LeadAssignmentPage from './pages/LeadAssignmentPage'
 import LeadClaimPoolPage from './pages/LeadClaimPoolPage'
+import LeadAgingPoolPage from './pages/LeadAgingPoolPage'
 import TodayTasksPage from './pages/TodayTasksPage'
 import LeadQualificationExceptionPage from './pages/LeadQualificationExceptionPage'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
@@ -160,6 +161,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
+  if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>

@@ -26,6 +26,7 @@ import cn.iocoder.yudao.module.system.enums.permission.RoleTypeEnum;
 import cn.iocoder.yudao.module.system.service.permission.MenuService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
+import cn.iocoder.yudao.module.system.api.tenant.dto.TenantCreatedEvent;
 import cn.iocoder.yudao.module.system.service.tenant.handler.TenantInfoHandler;
 import cn.iocoder.yudao.module.system.service.tenant.handler.TenantMenuHandler;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
@@ -35,6 +36,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.List;
@@ -73,6 +75,8 @@ public class TenantServiceImpl implements TenantService {
     private MenuService menuService;
     @Resource
     private PermissionService permissionService;
+    @Resource
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @Override
     public List<Long> getTenantIdList() {
@@ -117,6 +121,7 @@ public class TenantServiceImpl implements TenantService {
             // 修改租户的管理员
             tenantMapper.updateById(new TenantDO().setId(tenant.getId()).setContactUserId(userId));
         });
+        applicationEventPublisher.publishEvent(new TenantCreatedEvent(tenant.getId()));
         return tenant.getId();
     }
 

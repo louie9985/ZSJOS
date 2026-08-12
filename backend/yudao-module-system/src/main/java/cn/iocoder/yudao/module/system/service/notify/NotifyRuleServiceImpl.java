@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.notify.NotifyActionType;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyDefaultRuleReqDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRoleRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.rule.NotifyRulePageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.rule.NotifyRuleSaveReqVO;
@@ -19,6 +20,7 @@ import org.springframework.validation.annotation.Validated;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
@@ -79,6 +81,30 @@ public class NotifyRuleServiceImpl implements NotifyRuleService {
     @Override
     public List<NotifyRuleDO> getEnabledRules(String sceneCode) {
         return notifyRuleMapper.selectEnabledListBySceneCode(sceneCode, CommonStatusEnum.ENABLE.getStatus());
+    }
+
+    @Override
+    public void initializeDefaultRules(List<NotifyDefaultRuleReqDTO> rules) {
+        if (rules == null) return;
+        for (NotifyDefaultRuleReqDTO seed : rules) {
+            NotifyTemplateDO template = notifyTemplateService.getNotifyTemplateByCodeFromCache(seed.getTemplateCode());
+            if (template == null) continue;
+            boolean exists = notifyRuleMapper.selectCount(new LambdaQueryWrapper<NotifyRuleDO>()
+                    .eq(NotifyRuleDO::getSceneCode, seed.getSceneCode())
+                    .eq(NotifyRuleDO::getTemplateId, template.getId())
+                    .eq(seed.getTimingStage() != null, NotifyRuleDO::getTimingStage, seed.getTimingStage())
+                    .eq(seed.getTimingOffsetMinutes() != null, NotifyRuleDO::getTimingOffsetMinutes,
+                            seed.getTimingOffsetMinutes())) > 0;
+            if (exists) continue;
+            NotifyRuleSaveReqVO reqVO = new NotifyRuleSaveReqVO();
+            reqVO.setName(seed.getName()); reqVO.setSceneCode(seed.getSceneCode());
+            reqVO.setChannelCode(NotifyChannelType.IN_APP); reqVO.setTemplateId(template.getId());
+            reqVO.setRecipientRoles(seed.getRecipientRoles()); reqVO.setSpecifiedUserIds(List.of());
+            reqVO.setActionType(seed.getActionType()); reqVO.setTimingStage(seed.getTimingStage());
+            reqVO.setTimingOffsetMinutes(seed.getTimingOffsetMinutes());
+            reqVO.setStatus(CommonStatusEnum.ENABLE.getStatus());
+            createNotifyRule(reqVO);
+        }
     }
 
     private void validateRule(NotifyRuleSaveReqVO reqVO) {

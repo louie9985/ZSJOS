@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
@@ -31,6 +33,8 @@ public class LeadObjectPermissionService {
     private SecurityFrameworkService securityFrameworkService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
+    @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Resource private LeadAssignmentService leadAssignmentService;
 
     public void check(Long leadId, String action) {
         LeadDO lead = leadMapper.selectById(leadId);
@@ -39,19 +43,22 @@ public class LeadObjectPermissionService {
         }
         Long userId = getLoginUserId();
         boolean allowed = switch (action) {
-            case "read", "follow-up-read" -> canRead(lead, userId);
+            case "read", "follow-up-read" -> canRead(lead, userId) || canReadAgingPool(lead.getId(), userId);
             case "pending-read", "accept", "reject" -> ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
                     && Objects.equals(userId, lead.getPendingAssigneeUserId());
             case "owner-read" -> Objects.equals(userId, lead.getOwnerUserId());
-            case "follow-up-create" -> Objects.equals(userId, lead.getOwnerUserId())
+            case "follow-up-create" -> Objects.equals(userId, effectiveSalesUserId(lead))
                     && (STATUS_INVALID.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
                     || "converted".equals(lead.getStatus())
                     || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
-            case "qualify" -> Objects.equals(userId, lead.getOwnerUserId())
+            case "qualify" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
+                    && Objects.equals(userId, lead.getOwnerUserId())
                     && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                     || STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()));
-            case "basic-info-update" -> Objects.equals(userId, lead.getOwnerUserId());
+            case "enter-deal" -> Objects.equals(userId, effectiveSalesUserId(lead));
+            case "basic-info-update" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
+                    && Objects.equals(userId, lead.getOwnerUserId());
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.
             case "qualification-manage" -> canManageQualificationException(lead, userId);
@@ -69,6 +76,27 @@ public class LeadObjectPermissionService {
                 || managesOwnerDepartment(userId, lead.getOwnerUserId())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
                     && managesOwnerDepartment(userId, lead.getRecycleSourceOwnerUserId());
+    }
+
+    private Long effectiveSalesUserId(LeadDO lead) {
+        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
+        if (cycle == null) return lead.getOwnerUserId();
+        return Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())
+                ? cycle.getCollaboratorUserId() : null;
+    }
+
+    private boolean canReadAgingPool(Long leadId, Long userId) {
+        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(leadId);
+        if (cycle == null) return false;
+        if (securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE_ALL)
+                || Objects.equals(userId, cycle.getOriginalOwnerUserId())
+                || Objects.equals(userId, cycle.getCollaboratorUserId())) return true;
+        AdminUserRespDTO user = adminUserApi.getUser(userId);
+        boolean eligibleSales = leadAssignmentService.getEligibleSalesUsers().stream()
+                .anyMatch(candidate -> Objects.equals(candidate.getId(), userId));
+        if (user != null && eligibleSales && Objects.equals(user.getDeptId(), cycle.getFrozenDeptId())) return true;
+        DeptRespDTO dept = deptApi.getDept(cycle.getFrozenDeptId());
+        return dept != null && Objects.equals(dept.getLeaderUserId(), userId);
     }
 
     private boolean managesOwnerDepartment(Long userId, Long ownerUserId) {

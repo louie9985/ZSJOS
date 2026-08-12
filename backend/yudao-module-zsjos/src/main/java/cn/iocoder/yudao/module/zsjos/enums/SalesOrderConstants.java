@@ -12,6 +12,7 @@ public interface SalesOrderConstants {
     String STATUS_PENDING_APPROVAL = "pending_approval";
     String STATUS_REVISION_REQUIRED = "revision_required";
     String STATUS_EFFECTIVE = "effective";
+    String STATUS_SUPERSEDED = "superseded";
     Set<String> ACTIVE_ORDER_STATUSES = Set.of(STATUS_PENDING_APPROVAL, STATUS_REVISION_REQUIRED);
 
     String ROUND_PENDING = "pending";
@@ -19,6 +20,7 @@ public interface SalesOrderConstants {
     String ROUND_REJECTED = "rejected";
 
     String ORDER_TYPE_DIRECT_SALE = "direct_sale";
+    String ORDER_TYPE_CONTINUATION = "continuation_sale";
     String SUBMITTER_CENTER_SALES = "sales_conversion";
 
     String PERMISSION_CREATE = "zsjos:sales-order:create";

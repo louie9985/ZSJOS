@@ -22,6 +22,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -68,6 +69,15 @@ class LeadManagementServiceImplTest {
     private OpportunityMapper opportunityMapper;
     @Mock
     private SalesOrderMapper salesOrderMapper;
+    @Mock
+    private LeadAgingPoolService agingPoolService;
+
+    @BeforeEach
+    void setUp() {
+        org.mockito.Mockito.lenient().when(agingPoolService.resolveEffectiveSalesUserId(
+                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(Long.class)))
+                .thenAnswer(invocation -> invocation.getArgument(1));
+    }
 
     @Test
     void pageRestrictsOrdinaryUserToRelatedLeads() {
@@ -143,7 +153,7 @@ class LeadManagementServiceImplTest {
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "REVISE_DEAL");
         assertEquals(41L, revisionResult.getActiveSalesOrderId());
         assertEquals("revision_required", revisionResult.getActiveSalesOrderStatus());
-        assertActions(actionLead("invalid", "owned", true), null, "ADD_FOLLOW_UP");
+        assertActions(actionLead("invalid", "owned", true), null);
         assertActions(actionLead("submitted", "public_pool", false), null);
     }
 
@@ -169,6 +179,33 @@ class LeadManagementServiceImplTest {
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
 
         assertEquals(List.of(), service.getLead(1L, 99L).getAvailableActions());
+    }
+
+    @Test
+    void activePoolCollaboratorOnlyReceivesFollowUpAndDealActions() {
+        LeadDO lead = actionLead("valid", "owned", true);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("following");
+        cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO cycle =
+                new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO();
+        cycle.setStatus("assigned"); cycle.setCollaboratorUserId(30L);
+        when(agingPoolService.getActiveCycle(1L)).thenReturn(cycle);
+        when(agingPoolService.resolveEffectiveSalesUserId(1L, 20L)).thenReturn(30L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canRead(lead, 30L)).thenReturn(true);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(securityFrameworkService.hasPermission("zsjos:lead:update")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead:qualify")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:sales-order:create")).thenReturn(true);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals(List.of("ADD_FOLLOW_UP", "ENTER_DEAL"), result.getAvailableActions().stream()
+                .map(LeadManagementRespVO.ActionVO::getCode).toList());
     }
 
     @Test

@@ -39,9 +39,9 @@ SELECT 'claim_pool_action' AS check_name,
 SELECT 'claim_pool_v003' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V003'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_schemes' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer') AND published_version=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_scheme WHERE tenant_id=1 AND audience IN ('submitter','owner','reviewer','agingPool') AND published_version=1 AND deleted=b'0')=4, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_lead_inbox_filter_version WHERE tenant_id=1 AND version_no=1 AND deleted=b'0')=4, 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_menu' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6773 AND permission='zsjos:lead-filter:query' AND component='zsjos/leadFilter/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_filter_v005' AS check_name,
@@ -60,7 +60,19 @@ SELECT 'lead_filter_keys_v032' AS check_name,
                 OR published_config_json LIKE '%\"key\": \"financeReview\"%')),
           'PASS', 'FAIL') AS result;
 SELECT 'default_follow_up_rule' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+       IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND aging_pool_timeout_days=90 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_aging_pool_v033' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V033'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_aging_pool_schema' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN
+          ('zsjos_lead_aging_pool_cycle','zsjos_lead_aging_pool_event','zsjos_lead_aging_pool_notify_stage'))=3
+          AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_lead' AND column_name='ownership_started_at')
+          AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='zsjos_lead' AND index_name='idx_tenant_aging_pool_scan'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_aging_pool_menu' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE id IN (6794,6795,6796) AND deleted=b'0')=3, 'PASS', 'FAIL') AS result;
+SELECT 'lead_aging_pool_notifications' AS check_name,
+       IF((SELECT COUNT(*) FROM system_notify_template WHERE code IN ('ZSJOS_AGING_POOL_REMINDER','ZSJOS_AGING_POOL_DUE','ZSJOS_AGING_POOL_ASSIGNED','ZSJOS_AGING_POOL_REASSIGNED','ZSJOS_AGING_POOL_REASSIGN_REQUIRED','ZSJOS_AGING_POOL_EXITED') AND deleted=b'0')=6
+          AND NOT EXISTS(SELECT 1 FROM system_notify_rule WHERE scene_code LIKE 'zsjos.lead.aging_pool%' AND timing_stage='overdue' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_accept_permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_role_menu rm JOIN system_role r ON r.id=rm.role_id JOIN system_menu m ON m.id=rm.menu_id WHERE r.code='sales_specialist' AND m.permission='zsjos:lead:accept' AND rm.deleted=b'0' AND r.deleted=b'0' AND m.deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_follow_up_rule_v006' AS check_name,
@@ -263,6 +275,8 @@ FROM (
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
   UNION ALL SELECT 'zsjos_business_task_notify_stage'
   UNION ALL SELECT 'zsjos_lead_follow_up_record' UNION ALL SELECT 'zsjos_lead_follow_up_image'
+  UNION ALL SELECT 'zsjos_lead_aging_pool_cycle' UNION ALL SELECT 'zsjos_lead_aging_pool_event'
+  UNION ALL SELECT 'zsjos_lead_aging_pool_notify_stage'
   UNION ALL SELECT 'system_notify_rule' UNION ALL SELECT 'system_area'
   UNION ALL SELECT 'crm_owner_record' UNION ALL SELECT 'crm_performance_config'
   UNION ALL SELECT 'zsjos_module_schema_version'

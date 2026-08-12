@@ -12,4 +12,7 @@ public class LeadFollowUpRuleUpdateReqVO {
 
     @NotNull @Min(5) @Max(43200)
     private Integer qualificationTimeoutMinutes;
+
+    @NotNull @Min(1) @Max(3650)
+    private Integer agingPoolTimeoutDays;
 }

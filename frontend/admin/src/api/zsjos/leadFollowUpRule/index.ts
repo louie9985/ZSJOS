@@ -6,6 +6,7 @@ export interface LeadFollowUpRuleVO {
   name: string
   firstFollowUpTimeoutMinutes: number
   qualificationTimeoutMinutes: number
+  agingPoolTimeoutDays: number
   status: number
   version: number
 }
@@ -13,6 +14,7 @@ export interface LeadFollowUpRuleVO {
 export interface LeadFollowUpRuleUpdateReqVO {
   firstFollowUpTimeoutMinutes: number
   qualificationTimeoutMinutes: number
+  agingPoolTimeoutDays: number
 }
 
 export const getRule = (): Promise<LeadFollowUpRuleVO> =>
