@@ -13,6 +13,8 @@ import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderRepurchaseReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderTerminateReqVO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -41,6 +43,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.APPROVE;
@@ -359,36 +362,47 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void continuationSupersedesAOrderAndCreatesImmutableBOwnedOrder() {
-        SalesOrderDO original = new SalesOrderDO();
-        original.setId(100L); original.setLeadId(1L); original.setOpportunityId(30L);
-        original.setSubmitterUserId(10L); original.setStatus(STATUS_REVISION_REQUIRED);
-        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(original);
-        mockEligibleLeadAndOpportunity();
+    void systemRepurchasePersistsCustomerOnlyAndStartsDualApproval() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus(STATUS_WON);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(orderMapper.hasEffectiveOrder(10L)).thenReturn(true);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
-        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
-        when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
-        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
-        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-continuation");
+        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-repurchase");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
-        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; })
-                .when(orderMapper).insert(any(SalesOrderDO.class));
-        doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
-                .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
+        AreaRespDTO province = new AreaRespDTO(); province.setId(120000); province.setName("天津市");
+        province.setType(2); province.setStatus(0); province.setLeafSelectable(true); when(areaApi.getArea(120000)).thenReturn(province);
+        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(101L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
+        doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
+        SalesOrderRepurchaseReqVO req = new SalesOrderRepurchaseReqVO(); req.setRepurchaseReason("继续学习");
+        req.setOrder(request(BigDecimal.ZERO, "13800138000", null));
 
-        Long continuationId = service.continueAndSubmit(100L, 20L,
-                request(BigDecimal.ZERO, "13800138000", null));
+        Long id = service.createSystemRepurchase(1L, 20L, req);
 
-        assertEquals(101L, continuationId);
-        assertEquals(STATUS_SUPERSEDED, original.getStatus());
-        assertEquals(101L, original.getSupersededByOrderId());
-        ArgumentCaptor<SalesOrderDO> continuation = ArgumentCaptor.forClass(SalesOrderDO.class);
-        verify(orderMapper).insert(continuation.capture());
-        assertEquals(20L, continuation.getValue().getSubmitterUserId());
-        assertEquals(100L, continuation.getValue().getSupersedesOrderId());
-        assertEquals(ORDER_TYPE_CONTINUATION, continuation.getValue().getOrderType());
-        verify(agingPoolService).markDealPending(eq(1L), eq(20L), any());
+        assertEquals(101L, id);
+        verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(order -> ORDER_TYPE_REPURCHASE.equals(order.getOrderType())
+                && order.getLeadId() == null && order.getOpportunityId() == null && Objects.equals(order.getPersonId(), 10L)
+                && Objects.equals(order.getFormalSalesUserId(), 20L)));
+        verifyNoInteractions(opportunityMapper, lifecycleTaskService);
+    }
+
+    @Test
+    void terminateLocksCurrentRoundAndCancelsBpm() {
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setOrderType(ORDER_TYPE_REPURCHASE);
+        order.setStatus(STATUS_PENDING_APPROVAL); order.setSubmitterUserId(20L); order.setCurrentApprovalRoundId(200L); order.setVersion(3);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setOrderId(100L);
+        round.setProcessInstanceId("process-1"); round.setStatus(ROUND_PENDING); round.setVersion(4);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order); when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
+        SalesOrderTerminateReqVO req = new SalesOrderTerminateReqVO(); req.setApprovalRoundId(200L); req.setOrderVersion(3);
+        req.setRoundVersion(4); req.setReason("客户取消"); req.setIdempotencyKey("terminate-1");
+
+        service.terminate(100L, 20L, req);
+
+        assertEquals(STATUS_TERMINATED, order.getStatus()); assertEquals(ROUND_TERMINATED, round.getStatus());
+        assertEquals(4, order.getVersion()); assertEquals(5, round.getVersion());
+        verify(processInstanceApi).cancelProcessInstanceByStartUser(20L, "process-1", "客户取消");
+        verifyNoInteractions(opportunityMapper, agingPoolService);
     }
 
     private void mockEligibleLeadAndOpportunity() {

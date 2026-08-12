@@ -78,7 +78,10 @@ export default function SalesOrderApprovalPage() {
     const order = selectedItem
     const nextDecision = decision
     await runDecision(async ({ complete }) => {
-      await api.decideSalesOrder(order.id, nextDecision, { taskId: order.taskId!, reason: reason.trim() })
+      if (!detail) return
+      await api.decideSalesOrder(order.id, nextDecision, { taskId: order.taskId!, reason: reason.trim(),
+        approvalRoundId: detail.currentApprovalRoundId, orderVersion: detail.version,
+        roundVersion: detail.approvalRoundVersion, idempotencyKey: crypto.randomUUID() })
       complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); reload()
     }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '审批失败'))
   }

@@ -64,6 +64,7 @@ export const APP_ROUTES = {
   LEAD_APPEALS: '/zsjos/leads/appeals',
   MY_SALES_ORDERS: '/zsjos/sales-orders/my',
   SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
+  EXTERNAL_REPURCHASE: '/zsjos/orders/external-repurchase',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
 } as const
@@ -81,6 +82,9 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.WORK_PLANS,
   APP_ROUTES.QUALIFICATION_EXCEPTIONS,
   APP_ROUTES.LEAD_APPEALS,
+  APP_ROUTES.MY_SALES_ORDERS,
+  APP_ROUTES.SALES_ORDER_APPROVALS,
+  APP_ROUTES.EXTERNAL_REPURCHASE,
   APP_ROUTES.ALL_MESSAGES,
   APP_ROUTES.UNREAD_MESSAGES
 ])

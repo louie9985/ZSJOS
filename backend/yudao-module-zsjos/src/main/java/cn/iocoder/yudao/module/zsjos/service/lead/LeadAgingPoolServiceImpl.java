@@ -436,7 +436,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (isOwnerOrCollaborator(cycle, userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
             actions.add(ACTION_ADD_FOLLOW_UP);
             if (order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())) {
-                actions.add(Objects.equals(order.getSubmitterUserId(), userId) ? ACTION_REVISE_DEAL : ACTION_CONTINUE_DEAL);
+                actions.add(ACTION_REVISE_DEAL);
             } else {
                 actions.add(ACTION_ENTER_DEAL);
             }

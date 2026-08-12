@@ -153,7 +153,7 @@ class LeadManagementServiceImplTest {
         SalesOrderDO revisionOrder = new SalesOrderDO();
         revisionOrder.setId(41L); revisionOrder.setStatus("revision_required");
         LeadManagementRespVO revisionResult = assertActions(actionLead("valid", "owned", true), null, revisionOrder,
-                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "CONTINUE_DEAL");
+                "EDIT_BASIC_INFO", "ADD_FOLLOW_UP", "JUDGE_INVALID", "REVISE_DEAL");
         assertEquals(41L, revisionResult.getActiveSalesOrderId());
         assertEquals("revision_required", revisionResult.getActiveSalesOrderStatus());
         assertActions(actionLead("invalid", "owned", true), null);

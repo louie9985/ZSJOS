@@ -23,6 +23,7 @@ public class SalesOrderDO extends TenantBaseDO {
     private String orderType;
     private String status;
     private Long submitterUserId;
+    private Long formalSalesUserId;
     private String submitterCenterType;
     private String buyerName;
     private String studentName;
@@ -53,5 +54,8 @@ public class SalesOrderDO extends TenantBaseDO {
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
     private String submissionIdempotencyKey;
+    private String repurchaseReason;
+    private String terminationReason;
+    private LocalDateTime terminatedAt;
     private Integer version;
 }

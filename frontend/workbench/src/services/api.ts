@@ -90,7 +90,7 @@ export type ManagedLead = {
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
 }
 export type LeadComplaint = {
   id: number; leadId: number; complainantUserId: number; salesUserId: number; reason: string
@@ -151,8 +151,9 @@ export type SalesOrderSubmitRequest = {
   paymentVouchers: Array<{ infraFileId: number }>; idempotencyKey: string
 }
 export type SalesOrder = {
-  id: number; orderNo: string; leadId: number; opportunityId: number; status: 'pending_approval' | 'revision_required' | 'effective'
-  submitterUserId: number; buyerName: string; studentName: string; studentNature: string
+  id: number; orderNo: string; leadId?: number; opportunityId?: number; personId: number; orderType: 'first_purchase' | 'repurchase'
+  status: 'pending_approval' | 'revision_required' | 'effective' | 'terminated'
+  submitterUserId: number; formalSalesUserId: number; buyerName: string; studentName: string; studentNature: string
   studentMobile?: string; studentWechatId?: string; provinceCode: string; provinceName: string; cityCode: string; cityName: string
   agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string; totalAmount: number
   customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string
@@ -160,7 +161,8 @@ export type SalesOrder = {
   items: Array<{ id: number; productRef: string; skuRef: string; productName: string; skuName: string; categoryPath: string[]; attrValues: Record<string, string>; actualAmount: number }>
   paymentVouchers: SalesOrderVoucher[]; approvalRoundNo: number; approvalRoundStatus: string
   processInstanceId?: string; taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'
-  taskStatus?: number; taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp; decisionReason?: string; canRevise?: boolean
+  taskStatus?: number; taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp; decisionReason?: string; canRevise?: boolean; canTerminate?: boolean
+  version: number; currentApprovalRoundId: number; approvalRoundVersion: number; repurchaseReason?: string; terminationReason?: string
   submittedAt: Timestamp; effectiveAt?: Timestamp
   registrationApproval?: SalesOrderApprovalStatus
   financeApproval?: SalesOrderApprovalStatus
@@ -170,6 +172,7 @@ export type SalesOrderApprovalStatus = {
   reviewerUserId?: number; reviewerUserName?: string; createTime?: Timestamp; endTime?: Timestamp
 }
 export type SalesOrderListItem = Pick<SalesOrder, 'id' | 'orderNo' | 'leadId' | 'status' | 'studentName' | 'studentMobile' | 'totalAmount' | 'approvalRoundNo' | 'submittedAt' | 'effectiveAt'> & {
+  personId?: number; orderType?: SalesOrder['orderType']
   taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'; taskStatus?: number
   taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp
 }
@@ -249,7 +252,7 @@ export type LeadAgingPoolItem = {
   leadCategory?: string; sourceChannel?: string; ownershipStartedAt: Timestamp; dueAt: Timestamp; enteredAt: Timestamp
   assignedAt?: Timestamp; lastFollowUpAt?: Timestamp; nextFollowUpAt?: Timestamp
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions: Array<'ASSIGN' | 'EXIT' | 'REQUEST_TRANSFER' | 'ADD_FOLLOW_UP' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL'>
+  availableActions: Array<'ASSIGN' | 'EXIT' | 'REQUEST_TRANSFER' | 'ADD_FOLLOW_UP' | 'ENTER_DEAL' | 'REVISE_DEAL'>
 }
 export type SubordinateTask = { id: number; taskType: string; leadId: number; leadName?: string; dueAt?: Timestamp; overdue: boolean }
 export type SubordinateBatchItem = { leadId: number; success: boolean; code: string; message: string }
@@ -512,10 +515,13 @@ export const api = {
   salesOrderCatalog: async () => unwrap<LeadCatalog>(await http.get('/zsjos/sales-order/product/catalog')),
   submitSalesOrder: async (leadId: number, data: SalesOrderSubmitRequest) =>
     unwrap<number>(await http.post(`/zsjos/sales-order/lead/${leadId}/submit`, data)),
+  submitSystemRepurchase: async (leadId: number, repurchaseReason: string, order: SalesOrderSubmitRequest) =>
+    unwrap<number>(await http.post(`/zsjos/sales-order/lead/${leadId}/repurchase`, { repurchaseReason, order })),
+  submitExternalRepurchase: async (data: { customerName: string; customerMobile?: string; customerWechatId?: string; repurchaseReason: string; order: SalesOrderSubmitRequest }) =>
+    unwrap<number>(await http.post('/zsjos/sales-order/external-repurchase', data)),
+  customerSalesOrders: async (leadId: number) => unwrap<SalesOrderListItem[]>(await http.get(`/zsjos/sales-order/lead/${leadId}/customer-orders`)),
   resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
-  continueSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
-    unwrap<number>(await http.post(`/zsjos/sales-order/${orderId}/continue-submit`, data)),
   salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
   mySalesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
   mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string }) =>
@@ -525,8 +531,10 @@ export const api = {
   salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
   salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean }) =>
     unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
-  decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string }) =>
+  decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
+  terminateSalesOrder: async (orderId: number, data: { reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/terminate`, data)),
   uploadSalesOrderVoucher: async (file: File) => {
     const data = new FormData(); data.append('file', file)
     return unwrap<SalesOrderVoucher>(await http.post('/zsjos/sales-order/voucher/upload', data))

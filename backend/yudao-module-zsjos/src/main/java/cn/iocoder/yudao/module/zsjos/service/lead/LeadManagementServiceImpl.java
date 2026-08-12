@@ -325,9 +325,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (activeOrder == null) {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder));
             } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
-                actions.add(new LeadManagementRespVO.ActionVO(
-                        Objects.equals(activeOrder.getSubmitterUserId(), currentUserId)
-                                ? ACTION_REVISE_DEAL : ACTION_CONTINUE_DEAL, canCreateOrder));
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL, canCreateOrder));
             }
         }
         return actions;

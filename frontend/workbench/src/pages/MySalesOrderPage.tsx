@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Drawer, Empty, Input, Skeleton, Spin, Tabs, Tag, Typography } from 'antd'
+import { Alert, Avatar, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type SalesOrder, type SalesOrderListItem, type SalesOrderStatusCounts } from '../services/api'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS } from '../components/SalesOrderDetailCards'
@@ -27,6 +27,8 @@ export default function MySalesOrderPage() {
   const [countsError, setCountsError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [revisionOpen, setRevisionOpen] = useState(false)
+  const [terminateOpen, setTerminateOpen] = useState(false)
+  const [terminationReason, setTerminationReason] = useState('')
   const listVersion = useRef(0)
   const detailVersion = useRef(0)
   const activePages = useRef(new Set<string>())
@@ -71,11 +73,11 @@ export default function MySalesOrderPage() {
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
-      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)}/>
+      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)} onTerminate={() => setTerminateOpen(true)}/>
         : <Empty description="从左侧选择一条订单"/>
   const hasMore = items.length < total
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
-    id: detail.leadId, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,
+    id: detail.leadId || 0, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,
     provinceCode: detail.provinceCode, provinceName: detail.provinceName, cityCode: detail.cityCode, cityName: detail.cityName,
     primaryProduct: detail.items[0] ? { spuRef: detail.items[0].productRef, skuRef: detail.items[0].skuRef } : undefined
   } : undefined
@@ -113,6 +115,13 @@ export default function MySalesOrderPage() {
     </div>
     <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="订单详情" width="100%">{detailContent}</Drawer>
     {revisionLead && <SalesOrderEntryModal lead={revisionLead} orderId={detail?.id} open={revisionOpen} onClose={() => setRevisionOpen(false)}
-      onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}
+      onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}<Modal title="终止订单审批" open={terminateOpen} onCancel={() => setTerminateOpen(false)} okButtonProps={{ danger: true }} okText="确认终止"
+      onOk={async () => { if (!detail || !terminationReason.trim()) { message.warning('请填写终止原因'); return }
+        try { await api.terminateSalesOrder(detail.id, { reason: terminationReason.trim(), approvalRoundId: detail.currentApprovalRoundId,
+          orderVersion: detail.version, roundVersion: detail.approvalRoundVersion, idempotencyKey: crypto.randomUUID() })
+          message.success('订单审批已终止'); setTerminateOpen(false); setTerminationReason(''); reload() }
+        catch (error) { message.error(error instanceof Error ? error.message : '终止失败') } }}>
+      <Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写终止原因（必填）"/>
+    </Modal>
   </section>
 }

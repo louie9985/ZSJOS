@@ -20,6 +20,19 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
                 .in(SalesOrderDO::getStatus, statuses).orderByDesc(SalesOrderDO::getId).last("LIMIT 1"));
     }
+    default SalesOrderDO selectActiveRepurchaseByPersonId(Long personId, Collection<String> statuses) {
+        return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getPersonId, personId)
+                .eq(SalesOrderDO::getOrderType, "repurchase").in(SalesOrderDO::getStatus, statuses)
+                .orderByDesc(SalesOrderDO::getId).last("LIMIT 1"));
+    }
+    default boolean hasEffectiveOrder(Long personId) {
+        return selectCount(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getPersonId, personId)
+                .eq(SalesOrderDO::getStatus, "effective")) > 0;
+    }
+    default List<SalesOrderDO> selectByPersonId(Long personId) {
+        return selectList(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getPersonId, personId)
+                .orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId));
+    }
     default SalesOrderDO selectByIdempotencyKey(String key) {
         return selectOne(SalesOrderDO::getSubmissionIdempotencyKey, key);
     }

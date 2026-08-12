@@ -14,6 +14,9 @@ public class SalesOrderRespVO {
     private Long leadId;
     private Long opportunityId;
     private String status;
+    private String orderType;
+    private Long personId;
+    private Long formalSalesUserId;
     private Long submitterUserId;
     private Long supersedesOrderId;
     private Long supersededByOrderId;
@@ -50,6 +53,12 @@ public class SalesOrderRespVO {
     private LocalDateTime taskEndTime;
     private String decisionReason;
     private Boolean canRevise;
+    private Boolean canTerminate;
+    private String repurchaseReason;
+    private String terminationReason;
+    private Integer version;
+    private Long currentApprovalRoundId;
+    private Integer approvalRoundVersion;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
     private ApprovalStatusVO registrationApproval;

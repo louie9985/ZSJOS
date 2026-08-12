@@ -351,6 +351,8 @@ The server-owned `下属销售` menu is available only with `zsjos:subordinate-s
 - 成交订单提交/补正只通知本轮两个配置部门解析出的实际审批人；最终通过、拒绝或取消只通知订单提交销售。通知显示配置根部门名称，内部任务键仍保持 `registrationReview` / `financeReview`。
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
 - 订单详情通过 BPM 公共 API 汇总当前轮次两个节点的 `pending/approved/rejected/cancelled` 状态并展示给已有订单读取权限的用户；汇总优先保留实际通过或驳回决定，不能让同组后续取消的会签任务覆盖结果。ZSJOS 不新增审批任务或节点状态表。
+- 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化，复购生效不修改客资、商机或首次成交时间。
+- 报名履约和财务任务处理、驳回、创建人终止均先锁定订单及当前审批轮次，并校验当前 BPM 任务、轮次、订单/轮次版本与节点幂等键。流程取消仍由 BPM 公共 API 执行，ZSJOS 只保存订单业务状态、轮次和取消原因快照。
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`.
 - 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。筛选项稳定编码使用小写下划线格式 `registration_review` / `finance_review`，与保持 BPM 契约的驼峰条件值相互独立；读取历史配置时兼容旧筛选项编码，并在下一次保存或发布时规范化。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
 - 工作台业务附件选择后先保留本地文件和预览地址，确认提交时才通过 Infra 文件 API 上传 COS；任一上传失败都不会发送业务命令，成功引用和失败项会保留以便重试。删除只移除当前表单引用，不物理删除已上传文件。

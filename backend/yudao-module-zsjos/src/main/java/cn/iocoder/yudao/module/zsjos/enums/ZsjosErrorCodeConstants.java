@@ -140,5 +140,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_ALREADY_HANDLED = new ErrorCode(1_900_006_012, "该审批任务已由其他人员处理");
     ErrorCode SALES_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_006_013, "成交订单请求幂等键已被其他请求使用");
     ErrorCode SALES_ORDER_CONTINUATION_CONFLICT = new ErrorCode(1_900_006_014, "该驳回订单已被接续或当前协同销售无权接续");
+    ErrorCode SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE = new ErrorCode(1_900_006_015, "该客户已有活动复购订单");
+    ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
+    ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
+    ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
 
 }

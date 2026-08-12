@@ -35,8 +35,10 @@ export type SalesOrderEntryLead = {
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
 
-export default function SalesOrderEntryModal({ lead, orderId, continuation, open, onClose, onSubmitted }: {
-  lead: SalesOrderEntryLead; orderId?: number; continuation?: boolean; open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
+export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, open, onClose, onSubmitted }: {
+  lead: SalesOrderEntryLead; orderId?: number; repurchase?: boolean
+  externalCustomer?: { customerName: string; customerMobile?: string; customerWechatId?: string }
+  open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
   const [areas, setAreas] = useState<AreaNode[]>([])
@@ -49,6 +51,7 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingValues, setPendingValues] = useState<Values>()
   const [orderNo, setOrderNo] = useState<string>()
+  const [repurchaseReason, setRepurchaseReason] = useState('')
 
   const items = Form.useWatch('items', form) || []
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
@@ -93,7 +96,7 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
     if (!open) return
     resetIntent()
     setConfirmOpen(false); setPendingValues(undefined)
-    form.resetFields(); setVouchers([]); void load()
+    form.resetFields(); setVouchers([]); setRepurchaseReason(''); void load()
   }, [open, lead.id, orderId, resetIntent])
 
   const close = () => { setConfirmOpen(false); setPendingValues(undefined); onClose() }
@@ -132,9 +135,12 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
         const uploadResult = await uploadDeferredFiles(vouchers, api.uploadSalesOrderVoucher, setVouchers)
         if (uploadResult.failed) { message.error('有缴费凭证上传失败，请重试失败项'); return }
         request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
-        if (orderId && continuation) {
-          const submittedOrderId = await api.continueSalesOrder(orderId, request)
-          message.success('驳回订单已接续并重新提交会签')
+        if (repurchase) {
+          if (!repurchaseReason.trim()) { message.warning('请填写复购说明'); return }
+          const submittedOrderId = externalCustomer
+            ? await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason: repurchaseReason.trim(), order: request })
+            : await api.submitSystemRepurchase(lead.id, repurchaseReason.trim(), request)
+          message.success('复购订单已提交双中心审批')
           onSubmitted(submittedOrderId)
         } else if (orderId) {
           await api.resubmitSalesOrder(orderId, request)
@@ -151,11 +157,12 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
     })
   }
 
-  return <Modal title={continuation ? '接续成交' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={close} footer={null} width={980} destroyOnHidden>
+  return <Modal title={repurchase ? '录入复购订单' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={close} footer={null} width={980} destroyOnHidden>
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
       <Form form={form} layout="vertical" disabled={Boolean(loadError) || saving}>
+        {repurchase && <Form.Item label="复购说明" required><Input.TextArea rows={3} maxLength={1000} showCount value={repurchaseReason} onChange={event => setRepurchaseReason(event.target.value)}/></Form.Item>}
         <Divider titlePlacement="start">学员信息</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>

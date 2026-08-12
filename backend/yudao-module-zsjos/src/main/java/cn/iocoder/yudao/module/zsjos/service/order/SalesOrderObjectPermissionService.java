@@ -40,6 +40,7 @@ public class SalesOrderObjectPermissionService {
             case "read-own" -> Objects.equals(order.getSubmitterUserId(), userId);
             case "revise" -> canRevise(order, userId);
             case "continue-revise" -> canContinue(order, userId);
+            case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId);
             case "review" -> isApprovalPoolMember(userId);
             default -> false;
         };
@@ -47,18 +48,21 @@ public class SalesOrderObjectPermissionService {
     }
 
     public boolean canRead(SalesOrderDO order, Long userId) {
-        LeadDO lead = leadMapper.selectById(order.getLeadId());
+        LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         return Objects.equals(order.getSubmitterUserId(), userId)
+                || Objects.equals(order.getFormalSalesUserId(), userId)
                 || lead != null && Objects.equals(lead.getOwnerUserId(), userId)
-                || agingPoolService.canRead(order.getLeadId(), userId)
+                || order.getLeadId() != null && agingPoolService.canRead(order.getLeadId(), userId)
                 || isApprovalPoolMember(userId);
     }
 
     public boolean canRevise(SalesOrderDO order, Long userId) {
-        return Objects.equals(order.getSubmitterUserId(), userId) && order.getSupersededByOrderId() == null;
+        return (Objects.equals(order.getSubmitterUserId(), userId) || Objects.equals(order.getFormalSalesUserId(), userId))
+                && order.getSupersededByOrderId() == null;
     }
 
     public boolean canContinue(SalesOrderDO order, Long userId) {
+        if (order.getLeadId() == null) return false;
         var cycle = agingPoolService.getActiveCycle(order.getLeadId());
         return cycle != null && Objects.equals(cycle.getCollaboratorUserId(), userId)
                 && !Objects.equals(order.getSubmitterUserId(), userId) && order.getSupersededByOrderId() == null;

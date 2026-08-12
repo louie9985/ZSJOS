@@ -1,14 +1,14 @@
 import { Alert, Button, Card, Descriptions, Empty, Image, Space, Table, Tag, Typography } from 'antd'
-import { CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, EditOutlined, StopOutlined } from '@ant-design/icons'
 import type { SalesOrder, SalesOrderListItem } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import { canReviewSalesOrderTask } from '../services/salesOrder'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
-  pending_approval: '待审核', revision_required: '已驳回待修改', effective: '已通过'
+  pending_approval: '待审核', revision_required: '已驳回待修改', effective: '已通过', terminated: '已终止'
 }
 export const SALES_ORDER_STATUS_COLORS: Record<SalesOrder['status'], string> = {
-  pending_approval: 'gold', revision_required: 'red', effective: 'green'
+  pending_approval: 'gold', revision_required: 'red', effective: 'green', terminated: 'default'
 }
 export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
   registrationReview: '报名履约中心', financeReview: '财务结算中心'
@@ -17,13 +17,14 @@ const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批�
 const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
 const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRevise }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRevise, onTerminate }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
   mode: 'mine' | 'approval-todo' | 'approval-done'
   onApprove?: () => void
   onReject?: () => void
   onRevise?: () => void
+  onTerminate?: () => void
 }) {
   const task = approvalContext || order
   const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
@@ -39,6 +40,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </div>
       <Space wrap className="sales-order-detail-actions">
         {mode === 'mine' && order.status === 'revision_required' && order.canRevise && onRevise && <Button type="primary" icon={<EditOutlined/>} onClick={onRevise}>补正并重新提交</Button>}
+        {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止审批</Button>}
         {mode === 'approval-todo' && canReview && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button></>}
       </Space>
     </div>
@@ -54,12 +56,14 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </Card>
       <Card size="small" title="订单与审批" className="sales-order-card">
         <Descriptions column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
-          <Descriptions.Item label="订单号">{order.orderNo}</Descriptions.Item><Descriptions.Item label="审批轮次">第 {order.approvalRoundNo || 1} 轮</Descriptions.Item>
+          <Descriptions.Item label="订单号">{order.orderNo}</Descriptions.Item><Descriptions.Item label="订单类型">{order.orderType === 'repurchase' ? '复购' : '首购'}</Descriptions.Item>
+          <Descriptions.Item label="审批轮次">第 {order.approvalRoundNo || 1} 轮</Descriptions.Item>
           <Descriptions.Item label="当前状态">{SALES_ORDER_STATUS_LABELS[order.status]}</Descriptions.Item><Descriptions.Item label="当前中心">{SALES_ORDER_TASK_LABELS[task.taskDefinitionKey || ''] || '-'}</Descriptions.Item>
           <Descriptions.Item label="提交时间">{formatTimestamp(order.submittedAt)}</Descriptions.Item><Descriptions.Item label="通过时间">{formatTimestamp(order.effectiveAt)}</Descriptions.Item>
           {mode === 'approval-done' && <><Descriptions.Item label="处理结果">{task.taskStatus == null ? '-' : TASK_STATUS_LABELS[task.taskStatus] || `状态 ${task.taskStatus}`}</Descriptions.Item><Descriptions.Item label="处理时间">{formatTimestamp(task.taskEndTime)}</Descriptions.Item><Descriptions.Item label="审批意见" span={2}>{task.taskReason || '-'}</Descriptions.Item></>}
         </Descriptions>
       </Card>
+      {order.repurchaseReason && <Card size="small" title="复购说明" className="sales-order-card"><Typography.Text>{order.repurchaseReason}</Typography.Text></Card>}
       <Card size="small" title="学员资料" className="sales-order-card">
         <Descriptions column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
           <Descriptions.Item label="购买方">{order.buyerName || '-'}</Descriptions.Item><Descriptions.Item label="学员姓名">{order.studentName}</Descriptions.Item>

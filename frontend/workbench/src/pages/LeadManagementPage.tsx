@@ -114,6 +114,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [complaintReason, setComplaintReason] = useState('')
   const [submitterActionSaving, setSubmitterActionSaving] = useState(false)
   const [validConfirmOpen, setValidConfirmOpen] = useState(false)
+  const [repurchaseOpen, setRepurchaseOpen] = useState(false)
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
   const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
@@ -223,6 +224,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
           disabled={!actions.get('ENTER_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>录入成交</Button>}
         {actions.has('REVISE_DEAL') && <Button icon={<FileAddOutlined/>}
           disabled={!actions.get('REVISE_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>补正成交</Button>}
+        {lead.status === 'won' && <Button icon={<FileAddOutlined/>} onClick={() => setRepurchaseOpen(true)}>录入复购</Button>}
       </Space>
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
@@ -361,6 +363,8 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined}
       open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)}
       onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
+    <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)}
+      onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
   </div>
 }
 

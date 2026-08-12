@@ -9,8 +9,9 @@ import java.io.IOException;
 
 public interface SalesOrderService {
     Long createAndSubmit(Long leadId, Long userId, SalesOrderSubmitReqVO reqVO);
+    Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO);
+    Long createExternalRepurchase(Long userId, SalesOrderRepurchaseReqVO reqVO);
     void reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
-    Long continueAndSubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
     SalesOrderRespVO get(Long orderId, Long userId);
     SalesOrderRespVO getOwn(Long orderId, Long userId);
     PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId);
@@ -19,6 +20,8 @@ public interface SalesOrderService {
     SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId);
     void approve(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
     void reject(Long orderId, Long userId, SalesOrderDecisionReqVO reqVO);
+    void terminate(Long orderId, Long userId, SalesOrderTerminateReqVO reqVO);
+    java.util.List<SalesOrderListItemRespVO> getCustomerOrders(Long leadId, Long userId);
     LeadAttachmentUploadRespVO uploadVoucher(Long userId, MultipartFile file) throws IOException;
     void handleProcessResult(String processInstanceId, Integer status, String reason);
 }

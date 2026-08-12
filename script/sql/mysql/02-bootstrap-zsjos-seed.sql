@@ -361,6 +361,11 @@ VALUES ('core','V038','Duplicate Lead review queue and permissions',SHA2('duplic
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V040', 'Submitter actions and sales complaint queue', 'submitter-actions-complaints-v1');
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V041', 'Order repurchase and approval concurrency', 'order-repurchase-concurrency-v1');
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V040','Submitter actions and sales complaint queue',SHA2('submitter-actions-complaints-v1',256),'legacy',NOW());
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V041','Order repurchase and approval concurrency',SHA2('order-repurchase-concurrency-v1',256),'legacy',NOW());
