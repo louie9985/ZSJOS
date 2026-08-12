@@ -27,6 +27,8 @@ import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
   dictionaryDisplayLabel,
+  hasNextLeadInboxPage,
+  isLeadInboxUnauthorized,
   mergeUniqueLeads,
   protocolDisplayLabel,
   tryStartLeadPageRequest
@@ -334,8 +336,10 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const [items, setItems] = useState<ManagedLead[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [initialLoading, setInitialLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [initialError, setInitialError] = useState('')
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [keyword, setKeyword] = useState('')
   const [inboxGroup, setInboxGroup] = useState('all')
   const [inboxStage, setInboxStage] = useState('all')
@@ -354,6 +358,8 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const requestVersion = useRef(0)
   const metadataVersion = useRef(0)
   const activePageRequests = useRef(new Set<string>())
+  const listScrollRef = useRef<HTMLDivElement>(null)
+  const listSentinelRef = useRef<HTMLDivElement>(null)
 
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
@@ -379,8 +385,13 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const loadPage = useCallback(async (targetPage: number, replace: boolean, version: number) => {
     const requestKey = tryStartLeadPageRequest(activePageRequests.current, version, targetPage)
     if (!requestKey) return
-    setLoading(true)
-    setError('')
+    if (replace) {
+      setInitialLoading(true)
+      setInitialError('')
+    } else {
+      setLoadingMore(true)
+      setLoadMoreError('')
+    }
     try {
       const result = await api.managedLeadInboxPage(audience, {
         pageNo: targetPage,
@@ -397,12 +408,21 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
         || (current && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
     } catch (loadError) {
       if (version === requestVersion.current) {
-        setError(loadError instanceof Error ? loadError.message : '客资列表加载失败')
-        if (replace) setItems([])
+        const message = loadError instanceof Error ? loadError.message : '客资列表加载失败'
+        if (replace) {
+          setInitialError(message)
+          setItems([])
+          setTotal(0)
+        } else {
+          setLoadMoreError(message)
+        }
       }
     } finally {
       activePageRequests.current.delete(requestKey)
-      if (version === requestVersion.current) setLoading(false)
+      if (version === requestVersion.current) {
+        if (replace) setInitialLoading(false)
+        else setLoadingMore(false)
+      }
     }
   }, [audience, inboxGroup, inboxStage, keyword, requestedLeadId])
 
@@ -413,6 +433,11 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     setTotal(0)
     setPageNo(1)
     setSelectedId(undefined)
+    setInitialLoading(false)
+    setLoadingMore(false)
+    setInitialError('')
+    setLoadMoreError('')
+    if (listScrollRef.current) listScrollRef.current.scrollTop = 0
     void loadPage(1, true, version)
   }, [loadPage])
 
@@ -457,18 +482,25 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     (value?: string) => dictionaryDisplayLabel(channels, value, channelError),
     [channelError, channels]
   )
-  const hasMore = items.length < total
+  const hasMore = hasNextLeadInboxPage(pageNo, PAGE_SIZE, total)
+
+  useEffect(() => {
+    const root = listScrollRef.current
+    const sentinel = listSentinelRef.current
+    if (!root || !sentinel || !hasMore || initialLoading || loadingMore || loadMoreError) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting) {
+        void loadPage(pageNo + 1, false, requestVersion.current)
+      }
+    }, { root, rootMargin: '240px 0px', threshold: 0 })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, initialLoading, loadMoreError, loadPage, loadingMore, pageNo])
 
   const selectLead = (id: number) => {
     if (shouldBlockLeadSwitch(followUpDirty) && !window.confirm('当前表单尚未提交，切换客资将丢失已填写内容。确定继续吗？')) return
     setFollowUpDirty(false)
     setSelectedId(id)
-  }
-  const onListScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    const node = event.currentTarget
-    if (!loading && hasMore && node.scrollHeight - node.scrollTop - node.clientHeight < 80) {
-      void loadPage(pageNo + 1, false, requestVersion.current)
-    }
   }
   const changeInboxGroup = (key: string) => {
     setInboxGroup(key)
@@ -522,9 +554,13 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
         <div className="lead-inbox-toolbar">
           <Input.Search allowClear placeholder="搜索姓名 / 手机号 / 微信号" onSearch={value => setKeyword(value.trim())}/>
         </div>
-        {error && <Alert className="lead-list-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button>}/>} 
-        <div className="lead-inbox-scroll" onScroll={onListScroll}>
-          {!loading && !items.length && !error ? <Empty description="暂无可查看客资"/> : items.map(item => {
+        {initialError && <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
+          message={isLeadInboxUnauthorized(initialError) ? '无权查看客资收件箱' : '客资列表加载失败'} description={initialError}
+          action={!isLeadInboxUnauthorized(initialError) ? <Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button> : undefined}/>}
+        <div ref={listScrollRef} className="lead-inbox-scroll">
+          {initialLoading ? <div className="lead-list-skeletons">
+            {Array.from({ length: 5 }, (_, index) => <div className="lead-inbox-item" key={index}><Skeleton active avatar paragraph={{ rows: 2 }}/></div>)}
+          </div> : !items.length && !initialError ? <Empty description="当前筛选下暂无客资"/> : items.map(item => {
             const active = item.id === selectedId
             return <button key={item.id} type="button" className={active ? 'lead-inbox-item active' : 'lead-inbox-item'} onClick={() => selectLead(item.id)}>
               <div className="lead-inbox-item-main">
@@ -538,8 +574,16 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
               <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{channelLabel(item.sourceChannel)} · {categoryLabel(item.leadCategory)} · {formatTimestamp(item.submittedAt)}</span></div>
             </button>
           })}
-          {loading && <div className="lead-list-loading"><Spin size="small"/> 加载中</div>}
-          {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="lead-list-end">已加载全部 {total} 条客资</Typography.Text>}
+          {!initialLoading && items.length > 0 && <div ref={listSentinelRef} className="lead-list-sentinel">
+            {loadMoreError
+              ? <Alert type="error" showIcon message="更多客资加载失败" description={loadMoreError}
+                action={<Button size="small" onClick={() => void loadPage(pageNo + 1, false, requestVersion.current)}>重试</Button>}/>
+              : loadingMore
+                ? <div className="lead-list-loading"><Spin size="small"/> 加载中</div>
+                : hasMore
+                  ? <Typography.Text type="secondary">继续下滑加载</Typography.Text>
+                  : <Typography.Text type="secondary" className="lead-list-end">已加载全部 {total} 条客资</Typography.Text>}
+          </div>}
         </div>
       </aside>
       <main className="lead-inbox-detail-pane">{detailContent}</main>

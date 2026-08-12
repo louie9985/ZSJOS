@@ -52,6 +52,14 @@ export function tryStartLeadPageRequest(
   return key
 }
 
+export function isLeadInboxUnauthorized(message: string): boolean {
+  return message.includes('403') || message.includes('无权') || message.includes('权限')
+}
+
+export function hasNextLeadInboxPage(pageNo: number, pageSize: number, total: number): boolean {
+  return pageNo * pageSize < total
+}
+
 export function canJudgeLeadQualification(
   lead: Pick<import('./api').ManagedLead, 'qualificationStatus' | 'followUpStatus' | 'operationalStatus'>,
   audience: 'submitter' | 'owner',

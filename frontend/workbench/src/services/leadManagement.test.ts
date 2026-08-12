@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, isLeadInboxUnauthorized, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -56,6 +56,18 @@ describe('lead management paging helpers', () => {
     expect(tryStartLeadPageRequest(activeRequests, 2, 3)).toBe('2:3')
     expect(tryStartLeadPageRequest(activeRequests, 2, 3)).toBeUndefined()
     expect(tryStartLeadPageRequest(activeRequests, 3, 3)).toBe('3:3')
+  })
+
+  it('distinguishes unauthorized inbox failures from retryable load failures', () => {
+    expect(isLeadInboxUnauthorized('请求失败（403）')).toBe(true)
+    expect(isLeadInboxUnauthorized('当前账号无权查看客资')).toBe(true)
+    expect(isLeadInboxUnauthorized('客资列表加载超时')).toBe(false)
+  })
+
+  it('uses the backend page boundary instead of the deduplicated item count', () => {
+    expect(hasNextLeadInboxPage(1, 20, 41)).toBe(true)
+    expect(hasNextLeadInboxPage(2, 20, 41)).toBe(true)
+    expect(hasNextLeadInboxPage(3, 20, 41)).toBe(false)
   })
 
   it('uses the first server-provided stage and falls back to all', () => {
