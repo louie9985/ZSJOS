@@ -37,6 +37,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_SPECIFIED_SALES_REQUIRED = new ErrorCode(1_900_003_016, "指定派单必须选择可派销售");
     ErrorCode LEAD_MOBILE_INVALID = new ErrorCode(1_900_003_017, "手机号格式不正确");
     ErrorCode LEAD_DISPATCH_MODE_INVALID = new ErrorCode(1_900_003_018, "派单模式无效");
+    ErrorCode LEAD_DUPLICATE_REVIEW_NOT_EXISTS = new ErrorCode(1_900_003_060, "重复客资复核任务不存在");
+    ErrorCode LEAD_DUPLICATE_REVIEW_HANDLED = new ErrorCode(1_900_003_061, "重复客资复核任务已被处理");
+    ErrorCode LEAD_DUPLICATE_REVIEW_RESULT_INVALID = new ErrorCode(1_900_003_062, "复核结论与当前候选业务状态不匹配");
+    ErrorCode LEAD_DUPLICATE_REVIEW_SALES_INVALID = new ErrorCode(1_900_003_063, "所选销售不在复核人的可选范围内");
+    ErrorCode LEAD_DUPLICATE_REVIEW_PERMISSION_DENIED = new ErrorCode(1_900_003_064, "无权访问或处理该重复客资复核任务");
     ErrorCode LEAD_INBOX_FILTER_NOT_EXISTS = new ErrorCode(1_900_003_019, "客资筛选方案不存在或尚未发布");
     ErrorCode LEAD_INBOX_FILTER_INVALID = new ErrorCode(1_900_003_020, "客资筛选方案配置无效");
     ErrorCode LEAD_INBOX_FILTER_VERSION_NOT_EXISTS = new ErrorCode(1_900_003_021, "客资筛选方案版本不存在");

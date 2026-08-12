@@ -177,6 +177,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getPersonId, personId)
                 .orderByDesc(LeadDO::getSubmittedAt).last("LIMIT 1"));
     }
+    default List<LeadDO> selectByPersonIds(List<Long> personIds) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadDO>()
+                .in(LeadDO::getPersonId, personIds).orderByDesc(LeadDO::getSubmittedAt));
+    }
+    default List<LeadDO> selectByName(String name) {
+        return selectList(new LambdaQueryWrapperX<LeadDO>()
+                .eq(LeadDO::getSubmittedName, name).orderByDesc(LeadDO::getSubmittedAt));
+    }
     default List<LeadDO> selectPendingByUserId(Long userId) {
         return selectList(new LambdaQueryWrapperX<LeadDO>()
                 .eq(LeadDO::getAssignmentStatus, ASSIGNMENT_PENDING)

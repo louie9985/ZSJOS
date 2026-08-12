@@ -352,3 +352,9 @@ VALUES ('V037', 'Unify customer lead opportunity and first-purchase lifecycle', 
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V037','Unify customer lead opportunity and first-purchase lifecycle',SHA2('lifecycle-domain-unification-v1',256),'legacy',NOW());
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V038', 'Duplicate Lead review queue and permissions', 'duplicate-lead-review-v1');
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V038','Duplicate Lead review queue and permissions',SHA2('duplicate-lead-review-v1',256),'legacy',NOW());

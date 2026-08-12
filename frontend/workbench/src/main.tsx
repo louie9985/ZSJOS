@@ -50,6 +50,7 @@ import LeadAgingPoolPage from './pages/LeadAgingPoolPage'
 import TodayTasksPage from './pages/TodayTasksPage'
 import WorkPlanPage from './pages/WorkPlanPage'
 import LeadQualificationExceptionPage from './pages/LeadQualificationExceptionPage'
+import LeadDuplicateReviewPage from './pages/LeadDuplicateReviewPage'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
@@ -167,6 +168,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
   if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
   if (menu?.path === APP_ROUTES.LEAD_ASSIGNMENT) return <LeadAssignmentPage/>
+  if (menu?.path === APP_ROUTES.LEAD_DUPLICATE_REVIEW) return <LeadDuplicateReviewPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }

@@ -9,4 +9,5 @@ public interface LeadPublicSeaRecordMapper extends BaseMapperX<LeadPublicSeaReco
     default LeadPublicSeaRecordDO selectByLeadId(Long leadId) {
         return selectOne(LeadPublicSeaRecordDO::getLeadId, leadId);
     }
+    default void deleteByLeadId(Long leadId) { delete(LeadPublicSeaRecordDO::getLeadId, leadId); }
 }

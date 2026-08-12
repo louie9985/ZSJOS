@@ -18,6 +18,10 @@
 | `GET /zsjos/lead/product/simple-list` | `zsjos:lead:submit` |
 | `POST /zsjos/lead/attachment/upload` | `zsjos:lead:submit` |
 | `POST /zsjos/lead/create` | `zsjos:lead:submit` |
+| `GET /zsjos/lead-duplicate-review/page` | `zsjos:lead-duplicate-review:query`；租户公共复核队列 |
+| `GET /zsjos/lead-duplicate-review/{id}` | `zsjos:lead-duplicate-review:query` + 独立复核对象权限 |
+| `GET /zsjos/lead-duplicate-review/sales-candidates` | `zsjos:lead-duplicate-review:process`；部门管理范围或 `manage-all` |
+| `POST /zsjos/lead-duplicate-review/{id}/decision` | `zsjos:lead-duplicate-review:process` + 独立复核对象权限 |
 | `GET /zsjos/lead/assignment/my-pending` | `zsjos:lead:accept` |
 | `POST /zsjos/lead/{id}/accept` | `zsjos:lead:accept` + 当前候选对象权限 |
 | `POST /zsjos/lead/{id}/reject` | `zsjos:lead:accept` + 当前候选对象权限；仅自动派单 |
@@ -36,6 +40,10 @@
 | `POST /zsjos/lead/qualification/attachment/upload` | `zsjos:lead:qualify`；上传后仍需由判无效命令校验引用归属 |
 
 派单、接单、拒单和超时同时维护 `lead_assignment_accept` 业务任务。接单、抢单和管理员转派在归属事务内创建 `lead_first_follow_up` 任务，截止时间由接单时启用的独立跟进规则计算。
+
+提交接口先执行统一查重。活动客资手机号或微信号同字段强命中时返回 `outcome=duplicate_rejected`、已有客资编号、主状态、判定状态和运营状态，不创建复核任务。手机号/微信交叉、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中返回 `outcome=review_pending + reviewId`。完全无命中返回 `created`。旧 `activated` 只用于读取历史 `LeadActivation` 幂等结果，新提交不再直接激活。
+
+复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；决定事务对任务加行锁，第一位提交者成功。结论固定为 `new_person`、`reuse_person`、`reactivate_lead`、`notify_owner`，意见必填、附件可选。重新激活覆盖当前 Person/Lead 资料，选择范围内启用销售并回到待首次跟进；旧 Opportunity 保持 `lost`，重新判有效时恢复。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
 
 ## 管理接口与权限
 
@@ -85,7 +93,7 @@
 ## 部署顺序
 
 1. 评审并备份目标库，确认历史 `zsjos_lead` 兼容空值策略。
-2. 单独确认后按版本顺序执行至 `script/sql/mysql/migrations/V018__lead_actions_and_opportunity_followups.sql`；代码实现不会自动执行迁移。
+2. 单独确认后按版本顺序执行至 `script/sql/mysql/migrations/V038__duplicate_lead_review.sql`；代码实现不会自动执行迁移，V038 不授予任何角色菜单。
 3. 配置 `zsjos_lead_category`、`zsjos_lead_invalid_reason`、`zsjos_lead_invalid_remark_template` 与 `zsjos_lead_valid_remark_template` 字典数据及岗位对应菜单权限；快捷备注字典类型初始化为空。
 4. 接入并验证真实产品 SDK 适配器后才开放提交入口。
 5. 使用真实 MySQL、Redis、文件存储和 WebSocket 验证提交、超时转派、并发接单、业务任务及抢单。

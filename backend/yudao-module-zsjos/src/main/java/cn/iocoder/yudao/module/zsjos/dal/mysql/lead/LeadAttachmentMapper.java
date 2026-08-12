@@ -20,4 +20,6 @@ public interface LeadAttachmentMapper extends BaseMapperX<LeadAttachmentDO> {
                 .in(LeadAttachmentDO::getLeadId, leadIds)
                 .orderByAsc(LeadAttachmentDO::getSort));
     }
+
+    default void deleteByLeadId(Long leadId) { delete(LeadAttachmentDO::getLeadId, leadId); }
 }

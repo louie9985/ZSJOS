@@ -103,6 +103,8 @@ public interface LeadConstants {
     String FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY = "opportunity";
     String ASSIGNEE_TYPE_USER = "user";
     String BIZ_TYPE_LEAD = "lead";
+    String BIZ_TYPE_LEAD_DUPLICATE_REVIEW = "lead_duplicate_review";
+    String EVENT_LEAD_DUPLICATE_REVIEWED = "lead_duplicate_reviewed";
     String EVENT_LEAD_ACCEPTED = "lead_assignment_accepted";
     String EVENT_LEAD_CLAIMED = "lead_claimed";
     String EVENT_LEAD_TRANSFERRED = "lead_transferred";
