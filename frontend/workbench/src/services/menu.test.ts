@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { AuthenticationError, buildMenuTree, type RawMenu, unwrap } from './api'
 import {
   buildTwoLevelNavigation,
+  filterRenderableMenus,
   findPageByPath,
   findPrimaryByPath,
   getInaccessiblePathFallback,
@@ -86,6 +87,27 @@ describe('workbench menu conversion', () => {
     const navigation = buildTwoLevelNavigation(routes)
     expect(navigation.map(item => item.label)).toEqual(['Visible root'])
     expect(navigation[0].pages.map(page => page.key)).toEqual(['/visible/public'])
+  })
+
+  it('keeps directories for locally registered pages and removes Vue-only leaves', () => {
+    const routes = buildMenuTree([
+      menu({
+        id: 1,
+        name: 'Workbench',
+        path: '/zsjos',
+        children: [
+          menu({ id: 2, parentId: 1, name: 'Work plans', path: 'work-plans' }),
+          menu({ id: 3, parentId: 1, name: 'Plan config', path: 'work-plan-config' })
+        ]
+      }),
+      menu({ id: 4, name: 'System', path: '/system' })
+    ])
+
+    const filtered = filterRenderableMenus(routes, new Set(['/zsjos/work-plans']))
+
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].name).toBe('Workbench')
+    expect(filtered[0].children.map(child => child.name)).toEqual(['Work plans'])
   })
 
   it('supports a root that is itself a page', () => {

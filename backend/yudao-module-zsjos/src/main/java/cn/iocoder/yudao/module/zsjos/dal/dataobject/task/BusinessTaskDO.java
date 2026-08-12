@@ -21,7 +21,11 @@ public class BusinessTaskDO extends TenantBaseDO {
     private String status;
     private String assigneeType;
     private Long assigneeId;
+    private String titleSnapshot;
+    private String summarySnapshot;
+    private String actionCode;
     private LocalDateTime dueAt;
+    private LocalDateTime remindAt;
     private LocalDateTime completedAt;
     private LocalDateTime cancelledAt;
     private String cancelReason;

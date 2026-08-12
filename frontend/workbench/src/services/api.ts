@@ -164,8 +164,56 @@ export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
 export type BusinessTask = {
   id: number; taskType: string; bizType: string; bizId: number; title: string; summary?: string
-  dueAt?: Timestamp; overdue: boolean; actionCode: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP'
+  status: 'pending' | 'completed' | 'cancelled'; dueAt?: Timestamp; remindAt?: Timestamp
+  completedAt?: Timestamp; cancelledAt?: Timestamp; createTime: Timestamp; overdue: boolean
+  actionCode?: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP' | 'OPEN_WORK_PLAN_ITEM' | 'REVIEW_WORK_PLAN_ITEM'
+  actionable: boolean
 }
+export type BpmTask = {
+  id: string; name: string; createTime: Timestamp; endTime?: Timestamp; status: number; reason?: string
+  processInstanceId: string; processInstance?: { id: string; name: string; createTime: Timestamp; startUser?: { id: number; nickname: string } }
+}
+export type SimpleUser = { id: number; nickname: string; avatar?: string; deptId?: number; deptName?: string }
+export type SimpleDept = { id: number; name: string; parentId?: number }
+export type WorkPlanAttachmentUpload = { infraFileId: number; originalName: string; contentType?: string; fileSize?: number }
+export type WorkPlanChange = { id: number; subjectType: string; subjectId: number; changeType: string; beforeSnapshot?: string; afterSnapshot?: string; reason: string; operatorUserId: number; changedAt: Timestamp }
+export type WorkReport = {
+  id: number; revisionNo: number; completionSummary: string; submitterUserId: number; submittedAt: Timestamp
+  confirmationDecision?: 'auto_confirmed' | 'confirmed' | 'returned'; confirmationComment?: string
+  confirmedByUserId?: number; confirmedAt?: Timestamp; infraFileIds: number[]; reportFields?: Record<string, unknown>
+}
+export type WorkTask = {
+  id: number; planId?: number; parentTaskId?: number; title: string; description?: string; deliverableRequirement?: string
+  assigneeUserId: number; assigneeDeptId?: number; assignerUserId: number; dueAt?: Timestamp; remindAt?: Timestamp
+  confirmationRequired: boolean; confirmerUserId?: number
+  status: 'draft' | 'pending' | 'awaiting_confirmation' | 'completed' | 'cancelled'; reportedAt?: Timestamp
+  completedAt?: Timestamp; cancelledAt?: Timestamp; cancelReason?: string; version: number; blockedByChildren: boolean
+  completedChildCount: number; totalChildCount: number; taskFields?: Record<string, unknown>; reports: WorkReport[]
+  availableActions: Array<'assign' | 'complete' | 'review' | 'cancel' | 'decompose'>
+}
+export type WorkPlan = {
+  id: number; title: string; periodType: 'day' | 'month' | 'week' | 'quarter' | 'year' | 'custom'; startDate: string; endDate: string
+  planTypeId: number; templateId: number; templateVersionId: number; ownerUserId: number; ownerDeptId?: number
+  objective?: string; keyRequirements?: string; status: 'draft' | 'active' | 'completed' | 'cancelled'; summaryReady: boolean
+  creatorUserId: number; publishedAt?: Timestamp; completedAt?: Timestamp; cancelledAt?: Timestamp; cancelReason?: string; version: number
+  availableActions: Array<'update' | 'publish' | 'assign' | 'close' | 'cancel'>; fieldDefinitions: WorkPlanTemplateField[]
+  planFields?: Record<string, unknown>; tasks: WorkTask[]; summary?: WorkPlanSummary; changes: WorkPlanChange[]
+}
+export type WorkTaskInput = {
+  id?: number; parentTaskId?: number; title: string; description?: string; deliverableRequirement?: string; assigneeUserId: number
+  dueAt?: string; remindAt?: string; confirmationRequired: boolean; confirmerUserId?: number
+  taskFields?: Record<string, unknown>; version?: number; reason?: string
+}
+export type WorkPlanInput = {
+  title: string; periodType: WorkPlan['periodType']; startDate: string; endDate: string; templateVersionId: number; ownerUserId: number
+  objective?: string; keyRequirements?: string; planFields?: Record<string, unknown>; supplementalFields?: WorkPlanTemplateField[]
+  version?: number; reason?: string; tasks?: WorkTaskInput[]
+}
+export type WorkPlanType = { id: number; code: string; name: string; description?: string; status: number; sort: number }
+export type WorkPlanTemplateField = { id?: number; fieldKey?: string; label: string; section: 'plan' | 'task' | 'report' | 'summary'; fieldType: string; required?: boolean; unit?: string; placeholder?: string; filterable?: boolean; exportable?: boolean; optionsJson?: string; defaultValueJson?: string; sort?: number }
+export type WorkPlanTemplateTask = { title: string; description?: string; deliverableRequirement?: string; dueOffsetDays?: number; dueOffsetBasis?: string; confirmationRequired?: boolean; sort?: number }
+export type WorkPlanTemplate = { id: number; typeId: number; code: string; name: string; description?: string; status: string; currentVersionNo: number; versionId?: number; versionStatus?: string; periodMode?: WorkPlan['periodType']; fields?: WorkPlanTemplateField[]; applicableDeptIds?: number[]; includeChildDepartments?: boolean; presetItems?: WorkPlanTemplateTask[] }
+export type WorkPlanSummary = { id: number; summary: string; submitterUserId: number; submittedAt: Timestamp; infraFileIds: number[]; summaryFields?: Record<string, unknown> }
 export type NotifyMessage = {
   id: number
   templateNickname: string
@@ -197,6 +245,13 @@ export class AuthenticationError extends Error {
   constructor(message = '账号未登录') {
     super(message)
     this.name = 'AuthenticationError'
+  }
+}
+
+export class ApiError extends Error {
+  constructor(readonly code: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
   }
 }
 
@@ -244,7 +299,7 @@ export const unwrap = <T,>(response: { data: any }): T => {
   const payload = response.data
   if (payload && typeof payload.code === 'number') {
     if (payload.code === 401) throw new AuthenticationError(payload.msg)
-    if (payload.code !== 0) throw new Error(payload.msg || `请求失败（${payload.code}）`)
+    if (payload.code !== 0) throw new ApiError(payload.code, payload.msg || `请求失败（${payload.code}）`)
     return payload.data as T
   }
   return payload as T
@@ -399,6 +454,39 @@ export const api = {
   businessTaskSummary: async () => unwrap<BusinessTaskSummary>(await http.get('/zsjos/business-task/my-summary')),
   businessTaskPage: async (bucket: BusinessTaskBucket, params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-page', { params: { bucket, ...params } })),
+  businessTaskList: async (params: { status: 'pending' | 'done'; bucket?: BusinessTaskBucket; pageNo: number; pageSize: number }) =>
+    unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-task-page', { params })),
+  bpmTaskPage: async (view: 'todo' | 'done', params: { pageNo: number; pageSize: number }) =>
+    unwrap<PageResult<BpmTask>>(await http.get(`/bpm/task/${view}-page`, { params })),
+  simpleUsers: async () => unwrap<SimpleUser[]>(await http.get('/system/user/simple-list')),
+  simpleDepartments: async () => unwrap<SimpleDept[]>(await http.get('/system/dept/simple-list')),
+  workPlanPage: async (params: { pageNo: number; pageSize: number; periodType?: WorkPlan['periodType']; status?: string; startDate?: string; endDate?: string }) =>
+    unwrap<PageResult<WorkPlan>>(await http.get('/zsjos/work-plan/page', { params })),
+  workPlan: async (id: number) => unwrap<WorkPlan>(await http.get('/zsjos/work-plan/get', { params: { id } })),
+  workTask: async (id: number) => unwrap<WorkTask>(await http.get('/zsjos/work-plan/task/get', { params: { id } })),
+  myWorkTaskPage: async (params: { pageNo: number; pageSize: number; status?: string }) =>
+    unwrap<PageResult<WorkTask>>(await http.get('/zsjos/work-plan/task/my-page', { params })),
+  createWorkPlan: async (data: WorkPlanInput) => unwrap<number>(await http.post('/zsjos/work-plan/create', data)),
+  updateWorkPlan: async (id: number, data: WorkPlanInput) => unwrap<boolean>(await http.put(`/zsjos/work-plan/${id}`, data)),
+  publishWorkPlan: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/work-plan/${id}/publish`, { version })),
+  cancelWorkPlan: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/work-plan/${id}/cancel`, { version, reason })),
+  createTemporaryTask: async (data: WorkTaskInput) => unwrap<number>(await http.post('/zsjos/work-plan/task/temporary', data)),
+  addWorkTask: async (planId: number, data: WorkTaskInput) => unwrap<number>(await http.post(`/zsjos/work-plan/${planId}/task`, data)),
+  adjustWorkTask: async (id: number, data: WorkTaskInput) => unwrap<boolean>(await http.put(`/zsjos/work-plan/task/${id}`, data)),
+  submitWorkReport: async (id: number, data: { completionSummary: string; infraFileIds: number[]; version: number; reportFields?: Record<string, unknown> }) =>
+    unwrap<boolean>(await http.post(`/zsjos/work-plan/task/${id}/report`, data)),
+  uploadWorkPlanAttachment: async (file: File) => {
+    const data = new FormData(); data.append('file', file)
+    return unwrap<WorkPlanAttachmentUpload>(await http.post('/zsjos/work-plan/attachment/upload', data))
+  },
+  confirmWorkReport: async (id: number, data: { decision: 'confirmed' | 'returned'; comment?: string; version: number }) =>
+    unwrap<boolean>(await http.post(`/zsjos/work-plan/task/${id}/confirm`, data)),
+  cancelWorkTask: async (id: number, data: { version: number; reason: string; cascadeChildren?: boolean }) =>
+    unwrap<boolean>(await http.post(`/zsjos/work-plan/task/${id}/cancel`, data)),
+  submitWorkPlanSummary: async (id: number, data: { version: number; summary: string; infraFileIds: number[]; summaryFields?: Record<string, unknown> }) =>
+    unwrap<boolean>(await http.post(`/zsjos/work-plan/${id}/summary`, data)),
+  workPlanTypes: async () => unwrap<WorkPlanType[]>(await http.get('/zsjos/work-plan-config/types')),
+  workPlanTemplates: async () => unwrap<WorkPlanTemplate[]>(await http.get('/zsjos/work-plan/templates/available')),
   unreadNotifyCount: async () => unwrap<number>(await http.get('/system/notify-message/get-unread-count')),
   unreadNotifyMessages: async () => unwrap<NotifyMessage[]>(await http.get('/system/notify-message/get-unread-list')),
   myNotifyMessagePage: async (params: NotifyMessagePageParams) =>

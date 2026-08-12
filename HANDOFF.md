@@ -93,6 +93,69 @@ The entries below predate workstream-isolated handoff files. They remain unchang
 - Verification: Static checks and both root entry points passed; controlled MySQL 8 tests passed for fresh Bootstrap, verification, non-empty protection, V019-to-V020 upgrade, idempotent replay, schema drift blocking, and applied-checksum blocking; an earlier full migration path passed lock, logical backup, Bootstrap, verification, and a final READY plan; Compose configuration and workflow YAML parsed; Bash scripts passed `bash -n` inside the MySQL image; `git diff --check` passed; no test containers or Python cache remain. The final migrator image rebuild could not fetch `python:3.11.7-slim-bookworm` because Docker Hub authentication timed out, and a repeat of the host-based full CLI path was unavailable because the Windows host lacks `mysql` and `mysqldump`.
 - Remaining work: Build and publish the immutable migrator image in CI or a network environment with Docker Hub access, then run `plan`, `migrate`, and `verify` against the deployment target using reviewed secrets before starting the application release. No files were staged, committed, pushed, and no production or shared service state was changed.
 
+### 2026-08-10 18:18:55 +08:00
+
+- User goal: Read the project and prepare to start it, with execution plan confirmation required before starting.
+- Key decisions: Perform read-only discovery first; do not start services before user confirmation; avoid the repository Compose file because its relative build contexts are absent in the current checkout.
+- Result: Identified Spring Boot backend on port 48080 using local MySQL 3306 and Redis 6379, Vue admin Vite dev server, and available Maven/JDK/Docker/pnpm tooling. No relevant listeners are currently active; frontend dependencies are not installed.
+- Changed files: `HANDOFF.md` only.
+- Verification: Inspected repository instructions, README/configuration, Compose mappings, package scripts, Git status, installed tools, dependency directories, and TCP listeners. No service was started and no shared state was changed.
+- Remaining work: Await confirmation of the proposed startup plan and whether to install frontend dependencies and start local MySQL/Redis containers.
+
+### 2026-08-10 18:23:11 +08:00
+
+- User goal: Require MySQL, Redis, and MinIO to run in Docker as part of the local project startup.
+- Key decisions: Keep backend and frontends on the host; avoid changing or deleting the existing Docker database volumes; propose a separate local-development container set with independent volumes and host port mappings; do not automatically switch administrator-owned file storage configuration to MinIO.
+- Result: Refined the startup plan after discovering existing internal-only MySQL and Redis containers. The existing MySQL container is unhealthy because its persisted root credential differs from the currently mounted secret, while Redis is healthy; neither publishes a host port.
+- Changed files: `HANDOFF.md` only.
+- Verification: Inspected container state, health history, mounts, networks, port bindings, production Compose configuration, secret-file presence without reading secret values, and backend S3/MinIO integration ownership.
+- Remaining work: Await explicit confirmation before creating the new Docker containers and volumes, initializing the fresh development schema, installing frontend dependencies, and starting the backend and frontend processes.
+
+### 2026-08-10 18:27:15 +08:00
+
+- User goal: After deleting the old containers, determine how to continue starting the local project.
+- Key decisions: Preserve the existing `zsjos-local_*` Docker volumes; do not assume they are empty; recreate containers with host port mappings using a local-only startup configuration because the repository has no complete local Compose file and the production Compose omits host ports and MinIO.
+- Result: Confirmed that containers are absent while local MySQL, Redis, and MinIO data volumes remain. Frontend dependencies are still not installed.
+- Changed files: `HANDOFF.md` only.
+- Verification: Inspected Docker containers, volume labels and creation times, production environment/configuration, available images, repository Compose files, Git status, and frontend dependency directories. No containers were recreated and no data was deleted.
+- Remaining work: Await confirmation to recreate Docker services using the preserved volumes, initialize or migrate the database as needed, install frontend dependencies, and start backend plus both frontend dev servers.
+
+### 2026-08-10 18:44:19 +08:00
+
+- User goal: Start the complete local project after approving the Docker-based dependency plan.
+- Key decisions: Preserve the inaccessible historical MySQL volume; create a separate fresh development MySQL volume; reuse the existing local Redis and MinIO volumes; initialize the fresh schema from the repository Bootstrap; align missing Flowable 8 schema metadata with the bundled official SQL; run backend and both frontends on the host.
+- Result: Started Docker MySQL, Redis, and MinIO; initialized 203 database tables; built and started the Spring Boot backend; installed locked frontend dependencies; started the administration frontend and employee workbench. Runtime URLs are backend `http://localhost:48080`, admin `http://localhost:5173`, workbench `http://localhost:5174`, MinIO API `http://localhost:9000`, and MinIO console `http://localhost:9001`.
+- Changed files: `HANDOFF.md` only in tracked source; generated Maven targets and ignored frontend dependency directories were refreshed. Docker containers, a new development MySQL volume, and development database contents were created.
+- Verification: Maven package completed successfully with tests skipped; backend actuator reported `UP`; both frontend roots and MinIO health returned HTTP 200; Redis returned `PONG`; MySQL responded to `mysqladmin ping`; all required ports are listening. Git status contains only the pre-existing untracked `.codex/` and the required `HANDOFF.md` update.
+- Remaining work: MinIO is running but is not automatically selected as the administrator-owned file storage configuration. The workbench currently requires a hoisted dependency layout because two imported packages are not declared directly; this should be corrected separately before a clean reproducible install is claimed.
+
+### 2026-08-10 18:59:33 +08:00
+
+- User goal: Assess which foundational settings the current Yudao Infra module still lacks and identify practical improvements.
+- Key decisions: Treat the request as read-only analysis; distinguish missing production configuration and governance from missing Infra features; keep business options in dictionaries or owning business APIs and keep deployment, backup, and secrets outside the Infra parameter table.
+- Result: Confirmed that Infra already provides parameters, file storage, jobs, API logs, Redis and service monitoring, code generation, data-source configuration, WebSocket, and API documentation. Recommended prioritizing a production security baseline, an approved private MinIO master configuration and file policy, enabled log-retention jobs, actionable monitoring and alerting, environment-safe parameter governance, and least-privilege Infra roles; stale demo and disabled-module seeds should be removed from the Core baseline through a separately reviewed migration.
+- Changed files: `HANDOFF.md` only.
+- Verification: Inspected Infra controllers, services, security rules, cleanup jobs, frontend management views, runtime YAML, SQL seeds, architecture boundaries, current Git changes, and read-only local database summaries. The local database has 11 active file configurations with a sample cloud configuration as master, three paused cleanup jobs, 59 unprocessed API error logs, and no access logs because local access logging is disabled. No configuration, database row, service, or external state was changed.
+- Remaining work: Confirm which recommendation group to implement first; any behavior, SQL seed, permission, or production-profile change requires a scoped facts/assumptions/non-goals/verification proposal and user confirmation before editing.
+
+### 2026-08-10 19:08:37 +08:00
+
+- User goal: Determine whether the proposed AI-CRM workbench requirements for twelve departments can be abstracted into reusable foundational modules.
+- Key decisions: Organize capabilities by stable business ownership rather than department names; reuse System, BPM, Infra, and System notification facilities; separate plans, business tasks, SLA work orders, and approvals; model a person/student master with multiple independent service relations and domain cases instead of one universal lifecycle status; keep department workbenches as permission-scoped compositions of shared capabilities.
+- Result: Identified reusable ZSJOS platform capabilities for object authorization and user relations, work planning, business tasks, work orders, metric targets and fact snapshots, event/notification integration, forms/rules, files/evidence, and projections/reporting. Identified separate domain modules for customer and sales, product/course/SKU, order/payment/refund, registration and student service, content/media production, examination/employment/quality cases, HR, and administration assets. Confirmed that the current module already contains lead, opportunity, person, product/SKU, business-task, business-event, user-relation, and lead-specific object-permission foundations, but most later lifecycle domains remain target design rather than implemented APIs.
+- Changed files: `HANDOFF.md` only.
+- Verification: Inspected repository and ZSJOS instructions, architecture and permission documents, the target lead-order-service lifecycle model, current ZSJOS data objects/controllers/services, BusinessTask implementation, System notification facilities, BPM task capabilities, and current Git state. Found two documentation-to-code conflicts: product ownership remains documented as future-confirmed although ZSJOS product/SKU code exists, and module guidance says `@ZsjosPermission` is absent although a lead-only implementation now exists. No business code, schema, configuration, service, or external state was changed.
+- Remaining work: Confirm the proposed module map and select a first bounded design slice. Before implementation, reconcile product ownership and object-permission documentation, then produce the required facts, assumptions, non-goals, affected scope, data contracts, and verification plan for user confirmation.
+
+### 2026-08-10 19:15:12 +08:00
+
+- User goal: Exclude the customer/student business area because another team owns it, and identify AI-CRM areas that this workstream can independently build.
+- Key decisions: Treat customer, student, sales-conversion, registration, and payment lifecycle tables as out of scope; prioritize reusable workbench capabilities and the New Media content-production domain; defer HR, examination, employment, quality, and finance areas until their upstream data owners and external integrations are confirmed.
+- Result: Recommended a non-customer workstream consisting of a decoupled workbench task center, monthly/weekly/daily work plans, SLA work orders, metric targets and fact snapshots, business-event notification integration, and then a New Media module covering platform accounts, responsibility, content planning, publishing records, shared materials, and video production work orders. The current workbench contains lead-specific pages and the current `BusinessTaskServiceImpl` is lead-coupled, so decoupling the task presentation through scene providers is a bounded prerequisite. Files remain owned by Infra while media metadata and permissions remain business-owned.
+- Changed files: `HANDOFF.md` only.
+- Verification: Inspected current workbench pages/services, ZSJOS controllers, data objects and BusinessTask implementation, repository architecture boundaries, module list, and Git state. Confirmed no HR, asset, media, exam, employment, or quality domain implementation is currently present in ZSJOS. No business code, schema, configuration, service, or external state was changed.
+- Remaining work: Confirm whether to start with the shared workbench foundation or the New Media domain; before implementation, confirm exact non-customer scope, ownership of employee/account data, integration boundaries, and the verification plan.
+
 ### 2026-08-10 18:08:44 +08:00
 
 - User goal: Obtain the direct macOS zsh commands for preparing and running the implemented production database deployment and migration workflow.

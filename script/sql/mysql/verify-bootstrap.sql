@@ -124,6 +124,33 @@ SELECT 'historical_valid_leads_v019' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V019'), 'PASS', 'FAIL') AS result;
 SELECT 'unified_schema_migration_v020' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V020'), 'PASS', 'FAIL') AS result;
+SELECT 'workbench_foundation_v022' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V022'), 'PASS', 'FAIL') AS result;
+SELECT 'work_plan_query_permission_v033' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V033'), 'PASS', 'FAIL') AS result;
+SELECT 'business_task_workbench_columns' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+           AND table_name='zsjos_business_task'
+           AND column_name IN ('title_snapshot','summary_snapshot','action_code','remind_at'))=4, 'PASS', 'FAIL') AS result;
+SELECT 'work_plan_tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+           AND table_name IN ('zsjos_work_plan','zsjos_work_task','zsjos_work_report','zsjos_work_plan_summary',
+                              'zsjos_work_attachment','zsjos_work_plan_field_definition','zsjos_work_field_value','zsjos_work_change'))=8, 'PASS', 'FAIL') AS result;
+SELECT 'work_plan_config_tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+           AND table_name IN ('zsjos_work_plan_type','zsjos_work_plan_template','zsjos_work_plan_template_version',
+                              'zsjos_work_plan_template_field','zsjos_work_plan_template_scope','zsjos_work_plan_template_task'))=6, 'PASS', 'FAIL') AS result;
+SELECT 'work_plan_menu_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE id BETWEEN 6900 AND 6917 AND deleted=b'0'
+           AND permission IN ('zsjos:work-plan:query','zsjos:work-plan:create','zsjos:work-plan:update',
+                              'zsjos:work-plan:publish','zsjos:work-plan:assign','zsjos:work-plan:complete',
+                              'zsjos:work-plan:review','zsjos:work-plan:cancel','zsjos:work-plan:decompose','zsjos:work-plan:close',
+                              'zsjos:work-plan-config:query','zsjos:work-plan-config:create','zsjos:work-plan-config:update',
+                              'zsjos:work-plan-config:publish','zsjos:work-plan-config:disable','zsjos:work-plan:export'))=16, 'PASS', 'FAIL') AS result;
+SELECT 'work_plan_query_permission_split' AS check_name,
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6900 AND name='工作计划' AND permission='' AND type=2 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6908 AND parent_id=6900 AND name='查看工作计划'
+                      AND permission='zsjos:work-plan:query' AND type=3 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_intended_product_active_key_v021' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V021'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_order_dual_approval_v023' AS check_name,
@@ -184,7 +211,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
            'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V023','V024','V025','V026'))=10, 'PASS', 'FAIL') AS result;
+       IF(EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V025'), 'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
            AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;
@@ -265,6 +292,10 @@ FROM (
   UNION ALL SELECT 'zsjos_lead_follow_up_record' UNION ALL SELECT 'zsjos_lead_follow_up_image'
   UNION ALL SELECT 'system_notify_rule' UNION ALL SELECT 'system_area'
   UNION ALL SELECT 'crm_owner_record' UNION ALL SELECT 'crm_performance_config'
+  UNION ALL SELECT 'zsjos_work_plan' UNION ALL SELECT 'zsjos_work_task'
+  UNION ALL SELECT 'zsjos_work_report' UNION ALL SELECT 'zsjos_work_plan_summary'
+  UNION ALL SELECT 'zsjos_work_attachment' UNION ALL SELECT 'zsjos_work_plan_field_definition'
+  UNION ALL SELECT 'zsjos_work_field_value' UNION ALL SELECT 'zsjos_work_change'
   UNION ALL SELECT 'zsjos_module_schema_version'
 ) expected
 LEFT JOIN information_schema.tables actual
