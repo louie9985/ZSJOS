@@ -22,6 +22,10 @@
         <el-input-number v-model="formData.qualificationTimeoutMinutes" :min="5" :max="43200" :step="30" />
         <span class="unit">分钟</span>
       </el-form-item>
+      <el-form-item label="超期公海期限" prop="agingPoolTimeoutDays">
+        <el-input-number v-model="formData.agingPoolTimeoutDays" :min="1" :max="3650" :step="1" />
+        <span class="unit">自然日</span>
+      </el-form-item>
       <el-form-item>
         <el-button type="primary" :loading="saving" v-hasPermi="['zsjos:lead-follow-up-rule:update']" @click="saveRule">
           <Icon icon="ep:check" class="mr-5px" />保存规则
@@ -42,7 +46,7 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref('')
 const formRef = ref<FormInstance>()
-const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({ firstFollowUpTimeoutMinutes: 1440, qualificationTimeoutMinutes: 4320 })
+const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({ firstFollowUpTimeoutMinutes: 1440, qualificationTimeoutMinutes: 4320, agingPoolTimeoutDays: 90 })
 const rules: FormRules = {
   firstFollowUpTimeoutMinutes: [
     { required: true, message: '请输入首次跟进时限', trigger: 'blur' },
@@ -51,6 +55,10 @@ const rules: FormRules = {
   qualificationTimeoutMinutes: [
     { required: true, message: '请输入有效性判定时限', trigger: 'blur' },
     { type: 'number', min: 5, max: 43200, message: '范围为 5–43200 分钟', trigger: 'change' }
+  ],
+  agingPoolTimeoutDays: [
+    { required: true, message: '请输入超期公海期限', trigger: 'blur' },
+    { type: 'number', min: 1, max: 3650, message: '范围为 1–3650 个自然日', trigger: 'change' }
   ]
 }
 
@@ -61,6 +69,7 @@ const loadRule = async () => {
     const rule = await FollowUpRuleApi.getRule()
     formData.firstFollowUpTimeoutMinutes = rule.firstFollowUpTimeoutMinutes
     formData.qualificationTimeoutMinutes = rule.qualificationTimeoutMinutes
+    formData.agingPoolTimeoutDays = rule.agingPoolTimeoutDays
   } catch (loadError: any) {
     error.value = loadError?.msg || loadError?.message || '跟进规则加载失败'
   } finally {
@@ -73,7 +82,7 @@ const saveRule = async () => {
   saving.value = true
   try {
     await FollowUpRuleApi.updateRule({ ...formData })
-    message.success('跟进规则已更新，新的归属将使用新时限')
+    message.success('规则已更新；尚未入池客资会立即按新期限重算，已入池客资不自动回收')
     await loadRule()
   } finally {
     saving.value = false

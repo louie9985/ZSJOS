@@ -72,6 +72,15 @@ public interface AdminUserApi {
     List<AdminUserRespDTO> getUserListByNickname(String nickname);
 
     /**
+     * 修改用户状态。禁用时由 System 撤销该用户的登录 Token。
+     *
+     * @param id 用户编号
+     * @param status 账号状态
+     * @param reason 调用方审计原因
+     */
+    void updateUserStatus(Long id, Integer status, String reason);
+
+    /**
      * 获得用户 Map
      *
      * @param ids 用户编号数组

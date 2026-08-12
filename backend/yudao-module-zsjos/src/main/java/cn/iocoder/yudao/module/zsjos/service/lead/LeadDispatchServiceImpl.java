@@ -55,6 +55,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private FileApi fileApi;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
+    @Resource private LeadAgingPoolService agingPoolService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -183,6 +184,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 null, lead.getAssignmentAttemptCount(), null, null, acceptedAt);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setOwnerUserId(userId);
+        lead.setOwnershipStartedAt(acceptedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPendingAssigneeUserId(null);
         lead.setPendingExpiresAt(null);
@@ -237,6 +239,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lifecycleTaskService.cancelFollowUpReminders(leadId, claimedAt, "客资重新归属");
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setOwnerUserId(userId);
+        lead.setOwnershipStartedAt(claimedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);
@@ -272,25 +275,35 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId) {
+        adminTransfer(leadId, salesUserId, operatorUserId, "管理员转派");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
+    public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason) {
         requireSalesUser(salesUserId);
         LeadDO lead = requireLead(leadId);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
+        LocalDateTime transferredAt = LocalDateTime.now();
+        agingPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
         Long pendingAssigneeUserId = lead.getPendingAssigneeUserId();
         String fromAssignmentStatus = lead.getAssignmentStatus();
         lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(salesUserId);
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
-        LocalDateTime transferredAt = LocalDateTime.now();
+        lead.setOwnershipStartedAt(transferredAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, pendingAssigneeUserId,
-                transferredAt, "管理员转派");
-        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, transferredAt, "管理员转派");
-        lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, "管理员转派");
+                transferredAt, reason);
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, transferredAt, reason);
+        lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, reason);
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
         history.setLeadId(leadId); history.setActionType(ACTION_TRANSFER); history.setFromOwnerUserId(from);
         history.setToOwnerUserId(salesUserId); history.setOperatorUserId(operatorUserId);
+        history.setReason(reason);
         history.setOccurredAt(transferredAt); historyMapper.insert(history);
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);

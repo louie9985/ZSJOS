@@ -235,6 +235,7 @@ otherwise
   detail request cannot bypass row visibility. A leader of a peer department receives
   no access, while a leader of a parent department may access owners in child departments.
 - 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案：后端根据审批配置根部门及子部门解析用户可用中心，报名履约用户固定查询 `registrationReview`，财务用户固定查询 `financeReview`，同时属于两个范围的用户才可切换中心。`inbox-page` 必须将请求中心、已发布筛选条件和用户可用 BPM 节点取交集，页面隐藏另一中心不能代替授权。
+- 提交人和负责人客资收件箱固定按服务端分页每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一页；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取第一页。下一页失败必须保留已加载客资并提供局部重试，不得把增量失败渲染成空列表或扩大服务端筛选范围。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询和数量统计只消费已发布版本；保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
@@ -278,6 +279,31 @@ lead-category labels, remark, and attachment images.
 - Results are ordered by `public_pool_at ASC, id ASC`, so the oldest waiting lead is
   presented first. Tenant and logical-delete interceptors remain applicable.
 
+### Aging collaboration pool visibility and actions
+
+The aging collaboration pool is independent from the claim pool. An active cycle freezes the
+original owner A and A's direct department at entry. A remains the Lead owner until a collaborator
+B's order becomes effective.
+
+- `zsjos:lead-aging-pool:query` grants feature access only. Rows are limited to enabled eligible
+  sales in the frozen department, the frozen department's direct leader, A, B, or a user with
+  `zsjos:lead-aging-pool:manage-all`.
+- The direct frozen-department leader also needs `zsjos:lead-aging-pool:manage` to assign, reassign,
+  or exit a cycle. `manage-all` is the tenant-wide operational fallback.
+- B must be an enabled eligible sales user in the frozen department and must differ from A.
+- Before assignment neither A nor another salesperson can advance the Lead. After assignment only B
+  may add follow-ups and submit or revise the deal. A remains a read-only nominal owner.
+- Full contact data follows the same server-side pool visibility. Frontends consume
+  `availableActions` and do not infer mutation rights from owner or department labels.
+- The published `agingPool` inbox audience owns the configurable status grouping for the dedicated
+  pool page. It filters cycle status only and does not reinterpret ordinary Lead assignment state.
+- When B's order becomes effective, Lead and Opportunity ownership move to B in the same transaction;
+  the immutable order submitter remains B.
+- A rejected A-owned order is not reassigned in place. B creates a linked continuation order; the A
+  order remains as `superseded` history and only the B order may proceed through the new approval round.
+- Advance reminders use a durable pending/failed/sent stage. The stage becomes sent only after System
+  confirms message persistence; failed attempts retain a stable error code and a bounded retry time.
+
 ### Sales assignment acceptance
 
 - Sales acceptance requires `zsjos:lead:accept`; fresh initialization and V006 grant it to roles that already hold the claim action instead of inferring access from a role or post display name.
@@ -292,6 +318,17 @@ lead-category labels, remark, and attachment images.
 - 跟进备注和下次跟进时间均为必填，下次时间必须晚于当前时间。无效客资不再允许新增跟进；判无效及成交订单最终生效会取消未完成的首次跟进、下次跟进和适用的判定任务，并清空 Lead/Opportunity 当前下次跟进投影，历史跟进记录保持不变。
 - 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 阶段配置。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。直属主管只取销售当前部门负责人，不向上级部门递归。
 - Business editing overlays have presentation priority over assignment prompts. An assignment may continue to expire on the server while the workbench defers its modal, so reconnect, focus refresh and polling always reload server truth.
+
+### Subordinate-sales management
+
+The server-owned `下属销售` menu is available only with `zsjos:subordinate-sales:query`. Runtime scope is resolved from System department-leader relationships, including every child department, and then limited to users holding the stable `sales_specialist` post. Disabled accounts remain visible; no role name or department label creates access.
+
+- Account and dispatch mutations use separate permissions. Account disable delegates to the System public user API so current login tokens are revoked without moving Lead ownership.
+- Every account, dispatch, transfer, and manual public-sea mutation requires a trimmed reason of at most 500 characters and writes operator, target, before/after values, reason, and occurrence time.
+- Effective new-Lead intake requires an enabled account, current sales eligibility, online page presence, and accepting mode. Presence and accepting preference remain independent sources.
+- Metrics use current owned Lead inventory and Beijing-day pending follow-up tasks. Historical effective-order metrics remain attributed to immutable order submitters after later Lead transfers.
+- Batch transfer and manual public-sea release accept at most 200 Lead IDs and commit each Lead independently. Every result returns the Lead ID and a stable success or failure code; one failure does not roll back successful siblings.
+- Manual public sea is an owner-preserving collaboration marker with an optional enabled in-scope sales collaborator. It does not change Lead primary status, `owner_user_id`, or `assignment_status`, does not enter the claim pool, and cannot be claimed.
 
 ### Lead appeal routing (V015)
 

@@ -34,8 +34,8 @@ export type SalesOrderEntryLead = {
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
 
-export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onSubmitted }: {
-  lead: SalesOrderEntryLead; orderId?: number; open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
+export default function SalesOrderEntryModal({ lead, orderId, continuation, open, onClose, onSubmitted }: {
+  lead: SalesOrderEntryLead; orderId?: number; continuation?: boolean; open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
   const [areas, setAreas] = useState<AreaNode[]>([])
@@ -116,7 +116,11 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
         const uploadResult = await uploadDeferredFiles(vouchers, api.uploadSalesOrderVoucher, setVouchers)
         if (uploadResult.failed) { message.error('有缴费凭证上传失败，请重试失败项'); return }
         request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
-        if (orderId) {
+        if (orderId && continuation) {
+          const submittedOrderId = await api.continueSalesOrder(orderId, request)
+          message.success('驳回订单已接续并重新提交会签')
+          onSubmitted(submittedOrderId)
+        } else if (orderId) {
           await api.resubmitSalesOrder(orderId, request)
           message.success('成交订单已补正并重新提交会签')
           onSubmitted(orderId)
@@ -131,7 +135,7 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
     })
   }
 
-  return <Modal title={orderId ? '补正成交' : '录入成交'} open={open} onCancel={onClose} footer={null} width={980} destroyOnHidden>
+  return <Modal title={continuation ? '接续成交' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={onClose} footer={null} width={980} destroyOnHidden>
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>

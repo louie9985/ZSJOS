@@ -73,6 +73,16 @@ INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
 SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
 FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'reviewer' AND s.deleted = b'0';
 
+SET @aging_pool_filter = '{"groups":[{"key":"all","label":"全部公海客资","sort":0,"enabled":true,"sectionLabel":"公海状态","conditions":[],"options":[{"key":"all","label":"全部","sort":0,"enabled":true,"conditions":[]},{"key":"waiting_assignment","label":"待指派","sort":10,"enabled":true,"conditions":[{"field":"pool_status","values":["waiting_assignment"]}]},{"key":"assigned","label":"协同跟进中","sort":20,"enabled":true,"conditions":[{"field":"pool_status","values":["assigned"]}]},{"key":"deal_pending","label":"成交审批中","sort":30,"enabled":true,"conditions":[{"field":"pool_status","values":["deal_pending"]}]}]}]}';
+INSERT IGNORE INTO `zsjos_lead_inbox_filter_scheme`
+(`audience`, `name`, `draft_config_json`, `published_config_json`, `published_version`, `published_by`, `published_at`, `version`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT 'agingPool', '超期公海视角', @aging_pool_filter, @aging_pool_filter, 1, 1, NOW(), 0, '1', NOW(), '1', NOW(), b'0', t.id
+FROM `system_tenant` t WHERE t.id = 1 AND t.deleted = b'0';
+INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
+(`scheme_id`, `version_no`, `config_json`, `published_by`, `published_at`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
+FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'agingPool' AND s.deleted = b'0';
+
 INSERT INTO `system_role_menu`
 (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
@@ -223,6 +233,9 @@ VALUES ('V033', 'Separate work-plan route and query permission', 'split-work-pla
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V021', 'Make lead intended-product uniqueness active-row only', 'lead-intended-product-active-unique-key-v1');
 
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V022', 'Reserve migration sequence before sales-order approval', 'reserved-migration-sequence-v1');
+
 INSERT INTO `zsjos_order_approval_config` (`registration_dept_id`,`finance_dept_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT 1030,1040,'quick-init',NOW(),'quick-init',NOW(),b'0',1
 WHERE EXISTS(SELECT 1 FROM `system_dept` WHERE id=1030 AND tenant_id=1 AND deleted=b'0')
@@ -301,3 +314,26 @@ VALUES ('V025', 'Add sales-order workbench personal and approval views', 'sales-
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V025','Add sales-order workbench personal and approval views',SHA2('sales-order-workbench-views-v1',256),'legacy',NOW());
+
+INSERT IGNORE INTO `system_menu`
+(`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6814,'下属销售','zsjos:subordinate-sales:query',2,20,6735,'subordinate-sales','ep:user','zsjos/subordinateSales/index','ZsjosSubordinateSales',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6815,'停启下属账号','zsjos:subordinate-sales:account-status',3,1,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6816,'修改下属接单','zsjos:subordinate-sales:dispatch-mode',3,2,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6817,'批量转派客资','zsjos:subordinate-sales:batch-transfer',3,3,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+
+INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT DISTINCT source.role_id,target.id,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
+FROM system_role_menu source JOIN system_menu source_menu ON source_menu.id=source.menu_id
+  AND source_menu.permission='zsjos:lead:appeal:review-sales-manager' AND source_menu.deleted=b'0'
+JOIN system_menu target ON target.id BETWEEN 6814 AND 6818 AND target.deleted=b'0'
+WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existing
+ WHERE existing.tenant_id=source.tenant_id AND existing.role_id=source.role_id
+ AND existing.menu_id=target.id AND existing.deleted=b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
+VALUES ('V035','Add subordinate-sales management','subordinate-sales-management-v1');
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V035','Add subordinate-sales management',SHA2('subordinate-sales-management-v1',256),'legacy',NOW());

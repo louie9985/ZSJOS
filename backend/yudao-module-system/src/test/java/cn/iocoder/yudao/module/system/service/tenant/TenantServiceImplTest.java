@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.tenant.TenantPackageDO;
 import cn.iocoder.yudao.module.system.dal.mysql.tenant.TenantMapper;
+import cn.iocoder.yudao.module.system.api.tenant.dto.TenantCreatedEvent;
 import cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum;
 import cn.iocoder.yudao.module.system.enums.permission.RoleTypeEnum;
 import cn.iocoder.yudao.module.system.service.permission.MenuService;
@@ -25,6 +26,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
 import java.time.LocalDateTime;
 import java.util.Arrays;
@@ -53,6 +56,7 @@ import static org.mockito.Mockito.*;
  * @author 芋道源码
  */
 @Import(TenantServiceImpl.class)
+@RecordApplicationEvents
 public class TenantServiceImplTest extends BaseDbUnitTest {
 
     @Resource
@@ -73,6 +77,8 @@ public class TenantServiceImplTest extends BaseDbUnitTest {
     private MenuService menuService;
     @MockitoBean
     private PermissionService permissionService;
+    @Resource
+    private ApplicationEvents applicationEvents;
 
     @BeforeEach
     public void setUp() {
@@ -173,6 +179,8 @@ public class TenantServiceImplTest extends BaseDbUnitTest {
         verify(permissionService).assignRoleMenu(eq(200L), same(tenantPackage.getMenuIds()));
         // verify 分配角色
         verify(permissionService).assignUserRole(eq(300L), eq(singleton(200L)));
+        assertTrue(applicationEvents.stream(TenantCreatedEvent.class)
+                .anyMatch(event -> tenantId.equals(event.getTenantId())));
     }
 
     @Test

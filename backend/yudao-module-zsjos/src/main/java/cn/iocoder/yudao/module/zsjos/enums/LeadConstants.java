@@ -17,6 +17,8 @@ public interface LeadConstants {
     String STATUS_SUSPENDED = "suspended";
     String STATUS_VALID = "valid";
     String STATUS_INVALID = "invalid";
+    String STATUS_CONVERTED = "converted";
+    String STATUS_CLOSED = "closed";
     String ASSIGNMENT_UNASSIGNED = "unassigned";
     String ASSIGNMENT_PENDING = "pending_acceptance";
     String ASSIGNMENT_OWNED = "owned";
@@ -44,15 +46,18 @@ public interface LeadConstants {
     String ACTION_JUDGE_INVALID = "JUDGE_INVALID";
     String ACTION_ENTER_DEAL = "ENTER_DEAL";
     String ACTION_REVISE_DEAL = "REVISE_DEAL";
+    String ACTION_CONTINUE_DEAL = "CONTINUE_DEAL";
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
     String INBOX_AUDIENCE_REVIEWER = "reviewer";
+    String INBOX_AUDIENCE_AGING_POOL = "agingPool";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
     String INBOX_FILTER_FIELD_STATUS = "status";
     String INBOX_FILTER_FIELD_ASSIGNMENT_STATUS = "assignment_status";
     String INBOX_FILTER_FIELD_HANDLED = "handled";
     String INBOX_FILTER_FIELD_TASK_DEFINITION_KEY = "task_definition_key";
+    String INBOX_FILTER_FIELD_POOL_STATUS = "pool_status";
     String DISPATCH_AUTO = "auto";
     String DISPATCH_SPECIFIED = "specified";
 
@@ -60,6 +65,22 @@ public interface LeadConstants {
     String FOLLOW_UP_RULE_DEFAULT = "default";
     String STRATEGY_GLOBAL_ROUND_ROBIN = "global_round_robin";
     String SALES_POST_CODE = "sales_specialist";
+
+    String AGING_POOL_WAITING_ASSIGNMENT = "waiting_assignment";
+    String AGING_POOL_ASSIGNED = "assigned";
+    String AGING_POOL_DEAL_PENDING = "deal_pending";
+    String AGING_POOL_EXITED = "exited";
+    String AGING_POOL_CONVERTED = "converted";
+    String AGING_POOL_EVENT_ENTERED = "entered";
+    String AGING_POOL_EVENT_ASSIGNED = "assigned";
+    String AGING_POOL_EVENT_REASSIGNED = "reassigned";
+    String AGING_POOL_EVENT_COLLABORATOR_CLEARED = "collaborator_cleared";
+    String AGING_POOL_EVENT_EXITED = "exited";
+    String AGING_POOL_EVENT_DEAL_PENDING = "deal_pending";
+    String AGING_POOL_EVENT_CONVERTED = "converted";
+    String PERMISSION_AGING_POOL_QUERY = "zsjos:lead-aging-pool:query";
+    String PERMISSION_AGING_POOL_MANAGE = "zsjos:lead-aging-pool:manage";
+    String PERMISSION_AGING_POOL_MANAGE_ALL = "zsjos:lead-aging-pool:manage-all";
 
     String ACTION_DISPATCH = "dispatch";
     String ACTION_ACCEPT = "accept";

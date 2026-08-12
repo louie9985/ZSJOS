@@ -26,8 +26,55 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    @Select("""
+            SELECT l.* FROM zsjos_lead l
+            JOIN zsjos_opportunity o ON o.lead_id=l.id AND o.type='initial_conversion'
+              AND o.status IN ('open','following') AND o.deleted=b'0' AND o.tenant_id=l.tenant_id
+            WHERE l.tenant_id=#{tenantId} AND l.deleted=b'0' AND l.assignment_status='owned'
+              AND l.status IN ('valid','converted') AND l.owner_user_id IS NOT NULL
+              AND l.ownership_started_at IS NOT NULL AND l.ownership_started_at <= #{cutoff}
+              AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
+                AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
+                AND c.status IN ('waiting_assignment','assigned','deal_pending'))
+              AND NOT EXISTS (SELECT 1 FROM zsjos_order so WHERE so.lead_id=l.id
+                AND so.tenant_id=l.tenant_id AND so.deleted=b'0' AND so.status='pending_approval')
+            ORDER BY l.ownership_started_at ASC,l.id ASC LIMIT 200
+            """)
+    List<LeadDO> selectAgingPoolCandidates(@Param("tenantId") Long tenantId,
+                                           @Param("cutoff") LocalDateTime cutoff);
+    @Select("""
+            SELECT l.* FROM zsjos_lead l
+            JOIN zsjos_opportunity o ON o.lead_id=l.id AND o.type='initial_conversion'
+              AND o.status IN ('open','following') AND o.deleted=b'0' AND o.tenant_id=l.tenant_id
+            WHERE l.tenant_id=#{tenantId} AND l.deleted=b'0' AND l.assignment_status='owned'
+              AND l.status IN ('valid','converted') AND l.owner_user_id IS NOT NULL
+              AND l.ownership_started_at IS NOT NULL AND l.ownership_started_at <= #{latestStart}
+              AND NOT EXISTS (SELECT 1 FROM zsjos_lead_aging_pool_cycle c WHERE c.lead_id=l.id
+                AND c.tenant_id=l.tenant_id AND c.deleted=b'0'
+                AND c.status IN ('waiting_assignment','assigned','deal_pending'))
+              AND NOT EXISTS (SELECT 1 FROM zsjos_order so WHERE so.lead_id=l.id
+                AND so.tenant_id=l.tenant_id AND so.deleted=b'0' AND so.status='pending_approval')
+            ORDER BY l.ownership_started_at ASC,l.id ASC LIMIT 500
+            """)
+    List<LeadDO> selectAgingPoolReminderCandidates(@Param("tenantId") Long tenantId,
+                                                   @Param("latestStart") LocalDateTime latestStart);
+
+    default List<Long> selectIdsByContactKeyword(String keyword) {
+        return selectList(new LambdaQueryWrapperX<LeadDO>()
+                .select(LeadDO::getId)
+                .and(query -> query.like(LeadDO::getSubmittedName, keyword)
+                        .or().like(LeadDO::getSubmittedMobile, keyword)
+                        .or().like(LeadDO::getSubmittedWechatId, keyword)))
+                .stream().map(LeadDO::getId).toList();
+    }
+
     @Select("SELECT * FROM zsjos_lead WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
     LeadDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
+    default List<LeadDO> selectByOwnerUserIds(List<Long> ownerUserIds) {
+        if (ownerUserIds == null || ownerUserIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadDO>().in(LeadDO::getOwnerUserId, ownerUserIds));
+    }
 
     default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
                                                      List<String> inboxStatuses,

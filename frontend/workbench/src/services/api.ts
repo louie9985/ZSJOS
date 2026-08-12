@@ -76,7 +76,7 @@ export type ManagedLead = {
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL'; enabled: boolean }>
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL'; enabled: boolean }>
 }
 export type LeadQualificationException = {
   id: number; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
@@ -214,6 +214,27 @@ export type WorkPlanTemplateField = { id?: number; fieldKey?: string; label: str
 export type WorkPlanTemplateTask = { title: string; description?: string; deliverableRequirement?: string; dueOffsetDays?: number; dueOffsetBasis?: string; confirmationRequired?: boolean; sort?: number }
 export type WorkPlanTemplate = { id: number; typeId: number; code: string; name: string; description?: string; status: string; currentVersionNo: number; versionId?: number; versionStatus?: string; periodMode?: WorkPlan['periodType']; fields?: WorkPlanTemplateField[]; applicableDeptIds?: number[]; includeChildDepartments?: boolean; presetItems?: WorkPlanTemplateTask[] }
 export type WorkPlanSummary = { id: number; summary: string; submitterUserId: number; submittedAt: Timestamp; infraFileIds: number[]; summaryFields?: Record<string, unknown> }
+export type SubordinateCategoryCount = { value: string; label: string; count: number; configured: boolean }
+export type SubordinateSales = {
+  userId: number; name: string; username: string; mobile?: string; accountStatus: number
+  presence: 'online' | 'offline'; accepting: boolean; eligible: boolean; canReceiveNewLeads: boolean
+  newcomerPoolStatus: 'not_available'; todayPendingCount: number; todayFollowUpStatus: 'completed' | 'incomplete'
+  firstFollowTimeoutCount: number; suspendedLeadCount: number; categoryCounts: SubordinateCategoryCount[]
+  validLeadCount: number; convertedLeadCount: number; effectiveOrderCount: number; effectiveOrderAmount: number
+}
+export type LeadAgingPoolStatus = 'waiting_assignment' | 'assigned' | 'deal_pending'
+export type LeadAgingPoolItem = {
+  cycleId: number; leadId: number; cycleNo: number; status: LeadAgingPoolStatus
+  originalOwnerUserId: number; originalOwnerUserName?: string; collaboratorUserId?: number; collaboratorUserName?: string
+  frozenDeptId: number; frozenDeptName?: string; submittedName: string; submittedMobile?: string; submittedWechatId?: string
+  leadCategory?: string; sourceChannel?: string; ownershipStartedAt: Timestamp; dueAt: Timestamp; enteredAt: Timestamp
+  assignedAt?: Timestamp; lastFollowUpAt?: Timestamp; nextFollowUpAt?: Timestamp
+  activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
+  availableActions: Array<'ASSIGN' | 'EXIT' | 'ADD_FOLLOW_UP' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL'>
+}
+export type SubordinateTask = { id: number; taskType: string; leadId: number; leadName?: string; dueAt?: Timestamp; overdue: boolean }
+export type SubordinateBatchItem = { leadId: number; success: boolean; code: string; message: string }
+export type SubordinateBatchResult = { successCount: number; failureCount: number; items: SubordinateBatchItem[] }
 export type NotifyMessage = {
   id: number
   templateNickname: string
@@ -386,6 +407,18 @@ export const api = {
   managedLeadInboxPage: async (audience: 'submitter' | 'owner', params: ManagedLeadPageParams) =>
     unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/page`, { params })),
   managedLead: async (id: number) => unwrap<ManagedLead>(await http.get('/zsjos/lead/get', { params: { id } })),
+  agingPoolPage: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: LeadAgingPoolStatus; inboxGroup?: string; inboxStage?: string }) =>
+    unwrap<PageResult<LeadAgingPoolItem>>(await http.get('/zsjos/lead/aging-pool/page', { params })),
+  agingPoolCounts: async () => unwrap<Record<string, number>>(await http.get('/zsjos/lead/aging-pool/counts')),
+  agingPoolFilterProfile: async () => unwrap<LeadInboxFilterProfile>(await http.get('/zsjos/lead/aging-pool/filter-profile')),
+  agingPoolCandidates: async (cycleId: number) =>
+    unwrap<Array<{ id: number; nickname: string }>>(await http.get(`/zsjos/lead/aging-pool/${cycleId}/candidates`)),
+  assignAgingPool: async (cycleId: number, salesUserId: number) => unwrap<boolean>(
+    await http.post(`/zsjos/lead/aging-pool/${cycleId}/assign`, { salesUserId, idempotencyKey: crypto.randomUUID() })
+  ),
+  exitAgingPool: async (cycleId: number, reason: string) => unwrap<boolean>(
+    await http.post(`/zsjos/lead/aging-pool/${cycleId}/exit`, { reason, idempotencyKey: crypto.randomUUID() })
+  ),
   managedLeadStatusCounts: async () => unwrap<Record<string, number>>(await http.get('/zsjos/lead/status-counts')),
   judgeLeadValid: async (id: number, data: { leadCategory?: string; remark: string; idempotencyKey: string }) =>
     unwrap<boolean>(await http.post(`/zsjos/lead/${id}/judge-valid`, data)),
@@ -436,6 +469,8 @@ export const api = {
     unwrap<number>(await http.post(`/zsjos/sales-order/lead/${leadId}/submit`, data)),
   resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
+  continueSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
+    unwrap<number>(await http.post(`/zsjos/sales-order/${orderId}/continue-submit`, data)),
   salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
   mySalesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
   mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string }) =>
@@ -487,6 +522,24 @@ export const api = {
     unwrap<boolean>(await http.post(`/zsjos/work-plan/${id}/summary`, data)),
   workPlanTypes: async () => unwrap<WorkPlanType[]>(await http.get('/zsjos/work-plan-config/types')),
   workPlanTemplates: async () => unwrap<WorkPlanTemplate[]>(await http.get('/zsjos/work-plan/templates/available')),
+  subordinateSalesPage: async (params: { pageNo: number; pageSize: number; keyword?: string; accountStatus?: number; presence?: string; accepting?: boolean }) =>
+    unwrap<PageResult<SubordinateSales>>(await http.get('/zsjos/subordinate-sales/page', { params })),
+  subordinateSalesOverview: async (salesUserId: number) =>
+    unwrap<SubordinateSales>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/overview`)),
+  subordinateSalesLeads: async (salesUserId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+    unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/leads`, { params })),
+  subordinateSalesTasks: async (salesUserId: number, params: { pageNo: number; pageSize: number; bucket?: BusinessTaskBucket }) =>
+    unwrap<PageResult<SubordinateTask>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/tasks`, { params })),
+  subordinateTransferCandidates: async () =>
+    unwrap<AssignmentUser[]>(await http.get('/zsjos/subordinate-sales/transfer-candidates')),
+  updateSubordinateAccountStatus: async (salesUserId: number, status: number, reason: string) =>
+    unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/account-status`, { status, reason })),
+  updateSubordinateDispatchMode: async (salesUserId: number, accepting: boolean, reason: string) =>
+    unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/dispatch-mode`, { accepting, reason })),
+  batchTransferSubordinateLeads: async (leadIds: number[], targetUserId: number, reason: string) =>
+    unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-transfer', { leadIds, targetUserId, reason })),
+  batchReleaseSubordinateLeads: async (leadIds: number[], collaboratorUserId: number | undefined, reason: string) =>
+    unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-public-sea', { leadIds, collaboratorUserId, reason })),
   unreadNotifyCount: async () => unwrap<number>(await http.get('/system/notify-message/get-unread-count')),
   unreadNotifyMessages: async () => unwrap<NotifyMessage[]>(await http.get('/system/notify-message/get-unread-list')),
   myNotifyMessagePage: async (params: NotifyMessagePageParams) =>

@@ -356,7 +356,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；首次记录完成当前归属周期的 `lead_first_follow_up`，并创建 `lead_qualification` 任务。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
 
-判定有效在同一事务内完成判定任务、保存必填有效备注、创建唯一 `initial_conversion` Opportunity，并将 Lead 改为 `converted + closed`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时把未结束 Opportunity 改为 `lost`。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
+判定有效在同一事务内完成判定任务、保存必填有效备注、创建唯一 `initial_conversion` Opportunity，并将 Lead 改为 `converted + closed`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时取消待处理的首跟、判定和跟进提醒任务，并把未结束 Opportunity 改为 `lost`。任务查询还会排除无效客资遗留的上述待处理任务；`V034` 负责取消规则上线前的历史遗留记录。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
 
 ### 7.13 业务事件 `BusinessEvent`
 
@@ -829,3 +829,44 @@ invalid + 第3次申诉 -> chairman_reviewing      -> overturned | upheld(最终
 ```
 
 `upheld` 表示本轮维持无效，只有第三轮的 `upheld` 才是最终结论；第三轮之后禁止第四次申诉。改判有效统一复用“客资判有效”的后续转换入口，并清理当前无效展示字段，历史事件与申诉记录不变。每次提交和裁决都要求幂等键、必填理由和最多 9 张 JPG/PNG/WebP 图片；第二、三轮不会自动升级，必须由提交人重新提交。
+
+## 18. 超期协同公海状态机（V033）
+
+有效且机会处于 `open/following` 的未成交客资，从 A 正式接手时间起按租户规则计算自然日。默认 90 天；新增跟进不重置计时，修改规则立即影响尚未入池客资。活动成交审批中的客资暂不入池。
+
+```text
+超期 -> waiting_assignment -> assigned -> deal_pending -> converted
+                         |          |             |
+                         +--换派B---+             +--驳回/取消-> assigned
+waiting_assignment/assigned --主管填写原因退出--> exited
+```
+
+- 入池冻结 A 的直属部门，A 仍是 Lead 名义负责人；`waiting_assignment` 时 A 只读。
+- 主管只能指派同一冻结部门内、启用且不同于 A 的销售 B。B 失效或调离后自动清空并返回待指派，历史记录不覆盖。
+- `assigned` 时仅 B 可新增跟进、设置下次跟进、录入或补正成交；A 与同部门可见人员只读。
+- B 提交订单后进入 `deal_pending`，禁止换派和退出；驳回或取消回到 `assigned`。
+- 订单最终生效时，订单提交人保持 B，Lead 与 Opportunity 在同一事务转归 B，周期进入 `converted`。
+- 主管退出必须填写原因，且 A 必须仍启用；退出后以退出时间作为 A 新一轮持有起点。
+- 通知只包含一个或多个提前规则和实际入池到期通知，不发送逾期通知。
+### 超期公海接续成交
+
+- B 补正自己提交的驳回订单时，继续使用原订单并保持 `submitter_user_id` 不变。
+- B 接续 A 提交的驳回订单时，新建 `continuation_sale` 订单；A 的原订单转为 `superseded`。
+- 新旧订单通过 `supersedes_order_id` / `superseded_by_order_id` 双向关联，历史不可覆盖。
+- 同一客资仍只能存在一张 `pending_approval` 或 `revision_required` 活动订单；`superseded`
+  订单退出活动唯一约束但继续保留审计与审批历史。
+
+## 19. 主管人工公海标记（V035）
+
+人工释放公海不是 Lead 状态机迁移。主管只能对当前仍归属受管下属且未关闭的客资创建一次活动协作标记，可选一名管理范围内的启用销售作为公海跟进销售。
+
+```text
+owner=A, status=S, assignment_status=X
+  --填写原因释放人工公海，可选 collaborator=B-->
+owner=A, status=S, assignment_status=X, public_sea(owner=A, collaborator=B?)
+```
+
+- 释放前后 `owner_user_id`、Lead 主状态和 `assignment_status` 必须相同。
+- `assignment_status=public_pool` 仍专指无归属、可抢单的抢单池；人工公海不得进入抢单列表或领取接口。
+- 本期公海跟进销售只是协作基础信息，不因此获得直接跟进、判定或成交权限。
+- 重复释放返回稳定的“已在人工公海”失败；批量中该失败不回滚其他成功项。

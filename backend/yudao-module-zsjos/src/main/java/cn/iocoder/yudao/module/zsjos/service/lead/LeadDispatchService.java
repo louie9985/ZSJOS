@@ -20,6 +20,7 @@ public interface LeadDispatchService {
     LeadAssignmentRuleRespVO getRule();
     void updateRule(LeadAssignmentRuleUpdateReqVO reqVO);
     void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId);
+    void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason);
     int processExpired();
     int processUnassignedRetries();
 }

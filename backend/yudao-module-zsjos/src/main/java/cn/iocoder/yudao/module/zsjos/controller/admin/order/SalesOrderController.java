@@ -46,6 +46,13 @@ public class SalesOrderController {
         orderService.reviseAndResubmit(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
     }
 
+    @PostMapping("/{id}/continue-submit")
+    @Operation(summary = "协同销售接续驳回订单并重新提交")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<Long> continueSubmit(@PathVariable Long id, @Valid @RequestBody SalesOrderSubmitReqVO reqVO) {
+        return success(orderService.continueAndSubmit(id, WebFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
     @GetMapping("/{id}")
     @Operation(summary = "获得成交订单详情")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:sales-order:create')")

@@ -211,7 +211,9 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
            'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V025'), 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core'
+           AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V035'))=13,
+          'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
            AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;
@@ -290,6 +292,8 @@ FROM (
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
   UNION ALL SELECT 'zsjos_business_task_notify_stage'
   UNION ALL SELECT 'zsjos_lead_follow_up_record' UNION ALL SELECT 'zsjos_lead_follow_up_image'
+  UNION ALL SELECT 'zsjos_lead_aging_pool_cycle' UNION ALL SELECT 'zsjos_lead_aging_pool_event'
+  UNION ALL SELECT 'zsjos_lead_aging_pool_notify_stage'
   UNION ALL SELECT 'system_notify_rule' UNION ALL SELECT 'system_area'
   UNION ALL SELECT 'crm_owner_record' UNION ALL SELECT 'crm_performance_config'
   UNION ALL SELECT 'zsjos_work_plan' UNION ALL SELECT 'zsjos_work_task'

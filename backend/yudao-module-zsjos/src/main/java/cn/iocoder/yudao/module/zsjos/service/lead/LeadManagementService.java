@@ -22,4 +22,7 @@ public interface LeadManagementService {
     List<LeadAssignmentUserRespVO> getVisibleUsers(Long userId);
 
     LeadInboxFilterProfileRespVO getInboxFilterProfile(Long userId, String audience);
+
+    PageResult<LeadManagementRespVO> getManagedOwnerLeadPage(LeadManagementPageReqVO reqVO,
+                                                              Long managerUserId, Long ownerUserId);
 }

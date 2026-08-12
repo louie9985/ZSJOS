@@ -56,6 +56,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
+    @Resource private LeadAgingPoolService agingPoolService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -63,7 +64,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         LocalDateTime occurredAt = LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!Objects.equals(operatorUserId, lead.getOwnerUserId())) {
+        if (!Objects.equals(operatorUserId, agingPoolService.resolveEffectiveSalesUserId(leadId, lead.getOwnerUserId()))) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         if (!canFollow(lead)) {
@@ -224,7 +225,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                 .contains(opportunity.getStatus())) throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         OpportunityFollowUpRecordDO record = new OpportunityFollowUpRecordDO();
         record.setOpportunityId(opportunity.getId()); record.setLeadId(lead.getId());
-        record.setOperatorUserId(operatorUserId); record.setOwnerUserIdSnapshot(lead.getOwnerUserId());
+        record.setOperatorUserId(operatorUserId); record.setOwnerUserIdSnapshot(operatorUserId);
         record.setOwnerDeptIdSnapshot(operator == null ? null : operator.getDeptId());
         record.setMethodValue(method.getValue()); record.setMethodLabelSnapshot(method.getLabel());
         record.setResultValue(result.getValue()); record.setResultLabelSnapshot(result.getLabel());

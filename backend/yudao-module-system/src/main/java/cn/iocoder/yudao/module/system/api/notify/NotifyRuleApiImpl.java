@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.api.notify;
 
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyTimingRuleRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyDefaultRuleReqDTO;
 import cn.iocoder.yudao.module.system.service.notify.NotifyRuleService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -20,5 +21,10 @@ public class NotifyRuleApiImpl implements NotifyRuleApi {
                 .map(rule -> new NotifyTimingRuleRespDTO(rule.getId(), rule.getSceneCode(),
                         rule.getTimingStage(), rule.getTimingOffsetMinutes()))
                 .toList();
+    }
+
+    @Override
+    public void initializeDefaultRules(List<NotifyDefaultRuleReqDTO> rules) {
+        notifyRuleService.initializeDefaultRules(rules);
     }
 }

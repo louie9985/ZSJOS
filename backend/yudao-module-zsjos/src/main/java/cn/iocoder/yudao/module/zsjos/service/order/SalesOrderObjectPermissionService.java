@@ -29,6 +29,7 @@ public class SalesOrderObjectPermissionService {
     @Resource private SalesOrderApprovalConfigMapper salesOrderApprovalConfigMapper;
     @Resource private DeptApi deptApi;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService agingPoolService;
 
     public void check(Long orderId, String action) {
         SalesOrderDO order = orderMapper.selectById(orderId);
@@ -38,6 +39,7 @@ public class SalesOrderObjectPermissionService {
             case "read" -> canRead(order, userId);
             case "read-own" -> Objects.equals(order.getSubmitterUserId(), userId);
             case "revise" -> canRevise(order, userId);
+            case "continue-revise" -> canContinue(order, userId);
             case "review" -> isApprovalPoolMember(userId);
             default -> false;
         };
@@ -48,12 +50,18 @@ public class SalesOrderObjectPermissionService {
         LeadDO lead = leadMapper.selectById(order.getLeadId());
         return Objects.equals(order.getSubmitterUserId(), userId)
                 || lead != null && Objects.equals(lead.getOwnerUserId(), userId)
+                || agingPoolService.canRead(order.getLeadId(), userId)
                 || isApprovalPoolMember(userId);
     }
 
     public boolean canRevise(SalesOrderDO order, Long userId) {
-        LeadDO lead = leadMapper.selectById(order.getLeadId());
-        return lead != null && Objects.equals(lead.getOwnerUserId(), userId);
+        return Objects.equals(order.getSubmitterUserId(), userId) && order.getSupersededByOrderId() == null;
+    }
+
+    public boolean canContinue(SalesOrderDO order, Long userId) {
+        var cycle = agingPoolService.getActiveCycle(order.getLeadId());
+        return cycle != null && Objects.equals(cycle.getCollaboratorUserId(), userId)
+                && !Objects.equals(order.getSubmitterUserId(), userId) && order.getSupersededByOrderId() == null;
     }
 
     public boolean isApprovalPoolMember(Long userId) {

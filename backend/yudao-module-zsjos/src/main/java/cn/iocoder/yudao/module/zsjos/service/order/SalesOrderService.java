@@ -10,6 +10,7 @@ import java.io.IOException;
 public interface SalesOrderService {
     Long createAndSubmit(Long leadId, Long userId, SalesOrderSubmitReqVO reqVO);
     void reviseAndResubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
+    Long continueAndSubmit(Long orderId, Long userId, SalesOrderSubmitReqVO reqVO);
     SalesOrderRespVO get(Long orderId, Long userId);
     SalesOrderRespVO getOwn(Long orderId, Long userId);
     PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId);

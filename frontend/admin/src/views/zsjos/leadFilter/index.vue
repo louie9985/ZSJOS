@@ -294,7 +294,8 @@ const audience = ref<LeadFilterApi.LeadFilterAudience>('submitter')
 const audienceOptions = [
   { label: '提交人视角', value: 'submitter' },
   { label: '负责人视角', value: 'owner' },
-  { label: '审批人视角', value: 'reviewer' }
+  { label: '审批人视角', value: 'reviewer' },
+  { label: '超期公海视角', value: 'agingPool' }
 ]
 const config = ref<LeadFilterApi.LeadFilterAdminVO>()
 const groups = ref<LeadFilterApi.LeadFilterGroupVO[]>([])

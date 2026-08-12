@@ -10,6 +10,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.Collection;
+import java.util.List;
 
 import static cn.hutool.core.util.StrUtil.isNotBlank;
 
@@ -21,6 +22,9 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     default SalesOrderDO selectByIdempotencyKey(String key) {
         return selectOne(SalesOrderDO::getSubmissionIdempotencyKey, key);
+    }
+    default SalesOrderDO selectBySupersedesOrderId(Long orderId) {
+        return selectOne(SalesOrderDO::getSupersedesOrderId, orderId);
     }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
@@ -42,4 +46,9 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     @Select("SELECT * FROM zsjos_order WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
     SalesOrderDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+    default List<SalesOrderDO> selectEffectiveBySubmitterIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<SalesOrderDO>()
+                .in(SalesOrderDO::getSubmitterUserId, userIds).eq(SalesOrderDO::getStatus, "effective"));
+    }
 }
