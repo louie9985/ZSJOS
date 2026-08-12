@@ -29,3 +29,17 @@
 - Dependency or integration impact: Adds no npm or Maven dependency. Adds a BPM public cancellation method delegating to the existing BPM service. V041 adds nullable Lead association for repurchase, formal sales attribution, repurchase/termination snapshots, current-round versions/idempotency keys, one-active-repurchase unique key, and a server-owned historical-repurchase menu copied to roles already holding order-create permission.
 - Remaining work: Commit and merge to `main`, rerun integration checks, then mark merged. Real MySQL execution, real authenticated API requests, browser desktop/mobile verification, remote push, and shared-service changes were not performed.
 - Status: `ready-to-merge`
+
+### 2026-08-13 04:13:42 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `944c0fb1afaa07c4c231da14addc60c29a893fd3`
+- User goal: Integrate the completed fifth lifecycle phase and verify the merged result.
+- Key decisions: Preserved all ready-to-merge phase-five decisions; no conflict resolution changed behavior during the non-fast-forward merge.
+- Execution or analysis result: Feature commit `469ed3c0a7` was merged into `main` by merge commit `944c0fb1afaa07c4c231da14addc60c29a893fd3`.
+- Changed files: Integration of the 41 phase-five files listed in the preceding delivery entry; this appended merged-status record.
+- Verification evidence: On `main`, backend focused tests passed 38/38 (`SalesOrderServiceImplTest` 18 and `LeadManagementServiceImplTest` 20); Workbench typecheck passed; 17 Vitest files / 78 tests passed; production build passed; worktree was clean after removing generated `tsconfig.tsbuildinfo` change.
+- Dependency or integration impact: Phase five now follows integrated phases one through four on `main`. No remote push, real migration, shared service reconfiguration, or publication occurred.
+- Remaining work: Real MySQL V041 execution, authenticated API contract requests, and desktop/mobile browser verification remain environment-dependent release checks. The generated production bundle retains the existing large-chunk warning.
+- Status: `merged`
