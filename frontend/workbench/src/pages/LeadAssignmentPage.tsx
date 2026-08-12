@@ -26,6 +26,8 @@ import type { TableColumnsType } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { api, type AssignmentLog, type AssignmentRelation, type AssignmentUser } from '../services/api'
 import { useBusinessOverlay } from '../components/OverlayCoordinator'
+import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
+import { assignmentConfirmAction } from '../services/irreversibleConfirm'
 
 const { Text } = Typography
 type SaveMode = 'append' | 'replace' | 'remove'
@@ -52,6 +54,7 @@ export default function LeadAssignmentPage() {
   const [selectedSalesIds, setSelectedSalesIds] = useState<number[]>([])
   const [salesKeyword, setSalesKeyword] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
 
   const [logOpen, setLogOpen] = useState(false)
   const [logLoading, setLogLoading] = useState(false)
@@ -109,6 +112,7 @@ export default function LeadAssignmentPage() {
   }
 
   const submit = async () => {
+    setConfirmOpen(false)
     if (selectedSalesIds.length === 0 && saveMode !== 'replace') {
       message.warning('请至少选择一名销售')
       return
@@ -129,6 +133,14 @@ export default function LeadAssignmentPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const prepareSubmit = () => {
+    if (selectedSalesIds.length === 0 && saveMode !== 'replace') {
+      message.warning('请至少选择一名销售')
+      return
+    }
+    setConfirmOpen(true)
   }
 
   const loadLogs = async (targetPage = logPage) => {
@@ -191,7 +203,7 @@ export default function LeadAssignmentPage() {
     <Table<AssignmentRelation> rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} scroll={{ x: 980 }} rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}/>
     <div className="assignment-pagination"><Pagination current={pageNo} pageSize={pageSize} total={total} showSizeChanger onChange={(page, size) => { setPageNo(page); setPageSize(size) }}/></div>
 
-    <Drawer title={batchMode ? '批量配置派单关系' : '配置可派销售'} width={760} open={drawerOpen} onClose={() => setDrawerOpen(false)} extra={<Button type="primary" loading={saving} onClick={() => void submit()}>保存配置</Button>}>
+    <Drawer title={batchMode ? '批量配置派单关系' : '配置可派销售'} width={760} open={drawerOpen} onClose={() => setDrawerOpen(false)} extra={<IrreversiblePopconfirm action={assignmentConfirmAction(saveMode, batchMode ? { batchCount: selectedRowKeys.length } : { name: activeRow?.nickname || '当前员工' })} danger={saveMode === 'remove'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" danger={saveMode === 'remove'} loading={saving} onClick={prepareSubmit}>保存配置</Button></IrreversiblePopconfirm>}>
       <div className="assignment-subject"><ApartmentOutlined/><Text type="secondary">配置对象</Text><Text strong>{batchMode ? `已选择 ${selectedRowKeys.length} 名员工` : activeRow ? userLabel(activeRow) : ''}</Text></div>
       {batchMode && <Segmented<SaveMode> block value={saveMode} onChange={setSaveMode} options={[{ label: '追加绑定', value: 'append' }, { label: '替换原绑定', value: 'replace' }, { label: '解除指定绑定', value: 'remove' }]}/>} 
       <div className="assignment-picker">

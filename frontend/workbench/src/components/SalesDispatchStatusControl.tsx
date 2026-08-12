@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { api, type SalesDispatchStatus } from '../services/api'
 import { dispatchActionLabel, dispatchModeLabel, isDispatchPageActive } from '../services/salesDispatch'
 import { useRealtime } from './RealtimeProvider'
+import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 const HEARTBEAT_INTERVAL_MS = 30_000
 
@@ -102,10 +103,10 @@ export default function SalesDispatchStatusControl({ canAccept }: { canAccept: b
       <Tag color={pageActive ? 'processing' : 'default'} className="dispatch-status-tag">
         {pageActive ? '页面活跃' : '页面离线'}
       </Tag>
-      <Button className="dispatch-mode-button" disabled={!pageActive || loading} loading={updating}
-        onClick={() => error && !status ? void load() : void toggleMode()}>
+      <IrreversiblePopconfirm action="暂停接单" open={status?.mode === 'accepting' ? undefined : false} onConfirm={toggleMode} disabled={status?.mode !== 'accepting'}><Button className="dispatch-mode-button" disabled={!pageActive || loading} loading={updating}
+        onClick={() => error && !status ? void load() : status?.mode === 'accepting' ? undefined : void toggleMode()}>
         {error && !status ? '重试状态' : dispatchActionLabel(status)}
-      </Button>
+      </Button></IrreversiblePopconfirm>
     </Space>
   </Tooltip>
 }

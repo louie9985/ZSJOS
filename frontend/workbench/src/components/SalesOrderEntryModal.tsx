@@ -10,6 +10,7 @@ import SalesOrderCoursePicker from './SalesOrderCoursePicker'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
+import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 type Values = {
   buyerName?: string; studentName: string; studentNature: string; mobile?: string; wechatId?: string; regionPath: string[]
@@ -45,6 +46,9 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [loadError, setLoadError] = useState('')
   const [vouchers, setVouchers] = useState<DeferredUploadItem<SalesOrderVoucher>[]>([])
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingValues, setPendingValues] = useState<Values>()
+  const [orderNo, setOrderNo] = useState<string>()
 
   const items = Form.useWatch('items', form) || []
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
@@ -61,6 +65,7 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
       setAreas(areaResult as AreaNode[]); setCatalog(catalogResult as LeadCatalog)
       setDicts(Object.fromEntries(dictTypes.map((type, index) => [type, dictResults[index] as DictData[]])))
       const order = orderResult as SalesOrder | undefined
+      setOrderNo(order?.orderNo)
       const regionPath = resolveLeadAreaPath(areaResult as AreaNode[], order?.provinceCode || lead.provinceCode,
         order?.cityCode || lead.cityCode, order?.provinceName || lead.provinceName, order?.cityName || lead.cityName)
       const primary = lead.primaryProduct?.spuRef && lead.primaryProduct.skuRef
@@ -87,15 +92,26 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
   useEffect(() => {
     if (!open) return
     resetIntent()
+    setConfirmOpen(false); setPendingValues(undefined)
     form.resetFields(); setVouchers([]); void load()
   }, [open, lead.id, orderId, resetIntent])
+
+  const close = () => { setConfirmOpen(false); setPendingValues(undefined); onClose() }
 
   const options = (type: string) => (dicts[type] || []).map(item => ({ value: item.value, label: item.label }))
   const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
     ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
-  const submit = async (values: Values) => {
+  const prepareSubmit = async () => {
+    const values = await form.validateFields().catch(() => undefined)
+    if (!values) return
     const validationError = validateSalesOrderSubmission(values.mobile, values.wechatId, total, vouchers.length)
     if (validationError) { message.warning(validationError); return }
+    setPendingValues(values); setConfirmOpen(true)
+  }
+  const submit = async () => {
+    const values = pendingValues
+    setConfirmOpen(false)
+    if (!values) return
     const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
     const region = findRegion(areas, values.regionPath)
     if (!region.provinceName) { message.warning('请选择有效省市'); return }
@@ -135,11 +151,11 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
     })
   }
 
-  return <Modal title={continuation ? '接续成交' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={onClose} footer={null} width={980} destroyOnHidden>
+  return <Modal title={continuation ? '接续成交' : orderId ? '补正成交' : '录入成交'} open={open} onCancel={close} footer={null} width={980} destroyOnHidden>
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
-      <Form form={form} layout="vertical" onFinish={submit} disabled={Boolean(loadError) || saving}>
+      <Form form={form} layout="vertical" disabled={Boolean(loadError) || saving}>
         <Divider titlePlacement="start">学员信息</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
@@ -180,7 +196,7 @@ export default function SalesOrderEntryModal({ lead, orderId, continuation, open
             <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false}/>
           </Form.Item></Col>
         </Row>
-        <Space><Button type="primary" htmlType="submit" loading={saving}>{orderId ? '重新提交会签' : '提交会签'}</Button><Button onClick={onClose}>取消</Button></Space>
+        <Space><IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」会签` : `提交「${lead.submittedName}」的成交订单会签`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交会签' : '提交会签'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>
   </Modal>

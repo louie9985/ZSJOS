@@ -11,15 +11,34 @@
 
   <ContentWrap v-loading="loading">
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" class="mb-18px">
-      <template #default><el-button link type="primary" @click="loadRule">重新加载</el-button></template>
+      <template #default
+        ><el-button link type="primary" @click="loadRule">重新加载</el-button></template
+      >
     </el-alert>
-    <el-form v-else ref="formRef" :model="formData" :rules="rules" label-width="170px" class="rule-form">
+    <el-form
+      v-else
+      ref="formRef"
+      :model="formData"
+      :rules="rules"
+      label-width="170px"
+      class="rule-form"
+    >
       <el-form-item label="首次跟进时限" prop="firstFollowUpTimeoutMinutes">
-        <el-input-number v-model="formData.firstFollowUpTimeoutMinutes" :min="5" :max="10080" :step="30" />
+        <el-input-number
+          v-model="formData.firstFollowUpTimeoutMinutes"
+          :min="5"
+          :max="10080"
+          :step="30"
+        />
         <span class="unit">分钟</span>
       </el-form-item>
       <el-form-item label="有效性判定时限" prop="qualificationTimeoutMinutes">
-        <el-input-number v-model="formData.qualificationTimeoutMinutes" :min="5" :max="43200" :step="30" />
+        <el-input-number
+          v-model="formData.qualificationTimeoutMinutes"
+          :min="5"
+          :max="43200"
+          :step="30"
+        />
         <span class="unit">分钟</span>
       </el-form-item>
       <el-form-item label="超期公海期限" prop="agingPoolTimeoutDays">
@@ -27,9 +46,20 @@
         <span class="unit">自然日</span>
       </el-form-item>
       <el-form-item>
-        <el-button type="primary" :loading="saving" v-hasPermi="['zsjos:lead-follow-up-rule:update']" @click="saveRule">
-          <Icon icon="ep:check" class="mr-5px" />保存规则
-        </el-button>
+        <ZsjosPopconfirm
+          action="保存客资跟进规则"
+          v-model:visible="confirmVisible"
+          @confirm="saveRule"
+        >
+          <el-button
+            type="primary"
+            :loading="saving"
+            v-hasPermi="['zsjos:lead-follow-up-rule:update']"
+            @click="prepareSave"
+          >
+            <Icon icon="ep:check" class="mr-5px" />保存规则
+          </el-button>
+        </ZsjosPopconfirm>
       </el-form-item>
     </el-form>
   </ContentWrap>
@@ -38,15 +68,21 @@
 <script lang="ts" setup>
 import type { FormInstance, FormRules } from 'element-plus'
 import * as FollowUpRuleApi from '@/api/zsjos/leadFollowUpRule'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
 
 defineOptions({ name: 'ZsjosLeadFollowUpRule' })
 
 const message = useMessage()
 const loading = ref(true)
 const saving = ref(false)
+const confirmVisible = ref(false)
 const error = ref('')
 const formRef = ref<FormInstance>()
-const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({ firstFollowUpTimeoutMinutes: 1440, qualificationTimeoutMinutes: 4320, agingPoolTimeoutDays: 90 })
+const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({
+  firstFollowUpTimeoutMinutes: 1440,
+  qualificationTimeoutMinutes: 4320,
+  agingPoolTimeoutDays: 90
+})
 const rules: FormRules = {
   firstFollowUpTimeoutMinutes: [
     { required: true, message: '请输入首次跟进时限', trigger: 'blur' },
@@ -78,7 +114,7 @@ const loadRule = async () => {
 }
 
 const saveRule = async () => {
-  await formRef.value?.validate()
+  confirmVisible.value = false
   saving.value = true
   try {
     await FollowUpRuleApi.updateRule({ ...formData })
@@ -89,18 +125,53 @@ const saveRule = async () => {
   }
 }
 
+const prepareSave = async () => {
+  await formRef.value?.validate()
+  confirmVisible.value = true
+}
+
 onMounted(loadRule)
 </script>
 
 <style scoped>
-.rule-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.rule-heading h3 { margin: 0 0 8px; font-size: 18px; }
-.rule-heading p { margin: 0; color: var(--el-text-color-secondary); }
-.rule-form { max-width: 620px; padding: 12px 0; }
-.rule-form :deep(.el-input-number) { width: 280px; }
-.unit { margin-left: 10px; color: var(--el-text-color-secondary); }
+.rule-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rule-heading h3 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.rule-heading p {
+  margin: 0;
+  color: var(--el-text-color-secondary);
+}
+
+.rule-form {
+  max-width: 620px;
+  padding: 12px 0;
+}
+
+.rule-form :deep(.el-input-number) {
+  width: 280px;
+}
+
+.unit {
+  margin-left: 10px;
+  color: var(--el-text-color-secondary);
+}
+
 @media (width <= 768px) {
-  .rule-heading { flex-direction: column; }
-  .rule-form :deep(.el-input-number) { width: 100%; }
+  .rule-heading {
+    flex-direction: column;
+  }
+
+  .rule-form :deep(.el-input-number) {
+    width: 100%;
+  }
 }
 </style>

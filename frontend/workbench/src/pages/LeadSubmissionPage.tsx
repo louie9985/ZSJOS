@@ -7,6 +7,7 @@ import { buildLeadAreaOptions, normalizeLeadAreaPath } from '../services/area'
 import LeadIntendedProductEditor, { type IntendedProductSelection } from '../components/LeadIntendedProductEditor'
 import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
+import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 
 const { Title } = Typography
 type Option = { label: string; value: string }
@@ -28,13 +29,15 @@ export default function LeadSubmissionPage() {
   const [files, setFiles] = useState<DeferredUploadItem<LeadAttachment>[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
-  const idempotencyKeyRef = useRef(crypto.randomUUID())
+  const idempotencyKeyRef = useRef<string | undefined>(undefined)
   const [sales, setSales] = useState<Array<{ label: string; value: number }>>([])
   const [salesState, setSalesState] = useState<RemoteState>({ loading: false })
   const salesLoaded = useRef(false)
   const assignmentMode = Form.useWatch('dispatchMode', form)
   const [intentions, setIntentions] = useState<IntendedProductSelection[]>([])
   const [primaryKey, setPrimaryKey] = useState<string>()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingValues, setPendingValues] = useState<FormValues>()
 
   const loadOptions = useCallback(async () => {
     setRemote({ loading: true })
@@ -76,12 +79,24 @@ export default function LeadSubmissionPage() {
   const hasUploading = files.some(file => file.status === 'uploading'); const hasUploadError = files.some(file => file.status === 'error')
   const unavailable = Boolean(remote.error || areaState.error) || !areas.length || !sources.length || !categories.length
 
-  const submit = async (values: FormValues) => {
-    if (submittingRef.current) return
+  const prepareSubmit = async () => {
+    const values = await form.validateFields().catch(() => undefined)
+    if (!values) return
     if (!intentions.length || !primaryKey) return message.error('请先添加至少一条意向课程')
     if (hasUploading || hasUploadError) return message.error(hasUploading ? '图片仍在上传，请稍候' : '请删除或重试上传失败的图片')
+    setPendingValues(values)
+    setConfirmOpen(true)
+  }
+
+  const submit = async () => {
+    const values = pendingValues
+    setConfirmOpen(false)
+    if (!values) return
+    if (submittingRef.current) return
     submittingRef.current = true; setSubmitting(true)
     try {
+      const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID()
+      idempotencyKeyRef.current = idempotencyKey
       const uploadResult = await uploadDeferredFiles(files, api.uploadLeadAttachment, setFiles)
       if (uploadResult.failed) { message.error('有图片上传失败，请重试失败项'); return }
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
@@ -92,10 +107,10 @@ export default function LeadSubmissionPage() {
         sourceChannel: values.sourceChannel, leadCategory: values.leadCategory, remark: values.remark?.trim() || undefined,
         attachments: uploadResult.items.filter(file => file.uploaded)
           .map(file => ({ infraFileId: file.uploaded!.infraFileId })),
-        dispatchMode: values.dispatchMode, specifiedSalesUserId: values.specifiedSalesUserId, idempotencyKey: idempotencyKeyRef.current
+        dispatchMode: values.dispatchMode, specifiedSalesUserId: values.specifiedSalesUserId, idempotencyKey
       })
       message.success(result.outcome === 'created' ? '客资已提交' : '重复客资已记录为再次激活')
-      form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined); idempotencyKeyRef.current = crypto.randomUUID()
+      form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined); setPendingValues(undefined); idempotencyKeyRef.current = undefined
     } catch (error) { message.error(error instanceof Error ? error.message : '提交失败') }
     finally { submittingRef.current = false; setSubmitting(false) }
   }
@@ -106,7 +121,7 @@ export default function LeadSubmissionPage() {
     {!areaState.loading && !areaState.error && !areas.length && <Alert showIcon type="warning" message="地区数据尚未配置" />}
     {!remote.loading && !remote.error && !catalog.spus.length && <Alert showIcon type="warning" message="课程目录尚未配置，可选择“未明确课程”继续提交" />}
     <Card bordered={false} className="lead-form-card"><Spin spinning={remote.loading || areaState.loading} tip="正在读取地区、课程和字典配置">
-      <Form<FormValues> form={form} layout="vertical" requiredMark="optional" initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }} onFinish={submit}>
+      <Form<FormValues> form={form} layout="vertical" requiredMark="optional" initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
         <Title level={5}>客户信息</Title><Row gutter={[24, 0]}>
           <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
@@ -124,7 +139,7 @@ export default function LeadSubmissionPage() {
         </Row>
         <Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
         {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><Select loading={salesState.loading} options={sales} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}
-        <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined) }}>重置</Button><Button type="primary" htmlType="submit" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading}>提交客资</Button></Space></div>
+        <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined) }}>重置</Button><IrreversiblePopconfirm action={`提交客资「${pendingValues?.name?.trim() || '当前客户'}」`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading} onClick={() => void prepareSubmit()}>提交客资</Button></IrreversiblePopconfirm></Space></div>
       </Form>
     </Spin></Card>
   </section>

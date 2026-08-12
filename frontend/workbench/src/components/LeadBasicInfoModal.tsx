@@ -5,6 +5,7 @@ import { api, type AreaNode, type DictData, type LeadCatalog, type ManagedLead }
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
 import LeadIntendedProductEditor, { selectionFromManagedProduct, type IntendedProductSelection } from './LeadIntendedProductEditor'
+import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 type Values = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
@@ -36,6 +37,8 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
   const [dirty, setDirty] = useState(false)
   const [products, setProducts] = useState<IntendedProductSelection[]>([])
   const [primaryKey, setPrimaryKey] = useState<string>()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingValues, setPendingValues] = useState<Values>()
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   const load = async () => {
@@ -85,13 +88,23 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
   const regionSnapshot = [lead.provinceName, lead.cityName].filter(Boolean).join(' / ')
   const close = () => {
     if (dirty && !window.confirm('基础信息尚未保存，确定关闭吗？')) return
+    setConfirmOpen(false)
+    setPendingValues(undefined)
     setDirty(false)
     onClose()
   }
-  const submit = async (values: Values) => {
+  const prepareSubmit = async () => {
+    const values = await form.validateFields().catch(() => undefined)
+    if (!values) return
     if (!products.length || !primaryKey || !products.some(item => item.key === primaryKey)) {
       message.warning('请选择至少一项意向课程并指定主意向'); return
     }
+    setPendingValues(values); setConfirmOpen(true)
+  }
+  const submit = async () => {
+    const values = pendingValues
+    setConfirmOpen(false)
+    if (!values) return
     setSaving(true)
     try {
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
@@ -114,7 +127,7 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
         <span key={source}>{configLabels[source]}：{detail}</span>)}</Space>}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
-      <Form form={form} layout="vertical" onFinish={submit} onValuesChange={() => setDirty(true)}>
+      <Form form={form} layout="vertical" onValuesChange={() => setDirty(true)}>
         <div className="follow-up-field-grid">
           <Form.Item name="name" label="姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item>
           <Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: (_, value) => value?.trim() || form.getFieldValue('wechatId')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号')) }]}><Input maxLength={32}/></Form.Item>
@@ -132,8 +145,8 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
             onPrimaryChange={next => { setPrimaryKey(next); setDirty(true) }}/>
         </Form.Item>
         <Form.Item name="reason" label="修改原因" rules={[{ required: true }, { max: 500 }]}><Input.TextArea rows={3} maxLength={500} showCount/></Form.Item>
-        <Space><Button type="primary" htmlType="submit" loading={saving}
-          disabled={loading || Boolean(configErrors.area) || Boolean(configErrors.catalog)}>保存</Button><Button onClick={close}>取消</Button></Space>
+        <Space><IrreversiblePopconfirm action={`修改客资「${lead.submittedName}」的基础信息`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving}
+          disabled={loading || Boolean(configErrors.area) || Boolean(configErrors.catalog)} onClick={() => void prepareSubmit()}>保存</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>
   </Modal>

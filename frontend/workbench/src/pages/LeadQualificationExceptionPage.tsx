@@ -5,6 +5,7 @@ import { api, type AssignmentUser, type LeadQualificationException } from '../se
 import { LEAD_HANDLING_STAGE_LABELS } from '../constants'
 import { formatTimestamp } from '../services/time'
 import { useSubmissionGuard } from '../services/submissionGuard'
+import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 
 type ExceptionType = 'suspended' | 'recycle_pending'
 type Action = 'restore' | 'transfer' | 'recycle' | 'release'
@@ -20,6 +21,8 @@ export default function LeadQualificationExceptionPage() {
   const [salesUserId, setSalesUserId] = useState<number>()
   const [candidates, setCandidates] = useState<AssignmentUser[]>([])
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const closeAction = () => { setConfirmOpen(false); setAction(undefined) }
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -40,8 +43,8 @@ export default function LeadQualificationExceptionPage() {
   }
 
   const submit = async () => {
-    if (!selected || !action || !reason.trim()) { message.warning('请填写处置理由'); return }
-    if (action === 'transfer' && !salesUserId) { message.warning('请选择目标销售'); return }
+    setConfirmOpen(false)
+    if (!selected || !action) return
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const command = { reason: reason.trim(), idempotencyKey }
       if (action === 'restore') await api.restoreLead(selected.id, command)
@@ -54,6 +57,19 @@ export default function LeadQualificationExceptionPage() {
       await load()
     }).catch(submitError => message.error(submitError instanceof Error ? submitError.message : '异常客资处理失败'))
   }
+
+  const prepareSubmit = () => {
+    if (!selected || !action || !reason.trim()) { message.warning('请填写处置理由'); return }
+    if (action === 'transfer' && !salesUserId) { message.warning('请选择目标销售'); return }
+    setConfirmOpen(true)
+  }
+
+  const confirmAction = !selected || !action ? '处理异常客资' : ({
+    restore: `恢复客资「${selected.submittedName}」至原销售`,
+    transfer: `将客资「${selected.submittedName}」转派给「${candidates.find(user => user.id === salesUserId)?.nickname || '目标销售'}」`,
+    recycle: `回收客资「${selected.submittedName}」`,
+    release: `将客资「${selected.submittedName}」释放到抢单池`
+  } satisfies Record<Action, string>)[action]
 
   return <section className="workspace-page">
     <div className="workspace-page-heading">
@@ -80,7 +96,7 @@ export default function LeadQualificationExceptionPage() {
         </Space> }
       ]}/>
     </Spin>
-    <Modal open={Boolean(action)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' }[action || 'restore']} confirmLoading={saving} onOk={() => void submit()} onCancel={() => setAction(undefined)} okText="确认处理">
+    <Modal open={Boolean(action)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' }[action || 'restore']} onCancel={closeAction} footer={<Space><Button onClick={closeAction}>取消</Button><IrreversiblePopconfirm action={confirmAction} danger={action === 'recycle' || action === 'release'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" danger={action === 'recycle' || action === 'release'} loading={saving} onClick={prepareSubmit}>确认处理</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
         {action === 'transfer' && <Form.Item label="目标销售" required><Select showSearch optionFilterProp="label" value={salesUserId} onChange={setSalesUserId} placeholder={candidates.length ? '选择目标销售' : '暂无可转派销售'} options={candidates.map(user => ({ value: user.id, label: `${user.nickname}${user.deptName ? ` · ${user.deptName}` : ''}` }))} style={{ width: '100%' }}/></Form.Item>}
         <Form.Item label="处置理由" required><Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/></Form.Item>

@@ -79,13 +79,15 @@
               关系数据
             </el-button>
           </router-link>
-          <el-button
-            v-hasPermi="['zsjos:user-relation-scene:delete']"
-            link
-            type="danger"
-            @click="handleDelete(row.id)"
-            >删除</el-button
+          <ZsjosPopconfirm
+            :action="`删除用户关系场景「${row.name}」`"
+            danger
+            @confirm="handleDelete(row.id)"
           >
+            <el-button v-hasPermi="['zsjos:user-relation-scene:delete']" link type="danger"
+              >删除</el-button
+            >
+          </ZsjosPopconfirm>
         </template>
       </el-table-column>
     </el-table>
@@ -104,6 +106,7 @@
 import * as PostApi from '@/api/system/post'
 import * as UserRelationApi from '@/api/zsjos/userRelation'
 import SceneForm from './SceneForm.vue'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
 
 defineOptions({ name: 'ZsjosUserRelationScene' })
 
@@ -149,7 +152,6 @@ const openForm = (type: 'create' | 'update', id?: number) => formRef.value.open(
 
 const handleDelete = async (id: number) => {
   try {
-    await message.delConfirm()
     await UserRelationApi.deleteScene(id)
     message.success('删除成功')
     await getList()

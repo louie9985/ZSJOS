@@ -38,14 +38,20 @@
         <span class="unit">次</span>
       </el-form-item>
       <el-form-item>
-        <el-button
-          type="primary"
-          :loading="saving"
-          v-hasPermi="['zsjos:lead-rule:update']"
-          @click="saveRule"
+        <ZsjosPopconfirm
+          action="保存客资派单规则"
+          v-model:visible="confirmVisible"
+          @confirm="saveRule"
         >
-          <Icon icon="ep:check" class="mr-5px" />保存规则
-        </el-button>
+          <el-button
+            type="primary"
+            :loading="saving"
+            v-hasPermi="['zsjos:lead-rule:update']"
+            @click="prepareSave"
+          >
+            <Icon icon="ep:check" class="mr-5px" />保存规则
+          </el-button>
+        </ZsjosPopconfirm>
       </el-form-item>
     </el-form>
   </ContentWrap>
@@ -54,12 +60,14 @@
 <script lang="ts" setup>
 import type { FormInstance, FormRules } from 'element-plus'
 import * as LeadRuleApi from '@/api/zsjos/leadRule'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
 
 defineOptions({ name: 'ZsjosLeadRule' })
 
 const message = useMessage()
 const loading = ref(true)
 const saving = ref(false)
+const confirmVisible = ref(false)
 const error = ref('')
 const formRef = ref<FormInstance>()
 const formData = reactive<LeadRuleApi.LeadAssignmentRuleUpdateReqVO>({
@@ -92,7 +100,7 @@ const loadRule = async () => {
 }
 
 const saveRule = async () => {
-  await formRef.value?.validate()
+  confirmVisible.value = false
   saving.value = true
   try {
     await LeadRuleApi.updateRule({ ...formData })
@@ -101,6 +109,11 @@ const saveRule = async () => {
   } finally {
     saving.value = false
   }
+}
+
+const prepareSave = async () => {
+  await formRef.value?.validate()
+  confirmVisible.value = true
 }
 
 onMounted(loadRule)

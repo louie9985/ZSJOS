@@ -18,7 +18,11 @@
     <div class="audience-toolbar">
       <el-segmented v-model="audience" :options="audienceOptions" @change="loadAll" />
       <span class="toolbar-note">{{
-        audience === 'submitter' ? '员工查看自己提交的客资' : audience === 'owner' ? '销售查看自己负责的客资' : '审批人查看自己待办或已办的成交订单'
+        audience === 'submitter'
+          ? '员工查看自己提交的客资'
+          : audience === 'owner'
+            ? '销售查看自己负责的客资'
+            : '审批人查看自己待办或已办的成交订单'
       }}</span>
     </div>
 
@@ -246,13 +250,19 @@
         <el-button v-hasPermi="['zsjos:lead-filter:update']" :loading="saving" @click="save"
           >保存草稿</el-button
         >
-        <el-button
-          v-hasPermi="['zsjos:lead-filter:publish']"
-          type="primary"
-          :loading="publishing"
-          @click="publishConfig"
-          >发布到工作台</el-button
+        <ZsjosPopconfirm
+          :action="filterPublishConfirmAction(audienceLabel)"
+          v-model:visible="publishConfirmVisible"
+          @confirm="publishConfig"
         >
+          <el-button
+            v-hasPermi="['zsjos:lead-filter:publish']"
+            type="primary"
+            :loading="publishing"
+            @click="preparePublish"
+            >发布到工作台</el-button
+          >
+        </ZsjosPopconfirm>
       </div>
     </div>
   </ContentWrap>
@@ -262,20 +272,32 @@
       <el-table-column label="版本" prop="versionNo" width="100"
         ><template #default="scope">V{{ scope.row.versionNo }}</template></el-table-column
       >
-      <el-table-column label="发布时间" prop="publishedAt" min-width="190" :formatter="zsjosDateFormatter" />
+      <el-table-column
+        label="发布时间"
+        prop="publishedAt"
+        min-width="190"
+        :formatter="zsjosDateFormatter"
+      />
       <el-table-column label="发布人" prop="publishedBy" width="120"
         ><template #default="scope">用户 #{{ scope.row.publishedBy }}</template></el-table-column
       >
       <el-table-column label="操作" width="110">
         <template #default="scope">
-          <el-button
-            v-hasPermi="['zsjos:lead-filter:publish']"
-            link
-            type="primary"
-            :disabled="scope.row.versionNo === config?.publishedVersion"
-            @click="rollbackVersion(scope.row.versionNo)"
-            >回滚</el-button
+          <ZsjosPopconfirm
+            :action="filterRollbackConfirmAction(audienceLabel, scope.row.versionNo)"
+            :visible="rollbackConfirmVersion === scope.row.versionNo"
+            @update:visible="rollbackConfirmVersion = $event ? scope.row.versionNo : undefined"
+            @confirm="rollbackVersion(scope.row.versionNo)"
           >
+            <el-button
+              v-hasPermi="['zsjos:lead-filter:publish']"
+              link
+              type="primary"
+              :disabled="scope.row.versionNo === config?.publishedVersion"
+              @click="rollbackConfirmVersion = scope.row.versionNo"
+              >回滚</el-button
+            >
+          </ZsjosPopconfirm>
         </template>
       </el-table-column>
     </el-table>
@@ -286,6 +308,11 @@
 import { ArrowDown, ArrowUp, Clock, Delete, Plus } from '@element-plus/icons-vue'
 import * as LeadFilterApi from '@/api/zsjos/leadFilter'
 import { zsjosDateFormatter } from '@/utils/zsjosTime'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
+import {
+  filterPublishConfirmAction,
+  filterRollbackConfirmAction
+} from '../components/irreversibleConfirm'
 
 defineOptions({ name: 'ZsjosLeadFilter' })
 
@@ -297,6 +324,9 @@ const audienceOptions = [
   { label: '审批人视角', value: 'reviewer' },
   { label: '超期公海视角', value: 'agingPool' }
 ]
+const audienceLabel = computed(
+  () => audienceOptions.find((item) => item.value === audience.value)?.label || audience.value
+)
 const config = ref<LeadFilterApi.LeadFilterAdminVO>()
 const groups = ref<LeadFilterApi.LeadFilterGroupVO[]>([])
 const capabilities = ref<LeadFilterApi.LeadFilterCapabilityVO[]>([])
@@ -305,6 +335,8 @@ const activeGroups = ref<string[]>([])
 const loading = ref(true)
 const saving = ref(false)
 const publishing = ref(false)
+const publishConfirmVisible = ref(false)
+const rollbackConfirmVersion = ref<number>()
 const error = ref('')
 const historyVisible = ref(false)
 const historyLoading = ref(false)
@@ -448,16 +480,17 @@ const save = async () => {
     saving.value = false
   }
 }
-const publishConfig = async () => {
+const preparePublish = () => {
   try {
     validate()
   } catch (validationError: any) {
     message.error(validationError.message)
     return
   }
-  await ElMessageBox.confirm('将先保存当前草稿，再发布到员工工作台。确认继续？', '发布筛选方案', {
-    type: 'warning'
-  })
+  publishConfirmVisible.value = true
+}
+const publishConfig = async () => {
+  publishConfirmVisible.value = false
   publishing.value = true
   try {
     normalizeSort()
@@ -479,11 +512,7 @@ const openHistory = async () => {
   }
 }
 const rollbackVersion = async (versionNo: number) => {
-  await ElMessageBox.confirm(
-    `将 V${versionNo} 复制为新的发布版本，历史记录不会删除。`,
-    '回滚筛选方案',
-    { type: 'warning' }
-  )
+  rollbackConfirmVersion.value = undefined
   const newVersion = await LeadFilterApi.rollback(audience.value, versionNo)
   message.success(`已回滚并发布为 V${newVersion}`)
   historyVisible.value = false

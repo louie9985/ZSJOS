@@ -101,7 +101,12 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="最后修改" prop="updateTime" width="180" :formatter="zsjosDateFormatter" />
+      <el-table-column
+        label="最后修改"
+        prop="updateTime"
+        width="180"
+        :formatter="zsjosDateFormatter"
+      />
       <el-table-column label="操作" width="90" fixed="right" align="center">
         <template #default="{ row }">
           <el-button
@@ -195,13 +200,30 @@
     </div>
     <template #footer>
       <el-button @click="drawerVisible = false">取消</el-button>
-      <el-button type="primary" :loading="saving" @click="submitRelations">保存配置</el-button>
+      <ZsjosPopconfirm
+        :action="confirmAction"
+        :danger="saveMode === 'remove'"
+        v-model:visible="confirmVisible"
+        @confirm="submitRelations"
+      >
+        <el-button
+          :type="saveMode === 'remove' ? 'danger' : 'primary'"
+          :loading="saving"
+          @click="prepareSubmit"
+          >保存配置</el-button
+        >
+      </ZsjosPopconfirm>
     </template>
   </el-drawer>
 
   <el-dialog v-model="logVisible" :title="`${sceneName}变更记录`" width="900px">
     <el-table v-loading="logLoading" :data="logList">
-      <el-table-column label="操作时间" prop="createTime" width="180" :formatter="zsjosDateFormatter" />
+      <el-table-column
+        label="操作时间"
+        prop="createTime"
+        width="180"
+        :formatter="zsjosDateFormatter"
+      />
       <el-table-column label="操作人" prop="operatorName" width="120" />
       <el-table-column label="操作" width="100">
         <template #default="{ row }">{{ actionLabels[row.actionType] }}</template>
@@ -234,6 +256,8 @@ import { defaultProps, handleTree } from '@/utils/tree'
 import * as DeptApi from '@/api/system/dept'
 import * as AssignmentApi from '@/api/zsjos/leadAssignment'
 import * as UserRelationApi from '@/api/zsjos/userRelation'
+import ZsjosPopconfirm from '../components/ZsjosPopconfirm.vue'
+import { relationConfirmAction } from '../components/irreversibleConfirm'
 
 defineOptions({ name: 'ZsjosLeadAssignment' })
 
@@ -254,6 +278,7 @@ const logPermission = computed(() =>
 )
 const loading = ref(false)
 const saving = ref(false)
+const confirmVisible = ref(false)
 const total = ref(0)
 const list = ref<AssignmentApi.AssignmentRelationVO[]>([])
 const checkedRows = ref<AssignmentApi.AssignmentRelationVO[]>([])
@@ -301,6 +326,15 @@ const filteredSales = computed(() => {
 })
 const selectedSales = computed(() =>
   eligibleSales.value.filter((sales) => selectedSalesIds.value.includes(sales.id))
+)
+const confirmAction = computed(() =>
+  relationConfirmAction(
+    saveMode.value,
+    isAdminMode.value ? sceneName.value : '派单关系',
+    isBatch.value
+      ? { batchCount: checkedRows.value.length }
+      : { name: activeSource.value?.nickname || '当前员工' }
+  )
 )
 
 const getList = async () => {
@@ -369,6 +403,7 @@ const removeSelected = (id: number) => {
 }
 
 const submitRelations = async () => {
+  confirmVisible.value = false
   if (selectedSalesIds.value.length === 0 && saveMode.value !== 'replace') {
     message.warning(`请至少选择一名${targetLabel.value}`)
     return
@@ -399,6 +434,14 @@ const submitRelations = async () => {
   } finally {
     saving.value = false
   }
+}
+
+const prepareSubmit = () => {
+  if (selectedSalesIds.value.length === 0 && saveMode.value !== 'replace') {
+    message.warning(`请至少选择一名${targetLabel.value}`)
+    return
+  }
+  confirmVisible.value = true
 }
 
 const getLogs = async () => {

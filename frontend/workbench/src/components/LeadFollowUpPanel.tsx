@@ -10,6 +10,7 @@ import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import { snapshotDisplayLabel } from '../services/leadManagement'
+import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 const PAGE_SIZE = 10
@@ -33,6 +34,8 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
   const [results, setResults] = useState<DictData[]>([])
   const [categories, setCategories] = useState<DictData[]>([])
   const [quickNotes, setQuickNotes] = useState<DictData[]>([])
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [pendingValues, setPendingValues] = useState<Values>()
   useBusinessOverlay(dirty)
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
   useEffect(() => { if (open) resetIntent() }, [open, lead.id, resetIntent])
@@ -71,7 +74,16 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
     form.resetFields(); form.setFieldsValue({ leadCategory: lead.leadCategory })
     setImages([]); setDirty(false)
   }
-  const submit = async (values: Values) => {
+  const prepareSubmit = async () => {
+    const values = await form.validateFields().catch(() => undefined)
+    if (!values) return
+    setPendingValues(values)
+    setConfirmOpen(true)
+  }
+  const submit = async () => {
+    const values = pendingValues
+    setConfirmOpen(false)
+    if (!values) return
     await runSubmission(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(images, file => api.uploadLeadFollowUpImage(lead.id, file), setImages)
       if (uploadResult.failed) { message.error('有跟进图片上传失败，请重试失败项'); return }
@@ -92,7 +104,7 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
 
   return <section className="lead-follow-up-panel">
     <Modal title="新增跟进" open={open} onCancel={onClose} footer={null} destroyOnHidden width={760}>
-    <Form form={form} layout="vertical" className="follow-up-form" onFinish={submit} onValuesChange={() => setDirty(true)} disabled={submitting}>
+    <Form form={form} layout="vertical" className="follow-up-form" onValuesChange={() => setDirty(true)} disabled={submitting}>
       <div className="follow-up-field-grid">
         <Form.Item name="method" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}><Select options={methods.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
         <Form.Item name="result" label="跟进结果" rules={[{ required: true, message: '请选择跟进结果' }]}><Select options={results.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
@@ -109,7 +121,7 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
           <DeferredAttachmentPicker value={images} onChange={value => { setImages(value); setDirty(true) }} accept="image/jpeg,image/png,image/webp"/>
         </Form.Item>
       </div>
-      <Space><Button type="primary" htmlType="submit" loading={submitting}>提交跟进</Button><Button onClick={reset}>重置</Button></Space>
+      <Space><IrreversiblePopconfirm action={`提交客资「${lead.submittedName}」的跟进记录`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={submitting} onClick={() => void prepareSubmit()}>提交跟进</Button></IrreversiblePopconfirm><Button onClick={reset}>重置</Button></Space>
     </Form>
     </Modal>
 
