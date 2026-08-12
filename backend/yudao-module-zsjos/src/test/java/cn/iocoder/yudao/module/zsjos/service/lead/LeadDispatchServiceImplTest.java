@@ -19,8 +19,12 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentRuleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadClaimDailyCounterMapper;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -34,6 +38,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ACCEP
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ASSIGNED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_QUALIFICATION_DISPOSITION_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_CLAIM_DAILY_LIMIT_REACHED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -49,6 +54,9 @@ import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class LeadDispatchServiceImplTest {
+
+    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
+    @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @InjectMocks
     private LeadDispatchServiceImpl service;
@@ -80,6 +88,8 @@ class LeadDispatchServiceImplTest {
     private OpportunityMapper opportunityMapper;
     @Mock
     private LeadAgingPoolService agingPoolService;
+    @Mock
+    private LeadClaimDailyCounterMapper claimDailyCounterMapper;
 
     @Test
     void acceptAtomicallyCompletesAssignmentAndCreatesFirstFollowUpTask() {
@@ -177,6 +187,20 @@ class LeadDispatchServiceImplTest {
                 () -> service.getClaimPoolPage(request(), 20L));
 
         assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+    }
+
+    @Test
+    void claimRejectsWhenBeijingDailyLimitReached() {
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
+        when(ruleMapper.selectByCode("default")).thenReturn(rule());
+        when(leadMapper.selectById(1L)).thenReturn(lead());
+        when(leadMapper.updatePublicPoolToOwned(1L, 10L)).thenReturn(1);
+        when(claimDailyCounterMapper.reserve(eq(1L), eq(10L), any(), eq(5))).thenReturn(0);
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.claim(1L, 10L));
+
+        assertEquals(LEAD_CLAIM_DAILY_LIMIT_REACHED.getCode(), error.getCode());
+        verify(leadMapper).updatePublicPoolToOwned(1L, 10L);
     }
 
     @Test

@@ -37,6 +37,10 @@
         <el-input-number v-model="formData.maxAttempts" :min="1" :max="20" />
         <span class="unit">次</span>
       </el-form-item>
+      <el-form-item label="每日主动抢单上限" prop="dailyClaimLimit">
+        <el-input-number v-model="formData.dailyClaimLimit" :min="1" :max="100" />
+        <span class="unit">条</span>
+      </el-form-item>
       <el-form-item>
         <ZsjosPopconfirm
           action="保存客资派单规则"
@@ -72,7 +76,8 @@ const error = ref('')
 const formRef = ref<FormInstance>()
 const formData = reactive<LeadRuleApi.LeadAssignmentRuleUpdateReqVO>({
   acceptTimeoutSeconds: 120,
-  maxAttempts: 5
+  maxAttempts: 5,
+  dailyClaimLimit: 5
 })
 const rules: FormRules = {
   acceptTimeoutSeconds: [
@@ -82,6 +87,10 @@ const rules: FormRules = {
   maxAttempts: [
     { required: true, message: '请输入最大尝试次数', trigger: 'blur' },
     { type: 'number', min: 1, max: 20, message: '范围为 1–20 次', trigger: 'change' }
+  ],
+  dailyClaimLimit: [
+    { required: true, message: '请输入每日主动抢单上限', trigger: 'blur' },
+    { type: 'number', min: 1, max: 100, message: '范围为 1–100 条', trigger: 'change' }
   ]
 }
 
@@ -92,6 +101,7 @@ const loadRule = async () => {
     const rule = await LeadRuleApi.getRule()
     formData.acceptTimeoutSeconds = rule.acceptTimeoutSeconds
     formData.maxAttempts = rule.maxAttempts
+    formData.dailyClaimLimit = rule.dailyClaimLimit
   } catch (loadError: any) {
     error.value = loadError?.msg || loadError?.message || '派单规则加载失败'
   } finally {

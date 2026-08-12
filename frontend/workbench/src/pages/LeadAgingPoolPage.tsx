@@ -57,6 +57,8 @@ export default function LeadAgingPoolPage() {
   const [orderOpen, setOrderOpen] = useState(false);
   const [assignOpen, setAssignOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferReason, setTransferReason] = useState("");
   const [candidates, setCandidates] = useState<
     Array<{ id: number; nickname: string }>
   >([]);
@@ -136,7 +138,7 @@ export default function LeadAgingPoolPage() {
           selectedCycleRef.current = undefined;
           setDetail(undefined);
           setError(
-            loadError instanceof Error ? loadError.message : "超期公海加载失败",
+            loadError instanceof Error ? loadError.message : "公海池加载失败",
           );
         }
       } finally {
@@ -195,14 +197,27 @@ export default function LeadAgingPoolPage() {
     setSaving(true);
     try {
       await api.exitAgingPool(selected.cycleId, exitReason.trim());
-      message.success("客资已退出超期公海");
+      message.success("商机已退出公海池");
       setExitOpen(false);
       setExitReason("");
       await load();
     } catch (exitError) {
       message.error(
-        exitError instanceof Error ? exitError.message : "退出超期公海失败",
+        exitError instanceof Error ? exitError.message : "退出公海池失败",
       );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const requestTransfer = async () => {
+    if (!selected || !transferReason.trim()) return;
+    setSaving(true);
+    try {
+      await api.requestAgingPoolTransfer(selected.cycleId, transferReason.trim());
+      message.success("正式转派申请已提交主管审批");
+      setTransferOpen(false);
+      setTransferReason("");
     } finally {
       setSaving(false);
     }
@@ -267,7 +282,7 @@ export default function LeadAgingPoolPage() {
           <Spin spinning={loading}>
             <List
               dataSource={items}
-              locale={{ emptyText: <Empty description="暂无超期公海客资" /> }}
+              locale={{ emptyText: <Empty description="暂无公海商机" /> }}
               renderItem={(item) => (
                 <List.Item
                   className={
@@ -348,6 +363,11 @@ export default function LeadAgingPoolPage() {
                   {selected.availableActions.includes("EXIT") && (
                     <Button danger onClick={() => setExitOpen(true)}>
                       退出公海
+                    </Button>
+                  )}
+                  {selected.availableActions.includes("REQUEST_TRANSFER") && (
+                    <Button icon={<UserSwitchOutlined />} onClick={() => setTransferOpen(true)}>
+                      申请转给我
                     </Button>
                   )}
                   {detail.availableActions?.some(
@@ -458,7 +478,7 @@ export default function LeadAgingPoolPage() {
         />
       </Modal>
       <Modal
-        title="退出超期公海"
+        title="退出公海池"
         open={exitOpen}
         confirmLoading={saving}
         onOk={() => void exit()}
@@ -472,6 +492,22 @@ export default function LeadAgingPoolPage() {
           value={exitReason}
           onChange={(event) => setExitReason(event.target.value)}
           placeholder="填写退出原因；退出后A重新获得独占推进权，并从当前时间重新计时"
+        />
+      </Modal>
+      <Modal
+        title="申请正式转派给我"
+        open={transferOpen}
+        confirmLoading={saving}
+        onOk={() => void requestTransfer()}
+        onCancel={() => setTransferOpen(false)}
+      >
+        <Input.TextArea
+          rows={4}
+          maxLength={500}
+          showCount
+          value={transferReason}
+          onChange={(event) => setTransferReason(event.target.value)}
+          placeholder="填写申请原因；审批通过后正式归属和业绩归属将转给你，并退出公海池"
         />
       </Modal>
     </section>

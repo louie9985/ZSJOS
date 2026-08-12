@@ -75,9 +75,10 @@ class LeadManagementServiceImplTest {
 
     @BeforeEach
     void setUp() {
-        org.mockito.Mockito.lenient().when(agingPoolService.resolveEffectiveSalesUserId(
-                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(Long.class)))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        org.mockito.Mockito.lenient().when(agingPoolService.canOperate(
+                        org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(Long.class),
+                        org.mockito.ArgumentMatchers.anyLong()))
+                .thenAnswer(invocation -> java.util.Objects.equals(invocation.getArgument(1), invocation.getArgument(2)));
     }
 
     @Test
@@ -192,7 +193,7 @@ class LeadManagementServiceImplTest {
                 new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO();
         cycle.setStatus("assigned"); cycle.setCollaboratorUserId(30L);
         when(agingPoolService.getActiveCycle(1L)).thenReturn(cycle);
-        when(agingPoolService.resolveEffectiveSalesUserId(1L, 20L)).thenReturn(30L);
+        when(agingPoolService.canOperate(1L, 20L, 30L)).thenReturn(true);
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(leadObjectPermissionService.canRead(lead, 30L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());

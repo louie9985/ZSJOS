@@ -10,5 +10,6 @@ public class LeadAssignmentRuleRespVO {
     private String strategyType;
     private Integer acceptTimeoutSeconds;
     private Integer maxAttempts;
+    private Integer dailyClaimLimit;
     private Integer status;
 }

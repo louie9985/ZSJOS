@@ -489,8 +489,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private LeadDO requireEligibleLead(Long leadId, Long userId) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!Objects.equals(agingPoolService.resolveEffectiveSalesUserId(leadId, lead.getOwnerUserId()), userId) || lead.getSuspendedAt() != null
-                || !STATUS_VALID.equals(lead.getStatus())) throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
+        agingPoolService.requireCanOperateForUpdate(leadId, lead.getOwnerUserId(), userId);
+        if (lead.getSuspendedAt() != null || !STATUS_VALID.equals(lead.getStatus())) {
+            throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
+        }
         LeadAppealDO latestAppeal = leadAppealMapper.selectLatestByLeadId(leadId);
         if (latestAppeal != null && Set.of(APPEAL_STATUS_SALES_MANAGER_REVIEWING, APPEAL_STATUS_QUALITY_REVIEWING,
                 APPEAL_STATUS_CHAIRMAN_REVIEWING).contains(latestAppeal.getStatus())) throw exception(SALES_ORDER_ENTRY_FORBIDDEN);

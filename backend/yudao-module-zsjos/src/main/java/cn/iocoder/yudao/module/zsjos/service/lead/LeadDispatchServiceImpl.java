@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
@@ -26,6 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.Duration;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -46,6 +49,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private LeadAttachmentMapper attachmentMapper;
     @Resource private LeadAssignmentHistoryMapper historyMapper;
+    @Resource private LeadClaimDailyCounterMapper claimDailyCounterMapper;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadAssignmentRuleMapper ruleMapper;
     @Resource private LeadAssignmentService assignmentService;
@@ -231,8 +235,14 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "claim")
     public void claim(Long leadId, Long userId) {
         requireSalesUser(userId);
+        RuleConfig config = readConfig(requireRule().getConfigJson());
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         LeadDO lead = requireLead(leadId);
         if (leadMapper.updatePublicPoolToOwned(leadId, userId) == 0) throw exception(LEAD_CLAIM_ALREADY_TAKEN);
+        if (claimDailyCounterMapper.reserve(TenantContextHolder.getRequiredTenantId(), userId, today,
+                config.dailyClaimLimit()) == 0) {
+            throw exception(LEAD_CLAIM_DAILY_LIMIT_REACHED);
+        }
         LocalDateTime claimedAt = LocalDateTime.now();
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_CLAIM, userId, userId,
                 null, null, null, null, claimedAt);
@@ -261,6 +271,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         result.setId(rule.getId()); result.setCode(rule.getCode()); result.setName(rule.getName());
         result.setStrategyType(rule.getStrategyType()); result.setStatus(rule.getStatus());
         result.setAcceptTimeoutSeconds(config.acceptTimeoutSeconds()); result.setMaxAttempts(config.maxAttempts());
+        result.setDailyClaimLimit(config.dailyClaimLimit());
         return result;
     }
 
@@ -268,7 +279,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Transactional(rollbackFor = Exception.class)
     public void updateRule(LeadAssignmentRuleUpdateReqVO reqVO) {
         LeadAssignmentRuleDO rule = requireRule();
-        rule.setConfigJson(JsonUtils.toJsonString(new RuleConfig(reqVO.getAcceptTimeoutSeconds(), reqVO.getMaxAttempts())));
+        rule.setConfigJson(JsonUtils.toJsonString(new RuleConfig(reqVO.getAcceptTimeoutSeconds(),
+                reqVO.getMaxAttempts(), reqVO.getDailyClaimLimit())));
         ruleMapper.updateById(rule);
     }
 
@@ -477,9 +489,11 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
 
     private RuleConfig readConfig(String json) {
         RuleConfig config = JsonUtils.parseObject(json, RuleConfig.class);
-        if (config == null || config.acceptTimeoutSeconds() < 10 || config.acceptTimeoutSeconds() > 3600
+        if (config == null || config.acceptTimeoutSeconds() == null || config.acceptTimeoutSeconds() < 10
+                || config.acceptTimeoutSeconds() > 3600 || config.maxAttempts() == null
                 || config.maxAttempts() < 1 || config.maxAttempts() > 20) throw exception(LEAD_RULE_INVALID);
-        return config;
+        return new RuleConfig(config.acceptTimeoutSeconds(), config.maxAttempts(),
+                config.dailyClaimLimit() == null ? 5 : config.dailyClaimLimit());
     }
 
     private LeadAssignmentHistoryDO addHistory(LeadDO lead, String action, Long candidate, Long operator,
@@ -549,5 +563,5 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         return value.charAt(0) + "*".repeat(Math.min(6, value.length() - 2)) + value.substring(value.length() - 1);
     }
 
-    public record RuleConfig(int acceptTimeoutSeconds, int maxAttempts) {}
+    public record RuleConfig(Integer acceptTimeoutSeconds, Integer maxAttempts, Integer dailyClaimLimit) {}
 }

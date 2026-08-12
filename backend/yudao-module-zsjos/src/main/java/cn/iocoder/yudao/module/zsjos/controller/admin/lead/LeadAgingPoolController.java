@@ -20,6 +20,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/lead/aging-pool")
 public class LeadAgingPoolController {
     @Resource private LeadAgingPoolService service;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadTransferRequestService transferRequestService;
 
     @GetMapping("/page")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-aging-pool:query')")
@@ -51,5 +52,12 @@ public class LeadAgingPoolController {
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-aging-pool:manage','zsjos:lead-aging-pool:manage-all')")
     public CommonResult<Boolean> exit(@PathVariable Long id, @Valid @RequestBody LeadAgingPoolExitReqVO reqVO) {
         service.exit(id, getLoginUserId(), reqVO); return success(true);
+    }
+    @PostMapping("/{id}/transfer-request")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead-aging-pool:transfer-request')")
+    public CommonResult<Long> requestTransfer(@PathVariable Long id,
+            @Valid @RequestBody LeadTransferRequestCreateReqVO reqVO) {
+        LeadAgingPoolRespVO cycle = service.get(id, getLoginUserId());
+        return success(transferRequestService.create(cycle.getLeadId(), getLoginUserId(), reqVO));
     }
 }

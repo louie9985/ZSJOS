@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityFollowUpReco
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Mapper
 public interface OpportunityFollowUpRecordMapper extends BaseMapperX<OpportunityFollowUpRecordDO> {
@@ -18,5 +19,12 @@ public interface OpportunityFollowUpRecordMapper extends BaseMapperX<Opportunity
                 .eq(OpportunityFollowUpRecordDO::getLeadId, leadId)
                 .orderByDesc(OpportunityFollowUpRecordDO::getOccurredAt)
                 .orderByDesc(OpportunityFollowUpRecordDO::getId));
+    }
+    default LocalDateTime selectLatestOccurredAt(Long opportunityId) {
+        OpportunityFollowUpRecordDO latest = selectOne(new LambdaQueryWrapperX<OpportunityFollowUpRecordDO>()
+                .eq(OpportunityFollowUpRecordDO::getOpportunityId, opportunityId)
+                .orderByDesc(OpportunityFollowUpRecordDO::getOccurredAt)
+                .orderByDesc(OpportunityFollowUpRecordDO::getId).last("LIMIT 1"));
+        return latest == null ? null : latest.getOccurredAt();
     }
 }

@@ -98,3 +98,5 @@
 4. 接入并验证真实产品 SDK 适配器后才开放提交入口。
 5. 使用真实 MySQL、Redis、文件存储和 WebSocket 验证提交、超时转派、并发接单、业务任务及抢单。
 6. JVM、MySQL 连接会话和产品展示统一使用 `Asia/Shanghai`。MySQL Connector/J 8 连接必须配置 `connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true`，并通过 `script/sql/mysql/verify-zsjos-time-contract.sql` 只读核验 `@@session.time_zone` 和历史异常。
+主动抢单使用租户派单规则 `dailyClaimLimit`，默认每个销售每个北京时间自然日 5 条。服务端按
+租户、销售和日期原子保留额度；自动接单开关只影响自动轮询，不影响主动抢单。

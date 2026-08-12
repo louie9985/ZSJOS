@@ -41,8 +41,16 @@
         />
         <span class="unit">分钟</span>
       </el-form-item>
-      <el-form-item label="超期公海期限" prop="agingPoolTimeoutDays">
+      <el-form-item label="商机公海期限" prop="agingPoolTimeoutDays">
         <el-input-number v-model="formData.agingPoolTimeoutDays" :min="1" :max="3650" :step="1" />
+        <span class="unit">自然日</span>
+      </el-form-item>
+      <el-form-item label="判定前无进展预警" prop="noProgressWarningDays">
+        <el-input-number v-model="formData.noProgressWarningDays" :min="1" :max="365" :step="1" />
+        <span class="unit">自然日</span>
+      </el-form-item>
+      <el-form-item label="预警宽限期" prop="noProgressGraceDays">
+        <el-input-number v-model="formData.noProgressGraceDays" :min="1" :max="30" :step="1" />
         <span class="unit">自然日</span>
       </el-form-item>
       <el-form-item>
@@ -81,7 +89,9 @@ const formRef = ref<FormInstance>()
 const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({
   firstFollowUpTimeoutMinutes: 1440,
   qualificationTimeoutMinutes: 4320,
-  agingPoolTimeoutDays: 90
+  agingPoolTimeoutDays: 90,
+  noProgressWarningDays: 7,
+  noProgressGraceDays: 2
 })
 const rules: FormRules = {
   firstFollowUpTimeoutMinutes: [
@@ -95,6 +105,14 @@ const rules: FormRules = {
   agingPoolTimeoutDays: [
     { required: true, message: '请输入超期公海期限', trigger: 'blur' },
     { type: 'number', min: 1, max: 3650, message: '范围为 1–3650 个自然日', trigger: 'change' }
+  ],
+  noProgressWarningDays: [
+    { required: true, message: '请输入无进展预警天数', trigger: 'blur' },
+    { type: 'number', min: 1, max: 365, message: '范围为 1–365 个自然日', trigger: 'change' }
+  ],
+  noProgressGraceDays: [
+    { required: true, message: '请输入预警宽限期', trigger: 'blur' },
+    { type: 'number', min: 1, max: 30, message: '范围为 1–30 个自然日', trigger: 'change' }
   ]
 }
 
@@ -106,6 +124,8 @@ const loadRule = async () => {
     formData.firstFollowUpTimeoutMinutes = rule.firstFollowUpTimeoutMinutes
     formData.qualificationTimeoutMinutes = rule.qualificationTimeoutMinutes
     formData.agingPoolTimeoutDays = rule.agingPoolTimeoutDays
+    formData.noProgressWarningDays = rule.noProgressWarningDays
+    formData.noProgressGraceDays = rule.noProgressGraceDays
   } catch (loadError: any) {
     error.value = loadError?.msg || loadError?.message || '跟进规则加载失败'
   } finally {

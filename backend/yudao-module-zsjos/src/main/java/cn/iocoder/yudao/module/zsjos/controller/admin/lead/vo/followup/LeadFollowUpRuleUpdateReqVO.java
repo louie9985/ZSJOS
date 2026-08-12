@@ -15,4 +15,10 @@ public class LeadFollowUpRuleUpdateReqVO {
 
     @NotNull @Min(1) @Max(3650)
     private Integer agingPoolTimeoutDays;
+
+    @NotNull @Min(1) @Max(365)
+    private Integer noProgressWarningDays;
+
+    @NotNull @Min(1) @Max(30)
+    private Integer noProgressGraceDays;
 }

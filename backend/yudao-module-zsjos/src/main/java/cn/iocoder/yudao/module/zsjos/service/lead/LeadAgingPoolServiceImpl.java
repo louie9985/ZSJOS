@@ -42,7 +42,10 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private LeadAgingPoolCycleMapper cycleMapper;
     @Resource private LeadAgingPoolEventMapper eventMapper;
     @Resource private LeadMapper leadMapper;
+    @Resource private LeadAssignmentHistoryMapper assignmentHistoryMapper;
+    @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private OpportunityMapper opportunityMapper;
+    @Resource private OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
     @Resource private SalesOrderMapper orderMapper;
     @Resource private LeadFollowUpRuleService ruleService;
     @Resource private LeadAssignmentService assignmentService;
@@ -57,14 +60,14 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     public PageResult<LeadAgingPoolRespVO> getPage(LeadAgingPoolPageReqVO reqVO, Long userId) {
-        List<Long> deptIds = visibleDeptIds(userId);
+        List<Long> scopedOwnerUserIds = visibleOwnerUserIds(userId);
         boolean manageAll = hasManageAll();
         LeadInboxFilterQuery filter = reqVO.getInboxGroup() == null && reqVO.getInboxStage() == null
                 ? new LeadInboxFilterQuery(Set.of(), Set.of(), false)
                 : inboxFilterConfigService.resolveQuery(
                         inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_AGING_POOL),
                         reqVO.getInboxGroup(), reqVO.getInboxStage());
-        PageResult<LeadAgingPoolCycleDO> page = cycleMapper.selectPage(reqVO, manageAll ? null : deptIds,
+        PageResult<LeadAgingPoolCycleDO> page = cycleMapper.selectPage(reqVO, manageAll ? null : scopedOwnerUserIds,
                 manageAll ? null : userId,
                 List.copyOf(filter.values(INBOX_FILTER_FIELD_POOL_STATUS)), filter.matchNone());
         List<LeadAgingPoolRespVO> rows = page.getList().stream().map(cycle -> convert(cycle, userId)).toList();
@@ -75,12 +78,12 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     public Map<String, Long> getCounts(Long userId) {
-        List<Long> deptIds = hasManageAll() ? null : visibleDeptIds(userId);
+        List<Long> scopedOwnerUserIds = hasManageAll() ? null : visibleOwnerUserIds(userId);
         boolean manageAll = hasManageAll();
         Long participant = manageAll ? null : userId;
-        long waiting = cycleMapper.selectCountByStatus(deptIds, participant, AGING_POOL_WAITING_ASSIGNMENT);
-        long assigned = cycleMapper.selectCountByStatus(deptIds, participant, AGING_POOL_ASSIGNED);
-        long pending = cycleMapper.selectCountByStatus(deptIds, participant, AGING_POOL_DEAL_PENDING);
+        long waiting = cycleMapper.selectCountByStatus(scopedOwnerUserIds, participant, AGING_POOL_WAITING_ASSIGNMENT);
+        long assigned = cycleMapper.selectCountByStatus(scopedOwnerUserIds, participant, AGING_POOL_ASSIGNED);
+        long pending = cycleMapper.selectCountByStatus(scopedOwnerUserIds, participant, AGING_POOL_DEAL_PENDING);
         return Map.of("all", waiting + assigned + pending, AGING_POOL_WAITING_ASSIGNMENT, waiting,
                 AGING_POOL_ASSIGNED, assigned, AGING_POOL_DEAL_PENDING, pending);
     }
@@ -131,6 +134,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         }
         LeadAgingPoolCycleDO cycle = cycleMapper.selectByIdForUpdate(cycleId, TenantContextHolder.getRequiredTenantId());
         requireManageable(cycle, userId);
+        if (hasActiveApproval(cycle.getLeadId())) throw exception(LEAD_AGING_POOL_STATE_INVALID);
         if (!Set.of(AGING_POOL_WAITING_ASSIGNMENT, AGING_POOL_ASSIGNED).contains(cycle.getStatus())) {
             throw exception(LEAD_AGING_POOL_STATE_INVALID);
         }
@@ -156,6 +160,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         }
         LeadAgingPoolCycleDO cycle = cycleMapper.selectByIdForUpdate(cycleId, TenantContextHolder.getRequiredTenantId());
         requireManageable(cycle, userId);
+        if (hasActiveApproval(cycle.getLeadId())) throw exception(LEAD_AGING_POOL_STATE_INVALID);
         if (!Set.of(AGING_POOL_WAITING_ASSIGNMENT, AGING_POOL_ASSIGNED).contains(cycle.getStatus())) {
             throw exception(LEAD_AGING_POOL_STATE_INVALID);
         }
@@ -224,7 +229,12 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         int emitted = 0;
         for (LeadDO lead : leadMapper.selectAgingPoolReminderCandidates(TenantContextHolder.getRequiredTenantId(), latestStart)) {
             int nextCycleNo = cycleMapper.selectNextCycleNo(lead.getId());
-            LocalDateTime dueAt = lead.getOwnershipStartedAt().plusDays(config.getAgingPoolTimeoutDays());
+            OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+            if (opportunity == null) continue;
+            LocalDateTime progressAt = opportunityFollowUpRecordMapper.selectLatestOccurredAt(opportunity.getId());
+            if (progressAt == null) progressAt = opportunity.getCreateTime();
+            if (progressAt == null) continue;
+            LocalDateTime dueAt = progressAt.plusDays(config.getAgingPoolTimeoutDays());
             AdminUserRespDTO owner = adminUserApi.getUser(lead.getOwnerUserId());
             if (owner == null || owner.getDeptId() == null) continue;
             for (NotifyTimingRuleRespDTO rule : rules) {
@@ -269,11 +279,81 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         return emitted;
     }
 
-    @Override public Long resolveEffectiveSalesUserId(Long leadId, Long originalOwnerUserId) {
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public int processPreQualificationNoProgress(LocalDateTime now) {
+        LeadFollowUpRuleDO rule = ruleService.requireEnabledRule();
+        LocalDateTime warningCutoff = now.minusDays(rule.getNoProgressWarningDays());
+        int changed = 0;
+        for (LeadDO snapshot : leadMapper.selectPreQualificationNoProgressCandidates(warningCutoff)) {
+            LeadDO lead = leadMapper.selectByIdForUpdate(snapshot.getId(), TenantContextHolder.getRequiredTenantId());
+            if (lead == null || !STATUS_SUBMITTED.equals(lead.getStatus())
+                    || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) continue;
+            LocalDateTime progressAt = lead.getLastFollowUpAt() == null
+                    ? lead.getOwnershipStartedAt() : lead.getLastFollowUpAt();
+            if (progressAt == null || progressAt.plusDays(rule.getNoProgressWarningDays()).isAfter(now)) continue;
+            if (lead.getNoProgressWarnedAt() == null || lead.getNoProgressWarnedAt().isBefore(progressAt)) {
+                lead.setNoProgressWarnedAt(now);
+                leadMapper.updateById(lead);
+                publishNoProgress(lead, "warning", now);
+                changed++;
+                continue;
+            }
+            if (lead.getNoProgressWarnedAt().plusDays(rule.getNoProgressGraceDays()).isAfter(now)) continue;
+            Long previousOwner = lead.getOwnerUserId();
+            lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
+            lead.setOwnerUserId(null);
+            lead.setPublicPoolAt(now);
+            lead.setOwnershipStartedAt(null);
+            lead.setNoProgressWarnedAt(null);
+            leadMapper.updateById(lead);
+            lifecycleTaskService.cancelFirstFollowUpTasks(lead.getId(), now, "无进展宽限期结束释放抢单池");
+            lifecycleTaskService.cancelFollowUpReminders(lead.getId(), now, "无进展宽限期结束释放抢单池");
+            addNoProgressHistory(lead, previousOwner, now);
+            publishNoProgress(lead, previousOwner, "released", now);
+            changed++;
+        }
+        return changed;
+    }
+
+    private void addNoProgressHistory(LeadDO lead, Long previousOwner, LocalDateTime now) {
+        LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
+        history.setLeadId(lead.getId()); history.setActionType(ACTION_PUBLIC_POOL);
+        history.setFromOwnerUserId(previousOwner); history.setOperatorUserId(0L);
+        history.setReason("无进展预警宽限期结束"); history.setOccurredAt(now);
+        assignmentHistoryMapper.insert(history);
+    }
+
+    private void publishNoProgress(LeadDO lead, String stage, LocalDateTime now) {
+        publishNoProgress(lead, lead.getOwnerUserId(), stage, now);
+    }
+    private void publishNoProgress(LeadDO lead, Long ownerUserId, String stage, LocalDateTime now) {
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("ownerUserId", ownerUserId);
+        context.put("reminder.stage", stage);
+        context.put("assignment.reason", "released".equals(stage) ? "无进展宽限期结束" : "长期无有效进展");
+        notifyPublisher.publish("released".equals(stage) ? PUBLIC_POOL : NEXT_FOLLOW_UP_REMINDER,
+                lead.getId(), "lead-no-progress:" + stage + ":" + lead.getId() + ":" + now,
+                0L, now, context);
+    }
+
+    @Override public boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
+        if (Objects.equals(formalOwnerUserId, operatorUserId)) return true;
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadId(leadId);
-        if (cycle == null) return originalOwnerUserId;
-        return AGING_POOL_ASSIGNED.equals(cycle.getStatus()) || AGING_POOL_DEAL_PENDING.equals(cycle.getStatus())
-                ? cycle.getCollaboratorUserId() : null;
+        return cycle != null && Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
+                && Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus());
+    }
+    @Override public void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId) {
+        if (Objects.equals(formalOwnerUserId, operatorUserId)) {
+            cycleMapper.selectActiveByLeadIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+            return;
+        }
+        LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadIdForUpdate(
+                leadId, TenantContextHolder.getRequiredTenantId());
+        if (cycle == null || !Objects.equals(cycle.getCollaboratorUserId(), operatorUserId)
+                || !Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
     }
     @Override public LeadAgingPoolCycleDO getActiveCycle(Long leadId) { return cycleMapper.selectActiveByLeadId(leadId); }
 
@@ -281,7 +361,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     public void markDealPending(Long leadId, Long salesUserId, LocalDateTime now) {
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (cycle == null) return;
-        if (!AGING_POOL_ASSIGNED.equals(cycle.getStatus()) || !Objects.equals(cycle.getCollaboratorUserId(), salesUserId)) {
+        if (!AGING_POOL_ASSIGNED.equals(cycle.getStatus())
+                || !isOwnerOrCollaborator(cycle, salesUserId)) {
             throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
         }
         cycle.setStatus(AGING_POOL_DEAL_PENDING); updateCycle(cycle);
@@ -301,12 +382,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     public void completeConversion(Long leadId, Long salesUserId, LocalDateTime now) {
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (cycle == null) return;
-        if (!Objects.equals(cycle.getCollaboratorUserId(), salesUserId)) throw exception(LEAD_AGING_POOL_STATE_INVALID);
-        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
-        OpportunityDO opportunity = opportunityMapper.selectByLeadIdForUpdate(
-                leadId, TenantContextHolder.getRequiredTenantId());
-        lead.setOwnerUserId(salesUserId); lead.setOwnershipStartedAt(now); leadMapper.updateById(lead);
-        if (opportunity != null) { opportunity.setOwnerUserId(salesUserId); opportunityMapper.updateById(opportunity); }
+        if (!isOwnerOrCollaborator(cycle, salesUserId)) throw exception(LEAD_AGING_POOL_STATE_INVALID);
         cycle.setStatus(AGING_POOL_CONVERTED); cycle.setConvertedAt(now); updateCycle(cycle);
         addEvent(cycle, AGING_POOL_EVENT_CONVERTED, salesUserId, salesUserId, salesUserId, null,
                 "aging-pool-converted:" + leadId + ":" + now, now);
@@ -318,7 +394,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadIdForUpdate(
                 leadId, TenantContextHolder.getRequiredTenantId());
         if (cycle == null) return;
-        if (AGING_POOL_DEAL_PENDING.equals(cycle.getStatus())) {
+        if (hasActiveApproval(cycle.getLeadId())) {
             throw exception(LEAD_AGING_POOL_STATE_INVALID);
         }
         cycle.setStatus(AGING_POOL_EXITED); cycle.setExitedAt(now);
@@ -334,7 +410,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadId(leadId);
         if (cycle == null) return false;
         AdminUserRespDTO user = adminUserApi.getUser(userId);
-        return hasManageAll() || user != null && Objects.equals(user.getDeptId(), cycle.getFrozenDeptId()) && isEligibleSales(userId)
+        Long ownerDeptId = currentOwnerDeptId(cycle);
+        return hasManageAll() || user != null && Objects.equals(user.getDeptId(), ownerDeptId) && isEligibleSales(userId)
                 || canManage(cycle, userId) || Objects.equals(userId, cycle.getOriginalOwnerUserId())
                 || Objects.equals(userId, cycle.getCollaboratorUserId());
     }
@@ -346,7 +423,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         result.setCycleId(cycle.getId()); result.setLeadId(lead.getId()); result.setCycleNo(cycle.getCycleNo()); result.setStatus(cycle.getStatus());
         result.setOriginalOwnerUserId(cycle.getOriginalOwnerUserId()); result.setOriginalOwnerUserName(userName(cycle.getOriginalOwnerUserId()));
         result.setCollaboratorUserId(cycle.getCollaboratorUserId()); result.setCollaboratorUserName(userName(cycle.getCollaboratorUserId()));
-        result.setFrozenDeptId(cycle.getFrozenDeptId()); DeptRespDTO dept = deptApi.getDept(cycle.getFrozenDeptId()); result.setFrozenDeptName(dept == null ? null : dept.getName());
+        Long ownerDeptId = currentOwnerDeptId(cycle);
+        result.setFrozenDeptId(ownerDeptId); DeptRespDTO dept = ownerDeptId == null ? null : deptApi.getDept(ownerDeptId); result.setFrozenDeptName(dept == null ? null : dept.getName());
         result.setSubmittedName(lead.getSubmittedName()); result.setSubmittedMobile(lead.getSubmittedMobile()); result.setSubmittedWechatId(lead.getSubmittedWechatId());
         result.setLeadCategory(lead.getLeadCategory()); result.setSourceChannel(lead.getSourceChannelId()); result.setOwnershipStartedAt(cycle.getOwnershipStartedAt());
         result.setDueAt(cycle.getDueAt()); result.setEnteredAt(cycle.getEnteredAt()); result.setAssignedAt(cycle.getAssignedAt());
@@ -354,14 +432,19 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         SalesOrderDO order = orderMapper.selectActiveByLeadId(lead.getId(), ACTIVE_ORDER_STATUSES);
         if (order != null) { result.setActiveSalesOrderId(order.getId()); result.setActiveSalesOrderStatus(order.getStatus()); }
         List<String> actions = new ArrayList<>();
-        if (canManage(cycle, userId) && !AGING_POOL_DEAL_PENDING.equals(cycle.getStatus())) { actions.add("ASSIGN"); actions.add("EXIT"); }
-        if (Objects.equals(userId, cycle.getCollaboratorUserId()) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
+        if (canManage(cycle, userId) && !hasActiveApproval(cycle.getLeadId())) { actions.add("ASSIGN"); actions.add("EXIT"); }
+        if (isOwnerOrCollaborator(cycle, userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
             actions.add(ACTION_ADD_FOLLOW_UP);
             if (order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())) {
                 actions.add(Objects.equals(order.getSubmitterUserId(), userId) ? ACTION_REVISE_DEAL : ACTION_CONTINUE_DEAL);
             } else {
                 actions.add(ACTION_ENTER_DEAL);
             }
+        }
+        if (!Objects.equals(userId, cycle.getOriginalOwnerUserId())
+                && canRead(cycle.getLeadId(), userId) && !hasActiveApproval(cycle.getLeadId())
+                && securityFrameworkService.hasPermission("zsjos:lead-aging-pool:transfer-request")) {
+            actions.add("REQUEST_TRANSFER");
         }
         result.setAvailableActions(actions); return result;
     }
@@ -370,12 +453,28 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     private LeadAgingPoolCycleDO requireManageable(Long id, Long userId) { return requireManageable(requireCycle(id), userId); }
     private LeadAgingPoolCycleDO requireManageable(LeadAgingPoolCycleDO cycle, Long userId) { if (!canManage(cycle, userId)) throw exception(LEAD_AGING_POOL_MANAGER_DENIED); return cycle; }
     private LeadAgingPoolCycleDO requireCycle(Long id) { LeadAgingPoolCycleDO cycle = cycleMapper.selectById(id); if (cycle == null) throw exception(LEAD_AGING_POOL_NOT_EXISTS); return cycle; }
-    private boolean canManage(LeadAgingPoolCycleDO cycle, Long userId) { if (hasManageAll()) return true; DeptRespDTO dept = deptApi.getDept(cycle.getFrozenDeptId()); return securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE) && dept != null && Objects.equals(dept.getLeaderUserId(), userId); }
+    private boolean canManage(LeadAgingPoolCycleDO cycle, Long userId) { if (hasManageAll()) return true; Long ownerDeptId = currentOwnerDeptId(cycle); DeptRespDTO dept = ownerDeptId == null ? null : deptApi.getDept(ownerDeptId); return securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE) && dept != null && Objects.equals(dept.getLeaderUserId(), userId); }
     private boolean hasManageAll() { return securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE_ALL); }
     private List<Long> visibleDeptIds(Long userId) { AdminUserRespDTO user = adminUserApi.getUser(userId); Set<Long> ids = new LinkedHashSet<>(); if (user != null && user.getDeptId() != null && isEligibleSales(userId)) ids.add(user.getDeptId()); deptApi.getDeptListByLeaderUserId(userId).forEach(dept -> ids.add(dept.getId())); return List.copyOf(ids); }
-    private List<AdminUserRespDTO> eligibleSales(LeadAgingPoolCycleDO cycle) { Set<Long> eligible = new HashSet<>(assignmentService.getEligibleSalesUsers().stream().map(LeadAssignmentUserRespVO::getId).toList()); return adminUserApi.getUserListByDeptIds(List.of(cycle.getFrozenDeptId())).stream().filter(user -> eligible.contains(user.getId()) && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) && !Objects.equals(user.getId(), cycle.getOriginalOwnerUserId())).toList(); }
+    private List<Long> visibleOwnerUserIds(Long userId) {
+        List<Long> deptIds = visibleDeptIds(userId);
+        return deptIds.isEmpty() ? List.of() : adminUserApi.getUserListByDeptIds(deptIds).stream()
+                .map(AdminUserRespDTO::getId).filter(Objects::nonNull).distinct().toList();
+    }
+    private List<AdminUserRespDTO> eligibleSales(LeadAgingPoolCycleDO cycle) { Long ownerDeptId = currentOwnerDeptId(cycle); if (ownerDeptId == null) return List.of(); Set<Long> eligible = new HashSet<>(assignmentService.getEligibleSalesUsers().stream().map(LeadAssignmentUserRespVO::getId).toList()); return adminUserApi.getUserListByDeptIds(List.of(ownerDeptId)).stream().filter(user -> eligible.contains(user.getId()) && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) && !Objects.equals(user.getId(), cycle.getOriginalOwnerUserId())).toList(); }
     private AdminUserRespDTO requireEligibleSales(LeadAgingPoolCycleDO cycle, Long id) { return eligibleSales(cycle).stream().filter(user -> Objects.equals(user.getId(), id)).findFirst().orElseThrow(() -> exception(LEAD_AGING_POOL_SALES_INVALID)); }
     private boolean isEligibleSales(Long id) { return assignmentService.getEligibleSalesUsers().stream().anyMatch(user -> Objects.equals(user.getId(), id)); }
+    private Long currentOwnerDeptId(LeadAgingPoolCycleDO cycle) {
+        AdminUserRespDTO owner = adminUserApi.getUser(cycle.getOriginalOwnerUserId());
+        return owner == null ? null : owner.getDeptId();
+    }
+    private boolean isOwnerOrCollaborator(LeadAgingPoolCycleDO cycle, Long userId) {
+        return Objects.equals(cycle.getOriginalOwnerUserId(), userId)
+                || Objects.equals(cycle.getCollaboratorUserId(), userId);
+    }
+    private boolean hasActiveApproval(Long leadId) {
+        return orderMapper.selectActiveByLeadId(leadId, Set.of(STATUS_PENDING_APPROVAL)) != null;
+    }
     private void updateCycle(LeadAgingPoolCycleDO cycle) {
         int expectedVersion = Optional.ofNullable(cycle.getVersion()).orElse(0);
         cycle.setVersion(expectedVersion + 1);
@@ -387,22 +486,23 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     private boolean enterDueLead(Long leadId, LocalDateTime now) {
         LeadFollowUpRuleDO rule = ruleService.requireEnabledRule();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
-        if (lead == null || lead.getOwnershipStartedAt() == null
-                || lead.getOwnershipStartedAt().plusDays(rule.getAgingPoolTimeoutDays()).isAfter(now)
-                || cycleMapper.selectActiveByLeadId(lead.getId()) != null) return false;
+        if (lead == null || cycleMapper.selectActiveByLeadId(lead.getId()) != null) return false;
         if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 || !STATUS_VALID.equals(lead.getStatus())) return false;
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
         if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus())
                 || orderMapper.selectActiveByLeadId(lead.getId(), Set.of(STATUS_PENDING_APPROVAL)) != null) return false;
+        LocalDateTime progressAt = opportunityFollowUpRecordMapper.selectLatestOccurredAt(opportunity.getId());
+        if (progressAt == null) progressAt = opportunity.getCreateTime();
+        if (progressAt == null || progressAt.plusDays(rule.getAgingPoolTimeoutDays()).isAfter(now)) return false;
         AdminUserRespDTO owner = adminUserApi.getUser(lead.getOwnerUserId());
         if (owner == null || owner.getDeptId() == null) return false;
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
         cycle.setLeadId(lead.getId()); cycle.setCycleNo(cycleMapper.selectNextCycleNo(lead.getId()));
         cycle.setOriginalOwnerUserId(lead.getOwnerUserId()); cycle.setFrozenDeptId(owner.getDeptId());
-        cycle.setStatus(AGING_POOL_WAITING_ASSIGNMENT); cycle.setOwnershipStartedAt(lead.getOwnershipStartedAt());
-        cycle.setDueAt(lead.getOwnershipStartedAt().plusDays(rule.getAgingPoolTimeoutDays())); cycle.setEnteredAt(now);
+        cycle.setStatus(AGING_POOL_WAITING_ASSIGNMENT); cycle.setOwnershipStartedAt(progressAt);
+        cycle.setDueAt(progressAt.plusDays(rule.getAgingPoolTimeoutDays())); cycle.setEnteredAt(now);
         cycle.setIdempotencyKey("aging-pool-enter:" + lead.getId() + ":" + cycle.getCycleNo()); cycle.setVersion(0);
         try { cycleMapper.insert(cycle); } catch (DuplicateKeyException ignored) {
             return cycleMapper.selectActiveByLeadId(lead.getId()) != null;

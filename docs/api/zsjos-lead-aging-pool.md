@@ -1,4 +1,4 @@
-# ZSJOS 超期协同公海 API
+# ZSJOS 商机公海池 API
 
 Base path: `/admin-api/zsjos/lead/aging-pool`. All endpoints are tenant scoped and return the standard
 `CommonResult` wrapper.
@@ -12,6 +12,7 @@ Base path: `/admin-api/zsjos/lead/aging-pool`. All endpoints are tenant scoped a
 | GET | `/{id}/candidates` | manage or manage-all | Enabled same-department B candidates |
 | POST | `/{id}/assign` | manage or manage-all | Assign or reassign B |
 | POST | `/{id}/exit` | manage or manage-all | Exit with a required reason |
+| POST | `/{id}/transfer-request` | `zsjos:lead-aging-pool:transfer-request` | Same-team non-owner requests formal transfer to self |
 
 Assign body:
 
@@ -25,15 +26,25 @@ Exit body:
 {"reason": "business reason", "idempotencyKey": "uuid"}
 ```
 
-Active statuses are `waiting_assignment`, `assigned`, and `deal_pending`. Responses include full
+Transfer-request body uses the same required `reason` and `idempotencyKey` fields. The deployment must
+provide BPM process definition `zsjos_lead_transfer_request` with task key `ownerManagerReview` before
+the endpoint is enabled. An unavailable process returns a stable business error and rolls back the
+request row.
+
+Active statuses are `waiting_assignment`, `assigned`, and `deal_pending`. Entry is timed from the
+latest Opportunity follow-up, or Opportunity creation when no follow-up exists. Responses include full
 contact fields only after server-side object authorization and include `availableActions`; clients
 must not derive actions from A/B identities. Stable command conflicts distinguish missing cycles,
 manager denial, invalid candidates, invalid owner, invalid state, and idempotency-key conflicts.
 
-Existing lead detail, follow-up, and sales-order APIs remain authoritative for B's work. During an
-active cycle, the backend effective-sales check permits only B for follow-up/deal actions and rejects
-A's basic editing and qualification commands. Final order approval atomically transfers Lead and
-Opportunity to the immutable order submitter B.
+Visibility, manager authority, and collaborator candidates follow formal owner A's current department.
+The entry-time department snapshot remains audit data only, so organization changes do not leave the
+Opportunity visible to A's former team.
+
+Existing lead detail, follow-up, and sales-order APIs remain authoritative. During an active cycle,
+both formal owner A and configured collaborator B may follow up and create/revise an order. Every
+mutation locks the active cycle. Final approval exits the public sea without changing formal or
+performance ownership; the order submitter remains the actual operator.
 
 If the rejected active order was submitted by A, B uses
 `POST /admin-api/zsjos/sales-order/{id}/continue-submit`. The original order becomes `superseded`,

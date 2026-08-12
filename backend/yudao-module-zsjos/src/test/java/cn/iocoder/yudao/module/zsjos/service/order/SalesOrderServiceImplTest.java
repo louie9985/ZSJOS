@@ -77,8 +77,7 @@ class SalesOrderServiceImplTest {
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
-        lenient().when(agingPoolService.resolveEffectiveSalesUserId(anyLong(), anyLong()))
-                .thenAnswer(invocation -> invocation.getArgument(1));
+        lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
