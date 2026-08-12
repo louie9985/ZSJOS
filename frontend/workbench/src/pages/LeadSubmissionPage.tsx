@@ -1,11 +1,12 @@
-import { DeleteOutlined, PlusOutlined, ReloadOutlined, SendOutlined } from '@ant-design/icons'
-import { Alert, App, Button, Card, Cascader, Col, Divider, Form, Image, Input, Radio, Row, Select, Space, Spin, Typography, Upload } from 'antd'
-import type { UploadFile, UploadProps } from 'antd'
+import { ReloadOutlined, SendOutlined } from '@ant-design/icons'
+import { Alert, App, Button, Card, Cascader, Col, Divider, Form, Input, Radio, Row, Select, Space, Spin, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DICT_TYPE, LEAD_ASSIGNMENT_MODE, LEAD_ASSIGNMENT_OPTIONS, PHONE_PATTERN } from '../constants'
 import { api, type AreaNode, type LeadAttachment, type LeadCatalog } from '../services/api'
 import { buildLeadAreaOptions, normalizeLeadAreaPath } from '../services/area'
 import LeadIntendedProductEditor, { type IntendedProductSelection } from '../components/LeadIntendedProductEditor'
+import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
+import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 
 const { Title } = Typography
 type Option = { label: string; value: string }
@@ -24,7 +25,7 @@ export default function LeadSubmissionPage() {
   const [sources, setSources] = useState<Option[]>([])
   const [categories, setCategories] = useState<Option[]>([])
   const [remote, setRemote] = useState<RemoteState>({ loading: true })
-  const [files, setFiles] = useState<UploadFile<LeadAttachment>[]>([])
+  const [files, setFiles] = useState<DeferredUploadItem<LeadAttachment>[]>([])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const idempotencyKeyRef = useRef(crypto.randomUUID())
@@ -71,14 +72,7 @@ export default function LeadSubmissionPage() {
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
 
 
-  const uploadProps: UploadProps<LeadAttachment> = {
-    accept: '.jpg,.jpeg,.png,.webp', listType: 'picture-card', fileList: files, maxCount: 9,
-    customRequest: async ({ file, onSuccess, onError }) => { try { onSuccess?.(await api.uploadLeadAttachment(file as File)) } catch (error) { onError?.(error instanceof Error ? error : new Error('上传失败')) } },
-    onChange: ({ fileList }) => setFiles(fileList),
-    beforeUpload: file => { if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type) || file.size > 10 * 1024 * 1024) { message.error('仅支持 JPG、PNG、WebP，单张不超过 10MB'); return Upload.LIST_IGNORE } return true },
-    itemRender: (_, file, __, actions) => <div className="lead-upload-item"><Image preview={false} src={file.thumbUrl || file.response?.fileUrl} /><Button danger type="text" icon={<DeleteOutlined />} aria-label="删除图片" onClick={actions.remove}/></div>
-  }
-  const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim() ? Promise.resolve() : Promise.reject(new Error('手机号和微信号至少填写一个'))
+  const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const hasUploading = files.some(file => file.status === 'uploading'); const hasUploadError = files.some(file => file.status === 'error')
   const unavailable = Boolean(remote.error || areaState.error) || !areas.length || !sources.length || !categories.length
 
@@ -88,14 +82,16 @@ export default function LeadSubmissionPage() {
     if (hasUploading || hasUploadError) return message.error(hasUploading ? '图片仍在上传，请稍候' : '请删除或重试上传失败的图片')
     submittingRef.current = true; setSubmitting(true)
     try {
+      const uploadResult = await uploadDeferredFiles(files, api.uploadLeadAttachment, setFiles)
+      if (uploadResult.failed) { message.error('有图片上传失败，请重试失败项'); return }
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
       const result = await api.createLead({
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode,
         intendedProducts: intentions.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown, skuUnknown: item.skuUnknown, primary: item.key === primaryKey })),
         sourceChannel: values.sourceChannel, leadCategory: values.leadCategory, remark: values.remark?.trim() || undefined,
-        attachments: files.filter(file => file.status === 'done' && file.response)
-          .map(file => ({ infraFileId: file.response!.infraFileId })),
+        attachments: uploadResult.items.filter(file => file.uploaded)
+          .map(file => ({ infraFileId: file.uploaded!.infraFileId })),
         dispatchMode: values.dispatchMode, specifiedSalesUserId: values.specifiedSalesUserId, idempotencyKey: idempotencyKeyRef.current
       })
       message.success(result.outcome === 'created' ? '客资已提交' : '重复客资已记录为再次激活')
@@ -113,7 +109,7 @@ export default function LeadSubmissionPage() {
       <Form<FormValues> form={form} layout="vertical" requiredMark="optional" initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }} onFinish={submit}>
         <Title level={5}>客户信息</Title><Row gutter={[24, 0]}>
           <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input /></Form.Item></Col>
-          <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
+          <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={128} /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市" /></Form.Item></Col>
         </Row>
@@ -124,7 +120,7 @@ export default function LeadSubmissionPage() {
           <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
           <Col xs={24}><Form.Item name="remark" label="备注信息"><Input.TextArea rows={4} maxLength={1000} showCount /></Form.Item></Col>
-          <Col xs={24}><Form.Item label="附件图片" extra="最多 9 张，JPG、PNG、WebP，单张不超过 10MB"><Upload {...uploadProps}>{files.length < 9 && <button className="upload-trigger" type="button"><PlusOutlined /><span>上传</span></button>}</Upload></Form.Item></Col>
+          <Col xs={24}><Form.Item label={`附件图片${hasUploading ? '（上传中）' : ''}`} extra="确认提交后上传；最多 9 张，JPG、PNG、WebP，单张不超过 10MB"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp"/></Form.Item></Col>
         </Row>
         <Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
         {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><Select loading={salesState.loading} options={sales} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}

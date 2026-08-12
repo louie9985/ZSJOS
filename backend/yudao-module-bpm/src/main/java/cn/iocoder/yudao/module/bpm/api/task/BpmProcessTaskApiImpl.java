@@ -47,6 +47,9 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     @Override
     public PageResult<BpmTaskRespDTO> getTodoTaskPage(Long userId, BpmTaskPageReqDTO reqDTO) {
         PageResult<Task> page = bpmTaskService.getTaskTodoPage(userId, toPageReq(reqDTO));
+        if (page.getList().isEmpty()) {
+            return PageResult.empty(page.getTotal());
+        }
         Set<String> processIds = convertSet(page.getList(), Task::getProcessInstanceId);
         Map<String, ProcessInstance> processes = processInstanceService.getProcessInstanceMap(processIds);
         java.util.List<BpmTaskRespDTO> list = page.getList().stream().map(task -> {
@@ -63,6 +66,9 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     @Override
     public PageResult<BpmTaskRespDTO> getDoneTaskPage(Long userId, BpmTaskPageReqDTO reqDTO) {
         PageResult<HistoricTaskInstance> page = bpmTaskService.getTaskDonePage(userId, toPageReq(reqDTO));
+        if (page.getList().isEmpty()) {
+            return PageResult.empty(page.getTotal());
+        }
         Set<String> processIds = convertSet(page.getList(), HistoricTaskInstance::getProcessInstanceId);
         Map<String, HistoricProcessInstance> processes = processInstanceService.getHistoricProcessInstanceMap(processIds);
         java.util.List<BpmTaskRespDTO> list = page.getList().stream().map(task -> {
@@ -104,7 +110,10 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     private BpmTaskPageReqVO toPageReq(BpmTaskPageReqDTO reqDTO) {
         BpmTaskPageReqVO result = new BpmTaskPageReqVO();
         result.setPageNo(reqDTO.getPageNo()); result.setPageSize(reqDTO.getPageSize());
-        result.setProcessDefinitionKey(reqDTO.getProcessDefinitionKey()); return result;
+        result.setProcessDefinitionKey(reqDTO.getProcessDefinitionKey());
+        result.setTaskDefinitionKey(reqDTO.getTaskDefinitionKey());
+        result.setProcessInstanceIds(reqDTO.getProcessInstanceIds());
+        return result;
     }
 
     private LocalDateTime toLocalDateTime(Date value) {

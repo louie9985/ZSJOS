@@ -63,6 +63,16 @@ INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
 SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
 FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.deleted = b'0';
 
+SET @reviewer_filter = '{"groups":[{"key":"todo","label":"待处理","sort":10,"enabled":true,"sectionLabel":"审批环节","conditions":[{"field":"handled","values":["todo"]}],"options":[{"key":"all","label":"全部","sort":0,"enabled":true,"conditions":[]},{"key":"registration_review","label":"报名履约中心审批","sort":10,"enabled":true,"conditions":[{"field":"task_definition_key","values":["registrationReview"]}]},{"key":"finance_review","label":"财务结算中心审批","sort":20,"enabled":true,"conditions":[{"field":"task_definition_key","values":["financeReview"]}]}]},{"key":"done","label":"已处理","sort":20,"enabled":true,"sectionLabel":"审批环节","conditions":[{"field":"handled","values":["done"]}],"options":[{"key":"all","label":"全部","sort":0,"enabled":true,"conditions":[]},{"key":"registration_review","label":"报名履约中心审批","sort":10,"enabled":true,"conditions":[{"field":"task_definition_key","values":["registrationReview"]}]},{"key":"finance_review","label":"财务结算中心审批","sort":20,"enabled":true,"conditions":[{"field":"task_definition_key","values":["financeReview"]}]}]}]}';
+INSERT IGNORE INTO `zsjos_lead_inbox_filter_scheme`
+(`audience`, `name`, `draft_config_json`, `published_config_json`, `published_version`, `published_by`, `published_at`, `version`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT 'reviewer', '审批人视角', @reviewer_filter, @reviewer_filter, 1, 1, NOW(), 0, '1', NOW(), '1', NOW(), b'0', t.id
+FROM `system_tenant` t WHERE t.id = 1 AND t.deleted = b'0';
+INSERT IGNORE INTO `zsjos_lead_inbox_filter_version`
+(`scheme_id`, `version_no`, `config_json`, `published_by`, `published_at`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT s.id, 1, s.published_config_json, 1, s.published_at, '1', NOW(), '1', NOW(), b'0', s.tenant_id
+FROM `zsjos_lead_inbox_filter_scheme` s WHERE s.tenant_id = 1 AND s.audience = 'reviewer' AND s.deleted = b'0';
+
 INSERT INTO `system_role_menu`
 (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT source.role_id, target.menu_id, '1', NOW(), '1', NOW(), b'0', source.tenant_id
@@ -208,4 +218,86 @@ INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V022', 'Add simplified work-plan task tree, reports, summaries and business-task foundation', 'workbench-foundation-v3');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
-VALUES ('V023', 'Separate work-plan route and query permission', 'split-work-plan-query-permission-v1');
+VALUES ('V033', 'Separate work-plan route and query permission', 'split-work-plan-query-permission-v1');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V021', 'Make lead intended-product uniqueness active-row only', 'lead-intended-product-active-unique-key-v1');
+
+INSERT INTO `zsjos_order_approval_config` (`registration_dept_id`,`finance_dept_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT 1030,1040,'quick-init',NOW(),'quick-init',NOW(),b'0',1
+WHERE EXISTS(SELECT 1 FROM `system_dept` WHERE id=1030 AND tenant_id=1 AND deleted=b'0')
+  AND EXISTS(SELECT 1 FROM `system_dept` WHERE id=1040 AND tenant_id=1 AND deleted=b'0')
+  AND NOT EXISTS(SELECT 1 FROM `zsjos_order_approval_config` WHERE tenant_id=1 AND deleted=b'0');
+
+INSERT INTO `system_dict_type` (`name`,`type`,`status`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT seed.name,seed.type,0,'成交订单字段字典','quick-init',NOW(),'quick-init',NOW(),b'0' FROM (
+ SELECT '学员性质' name,'zsjos_order_student_nature' type UNION ALL SELECT '服务周期','zsjos_order_service_period' UNION ALL
+ SELECT '学生来源','zsjos_order_student_source' UNION ALL SELECT '缴费方式','zsjos_order_fee_mode' UNION ALL SELECT '支付方式','zsjos_order_payment_method'
+) seed WHERE NOT EXISTS(SELECT 1 FROM `system_dict_type` d WHERE d.type=seed.type AND d.deleted=b'0');
+
+INSERT INTO `system_dict_data` (`sort`,`label`,`value`,`dict_type`,`status`,`color_type`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+SELECT seed.sort,seed.label,seed.value,seed.dict_type,0,'default','quick-init',NOW(),'quick-init',NOW(),b'0' FROM (
+ SELECT 50 sort,'畅学卡' label,'learning_card' value,'zsjos_order_student_nature' dict_type UNION ALL SELECT 40,'老学员','existing_student','zsjos_order_student_nature' UNION ALL SELECT 30,'新学员','new_student','zsjos_order_student_nature' UNION ALL SELECT 20,'老带新','existing_referral','zsjos_order_student_nature' UNION ALL SELECT 10,'大客户代理','key_account_agent','zsjos_order_student_nature' UNION ALL
+ SELECT 80,'1年','one_year','zsjos_order_service_period' UNION ALL SELECT 70,'2年','two_year','zsjos_order_service_period' UNION ALL SELECT 60,'3年','three_year','zsjos_order_service_period' UNION ALL SELECT 50,'4年','four_year','zsjos_order_service_period' UNION ALL SELECT 40,'5年','five_year','zsjos_order_service_period' UNION ALL SELECT 30,'仅限当期','current_term_only','zsjos_order_service_period' UNION ALL SELECT 20,'当期有效（可免费复训一期）','current_term_plus_retrain','zsjos_order_service_period' UNION ALL SELECT 10,'长期有效','long_term','zsjos_order_service_period' UNION ALL
+ SELECT 40,'直接招生','direct_enrollment','zsjos_order_student_source' UNION ALL SELECT 30,'代理推荐','agent_referral','zsjos_order_student_source' UNION ALL SELECT 20,'合作伙伴','partner','zsjos_order_student_source' UNION ALL SELECT 10,'大客户低价','key_account_low_price','zsjos_order_student_source' UNION ALL
+ SELECT 30,'零售缴费','retail','zsjos_order_fee_mode' UNION ALL SELECT 20,'预付款扣费','prepaid_deduction','zsjos_order_fee_mode' UNION ALL SELECT 10,'底价缴费','floor_price','zsjos_order_fee_mode' UNION ALL
+ SELECT 70,'学习二维码','learning_qr','zsjos_order_payment_method' UNION ALL SELECT 60,'公司二维码','company_qr','zsjos_order_payment_method' UNION ALL SELECT 50,'财务微信','finance_wechat','zsjos_order_payment_method' UNION ALL SELECT 40,'公司支付宝','company_alipay','zsjos_order_payment_method' UNION ALL SELECT 30,'等价/退差价换课','course_exchange','zsjos_order_payment_method' UNION ALL SELECT 20,'余额抵扣现金','balance_cash','zsjos_order_payment_method' UNION ALL SELECT 10,'充值预扣','prepaid_recharge','zsjos_order_payment_method'
+) seed WHERE NOT EXISTS(SELECT 1 FROM `system_dict_data` d WHERE d.dict_type=seed.dict_type AND d.value=seed.value AND d.deleted=b'0');
+
+INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6810,'成交审批','zsjos:sales-order:review',2,17,6735,'sales-order-approvals','ep:finished','zsjos/salesOrderApproval/index','ZsjosSalesOrderApproval',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6811,'录入成交','zsjos:sales-order:create',3,15,6770,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6812,'查询成交订单','zsjos:sales-order:query',3,1,6810,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V023', 'Add direct sales-order entry and dual-center approval', 'sales-order-dual-approval-v1');
+
+SET @zsjos_bpm_form_conf = '{"form":{"labelPosition":"right","labelWidth":"120px","size":"default"},"submitBtn":false,"resetBtn":false}';
+SET @zsjos_bpm_field_appeal_id = '{"type":"input","field":"appealId","title":"申诉编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_order_id = '{"type":"input","field":"orderId","title":"订单编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_lead_id = '{"type":"input","field":"leadId","title":"客资编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_round_no = '{"type":"input","field":"roundNo","title":"审批轮次","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_review_stage = '{"type":"input","field":"reviewStage","title":"复核阶段","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+
+INSERT INTO `bpm_form`
+(`name`,`status`,`conf`,`fields`,`remark`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT seed.name,0,@zsjos_bpm_form_conf,seed.fields,seed.marker,
+       'quick-init',NOW(),'quick-init',NOW(),b'0',tenant.id
+FROM `system_tenant` tenant
+CROSS JOIN (
+  SELECT '客资申诉流程关联信息' name,
+         JSON_ARRAY(@zsjos_bpm_field_appeal_id,@zsjos_bpm_field_lead_id,
+                    @zsjos_bpm_field_round_no,@zsjos_bpm_field_review_stage) fields,
+         'zsjos-system-form:lead-appeal-review' marker
+  UNION ALL
+  SELECT '成交会签流程关联信息',
+         JSON_ARRAY(@zsjos_bpm_field_order_id,@zsjos_bpm_field_lead_id,@zsjos_bpm_field_round_no),
+         'zsjos-system-form:sales-order-dual-approval'
+) seed
+WHERE tenant.deleted=b'0' AND tenant.status=0
+  AND NOT EXISTS (
+    SELECT 1 FROM `bpm_form` existing
+    WHERE existing.tenant_id=tenant.id AND existing.remark=seed.marker AND existing.deleted=b'0'
+  );
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V024', 'Add read-only BPM forms for ZSJOS workflows', 'zsjos-bpm-readonly-forms-v1');
+
+INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6813,'我的订单','zsjos:sales-order:query-own',2,17,6735,'sales-orders/my','ep:tickets','zsjos/mySalesOrder/index','ZsjosMySalesOrder',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+UPDATE `system_menu` SET `sort`=18 WHERE `id`=6810 AND `deleted`=b'0';
+UPDATE `system_menu` SET `sort`=19 WHERE `id`=6804 AND `deleted`=b'0';
+
+INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT DISTINCT source.role_id,6813,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
+FROM `system_role_menu` source
+WHERE source.menu_id=6811 AND source.deleted=b'0'
+  AND NOT EXISTS(SELECT 1 FROM `system_role_menu` existing WHERE existing.role_id=source.role_id
+    AND existing.menu_id=6813 AND existing.tenant_id=source.tenant_id AND existing.deleted=b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V025', 'Add sales-order workbench personal and approval views', 'sales-order-workbench-views-v1');
+
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V025','Add sales-order workbench personal and approval views',SHA2('sales-order-workbench-views-v1',256),'legacy',NOW());

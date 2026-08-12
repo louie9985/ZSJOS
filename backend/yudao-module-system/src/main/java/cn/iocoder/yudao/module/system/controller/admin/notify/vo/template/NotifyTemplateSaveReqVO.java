@@ -35,6 +35,12 @@ public class NotifyTemplateSaveReqVO {
     @Schema(description = "业务通知场景编码")
     private String sceneCode;
 
+    @Schema(description = "通知渠道编码")
+    private String channelCode;
+
+    private String smsTemplateId;
+    private String wecomMessageType;
+
     @Schema(description = "通知标题模板", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "通知标题不能为空")
     @Size(max = 128, message = "通知标题不能超过 128 个字符")

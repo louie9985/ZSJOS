@@ -26,7 +26,9 @@ import { api, type DictData, type LeadInboxFilterProfile, type ManagedLead } fro
 import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
+  dictionaryDisplayLabel,
   mergeUniqueLeads,
+  protocolDisplayLabel,
   tryStartLeadPageRequest
 } from '../services/leadManagement'
 import {
@@ -39,7 +41,9 @@ import {
 import LeadFollowUpPanel from '../components/LeadFollowUpPanel'
 import LeadAppealPanel from '../components/LeadAppealPanel'
 import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
+import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import LeadBasicInfoModal from '../components/LeadBasicInfoModal'
+import SalesOrderEntryModal from '../components/SalesOrderEntryModal'
 import type { LeadAppealEvidence } from '../services/api'
 import { defaultLeadDetailTab, shouldBlockLeadSwitch, type LeadDetailTab } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
@@ -58,9 +62,9 @@ function productText(lead: ManagedLead) {
 function LeadStateTags({ lead }: { lead: ManagedLead }) {
   return <Space size={4} wrap>
     <Tag color={lead.qualificationStatus === 'invalid' ? 'red' : lead.qualificationStatus === 'valid' ? 'green' : 'gold'}>
-      {LEAD_QUALIFICATION_STATUS_LABELS[lead.qualificationStatus] || '待判定'}
+      {protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}
     </Tag>
-    {lead.followUpStatus && <Tag color="blue">{LEAD_FOLLOW_UP_STATUS_LABELS[lead.followUpStatus] || lead.followUpStatus}</Tag>}
+    {lead.followUpStatus && <Tag color="blue">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Tag>}
     {lead.operationalStatus === 'suspended' && <Tag color="orange">已挂起</Tag>}
   </Space>
 }
@@ -86,7 +90,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidRemarkTemplateError, setInvalidRemarkTemplateError] = useState('')
   const [invalidReason, setInvalidReason] = useState<string>()
   const [invalidDescription, setInvalidDescription] = useState('')
-  const [invalidEvidence, setInvalidEvidence] = useState<LeadAppealEvidence[]>([])
+  const [invalidEvidence, setInvalidEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const [qualificationSaving, setQualificationSaving] = useState(false)
   const [followUpOpen, setFollowUpOpen] = useState(autoExpandFollowUp)
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
@@ -97,6 +101,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [validRemark, setValidRemark] = useState('')
   const [validTemplates, setValidTemplates] = useState<DictData[]>([])
   const [validTemplateError, setValidTemplateError] = useState('')
+  const [salesOrderOpen, setSalesOrderOpen] = useState(false)
   const actions = new Map((lead.availableActions || []).map(item => [item.code, item]))
   useEffect(() => { onDirtyChange(followUpFormDirty || basicInfoDirty) },
     [basicInfoDirty, followUpFormDirty, onDirtyChange])
@@ -151,7 +156,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     }
     setQualificationSaving(true)
     try {
-      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: invalidEvidence.map(item => ({ infraFileId: item.infraFileId })), idempotencyKey: crypto.randomUUID() })
+      const uploadResult = await uploadDeferredFiles(invalidEvidence, api.uploadLeadQualificationImage, setInvalidEvidence)
+      if (uploadResult.failed) { message.error('有判定附件上传失败，请重试失败项'); return }
+      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
       message.success('已判定为无效客资')
       setInvalidOpen(false)
       setInvalidReason(undefined)
@@ -179,11 +186,14 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         {actions.has('ADD_FOLLOW_UP') && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setFollowUpOpen(true)}>跟进</Button>}
         {actions.has('JUDGE_VALID') && <Button icon={<CheckOutlined/>} onClick={() => void openValid()}>判有效</Button>}
         {actions.has('JUDGE_INVALID') && <Button danger icon={<CloseOutlined/>} onClick={() => void openInvalid()}>判无效</Button>}
-        {actions.has('ENTER_DEAL') && <Button icon={<FileAddOutlined/>} disabled>录入成交</Button>}
+        {actions.has('ENTER_DEAL') && <Button icon={<FileAddOutlined/>}
+          disabled={!actions.get('ENTER_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>录入成交</Button>}
+        {actions.has('REVISE_DEAL') && <Button icon={<FileAddOutlined/>}
+          disabled={!actions.get('REVISE_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>补正成交</Button>}
       </Space>
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
-    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReasonLabelSnapshot || lead.invalidReason, lead.invalidDescription].filter(Boolean).join('：')}/>} 
+    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReasonLabelSnapshot || (lead.invalidReason ? '标签未配置' : undefined), lead.invalidDescription].filter(Boolean).join('：')}/>}
     {lead.qualificationStatus === 'pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}/>}
     <Tabs
       className="lead-detail-tabs"
@@ -208,11 +218,11 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                 <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
                   <Descriptions.Item label="客资分类">{categoryLabel(lead.leadCategory)}</Descriptions.Item>
                   <Descriptions.Item label="来源渠道">{channelLabel(lead.sourceChannel)}</Descriptions.Item>
-                  <Descriptions.Item label="客资有效状态">{LEAD_QUALIFICATION_STATUS_LABELS[lead.qualificationStatus] || lead.qualificationStatus}</Descriptions.Item>
-                  <Descriptions.Item label="客资跟进状态">{lead.followUpStatus ? LEAD_FOLLOW_UP_STATUS_LABELS[lead.followUpStatus] || lead.followUpStatus : '-'}</Descriptions.Item>
-                  <Descriptions.Item label="分配状态">{LEAD_ASSIGNMENT_STATUS_LABELS[lead.assignmentStatus] || lead.assignmentStatus}</Descriptions.Item>
+                  <Descriptions.Item label="客资有效状态">{protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}</Descriptions.Item>
+                  <Descriptions.Item label="客资跟进状态">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Descriptions.Item>
+                  <Descriptions.Item label="分配状态">{protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, lead.assignmentStatus, '未知分配状态')}</Descriptions.Item>
                   <Descriptions.Item label="提交备注" span={2}>{lead.remark || '-'}</Descriptions.Item>
-                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{lead.invalidReasonLabelSnapshot || lead.invalidReason}</Descriptions.Item>}
+                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{lead.invalidReasonLabelSnapshot || '标签未配置'}</Descriptions.Item>}
                   {lead.invalidDescription && <Descriptions.Item label="备注" span={2}>{lead.invalidDescription}</Descriptions.Item>}
                   {lead.status === 'invalid' && <Descriptions.Item label="附件" span={2}>
                     {lead.invalidEvidence?.length ? <Image.PreviewGroup><Space wrap>
@@ -244,7 +254,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                 <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
                   <Descriptions.Item label="提交人">{userText(lead.sourceUserId, lead.sourceUserName)}</Descriptions.Item>
                   <Descriptions.Item label="负责人">{userText(lead.ownerUserId, lead.ownerUserName)}</Descriptions.Item>
-                  <Descriptions.Item label="派单方式">{lead.dispatchMode ? LEAD_DISPATCH_MODE_LABELS[lead.dispatchMode] || lead.dispatchMode : '-'}</Descriptions.Item>
+                  <Descriptions.Item label="派单方式">{protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, lead.dispatchMode, '未知派单方式')}</Descriptions.Item>
                   <Descriptions.Item label="待接单人">{userText(lead.pendingAssigneeUserId, lead.pendingAssigneeUserName)}</Descriptions.Item>
                   <Descriptions.Item label="提交时间">{formatTimestamp(lead.submittedAt)}</Descriptions.Item>
                   <Descriptions.Item label="更新时间">{formatTimestamp(lead.updateTime)}</Descriptions.Item>
@@ -293,8 +303,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         </Space> : !invalidRemarkTemplateError && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无快捷备注"/>}
         <Input.TextArea value={invalidDescription} onChange={event => setInvalidDescription(event.target.value)} rows={4} maxLength={2000} showCount placeholder="填写无效判定备注"/>
         <Typography.Text strong>附件</Typography.Text>
-        <LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence}
-          disabled={qualificationSaving} uploadImage={api.uploadLeadQualificationImage}/>
+        <LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence} disabled={qualificationSaving}/>
       </Space>
     </Modal>
     <Modal title="判定为有效客资" open={validOpen} confirmLoading={qualificationSaving}
@@ -312,6 +321,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     </Modal>
     <LeadBasicInfoModal lead={lead} open={basicInfoOpen} onClose={() => setBasicInfoOpen(false)}
       onDirtyChange={setBasicInfoDirty} onChanged={onChanged}/>
+    <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined}
+      open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)}
+      onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
   </div>
 }
 
@@ -332,6 +344,8 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const [metadataError, setMetadataError] = useState('')
   const [categories, setCategories] = useState<DictData[]>([])
   const [channels, setChannels] = useState<DictData[]>([])
+  const [categoryError, setCategoryError] = useState(false)
+  const [channelError, setChannelError] = useState(false)
   const [selectedId, setSelectedId] = useState<number | undefined>(requestedLeadId)
   const [detail, setDetail] = useState<ManagedLead>()
   const [detailLoading, setDetailLoading] = useState(false)
@@ -344,6 +358,8 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
     setMetadataError('')
+    setCategoryError(false)
+    setChannelError(false)
     setFilterLoading(true)
     const results = await Promise.allSettled([
       api.leadInboxFilterProfile(audience),
@@ -353,7 +369,9 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     if (version !== metadataVersion.current) return
     if (results[0].status === 'fulfilled') setFilterProfile(results[0].value)
     if (results[1].status === 'fulfilled') setCategories(results[1].value)
+    else { setCategories([]); setCategoryError(true) }
     if (results[2].status === 'fulfilled') setChannels(results[2].value)
+    else { setChannels([]); setChannelError(true) }
     if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和状态统计。')
     setFilterLoading(false)
   }, [audience])
@@ -431,8 +449,14 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     setInboxGroup(firstGroup.key)
     setInboxStage(defaultInboxStage(filterProfile.groups, firstGroup.key))
   }, [filterProfile.groups, inboxGroup])
-  const categoryLabel = useCallback((value?: string) => categories.find(item => item.value === value)?.label || value || '-', [categories])
-  const channelLabel = useCallback((value?: string) => channels.find(item => item.value === value)?.label || value || '-', [channels])
+  const categoryLabel = useCallback(
+    (value?: string) => dictionaryDisplayLabel(categories, value, categoryError),
+    [categories, categoryError]
+  )
+  const channelLabel = useCallback(
+    (value?: string) => dictionaryDisplayLabel(channels, value, channelError),
+    [channelError, channels]
+  )
   const hasMore = items.length < total
 
   const selectLead = (id: number) => {

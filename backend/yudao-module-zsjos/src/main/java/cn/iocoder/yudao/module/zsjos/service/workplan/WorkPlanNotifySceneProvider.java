@@ -73,7 +73,7 @@ public class WorkPlanNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("event.time", "事件时间", false), new NotifySceneVariableRespDTO("reason", "调整或退回原因", false));
         return new NotifySceneRespDTO(code, name, variables, Arrays.stream(roles)
                 .map(role -> new NotifySceneRoleRespDTO(role, roleLabel(role))).toList(),
-                List.of(NotifyActionType.NONE, NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL));
+                List.of(NotifyActionType.NONE, NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false);
     }
 
     private String roleLabel(String role) {

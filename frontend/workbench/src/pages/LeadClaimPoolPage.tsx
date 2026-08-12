@@ -8,7 +8,7 @@ import {
 import { Alert, App, Button, Card, Empty, Image, Skeleton, Spin, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type PendingLead } from '../services/api'
-import { mergeUniqueLeads, tryStartLeadPageRequest } from '../services/leadManagement'
+import { mergeUniqueLeads, resolvedDisplayLabel, tryStartLeadPageRequest } from '../services/leadManagement'
 import { formatTimestamp } from '../services/time'
 
 const PAGE_SIZE = 12
@@ -42,8 +42,8 @@ function ClaimCard({ lead, canClaim, claiming, onClaim }: {
       <div className="claim-card-region"><EnvironmentOutlined /> <span>{region}</span></div>
 
       <dl className="claim-card-fields">
-        <div><dt>来源渠道</dt><dd>{lead.sourceChannel || '-'}</dd></div>
-        <div><dt>客资分类</dt><dd>{lead.leadCategory || '-'}</dd></div>
+        <div><dt>来源渠道</dt><dd>{resolvedDisplayLabel(lead.sourceChannelLabel, lead.sourceChannel)}</dd></div>
+        <div><dt>客资分类</dt><dd>{resolvedDisplayLabel(lead.leadCategoryLabel, lead.leadCategory)}</dd></div>
       </dl>
 
       <section className="claim-card-section">

@@ -22,6 +22,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
+    @Resource private BusinessTaskReminderService taskReminderService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -80,6 +82,8 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, "converted",
                 reqVO.getRemark().trim(), key, Map.of("roundNo", lead.getQualificationRoundNo(),
                         "opportunityId", opportunity.getId()));
+        notifyEventPublisher.publish(QUALIFIED_VALID, leadId, "notify:" + key, userId, now,
+                notificationContext(lead));
     }
 
     @Override
@@ -108,21 +112,26 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setInvalidDescription(reqVO.getDescription().trim());
         lead.setInvalidEvidenceRefs(buildEvidenceJson(reqVO.getAttachments(), userId));
         lead.setValidDescription(null);
+        lead.setNextFollowUpAt(null);
         leadMapper.updateById(lead);
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "客资判定无效");
+        lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资判定无效");
+        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "客资判定无效");
         if (converted) {
             OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
             if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                     .contains(opportunity.getStatus())) throw exception(LEAD_QUALIFICATION_STATE_INVALID);
             opportunity.setStatus(OPPORTUNITY_STATUS_LOST); opportunity.setLostAt(now);
             opportunity.setLostReason(reason.getLabel() + "：" + reqVO.getDescription().trim());
+            opportunity.setNextFollowUpAt(null);
             opportunityMapper.updateById(opportunity);
-        } else {
-            lifecycleTaskService.completeQualificationTask(leadId, lead.getQualificationRoundNo(), now);
         }
         addEvent(EVENT_LEAD_QUALIFIED_INVALID, lead, userId, converted ? "converted" : STATUS_SUBMITTED, STATUS_INVALID,
                 reqVO.getDescription().trim(), key,
                 Map.of("roundNo", lead.getQualificationRoundNo(), "reasonCode", reason.getValue(),
                         "reasonLabel", reason.getLabel()));
+        notifyEventPublisher.publish(QUALIFIED_INVALID, leadId, "notify:" + key, userId, now,
+                notificationContext(lead));
     }
 
     @Override
@@ -294,6 +303,9 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                     || lead.getQualificationDeadlineAt() == null || lead.getQualificationDeadlineAt().isAfter(now)) {
                 continue;
             }
+            Long qualificationTaskId = lifecycleTaskService.getQualificationTaskId(
+                    lead.getId(), lead.getQualificationRoundNo());
+            if (qualificationTaskId != null) taskReminderService.emitDueForTask(qualificationTaskId, now);
             lead.setStatus(STATUS_SUSPENDED);
             lead.setSuspendedAt(now);
             leadMapper.updateById(lead);
@@ -303,9 +315,6 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                     "有效性判定超时", "lead-suspended:" + lead.getId() + ":" + lead.getQualificationRoundNo(),
                     Map.of("roundNo", lead.getQualificationRoundNo(),
                             "deadlineAt", lead.getQualificationDeadlineAt().toString()));
-            notifyEventPublisher.publish(QUALIFICATION_SUSPENDED, lead.getId(),
-                    "notify:" + EVENT_LEAD_SUSPENDED + ":" + lead.getId() + ":" + lead.getQualificationRoundNo(),
-                    null, now, Map.of("ownerUserId", lead.getOwnerUserId()));
             processed++;
         }
         return processed;
@@ -316,6 +325,13 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 || lead.getQualificationDeadlineAt() == null || !Objects.equals(userId, lead.getOwnerUserId())) {
             throw exception(LEAD_QUALIFICATION_STATE_INVALID);
         }
+    }
+
+    private Map<String, Object> notificationContext(LeadDO lead) {
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("submitterUserId", lead.getSourceUserId());
+        context.put("ownerUserId", lead.getOwnerUserId());
+        return context;
     }
 
     private String normalizeCategory(String value) {

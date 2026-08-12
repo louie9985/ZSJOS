@@ -19,4 +19,8 @@ public class NotifyTemplateSimpleRespVO {
     @Schema(description = "业务场景编码")
     private String sceneCode;
 
+    private String channelCode;
+    private String smsTemplateId;
+    private String wecomMessageType;
+
 }

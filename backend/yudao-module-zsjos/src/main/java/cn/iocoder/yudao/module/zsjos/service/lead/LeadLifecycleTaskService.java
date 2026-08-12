@@ -62,14 +62,16 @@ public class LeadLifecycleTaskService {
         return taskCommandService.completeByKey("lead-first-follow-up:" + assignmentHistoryId, completedAt);
     }
 
-    public void replaceFollowUpReminder(Long leadId, Long assigneeId, Long recordId,
+    public void replaceFollowUpReminder(Long leadId, Long assigneeId, String recordScope, Long recordId,
                                         LocalDateTime dueAt, LocalDateTime changedAt) {
         taskCommandService.complete(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId, changedAt);
         if (dueAt == null) return;
         taskCommandService.create(command(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId,
                 "跟进提醒：客资 #" + leadId, "OPEN_LEAD_FOLLOW_UP", dueAt,
-                JsonUtils.toJsonString(Map.of("followUpRecordId", recordId)),
-                "lead-follow-up-reminder:" + recordId));
+                JsonUtils.toJsonString(Map.of(
+                "followUpRecordScope", recordScope,
+                "followUpRecordId", recordId)),
+                "lead-follow-up-reminder:" + recordScope + ":" + recordId));
     }
 
     public void cancelFollowUpReminders(Long leadId, LocalDateTime cancelledAt, String reason) {
@@ -122,6 +124,12 @@ public class LeadLifecycleTaskService {
         if (task != null) {
             taskCommandService.cancel(TASK_TYPE_QUALIFICATION, leadId, task.getAssigneeId(), cancelledAt, reason);
         }
+    }
+
+    public Long getQualificationTaskId(Long leadId, Integer roundNo) {
+        if (roundNo == null) return null;
+        var task = taskCommandService.getByIdempotencyKey(qualificationTaskKey(leadId, roundNo));
+        return task == null ? null : task.getId();
     }
 
     private BusinessTaskCreateCommand command(String taskType, Long leadId, Long assigneeId, String title,

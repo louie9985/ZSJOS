@@ -82,20 +82,31 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void invalidFollowUpStaysOnLeadAndCreatesNoTasks() {
+    void invalidLeadRejectsNewFollowUp() {
         LeadDO lead = validLead();
         lead.setStatus("invalid"); lead.setAssignmentStatus("owned");
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1)))));
+
+        assertEquals(LEAD_FOLLOW_UP_STATE_INVALID.getCode(), error.getCode());
+        verifyNoInteractions(lifecycleTaskService);
+    }
+
+    @Test
+    void submittedLeadFollowUpUsesLeadReminderScope() {
+        LeadDO lead = validLead();
         stubSuccessfulCreate(lead);
         doAnswer(invocation -> {
             invocation.<LeadFollowUpRecordDO>getArgument(0).setId(40L);
             return 1;
         }).when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
 
-        LeadFollowUpRespVO result = withTenant(() -> service.create(1L, 20L, request(null)));
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
 
-        assertEquals("lead", result.getRecordScope());
-        verify(recordMapper).insert(any(LeadFollowUpRecordDO.class));
-        verifyNoInteractions(lifecycleTaskService);
+        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("lead"), eq(40L),
+                any(LocalDateTime.class), any(LocalDateTime.class));
     }
 
     @Test
@@ -118,7 +129,7 @@ class LeadFollowUpServiceImplTest {
         assertEquals(30L, result.getOpportunityId());
         assertEquals("following", opportunity.getStatus());
         verify(opportunityRecordMapper).insert(any(OpportunityFollowUpRecordDO.class));
-        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq(50L),
+        verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("opportunity"), eq(50L),
                 any(LocalDateTime.class), any(LocalDateTime.class));
     }
 
@@ -161,6 +172,7 @@ class LeadFollowUpServiceImplTest {
     private LeadFollowUpCreateReqVO request(LocalDateTime nextAt) {
         LeadFollowUpCreateReqVO request = new LeadFollowUpCreateReqVO();
         request.setMethod("phone"); request.setResult("interested"); request.setLeadCategory("a");
+        request.setRemark("已联系客户");
         request.setNextFollowUpAt(nextAt); request.setIdempotencyKey("request-1");
         return request;
     }

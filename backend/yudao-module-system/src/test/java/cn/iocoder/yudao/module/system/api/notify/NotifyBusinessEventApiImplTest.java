@@ -23,11 +23,12 @@ class NotifyBusinessEventApiImplTest {
     @Test
     void publishUsesExplicitTenantWithoutThreadTenantContext() {
         api.publish(NotifyBusinessEvent.builder()
-                .tenantId(10L).sceneCode("test.scene").sourceEventKey("event:1").build());
+                .tenantId(10L).sceneCode("test.scene").sourceEventKey("event:1").targetRuleId(20L).build());
 
         ArgumentCaptor<NotifyBusinessEvent> captor = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
         verify(eventPublisher).publishEvent(captor.capture());
         assertEquals(10L, captor.getValue().getTenantId());
         assertEquals("event:1", captor.getValue().getSourceEventKey());
+        assertEquals(20L, captor.getValue().getTargetRuleId());
     }
 }

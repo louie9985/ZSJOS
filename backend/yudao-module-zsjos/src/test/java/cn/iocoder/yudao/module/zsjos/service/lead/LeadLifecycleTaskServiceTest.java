@@ -14,9 +14,12 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -72,5 +75,23 @@ class LeadLifecycleTaskServiceTest {
         assertEquals(startedAt.plusMinutes(4320), lead.getQualificationDeadlineAt());
         assertTrue(lead.getQualificationRuleSnapshot().contains("\"ruleVersion\":4"));
         assertTrue(lead.getQualificationRuleSnapshot().contains("\"timeoutMinutes\":4320"));
+    }
+
+    @Test
+    void createsDistinctReminderKeysForLeadAndOpportunityRecordsWithSameId() {
+        LocalDateTime changedAt = LocalDateTime.of(2026, 8, 10, 10, 0);
+        LocalDateTime dueAt = changedAt.plusDays(1);
+
+        service.replaceFollowUpReminder(8L, 10L, "lead", 1L, dueAt, changedAt);
+        service.replaceFollowUpReminder(8L, 10L, "opportunity", 1L, dueAt, changedAt);
+
+        ArgumentCaptor<BusinessTaskCreateCommand> taskCaptor = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(taskCommandService, times(2)).create(taskCaptor.capture());
+        List<BusinessTaskCreateCommand> tasks = taskCaptor.getAllValues();
+        assertEquals("lead-follow-up-reminder:lead:1", tasks.get(0).idempotencyKey());
+        assertEquals("lead-follow-up-reminder:opportunity:1", tasks.get(1).idempotencyKey());
+        assertNotEquals(tasks.get(0).idempotencyKey(), tasks.get(1).idempotencyKey());
+        assertTrue(tasks.get(0).payload().contains("\"followUpRecordScope\":\"lead\""));
+        assertTrue(tasks.get(1).payload().contains("\"followUpRecordScope\":\"opportunity\""));
     }
 }

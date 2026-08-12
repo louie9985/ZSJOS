@@ -39,7 +39,8 @@ export type LeadCreateResult = { leadId: number; outcome: 'created' | 'activated
 export type PendingLead = {
   id: number; dispatchMode: 'auto' | 'specified'; maskedName: string; maskedMobile?: string; maskedWechatId?: string
   provinceName: string; cityName: string; intendedProducts: string[]; primaryIntendedProduct?: string
-  sourceChannel: string; leadCategory: string; remark?: string; attachmentUrls: string[]
+  sourceChannel: string; sourceChannelLabel?: string; leadCategory: string; leadCategoryLabel?: string
+  remark?: string; attachmentUrls: string[]
   submittedAt: Timestamp; expiresAt?: Timestamp
   remainingSeconds?: number; rejectable: boolean; deferrable: boolean; assignmentHistoryId?: number
 }
@@ -74,7 +75,8 @@ export type ManagedLead = {
   createTime: Timestamp; updateTime: Timestamp; relationTypes: Array<'submitter' | 'owner'>
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL'; enabled: boolean }>
+  activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL'; enabled: boolean }>
 }
 export type LeadQualificationException = {
   id: number; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
@@ -119,6 +121,38 @@ export type LeadAppeal = {
   decisionReason?: string; decisionEvidence: LeadAppealEvidence[]; submittedAt: Timestamp; decidedAt?: Timestamp
   canSubmitNextRound: boolean
 }
+export type SalesOrderVoucher = LeadAttachment
+export type SalesOrderSubmitRequest = {
+  buyerName?: string; studentName: string; studentNature: string; studentMobile?: string; studentWechatId?: string
+  provinceCode: string; provinceName: string; cityCode: string; cityName: string
+  agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string
+  customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string
+  studentSpecialRequirements?: string; materialDeliveryContact?: string
+  items: Array<{ spuRef: string; skuRef: string; actualAmount: number }>
+  paymentVouchers: Array<{ infraFileId: number }>; idempotencyKey: string
+}
+export type SalesOrder = {
+  id: number; orderNo: string; leadId: number; opportunityId: number; status: 'pending_approval' | 'revision_required' | 'effective'
+  submitterUserId: number; buyerName: string; studentName: string; studentNature: string
+  studentMobile?: string; studentWechatId?: string; provinceCode: string; provinceName: string; cityCode: string; cityName: string
+  agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string; totalAmount: number
+  customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string
+  studentSpecialRequirements?: string; materialDeliveryContact?: string
+  items: Array<{ id: number; productRef: string; skuRef: string; productName: string; skuName: string; categoryPath: string[]; attrValues: Record<string, string>; actualAmount: number }>
+  paymentVouchers: SalesOrderVoucher[]; approvalRoundNo: number; approvalRoundStatus: string
+  processInstanceId?: string; taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'
+  taskStatus?: number; taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp; decisionReason?: string; canRevise?: boolean
+  submittedAt: Timestamp; effectiveAt?: Timestamp
+}
+export type SalesOrderListItem = Pick<SalesOrder, 'id' | 'orderNo' | 'leadId' | 'status' | 'studentName' | 'studentMobile' | 'totalAmount' | 'approvalRoundNo' | 'submittedAt' | 'effectiveAt'> & {
+  taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'; taskStatus?: number
+  taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp
+}
+export type SalesOrderStatusCounts = { total: number; pendingApproval: number; revisionRequired: number; effective: number }
+export type SalesOrderApprovalFilterOption = { key: string; label: string; count: number }
+export type SalesOrderApprovalFilterSection = { key: string; label: string; options: SalesOrderApprovalFilterOption[] }
+export type SalesOrderApprovalFilterGroup = { key: string; label: string; count: number; sections: SalesOrderApprovalFilterSection[] }
+export type SalesOrderApprovalFilterProfile = { groups: SalesOrderApprovalFilterGroup[] }
 export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
 export type BusinessTask = {
@@ -217,6 +251,7 @@ export class ApiError extends Error {
 export const clearAuthStorage = () => {
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN)
+  localStorage.removeItem(STORAGE_KEYS.CLIENT_ID)
   localStorage.removeItem(STORAGE_KEYS.EXPIRES_TIME)
 }
 
@@ -267,10 +302,13 @@ async function refreshToken(): Promise<string | null> {
   const refresh = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
   if (!refresh) return null
   try {
-    const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}`, undefined, { headers: { 'tenant-id': APP_CONFIG.DEFAULT_TENANT_ID }, timeout: 30000 })
-    const result = unwrap<{ accessToken: string; refreshToken: string }>(response)
+    const clientId = localStorage.getItem(STORAGE_KEYS.CLIENT_ID)
+    const clientIdParam = clientId ? `&clientId=${encodeURIComponent(clientId)}` : ''
+    const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`, undefined, { headers: { 'tenant-id': APP_CONFIG.DEFAULT_TENANT_ID }, timeout: 30000 })
+    const result = unwrap<{ accessToken: string; refreshToken: string; clientId?: string }>(response)
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken)
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
+    if (result.clientId) localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId)
     return result.accessToken
   } catch { return null }
 }
@@ -301,11 +339,12 @@ export function buildMenuTree(rawMenus: RawMenu[], parentPath = '/'): WorkbenchM
 }
 
 export const api = {
-  login: async (username: string, password: string) => {
-    const result = unwrap<{ accessToken: string; refreshToken: string; expiresTime: string }>(await http.post('/system/auth/login', { username, password }))
+  login: async (username: string, password: string, platform: 'PC' | 'MOBILE' = 'PC') => {
+    const result = unwrap<{ accessToken: string; refreshToken: string; expiresTime: string; clientId?: string }>(await http.post('/system/auth/login', { username, password, platform }))
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken)
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
     localStorage.setItem(STORAGE_KEYS.EXPIRES_TIME, result.expiresTime)
+    localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId || (platform === 'MOBILE' ? 'zsjos-mobile' : 'zsjos-pc'))
     return result
   },
   logout: async () => {
@@ -384,6 +423,26 @@ export const api = {
   uploadLeadAppealImage: async (file: File) => {
     const data = new FormData(); data.append('file', file)
     return unwrap<LeadAttachment>(await http.post('/zsjos/lead/appeal/attachment/upload', data))
+  },
+  salesOrderCatalog: async () => unwrap<LeadCatalog>(await http.get('/zsjos/sales-order/product/catalog')),
+  submitSalesOrder: async (leadId: number, data: SalesOrderSubmitRequest) =>
+    unwrap<number>(await http.post(`/zsjos/sales-order/lead/${leadId}/submit`, data)),
+  resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
+  salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
+  mySalesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
+  mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string }) =>
+    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-page', { params })),
+  mySalesOrderStatusCounts: async () =>
+    unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
+  salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
+  salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean }) =>
+    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
+  decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string }) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
+  uploadSalesOrderVoucher: async (file: File) => {
+    const data = new FormData(); data.append('file', file)
+    return unwrap<SalesOrderVoucher>(await http.post('/zsjos/sales-order/voucher/upload', data))
   },
   businessTaskSummary: async () => unwrap<BusinessTaskSummary>(await http.get('/zsjos/business-task/my-summary')),
   businessTaskPage: async (bucket: BusinessTaskBucket, params: { pageNo: number; pageSize: number }) =>

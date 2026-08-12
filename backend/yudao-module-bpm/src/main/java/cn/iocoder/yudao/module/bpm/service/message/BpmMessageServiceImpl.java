@@ -1,13 +1,12 @@
 package cn.iocoder.yudao.module.bpm.service.message;
 
 import cn.iocoder.yudao.framework.web.config.WebProperties;
-import cn.iocoder.yudao.module.bpm.convert.message.BpmMessageConvert;
-import cn.iocoder.yudao.module.bpm.enums.message.BpmMessageEnum;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenProcessInstanceApproveReqDTO;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenProcessInstanceRejectReqDTO;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenTaskCreatedReqDTO;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenTaskTimeoutReqDTO;
-import cn.iocoder.yudao.module.system.api.sms.SmsSendApi;
+import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -27,7 +26,7 @@ import java.util.Map;
 public class BpmMessageServiceImpl implements BpmMessageService {
 
     @Resource
-    private SmsSendApi smsSendApi;
+    private NotifyBusinessEventApi notifyBusinessEventApi;
 
     @Resource
     private WebProperties webProperties;
@@ -37,8 +36,7 @@ public class BpmMessageServiceImpl implements BpmMessageService {
         Map<String, Object> templateParams = new HashMap<>();
         templateParams.put("processInstanceName", reqDTO.getProcessInstanceName());
         templateParams.put("detailUrl", getProcessInstanceDetailUrl(reqDTO.getProcessInstanceId()));
-        smsSendApi.sendSingleSmsToAdmin(BpmMessageConvert.INSTANCE.convert(reqDTO.getStartUserId(),
-                BpmMessageEnum.PROCESS_INSTANCE_APPROVE.getSmsTemplateCode(), templateParams));
+        publish("bpm.process.approved", reqDTO.getProcessInstanceId(), reqDTO.getStartUserId(), templateParams);
     }
 
     @Override
@@ -47,8 +45,7 @@ public class BpmMessageServiceImpl implements BpmMessageService {
         templateParams.put("processInstanceName", reqDTO.getProcessInstanceName());
         templateParams.put("reason", reqDTO.getReason());
         templateParams.put("detailUrl", getProcessInstanceDetailUrl(reqDTO.getProcessInstanceId()));
-        smsSendApi.sendSingleSmsToAdmin(BpmMessageConvert.INSTANCE.convert(reqDTO.getStartUserId(),
-                BpmMessageEnum.PROCESS_INSTANCE_REJECT.getSmsTemplateCode(), templateParams));
+        publish("bpm.process.rejected", reqDTO.getProcessInstanceId(), reqDTO.getStartUserId(), templateParams);
     }
 
     @Override
@@ -58,8 +55,7 @@ public class BpmMessageServiceImpl implements BpmMessageService {
         templateParams.put("taskName", reqDTO.getTaskName());
         templateParams.put("startUserNickname", reqDTO.getStartUserNickname());
         templateParams.put("detailUrl", getProcessInstanceDetailUrl(reqDTO.getProcessInstanceId()));
-        smsSendApi.sendSingleSmsToAdmin(BpmMessageConvert.INSTANCE.convert(reqDTO.getAssigneeUserId(),
-                BpmMessageEnum.TASK_ASSIGNED.getSmsTemplateCode(), templateParams));
+        publish("bpm.task.assigned", reqDTO.getTaskId(), reqDTO.getAssigneeUserId(), templateParams);
     }
 
     @Override
@@ -68,8 +64,18 @@ public class BpmMessageServiceImpl implements BpmMessageService {
         templateParams.put("processInstanceName", reqDTO.getProcessInstanceName());
         templateParams.put("taskName", reqDTO.getTaskName());
         templateParams.put("detailUrl", getProcessInstanceDetailUrl(reqDTO.getProcessInstanceId()));
-        smsSendApi.sendSingleSmsToAdmin(BpmMessageConvert.INSTANCE.convert(reqDTO.getAssigneeUserId(),
-                BpmMessageEnum.TASK_TIMEOUT.getSmsTemplateCode(), templateParams));
+        publish("bpm.task.timeout", reqDTO.getTaskId(), reqDTO.getAssigneeUserId(), templateParams);
+    }
+
+    private void publish(String sceneCode, String eventId, Long targetUserId, Map<String, Object> params) {
+        try {
+            Map<String, Object> payload = new HashMap<>(params);
+            payload.put("targetUserId", targetUserId);
+            notifyBusinessEventApi.publish(NotifyBusinessEvent.builder().sceneCode(sceneCode)
+                    .sourceEventKey(sceneCode + ":" + eventId).bizType("bpm").payload(payload).build());
+        } catch (Exception ex) {
+            log.warn("[publish][scene({}) event({}) notification publish failed]", sceneCode, eventId, ex);
+        }
     }
 
     private String getProcessInstanceDetailUrl(String taskId) {

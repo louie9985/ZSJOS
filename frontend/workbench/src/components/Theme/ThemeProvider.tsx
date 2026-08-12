@@ -1,5 +1,6 @@
 import type { ConfigProviderProps } from 'antd';
 import { ConfigProvider } from 'antd';
+import zhCN from 'antd/locale/zh_CN';
 import type { ReactNode } from 'react';
 import type { ThemePreset } from '../../constants';
 import { buildDefaultConfig } from './presets';
@@ -54,7 +55,7 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
         data-crm-dark={isDark ? 'true' : 'false'}
         style={{ display: 'contents' }}
       >
-        <ConfigProvider {...finalConfig}>{children}</ConfigProvider>
+        <ConfigProvider {...finalConfig} locale={zhCN}>{children}</ConfigProvider>
       </div>
     </ThemeStateContext.Provider>
   );

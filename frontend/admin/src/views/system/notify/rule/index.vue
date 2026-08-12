@@ -44,6 +44,9 @@
       <el-table-column label="业务场景" min-width="160">
         <template #default="scope">{{ sceneName(scope.row.sceneCode) }}</template>
       </el-table-column>
+      <el-table-column label="通知渠道" width="110">
+        <template #default="scope">{{ channelName(scope.row.channelCode) }}</template>
+      </el-table-column>
       <el-table-column label="模板" min-width="160">
         <template #default="scope">{{ templateName(scope.row.templateId) }}</template>
       </el-table-column>
@@ -55,6 +58,9 @@
       </el-table-column>
       <el-table-column label="点击动作" width="120">
         <template #default="scope">{{ actionName(scope.row.actionType) }}</template>
+      </el-table-column>
+      <el-table-column label="提醒时间" width="150">
+        <template #default="scope">{{ timingName(scope.row) }}</template>
       </el-table-column>
       <el-table-column label="启用" width="90">
         <template #default="scope">
@@ -108,6 +114,11 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="通知渠道" prop="channelCode">
+        <el-select v-model="form.channelCode" class="!w-100%" @change="channelChanged">
+          <el-option v-for="item in channels" :key="item.value" :label="item.label" :value="item.value" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="消息模板" prop="templateId">
         <el-select v-model="form.templateId" class="!w-100%" placeholder="请选择同场景模板">
           <el-option
@@ -155,6 +166,19 @@
           >
         </el-radio-group>
       </el-form-item>
+      <template v-if="currentScene?.timed">
+        <el-form-item label="提醒阶段" prop="timingStage">
+          <el-radio-group v-model="form.timingStage" @change="timingStageChanged">
+            <el-radio-button value="advance">提前</el-radio-button>
+            <el-radio-button value="due">到期</el-radio-button>
+            <el-radio-button value="overdue">逾期</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.timingStage !== 'due'" label="偏移分钟" prop="timingOffsetMinutes">
+          <el-input-number v-model="form.timingOffsetMinutes" :min="1" :max="10080" />
+          <span class="ml-10px text-12px text-gray-500">最大 7 天</span>
+        </el-form-item>
+      </template>
       <el-form-item label="状态" prop="status">
         <el-switch
           v-model="form.status"
@@ -193,6 +217,16 @@ const templateName = (id?: number) =>
   templates.value.find((template) => template.id === id)?.name || `#${id}`
 const actionName = (action: string) =>
   ({ none: '无操作', message_detail: '消息详情', business_detail: '客资详情' })[action] || action
+const timingName = (rule: RuleApi.NotifyRuleVO) => {
+  if (!rule.timingStage) return '-'
+  if (rule.timingStage === 'due') return '到期时'
+  return `${rule.timingStage === 'advance' ? '提前' : '逾期'} ${rule.timingOffsetMinutes || 0} 分钟`
+}
+const channels = [
+  { value: 'in_app', label: '站内信（含实时提醒）' },
+  { value: 'wecom', label: '企业微信（待配置）' }, { value: 'sms', label: '短信（待配置）' }
+]
+const channelName = (code?: string) => channels.find((item) => item.value === code)?.label || '站内信'
 const roleNames = (rule: RuleApi.NotifyRuleVO) => {
   const scene = scenes.value.find((item) => item.code === rule.sceneCode)
   return rule.recipientRoles
@@ -230,10 +264,13 @@ const formRef = ref()
 const emptyForm = (): RuleApi.NotifyRuleVO => ({
   name: '',
   sceneCode: '',
+  channelCode: 'in_app',
   templateId: undefined,
   recipientRoles: [],
   specifiedUserIds: [],
   actionType: 'message_detail',
+  timingStage: undefined,
+  timingOffsetMinutes: undefined,
   status: CommonStatusEnum.ENABLE
 })
 const form = ref<RuleApi.NotifyRuleVO>(emptyForm())
@@ -241,11 +278,14 @@ const currentScene = computed(() =>
   scenes.value.find((scene) => scene.code === form.value.sceneCode)
 )
 const sceneTemplates = computed(() =>
-  templates.value.filter((template) => template.sceneCode === form.value.sceneCode)
+  templates.value.filter((template) => template.sceneCode === form.value.sceneCode
+    && (!template.channelCode || template.channelCode === form.value.channelCode
+      || (form.value.channelCode === 'websocket' && template.channelCode === 'in_app')))
 )
 const rules = {
   name: [{ required: true, message: '规则名称不能为空' }],
   sceneCode: [{ required: true, message: '业务场景不能为空' }],
+  channelCode: [{ required: true, message: '通知渠道不能为空' }],
   templateId: [{ required: true, message: '消息模板不能为空' }],
   actionType: [{ required: true, message: '点击动作不能为空' }]
 }
@@ -255,7 +295,13 @@ const sceneChanged = () => {
   form.value.actionType = currentScene.value?.allowedActions.includes('message_detail')
     ? 'message_detail'
     : 'none'
+  form.value.timingStage = currentScene.value?.timed ? 'advance' : undefined
+  form.value.timingOffsetMinutes = currentScene.value?.timed ? 30 : undefined
 }
+const timingStageChanged = () => {
+  form.value.timingOffsetMinutes = form.value.timingStage === 'due' ? 0 : 30
+}
+const channelChanged = () => { form.value.templateId = undefined }
 const openForm = async (id?: number) => {
   dialogVisible.value = true
   form.value = emptyForm()

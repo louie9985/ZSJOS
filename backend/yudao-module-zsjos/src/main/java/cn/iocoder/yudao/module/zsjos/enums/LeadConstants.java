@@ -43,12 +43,16 @@ public interface LeadConstants {
     String ACTION_JUDGE_VALID = "JUDGE_VALID";
     String ACTION_JUDGE_INVALID = "JUDGE_INVALID";
     String ACTION_ENTER_DEAL = "ENTER_DEAL";
+    String ACTION_REVISE_DEAL = "REVISE_DEAL";
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
+    String INBOX_AUDIENCE_REVIEWER = "reviewer";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
     String INBOX_FILTER_FIELD_STATUS = "status";
     String INBOX_FILTER_FIELD_ASSIGNMENT_STATUS = "assignment_status";
+    String INBOX_FILTER_FIELD_HANDLED = "handled";
+    String INBOX_FILTER_FIELD_TASK_DEFINITION_KEY = "task_definition_key";
     String DISPATCH_AUTO = "auto";
     String DISPATCH_SPECIFIED = "specified";
 
@@ -74,6 +78,8 @@ public interface LeadConstants {
     String TASK_TYPE_FOLLOW_UP_REMINDER = "lead_follow_up_reminder";
     String TASK_TYPE_QUALIFICATION = "lead_qualification";
     String TASK_STATUS_PENDING = "pending";
+    String FOLLOW_UP_RECORD_SCOPE_LEAD = "lead";
+    String FOLLOW_UP_RECORD_SCOPE_OPPORTUNITY = "opportunity";
     String ASSIGNEE_TYPE_USER = "user";
     String BIZ_TYPE_LEAD = "lead";
     String EVENT_LEAD_ACCEPTED = "lead_assignment_accepted";

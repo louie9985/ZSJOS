@@ -19,11 +19,16 @@ public class LeadNotifyEventPublisher {
 
     public void publish(String sceneCode, Long leadId, String sourceEventKey, Long operatorUserId,
                         LocalDateTime occurredAt, Map<String, Object> context) {
+        publish(sceneCode, leadId, sourceEventKey, null, operatorUserId, occurredAt, context);
+    }
+
+    public void publish(String sceneCode, Long leadId, String sourceEventKey, Long targetRuleId,
+                        Long operatorUserId, LocalDateTime occurredAt, Map<String, Object> context) {
         Map<String, Object> payload = new LinkedHashMap<>(context == null ? Map.of() : context);
         payload.put("operatorUserId", operatorUserId);
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
                 .tenantId(TenantContextHolder.getRequiredTenantId()).sceneCode(sceneCode)
-                .sourceEventKey(sourceEventKey).bizType(BIZ_TYPE_LEAD).bizId(leadId)
+                .sourceEventKey(sourceEventKey).targetRuleId(targetRuleId).bizType(BIZ_TYPE_LEAD).bizId(leadId)
                 .operatorUserId(operatorUserId).occurredAt(occurredAt).payload(payload).build());
     }
 }

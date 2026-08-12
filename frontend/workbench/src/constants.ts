@@ -40,6 +40,7 @@ export const APP_CONFIG = {
 export const STORAGE_KEYS = {
   ACCESS_TOKEN: 'zsjos_access_token',
   REFRESH_TOKEN: 'zsjos_refresh_token',
+  CLIENT_ID: 'zsjos_client_id',
   EXPIRES_TIME: 'zsjos_expires_time',
   LOGIN_FORM: 'zsjos_login_form',
   THEME: 'crm-theme'
@@ -56,6 +57,8 @@ export const APP_ROUTES = {
   BPM_TODO: '/bpm/task/todo',
   QUALIFICATION_EXCEPTIONS: '/zsjos/leads/qualification-exceptions',
   LEAD_APPEALS: '/zsjos/leads/appeals',
+  MY_SALES_ORDERS: '/zsjos/sales-orders/my',
+  SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
 } as const
@@ -85,6 +88,11 @@ export const DICT_TYPE = {
   LEAD_INVALID_REASON: 'zsjos_lead_invalid_reason',
   LEAD_INVALID_REMARK_TEMPLATE: 'zsjos_lead_invalid_remark_template',
   LEAD_VALID_REMARK_TEMPLATE: 'zsjos_lead_valid_remark_template'
+  ,ORDER_STUDENT_NATURE: 'zsjos_order_student_nature'
+  ,ORDER_SERVICE_PERIOD: 'zsjos_order_service_period'
+  ,ORDER_STUDENT_SOURCE: 'zsjos_order_student_source'
+  ,ORDER_FEE_MODE: 'zsjos_order_fee_mode'
+  ,ORDER_PAYMENT_METHOD: 'zsjos_order_payment_method'
 } as const
 
 // ========== Lead Management ==========

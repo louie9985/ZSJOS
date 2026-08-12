@@ -18,10 +18,12 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import lombok.Data;
@@ -71,6 +73,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private DeptApi deptApi;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadBasicInfoService leadBasicInfoService;
+    @Resource private SalesOrderMapper salesOrderMapper;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -229,12 +232,19 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 opportunityVO.setId(opportunity.getId()); opportunityVO.setStatus(opportunity.getStatus());
                 opportunityVO.setNextFollowUpAt(opportunity.getNextFollowUpAt()); result.setOpportunity(opportunityVO);
             }
-            result.setAvailableActions(resolveActions(lead, opportunity, currentUserId));
+            SalesOrderDO activeOrder = salesOrderMapper.selectActiveByLeadId(lead.getId(),
+                    cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES);
+            if (activeOrder != null) {
+                result.setActiveSalesOrderId(activeOrder.getId());
+                result.setActiveSalesOrderStatus(activeOrder.getStatus());
+            }
+            result.setAvailableActions(resolveActions(lead, opportunity, activeOrder, currentUserId));
         }
         return result;
     }
 
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,
+                                                                SalesOrderDO activeOrder,
                                                                 Long currentUserId) {
         if (!Objects.equals(currentUserId, lead.getOwnerUserId())
                 || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return List.of();
@@ -249,15 +259,18 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_VALID, true));
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
             }
-        } else if (STATUS_INVALID.equals(lead.getStatus())) {
-            if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
         } else if ((STATUS_VALID.equals(lead.getStatus()) || "converted".equals(lead.getStatus()))
                 && (opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
                 .contains(opportunity.getStatus()))) {
             if (canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
             if (canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
-            actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, false));
+            boolean canCreateOrder = securityFrameworkService.hasPermission("zsjos:sales-order:create");
+            if (activeOrder == null) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder));
+            } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL, canCreateOrder));
+            }
         }
         return actions;
     }

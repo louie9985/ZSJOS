@@ -58,6 +58,38 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
     private AdminUserService adminUserService;
 
     @Test
+    public void testRemoveExcessAccessTokens_removesOldestForClient() {
+        TenantContextHolder.setTenantId(0L);
+        Long userId = randomLongId();
+        String clientId = "zsjos-pc";
+        LocalDateTime now = LocalDateTime.now();
+        OAuth2RefreshTokenDO oldRefresh = randomPojo(OAuth2RefreshTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId(clientId)
+                .setRefreshToken("old-refresh-token").setExpiresTime(now.plusDays(7)));
+        OAuth2RefreshTokenDO newRefresh = randomPojo(OAuth2RefreshTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId(clientId)
+                .setRefreshToken("new-refresh-token").setExpiresTime(now.plusDays(7)));
+        oauth2RefreshTokenMapper.insert(oldRefresh);
+        oauth2RefreshTokenMapper.insert(newRefresh);
+        OAuth2AccessTokenDO oldToken = randomPojo(OAuth2AccessTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId(clientId)
+                .setAccessToken("old-access-token").setRefreshToken(oldRefresh.getRefreshToken())
+                .setExpiresTime(now.plusHours(2)).setCreateTime(now.minusMinutes(1)));
+        OAuth2AccessTokenDO newToken = randomPojo(OAuth2AccessTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId(clientId)
+                .setAccessToken("new-access-token").setRefreshToken(newRefresh.getRefreshToken())
+                .setExpiresTime(now.plusHours(2)).setCreateTime(now));
+        oauth2AccessTokenMapper.insert(oldToken);
+        oauth2AccessTokenMapper.insert(newToken);
+
+        oauth2TokenService.removeExcessAccessTokens(userId, UserTypeEnum.ADMIN.getValue(), clientId, 2);
+
+        assertNull(oauth2AccessTokenMapper.selectById(oldToken.getId()));
+        assertNotNull(oauth2AccessTokenMapper.selectById(newToken.getId()));
+        assertNull(oauth2RefreshTokenMapper.selectByRefreshToken(oldRefresh.getRefreshToken()));
+    }
+
+    @Test
     public void testCreateAccessToken() {
         TenantContextHolder.setTenantId(0L);
         // 准备参数

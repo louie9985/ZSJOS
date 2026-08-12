@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -62,6 +63,45 @@ class NotifyRuleServiceImplTest {
     }
 
     @Test
+    void createRejectsUnknownTimingStage() {
+        NotifyRuleSaveReqVO request = request();
+        request.setTimingStage("later");
+        request.setTimingOffsetMinutes(30);
+        stubValidTimedCatalog();
+
+        assertThrows(ServiceException.class, () -> service.createNotifyRule(request));
+
+        verify(notifyRuleMapper, never()).insert(any(NotifyRuleDO.class));
+    }
+
+    @Test
+    void createRejectsNonZeroDueOffset() {
+        NotifyRuleSaveReqVO request = request();
+        request.setTimingStage("due");
+        request.setTimingOffsetMinutes(5);
+        stubValidTimedCatalog();
+
+        assertThrows(ServiceException.class, () -> service.createNotifyRule(request));
+
+        verify(notifyRuleMapper, never()).insert(any(NotifyRuleDO.class));
+    }
+
+    @Test
+    void createClearsTimingForNonTimedScene() {
+        NotifyRuleSaveReqVO request = request();
+        request.setTimingStage("advance");
+        request.setTimingOffsetMinutes(30);
+        stubValidCatalog();
+
+        service.createNotifyRule(request);
+
+        ArgumentCaptor<NotifyRuleDO> captor = ArgumentCaptor.forClass(NotifyRuleDO.class);
+        verify(notifyRuleMapper).insert(captor.capture());
+        assertNull(captor.getValue().getTimingStage());
+        assertNull(captor.getValue().getTimingOffsetMinutes());
+    }
+
+    @Test
     void enablingExistingRuleRevalidatesTemplateScene() {
         NotifyRuleDO existing = NotifyRuleDO.builder().id(1L).name("rule").sceneCode("test.scene")
                 .templateId(2L).recipientRoles(List.of("owner")).specifiedUserIds(List.of())
@@ -83,10 +123,22 @@ class NotifyRuleServiceImplTest {
                 .thenReturn(NotifyTemplateDO.builder().id(2L).sceneCode("test.scene").build());
     }
 
+    private void stubValidTimedCatalog() {
+        when(sceneRegistry.getScene("test.scene")).thenReturn(timedScene());
+        when(notifyTemplateService.getNotifyTemplate(2L))
+                .thenReturn(NotifyTemplateDO.builder().id(2L).sceneCode("test.scene").build());
+    }
+
     private static NotifySceneRespDTO scene() {
         return new NotifySceneRespDTO("test.scene", "测试场景", List.of(),
                 List.of(new NotifySceneRoleRespDTO("owner", "负责人")),
-                List.of(NotifyActionType.MESSAGE_DETAIL));
+                List.of(NotifyActionType.MESSAGE_DETAIL), false);
+    }
+
+    private static NotifySceneRespDTO timedScene() {
+        return new NotifySceneRespDTO("test.scene", "测试场景", List.of(),
+                List.of(new NotifySceneRoleRespDTO("owner", "负责人")),
+                List.of(NotifyActionType.MESSAGE_DETAIL), true);
     }
 
     private static NotifyRuleSaveReqVO request() {

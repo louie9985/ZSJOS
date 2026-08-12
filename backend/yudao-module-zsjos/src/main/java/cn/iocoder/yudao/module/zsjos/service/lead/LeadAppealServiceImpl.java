@@ -32,6 +32,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -46,6 +47,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
+@Slf4j
 public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Resource private LeadAppealMapper appealMapper;
@@ -91,7 +93,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         if (roundNo > 3 || previous != null && !APPEAL_STATUS_UPHELD.equals(previous.getStatus())) {
             throw exception(LEAD_APPEAL_STATE_INVALID);
         }
-        List<Long> reviewers = resolveReviewers(roundNo, lead);
+        ReviewerResolution resolution = resolveReviewers(roundNo, lead);
+        List<Long> reviewers = resolution.reviewerUserIds();
         String evidence = buildEvidenceJson(reqVO.getAttachments(), userId);
         LocalDateTime now = LocalDateTime.now();
         LeadAppealDO appeal = new LeadAppealDO();
@@ -99,6 +102,10 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         appeal.setRoundNo(roundNo);
         appeal.setReviewStage(stage(roundNo));
         appeal.setStatus(reviewingStatus(roundNo));
+        appeal.setOwnerUserIdSnapshot(resolution.ownerUserId());
+        appeal.setOwnerDeptIdSnapshot(resolution.ownerDeptId());
+        appeal.setReviewerDeptIdSnapshot(resolution.reviewerDeptId());
+        appeal.setReviewerUserIdsSnapshot(JsonUtils.toJsonString(reviewers));
         appeal.setApplicantUserId(userId);
         appeal.setReason(reqVO.getReason().trim());
         appeal.setEvidenceRefs(evidence);
@@ -113,11 +120,17 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             BpmProcessInstanceCreateReqDTO processReq = new BpmProcessInstanceCreateReqDTO();
             processReq.setProcessDefinitionKey(APPEAL_PROCESS_DEFINITION_KEY);
             processReq.setBusinessKey(APPEAL_BUSINESS_KEY_PREFIX + appeal.getId());
-            processReq.setVariables(Map.of("appealId", appeal.getId(), "leadId", leadId,
-                    "roundNo", roundNo, "reviewStage", appeal.getReviewStage()));
+            Map<String, Object> processVariables = new LinkedHashMap<>();
+            processVariables.put("appealId", appeal.getId());
+            processVariables.put("leadId", leadId);
+            processVariables.put("roundNo", roundNo);
+            processVariables.put("reviewStage", appeal.getReviewStage());
+            processReq.setVariables(processVariables);
             processReq.setStartUserSelectAssignees(Map.of(APPEAL_TASK_DEFINITION_KEY, reviewers));
             appeal.setProcessInstanceId(processInstanceApi.createProcessInstance(userId, processReq));
         } catch (RuntimeException ex) {
+            log.error("[submit][leadId({}) roundNo({}) processDefinitionKey({}) taskDefinitionKey({}) reviewerCount({}) BPM process start failed]",
+                    leadId, roundNo, APPEAL_PROCESS_DEFINITION_KEY, APPEAL_TASK_DEFINITION_KEY, reviewers.size(), ex);
             throw exception(LEAD_APPEAL_PROCESS_UNAVAILABLE);
         }
         appealMapper.updateById(appeal);
@@ -145,7 +158,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             LeadAppealDO appeal = appealId == null ? null : appealMapper.selectById(appealId);
             if (appeal == null) continue;
             LeadDO lead = leadMapper.selectById(appeal.getLeadId());
-            if (lead == null || !canReview(appeal, lead, userId)) continue;
+            if (lead == null || !canReview(appeal, userId)) continue;
             result.add(convert(appeal, lead, task.getId()));
         }
         return new PageResult<>(result, tasks.getTotal());
@@ -173,7 +186,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         }
         if (!isReviewing(appeal.getStatus())) throw exception(LEAD_APPEAL_ALREADY_HANDLED);
         LeadDO lead = requireLeadForUpdate(appeal.getLeadId());
-        if (!canReview(appeal, lead, userId)) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        if (!canReview(appeal, userId)) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         BpmTaskRespDTO task;
         try {
             task = processTaskApi.getTodoTask(userId, reqVO.getTaskId());
@@ -247,26 +260,46 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         return attachmentService.upload(file);
     }
 
-    private List<Long> resolveReviewers(int roundNo, LeadDO lead) {
+    private ReviewerResolution resolveReviewers(int roundNo, LeadDO lead) {
+        OwnerContext ownerContext = resolveOwnerContext(lead);
         if (roundNo == 1) {
-            AdminUserRespDTO owner = adminUserApi.getUser(lead.getOwnerUserId());
-            DeptRespDTO dept = owner == null || owner.getDeptId() == null ? null : deptApi.getDept(owner.getDeptId());
-            Long leader = dept == null ? null : dept.getLeaderUserId();
-            AdminUserRespDTO user = leader == null ? null : adminUserApi.getUser(leader);
-            if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
-                    || !permissionApi.hasAnyPermissions(leader, PERMISSION_APPEAL_REVIEW_SALES_MANAGER)) {
-                throw exception(LEAD_APPEAL_REVIEWER_NOT_CONFIGURED);
-            }
-            return List.of(leader);
+            SupervisorResolution supervisor = findSupervisor(ownerContext);
+            return new ReviewerResolution(ownerContext.ownerUserId(), ownerContext.deptId(),
+                    supervisor.deptId(), List.of(supervisor.userId()));
         }
         if (roundNo == 2) {
             List<Long> users = roleUsers(ROLE_QUALITY_MANAGER, ROLE_QUALITY_SPECIALIST);
             if (users.isEmpty()) throw exception(LEAD_APPEAL_REVIEWER_NOT_CONFIGURED);
-            return users;
+            return new ReviewerResolution(ownerContext.ownerUserId(), ownerContext.deptId(), null, users);
         }
         List<Long> users = roleUsers(ROLE_CHAIRMAN);
         if (users.size() != 1) throw exception(LEAD_APPEAL_CHAIRMAN_INVALID);
-        return users;
+        return new ReviewerResolution(ownerContext.ownerUserId(), ownerContext.deptId(), null, users);
+    }
+
+    private OwnerContext resolveOwnerContext(LeadDO lead) {
+        AdminUserRespDTO owner = lead.getOwnerUserId() == null ? null : adminUserApi.getUser(lead.getOwnerUserId());
+        Long deptId = owner == null ? null : owner.getDeptId();
+        return new OwnerContext(lead.getOwnerUserId(), deptId, deptId == null ? null : deptApi.getDept(deptId));
+    }
+
+    private SupervisorResolution findSupervisor(OwnerContext ownerContext) {
+        if (ownerContext.dept() == null) throw exception(LEAD_APPEAL_REVIEWER_NOT_CONFIGURED);
+        Set<Long> visitedDeptIds = new HashSet<>();
+        DeptRespDTO current = ownerContext.dept();
+        while (current != null && current.getId() != null && visitedDeptIds.add(current.getId())) {
+            Long leaderId = current.getLeaderUserId();
+            AdminUserRespDTO leader = leaderId == null ? null : adminUserApi.getUser(leaderId);
+            if (leader != null && !Objects.equals(leaderId, ownerContext.ownerUserId())
+                    && CommonStatusEnum.ENABLE.getStatus().equals(leader.getStatus())
+                    && permissionApi.hasAnyPermissions(leaderId, PERMISSION_APPEAL_REVIEW_SALES_MANAGER)) {
+                return new SupervisorResolution(current.getId(), leaderId);
+            }
+            Long parentId = current.getParentId();
+            if (parentId == null || parentId == 0L) break;
+            current = deptApi.getDept(parentId);
+        }
+        throw exception(LEAD_APPEAL_REVIEWER_NOT_CONFIGURED);
     }
 
     private List<Long> roleUsers(String... codes) {
@@ -281,18 +314,20 @@ public class LeadAppealServiceImpl implements LeadAppealService {
                 .map(AdminUserRespDTO::getId).distinct().sorted().toList();
     }
 
-    private boolean canReview(LeadAppealDO appeal, LeadDO lead, Long userId) {
-        if (APPEAL_STAGE_SALES_MANAGER.equals(appeal.getReviewStage())) {
-            AdminUserRespDTO owner = adminUserApi.getUser(lead.getOwnerUserId());
-            DeptRespDTO dept = owner == null || owner.getDeptId() == null ? null : deptApi.getDept(owner.getDeptId());
-            return dept != null && Objects.equals(dept.getLeaderUserId(), userId)
-                    && permissionApi.hasAnyPermissions(userId, PERMISSION_APPEAL_REVIEW_SALES_MANAGER);
+    private boolean canReview(LeadAppealDO appeal, Long userId) {
+        AdminUserRespDTO user = adminUserApi.getUser(userId);
+        if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) return false;
+        // Legacy rows predate reviewer snapshots. The BPM task API already scopes the task to its assignee.
+        String snapshot = appeal.getReviewerUserIdsSnapshot();
+        if (snapshot == null) return true;
+        if (snapshot.isBlank()) return false;
+        try {
+            List<Long> ids = JsonUtils.parseArray(snapshot, Long.class);
+            return ids != null && !ids.isEmpty() && ids.contains(userId);
+        } catch (RuntimeException ex) {
+            log.warn("[canReview][appealId({}) reviewer snapshot is invalid]", appeal.getId());
+            return false;
         }
-        if (APPEAL_STAGE_QUALITY.equals(appeal.getReviewStage())) {
-            return permissionApi.hasAnyPermissions(userId, PERMISSION_APPEAL_REVIEW_QUALITY);
-        }
-        return APPEAL_STAGE_CHAIRMAN.equals(appeal.getReviewStage())
-                && permissionApi.hasAnyPermissions(userId, PERMISSION_APPEAL_REVIEW_CHAIRMAN);
     }
 
     private String buildEvidenceJson(List<LeadAttachmentReqVO> attachments, Long userId) {
@@ -399,6 +434,11 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     private String stage(int round) { return round == 1 ? APPEAL_STAGE_SALES_MANAGER : round == 2 ? APPEAL_STAGE_QUALITY : APPEAL_STAGE_CHAIRMAN; }
     private String reviewingStatus(int round) { return round == 1 ? APPEAL_STATUS_SALES_MANAGER_REVIEWING : round == 2 ? APPEAL_STATUS_QUALITY_REVIEWING : APPEAL_STATUS_CHAIRMAN_REVIEWING; }
     private boolean isReviewing(String status) { return Set.of(APPEAL_STATUS_SALES_MANAGER_REVIEWING, APPEAL_STATUS_QUALITY_REVIEWING, APPEAL_STATUS_CHAIRMAN_REVIEWING).contains(status); }
+
+    private record OwnerContext(Long ownerUserId, Long deptId, DeptRespDTO dept) {}
+    private record SupervisorResolution(Long deptId, Long userId) {}
+    private record ReviewerResolution(Long ownerUserId, Long ownerDeptId, Long reviewerDeptId,
+                                      List<Long> reviewerUserIds) {}
 
     @Data @NoArgsConstructor @AllArgsConstructor
     private static class EvidenceRef {

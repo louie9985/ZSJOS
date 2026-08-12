@@ -13,10 +13,13 @@ public class NotifyRuleRespVO {
     private Long id;
     private String name;
     private String sceneCode;
+    private String channelCode;
     private Long templateId;
     private List<String> recipientRoles;
     private List<Long> specifiedUserIds;
     private String actionType;
+    private String timingStage;
+    private Integer timingOffsetMinutes;
     private Integer status;
     private LocalDateTime createTime;
 }

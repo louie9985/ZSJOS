@@ -39,22 +39,24 @@ public class LeadInboxFilterConfigController {
     @Operation(summary = "获得客资筛选方案")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-filter:query')")
     public CommonResult<LeadInboxFilterAdminRespVO> get(
-            @RequestParam("audience") @Pattern(regexp = "submitter|owner") String audience) {
+            @RequestParam("audience") @Pattern(regexp = "submitter|owner|reviewer") String audience) {
         return success(configService.getAdminConfig(audience));
     }
 
     @GetMapping("/capabilities")
     @Operation(summary = "获得客资筛选条件能力")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-filter:query')")
-    public CommonResult<List<LeadInboxFilterCapabilityRespVO>> getCapabilities() {
-        return success(configService.getCapabilities());
+    public CommonResult<List<LeadInboxFilterCapabilityRespVO>> getCapabilities(
+            @RequestParam(value = "audience", required = false, defaultValue = "submitter")
+            @Pattern(regexp = "submitter|owner|reviewer") String audience) {
+        return success(configService.getCapabilities(audience));
     }
 
     @GetMapping("/versions")
     @Operation(summary = "获得客资筛选方案版本")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-filter:query')")
     public CommonResult<List<LeadInboxFilterVersionRespVO>> getVersions(
-            @RequestParam("audience") @Pattern(regexp = "submitter|owner") String audience) {
+            @RequestParam("audience") @Pattern(regexp = "submitter|owner|reviewer") String audience) {
         return success(configService.getVersions(audience));
     }
 
@@ -70,7 +72,7 @@ public class LeadInboxFilterConfigController {
     @Operation(summary = "发布客资筛选方案")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-filter:publish')")
     public CommonResult<Integer> publish(
-            @RequestParam("audience") @Pattern(regexp = "submitter|owner") String audience) {
+            @RequestParam("audience") @Pattern(regexp = "submitter|owner|reviewer") String audience) {
         return success(configService.publish(audience, getLoginUserId()));
     }
 
@@ -78,7 +80,7 @@ public class LeadInboxFilterConfigController {
     @Operation(summary = "回滚并发布客资筛选方案")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-filter:publish')")
     public CommonResult<Integer> rollback(
-            @RequestParam("audience") @Pattern(regexp = "submitter|owner") String audience,
+            @RequestParam("audience") @Pattern(regexp = "submitter|owner|reviewer") String audience,
             @RequestParam("versionNo") Integer versionNo) {
         return success(configService.rollback(audience, versionNo, getLoginUserId()));
     }

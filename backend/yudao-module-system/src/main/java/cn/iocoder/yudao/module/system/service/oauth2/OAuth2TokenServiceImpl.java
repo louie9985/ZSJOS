@@ -24,6 +24,8 @@ import cn.iocoder.yudao.module.system.dal.mysql.oauth2.OAuth2RefreshTokenMapper;
 import cn.iocoder.yudao.module.system.dal.redis.oauth2.OAuth2AccessTokenRedisDAO;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import jakarta.annotation.Resource;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,8 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception0;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
@@ -44,6 +48,10 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
 @Service
 public class OAuth2TokenServiceImpl implements OAuth2TokenService {
 
+    private static final DefaultRedisScript<Long> RELEASE_LOGIN_LOCK_SCRIPT = new DefaultRedisScript<>(
+            "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end",
+            Long.class);
+
     @Resource
     private OAuth2AccessTokenMapper oauth2AccessTokenMapper;
     @Resource
@@ -51,6 +59,8 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
 
     @Resource
     private OAuth2AccessTokenRedisDAO oauth2AccessTokenRedisDAO;
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
 
     @Resource
     private OAuth2ClientService oauth2ClientService;
@@ -61,11 +71,72 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OAuth2AccessTokenDO createAccessToken(Long userId, Integer userType, String clientId, List<String> scopes) {
+        return createAccessToken(userId, userType, clientId, scopes, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OAuth2AccessTokenDO createAccessToken(Long userId, Integer userType, String clientId, List<String> scopes,
+                                                 Integer refreshTokenValiditySeconds) {
         OAuth2ClientDO clientDO = oauth2ClientService.validOAuthClientFromCache(clientId);
         // 创建刷新令牌
-        OAuth2RefreshTokenDO refreshTokenDO = createOAuth2RefreshToken(userId, userType, clientDO, scopes);
+        OAuth2RefreshTokenDO refreshTokenDO = createOAuth2RefreshToken(userId, userType, clientDO, scopes,
+                refreshTokenValiditySeconds);
         // 创建访问令牌
         return createOAuth2AccessToken(refreshTokenDO, clientDO);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void removeExcessAccessTokens(Long userId, Integer userType, String clientId, int maxDevices) {
+        withLoginLock(userId, clientId, () -> {
+            removeExcessAccessTokensWithoutLock(userId, userType, clientId, maxDevices);
+            return null;
+        });
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OAuth2AccessTokenDO createAccessTokenWithLimit(Long userId, Integer userType, String clientId,
+                                                          List<String> scopes, Integer refreshTokenValiditySeconds,
+                                                          int maxDevices) {
+        return withLoginLock(userId, clientId, () -> {
+            removeExcessAccessTokensWithoutLock(userId, userType, clientId, maxDevices);
+            return createAccessToken(userId, userType, clientId, scopes, refreshTokenValiditySeconds);
+        });
+    }
+
+    private void removeExcessAccessTokensWithoutLock(Long userId, Integer userType, String clientId, int maxDevices) {
+        if (maxDevices < 1) {
+            maxDevices = 1;
+        }
+        List<OAuth2RefreshTokenDO> tokens = oauth2RefreshTokenMapper.selectListByUserIdAndTypeAndClientId(
+                userId, userType, clientId, LocalDateTime.now());
+        int removeCount = tokens.size() - maxDevices + 1;
+        for (int i = 0; i < removeCount; i++) {
+            OAuth2RefreshTokenDO token = tokens.get(i);
+            List<OAuth2AccessTokenDO> accessTokens = oauth2AccessTokenMapper.selectListByRefreshToken(token.getRefreshToken());
+            accessTokens.forEach(accessToken -> {
+                oauth2AccessTokenMapper.deleteById(accessToken.getId());
+                oauth2AccessTokenRedisDAO.delete(accessToken.getAccessToken());
+            });
+            oauth2RefreshTokenMapper.deleteByRefreshToken(token.getRefreshToken());
+            oauth2AccessTokenRedisDAO.delete(token.getRefreshToken());
+        }
+    }
+
+    private <T> T withLoginLock(Long userId, String clientId, java.util.function.Supplier<T> action) {
+        String lockKey = "zsjos:auth:device-limit:" + userId + ":" + clientId;
+        String lockValue = UUID.randomUUID().toString();
+        Boolean locked = stringRedisTemplate.opsForValue().setIfAbsent(lockKey, lockValue, 10, TimeUnit.SECONDS);
+        if (!Boolean.TRUE.equals(locked)) {
+            throw exception0(GlobalErrorCodeConstants.TOO_MANY_REQUESTS.getCode(), "登录请求过于频繁，请稍后重试");
+        }
+        try {
+            return action.get();
+        } finally {
+            stringRedisTemplate.execute(RELEASE_LOGIN_LOCK_SCRIPT, Collections.singletonList(lockKey), lockValue);
+        }
     }
 
     @Override
@@ -196,11 +267,13 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
         return accessTokenDO;
     }
 
-    private OAuth2RefreshTokenDO createOAuth2RefreshToken(Long userId, Integer userType, OAuth2ClientDO clientDO, List<String> scopes) {
+    private OAuth2RefreshTokenDO createOAuth2RefreshToken(Long userId, Integer userType, OAuth2ClientDO clientDO,
+                                                          List<String> scopes, Integer validitySeconds) {
         OAuth2RefreshTokenDO refreshToken = new OAuth2RefreshTokenDO().setRefreshToken(generateRefreshToken())
                 .setUserId(userId).setUserType(userType)
                 .setClientId(clientDO.getClientId()).setScopes(scopes)
-                .setExpiresTime(LocalDateTime.now().plusSeconds(clientDO.getRefreshTokenValiditySeconds()));
+                .setExpiresTime(LocalDateTime.now().plusSeconds(validitySeconds != null
+                        ? validitySeconds : clientDO.getRefreshTokenValiditySeconds()));
         oauth2RefreshTokenMapper.insert(refreshToken);
         return refreshToken;
     }

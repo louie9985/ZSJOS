@@ -15,10 +15,12 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -27,7 +29,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.QUALIFICATION_RESTORED;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.QUALIFICATION_SUSPENDED;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -43,6 +44,7 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadAssignmentService assignmentService;
     @Mock private LeadObjectPermissionService permissionService;
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
+    @Mock private BusinessTaskReminderService taskReminderService;
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
@@ -124,14 +126,18 @@ class LeadQualificationServiceImplTest {
         lead.setQualificationDeadlineAt(LocalDateTime.now().minusMinutes(1));
         when(leadMapper.selectExpiredQualifications(any(LocalDateTime.class))).thenReturn(List.of(lead));
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(lifecycleTaskService.getQualificationTaskId(1L, 2)).thenReturn(88L);
 
         int processed = withTenantResult(service::processExpired);
 
         assertEquals(1, processed);
         assertEquals("suspended", lead.getStatus());
         assertNotNull(lead.getSuspendedAt());
-        verify(notifyEventPublisher).publish(eq(QUALIFICATION_SUSPENDED), eq(1L), anyString(),
-                isNull(), any(LocalDateTime.class), anyMap());
+        InOrder timeoutOrder = inOrder(taskReminderService, lifecycleTaskService);
+        timeoutOrder.verify(taskReminderService).emitDueForTask(eq(88L), any(LocalDateTime.class));
+        timeoutOrder.verify(lifecycleTaskService).cancelQualificationTask(eq(1L), eq(2),
+                any(LocalDateTime.class), anyString());
+        verifyNoInteractions(notifyEventPublisher);
     }
 
     @Test

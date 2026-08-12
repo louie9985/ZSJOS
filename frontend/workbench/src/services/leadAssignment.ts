@@ -1,5 +1,15 @@
 import type { PendingLead } from './api'
 
+export const ASSIGNMENT_REFRESH_RETRY_DELAYS_MS = [0, 300, 900] as const
+
+const ASSIGNMENT_OPEN_EVENT_TYPES = new Set(['assigned', 'reassigned', 'transferred'])
+
+export const shouldFocusAssignmentEvent = (eventType: unknown) =>
+  typeof eventType === 'string' && ASSIGNMENT_OPEN_EVENT_TYPES.has(eventType)
+
+export const hasPendingLead = (items: PendingLead[], leadId: number) =>
+  items.some(item => item.id === leadId)
+
 export const remainingSecondsAt = (lead: PendingLead, elapsedSeconds: number) =>
   lead.remainingSeconds == null ? undefined : Math.max(0, lead.remainingSeconds - elapsedSeconds)
 

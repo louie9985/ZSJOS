@@ -57,6 +57,10 @@ public class NotifyTemplateDO extends BaseDO {
      */
     @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String sceneCode;
+    /** Delivery channel; legacy null values are treated as in_app. */
+    private String channelCode;
+    private String smsTemplateId;
+    private String wecomMessageType;
     /**
      * 通知标题模板。
      */

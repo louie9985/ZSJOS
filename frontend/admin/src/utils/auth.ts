@@ -6,6 +6,7 @@ const { wsCache } = useCache()
 
 const AccessTokenKey = 'ACCESS_TOKEN'
 const RefreshTokenKey = 'REFRESH_TOKEN'
+const ClientIdKey = 'CLIENT_ID'
 
 // 获取token
 export const getAccessToken = () => {
@@ -19,16 +20,20 @@ export const getRefreshToken = () => {
   return wsCache.get(RefreshTokenKey)
 }
 
+export const getClientId = () => wsCache.get(ClientIdKey)
+
 // 设置token
 export const setToken = (token: TokenType) => {
   wsCache.set(RefreshTokenKey, token.refreshToken)
   wsCache.set(AccessTokenKey, token.accessToken)
+  wsCache.set(ClientIdKey, token.clientId || 'zsjos-pc')
 }
 
 // 删除token
 export const removeToken = () => {
   wsCache.delete(AccessTokenKey)
   wsCache.delete(RefreshTokenKey)
+  wsCache.delete(ClientIdKey)
 }
 
 /** 格式化token（jwt格式） */

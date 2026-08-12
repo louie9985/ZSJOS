@@ -2,9 +2,18 @@ import { Alert, App, Button, Descriptions, Image, Modal, Space, Tag, Typography 
 import { BellOutlined, ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type PendingLead } from '../services/api'
-import { formatCountdown, remainingSecondsAt, shouldShowAssignmentModal, sortPendingLeads } from '../services/leadAssignment'
+import { resolvedDisplayLabel } from '../services/leadManagement'
+import {
+  ASSIGNMENT_REFRESH_RETRY_DELAYS_MS,
+  formatCountdown,
+  hasPendingLead,
+  remainingSecondsAt,
+  shouldFocusAssignmentEvent,
+  shouldShowAssignmentModal,
+  sortPendingLeads
+} from '../services/leadAssignment'
 import { useOverlayCoordinator } from './OverlayCoordinator'
-import { useRealtimeEvent } from './RealtimeProvider'
+import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
 
 const FALLBACK_POLL_MS = 15_000
 
@@ -15,6 +24,10 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
 }) {
   const { message } = App.useApp()
   const { businessOverlayCount } = useOverlayCoordinator()
+  const { status: realtimeStatus } = useRealtime()
+  const mountedRef = useRef(true)
+  const requestSequence = useRef(0)
+  const targetedRefreshSequence = useRef(0)
   const [pending, setPending] = useState<PendingLead[]>([])
   const [deferred, setDeferred] = useState<Set<number>>(new Set())
   const [error, setError] = useState('')
@@ -22,16 +35,44 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [focusLeadId, setFocusLeadId] = useState<number>()
 
-  const loadPending = useCallback(async () => {
-    if (!canAccept) return
+  const loadPending = useCallback(async (): Promise<PendingLead[] | undefined> => {
+    if (!canAccept) return undefined
+    const requestId = ++requestSequence.current
     try {
-      setPending(await api.myPendingLeads())
+      const items = await api.myPendingLeads()
+      if (!mountedRef.current || requestId !== requestSequence.current) return undefined
+      setPending(items)
       setElapsedSeconds(0)
       setError('')
+      return items
     } catch (loadError) {
+      if (!mountedRef.current || requestId !== requestSequence.current) return undefined
       setError(loadError instanceof Error ? loadError.message : '待接客资加载失败')
+      return undefined
     }
   }, [canAccept])
+
+  const refreshForLead = useCallback(async (leadId: number) => {
+    const refreshId = ++targetedRefreshSequence.current
+    setFocusLeadId(leadId)
+    setDeferred(ids => { const next = new Set(ids); next.delete(leadId); return next })
+    for (const delay of ASSIGNMENT_REFRESH_RETRY_DELAYS_MS) {
+      if (delay > 0) await new Promise(resolve => window.setTimeout(resolve, delay))
+      if (!mountedRef.current || refreshId !== targetedRefreshSequence.current) return
+      const items = await loadPending()
+      if (!mountedRef.current || refreshId !== targetedRefreshSequence.current) return
+      if (items && hasPendingLead(items, leadId)) return
+    }
+  }, [loadPending])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      requestSequence.current++
+      targetedRefreshSequence.current++
+    }
+  }, [])
 
   useEffect(() => {
     if (!canAccept) {
@@ -50,18 +91,27 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
       document.removeEventListener('visibilitychange', refreshVisible)
     }
   }, [canAccept, loadPending])
-  useRealtimeEvent('zsjos_lead_assignment', () => { void loadPending() })
+  useEffect(() => {
+    if (realtimeStatus === 'open') void loadPending()
+  }, [loadPending, realtimeStatus])
+  useRealtimeEvent('zsjos_lead_assignment', realtime => {
+    const content = realtime.content as { leadId?: unknown; eventType?: unknown } | null
+    const leadId = Number(content?.leadId)
+    if (Number.isFinite(leadId) && shouldFocusAssignmentEvent(content?.eventType)) {
+      void refreshForLead(leadId)
+      return
+    }
+    void loadPending()
+  })
   useEffect(() => {
     const focus = (event: Event) => {
       const leadId = Number((event as CustomEvent<{ leadId?: number }>).detail?.leadId)
       if (!Number.isFinite(leadId)) return
-      setFocusLeadId(leadId)
-      setDeferred(ids => { const next = new Set(ids); next.delete(leadId); return next })
-      void loadPending()
+      void refreshForLead(leadId)
     }
     window.addEventListener('zsjos-open-lead-assignment', focus)
     return () => window.removeEventListener('zsjos-open-lead-assignment', focus)
-  }, [loadPending])
+  }, [refreshForLead])
 
   useEffect(() => {
     if (!pending.some(item => item.remainingSeconds != null)) return
@@ -155,8 +205,8 @@ export function LeadDetails({ lead }: { lead: PendingLead }) {
     <Descriptions.Item label="微信号">{lead.maskedWechatId || '-'}</Descriptions.Item>
     <Descriptions.Item label="地区">{lead.provinceName} / {lead.cityName}</Descriptions.Item>
     <Descriptions.Item label="意向课程"><Space wrap>{lead.intendedProducts.map(name => <Tag key={name} color={name === lead.primaryIntendedProduct ? 'blue' : undefined}>{name}</Tag>)}</Space></Descriptions.Item>
-    <Descriptions.Item label="来源渠道">{lead.sourceChannel}</Descriptions.Item>
-    <Descriptions.Item label="客资分类">{lead.leadCategory}</Descriptions.Item>
+    <Descriptions.Item label="来源渠道">{resolvedDisplayLabel(lead.sourceChannelLabel, lead.sourceChannel)}</Descriptions.Item>
+    <Descriptions.Item label="客资分类">{resolvedDisplayLabel(lead.leadCategoryLabel, lead.leadCategory)}</Descriptions.Item>
     <Descriptions.Item label="备注">{lead.remark || '-'}</Descriptions.Item>
     {lead.attachmentUrls.length > 0 && <Descriptions.Item label="附件"><Image.PreviewGroup>{lead.attachmentUrls.map(url => <Image key={url} width={64} height={64} src={url} />)}</Image.PreviewGroup></Descriptions.Item>}
   </Descriptions>

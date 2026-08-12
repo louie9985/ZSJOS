@@ -32,6 +32,10 @@ public class AuthLoginReqVO extends CaptchaVerificationReqVO {
     @Length(min = 4, max = 16, message = "密码长度为 4-16 位")
     private String password;
 
+    @Schema(description = "登录端类型：PC 或 MOBILE", example = "PC")
+    @Builder.Default
+    private String platform = "PC";
+
     // ========== 绑定社交登录时，需要传递如下参数 ==========
 
     @Schema(description = "社交平台的类型，参见 SocialTypeEnum 枚举值", requiredMode = Schema.RequiredMode.REQUIRED, example = "10")

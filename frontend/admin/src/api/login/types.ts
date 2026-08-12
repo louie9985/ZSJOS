@@ -5,6 +5,7 @@ export type UserLoginVO = {
   socialType?: string
   socialCode?: string
   socialState?: string
+  platform?: 'PC' | 'MOBILE'
 }
 
 export type TokenType = {

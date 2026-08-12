@@ -3,7 +3,7 @@
     <div class="filter-heading">
       <div>
         <h3>客资筛选方案</h3>
-        <p>分别维护提交人和负责人的收件箱分组。只有发布后的版本会影响员工工作台。</p>
+        <p>分别维护提交人、负责人和审批人的收件箱分组。只有发布后的版本会影响员工工作台。</p>
       </div>
       <div class="heading-actions">
         <el-tag v-if="config" type="success" effect="plain"
@@ -16,9 +16,9 @@
 
   <ContentWrap>
     <div class="audience-toolbar">
-      <el-segmented v-model="audience" :options="audienceOptions" @change="loadConfig" />
+      <el-segmented v-model="audience" :options="audienceOptions" @change="loadAll" />
       <span class="toolbar-note">{{
-        audience === 'submitter' ? '员工查看自己提交的客资' : '销售查看自己负责的客资'
+        audience === 'submitter' ? '员工查看自己提交的客资' : audience === 'owner' ? '销售查看自己负责的客资' : '审批人查看自己待办或已办的成交订单'
       }}</span>
     </div>
 
@@ -47,7 +47,7 @@
                 <el-input v-model="group.label" maxlength="20" show-word-limit />
               </el-form-item>
               <el-form-item label="稳定编码">
-                <el-input v-model="group.key" :disabled="group.key === 'all'" />
+                <el-input v-model="group.key" :disabled="group.key === 'all'" maxlength="64" />
               </el-form-item>
               <el-form-item label="二级标题">
                 <el-input
@@ -117,7 +117,11 @@
             <div class="editor-section">
               <div class="section-heading">
                 <strong>二级筛选项</strong>
-                <el-button text type="primary" @click="addOption(group)"
+                <el-button
+                  text
+                  type="primary"
+                  :disabled="group.options.length >= 20"
+                  @click="addOption(group)"
                   ><Icon icon="ep:plus" /> 添加筛选项</el-button
                 >
               </div>
@@ -133,7 +137,8 @@
                   ><template #default="scope"
                     ><el-input
                       v-model="scope.row.key"
-                      :disabled="scope.row.key === 'all'" /></template
+                      :disabled="scope.row.key === 'all'"
+                      maxlength="64" /></template
                 ></el-table-column>
                 <el-table-column label="条件" min-width="360">
                   <template #default="scope">
@@ -229,7 +234,14 @@
         </el-collapse-item>
       </el-collapse>
 
-      <el-button class="add-group" :icon="Plus" plain @click="addGroup">新增一级分组</el-button>
+      <el-button
+        class="add-group"
+        :icon="Plus"
+        plain
+        :disabled="groups.length >= 20"
+        @click="addGroup"
+        >新增一级分组</el-button
+      >
       <div class="footer-actions">
         <el-button v-hasPermi="['zsjos:lead-filter:update']" :loading="saving" @click="save"
           >保存草稿</el-button
@@ -281,7 +293,8 @@ const message = useMessage()
 const audience = ref<LeadFilterApi.LeadFilterAudience>('submitter')
 const audienceOptions = [
   { label: '提交人视角', value: 'submitter' },
-  { label: '负责人视角', value: 'owner' }
+  { label: '负责人视角', value: 'owner' },
+  { label: '审批人视角', value: 'reviewer' }
 ]
 const config = ref<LeadFilterApi.LeadFilterAdminVO>()
 const groups = ref<LeadFilterApi.LeadFilterGroupVO[]>([])
@@ -294,6 +307,7 @@ const publishing = ref(false)
 const error = ref('')
 const historyVisible = ref(false)
 const historyLoading = ref(false)
+const keyPattern = /^[a-z][a-z0-9_]{1,63}$/
 
 const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
 const capabilityValues = (field: string) =>
@@ -326,7 +340,7 @@ const loadConfig = async () => {
 }
 const loadAll = async () => {
   try {
-    capabilities.value = await LeadFilterApi.getCapabilities()
+    capabilities.value = await LeadFilterApi.getCapabilities(audience.value)
     await loadConfig()
   } catch (loadError: any) {
     error.value = loadError?.msg || loadError?.message || '筛选能力加载失败'
@@ -379,15 +393,23 @@ const normalizeSort = () => {
 }
 const validate = () => {
   if (
+    audience.value !== 'reviewer' &&
     !groups.value.some(
       (group) => group.key === 'all' && group.enabled && group.conditions.length === 0
     )
   )
     throw new Error('必须保留启用且无条件的 all 分组')
+  if (groups.value.length > 20) throw new Error('一级分组不能超过 20 个')
+  const groupKeys = new Set<string>()
   for (const group of groups.value) {
     if (!group.key || !group.label) throw new Error('分组名称和编码不能为空')
+    if (!keyPattern.test(group.key))
+      throw new Error(`分组“${group.label}”的编码只能使用小写字母、数字和下划线`)
+    if (groupKeys.has(group.key)) throw new Error(`分组编码“${group.key}”不能重复`)
+    groupKeys.add(group.key)
     if (group.conditions.some((condition) => !condition.field || !condition.values.length))
       throw new Error(`分组“${group.label}”存在未完成的条件`)
+    if (group.options.length > 20) throw new Error(`分组“${group.label}”的筛选项不能超过 20 个`)
     if (
       group.options.length &&
       !group.options.some(
@@ -395,8 +417,14 @@ const validate = () => {
       )
     )
       throw new Error(`分组“${group.label}”必须保留无条件的“全部”筛选项`)
+    const optionKeys = new Set<string>()
     for (const option of group.options) {
       if (!option.key || !option.label) throw new Error(`分组“${group.label}”存在未命名筛选项`)
+      if (!keyPattern.test(option.key))
+        throw new Error(`筛选项“${option.label}”的编码只能使用小写字母、数字和下划线`)
+      if (optionKeys.has(option.key))
+        throw new Error(`分组“${group.label}”中的筛选项编码“${option.key}”不能重复`)
+      optionKeys.add(option.key)
       if (option.conditions.some((condition) => !condition.field || !condition.values.length))
         throw new Error(`筛选项“${option.label}”存在未完成的条件`)
     }

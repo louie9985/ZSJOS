@@ -5,6 +5,7 @@ import {
   filterRenderableMenus,
   findPageByPath,
   findPrimaryByPath,
+  getInaccessiblePathFallback,
   getInitialTarget,
   getPrimaryTarget
 } from './menu'
@@ -147,5 +148,20 @@ describe('workbench menu conversion', () => {
 
     expect(getPrimaryTarget(navigation[0])).toBe('https://example.com')
     expect(getInitialTarget(navigation)).toBe('/crm/leads')
+  })
+
+  it('replaces an inaccessible route with the first authorized internal page', () => {
+    const navigation = buildTwoLevelNavigation(buildMenuTree([
+      menu({
+        id: 1,
+        name: 'Workbench',
+        path: '/zsjos',
+        children: [menu({ id: 2, parentId: 1, name: 'Appeals', path: 'appeals' })]
+      })
+    ]))
+
+    expect(getInaccessiblePathFallback(navigation, '/zsjos/tasks/today')).toBe('/zsjos/appeals')
+    expect(getInaccessiblePathFallback(navigation, '/zsjos/appeals')).toBeUndefined()
+    expect(getInaccessiblePathFallback(navigation, '/')).toBeUndefined()
   })
 })

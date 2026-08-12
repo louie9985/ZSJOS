@@ -1,5 +1,7 @@
 import request from '@/config/axios'
 
+export type NotifyChannelCode = 'in_app' | 'websocket' | 'wecom' | 'sms'
+
 export interface NotifySceneVariableVO {
   key: string
   label: string
@@ -17,16 +19,20 @@ export interface NotifySceneVO {
   variables: NotifySceneVariableVO[]
   recipientRoles: NotifySceneRoleVO[]
   allowedActions: Array<'none' | 'message_detail' | 'business_detail'>
+  timed?: boolean
 }
 
 export interface NotifyRuleVO {
   id?: number
   name: string
   sceneCode: string
+  channelCode: NotifyChannelCode
   templateId?: number
   recipientRoles: string[]
   specifiedUserIds: number[]
   actionType: 'none' | 'message_detail' | 'business_detail'
+  timingStage?: 'advance' | 'due' | 'overdue'
+  timingOffsetMinutes?: number
   status: number
   createTime?: Date
 }

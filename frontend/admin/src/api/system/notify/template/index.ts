@@ -6,6 +6,7 @@ export interface NotifyTemplateVO {
   nickname: string
   code: string
   sceneCode?: string
+  channelCode?: 'in_app' | 'websocket' | 'wecom' | 'sms'
   title: string
   summary: string
   content: string
@@ -26,6 +27,7 @@ export interface NotifyTemplateSimpleVO {
   name: string
   code: string
   sceneCode?: string
+  channelCode?: 'in_app' | 'websocket' | 'wecom' | 'sms'
 }
 
 // 查询站内信模板精简列表

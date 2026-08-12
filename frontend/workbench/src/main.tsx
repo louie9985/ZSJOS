@@ -8,7 +8,6 @@ import {
   Breadcrumb,
   Button,
   Card,
-  Checkbox,
   Dropdown,
   Input,
   Layout,
@@ -36,11 +35,13 @@ import {
   filterRenderableMenus,
   findPageByPath,
   findPrimaryByPath,
+  getInaccessiblePathFallback,
   getInitialTarget,
   getPrimaryTarget,
   type PrimaryNavigationItem,
   type SecondaryNavigationItem
 } from './services/menu'
+import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from './services/menuComponentRegistry'
 import LeadSubmissionPage from './pages/LeadSubmissionPage'
 import LeadManagementPage from './pages/LeadManagementPage'
 import LeadAssignmentPage from './pages/LeadAssignmentPage'
@@ -55,6 +56,8 @@ import { NotifyMessageProvider } from './components/NotifyMessageProvider'
 import MessageCenter from './components/MessageCenter'
 import MessageInboxPage from './pages/MessageInboxPage'
 import LeadAppealPage from './pages/LeadAppealPage'
+import SalesOrderApprovalPage from './pages/SalesOrderApprovalPage'
+import MySalesOrderPage from './pages/MySalesOrderPage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import {
@@ -85,10 +88,8 @@ class RuntimeBoundary extends React.Component<React.PropsWithChildren, { error?:
 }
 
 function Login({ onLogin, initialError = '' }: { onLogin: () => void; initialError?: string }) {
-  const rememberedLogin = useMemo(() => loadLoginFormCache(), [])
-  const [username, setUsername] = useState(rememberedLogin?.username ?? '')
-  const [password, setPassword] = useState(rememberedLogin?.password ?? '')
-  const [rememberMe, setRememberMe] = useState(Boolean(rememberedLogin))
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -98,13 +99,8 @@ function Login({ onLogin, initialError = '' }: { onLogin: () => void; initialErr
     setLoading(true)
     setError('')
     try {
-      await api.login(username, password)
-      try {
-        if (rememberMe) saveLoginFormCache(username, password)
-        else clearLoginFormCache()
-      } catch {
-        clearLoginFormCache()
-      }
+      const platform = window.location.pathname.startsWith('/zsjos/mobile') ? 'MOBILE' : 'PC'
+      await api.login(username, password, platform)
       onLogin()
     } catch (loginError: any) {
       setError(loginError.response?.data?.msg || loginError.message || '登录失败')
@@ -120,14 +116,6 @@ function Login({ onLogin, initialError = '' }: { onLogin: () => void; initialErr
     {error && <Alert className="form-alert" type="error" showIcon message={error}/>} 
     <Input placeholder="用户名" size="large" value={username} onChange={event => setUsername(event.target.value)} className="login-input"/>
     <Input.Password placeholder="密码" size="large" value={password} onChange={event => setPassword(event.target.value)} onPressEnter={login} className="login-input"/>
-    <Checkbox
-      className="login-remember"
-      checked={rememberMe}
-      onChange={event => {
-        setRememberMe(event.target.checked)
-        if (!event.target.checked) clearLoginFormCache()
-      }}
-    >记住我</Checkbox>
     <Button type="primary" block size="large" loading={loading} onClick={login}>登录</Button>
   </Card></div>
 }
@@ -171,6 +159,7 @@ function toSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
 }
 
 function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: WorkbenchMenu; permissions: string[]; onOpenAssignment: () => void }) {
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
   if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
@@ -182,6 +171,8 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
+  if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
+  if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
@@ -215,6 +206,10 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
   )
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
+  const inaccessiblePathFallback = useMemo(
+    () => getInaccessiblePathFallback(navigation, location.pathname),
+    [navigation, location.pathname]
+  )
   const activePrimary = useMemo(
     () => findPrimaryByPath(navigation, location.pathname),
     [navigation, location.pathname]
@@ -223,6 +218,10 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
     () => findPageByPath(navigation, location.pathname),
     [navigation, location.pathname]
   )
+
+  useEffect(() => {
+    if (inaccessiblePathFallback) navigate(inaccessiblePathFallback, { replace: true })
+  }, [inaccessiblePathFallback, navigate])
 
   useEffect(() => {
     if (!activePrimary || location.pathname !== activePrimary.menu.path || activePrimary.pages.length === 0) return

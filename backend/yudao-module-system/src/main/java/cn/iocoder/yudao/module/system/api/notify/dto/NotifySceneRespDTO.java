@@ -16,4 +16,5 @@ public class NotifySceneRespDTO {
     private List<NotifySceneVariableRespDTO> variables;
     private List<NotifySceneRoleRespDTO> recipientRoles;
     private List<String> allowedActions;
+    private Boolean timed;
 }

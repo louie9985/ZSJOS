@@ -25,6 +25,8 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.NOTIFY_TEMPLATE_CODE_DUPLICATE;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.NOTIFY_TEMPLATE_NOT_EXISTS;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.NOTIFY_TEMPLATE_PARAM_INVALID;
+import cn.iocoder.yudao.module.system.api.notify.NotifyChannelType;
 
 /**
  * 站内信模版 Service 实现类
@@ -55,6 +57,7 @@ public class NotifyTemplateServiceImpl implements NotifyTemplateService {
 
         // 插入
         NotifyTemplateDO notifyTemplate = BeanUtils.toBean(createReqVO, NotifyTemplateDO.class);
+        normalizeChannel(notifyTemplate);
         notifyTemplate.setParams(parseTemplateParams(notifyTemplate.getTitle(), notifyTemplate.getSummary(),
                 notifyTemplate.getContent()));
         validateSceneParams(notifyTemplate.getSceneCode(), notifyTemplate.getParams());
@@ -73,6 +76,7 @@ public class NotifyTemplateServiceImpl implements NotifyTemplateService {
 
         // 更新
         NotifyTemplateDO updateObj = BeanUtils.toBean(updateReqVO, NotifyTemplateDO.class);
+        normalizeChannel(updateObj);
         updateObj.setParams(parseTemplateParams(updateObj.getTitle(), updateObj.getSummary(), updateObj.getContent()));
         validateSceneParams(updateObj.getSceneCode(), updateObj.getParams());
         notifyTemplateMapper.updateById(updateObj);
@@ -81,6 +85,23 @@ public class NotifyTemplateServiceImpl implements NotifyTemplateService {
     @VisibleForTesting
     public List<String> parseTemplateContentParams(String content) {
         return parseTemplateParams(content);
+    }
+
+    private void normalizeChannel(NotifyTemplateDO template) {
+        if (template.getChannelCode() == null || template.getChannelCode().isBlank()) {
+            template.setChannelCode(NotifyChannelType.IN_APP);
+        }
+        if (!NotifyChannelType.ALL.contains(template.getChannelCode())) {
+            throw exception(NOTIFY_TEMPLATE_PARAM_INVALID, template.getChannelCode());
+        }
+        if (NotifyChannelType.SMS.equals(template.getChannelCode())
+                && (template.getSmsTemplateId() == null || template.getSmsTemplateId().isBlank())) {
+            throw exception(NOTIFY_TEMPLATE_PARAM_INVALID, "smsTemplateId");
+        }
+        if (NotifyChannelType.WECOM.equals(template.getChannelCode())
+                && (template.getContent() == null || template.getContent().isBlank())) {
+            throw exception(NOTIFY_TEMPLATE_PARAM_INVALID, "content");
+        }
     }
 
     public List<String> parseTemplateParams(String... contents) {

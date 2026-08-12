@@ -28,6 +28,13 @@
       </el-row>
       <el-row>
         <el-col :span="12">
+          <el-form-item label="企微 userid" prop="wecomUserId">
+            <el-input v-model="formData.wecomUserId" maxlength="64" placeholder="请输入企业微信 userid" />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row>
+        <el-col :span="12">
           <el-form-item label="手机号码" prop="mobile">
             <el-input v-model="formData.mobile" maxlength="11" placeholder="请输入手机号码" />
           </el-form-item>
@@ -117,6 +124,7 @@ const formData = ref({
   nickname: '',
   deptId: '',
   mobile: '',
+  wecomUserId: '',
   email: '',
   id: undefined,
   username: '',
@@ -204,6 +212,7 @@ const resetForm = () => {
     nickname: '',
     deptId: '',
     mobile: '',
+    wecomUserId: '',
     email: '',
     id: undefined,
     username: '',

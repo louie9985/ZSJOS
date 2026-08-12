@@ -23,6 +23,9 @@ public class NotifyRuleSaveReqVO {
     @NotEmpty(message = "通知场景不能为空")
     private String sceneCode;
 
+    @NotEmpty(message = "通知渠道不能为空")
+    private String channelCode;
+
     @NotNull(message = "通知模板不能为空")
     private Long templateId;
 
@@ -31,6 +34,9 @@ public class NotifyRuleSaveReqVO {
 
     @NotEmpty(message = "点击动作不能为空")
     private String actionType;
+
+    private String timingStage;
+    private Integer timingOffsetMinutes;
 
     @NotNull(message = "状态不能为空")
     @InEnum(value = CommonStatusEnum.class, message = "状态必须是 {value}")

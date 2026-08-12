@@ -2956,6 +2956,9 @@ CREATE TABLE IF NOT EXISTS `system_notify_message` (
   `template_params` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模版参数',
   `notify_rule_id` bigint DEFAULT NULL COMMENT '通知规则编号',
   `scene_code` varchar(64) DEFAULT NULL COMMENT '业务场景编码',
+  `channel_code` varchar(32) NOT NULL DEFAULT 'in_app' COMMENT '通知渠道',
+  `sms_template_id` varchar(64) DEFAULT NULL COMMENT '短信模板编号',
+  `wecom_message_type` varchar(16) DEFAULT NULL COMMENT '企微消息类型',
   `source_event_key` varchar(128) DEFAULT NULL COMMENT '来源事件键',
   `action_type` varchar(32) DEFAULT NULL COMMENT '受控点击动作',
   `biz_type` varchar(64) DEFAULT NULL COMMENT '业务类型',
@@ -3000,10 +3003,13 @@ CREATE TABLE IF NOT EXISTS `system_notify_rule` (
   `id` bigint NOT NULL AUTO_INCREMENT,
   `name` varchar(64) NOT NULL,
   `scene_code` varchar(64) NOT NULL,
+  `channel_code` varchar(32) NOT NULL DEFAULT 'in_app',
   `template_id` bigint NOT NULL,
   `recipient_roles` text NOT NULL,
   `specified_user_ids` text NOT NULL,
   `action_type` varchar(32) NOT NULL,
+  `timing_stage` varchar(16) DEFAULT NULL COMMENT '提醒阶段：advance/due/overdue',
+  `timing_offset_minutes` int DEFAULT NULL COMMENT '相对截止时间偏移分钟数',
   `status` tinyint NOT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -3426,6 +3432,7 @@ CREATE TABLE IF NOT EXISTS `system_users` (
   `post_ids` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '岗位编号数组',
   `email` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '用户邮箱',
   `mobile` varchar(11) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '手机号码',
+  `wecom_user_id` varchar(64) DEFAULT NULL COMMENT '企业微信 userid',
   `sex` tinyint DEFAULT '0' COMMENT '用户性别',
   `avatar` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '头像地址',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '帐号状态（0正常 1停用）',
@@ -3776,6 +3783,16 @@ CREATE TABLE IF NOT EXISTS `zsjos_work_change` (
   PRIMARY KEY (`id`), KEY `idx_tenant_subject_changed` (`tenant_id`,`subject_type`,`subject_id`,`changed_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工作计划与任务变更历史';
 
+CREATE TABLE IF NOT EXISTS `zsjos_business_task_notify_stage` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `task_id` bigint NOT NULL, `notify_rule_id` bigint NOT NULL,
+  `stage` varchar(16) NOT NULL, `emitted_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_task_stage` (`tenant_id`,`task_id`,`stage`),
+  KEY `idx_tenant_rule` (`tenant_id`,`notify_rule_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务任务提醒阶段幂等记录';
+
 -- zsjos_customer_account
 CREATE TABLE IF NOT EXISTS `zsjos_customer_account` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '客户资金账户编号',
@@ -3925,6 +3942,10 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_appeal` (
   `round_no` int NOT NULL COMMENT '申诉轮次',
   `review_stage` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '审核阶段',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '申诉状态',
+  `owner_user_id_snapshot` bigint DEFAULT NULL COMMENT '提交时客资负责人快照',
+  `owner_dept_id_snapshot` bigint DEFAULT NULL COMMENT '提交时负责人部门快照',
+  `reviewer_dept_id_snapshot` bigint DEFAULT NULL COMMENT '提交时审批部门快照',
+  `reviewer_user_ids_snapshot` json DEFAULT NULL COMMENT '本轮审批人快照',
   `applicant_user_id` bigint NOT NULL COMMENT '申请人用户编号',
   `reason` varchar(1000) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '申诉原因',
   `evidence_refs` json DEFAULT NULL COMMENT '证据引用',
@@ -4103,7 +4124,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_sales_dispatch_preference` (
 -- zsjos_lead_inbox_filter_scheme
 CREATE TABLE IF NOT EXISTS `zsjos_lead_inbox_filter_scheme` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '筛选方案编号',
-  `audience` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '适用视角：submitter 或 owner',
+  `audience` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '适用视角：submitter、owner 或 reviewer',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '方案名称',
   `draft_config_json` json NOT NULL COMMENT '当前草稿配置',
   `published_config_json` json DEFAULT NULL COMMENT '当前已发布配置',
@@ -4190,8 +4211,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_intended_product` (
   `category_id` bigint DEFAULT NULL COMMENT '提交时叶子分类编号',
   `category_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交时叶子分类名称快照',
   `category_path_snapshot` json DEFAULT NULL COMMENT '提交时完整分类路径快照',
+  `active_product_ref` varchar(128) GENERATED ALWAYS AS (IF(`deleted` = 0, `product_ref`, NULL)) STORED,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tenant_lead_product` (`tenant_id`,`lead_id`,`product_ref`),
+  UNIQUE KEY `uk_tenant_lead_active_product` (`tenant_id`,`lead_id`,`active_product_ref`),
   KEY `idx_tenant_lead_primary` (`tenant_id`,`lead_id`,`is_primary`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资意向产品';
 
@@ -4264,9 +4286,30 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单状态',
   `submitter_user_id` bigint DEFAULT NULL COMMENT '本次订单提交人',
   `submitter_center_type` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交中心类型',
+  `buyer_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '购买方快照',
+  `student_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员姓名快照',
+  `student_nature` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员性质字典值',
+  `student_mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员手机号快照',
+  `student_wechat_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学员微信号快照',
+  `province_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '省编码快照',
+  `province_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '省名称快照',
+  `city_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '市编码快照',
+  `city_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '市名称快照',
+  `agreed_exam_time` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '商定考试时间文本',
+  `class_type` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '开通班种文本',
+  `service_period` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '服务周期字典值',
+  `student_source` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生来源字典值',
   `total_amount` decimal(18,2) NOT NULL COMMENT '订单总额',
   `discount_amount` decimal(18,2) NOT NULL DEFAULT '0.00' COMMENT '优惠金额',
   `payable_amount` decimal(18,2) NOT NULL COMMENT '应付金额',
+  `customer_paid_at` datetime DEFAULT NULL COMMENT '客户实际付款时间',
+  `fee_mode` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '缴费方式字典值',
+  `payment_method` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '支付方式字典值',
+  `remark` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '订单备注',
+  `student_special_requirements` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学生特殊要求',
+  `material_delivery_contact` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '教材邮递联系',
+  `payment_voucher_refs` json DEFAULT NULL COMMENT '缴费凭证文件快照',
+  `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次提交幂等键',
   `contract_refs` json DEFAULT NULL COMMENT '合同或附件引用',
   `current_approval_round_id` bigint DEFAULT NULL COMMENT '当前审批轮次编号',
   `submitted_at` datetime DEFAULT NULL COMMENT '提交时间',
@@ -4282,12 +4325,16 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  `active_lead_id` bigint GENERATED ALWAYS AS (CASE WHEN (`deleted` = b'0' AND `status` IN ('pending_approval','revision_required')) THEN `lead_id` ELSE NULL END) STORED COMMENT '活动成交单客资唯一键',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_no` (`tenant_id`,`order_no`),
   UNIQUE KEY `uk_tenant_source_payment_order` (`tenant_id`,`source_payment_order_id`),
   UNIQUE KEY `uk_tenant_opportunity` (`tenant_id`,`opportunity_id`),
+  UNIQUE KEY `uk_tenant_order_submit_key` (`tenant_id`,`submission_idempotency_key`),
+  UNIQUE KEY `uk_tenant_active_lead_order` (`tenant_id`,`active_lead_id`),
   KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`),
-  KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`)
+  KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
+  KEY `idx_tenant_submitter_status_submitted` (`tenant_id`,`submitter_user_id`,`status`,`submitted_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 业务订单';
 
 -- zsjos_order_approval_round
@@ -4303,6 +4350,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   `submitted_at` datetime NOT NULL COMMENT '本轮提交时间',
   `completed_at` datetime DEFAULT NULL COMMENT '本轮完成时间',
   `rejected_bpm_task_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '驳回任务引用，由 BPM 任务事件提供',
+  `decision_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本轮最终非通过原因快照',
+  `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '本轮提交幂等键',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
@@ -4312,8 +4361,24 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_order_round` (`tenant_id`,`order_id`,`round_no`),
   UNIQUE KEY `uk_tenant_process_instance` (`tenant_id`,`process_instance_id`),
+  UNIQUE KEY `uk_tenant_order_round_submit_key` (`tenant_id`,`submission_idempotency_key`),
   KEY `idx_tenant_order_status` (`tenant_id`,`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 订单审批轮次与 BPM 引用';
+
+-- zsjos_order_approval_config
+CREATE TABLE IF NOT EXISTS `zsjos_order_approval_config` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `registration_dept_id` bigint NOT NULL COMMENT '报名履约中心根部门',
+  `finance_dept_id` bigint NOT NULL COMMENT '财务结算中心根部门',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_order_approval_config` (`tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成交订单审批部门配置';
 
 -- zsjos_order_item
 CREATE TABLE IF NOT EXISTS `zsjos_order_item` (
@@ -4321,6 +4386,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_item` (
   `order_id` bigint NOT NULL COMMENT '订单编号',
   `product_id` bigint DEFAULT NULL COMMENT '产品模块产品编号',
   `sku_id` bigint DEFAULT NULL COMMENT '产品模块 SKU 编号',
+  `product_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '产品稳定编号快照',
+  `sku_ref` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'SKU 稳定编号快照',
   `quantity` decimal(18,4) NOT NULL DEFAULT '1.0000' COMMENT '数量',
   `unit_price` decimal(18,2) NOT NULL COMMENT '单价',
   `discount_amount` decimal(18,2) NOT NULL DEFAULT '0.00' COMMENT '订单项优惠金额',
@@ -4802,5 +4869,30 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`),
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 用户关系场景表';
+
+-- ZSJOS 登录安全默认客户端与配置（可重复执行）
+INSERT INTO system_oauth2_client
+    (client_id, secret, name, logo, description, status, access_token_validity_seconds,
+     refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes,
+     auto_approve_scopes, authorities, resource_ids, additional_information)
+SELECT 'zsjos-pc', '$2a$10$K8KpY7uGvCx7m8VJQ5hWQe3tQg5yDYr2yAYlF6FQq5FzHj7qXqz6K', 'ZSJOS 电脑端', '', '中世健电脑端登录', 0, 7200, 604800,
+       '[]', '["password","refresh_token"]', '[]', '[]', '[]', '[]', '{}'
+WHERE NOT EXISTS (SELECT 1 FROM system_oauth2_client WHERE client_id = 'zsjos-pc' AND deleted = b'0');
+INSERT INTO system_oauth2_client
+    (client_id, secret, name, logo, description, status, access_token_validity_seconds,
+     refresh_token_validity_seconds, redirect_uris, authorized_grant_types, scopes,
+     auto_approve_scopes, authorities, resource_ids, additional_information)
+SELECT 'zsjos-mobile', '$2a$10$K8KpY7uGvCx7m8VJQ5hWQe3tQg5yDYr2yAYlF6FQq5FzHj7qXqz6K', 'ZSJOS 手机端', '', '中世健手机端登录', 0, 7200, 604800,
+       '[]', '["password","refresh_token"]', '[]', '[]', '[]', '[]', '{}'
+WHERE NOT EXISTS (SELECT 1 FROM system_oauth2_client WHERE client_id = 'zsjos-mobile' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '电脑端最大登录设备数', 'zsjos.auth.pc.max-devices', '1', b'1', '正整数，最大 20'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.pc.max-devices' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '手机端最大登录设备数', 'zsjos.auth.mobile.max-devices', '1', b'1', '正整数，最大 20'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.mobile.max-devices' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS登录安全', 1, '免密登录天数', 'zsjos.auth.remember-days', '7', b'1', '正整数，最大 365 天'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.remember-days' AND deleted = b'0');
 
 SET FOREIGN_KEY_CHECKS=1;

@@ -27,4 +27,7 @@ public class AuthLoginRespVO {
     @Schema(description = "过期时间", requiredMode = Schema.RequiredMode.REQUIRED)
     private LocalDateTime expiresTime;
 
+    @Schema(description = "OAuth2 客户端编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "zsjos-pc")
+    private String clientId;
+
 }

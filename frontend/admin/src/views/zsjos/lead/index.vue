@@ -181,7 +181,7 @@
             detail.remark || '-'
           }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.invalidReason" label="无效原因" :span="2">{{
-            detail.invalidReason
+            detail.invalidReasonLabelSnapshot || '标签未配置'
           }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.closeReason" label="关闭原因" :span="2">{{
             detail.closeReason
@@ -394,14 +394,14 @@ const reloadDetail = async () => {
   }
 }
 const dictLabel = (options: Array<{ label: string; value: string | number }>, value?: string) =>
-  options.find((item) => String(item.value) === String(value))?.label || value || '-'
+  !value ? '-' : options.find((item) => String(item.value) === String(value))?.label || '标签未配置'
 const optionLabel = (options: Array<{ label: string; value: string }>, value?: string) =>
-  options.find((item) => item.value === value)?.label || value || '-'
+  !value ? '-' : options.find((item) => item.value === value)?.label || '未知状态'
 const leadStatusLabel = (value?: string) => optionLabel(LeadApi.LEAD_STATUS_OPTIONS, value)
 const assignmentStatusLabel = (value?: string) =>
   optionLabel(LeadApi.ASSIGNMENT_STATUS_OPTIONS, value)
 const dispatchModeLabel = (value?: string) =>
-  value ? LeadApi.DISPATCH_MODE_LABELS[value] || value : '-'
+  value ? LeadApi.DISPATCH_MODE_LABELS[value] || '未知派单方式' : '-'
 const userText = (id?: number, name?: string) => name || (id ? `用户 #${id}` : '未分配')
 const areaText = (row: LeadApi.LeadManagementVO) =>
   [row.provinceName, row.cityName].filter(Boolean).join(' / ') || '-'

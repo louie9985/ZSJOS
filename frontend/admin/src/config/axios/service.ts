@@ -6,6 +6,7 @@ import { config } from '@/config/axios/config'
 import {
   getAccessToken,
   getRefreshToken,
+  getClientId,
   getTenantId,
   getVisitTenantId,
   removeToken,
@@ -240,7 +241,9 @@ service.interceptors.response.use(
 
 const refreshToken = async () => {
   axios.defaults.headers.common['tenant-id'] = getTenantId()
-  return await axios.post(base_url + '/system/auth/refresh-token?refreshToken=' + getRefreshToken())
+  const clientId = getClientId()
+  return await axios.post(base_url + '/system/auth/refresh-token?refreshToken=' + getRefreshToken()
+    + (clientId ? '&clientId=' + encodeURIComponent(clientId) : ''))
 }
 const handleAuthorized = () => {
   const { t } = useI18n()

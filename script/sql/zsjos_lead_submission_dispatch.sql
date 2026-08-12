@@ -46,8 +46,9 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_intended_product` (
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  `active_product_ref` varchar(128) GENERATED ALWAYS AS (IF(`deleted` = 0, `product_ref`, NULL)) STORED,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tenant_lead_product` (`tenant_id`, `lead_id`, `product_ref`),
+  UNIQUE KEY `uk_tenant_lead_active_product` (`tenant_id`, `lead_id`, `active_product_ref`),
   KEY `idx_tenant_lead_primary` (`tenant_id`, `lead_id`, `is_primary`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资意向产品';
 

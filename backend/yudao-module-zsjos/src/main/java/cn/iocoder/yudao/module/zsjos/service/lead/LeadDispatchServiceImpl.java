@@ -399,8 +399,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 .map(LeadIntendedProductDO::getProductNameSnapshot).toList());
         result.setPrimaryIntendedProduct(products.stream().filter(item -> Boolean.TRUE.equals(item.getIsPrimary()))
                 .map(LeadIntendedProductDO::getProductNameSnapshot).findFirst().orElse(null));
-        result.setSourceChannel(channelLabels.getOrDefault(lead.getSourceChannelId(), lead.getSourceChannelId()));
-        result.setLeadCategory(categoryLabels.getOrDefault(lead.getLeadCategory(), lead.getLeadCategory()));
+        result.setSourceChannel(lead.getSourceChannelId());
+        result.setSourceChannelLabel(channelLabels.get(lead.getSourceChannelId()));
+        result.setLeadCategory(lead.getLeadCategory());
+        result.setLeadCategoryLabel(categoryLabels.get(lead.getLeadCategory()));
         result.setRemark(lead.getRemark());
         result.setAttachmentUrls(attachments.stream()
                 .sorted(Comparator.comparing(LeadAttachmentDO::getSort))

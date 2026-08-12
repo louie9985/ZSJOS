@@ -17,7 +17,9 @@ public class LeadPendingRespVO {
     private List<String> intendedProducts;
     private String primaryIntendedProduct;
     private String sourceChannel;
+    private String sourceChannelLabel;
     private String leadCategory;
+    private String leadCategoryLabel;
     private String remark;
     private List<String> attachmentUrls;
     private LocalDateTime submittedAt;

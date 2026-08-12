@@ -22,6 +22,7 @@ public class NotifyBusinessEventApiImpl implements NotifyBusinessEventApi {
         LocalDateTime occurredAt = Objects.requireNonNullElseGet(event.getOccurredAt(), LocalDateTime::now);
         eventPublisher.publishEvent(NotifyBusinessEvent.builder()
                 .tenantId(tenantId).sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey())
+                .targetRuleId(event.getTargetRuleId())
                 .bizType(event.getBizType()).bizId(event.getBizId()).operatorUserId(event.getOperatorUserId())
                 .occurredAt(occurredAt).payload(event.getPayload()).build());
     }

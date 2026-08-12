@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AssignmentUser, type LeadQualificationException } from '../services/api'
 import { LEAD_HANDLING_STAGE_LABELS } from '../constants'
@@ -80,8 +80,8 @@ export default function LeadQualificationExceptionPage() {
     </Spin>
     <Modal open={Boolean(action)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' }[action || 'restore']} confirmLoading={saving} onOk={() => void submit()} onCancel={() => setAction(undefined)} okText="确认处理">
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        {action === 'transfer' && <Select showSearch optionFilterProp="label" value={salesUserId} onChange={setSalesUserId} placeholder={candidates.length ? '选择目标销售' : '暂无可转派销售'} options={candidates.map(user => ({ value: user.id, label: `${user.nickname}${user.deptName ? ` · ${user.deptName}` : ''}` }))} style={{ width: '100%' }}/>} 
-        <Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/>
+        {action === 'transfer' && <Form.Item label="目标销售" required><Select showSearch optionFilterProp="label" value={salesUserId} onChange={setSalesUserId} placeholder={candidates.length ? '选择目标销售' : '暂无可转派销售'} options={candidates.map(user => ({ value: user.id, label: `${user.nickname}${user.deptName ? ` · ${user.deptName}` : ''}` }))} style={{ width: '100%' }}/></Form.Item>}
+        <Form.Item label="处置理由" required><Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/></Form.Item>
       </Space>
     </Modal>
   </section>

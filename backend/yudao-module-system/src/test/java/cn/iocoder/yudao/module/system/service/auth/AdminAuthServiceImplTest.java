@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
 import cn.iocoder.yudao.module.system.api.sms.SmsCodeApi;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.*;
@@ -61,6 +62,8 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
     private MemberService memberService;
     @MockitoBean
     private Validator validator;
+    @MockitoBean
+    private ConfigApi configApi;
 
     @BeforeEach
     public void setUp() {
@@ -151,6 +154,7 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
         // 准备参数
         AuthLoginReqVO reqVO = randomPojo(AuthLoginReqVO.class, o ->
                 o.setUsername("test_username").setPassword("test_password")
+                        .setPlatform("PC")
                         .setSocialType(randomEle(SocialTypeEnum.values()).getType()));
 
         // mock 验证码正确
@@ -164,8 +168,10 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
         // mock 缓存登录用户到 Redis
         OAuth2AccessTokenDO accessTokenDO = randomPojo(OAuth2AccessTokenDO.class, o -> o.setUserId(1L)
                 .setUserType(UserTypeEnum.ADMIN.getValue()));
-        when(oauth2TokenService.createAccessToken(eq(1L), eq(UserTypeEnum.ADMIN.getValue()), eq("default"), isNull()))
+        when(oauth2TokenService.createAccessTokenWithLimit(eq(1L), eq(UserTypeEnum.ADMIN.getValue()),
+                eq("zsjos-pc"), isNull(), eq(7 * 24 * 60 * 60), eq(1)))
                 .thenReturn(accessTokenDO);
+        when(configApi.getConfigValueByKey(anyString())).thenThrow(new IllegalStateException("config unavailable"));
 
         // 调用，并校验
         AuthLoginRespVO loginRespVO = authService.login(reqVO);

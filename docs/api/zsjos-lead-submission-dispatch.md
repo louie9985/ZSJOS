@@ -9,6 +9,7 @@
 - WebSocket 使用现有 `/infra/ws`，消息类型为 `zsjos_lead_assignment`，内容仅包含 `leadId` 和 `eventType`。
 - `eventType` 包含 `assigned`、`reassigned`、`accepted`、`rejected`、`expired`、`cancelled`；客户端只将消息作为重新查询信号。
 - 待接列表项返回 `remainingSeconds`、`rejectable`、`deferrable` 和 `assignmentHistoryId`。自动派单可拒绝且不可延后，指定派单不可拒绝但可收起稍后处理。
+- 待接列表和抢单池中的 `sourceChannel`、`leadCategory` 始终是持久化的稳定字典键；`sourceChannelLabel`、`leadCategoryLabel` 是当前启用字典解析出的展示标签。字典缺项时标签字段为空，客户端必须显示未配置状态，不得把稳定键当作展示标签。
 
 ## 员工接口与权限
 
