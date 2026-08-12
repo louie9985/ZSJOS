@@ -12,7 +12,7 @@
 - Dependencies: Existing lead qualification, opportunity follow-up, sales-order dual BPM approval, object permissions, and current schema baseline through `V032`.
 - Integration order: Phase one must merge before duplicate review, opportunity public pool, submitter actions/complaints, and repurchase workstreams.
 - Verification plan: Focused service tests; full `yudao-module-zsjos` Maven tests; migration syntax/repeatability and schema verification review; workbench unit tests, typecheck, production build, and responsive browser checks for changed list/detail projections.
-- Status: `implementation-complete-awaiting-commit-confirmation`
+- Status: `ready-to-merge`
 
 ## Delivery Entries
 
@@ -28,3 +28,16 @@
 - Verification evidence: Reactor compile/install with tests skipped passed for all dependencies and ZSJOS. Focused lifecycle tests passed 66/66, including appeal restore, qualification restore, owner transfer, follow-up projection, management actions, customer consistency, and approval success. Workbench tests passed 65/65; TypeScript typecheck passed; production build passed with the existing large-chunk warning. Browser checks at 1440x900 and 390x844 showed no horizontal overflow or control clipping on the unauthenticated page; authenticated lead-list rendering was unavailable. `git diff --check` passed. SQL was reviewed for MySQL client `DELIMITER`, guarded DDL, repeatability, migration order, global/module version recording, and non-destructive duplicate blocking; real MySQL execution was not authorized and therefore not run.
 - Dependency or integration impact: Phase two must start only after this workstream is committed and integrated. Full repository/module test commands expose unrelated baseline failures: `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch`; ZSJOS `LeadFollowUpRuleServiceImplTest.updatesTimeoutAndAdvancesVersion`; ZSJOS `LeadNotifySceneProviderTest.registersAllScenesWithSceneSpecificVariables`. These files were not modified. `npm ci --ignore-scripts` installed lockfile-defined dependencies only in this worktree; no lockfile changed.
 - Remaining work: Obtain explicit confirmation to commit this workstream. Before production migration, run `script/sql/mysql/verify-lifecycle-domain-v033.sql` against the target database, resolve any returned relationship conflicts, execute V033 in a controlled environment, and run `verify-bootstrap.sql`. Real authenticated HTTP and lead-list browser checks remain unverified because no backend/login environment was started. After commit and integration confirmation, create a separate branch/worktree for phase two.
+
+### 2026-08-12 21:19:44 +08:00
+
+- Branch: `codex/lifecycle-domain-unification`
+- Worktree: `D:\ZSJ-OS-worktrees\lifecycle-domain-unification`
+- HEAD commit: `0275ff5e10542a145547d8d8c3fa9ac2d32dc018`
+- User goal: Commit and integrate all approved branches and worktrees into `main`.
+- Key decisions: Preserved the phase-one implementation as its own auditable commit; marked it ready to merge after confirming the worktree was clean and the previously recorded verification remained applicable.
+- Execution or analysis result: Phase-one implementation committed successfully and is ready for integration. Integration must renumber its migration because another ready workstream independently owns V033 through V035.
+- Changed files: `handoff/lifecycle-domain-unification.md`.
+- Verification evidence: Pre-commit `git diff --check` passed; implementation verification remains the 66/66 backend lifecycle tests, 65/65 workbench tests, typecheck, production build, and responsive smoke checks recorded above.
+- Dependency or integration impact: During integration, rename the lifecycle migration and verification references from V033 to the next free migration number after the collaboration-pool sequence, then rerun affected checks.
+- Remaining work: Merge into `main`, resolve the migration-number collision, rerun integration verification, and record the resulting integration commit.
