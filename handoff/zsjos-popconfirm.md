@@ -12,7 +12,7 @@
 - Dependencies: Existing Ant Design 6 and Element Plus dependencies; no new dependency.
 - Integration order: Merge after any workstream touching the same ZSJOS frontend pages, or rebase and rerun all affected checks before integration.
 - Verification plan: Workbench tests, typecheck, build, desktop/mobile browser checks; admin typecheck, lint, local build, desktop/mobile browser checks.
-- Status: `implemented; verification-limited`
+- Status: `ready-to-merge; verification-limited`
 
 ## Delivery entries
 
@@ -29,3 +29,17 @@
 - Verification evidence: Workbench focused tests passed (4/4), `npm run typecheck` passed, and `npm run build` passed. Workbench full test run executed 58 passing tests; the pre-existing `loginFormCache` suite could not load because the main-worktree dependency link lacks `jsencrypt/lib/index.js`. Admin confirmation-copy tests passed (2/2); scoped ESLint, Prettier, and Stylelint passed; `build:local` passed. Admin `vue-tsc` reported 12 existing errors outside `src/views/zsjos`; no changed ZSJOS file had a diagnostic. `git diff --check` passed. Desktop browser smoke check rendered the Workbench appeal page and Admin login page without horizontal overflow. Workbench had no appeal rows and the current account exposed no other target pages; Admin login was rejected with `请求的租户标识未传递`. Browser viewport override did not change the actual 1280x720 viewport, so mobile interaction remains unverified.
 - Dependency or integration impact: No new dependency. Integration must account for any concurrent changes to the same 19 existing ZSJOS frontend files. Generated build output and TypeScript cache changes were not retained.
 - Remaining work: Re-run interactive desktop/mobile checks with an Admin tenant-authenticated session and target-role Workbench accounts containing representative records. Re-run Admin full typecheck after resolving baseline non-ZSJOS diagnostics and Workbench full tests after repairing the `jsencrypt` dependency link. Commit, push, merge, and integration verification remain separately unauthorized.
+
+### 2026-08-12 21:19:44 +08:00
+
+- Branch: `codex/zsjos-popconfirm`
+- Worktree: `D:\ZSJ-OS-worktrees\zsjos-popconfirm`
+- HEAD commit: `e9f5e55197674b95405725baa969f8f7de6db27e`
+- Final commit: `e9f5e55197674b95405725baa969f8f7de6db27e`
+- User goal: Commit and integrate all approved branches and worktrees into `main`.
+- Key decisions: Preserved the confirmation implementation as an independent commit and retained the documented authenticated/mobile verification limitations.
+- Execution or analysis result: Implementation committed successfully and is ready for integration.
+- Changed files: `handoff/zsjos-popconfirm.md`.
+- Verification evidence: Pre-commit `git diff --check` passed; focused tests, builds, lint/style checks, and browser evidence remain as recorded above.
+- Dependency or integration impact: Overlapping Workbench files must be resolved after the subordinate-sales and lifecycle merges, followed by frontend integration checks.
+- Remaining work: Merge into `main`, resolve overlapping frontend changes, and rerun integration verification.
