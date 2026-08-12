@@ -1,7 +1,7 @@
 # Workstream Handoff: workbench-foundation
 
 - Workstream ID: `workbench-foundation`
-- Status: `ready-to-merge`
+- Status: `merged`
 - Goal: Implement the simplified Zhongshijian workbench foundation with a decoupled task center and a template-backed plan -> task tree -> completion report -> optional confirmation -> plan summary workflow.
 - Non-goals: Customer, lead, student, order, payment, registration, work-order, performance-scoring, recurring-template, or multi-assignee business behavior.
 - Branch: `codex/workbench-foundation`
@@ -676,3 +676,16 @@
 - Verification evidence: `git diff --check` 通过；员工工作台 51 个测试、类型检查和生产构建已通过；Vue 目标文件 ESLint 与本地生产构建已通过，Vue 全仓类型检查仅有其他模块 14 处既有错误；工作计划后端 13 个定向测试及 `yudao-server` 打包已通过；后端健康状态为 `UP`。完整迁移连续性检查按用户指示不因缺失 `V021` 阻断。
 - Dependency or integration impact: 将创建工作流最终提交并合入 `main`；主工作树现有改动会先单独提交以保留来源和内容；不推送远端。
 - Remaining work: 创建功能提交、保护性提交主工作树现有改动、合并到 `main`、在集成分支重跑受影响检查，并将本交接状态更新为 `merged`。
+
+### 2026-08-12 18:11:18 CST
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `9c5ebf12a435e78eb74ba2e3477e3c00d576f353` before the final handoff commit.
+- User goal: 完成 `codex/workbench-foundation` 到 `main` 的提交、合并与集成验证。
+- Key decisions: 功能分支以 `03a1142` 提交；主工作树原有 `.gitignore`、`AGENTS.md`、`HANDOFF.md` 以独立保护性提交 `da89932` 原样保存；通过非快进合并提交 `9c5ebf1` 集成工作流；不推送远端、不重启服务、不修改数据库；按用户明确指示不以缺失 `V021` 阻断本次合并。
+- Execution or analysis result: 合并使用 Git `ort` 策略完成且无冲突，`codex/workbench-foundation` 已是 `main` 的祖先；生成的 TypeScript 构建信息差异已清理；工作流状态更新为 `merged`。
+- Changed files: `handoff/workbench-foundation.md`; `frontend/workbench/tsconfig.tsbuildinfo` restored after integration build. No business source change after merge.
+- Verification evidence: 集成后的后端工作计划 13 个定向测试全部通过，20 个 Maven Reactor 模块 `BUILD SUCCESS`；员工工作台 11 个测试文件、51 个测试、类型检查和生产构建通过，仅有既有 chunk size warning；Vue 两个目标工作计划页面 ESLint 与 `pnpm build:local` 通过，仅有既有 LightningCSS `*zoom: 1` warning；`git diff --check` 通过；Java PID `33946` 继续监听 `48080` 且健康状态为 `UP`。首次未带 `-am` 的 Maven 命令因主工作树本地仓库缺少内部模块依赖而在解析阶段失败，补充 `-am` 后完整通过。
+- Dependency or integration impact: `main` 包含工作计划 V022、查询权限拆分 V023、后端、React/Vue 前端、测试与文档；本地主分支相对 `origin/main` 领先，尚未推送。缺失 `V021` 的迁移连续性风险由用户明确接受，本次未运行连续迁移链检查。
+- Remaining work: None for local merge. 推送远端、发布前端产物、在其他环境执行 V022/V023 或重启服务均需独立执行。
