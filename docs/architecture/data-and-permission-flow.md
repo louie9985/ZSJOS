@@ -223,6 +223,7 @@ otherwise
   detail request cannot bypass row visibility. A leader of a peer department receives
   no access, while a leader of a parent department may access owners in child departments.
 - 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案：后端根据审批配置根部门及子部门解析用户可用中心，报名履约用户固定查询 `registrationReview`，财务用户固定查询 `financeReview`，同时属于两个范围的用户才可切换中心。`inbox-page` 必须将请求中心、已发布筛选条件和用户可用 BPM 节点取交集，页面隐藏另一中心不能代替授权。
+- 提交人和负责人客资收件箱固定按服务端分页每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一页；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取第一页。下一页失败必须保留已加载客资并提供局部重试，不得把增量失败渲染成空列表或扩大服务端筛选范围。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询和数量统计只消费已发布版本；保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。

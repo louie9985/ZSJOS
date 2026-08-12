@@ -31,6 +31,7 @@
 
 .lead-detail-actions{min-width:0;margin-left:auto;justify-content:flex-end}
 .lead-detail-actions .ant-btn{flex:none}
+.lead-list-skeletons{display:flex;flex-direction:column;gap:6px}.lead-list-sentinel{display:flex;min-height:48px;flex:none;align-items:center;justify-content:center;padding:4px 0}.lead-list-sentinel>.ant-alert{width:100%}
 @media(max-width:768px){.lead-detail-hero{flex-wrap:wrap}.lead-detail-actions{width:100%;margin-left:0;justify-content:flex-start}.lead-detail-actions .ant-btn{flex:1;min-width:112px}.follow-up-field-grid{grid-template-columns:1fr}}
 .sales-dispatch-control{height:32px;flex:none}.dispatch-status-tag{min-width:72px;height:32px;margin-inline-end:0;padding-inline:9px;display:inline-flex;align-items:center;justify-content:center;line-height:30px;text-align:center}.dispatch-mode-button{width:96px;height:32px;padding-inline:12px}.sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn{font-size:14px;white-space:nowrap}@media(max-width:768px){.header-actions{gap:4px!important}.ai-action{display:none}.sales-dispatch-control{gap:2px!important}.dispatch-status-tag{min-width:56px;padding-inline:3px}.dispatch-mode-button{width:72px;padding-inline:4px}.sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn{font-size:12px}}
 
