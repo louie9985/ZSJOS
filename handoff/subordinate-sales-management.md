@@ -1,7 +1,7 @@
 # Workstream Handoff: subordinate-sales-management
 
 - Workstream ID: `subordinate-sales-management`
-- Status: `active`
+- Status: `ready-to-merge`
 - Goal: Implement the approved server-authorized subordinate-sales management list, detail tabs, status controls, metrics, and reason-required partial-success batch lead operations.
 - Non-goals: Execute database migrations, add a standalone public-sea menu, implement newcomer-pool routing, add follow-up completion rate, change external/shared services, push, or merge into `main`.
 - Branch: `codex/subordinate-sales-management`
@@ -13,6 +13,9 @@
 - Dependencies: Integrated aging collaboration pool, invalid-lead task cleanup, and lead-inbox lazy-loading behavior at base commit `90b2c3dfd8`.
 - Integration order: System public API and persistence contract, ZSJOS services/controllers/tests, SQL/menu grants, Workbench UI/tests, documentation, then full verification.
 - Verification plan: Focused System and ZSJOS Maven tests and compile; backend contract/authorization tests; database static/repeatability checks without execution; Workbench unit tests/typecheck/build; desktop and mobile browser checks against a local development server; `git diff --check` and final scope review.
+- Final feature commit: `b11223b44f44b9a01e3e61912fc04d788fc5a09a`
+- Unresolved risks: Authenticated browser and real authorized/unauthorized HTTP verification require an applied V035 migration, test account, and available MySQL/Redis environment; migration execution remains intentionally excluded.
+- Dependency state: Base dependencies are integrated at `90b2c3dfd8`; this workstream is self-contained and ready for integration into `codex/subordinate-sales-integration` after deployment review.
 
 ## Delivery Entries
 
