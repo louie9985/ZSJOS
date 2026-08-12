@@ -27,4 +27,8 @@ public class SalesOrderApprovalRoundDO extends TenantBaseDO {
     private String rejectedBpmTaskId;
     private String decisionReason;
     private String submissionIdempotencyKey;
+    private String registrationDecisionIdempotencyKey;
+    private String financeDecisionIdempotencyKey;
+    private String terminationIdempotencyKey;
+    private Integer version;
 }

@@ -62,6 +62,7 @@ import SalesOrderApprovalPage from './pages/SalesOrderApprovalPage'
 import MySalesOrderPage from './pages/MySalesOrderPage'
 import SubordinateSalesPage from './pages/SubordinateSalesPage'
 import LeadComplaintPage from './pages/LeadComplaintPage'
+import ExternalRepurchasePage from './pages/ExternalRepurchasePage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import {
@@ -183,6 +184,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
+  if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>

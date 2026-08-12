@@ -382,7 +382,7 @@ export default function LeadAgingPoolPage() {
                     </Button>
                   )}
                   {detail.availableActions?.some((action) =>
-                    ["ENTER_DEAL", "REVISE_DEAL", "CONTINUE_DEAL"].includes(
+                    ["ENTER_DEAL", "REVISE_DEAL"].includes(
                       action.code,
                     ),
                   ) && (
@@ -390,11 +390,7 @@ export default function LeadAgingPoolPage() {
                       icon={<FileAddOutlined />}
                       onClick={() => setOrderOpen(true)}
                     >
-                      {detail.availableActions?.some(
-                        (action) => action.code === "CONTINUE_DEAL",
-                      )
-                        ? "接续成交"
-                        : selected.activeSalesOrderStatus ===
+                      {selected.activeSalesOrderStatus ===
                             "revision_required"
                           ? "补正成交"
                           : "录入成交"}
@@ -446,9 +442,6 @@ export default function LeadAgingPoolPage() {
                     ? selected.activeSalesOrderId
                     : undefined
                 }
-                continuation={detail.availableActions?.some(
-                  (action) => action.code === "CONTINUE_DEAL",
-                )}
                 onClose={() => setOrderOpen(false)}
                 onSubmitted={() => {
                   setOrderOpen(false);

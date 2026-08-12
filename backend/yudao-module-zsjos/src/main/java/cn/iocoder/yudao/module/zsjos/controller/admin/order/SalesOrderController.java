@@ -39,18 +39,33 @@ public class SalesOrderController {
         return success(orderService.createAndSubmit(leadId, WebFrameworkUtils.getLoginUserId(), reqVO));
     }
 
+    @PostMapping("/lead/{leadId}/repurchase")
+    @Operation(summary = "从客资详情提交系统客户复购订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<Long> createSystemRepurchase(@PathVariable Long leadId,
+                                                      @Valid @RequestBody SalesOrderRepurchaseReqVO reqVO) {
+        return success(orderService.createSystemRepurchase(leadId, WebFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
+    @PostMapping("/external-repurchase")
+    @Operation(summary = "提交系统外历史客户复购订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<Long> createExternalRepurchase(@Valid @RequestBody SalesOrderRepurchaseReqVO reqVO) {
+        return success(orderService.createExternalRepurchase(WebFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
+    @GetMapping("/lead/{leadId}/customer-orders")
+    @Operation(summary = "按客资客户聚合全部首购和复购订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<java.util.List<SalesOrderListItemRespVO>> getCustomerOrders(@PathVariable Long leadId) {
+        return success(orderService.getCustomerOrders(leadId, WebFrameworkUtils.getLoginUserId()));
+    }
+
     @PutMapping("/{id}/resubmit")
     @Operation(summary = "补正并重新提交成交订单")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
     public CommonResult<Boolean> resubmit(@PathVariable Long id, @Valid @RequestBody SalesOrderSubmitReqVO reqVO) {
         orderService.reviseAndResubmit(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
-    }
-
-    @PostMapping("/{id}/continue-submit")
-    @Operation(summary = "协同销售接续驳回订单并重新提交")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
-    public CommonResult<Long> continueSubmit(@PathVariable Long id, @Valid @RequestBody SalesOrderSubmitReqVO reqVO) {
-        return success(orderService.continueAndSubmit(id, WebFrameworkUtils.getLoginUserId(), reqVO));
     }
 
     @GetMapping("/{id}")
@@ -103,6 +118,13 @@ public class SalesOrderController {
     @Operation(summary = "驳回当前会签轮次")
     public CommonResult<Boolean> reject(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {
         orderService.reject(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
+    }
+
+    @PutMapping("/{id}/terminate")
+    @Operation(summary = "订单创建人终止当前审批")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
+    public CommonResult<Boolean> terminate(@PathVariable Long id, @Valid @RequestBody SalesOrderTerminateReqVO reqVO) {
+        orderService.terminate(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
     }
 
     @PostMapping("/voucher/upload")

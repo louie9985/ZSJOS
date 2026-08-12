@@ -10,6 +10,8 @@ public class SalesOrderListItemRespVO {
     private Long id;
     private String orderNo;
     private Long leadId;
+    private Long personId;
+    private String orderType;
     private String status;
     private String studentName;
     private String studentMobile;
