@@ -232,15 +232,15 @@ ServiceRelation 1:N ServiceRecord
 | `converted_at` | datetime | 否 | 首次销售转化机会创建成功时间，不是订单创建或首次付款时间 |
 | `closed_at`、`close_reason` | datetime/varchar | 条件必填 | 关闭时间和原因 |
 
-提交人身份必须满足二选一：内部来源填写 `source_user_id`，兼职来源填写 `partner_id`。手机号和微信号均未命中时，同一事务创建 Person 与 Lead；任一标识命中同一已有 Person 时不插入 Lead，而是创建客资激活记录；两个标识交叉指向不同 Person 时整个提交失败。
+提交人身份必须满足二选一：内部来源填写 `source_user_id`，兼职来源填写 `partner_id`。提交先执行统一查重：活动客资手机号或微信号同字段强命中时直接拒绝并展示已有业务阶段；交叉联系方式、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中进入独立重复客资复核；完全无命中才在同一事务创建 Person 与 Lead。
 
-新提交必须至少选择一个启用课程、同一课程不可重复且恰好一个主意向。稳定产品引用与提交时名称保存在 `zsjos_lead_intended_product`；最多九张图片的 Infra 文件编号和提交时元数据快照保存在 `zsjos_lead_attachment`。附件保持私有读，只有在客资读取权限校验通过后，ZSJOS 才通过 Infra 公共 API 按文件原存储配置生成短期访问地址；临时签名地址不作为持久化标识。重复客资的本次地区、课程、分类、备注和附件只写入 `LeadActivation.submission_snapshot`，不覆盖原 Lead。
+新提交必须至少选择一个启用课程、同一课程不可重复且恰好一个主意向。稳定产品引用与提交时名称保存在 `zsjos_lead_intended_product`；最多九张图片的 Infra 文件编号和提交时元数据快照保存在 `zsjos_lead_attachment`。附件保持私有读，只有在对象读取权限校验通过后才通过 Infra 公共 API 生成短期访问地址。疑似重复提交的完整资料、命中规则和候选对象保存在 `zsjos_lead_duplicate_review`，强命中活动客资不落复核任务。
 
-### 7.4 客资激活 `LeadActivation`
+### 7.4 重复客资复核与历史激活
 
-重复客资不覆盖原 Lead，也不伪造一条新客资。每次激活独立保存，至少包含 `person_id`、`lead_id`、`source_type`、`source_user_id`、`partner_id`、`source_channel_id`、`submission_snapshot`、`activated_at`、`idempotency_key`。通知对象及投递结果通过关联业务任务或事件留痕。
+`LeadActivation` 仅保留阶段二上线前的历史兼容数据，新提交不再写入。新复核任务永久保存提交快照、命中规则、候选快照、处理人、处理时间、结构化结论、意见、附件、选择销售及资料前后值。公共队列提交结论时锁定任务，第一位处理人成功。
 
-激活通知按当前业务关系路由：有活动服务关系时通知学生服务负责人；否则有未结束机会时通知机会负责人；否则通知客资当前负责人，尚无负责人时进入销售分配流程。路由依据稳定业务关系和状态，不根据部门、岗位或角色名称推断。
+非重复创建新 Person/Lead；重复 Person 且无主客资时复用 Person 创建首条主客资；无效或关闭 Lead 可覆盖当前资料、选择范围内销售并回到待首次跟进；活动、商机或已成交客户只通知所属销售而不修改资料。重新激活时旧 Opportunity 保持关闭，重新判有效后恢复原 Opportunity。联系方式修改只在完全无命中时成功，任何疑似命中都取消修改且不进入复核。
 
 ### 7.5 客资分配历史 `LeadAssignmentHistory`
 

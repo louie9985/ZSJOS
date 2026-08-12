@@ -3915,6 +3915,24 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资';
 
 -- zsjos_lead_activation
+CREATE TABLE IF NOT EXISTS `zsjos_lead_duplicate_review` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `status` varchar(32) NOT NULL, `submitter_user_id` bigint DEFAULT NULL,
+  `submission_snapshot` json NOT NULL, `match_rules` json NOT NULL, `candidate_snapshot` json NOT NULL,
+  `matched_person_id` bigint DEFAULT NULL, `matched_lead_id` bigint DEFAULT NULL, `result_type` varchar(32) DEFAULT NULL,
+  `review_opinion` varchar(2000) DEFAULT NULL, `review_attachments` json DEFAULT NULL, `selected_sales_user_id` bigint DEFAULT NULL,
+  `reviewer_user_id` bigint DEFAULT NULL, `reviewed_at` datetime DEFAULT NULL, `before_snapshot` json DEFAULT NULL,
+  `after_snapshot` json DEFAULT NULL, `submission_idempotency_key` varchar(128) NOT NULL,
+  `decision_idempotency_key` varchar(128) DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_submission_idempotency` (`tenant_id`,`submission_idempotency_key`),
+  UNIQUE KEY `uk_tenant_decision_idempotency` (`tenant_id`,`decision_idempotency_key`), KEY `idx_tenant_queue` (`tenant_id`,`status`,`create_time`,`id`),
+  KEY `idx_tenant_person` (`tenant_id`,`matched_person_id`), KEY `idx_tenant_lead` (`tenant_id`,`matched_lead_id`),
+  KEY `idx_tenant_reviewer` (`tenant_id`,`reviewer_user_id`,`reviewed_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 重复客资复核';
+
+-- zsjos_lead_activation
 CREATE TABLE IF NOT EXISTS `zsjos_lead_activation` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '客资激活编号',
   `person_id` bigint NOT NULL COMMENT 'Person 编号',

@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
@@ -39,6 +40,7 @@ public class LeadBasicInfoService {
     @Resource private DictDataApi dictDataApi;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private BusinessEventMapper eventMapper;
+    @Resource private LeadDuplicateMatcher duplicateMatcher;
 
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "basic-info-update")
@@ -55,7 +57,7 @@ public class LeadBasicInfoService {
         String wechat = StrUtil.trimToNull(req.getWechatId());
         if (mobile == null && wechat == null) throw exception(LEAD_CONTACT_REQUIRED);
         if (mobile != null && !ValidationUtils.isMobile(mobile)) throw exception(LEAD_MOBILE_INVALID);
-        checkIdentityConflict(lead.getPersonId(), mobile, wechat);
+        checkIdentityConflict(lead, req, mobile, wechat);
         Region region = validateRegion(req.getProvinceCode(), req.getCityCode());
         String category = StrUtil.trimToNull(req.getLeadCategory());
         if (category != null) dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(category));
@@ -100,11 +102,18 @@ public class LeadBasicInfoService {
         return opportunity == null || Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING).contains(opportunity.getStatus());
     }
 
-    private void checkIdentityConflict(Long personId, String mobile, String wechat) {
+    private void checkIdentityConflict(LeadDO lead, LeadBasicInfoUpdateReqVO req, String mobile, String wechat) {
         PersonDO byMobile = mobile == null ? null : personMapper.selectByMobile(mobile);
         PersonDO byWechat = wechat == null ? null : personMapper.selectByWechatId(wechat);
-        if (byMobile != null && !Objects.equals(byMobile.getId(), personId)
-                || byWechat != null && !Objects.equals(byWechat.getId(), personId)) {
+        if (byMobile != null && !Objects.equals(byMobile.getId(), lead.getPersonId())
+                || byWechat != null && !Objects.equals(byWechat.getId(), lead.getPersonId())) {
+            throw exception(LEAD_BASIC_INFO_CONTACT_CONFLICT);
+        }
+        LeadCreateReqVO probe = new LeadCreateReqVO();
+        probe.setName(req.getName()); probe.setMobile(mobile); probe.setWechatId(wechat);
+        probe.setProvinceCode(req.getProvinceCode()); probe.setCityCode(req.getCityCode());
+        probe.setIntendedProducts(req.getIntendedProducts());
+        if (duplicateMatcher.match(probe, lead.getPersonId()).hasMatches()) {
             throw exception(LEAD_BASIC_INFO_CONTACT_CONFLICT);
         }
     }

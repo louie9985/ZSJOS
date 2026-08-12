@@ -22,6 +22,12 @@ public interface LeadIntendedProductMapper extends BaseMapperX<LeadIntendedProdu
         return selectList(LeadIntendedProductDO::getLeadId, leadId);
     }
 
+    default LeadIntendedProductDO selectPrimaryByLeadId(Long leadId) {
+        return selectOne(new LambdaQueryWrapperX<LeadIntendedProductDO>()
+                .eq(LeadIntendedProductDO::getLeadId, leadId)
+                .eq(LeadIntendedProductDO::getIsPrimary, true).last("LIMIT 1"));
+    }
+
     default List<LeadIntendedProductDO> selectListByLeadIds(Collection<Long> leadIds) {
         return selectList(new LambdaQueryWrapperX<LeadIntendedProductDO>()
                 .in(LeadIntendedProductDO::getLeadId, leadIds)

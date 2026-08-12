@@ -32,6 +32,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private PersonMapper personMapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadActivationMapper activationMapper;
+    @Resource private LeadDuplicateReviewMapper duplicateReviewMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private LeadAttachmentMapper attachmentMapper;
     @Resource private AreaApi areaApi;
@@ -40,6 +41,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadDispatchService dispatchService;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
+    @Resource private LeadDuplicateMatcher duplicateMatcher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -58,33 +60,62 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 reqVO.getAttachments(), submitterUserId);
         validateDispatch(reqVO);
 
-        PersonDO byMobile = mobile == null ? null : personMapper.selectByMobile(mobile);
-        PersonDO byWechat = wechatId == null ? null : personMapper.selectByWechatId(wechatId);
-        if (byMobile != null && byWechat != null && !Objects.equals(byMobile.getId(), byWechat.getId())) {
-            throw exception(LEAD_CONTACT_CONFLICT);
+        LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
+        if (existingReview != null) return LeadCreateRespVO.reviewPending(existingReview.getId());
+        LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
+        if (match.strongActiveMatch() != null) {
+            LeadDO existingLead = leadMapper.selectById(match.strongActiveMatch().leadId());
+            return LeadCreateRespVO.duplicateRejected(existingLead.getId(), existingLead.getStatus(),
+                    LeadStateProjection.qualification(existingLead), LeadStateProjection.operational(existingLead));
         }
-        PersonDO person = byMobile != null ? byMobile : byWechat;
-        if (person == null) {
-            person = createPerson(reqVO.getName().trim(), mobile, wechatId);
-        } else {
-            person.setLastSeenAt(LocalDateTime.now());
-            personMapper.updateById(person);
-        }
-
-        LeadDO existing = leadMapper.selectLatestByPersonId(person.getId());
-        if (existing != null) {
-            LeadActivationDO activation = createActivation(existing, person, reqVO, products, region, submitterUserId);
-            notifyEventPublisher.publish(ACTIVATED, existing.getId(), "lead-activated:" + activation.getId(),
-                    submitterUserId, activation.getActivatedAt(), eventContext(existing, submitterUserId));
-            if (existing.getOwnerUserId() != null) {
-                dispatchService.notifyActivation(existing);
-            } else if (!ASSIGNMENT_PENDING.equals(existing.getAssignmentStatus())) {
-                existing.setDispatchMode(reqVO.getDispatchMode());
-                dispatchService.start(existing, reqVO.getSpecifiedSalesUserId(), submitterUserId);
-            }
-            return response(existing, "activated");
+        if (match.hasMatches()) {
+            LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
+            review.setStatus("pending");
+            review.setSubmitterUserId(submitterUserId);
+            review.setSubmissionSnapshot(JsonUtils.toJsonString(reqVO));
+            review.setMatchRules(JsonUtils.toJsonString(match.candidates().stream()
+                    .flatMap(candidate -> candidate.rules().stream()).distinct().toList()));
+            review.setCandidateSnapshot(JsonUtils.toJsonString(match.candidates()));
+            review.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey());
+            review.setVersion(0);
+            duplicateReviewMapper.insert(review);
+            return LeadCreateRespVO.reviewPending(review.getId());
         }
 
+        return createApproved(reqVO, submitterUserId, null, products, region, attachments);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public LeadCreateRespVO createApproved(LeadCreateReqVO reqVO, Long submitterUserId, Long reusePersonId) {
+        String mobile = StrUtil.trimToNull(reqVO.getMobile());
+        String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
+        validateContact(mobile, wechatId);
+        RegionSnapshot region = validateRegion(reqVO.getProvinceCode(), reqVO.getCityCode());
+        dictDataApi.validateDictDataList(DICT_SOURCE_CHANNEL, List.of(reqVO.getSourceChannel()));
+        dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(reqVO.getLeadCategory()));
+        List<LeadProductSnapshot> products = validateProducts(reqVO.getEffectiveProducts());
+        Map<Long, FileInfoRespDTO> attachments = attachmentService.validateReferences(
+                reqVO.getAttachments(), submitterUserId);
+        validateDispatch(reqVO);
+        return createApproved(reqVO, submitterUserId, reusePersonId, products, region, attachments);
+    }
+
+    private LeadCreateRespVO createApproved(LeadCreateReqVO reqVO, Long submitterUserId, Long reusePersonId,
+                                            List<LeadProductSnapshot> products, RegionSnapshot region,
+                                            Map<Long, FileInfoRespDTO> attachments) {
+        String mobile = StrUtil.trimToNull(reqVO.getMobile());
+        String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
+        PersonDO person = reusePersonId == null ? createPerson(reqVO.getName().trim(), mobile, wechatId)
+                : personMapper.selectById(reusePersonId);
+        if (person == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
+        if (leadMapper.selectLatestByPersonId(person.getId()) != null) {
+            throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
+        }
+        person.setName(reqVO.getName().trim());
+        person.setMobile(mobile);
+        person.setWechatId(wechatId);
+        person.setLastSeenAt(LocalDateTime.now());
+        personMapper.updateById(person);
         LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, submitterUserId);
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);

@@ -35,7 +35,21 @@ export type LeadCreateRequest = {
   remark?: string; attachments: Array<{ infraFileId: number }>; dispatchMode: 'auto' | 'specified'
   specifiedSalesUserId?: number; idempotencyKey: string
 }
-export type LeadCreateResult = { leadId: number; outcome: 'created' | 'activated'; assignmentStatus: string; pendingAssigneeUserId?: number }
+export type LeadCreateResult = {
+  leadId?: number; reviewId?: number; outcome: 'created' | 'activated' | 'review_pending' | 'duplicate_rejected'
+  assignmentStatus?: string; pendingAssigneeUserId?: number; existingLeadStatus?: string
+  existingQualificationStatus?: string; existingOperationalStatus?: string
+}
+export type LeadDuplicateReview = {
+  id: number; status: 'pending' | 'completed'; submitterUserId?: number; submissionSnapshot: string
+  matchRules: string; candidateSnapshot: string; resultType?: string; reviewOpinion?: string
+  selectedSalesUserId?: number; reviewerUserId?: number; reviewedAt?: Timestamp; createTime: Timestamp
+}
+export type LeadDuplicateReviewDecision = {
+  resultType: 'new_person' | 'reuse_person' | 'reactivate_lead' | 'notify_owner'
+  matchedPersonId?: number; matchedLeadId?: number; selectedSalesUserId?: number
+  opinion: string; attachments: Array<{ infraFileId: number }>; idempotencyKey: string
+}
 export type PendingLead = {
   id: number; dispatchMode: 'auto' | 'specified'; maskedName: string; maskedMobile?: string; maskedWechatId?: string
   provinceName: string; cityName: string; intendedProducts: string[]; primaryIntendedProduct?: string
@@ -392,6 +406,16 @@ export const api = {
     return unwrap<LeadAttachment>(await http.post('/zsjos/lead/attachment/upload', data))
   },
   createLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/create', data)),
+  duplicateReviewPage: async (status: 'pending' | 'completed') =>
+    unwrap<PageResult<LeadDuplicateReview>>(await http.get('/zsjos/lead-duplicate-review/page', { params: { status, pageNo: 1, pageSize: 100 } })),
+  duplicateReviewSalesCandidates: async () =>
+    unwrap<AssignmentUser[]>(await http.get('/zsjos/lead-duplicate-review/sales-candidates')),
+  uploadDuplicateReviewAttachment: async (file: File) => {
+    const data = new FormData(); data.append('file', file)
+    return unwrap<LeadAttachment>(await http.post('/zsjos/lead-duplicate-review/attachment/upload', data))
+  },
+  decideDuplicateReview: async (id: number, data: LeadDuplicateReviewDecision) =>
+    unwrap<boolean>(await http.post(`/zsjos/lead-duplicate-review/${id}/decision`, data)),
   myPendingLeads: async () => unwrap<PendingLead[]>(await http.get('/zsjos/lead/assignment/my-pending')),
   myDispatchStatus: async () => unwrap<SalesDispatchStatus>(await http.get('/zsjos/lead/dispatch-status/my')),
   dispatchHeartbeat: async () => unwrap<SalesDispatchStatus>(await http.post('/zsjos/lead/dispatch-status/heartbeat')),
