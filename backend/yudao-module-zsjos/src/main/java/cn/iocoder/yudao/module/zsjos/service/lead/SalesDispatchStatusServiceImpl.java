@@ -20,6 +20,11 @@ public class SalesDispatchStatusServiceImpl implements SalesDispatchStatusServic
 
     @Override
     public SalesDispatchStatusRespVO getMyStatus(Long userId) {
+        return getStatus(userId);
+    }
+
+    @Override
+    public SalesDispatchStatusRespVO getStatus(Long userId) {
         boolean eligible = isEligible(userId);
         boolean accepting = eligible && isAccepting(userId);
         if (eligible) {
@@ -47,6 +52,12 @@ public class SalesDispatchStatusServiceImpl implements SalesDispatchStatusServic
         savePreference(userId, accepting);
         redisRepository.cacheMode(userId, accepting);
         return buildStatus(userId, true, accepting);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SalesDispatchStatusRespVO updateModeByManager(Long userId, boolean accepting) {
+        return updateMode(userId, accepting);
     }
 
     @Override

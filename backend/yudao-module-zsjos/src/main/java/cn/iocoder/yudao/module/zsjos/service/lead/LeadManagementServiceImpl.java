@@ -109,6 +109,27 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     @Override
+    public PageResult<LeadManagementRespVO> getManagedOwnerLeadPage(LeadManagementPageReqVO reqVO,
+                                                                     Long managerUserId, Long ownerUserId) {
+        if (!leadObjectPermissionService.getManagedUserIds(managerUserId).contains(ownerUserId)) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
+        reqVO.setAudience(INBOX_AUDIENCE_OWNER);
+        reqVO.setOwnerUserId(ownerUserId);
+        PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, ownerUserId,
+                List.of(), List.of(), false);
+        if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
+        List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
+        Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
+                intendedProductMapper.selectListByLeadIds(leadIds), LeadIntendedProductDO::getLeadId);
+        Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
+        return new PageResult<>(page.getList().stream()
+                .map(lead -> convert(lead, managerUserId, users,
+                        products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false))
+                .toList(), page.getTotal());
+    }
+
+    @Override
     @ZsjosPermission(bizType = "lead", bizId = "#id", action = "read")
     public LeadManagementRespVO getLead(Long id, Long userId) {
         LeadDO lead = leadMapper.selectById(id);

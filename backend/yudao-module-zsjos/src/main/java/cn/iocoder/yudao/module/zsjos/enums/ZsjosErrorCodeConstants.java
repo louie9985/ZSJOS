@@ -71,6 +71,13 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_AGING_POOL_SALES_INVALID = new ErrorCode(1_900_003_050, "协同销售无效、不在冻结部门或与原销售相同");
     ErrorCode LEAD_AGING_POOL_OWNER_INVALID = new ErrorCode(1_900_003_051, "原销售已停用，不能退出超期公海");
     ErrorCode LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_052, "超期公海请求幂等键已被其他操作使用");
+    ErrorCode SUBORDINATE_SALES_NOT_MANAGED = new ErrorCode(1_900_003_053, "该销售不在当前主管管理范围内");
+    ErrorCode SUBORDINATE_SALES_REASON_REQUIRED = new ErrorCode(1_900_003_054, "操作原因不能为空且不能超过 500 个字符");
+    ErrorCode SUBORDINATE_SALES_STATUS_INVALID = new ErrorCode(1_900_003_055, "账号或接单状态无效");
+    ErrorCode SUBORDINATE_SALES_TARGET_INVALID = new ErrorCode(1_900_003_056, "目标销售无效、已停用或不在管理范围内");
+    ErrorCode SUBORDINATE_LEAD_OWNER_CHANGED = new ErrorCode(1_900_003_057, "客资归属已变化，请刷新后重试");
+    ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058, "当前客资状态不允许执行该操作");
+    ErrorCode SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA = new ErrorCode(1_900_003_059, "客资已在人工公海中");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");

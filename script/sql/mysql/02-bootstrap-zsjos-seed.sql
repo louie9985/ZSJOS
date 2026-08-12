@@ -287,3 +287,26 @@ VALUES ('V025', 'Add sales-order workbench personal and approval views', 'sales-
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V025','Add sales-order workbench personal and approval views',SHA2('sales-order-workbench-views-v1',256),'legacy',NOW());
+
+INSERT IGNORE INTO `system_menu`
+(`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6814,'下属销售','zsjos:subordinate-sales:query',2,20,6735,'subordinate-sales','ep:user','zsjos/subordinateSales/index','ZsjosSubordinateSales',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6815,'停启下属账号','zsjos:subordinate-sales:account-status',3,1,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6816,'修改下属接单','zsjos:subordinate-sales:dispatch-mode',3,2,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6817,'批量转派客资','zsjos:subordinate-sales:batch-transfer',3,3,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+
+INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
+SELECT DISTINCT source.role_id,target.id,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id
+FROM system_role_menu source JOIN system_menu source_menu ON source_menu.id=source.menu_id
+  AND source_menu.permission='zsjos:lead:appeal:review-sales-manager' AND source_menu.deleted=b'0'
+JOIN system_menu target ON target.id BETWEEN 6814 AND 6818 AND target.deleted=b'0'
+WHERE source.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM system_role_menu existing
+ WHERE existing.tenant_id=source.tenant_id AND existing.role_id=source.role_id
+ AND existing.menu_id=target.id AND existing.deleted=b'0');
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
+VALUES ('V035','Add subordinate-sales management','subordinate-sales-management-v1');
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V035','Add subordinate-sales management',SHA2('subordinate-sales-management-v1',256),'legacy',NOW());

@@ -275,6 +275,13 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId) {
+        adminTransfer(leadId, salesUserId, operatorUserId, "管理员转派");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
+    public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason) {
         requireSalesUser(salesUserId);
         LeadDO lead = requireLead(leadId);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
@@ -290,12 +297,13 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
         lead.setOwnershipStartedAt(transferredAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, pendingAssigneeUserId,
-                transferredAt, "管理员转派");
-        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, transferredAt, "管理员转派");
-        lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, "管理员转派");
+                transferredAt, reason);
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, transferredAt, reason);
+        lifecycleTaskService.cancelFollowUpReminders(leadId, transferredAt, reason);
         LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
         history.setLeadId(leadId); history.setActionType(ACTION_TRANSFER); history.setFromOwnerUserId(from);
         history.setToOwnerUserId(salesUserId); history.setOperatorUserId(operatorUserId);
+        history.setReason(reason);
         history.setOccurredAt(transferredAt); historyMapper.insert(history);
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);

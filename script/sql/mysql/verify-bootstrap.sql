@@ -22,6 +22,25 @@ SELECT 'lead_intended_product_active_key' AS check_name,
        'PASS', 'FAIL') AS result;
 SELECT 'reserved_migration_v022' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V022'), 'PASS', 'FAIL') AS result;
+SELECT 'subordinate_sales_tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+           AND table_name IN ('zsjos_lead_public_sea_record','zsjos_subordinate_sales_audit_log'))=2,
+          'PASS', 'FAIL') AS result;
+SELECT 'subordinate_sales_menu' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE id IN (6814,6815,6816,6817,6818) AND deleted=b'0')=5,
+          'PASS', 'FAIL') AS result;
+SELECT 'subordinate_sales_manager_grants' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_role_menu source
+            JOIN system_menu source_menu ON source_menu.id=source.menu_id
+              AND source_menu.permission='zsjos:lead:appeal:review-sales-manager' AND source_menu.deleted=b'0'
+            WHERE source.deleted=b'0' AND EXISTS (
+              SELECT 1 FROM system_menu target WHERE target.id BETWEEN 6814 AND 6818 AND target.deleted=b'0'
+              AND NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
+                WHERE grant_row.tenant_id=source.tenant_id AND grant_row.role_id=source.role_id
+                  AND grant_row.menu_id=target.id AND grant_row.deleted=b'0'))), 'PASS', 'FAIL') AS result;
+SELECT 'subordinate_sales_v035' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V035'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_category_empty' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_lead_category' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'source_channel_empty' AS check_name,
@@ -209,7 +228,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
            'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
-       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026'))=11, 'PASS', 'FAIL') AS result;
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core' AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V035'))=12, 'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
            AND table_name IN ('crm_owner_record','crm_performance_config'))=2, 'PASS', 'FAIL') AS result;

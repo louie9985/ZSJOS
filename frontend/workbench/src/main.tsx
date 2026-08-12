@@ -57,6 +57,7 @@ import MessageInboxPage from './pages/MessageInboxPage'
 import LeadAppealPage from './pages/LeadAppealPage'
 import SalesOrderApprovalPage from './pages/SalesOrderApprovalPage'
 import MySalesOrderPage from './pages/MySalesOrderPage'
+import SubordinateSalesPage from './pages/SubordinateSalesPage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { APP_ROUTES, STORAGE_KEYS } from './constants'
 import ThemeProvider from './components/Theme/ThemeProvider'
@@ -154,6 +155,7 @@ function toSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
 
 function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: WorkbenchMenu; permissions: string[]; onOpenAssignment: () => void }) {
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
   if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
@@ -162,6 +164,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
     return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
   }
   if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
+  if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>

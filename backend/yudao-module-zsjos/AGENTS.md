@@ -44,6 +44,12 @@ ZSJOS business operations **MUST** enforce three independent and cumulative laye
 - Services own business decisions and transaction boundaries. Controllers should translate HTTP input and output, not implement business rules.
 - Comments **MUST** explain non-obvious business rules, authorization, transaction boundaries, or compatibility constraints.
 
+## Lead pool terminology
+
+- The legacy ZSJOS technical value `assignment_status=public_pool` means the unowned first-come claim pool (抢单池).
+- The aging collaboration pool and the manually released public sea are owner-preserving collaboration views. They must not reuse the claim-pool assignment value, claim endpoints, direct-claim behavior, or business wording.
+- Manual public-sea release must preserve Lead owner, primary status, and assignment status. An optional public-sea collaborator does not gain follow-up authority unless a separately approved capability explicitly grants it.
+
 ## Database and SQL
 
 - Schema and initialization changes **MUST** preserve tenant rules, logical deletion conventions, audit columns, indexes, and established naming patterns.

@@ -46,3 +46,7 @@ Normalizes only the current reviewer scheme option keys from `registrationReview
 ### V034 - cancel invalid-lead pending lifecycle tasks
 
 Cancels, without deleting, historical pending `lead_first_follow_up`, `lead_follow_up_reminder`, and `lead_qualification` tasks whose tenant-matched lead is already `invalid`. It runs after V033 and depends behaviorally on V008 and V014, updates only pending rows, and is repeatable. The migration records cancellation time and reason; rollback requires a reviewed forward repair because automatically reactivating historical work could create false assignments or reminders.
+
+### V035 - subordinate-sales management
+
+Adds the manual public-sea collaboration marker, reason-bearing subordinate operation audit, and the server-owned “下属销售” menu with separate query/account/dispatch/transfer/public-sea permissions. Grants are copied only from roles already holding the established sales-manager appeal permission; runtime authorization still requires the menu permission and current System department-leader scope. The migration is additive and repeatable, changes no Lead owner/status/assignment row, and must not be executed without separate environment approval.

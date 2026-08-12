@@ -4593,6 +4593,29 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   KEY `idx_tenant_registration_case` (`tenant_id`,`registration_case_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 学生服务关系';
 
+-- zsjos_lead_public_sea_record
+CREATE TABLE IF NOT EXISTS `zsjos_lead_public_sea_record` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `owner_user_id` bigint NOT NULL,
+  `collaborator_user_id` bigint DEFAULT NULL, `released_by_user_id` bigint NOT NULL, `released_at` datetime NOT NULL,
+  `release_reason` varchar(500) NOT NULL, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_lead` (`tenant_id`,`lead_id`), KEY `idx_tenant_owner_released` (`tenant_id`,`owner_user_id`,`released_at`),
+  KEY `idx_tenant_collaborator` (`tenant_id`,`collaborator_user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 人工公海协作记录';
+
+-- zsjos_subordinate_sales_audit_log
+CREATE TABLE IF NOT EXISTS `zsjos_subordinate_sales_audit_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `action_type` varchar(32) NOT NULL, `operator_user_id` bigint NOT NULL,
+  `target_user_id` bigint DEFAULT NULL, `lead_id` bigint DEFAULT NULL, `before_value` varchar(1000) DEFAULT NULL,
+  `after_value` varchar(1000) DEFAULT NULL, `reason` varchar(500) NOT NULL, `occurred_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+  KEY `idx_tenant_operator_time` (`tenant_id`,`operator_user_id`,`occurred_at`), KEY `idx_tenant_target_time` (`tenant_id`,`target_user_id`,`occurred_at`),
+  KEY `idx_tenant_lead_time` (`tenant_id`,`lead_id`,`occurred_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 下属销售操作审计';
+
 -- zsjos_user_relation
 CREATE TABLE IF NOT EXISTS `zsjos_user_relation` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '关系编号',

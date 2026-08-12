@@ -855,3 +855,18 @@ waiting_assignment/assigned --主管填写原因退出--> exited
 - 新旧订单通过 `supersedes_order_id` / `superseded_by_order_id` 双向关联，历史不可覆盖。
 - 同一客资仍只能存在一张 `pending_approval` 或 `revision_required` 活动订单；`superseded`
   订单退出活动唯一约束但继续保留审计与审批历史。
+
+## 19. 主管人工公海标记（V035）
+
+人工释放公海不是 Lead 状态机迁移。主管只能对当前仍归属受管下属且未关闭的客资创建一次活动协作标记，可选一名管理范围内的启用销售作为公海跟进销售。
+
+```text
+owner=A, status=S, assignment_status=X
+  --填写原因释放人工公海，可选 collaborator=B-->
+owner=A, status=S, assignment_status=X, public_sea(owner=A, collaborator=B?)
+```
+
+- 释放前后 `owner_user_id`、Lead 主状态和 `assignment_status` 必须相同。
+- `assignment_status=public_pool` 仍专指无归属、可抢单的抢单池；人工公海不得进入抢单列表或领取接口。
+- 本期公海跟进销售只是协作基础信息，不因此获得直接跟进、判定或成交权限。
+- 重复释放返回稳定的“已在人工公海”失败；批量中该失败不回滚其他成功项。

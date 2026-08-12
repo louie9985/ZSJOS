@@ -176,6 +176,17 @@ export type BusinessTask = {
   id: number; taskType: string; bizType: string; bizId: number; title: string; summary?: string
   dueAt?: Timestamp; overdue: boolean; actionCode: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP'
 }
+export type SubordinateCategoryCount = { value: string; label: string; count: number; configured: boolean }
+export type SubordinateSales = {
+  userId: number; name: string; username: string; mobile?: string; accountStatus: number
+  presence: 'online' | 'offline'; accepting: boolean; eligible: boolean; canReceiveNewLeads: boolean
+  newcomerPoolStatus: 'not_available'; todayPendingCount: number; todayFollowUpStatus: 'completed' | 'incomplete'
+  firstFollowTimeoutCount: number; suspendedLeadCount: number; categoryCounts: SubordinateCategoryCount[]
+  validLeadCount: number; convertedLeadCount: number; effectiveOrderCount: number; effectiveOrderAmount: number
+}
+export type SubordinateTask = { id: number; taskType: string; leadId: number; leadName?: string; dueAt?: Timestamp; overdue: boolean }
+export type SubordinateBatchItem = { leadId: number; success: boolean; code: string; message: string }
+export type SubordinateBatchResult = { successCount: number; failureCount: number; items: SubordinateBatchItem[] }
 export type NotifyMessage = {
   id: number
   templateNickname: string
@@ -425,6 +436,24 @@ export const api = {
   businessTaskSummary: async () => unwrap<BusinessTaskSummary>(await http.get('/zsjos/business-task/my-summary')),
   businessTaskPage: async (bucket: BusinessTaskBucket, params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-page', { params: { bucket, ...params } })),
+  subordinateSalesPage: async (params: { pageNo: number; pageSize: number; keyword?: string; accountStatus?: number; presence?: string; accepting?: boolean }) =>
+    unwrap<PageResult<SubordinateSales>>(await http.get('/zsjos/subordinate-sales/page', { params })),
+  subordinateSalesOverview: async (salesUserId: number) =>
+    unwrap<SubordinateSales>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/overview`)),
+  subordinateSalesLeads: async (salesUserId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+    unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/leads`, { params })),
+  subordinateSalesTasks: async (salesUserId: number, params: { pageNo: number; pageSize: number; bucket?: BusinessTaskBucket }) =>
+    unwrap<PageResult<SubordinateTask>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/tasks`, { params })),
+  subordinateTransferCandidates: async () =>
+    unwrap<AssignmentUser[]>(await http.get('/zsjos/subordinate-sales/transfer-candidates')),
+  updateSubordinateAccountStatus: async (salesUserId: number, status: number, reason: string) =>
+    unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/account-status`, { status, reason })),
+  updateSubordinateDispatchMode: async (salesUserId: number, accepting: boolean, reason: string) =>
+    unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/dispatch-mode`, { accepting, reason })),
+  batchTransferSubordinateLeads: async (leadIds: number[], targetUserId: number, reason: string) =>
+    unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-transfer', { leadIds, targetUserId, reason })),
+  batchReleaseSubordinateLeads: async (leadIds: number[], collaboratorUserId: number | undefined, reason: string) =>
+    unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-public-sea', { leadIds, collaboratorUserId, reason })),
   unreadNotifyCount: async () => unwrap<number>(await http.get('/system/notify-message/get-unread-count')),
   unreadNotifyMessages: async () => unwrap<NotifyMessage[]>(await http.get('/system/notify-message/get-unread-list')),
   myNotifyMessagePage: async (params: NotifyMessagePageParams) =>

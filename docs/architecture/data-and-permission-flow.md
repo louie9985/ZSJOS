@@ -307,6 +307,17 @@ B's order becomes effective.
 - 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 阶段配置。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。直属主管只取销售当前部门负责人，不向上级部门递归。
 - Business editing overlays have presentation priority over assignment prompts. An assignment may continue to expire on the server while the workbench defers its modal, so reconnect, focus refresh and polling always reload server truth.
 
+### Subordinate-sales management
+
+The server-owned `下属销售` menu is available only with `zsjos:subordinate-sales:query`. Runtime scope is resolved from System department-leader relationships, including every child department, and then limited to users holding the stable `sales_specialist` post. Disabled accounts remain visible; no role name or department label creates access.
+
+- Account and dispatch mutations use separate permissions. Account disable delegates to the System public user API so current login tokens are revoked without moving Lead ownership.
+- Every account, dispatch, transfer, and manual public-sea mutation requires a trimmed reason of at most 500 characters and writes operator, target, before/after values, reason, and occurrence time.
+- Effective new-Lead intake requires an enabled account, current sales eligibility, online page presence, and accepting mode. Presence and accepting preference remain independent sources.
+- Metrics use current owned Lead inventory and Beijing-day pending follow-up tasks. Historical effective-order metrics remain attributed to immutable order submitters after later Lead transfers.
+- Batch transfer and manual public-sea release accept at most 200 Lead IDs and commit each Lead independently. Every result returns the Lead ID and a stable success or failure code; one failure does not roll back successful siblings.
+- Manual public sea is an owner-preserving collaboration marker with an optional enabled in-scope sales collaborator. It does not change Lead primary status, `owner_user_id`, or `assignment_status`, does not enter the claim pool, and cannot be claimed.
+
 ### Lead appeal routing (V015)
 
 - `zsjos:lead:appeal:create` is restricted to the current lead submitter and is checked again at the service boundary against the invalid lead and the next round.

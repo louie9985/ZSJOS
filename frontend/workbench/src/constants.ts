@@ -53,6 +53,7 @@ export const APP_ROUTES = {
   LEAD_ASSIGNMENT: '/zsjos/leads/assignment-relations',
   LEAD_CLAIM_POOL: '/zsjos/claim-pool',
   LEAD_AGING_POOL: '/zsjos/lead-aging-pool',
+  SUBORDINATE_SALES: '/zsjos/subordinate-sales',
   TODAY_TASKS: '/zsjos/tasks/today',
   QUALIFICATION_EXCEPTIONS: '/zsjos/leads/qualification-exceptions',
   LEAD_APPEALS: '/zsjos/leads/appeals',

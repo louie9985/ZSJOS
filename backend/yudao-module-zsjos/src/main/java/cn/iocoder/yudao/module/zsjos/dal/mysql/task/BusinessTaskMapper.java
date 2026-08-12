@@ -40,6 +40,11 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                 .orderByAsc(BusinessTaskDO::getId));
     }
 
+    default List<BusinessTaskDO> selectByAssigneeIds(List<Long> assigneeIds) {
+        if (assigneeIds == null || assigneeIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<BusinessTaskDO>().in(BusinessTaskDO::getAssigneeId, assigneeIds));
+    }
+
     default List<BusinessTaskDO> selectPendingReminderCandidates(List<String> taskTypes,
                                                                   LocalDateTime latestDueAt, int limit) {
         return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()

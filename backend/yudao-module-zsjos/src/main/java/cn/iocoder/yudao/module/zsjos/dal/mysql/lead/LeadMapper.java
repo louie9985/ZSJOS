@@ -71,6 +71,11 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     @Select("SELECT * FROM zsjos_lead WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
     LeadDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 
+    default List<LeadDO> selectByOwnerUserIds(List<Long> ownerUserIds) {
+        if (ownerUserIds == null || ownerUserIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<LeadDO>().in(LeadDO::getOwnerUserId, ownerUserIds));
+    }
+
     default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
                                                      List<String> inboxStatuses,
                                                      List<String> inboxAssignmentStatuses,

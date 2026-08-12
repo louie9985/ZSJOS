@@ -7,6 +7,10 @@ describe('workbench menu component registry', () => {
     expect(resolveWorkbenchComponent('  zsjos/leadAppeal/index  ')).toBe(WORKBENCH_COMPONENT.LEAD_APPEAL)
   })
 
+  it('maps the server-owned subordinate-sales component', () => {
+    expect(resolveWorkbenchComponent('zsjos/subordinateSales/index')).toBe(WORKBENCH_COMPONENT.SUBORDINATE_SALES)
+  })
+
   it('leaves unknown server components on the migration placeholder', () => {
     expect(resolveWorkbenchComponent('zsjos/notMigrated/index')).toBeUndefined()
     expect(resolveWorkbenchComponent()).toBeUndefined()
