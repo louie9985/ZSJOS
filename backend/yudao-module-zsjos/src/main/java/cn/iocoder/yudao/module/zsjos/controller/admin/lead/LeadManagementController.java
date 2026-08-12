@@ -6,6 +6,9 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadUrgeReqVO;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmitterActionService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -37,6 +40,7 @@ public class LeadManagementController {
 
     @Resource
     private LeadManagementService leadManagementService;
+    @Resource private LeadSubmitterActionService submitterActionService;
 
     @GetMapping("/page")
     @Operation(summary = "获得客资分页")
@@ -79,6 +83,21 @@ public class LeadManagementController {
                                                   @Valid @RequestBody LeadBasicInfoUpdateReqVO reqVO) {
         leadManagementService.updateBasicInfo(id, getLoginUserId(), reqVO);
         return success(true);
+    }
+
+    @PutMapping("/{id}/submitter-supplement")
+    @Operation(summary = "提交人补充非身份资料")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:submitter-supplement')")
+    public CommonResult<Boolean> supplement(@PathVariable("id") Long id,
+                                             @Valid @RequestBody LeadSubmitterSupplementReqVO reqVO) {
+        submitterActionService.supplement(id, getLoginUserId(), reqVO); return success(true);
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/{id}/urge")
+    @Operation(summary = "提交人催促当前责任销售")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:urge')")
+    public CommonResult<Boolean> urge(@PathVariable("id") Long id, @Valid @RequestBody LeadUrgeReqVO reqVO) {
+        submitterActionService.urge(id, getLoginUserId(), reqVO); return success(true);
     }
 
     @GetMapping("/status-counts")

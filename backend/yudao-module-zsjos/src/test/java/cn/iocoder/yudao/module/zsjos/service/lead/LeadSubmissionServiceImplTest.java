@@ -37,6 +37,13 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadProductCatalogPort productCatalogPort;
     @Mock private LeadDispatchService dispatchService;
     @Mock private LeadAttachmentService attachmentService;
+    @Mock private LeadSubmissionIdentityService identityService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUpIdentity() {
+        org.mockito.Mockito.lenient().when(identityService.requireOrdinarySubmitter(1L)).thenReturn(
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
+    }
 
     @Test
     void createRejectsMissingMobileAndWechat() {

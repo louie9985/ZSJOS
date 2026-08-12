@@ -20,7 +20,7 @@ import {
   Typography
 } from 'antd'
 import { message } from 'antd'
-import { CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { BellOutlined, CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
 import { api, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
 import {
@@ -107,6 +107,12 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [validTemplates, setValidTemplates] = useState<DictData[]>([])
   const [validTemplateError, setValidTemplateError] = useState('')
   const [salesOrderOpen, setSalesOrderOpen] = useState(false)
+  const [submitterSupplementOpen, setSubmitterSupplementOpen] = useState(false)
+  const [urgeOpen, setUrgeOpen] = useState(false)
+  const [complaintOpen, setComplaintOpen] = useState(false)
+  const [urgeReason, setUrgeReason] = useState('')
+  const [complaintReason, setComplaintReason] = useState('')
+  const [submitterActionSaving, setSubmitterActionSaving] = useState(false)
   const [validConfirmOpen, setValidConfirmOpen] = useState(false)
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
@@ -207,6 +213,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       </div>
       <Space wrap className="lead-detail-actions">
         {actions.has('EDIT_BASIC_INFO') && <Button icon={<EditOutlined/>} onClick={() => setBasicInfoOpen(true)}>修改基础信息</Button>}
+        {actions.has('SUBMITTER_SUPPLEMENT') && <Button icon={<EditOutlined/>} onClick={() => setSubmitterSupplementOpen(true)}>补充资料</Button>}
+        {actions.has('SUBMITTER_URGE') && <Button icon={<BellOutlined/>} onClick={() => setUrgeOpen(true)}>催促</Button>}
+        {actions.has('SUBMITTER_COMPLAINT') && <Button danger icon={<WarningOutlined/>} onClick={() => setComplaintOpen(true)}>投诉</Button>}
         {actions.has('ADD_FOLLOW_UP') && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setFollowUpOpen(true)}>跟进</Button>}
         {actions.has('JUDGE_VALID') && <Button icon={<CheckOutlined/>} onClick={() => void openValid()}>判有效</Button>}
         {actions.has('JUDGE_INVALID') && <Button danger icon={<CloseOutlined/>} onClick={() => void openInvalid()}>判无效</Button>}
@@ -338,6 +347,17 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     </Modal>
     <LeadBasicInfoModal lead={lead} open={basicInfoOpen} onClose={() => setBasicInfoOpen(false)}
       onDirtyChange={setBasicInfoDirty} onChanged={onChanged}/>
+    <LeadBasicInfoModal lead={lead} open={submitterSupplementOpen} submitterOnly onClose={() => setSubmitterSupplementOpen(false)} onChanged={onChanged}/>
+    <Modal title="催促当前责任销售" open={urgeOpen} confirmLoading={submitterActionSaving} onCancel={() => setUrgeOpen(false)} onOk={async () => {
+      if (!urgeReason.trim()) { message.warning('请填写催促原因'); return }
+      setSubmitterActionSaving(true); try { await api.urgeLead(lead.id, urgeReason.trim()); message.success('催促已发送'); setUrgeReason(''); setUrgeOpen(false) }
+      catch (error) { message.error(error instanceof Error ? error.message : '催促失败') } finally { setSubmitterActionSaving(false) }
+    }}><Input.TextArea value={urgeReason} onChange={event => setUrgeReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次催促原因"/></Modal>
+    <Modal title="发起销售投诉" open={complaintOpen} confirmLoading={submitterActionSaving} onCancel={() => setComplaintOpen(false)} onOk={async () => {
+      if (!complaintReason.trim()) { message.warning('请填写投诉原因'); return }
+      setSubmitterActionSaving(true); try { await api.createLeadComplaint(lead.id, complaintReason.trim(), []); message.success('投诉已提交'); setComplaintReason(''); setComplaintOpen(false) }
+      catch (error) { message.error(error instanceof Error ? error.message : '投诉提交失败') } finally { setSubmitterActionSaving(false) }
+    }}><Input.TextArea value={complaintReason} onChange={event => setComplaintReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写投诉事实与诉求"/></Modal>
     <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined}
       open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)}
       onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>

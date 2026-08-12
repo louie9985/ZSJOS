@@ -65,6 +65,17 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void start(LeadDO lead, Long specifiedSalesUserId, Long submitterUserId) {
+        if (DISPATCH_SELF.equals(lead.getDispatchMode())) {
+            LocalDateTime now = LocalDateTime.now();
+            lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(submitterUserId);
+            lead.setOwnershipStartedAt(now); leadMapper.updateById(lead);
+            LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, submitterUserId,
+                    submitterUserId, null, 1, null, "销售自拓直接归属", now);
+            lead.setCurrentAssignmentHistoryId(history.getId());
+            lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
+                    lead.getId(), submitterUserId, history.getId(), now, EVENT_LEAD_ACCEPTED, ASSIGNMENT_UNASSIGNED));
+            leadMapper.updateById(lead); return;
+        }
         if (DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
             boolean allowed = assignmentService.getAssignableSalesUsers(submitterUserId).stream()
                     .anyMatch(user -> Objects.equals(user.getId(), specifiedSalesUserId));
@@ -88,6 +99,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         leadMapper.updateById(lead);
         dispatchNext(lead, rule, config, submitterUserId, null);
     }
+
+    @Override public List<LeadAssignmentUserRespVO> getEligibleSalesUsers() { return assignmentService.getEligibleSalesUsers(); }
+    @Override public List<LeadAssignmentUserRespVO> getAssignableSalesUsers(Long sourceUserId) { return assignmentService.getAssignableSalesUsers(sourceUserId); }
 
     @Override
     public void notifyActivation(LeadDO lead) {

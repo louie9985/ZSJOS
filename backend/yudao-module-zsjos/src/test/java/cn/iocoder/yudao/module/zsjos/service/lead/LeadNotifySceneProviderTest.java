@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -41,17 +42,21 @@ class LeadNotifySceneProviderTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
     @Mock private DeptApi deptApi;
+    @Mock private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Mock private LeadAssignmentService assignmentService;
 
     @Test
     void registersAllScenesWithSceneSpecificVariables() {
         List<NotifySceneRespDTO> scenes = provider.getScenes();
 
-        assertEquals(20, scenes.size());
+        assertEquals(33, scenes.size());
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("followUp.result"));
         assertTrue(variableKeys(scene(scenes, FOLLOW_UP_RECORDED)).contains("followUp.result"));
         assertFalse(variableKeys(scene(scenes, FOLLOW_UP_RECORDED)).contains("assignment.attempt"));
         assertTrue(variableKeys(scene(scenes, APPEAL_SUBMITTED)).contains("appeal.roundNo"));
+        assertTrue(variableKeys(scene(scenes, SUBMITTER_URGED)).contains("urge.reason"));
+        assertTrue(scenes.stream().anyMatch(item -> COMPLAINT_FOUNDED.equals(item.getCode())));
     }
 
     @Test

@@ -90,7 +90,12 @@ export type ManagedLead = {
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL'; enabled: boolean }>
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'CONTINUE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
+}
+export type LeadComplaint = {
+  id: number; leadId: number; complainantUserId: number; salesUserId: number; reason: string
+  evidenceRefs?: string; status: 'pending' | 'handled'; result?: 'founded' | 'unfounded'
+  handlerUserId?: number; handlerOpinion?: string; handlerEvidenceRefs?: string; handledAt?: Timestamp; createTime: Timestamp
 }
 export type LeadQualificationException = {
   id: number; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
@@ -406,6 +411,7 @@ export const api = {
     return unwrap<LeadAttachment>(await http.post('/zsjos/lead/attachment/upload', data))
   },
   createLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/create', data)),
+  createSelfSourcedLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/self-sourced/create', data)),
   duplicateReviewPage: async (status: 'pending' | 'completed') =>
     unwrap<PageResult<LeadDuplicateReview>>(await http.get('/zsjos/lead-duplicate-review/page', { params: { status, pageNo: 1, pageSize: 100 } })),
   duplicateReviewSalesCandidates: async () =>
@@ -457,6 +463,18 @@ export const api = {
   },
   updateLeadBasicInfo: async (id: number, data: LeadBasicInfoUpdateRequest) =>
     unwrap<boolean>(await http.put(`/zsjos/lead/${id}/basic-info`, data)),
+  supplementLead: async (id: number, data: { provinceCode: string; cityCode: string; leadCategory: string; intendedProducts: LeadCreateRequest['intendedProducts']; remark?: string; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.put(`/zsjos/lead/${id}/submitter-supplement`, data)),
+  urgeLead: async (id: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/lead/${id}/urge`, { reason })),
+  createLeadComplaint: async (id: number, reason: string, evidenceFileIds: number[]) => unwrap<number>(
+    await http.post(`/zsjos/lead-complaint/lead/${id}`, { reason, evidenceFileIds, idempotencyKey: crypto.randomUUID() })
+  ),
+  leadComplaintPage: async (status: 'pending' | 'handled') => unwrap<PageResult<LeadComplaint>>(
+    await http.get('/zsjos/lead-complaint/page', { params: { status, pageNo: 1, pageSize: 100 } })
+  ),
+  decideLeadComplaint: async (id: number, result: 'founded' | 'unfounded', opinion: string, evidenceFileIds: number[]) => unwrap<boolean>(
+    await http.post(`/zsjos/lead-complaint/${id}/decision`, { result, opinion, evidenceFileIds, idempotencyKey: crypto.randomUUID() })
+  ),
   qualificationExceptionPage: async (type: 'suspended' | 'recycle_pending', params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<LeadQualificationException>>(await http.get('/zsjos/lead/qualification-exception/page', { params: { type, ...params } })),
   leadTransferCandidates: async (id: number) =>

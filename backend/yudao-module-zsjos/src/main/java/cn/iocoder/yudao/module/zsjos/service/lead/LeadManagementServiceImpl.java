@@ -289,9 +289,22 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                                                 SalesOrderDO activeOrder,
                                                                 Long currentUserId) {
         LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
-        if (!agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
-                || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return List.of();
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
+        if (Objects.equals(lead.getSourceUserId(), currentUserId)
+                && lead.getStatus() != null
+                && !Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {
+            if (securityFrameworkService.hasPermission("zsjos:lead:submitter-supplement")) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_SUPPLEMENT, true));
+            }
+            if (lead.getOwnerUserId() != null && securityFrameworkService.hasPermission("zsjos:lead:urge")) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_URGE, true));
+            }
+            if (lead.getOwnerUserId() != null && securityFrameworkService.hasPermission("zsjos:lead-complaint:create")) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_COMPLAINT, true));
+            }
+        }
+        if (!agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
+                || OPERATIONAL_SUSPENDED.equals(LeadStateProjection.operational(lead))) return actions;
         boolean canUpdate = securityFrameworkService.hasPermission("zsjos:lead:update");
         boolean canFollow = securityFrameworkService.hasPermission("zsjos:lead-follow-up:create");
         boolean canQualify = securityFrameworkService.hasPermission("zsjos:lead:qualify");

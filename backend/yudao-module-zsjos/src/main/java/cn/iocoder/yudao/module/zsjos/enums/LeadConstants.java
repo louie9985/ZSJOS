@@ -13,6 +13,8 @@ public interface LeadConstants {
     String REGION_OTHER = "OTHER";
 
     String SOURCE_INTERNAL_NEW_MEDIA = "internal_new_media";
+    String SOURCE_PARTNER = "partner";
+    String SOURCE_SALES_SELF = "sales_self_sourced";
     String STATUS_SUBMITTED = "submitted";
     String STATUS_SUSPENDED = "suspended";
     String STATUS_VALID = "valid";
@@ -47,6 +49,9 @@ public interface LeadConstants {
     String ACTION_ENTER_DEAL = "ENTER_DEAL";
     String ACTION_REVISE_DEAL = "REVISE_DEAL";
     String ACTION_CONTINUE_DEAL = "CONTINUE_DEAL";
+    String ACTION_SUBMITTER_SUPPLEMENT = "SUBMITTER_SUPPLEMENT";
+    String ACTION_SUBMITTER_URGE = "SUBMITTER_URGE";
+    String ACTION_SUBMITTER_COMPLAINT = "SUBMITTER_COMPLAINT";
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
     String INBOX_AUDIENCE_REVIEWER = "reviewer";
@@ -60,6 +65,7 @@ public interface LeadConstants {
     String INBOX_FILTER_FIELD_POOL_STATUS = "pool_status";
     String DISPATCH_AUTO = "auto";
     String DISPATCH_SPECIFIED = "specified";
+    String DISPATCH_SELF = "self";
 
     String RULE_DEFAULT = "default";
     String FOLLOW_UP_RULE_DEFAULT = "default";

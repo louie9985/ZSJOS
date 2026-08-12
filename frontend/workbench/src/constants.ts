@@ -48,6 +48,8 @@ export const STORAGE_KEYS = {
 
 export const APP_ROUTES = {
   LEAD_SUBMISSION: '/zsjos/leads/submit',
+  LEAD_SELF_SOURCED: '/zsjos/leads/self-sourced',
+  LEAD_COMPLAINTS: '/zsjos/leads/complaints',
   SUBMITTED_LEADS: '/zsjos/leads/submitted',
   OWNED_LEADS: '/zsjos/leads/owned',
   LEAD_ASSIGNMENT: '/zsjos/leads/assignment-relations',
@@ -68,6 +70,8 @@ export const APP_ROUTES = {
 
 export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.LEAD_SUBMISSION,
+  APP_ROUTES.LEAD_SELF_SOURCED,
+  APP_ROUTES.LEAD_COMPLAINTS,
   APP_ROUTES.SUBMITTED_LEADS,
   APP_ROUTES.OWNED_LEADS,
   APP_ROUTES.LEAD_ASSIGNMENT,

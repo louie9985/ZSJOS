@@ -97,8 +97,10 @@ public class LeadObjectPermissionService {
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         boolean eligibleSales = leadAssignmentService.getEligibleSalesUsers().stream()
                 .anyMatch(candidate -> Objects.equals(candidate.getId(), userId));
-        if (user != null && eligibleSales && Objects.equals(user.getDeptId(), cycle.getFrozenDeptId())) return true;
-        DeptRespDTO dept = deptApi.getDept(cycle.getFrozenDeptId());
+        AdminUserRespDTO owner = adminUserApi.getUser(cycle.getOriginalOwnerUserId());
+        Long ownerDeptId = owner == null ? null : owner.getDeptId();
+        if (user != null && eligibleSales && Objects.equals(user.getDeptId(), ownerDeptId)) return true;
+        DeptRespDTO dept = ownerDeptId == null ? null : deptApi.getDept(ownerDeptId);
         return dept != null && Objects.equals(dept.getLeaderUserId(), userId);
     }
 

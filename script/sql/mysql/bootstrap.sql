@@ -25,6 +25,7 @@ SOURCE script/sql/mysql/migrations/V036__subordinate_sales_management.sql;
 SOURCE script/sql/mysql/migrations/V037__lifecycle_domain_unification.sql;
 SOURCE script/sql/mysql/migrations/V038__duplicate_lead_review.sql;
 SOURCE script/sql/mysql/migrations/V039__lead_pools_and_claim_limit.sql;
+SOURCE script/sql/mysql/migrations/V040__submitter_actions_and_complaints.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

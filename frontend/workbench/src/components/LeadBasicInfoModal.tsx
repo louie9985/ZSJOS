@@ -9,7 +9,7 @@ import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 type Values = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
-  leadCategory?: string; reason: string
+  leadCategory?: string; reason?: string
 }
 
 type ConfigSource = 'area' | 'category' | 'catalog'
@@ -20,9 +20,9 @@ const configLabels: Record<ConfigSource, string> = {
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : '加载失败'
 
-export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onDirtyChange }: {
+export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onDirtyChange, submitterOnly = false }: {
   lead: ManagedLead; open: boolean; onClose: () => void; onChanged: () => void
-  onDirtyChange?: (dirty: boolean) => void
+  onDirtyChange?: (dirty: boolean) => void; submitterOnly?: boolean
 }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
@@ -108,31 +108,34 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
     setSaving(true)
     try {
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
-      await api.updateLeadBasicInfo(lead.id, {
+      const intendedProducts = products.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown,
+        skuUnknown: item.skuUnknown, primary: item.key === primaryKey }))
+      if (submitterOnly) await api.supplementLead(lead.id, {
+        provinceCode, cityCode, leadCategory: values.leadCategory!, intendedProducts,
+        remark: values.reason?.trim() || undefined, idempotencyKey: crypto.randomUUID()
+      })
+      else await api.updateLeadBasicInfo(lead.id, {
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode, leadCategory: values.leadCategory,
-        intendedProducts: products.map(item => {
-          return { spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown,
-            skuUnknown: item.skuUnknown, primary: item.key === primaryKey }
-        }), reason: values.reason.trim()
+        intendedProducts, reason: values.reason!.trim()
       })
-      setDirty(false); message.success('基础信息已更新'); onClose(); onChanged()
+      setDirty(false); message.success(submitterOnly ? '资料已补充' : '基础信息已更新'); onClose(); onChanged()
     } catch (saveError) { message.error(saveError instanceof Error ? saveError.message : '保存失败') }
     finally { setSaving(false) }
   }
 
-  return <Modal title="修改基础信息" open={open} onCancel={close} footer={null} width={760} destroyOnHidden>
+  return <Modal title={submitterOnly ? '补充客资资料' : '修改基础信息'} open={open} onCancel={close} footer={null} width={760} destroyOnHidden>
     {Object.keys(configErrors).length > 0 && <Alert type="error" showIcon message="部分配置加载失败"
       description={<Space direction="vertical" size={0}>{(Object.entries(configErrors) as Array<[ConfigSource, string]>).map(([source, detail]) =>
         <span key={source}>{configLabels[source]}：{detail}</span>)}</Space>}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
       <Form form={form} layout="vertical" onValuesChange={() => setDirty(true)}>
-        <div className="follow-up-field-grid">
+        {!submitterOnly && <div className="follow-up-field-grid">
           <Form.Item name="name" label="姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item>
           <Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: (_, value) => value?.trim() || form.getFieldValue('wechatId')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号')) }]}><Input maxLength={32}/></Form.Item>
           <Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: (_, value) => value?.trim() || form.getFieldValue('mobile')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号')) }]}><Input maxLength={128}/></Form.Item>
-        </div>
+        </div>}
         <Form.Item name="regionPath" label="所在地区" rules={[{ required: true, message: '请选择所在地区' }]}>
           <Cascader options={areaOptions} showSearch disabled={loadingSources.area || Boolean(configErrors.area)}
             placeholder={configErrors.area ? (regionSnapshot || '地区配置加载失败') : (regionSnapshot ? `${regionSnapshot}（请选择）` : '请选择省 / 市')}/>
@@ -144,8 +147,8 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
             disabled={loadingSources.catalog || Boolean(configErrors.catalog)} onChange={next => { setProducts(next); setDirty(true) }}
             onPrimaryChange={next => { setPrimaryKey(next); setDirty(true) }}/>
         </Form.Item>
-        <Form.Item name="reason" label="修改原因" rules={[{ required: true }, { max: 500 }]}><Input.TextArea rows={3} maxLength={500} showCount/></Form.Item>
-        <Space><IrreversiblePopconfirm action={`修改客资「${lead.submittedName}」的基础信息`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving}
+        <Form.Item name="reason" label={submitterOnly ? '补充备注' : '修改原因'} rules={[{ required: !submitterOnly }, { max: submitterOnly ? 1000 : 500 }]}><Input.TextArea rows={3} maxLength={submitterOnly ? 1000 : 500} showCount/></Form.Item>
+        <Space><IrreversiblePopconfirm action={`${submitterOnly ? '补充' : '修改'}客资「${lead.submittedName}」的资料`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving}
           disabled={loading || Boolean(configErrors.area) || Boolean(configErrors.catalog)} onClick={() => void prepareSubmit()}>保存</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>

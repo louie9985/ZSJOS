@@ -33,6 +33,8 @@ public interface LeadNotifySceneConstants {
     String AGING_POOL_REASSIGNED_NOTICE = "zsjos.lead.aging_pool_reassigned";
     String AGING_POOL_REASSIGN_REQUIRED_NOTICE = "zsjos.lead.aging_pool_reassign_required";
     String AGING_POOL_EXITED_NOTICE = "zsjos.lead.aging_pool_exited";
+    String SUBMITTER_URGED = "zsjos.lead.submitter_urged";
+    String COMPLAINT_FOUNDED = "zsjos.lead.complaint_founded";
 
     String ROLE_SUBMITTER = "submitter";
     String ROLE_PENDING_SALES = "pending_sales";

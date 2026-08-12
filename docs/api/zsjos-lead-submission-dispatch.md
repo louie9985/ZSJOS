@@ -18,6 +18,7 @@
 | `GET /zsjos/lead/product/simple-list` | `zsjos:lead:submit` |
 | `POST /zsjos/lead/attachment/upload` | `zsjos:lead:submit` |
 | `POST /zsjos/lead/create` | `zsjos:lead:submit` |
+| `POST /zsjos/lead/self-sourced/create` | `zsjos:lead:self-sourced:create` |
 | `GET /zsjos/lead-duplicate-review/page` | `zsjos:lead-duplicate-review:query`；租户公共复核队列 |
 | `GET /zsjos/lead-duplicate-review/{id}` | `zsjos:lead-duplicate-review:query` + 独立复核对象权限 |
 | `GET /zsjos/lead-duplicate-review/sales-candidates` | `zsjos:lead-duplicate-review:process`；部门管理范围或 `manage-all` |
@@ -30,6 +31,8 @@
 | `PUT /zsjos/lead/dispatch-status/mode` | `zsjos:lead:accept`；请求体为 `{ "accepting": true|false }` |
 | `POST /zsjos/lead/dispatch-status/offline` | `zsjos:lead:accept`；正常退出时尽力移出轮询池 |
 | `GET /zsjos/lead/claim-pool/page` | `zsjos:lead:claim` + 启用销售专员校验 |
+
+Ordinary submission identity and dispatch restrictions, submitter actions, and the independent complaint queue are defined in `docs/api/zsjos-lead-submitter-actions.md`.
 | `POST /zsjos/lead/{id}/claim` | `zsjos:lead:claim` + 抢单池对象权限 |
 | `GET /zsjos/lead/inbox/submitted/page` | `zsjos:lead:query` + `zsjos:lead:query-submitted` |
 | `GET /zsjos/lead/inbox/submitted/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-submitted` |
