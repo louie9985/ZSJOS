@@ -27,6 +27,7 @@ import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
   dictionaryDisplayLabel,
+  invalidReasonSnapshotLabel,
   mergeUniqueLeads,
   protocolDisplayLabel,
   tryStartLeadPageRequest
@@ -47,6 +48,7 @@ import SalesOrderEntryModal from '../components/SalesOrderEntryModal'
 import type { LeadAppealEvidence } from '../services/api'
 import { defaultLeadDetailTab, shouldBlockLeadSwitch, type LeadDetailTab } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
+import { useSubmissionGuard } from '../services/submissionGuard'
 
 const PAGE_SIZE = 20
 
@@ -91,7 +93,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidReason, setInvalidReason] = useState<string>()
   const [invalidDescription, setInvalidDescription] = useState('')
   const [invalidEvidence, setInvalidEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
-  const [qualificationSaving, setQualificationSaving] = useState(false)
+  const { submitting: qualificationSaving, run: runQualification, resetIntent: resetQualificationIntent } = useSubmissionGuard()
   const [followUpOpen, setFollowUpOpen] = useState(autoExpandFollowUp)
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
@@ -108,16 +110,17 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
 
   const judgeValid = async () => {
     if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
-    setQualificationSaving(true)
-    try {
-      await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey: crypto.randomUUID() })
+    await runQualification(async ({ idempotencyKey, complete }) => {
+      await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey })
+      complete()
       message.success('已判定为有效客资')
       setValidOpen(false); setValidRemark('')
       onChanged()
-    } finally { setQualificationSaving(false) }
+    }).catch(error => message.error(error instanceof Error ? error.message : '有效判定失败'))
   }
 
   const openValid = async () => {
+    resetQualificationIntent()
     setValidCategory(lead.leadCategory); setValidRemark(''); setValidOpen(true); setValidTemplateError('')
     try { setValidTemplates(await api.dictDataByType(DICT_TYPE.LEAD_VALID_REMARK_TEMPLATE)) }
     catch (error) { setValidTemplates([]); setValidTemplateError(error instanceof Error ? error.message : '快捷备注加载失败') }
@@ -144,6 +147,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   }
 
   const openInvalid = () => {
+    resetQualificationIntent()
     setInvalidOpen(true)
     if (!invalidReasons.length && !invalidReasonLoading) void loadInvalidReasons()
     if (!invalidRemarkTemplates.length && !invalidRemarkTemplateLoading) void loadInvalidRemarkTemplates()
@@ -154,18 +158,18 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       message.warning('请选择无效原因并填写备注')
       return
     }
-    setQualificationSaving(true)
-    try {
+    await runQualification(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(invalidEvidence, api.uploadLeadQualificationImage, setInvalidEvidence)
       if (uploadResult.failed) { message.error('有判定附件上传失败，请重试失败项'); return }
-      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
+      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
+      complete()
       message.success('已判定为无效客资')
       setInvalidOpen(false)
       setInvalidReason(undefined)
       setInvalidDescription('')
       setInvalidEvidence([])
       onChanged()
-    } finally { setQualificationSaving(false) }
+    }).catch(error => message.error(error instanceof Error ? error.message : '无效判定失败'))
   }
 
   useEffect(() => {
@@ -193,7 +197,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       </Space>
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
-    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReasonLabelSnapshot || (lead.invalidReason ? '标签未配置' : undefined), lead.invalidDescription].filter(Boolean).join('：')}/>}
+    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReason ? invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot) : undefined, lead.invalidDescription].filter(Boolean).join('：')}/>}
     {lead.qualificationStatus === 'pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}/>}
     <Tabs
       className="lead-detail-tabs"
@@ -210,7 +214,6 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                   <Descriptions.Item label="手机号">{lead.submittedMobile || '-'}</Descriptions.Item>
                   <Descriptions.Item label="微信号">{lead.submittedWechatId || '-'}</Descriptions.Item>
                   <Descriptions.Item label="所在地区">{[lead.provinceName, lead.cityName].filter(Boolean).join(' / ') || '-'}</Descriptions.Item>
-                  <Descriptions.Item label="当前负责人">{userText(lead.ownerUserId, lead.ownerUserName)}</Descriptions.Item>
                 </Descriptions>
               </Card>
 
@@ -222,14 +225,6 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                   <Descriptions.Item label="客资跟进状态">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Descriptions.Item>
                   <Descriptions.Item label="分配状态">{protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, lead.assignmentStatus, '未知分配状态')}</Descriptions.Item>
                   <Descriptions.Item label="提交备注" span={2}>{lead.remark || '-'}</Descriptions.Item>
-                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{lead.invalidReasonLabelSnapshot || '标签未配置'}</Descriptions.Item>}
-                  {lead.invalidDescription && <Descriptions.Item label="备注" span={2}>{lead.invalidDescription}</Descriptions.Item>}
-                  {lead.status === 'invalid' && <Descriptions.Item label="附件" span={2}>
-                    {lead.invalidEvidence?.length ? <Image.PreviewGroup><Space wrap>
-                      {lead.invalidEvidence.map(file => <Image key={file.infraFileId} width={64} height={64}
-                        src={file.fileUrl} alt={file.originalName} title={file.originalName}/>) }
-                    </Space></Image.PreviewGroup> : '-'}
-                  </Descriptions.Item>}
                   {lead.currentAssignmentFirstFollowUpDeadlineAt && <Descriptions.Item label="首次跟进截止">{formatTimestamp(lead.currentAssignmentFirstFollowUpDeadlineAt)}</Descriptions.Item>}
                   {lead.qualificationDeadlineAt && <Descriptions.Item label="判定截止">{formatTimestamp(lead.qualificationDeadlineAt)}</Descriptions.Item>}
                   {lead.closeReason && <Descriptions.Item label="关闭原因" span={2}>{lead.closeReason}</Descriptions.Item>}
@@ -258,6 +253,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
                   <Descriptions.Item label="待接单人">{userText(lead.pendingAssigneeUserId, lead.pendingAssigneeUserName)}</Descriptions.Item>
                   <Descriptions.Item label="提交时间">{formatTimestamp(lead.submittedAt)}</Descriptions.Item>
                   <Descriptions.Item label="更新时间">{formatTimestamp(lead.updateTime)}</Descriptions.Item>
+                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot)}</Descriptions.Item>}
+                  {lead.invalidDescription && <Descriptions.Item label="判定备注" span={2}>{lead.invalidDescription}</Descriptions.Item>}
+                  {lead.status === 'invalid' && <Descriptions.Item label="判定附件" span={2}>{lead.invalidEvidence?.length ? <Image.PreviewGroup><Space wrap>{lead.invalidEvidence.map(file => <Image key={file.infraFileId} width={64} height={64} src={file.fileUrl} alt={file.originalName} title={file.originalName}/>)}</Space></Image.PreviewGroup> : '-'}</Descriptions.Item>}
                 </Descriptions>
               </Card>
 

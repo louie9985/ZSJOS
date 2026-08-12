@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskDecisionReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import jakarta.validation.constraints.NotEmpty;
 
 /**
@@ -12,6 +13,9 @@ import jakarta.validation.constraints.NotEmpty;
  * @author jason
  */
 public interface BpmProcessTaskApi {
+
+    java.util.List<BpmProcessNodeStatusRespDTO> getProcessNodeStatuses(String processInstanceId,
+                                                                         java.util.Set<String> taskDefinitionKeys);
 
     /**
      * 触发流程任务的执行

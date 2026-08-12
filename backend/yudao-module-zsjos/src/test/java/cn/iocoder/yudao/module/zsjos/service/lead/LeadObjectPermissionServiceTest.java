@@ -7,6 +7,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -21,6 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.Mockito.when;
+
+import java.util.List;
 
 @ExtendWith(MockitoExtension.class)
 class LeadObjectPermissionServiceTest {
@@ -79,6 +83,48 @@ class LeadObjectPermissionServiceTest {
         assertEquals(LEAD_NOT_EXISTS.getCode(), error.getCode());
     }
 
+    @Test
+    void readAllowsLeaderOfOwnerDepartment() {
+        LeadDO lead = lead(10L, 20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 101L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(101L)));
+
+        assertReadAllowed(30L);
+    }
+
+    @Test
+    void readAllowsLeaderOfParentDepartment() {
+        LeadDO lead = lead(10L, 20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 102L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(100L)));
+        when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(101L), dept(102L)));
+
+        assertReadAllowed(30L);
+    }
+
+    @Test
+    void readRejectsLeaderOfParallelDepartment() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 102L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(101L)));
+        when(deptApi.getChildDeptList(101L)).thenReturn(List.of());
+
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
+            ServiceException error = assertThrows(ServiceException.class, () -> service.check(1L, "read"));
+            assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        }
+    }
+
+    @Test
+    void relatedAndManagedUsersAlwaysIncludeCurrentUser() {
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of());
+
+        assertEquals(java.util.Set.of(30L), service.getRelatedAndManagedUserIds(30L));
+    }
+
     private void assertReadAllowed(Long userId) {
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);
@@ -92,5 +138,18 @@ class LeadObjectPermissionServiceTest {
         lead.setSourceUserId(sourceUserId);
         lead.setOwnerUserId(ownerUserId);
         return lead;
+    }
+
+    private static AdminUserRespDTO user(Long id, Long deptId) {
+        AdminUserRespDTO user = new AdminUserRespDTO();
+        user.setId(id);
+        user.setDeptId(deptId);
+        return user;
+    }
+
+    private static DeptRespDTO dept(Long id) {
+        DeptRespDTO dept = new DeptRespDTO();
+        dept.setId(id);
+        return dept;
     }
 }

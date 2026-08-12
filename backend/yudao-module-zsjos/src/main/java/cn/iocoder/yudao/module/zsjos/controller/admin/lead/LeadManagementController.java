@@ -22,6 +22,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
 import java.util.Map;
+import java.util.List;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
@@ -84,6 +86,13 @@ public class LeadManagementController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
     public CommonResult<Map<String, Long>> getStatusCounts() {
         return success(leadManagementService.getStatusCounts(getLoginUserId()));
+    }
+
+    @GetMapping("/visible-users")
+    @Operation(summary = "获得当前客资范围内的用户")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<List<LeadAssignmentUserRespVO>> getVisibleUsers() {
+        return success(leadManagementService.getVisibleUsers(getLoginUserId()));
     }
 
     @GetMapping("/inbox/filter-profile")

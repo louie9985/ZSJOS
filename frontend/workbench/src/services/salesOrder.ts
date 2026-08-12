@@ -1,3 +1,5 @@
+import type { SalesOrder, SalesOrderListItem } from './api'
+
 export function validateSalesOrderSubmission(
   mobile: string | undefined,
   wechatId: string | undefined,
@@ -13,6 +15,17 @@ export function salesOrderTaskKey(item: SalesOrderListItem) {
   return item.taskId || `order:${item.id}`
 }
 
+export function canReviewSalesOrderTask(
+  order: Pick<SalesOrder, 'status' | 'registrationApproval' | 'financeApproval'>,
+  task: Pick<SalesOrderListItem, 'taskId' | 'taskDefinitionKey'>
+) {
+  if (order.status !== 'pending_approval' || !task.taskId || !task.taskDefinitionKey) return false
+  const approval = task.taskDefinitionKey === 'registrationReview'
+    ? order.registrationApproval
+    : task.taskDefinitionKey === 'financeReview' ? order.financeApproval : undefined
+  return approval?.status === 'pending'
+}
+
 export function mergeSalesOrderListItems(
   current: SalesOrderListItem[],
   next: SalesOrderListItem[],
@@ -22,4 +35,3 @@ export function mergeSalesOrderListItems(
   next.forEach(item => values.set(keyOf(item), item))
   return [...values.values()]
 }
-import type { SalesOrderListItem } from './api'

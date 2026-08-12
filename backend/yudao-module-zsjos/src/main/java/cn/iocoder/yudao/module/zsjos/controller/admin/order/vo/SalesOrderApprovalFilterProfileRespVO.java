@@ -11,6 +11,15 @@ import java.util.List;
 @AllArgsConstructor
 public class SalesOrderApprovalFilterProfileRespVO {
     private List<GroupVO> groups;
+    private List<CenterVO> centers;
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CenterVO {
+        private String key;
+        private String label;
+    }
 
     @Data
     @NoArgsConstructor

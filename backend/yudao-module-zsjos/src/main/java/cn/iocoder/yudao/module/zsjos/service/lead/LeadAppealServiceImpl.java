@@ -109,8 +109,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         appeal.setApplicantUserId(userId);
         appeal.setReason(reqVO.getReason().trim());
         appeal.setEvidenceRefs(evidence);
-        appeal.setInvalidReasonSnapshot(lead.getInvalidReasonLabelSnapshot() != null
-                ? lead.getInvalidReasonLabelSnapshot() : lead.getInvalidReason());
+        appeal.setInvalidReasonSnapshot(lead.getInvalidReasonLabelSnapshot());
         appeal.setInvalidDescriptionSnapshot(lead.getInvalidDescription());
         appeal.setInvalidEvidenceRefsSnapshot(lead.getInvalidEvidenceRefs());
         appeal.setSubmittedAt(now);

@@ -5,6 +5,9 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
+
+import java.util.List;
 
 public interface LeadManagementService {
 
@@ -15,6 +18,8 @@ public interface LeadManagementService {
     void updateBasicInfo(Long id, Long userId, LeadBasicInfoUpdateReqVO reqVO);
 
     java.util.Map<String, Long> getStatusCounts(Long userId);
+
+    List<LeadAssignmentUserRespVO> getVisibleUsers(Long userId);
 
     LeadInboxFilterProfileRespVO getInboxFilterProfile(Long userId, String audience);
 }

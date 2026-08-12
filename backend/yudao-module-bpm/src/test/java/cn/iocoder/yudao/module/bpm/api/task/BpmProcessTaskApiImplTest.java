@@ -4,17 +4,29 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
 import cn.iocoder.yudao.module.bpm.service.task.BpmTaskService;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.flowable.task.api.Task;
+import org.flowable.task.api.history.HistoricTaskInstance;
+
+import java.util.Date;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
+import static cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants.TASK_VARIABLE_STATUS;
 
 class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
 
@@ -27,6 +39,8 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     private BpmTaskService bpmTaskService;
     @Mock
     private BpmProcessInstanceService processInstanceService;
+    @Mock
+    private AdminUserApi adminUserApi;
 
     @Test
     void getTodoTaskPageReturnsEmptyPageWithoutQueryingProcessInstances() {
@@ -52,6 +66,53 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
         assertEquals(0L, result.getTotal());
         assertTrue(result.getList().isEmpty());
         verifyNoInteractions(processInstanceService);
+    }
+
+    @Test
+    void getProcessNodeStatusesKeepsApprovedDecisionWhenSiblingWasCancelledLater() {
+        HistoricTaskInstance approved = historicTask("registrationReview", 2, 1000L, "233");
+        HistoricTaskInstance cancelled = historicTask("registrationReview", 4, 2000L);
+        when(bpmTaskService.getRunningTaskListByProcessInstanceId("process-1", null, null)).thenReturn(List.of());
+        when(bpmTaskService.getTaskListByProcessInstanceId("process-1", true)).thenReturn(List.of(approved, cancelled));
+        AdminUserRespDTO reviewer = new AdminUserRespDTO();
+        reviewer.setId(233L); reviewer.setNickname("审核员甲");
+        when(adminUserApi.getUserMap(Set.of(233L))).thenReturn(Map.of(233L, reviewer));
+
+        List<BpmProcessNodeStatusRespDTO> result = processTaskApi.getProcessNodeStatuses(
+                "process-1", Set.of("registrationReview", "financeReview"));
+
+        assertEquals(1, result.size());
+        assertEquals("approved", result.getFirst().getStatus());
+        assertEquals(233L, result.getFirst().getReviewerUserId());
+        assertEquals("审核员甲", result.getFirst().getReviewerUserName());
+    }
+
+    @Test
+    void getProcessNodeStatusesReportsRunningNodeAsPending() {
+        Task running = mock(Task.class);
+        when(running.getTaskDefinitionKey()).thenReturn("financeReview");
+        when(running.getCreateTime()).thenReturn(new Date(1000L));
+        when(bpmTaskService.getRunningTaskListByProcessInstanceId("process-1", null, null)).thenReturn(List.of(running));
+        when(bpmTaskService.getTaskListByProcessInstanceId("process-1", true)).thenReturn(List.of());
+
+        List<BpmProcessNodeStatusRespDTO> result = processTaskApi.getProcessNodeStatuses(
+                "process-1", Set.of("registrationReview", "financeReview"));
+
+        assertEquals("pending", result.getFirst().getStatus());
+    }
+
+    private HistoricTaskInstance historicTask(String taskKey, int status, long endTime) {
+        return historicTask(taskKey, status, endTime, null);
+    }
+
+    private HistoricTaskInstance historicTask(String taskKey, int status, long endTime, String assignee) {
+        HistoricTaskInstance task = mock(HistoricTaskInstance.class);
+        when(task.getTaskDefinitionKey()).thenReturn(taskKey);
+        org.mockito.Mockito.lenient().when(task.getAssignee()).thenReturn(assignee);
+        org.mockito.Mockito.lenient().when(task.getCreateTime()).thenReturn(new Date(500L));
+        when(task.getEndTime()).thenReturn(new Date(endTime));
+        when(task.getTaskLocalVariables()).thenReturn(Map.of(TASK_VARIABLE_STATUS, status));
+        return task;
     }
 
     private BpmTaskPageReqDTO pageReq() {

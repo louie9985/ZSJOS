@@ -33,6 +33,18 @@ export function protocolDisplayLabel(
   return labels[value] || unknownLabel
 }
 
+const PROTOCOL_KEY_PATTERN = /^[a-z][a-z0-9_.-]*$/i
+
+export function snapshotDisplayLabel(label?: string, value?: string): string {
+  if (!label || PROTOCOL_KEY_PATTERN.test(label) || label === value) return '标签未配置'
+  return label
+}
+
+export function invalidReasonSnapshotLabel(snapshot?: string): string {
+  if (!snapshot || PROTOCOL_KEY_PATTERN.test(snapshot)) return '标签未配置'
+  return snapshot
+}
+
 export function defaultInboxStage(
   groups: Array<{ key: string; sections: Array<{ options: Array<{ key: string }> }> }>,
   groupKey: string

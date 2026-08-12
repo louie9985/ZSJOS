@@ -272,7 +272,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     }
 
     private String labelOf(DictDataRespDTO data, String fallback) {
-        return data == null ? fallback : data.getLabel();
+        return data == null ? null : data.getLabel();
     }
 
     private BusinessEventDO addEvent(String type, LeadDO lead, Long operatorUserId, Long recordId,

@@ -8,6 +8,8 @@ import { appendQuickNote } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
+import { useSubmissionGuard } from '../services/submissionGuard'
+import { snapshotDisplayLabel } from '../services/leadManagement'
 
 const QUICK_DAYS = [1, 2, 3, 5, 7, 14, 30]
 const PAGE_SIZE = 10
@@ -21,7 +23,7 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
   const [dirty, setDirty] = useState(false)
-  const [submitting, setSubmitting] = useState(false)
+  const { submitting, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [images, setImages] = useState<DeferredUploadItem<LeadAttachment>[]>([])
   const [records, setRecords] = useState<LeadFollowUp[]>([])
   const [total, setTotal] = useState(0)
@@ -33,6 +35,7 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
   const [quickNotes, setQuickNotes] = useState<DictData[]>([])
   useBusinessOverlay(dirty)
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
+  useEffect(() => { if (open) resetIntent() }, [open, lead.id, resetIntent])
 
   const loadRecords = useCallback(async (pageNo = 1) => {
     setLoading(true); setError('')
@@ -69,19 +72,18 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
     setImages([]); setDirty(false)
   }
   const submit = async (values: Values) => {
-    setSubmitting(true)
-    try {
+    await runSubmission(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(images, file => api.uploadLeadFollowUpImage(lead.id, file), setImages)
       if (uploadResult.failed) { message.error('有跟进图片上传失败，请重试失败项'); return }
       await api.createLeadFollowUp(lead.id, {
         method: values.method, result: values.result, leadCategory: values.leadCategory,
         remark: values.remark?.trim() || undefined,
         nextFollowUpAt: values.nextFollowUpAt?.valueOf(),
-        images: uploadResult.items.filter(image => image.uploaded).map(image => ({ infraFileId: image.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID()
+        images: uploadResult.items.filter(image => image.uploaded).map(image => ({ infraFileId: image.uploaded!.infraFileId })), idempotencyKey
       })
+      complete()
       reset(); await loadRecords(); onChanged?.(); onClose(); message.success('跟进记录已提交')
-    } catch (submitError) { message.error(submitError instanceof Error ? submitError.message : '提交失败') }
-    finally { setSubmitting(false) }
+    }).catch(submitError => message.error(submitError instanceof Error ? submitError.message : '提交失败'))
   }
   const appendNote = (note: string) => {
     const current = form.getFieldValue('remark') || ''
@@ -90,7 +92,7 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
 
   return <section className="lead-follow-up-panel">
     <Modal title="新增跟进" open={open} onCancel={onClose} footer={null} destroyOnHidden width={760}>
-    <Form form={form} layout="vertical" className="follow-up-form" onFinish={submit} onValuesChange={() => setDirty(true)}>
+    <Form form={form} layout="vertical" className="follow-up-form" onFinish={submit} onValuesChange={() => setDirty(true)} disabled={submitting}>
       <div className="follow-up-field-grid">
         <Form.Item name="method" label="跟进方式" rules={[{ required: true, message: '请选择跟进方式' }]}><Select options={methods.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
         <Form.Item name="result" label="跟进结果" rules={[{ required: true, message: '请选择跟进结果' }]}><Select options={results.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>
@@ -116,8 +118,8 @@ export default function LeadFollowUpPanel({ lead, open, onClose, onChanged, onDi
     {!loading && records.length === 0 && !error ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无跟进记录"/> : <Timeline items={records.map(record => ({
       children: <div className="follow-up-timeline-item">
         <Space wrap><Typography.Text strong>{record.operatorName || `用户 #${record.operatorUserId}`}</Typography.Text><span>{formatTimestamp(record.occurredAt)}</span>{record.firstInAssignment && <Tag color="green">本轮首次跟进</Tag>}</Space>
-        <div><Tag>{record.methodLabel}</Tag><Tag color="blue">{record.resultLabel}</Tag></div>
-        {record.categoryBefore !== record.categoryAfter && <Typography.Text>分类：{record.categoryBeforeLabel || '未分类'} → {record.categoryAfterLabel || '未分类'}</Typography.Text>}
+        <div><Tag>{snapshotDisplayLabel(record.methodLabel, record.method)}</Tag><Tag color="blue">{snapshotDisplayLabel(record.resultLabel, record.result)}</Tag></div>
+        {record.categoryBefore !== record.categoryAfter && <Typography.Text>分类：{snapshotDisplayLabel(record.categoryBeforeLabel, record.categoryBefore)} → {snapshotDisplayLabel(record.categoryAfterLabel, record.categoryAfter)}</Typography.Text>}
         {record.remark && <Typography.Paragraph>{record.remark}</Typography.Paragraph>}
         {record.nextFollowUpAt && <Typography.Text type="secondary">下次跟进：{formatTimestamp(record.nextFollowUpAt)}</Typography.Text>}
         {record.images.length > 0 && <Image.PreviewGroup><div className="follow-up-record-images">{record.images.map(image => <Image key={image.infraFileId} src={image.url} alt={image.originalName}/>)}</div></Image.PreviewGroup>}

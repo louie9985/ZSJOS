@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, invalidReasonSnapshotLabel, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -48,6 +48,13 @@ describe('lead management paging helpers', () => {
     expect(protocolDisplayLabel({ owned: '已归属' }, 'owned', '未知分配状态')).toBe('已归属')
     expect(protocolDisplayLabel({ owned: '已归属' }, 'new_state', '未知分配状态')).toBe('未知分配状态')
     expect(protocolDisplayLabel({}, undefined, '未知分配状态')).toBe('-')
+  })
+
+  it('does not expose protocol keys stored in historical label snapshots', () => {
+    expect(snapshotDisplayLabel('电话', 'phone')).toBe('电话')
+    expect(snapshotDisplayLabel('phone', 'phone')).toBe('标签未配置')
+    expect(invalidReasonSnapshotLabel('duplicate_lead')).toBe('标签未配置')
+    expect(invalidReasonSnapshotLabel('客户已重复提交')).toBe('客户已重复提交')
   })
 
   it('prevents duplicate requests for the same filter version and page', () => {

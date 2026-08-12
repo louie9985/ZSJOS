@@ -20,6 +20,7 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
 
 @Service
 public class SalesOrderObjectPermissionService {
@@ -56,11 +57,18 @@ public class SalesOrderObjectPermissionService {
     }
 
     public boolean isApprovalPoolMember(Long userId) {
+        return !approvalTaskKeys(userId).isEmpty();
+    }
+
+    public Set<String> approvalTaskKeys(Long userId) {
         AdminUserRespDTO user = adminUserApi.getUser(userId);
-        if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) || user.getDeptId() == null) return false;
+        if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) || user.getDeptId() == null) return Set.of();
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
-        return config != null && (belongsTo(config.getRegistrationDeptId(), user.getDeptId())
-                || belongsTo(config.getFinanceDeptId(), user.getDeptId()));
+        if (config == null) return Set.of();
+        Set<String> result = new LinkedHashSet<>();
+        if (belongsTo(config.getRegistrationDeptId(), user.getDeptId())) result.add(TASK_REGISTRATION);
+        if (belongsTo(config.getFinanceDeptId(), user.getDeptId())) result.add(TASK_FINANCE);
+        return result;
     }
 
     public Set<Long> enabledUsers(Long rootDeptId) {

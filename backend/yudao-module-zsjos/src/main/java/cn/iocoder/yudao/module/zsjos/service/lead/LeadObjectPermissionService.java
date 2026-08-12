@@ -71,6 +71,10 @@ public class LeadObjectPermissionService {
                     && managesOwnerDepartment(userId, lead.getRecycleSourceOwnerUserId());
     }
 
+    public boolean hasQueryAll() {
+        return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
+    }
+
     private boolean managesOwnerDepartment(Long userId, Long ownerUserId) {
         if (ownerUserId == null) return false;
         AdminUserRespDTO owner = adminUserApi.getUser(ownerUserId);
@@ -105,5 +109,11 @@ public class LeadObjectPermissionService {
         if (deptIds.isEmpty()) return Set.of();
         return new HashSet<>(adminUserApi.getUserListByDeptIds(deptIds).stream()
                 .map(AdminUserRespDTO::getId).toList());
+    }
+
+    public Set<Long> getRelatedAndManagedUserIds(Long userId) {
+        Set<Long> userIds = new HashSet<>(getManagedUserIds(userId));
+        userIds.add(userId);
+        return userIds;
     }
 }

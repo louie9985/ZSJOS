@@ -8,6 +8,8 @@ import jakarta.validation.constraints.Size;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class SalesOrderPageReqVO extends PageParam {
+    @Size(max = 32)
+    private String center;
     private Boolean handled;
 
     @Size(max = 64)

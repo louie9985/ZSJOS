@@ -105,6 +105,13 @@ export interface LeadTransferCandidateVO {
   deptName?: string
 }
 
+export interface VisibleUserVO {
+  id: number
+  nickname: string
+  deptId?: number
+  deptName?: string
+}
+
 export const LEAD_STATUS_OPTIONS = [
   { label: '已提交', value: 'submitted' }, { label: '已挂起', value: 'suspended' },
   { label: '有效', value: 'valid' }, { label: '无效', value: 'invalid' },
@@ -128,6 +135,9 @@ export const getLeadPage = (params: LeadManagementPageReqVO) =>
 
 export const getLead = (id: number): Promise<LeadManagementVO> =>
   request.get({ url: '/zsjos/lead/get', params: { id } })
+
+export const getVisibleUsers = (): Promise<VisibleUserVO[]> =>
+  request.get({ url: '/zsjos/lead/visible-users' })
 
 export const judgeValid = (id: number, idempotencyKey: string) => request.post({ url: `/zsjos/lead/${id}/judge-valid`, data: { idempotencyKey } })
 export const judgeInvalid = (id: number, data: { reasonCode: string; description: string; idempotencyKey: string }) => request.post({ url: `/zsjos/lead/${id}/judge-invalid`, data })

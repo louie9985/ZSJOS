@@ -12,6 +12,9 @@ import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderPageReqVO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -24,6 +27,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -67,6 +71,7 @@ class SalesOrderServiceImplTest {
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
     @Mock private DeptApi deptApi;
+    @Mock private LeadInboxFilterConfigService inboxFilterConfigService;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -189,6 +194,34 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void createReturnsExistingOrderForSameIdempotencyIntent() {
+        SalesOrderDO existing = new SalesOrderDO();
+        existing.setId(100L); existing.setLeadId(1L); existing.setSubmitterUserId(20L);
+        when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(existing);
+
+        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+
+        assertEquals(100L, id);
+        verifyNoInteractions(leadMapper, opportunityMapper, skuService, processInstanceApi);
+    }
+
+    @Test
+    void createRechecksIdempotencyAfterLeadLock() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(20L); lead.setStatus("converted");
+        SalesOrderDO existing = new SalesOrderDO();
+        existing.setId(100L); existing.setLeadId(1L); existing.setSubmitterUserId(20L);
+        when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(null, existing);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+
+        Long id = service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+
+        assertEquals(100L, id);
+        verify(orderMapper, times(2)).selectByIdempotencyKey("key-1");
+        verify(orderMapper, never()).selectActiveByLeadId(anyLong(), any());
+        verify(orderMapper, never()).insert(any(SalesOrderDO.class));
+    }
+
+    @Test
     void myPageUsesSubmitterScopeAndDoesNotLoadHeavyDetails() {
         SalesOrderMyPageReqVO reqVO = new SalesOrderMyPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setStatus(STATUS_PENDING_APPROVAL); reqVO.setKeyword("测试");
@@ -219,6 +252,58 @@ class SalesOrderServiceImplTest {
 
         assertEquals(7L, result.getTotal()); assertEquals(2L, result.getPendingApproval());
         assertEquals(1L, result.getRevisionRequired()); assertEquals(4L, result.getEffective());
+    }
+
+    @Test
+    void getProjectsReviewerIdentityResultAndTimeFromBpmHistory() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("SO-100"); order.setLeadId(1L); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setStudentName("测试学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setRoundNo(1); round.setProcessInstanceId("process-1");
+        BpmProcessNodeStatusRespDTO registration = new BpmProcessNodeStatusRespDTO();
+        registration.setTaskDefinitionKey(TASK_REGISTRATION); registration.setStatus("approved");
+        registration.setReviewerUserId(233L); registration.setReviewerUserName("审核员甲");
+        registration.setEndTime(LocalDateTime.of(2026, 8, 12, 10, 30));
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(round);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+        when(processTaskApi.getProcessNodeStatuses("process-1", Set.of(TASK_REGISTRATION, TASK_FINANCE)))
+                .thenReturn(List.of(registration));
+
+        var result = service.get(100L, 20L);
+
+        assertEquals("approved", result.getRegistrationApproval().getStatus());
+        assertEquals(233L, result.getRegistrationApproval().getReviewerUserId());
+        assertEquals("审核员甲", result.getRegistrationApproval().getReviewerUserName());
+        assertEquals(LocalDateTime.of(2026, 8, 12, 10, 30), result.getRegistrationApproval().getEndTime());
+    }
+
+    @Test
+    void approvalInboxRestrictsSingleCenterUserToRegistrationTasks() {
+        SalesOrderPageReqVO reqVO = new SalesOrderPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setHandled(false); reqVO.setCenter(CENTER_REGISTRATION);
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+        when(processTaskApi.getTodoTaskPage(eq(20L), any())).thenReturn(PageResult.empty());
+
+        PageResult<?> result = service.getInboxPage(reqVO, 20L);
+
+        assertTrue(result.getList().isEmpty());
+        ArgumentCaptor<BpmTaskPageReqDTO> captor = ArgumentCaptor.forClass(BpmTaskPageReqDTO.class);
+        verify(processTaskApi, atLeastOnce()).getTodoTaskPage(eq(20L), captor.capture());
+        assertTrue(captor.getAllValues().stream().allMatch(value -> TASK_REGISTRATION.equals(value.getTaskDefinitionKey())));
+    }
+
+    @Test
+    void approvalInboxRejectsCenterOutsideUserScope() {
+        SalesOrderPageReqVO reqVO = new SalesOrderPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setCenter(CENTER_FINANCE);
+        when(permissionService.approvalTaskKeys(20L)).thenReturn(Set.of(TASK_REGISTRATION));
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.getInboxPage(reqVO, 20L));
+
+        assertEquals(SALES_ORDER_PERMISSION_DENIED.getCode(), error.getCode());
+        verifyNoInteractions(processTaskApi);
     }
 
     @Test

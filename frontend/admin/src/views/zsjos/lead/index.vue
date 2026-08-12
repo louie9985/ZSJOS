@@ -180,9 +180,6 @@
           <el-descriptions-item label="提交备注" :span="2">{{
             detail.remark || '-'
           }}</el-descriptions-item>
-          <el-descriptions-item v-if="detail.invalidReason" label="无效原因" :span="2">{{
-            detail.invalidReasonLabelSnapshot || '标签未配置'
-          }}</el-descriptions-item>
           <el-descriptions-item v-if="detail.closeReason" label="关闭原因" :span="2">{{
             detail.closeReason
           }}</el-descriptions-item>
@@ -199,12 +196,12 @@
               ><el-tag v-if="scope.row.primary" type="success">是</el-tag></template
             ></el-table-column
           >
-          <el-table-column label="SPU" min-width="150"
+          <el-table-column label="课程" min-width="150"
             ><template #default="scope">{{
               scope.row.spuName || '未明确'
             }}</template></el-table-column
           >
-          <el-table-column label="SKU" min-width="150"
+          <el-table-column label="具体方案" min-width="150"
             ><template #default="scope">{{
               scope.row.skuName || '未明确'
             }}</template></el-table-column
@@ -234,6 +231,12 @@
           }}</el-descriptions-item>
           <el-descriptions-item label="更新时间">{{
             formatZsjosTimestamp(detail.updateTime)
+          }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.invalidReason" label="无效原因" :span="2">{{
+            snapshotLabel(detail.invalidReasonLabelSnapshot, detail.invalidReason)
+          }}</el-descriptions-item>
+          <el-descriptions-item v-if="detail.invalidDescription" label="判定备注" :span="2">{{
+            detail.invalidDescription
           }}</el-descriptions-item>
         </el-descriptions>
         <div class="detail-heading">附件</div>
@@ -280,11 +283,14 @@
                 ></div
               >
               <div class="follow-up-tags"
-                ><el-tag size="small">{{ record.methodLabel }}</el-tag
-                ><el-tag type="primary" size="small">{{ record.resultLabel }}</el-tag></div
+                ><el-tag size="small">{{ snapshotLabel(record.methodLabel, record.method) }}</el-tag
+                ><el-tag type="primary" size="small">{{
+                  snapshotLabel(record.resultLabel, record.result)
+                }}</el-tag></div
               >
               <div v-if="record.categoryBefore !== record.categoryAfter"
-                >分类：{{ record.categoryBeforeLabel }} → {{ record.categoryAfterLabel }}</div
+                >分类：{{ snapshotLabel(record.categoryBeforeLabel, record.categoryBefore) }} →
+                {{ snapshotLabel(record.categoryAfterLabel, record.categoryAfter) }}</div
               >
               <p v-if="record.remark">{{ record.remark }}</p>
               <div v-if="record.nextFollowUpAt" class="follow-up-next"
@@ -310,7 +316,6 @@
 
 <script setup lang="ts">
 import type { FormInstance } from 'element-plus'
-import * as UserApi from '@/api/system/user'
 import * as LeadApi from '@/api/zsjos/leadManagement'
 import * as LeadFollowUpApi from '@/api/zsjos/leadFollowUp'
 import { DICT_TYPE, getStrDictOptions } from '@/utils/dict'
@@ -327,7 +332,7 @@ const loading = ref(false)
 const error = ref('')
 const list = ref<LeadApi.LeadManagementVO[]>([])
 const total = ref(0)
-const users = ref<UserApi.UserVO[]>([])
+const users = ref<LeadApi.VisibleUserVO[]>([])
 const queryParams = reactive<LeadApi.LeadManagementPageReqVO>({ pageNo: 1, pageSize: 10 })
 const detailVisible = ref(false)
 const detailLoading = ref(false)
@@ -407,9 +412,11 @@ const areaText = (row: LeadApi.LeadManagementVO) =>
   [row.provinceName, row.cityName].filter(Boolean).join(' / ') || '-'
 const productText = (product?: LeadApi.LeadProductVO) =>
   product ? [product.spuName || '未明确课程', product.skuName].filter(Boolean).join(' / ') : '-'
+const snapshotLabel = (label?: string, value?: string) =>
+  !label || /^[a-z][a-z0-9_.-]*$/i.test(label) || label === value ? '标签未配置' : label
 
 onMounted(async () => {
-  const [userResult] = await Promise.allSettled([UserApi.getSimpleUserList()])
+  const [userResult] = await Promise.allSettled([LeadApi.getVisibleUsers()])
   if (userResult.status === 'fulfilled') users.value = userResult.value
   await getList()
   const requestedLeadId = Number(route.query.leadId)
