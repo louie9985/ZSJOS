@@ -40,3 +40,7 @@ Adds the non-destructive `reviewer` audience to the shared filter-scheme table w
 ### V032 - normalize reviewer filter option keys
 
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.
+
+### V034 - cancel invalid-lead pending lifecycle tasks
+
+Cancels, without deleting, historical pending `lead_first_follow_up`, `lead_follow_up_reminder`, and `lead_qualification` tasks whose tenant-matched lead is already `invalid`. It runs after V033 and depends behaviorally on V008 and V014, updates only pending rows, and is repeatable. The migration records cancellation time and reason; rollback requires a reviewed forward repair because automatically reactivating historical work could create false assignments or reminders.

@@ -93,6 +93,10 @@ class LeadQualificationServiceImplTest {
         assertEquals("no_budget", lead.getInvalidReason());
         assertEquals("暂无预算", lead.getInvalidReasonLabelSnapshot());
         assertEquals("客户确认本季度无预算", lead.getInvalidDescription());
+        verify(lifecycleTaskService).cancelFirstFollowUpTasks(eq(1L), any(LocalDateTime.class), eq("客资判定无效"));
+        verify(lifecycleTaskService).cancelFollowUpReminders(eq(1L), any(LocalDateTime.class), eq("客资判定无效"));
+        verify(lifecycleTaskService).cancelQualificationTask(eq(1L), eq(2),
+                any(LocalDateTime.class), eq("客资判定无效"));
     }
 
     @Test

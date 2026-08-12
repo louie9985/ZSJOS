@@ -356,7 +356,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；首次记录完成当前归属周期的 `lead_first_follow_up`，并创建 `lead_qualification` 任务。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
 
-判定有效在同一事务内完成判定任务、保存必填有效备注、创建唯一 `initial_conversion` Opportunity，并将 Lead 改为 `converted + closed`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时把未结束 Opportunity 改为 `lost`。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
+判定有效在同一事务内完成判定任务、保存必填有效备注、创建唯一 `initial_conversion` Opportunity，并将 Lead 改为 `converted + closed`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时取消待处理的首跟、判定和跟进提醒任务，并把未结束 Opportunity 改为 `lost`。任务查询还会排除无效客资遗留的上述待处理任务；`V034` 负责取消规则上线前的历史遗留记录。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
 
 ### 7.13 业务事件 `BusinessEvent`
 
