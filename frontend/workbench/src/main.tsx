@@ -62,6 +62,7 @@ import MySalesOrderPage from './pages/MySalesOrderPage'
 import SubordinateSalesPage from './pages/SubordinateSalesPage'
 import LeadComplaintPage from './pages/LeadComplaintPage'
 import ExternalRepurchasePage from './pages/ExternalRepurchasePage'
+import { LeadFilterConfigPage, LeadFollowUpRuleConfigPage, LeadRuleConfigPage, ProductConfigPage, WorkPlanConfigPage } from './pages/ConfigurationPages'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
@@ -185,6 +186,11 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
+  if (menu?.path === APP_ROUTES.LEAD_RULE) return <LeadRuleConfigPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.LEAD_FILTER) return <LeadFilterConfigPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.LEAD_FOLLOW_UP_RULE) return <LeadFollowUpRuleConfigPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.PRODUCT_CONFIG) return <ProductConfigPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
