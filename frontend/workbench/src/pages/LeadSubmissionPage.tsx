@@ -8,6 +8,8 @@ import LeadIntendedProductEditor, { type IntendedProductSelection } from '../com
 import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
+import EmployeeSelect from '../components/EmployeeSelect'
+import type { SalesUser } from '../services/api'
 
 const { Title } = Typography
 type Option = { label: string; value: string }
@@ -30,7 +32,7 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const idempotencyKeyRef = useRef<string | undefined>(undefined)
-  const [sales, setSales] = useState<Array<{ label: string; value: number }>>([])
+  const [sales, setSales] = useState<SalesUser[]>([])
   const [salesState, setSalesState] = useState<RemoteState>({ loading: false })
   const salesLoaded = useRef(false)
   const assignmentMode = Form.useWatch('dispatchMode', form)
@@ -67,7 +69,7 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
 
   const loadSales = useCallback(async () => {
     setSalesState({ loading: true })
-    try { const users = await api.salesUsers(); setSales(users.map(user => ({ value: user.id, label: `${user.nickname}${user.deptName ? ` · ${user.deptName}` : ''}` }))); salesLoaded.current = true; setSalesState({ loading: false }) }
+      try { setSales(await api.salesUsers()); salesLoaded.current = true; setSalesState({ loading: false }) }
     catch (error) { setSalesState({ loading: false, error: error instanceof Error ? error.message : '销售列表加载失败' }) }
   }, [])
   useEffect(() => { if (assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && !salesLoaded.current) void loadSales() }, [assignmentMode, loadSales])
@@ -142,7 +144,7 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
           <Col xs={24}><Form.Item label={`附件图片${hasUploading ? '（上传中）' : ''}`} extra="确认提交后上传；最多 9 张，JPG、PNG、WebP，单张不超过 10MB"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp"/></Form.Item></Col>
         </Row>
         {!selfSourced && <><Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
-        {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><Select loading={salesState.loading} options={sales} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}</>}
+        {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><EmployeeSelect users={sales} loading={salesState.loading} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}</>}
         <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined) }}>重置</Button><IrreversiblePopconfirm action={`提交客资「${pendingValues?.name?.trim() || '当前客户'}」`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading} onClick={() => void prepareSubmit()}>提交客资</Button></IrreversiblePopconfirm></Space></div>
       </Form>
     </Spin></Card>

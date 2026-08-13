@@ -5,7 +5,7 @@ import type { Timestamp } from './time'
 export type User = { id: number; nickname: string; avatar?: string; username?: string }
 export type RawMenu = { id: number; name: string; path?: string; icon?: string; component?: string; componentName?: string; visible?: boolean; keepAlive?: boolean; alwaysShow?: boolean; type?: number; sort?: number; parentId: number; children?: RawMenu[] }
 export type WorkbenchMenu = Omit<RawMenu, 'children' | 'path'> & { path: string; hidden: boolean; noCache: boolean; alwaysShow: boolean; children: WorkbenchMenu[] }
-export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[] }
+export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; defaultAvatar?: string }
 export type DictData = { label: string; value: string; dictType: string; colorType?: string; cssClass?: string }
 export type SalesUser = { id: number; nickname: string; maskedMobile?: string; deptName?: string; avatar?: string }
 export type AssignmentUser = SalesUser & { deptId?: number; status: number }
@@ -238,7 +238,7 @@ export type WorkPlanTemplate = { id: number; typeId: number; code: string; name:
 export type WorkPlanSummary = { id: number; summary: string; submitterUserId: number; submittedAt: Timestamp; infraFileIds: number[]; summaryFields?: Record<string, unknown> }
 export type SubordinateCategoryCount = { value: string; label: string; count: number; configured: boolean }
 export type SubordinateSales = {
-  userId: number; name: string; username: string; mobile?: string; accountStatus: number
+  userId: number; name: string; avatar?: string; username: string; mobile?: string; accountStatus: number
   presence: 'online' | 'offline'; accepting: boolean; eligible: boolean; canReceiveNewLeads: boolean
   newcomerPoolStatus: 'not_available'; todayPendingCount: number; todayFollowUpStatus: 'completed' | 'incomplete'
   firstFollowTimeoutCount: number; suspendedLeadCount: number; categoryCounts: SubordinateCategoryCount[]

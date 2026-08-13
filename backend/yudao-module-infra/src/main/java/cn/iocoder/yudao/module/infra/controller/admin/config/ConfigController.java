@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.module.infra.controller.admin.config.vo.ConfigPageReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.config.vo.ConfigRespVO;
 import cn.iocoder.yudao.module.infra.controller.admin.config.vo.ConfigSaveReqVO;
+import cn.iocoder.yudao.module.infra.controller.admin.config.vo.DefaultUserAvatarUpdateReqVO;
 import cn.iocoder.yudao.module.infra.convert.config.ConfigConvert;
 import cn.iocoder.yudao.module.infra.dal.dataobject.config.ConfigDO;
 import cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants;
@@ -91,6 +92,21 @@ public class ConfigController {
             throw exception(ErrorCodeConstants.CONFIG_GET_VALUE_ERROR_IF_VISIBLE);
         }
         return success(config.getValue());
+    }
+
+    @GetMapping("/default-user-avatar")
+    @Operation(summary = "获得默认员工头像")
+    @PreAuthorize("@ss.hasPermission('infra:config:query')")
+    public CommonResult<String> getDefaultUserAvatar() {
+        return success(configService.getDefaultUserAvatar());
+    }
+
+    @PutMapping("/default-user-avatar")
+    @Operation(summary = "更新默认员工头像")
+    @PreAuthorize("@ss.hasPermission('infra:config:update')")
+    public CommonResult<Boolean> updateDefaultUserAvatar(@Valid @RequestBody DefaultUserAvatarUpdateReqVO reqVO) {
+        configService.updateDefaultUserAvatar(reqVO.getAvatar());
+        return success(true);
     }
 
     @GetMapping("/page")

@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.framework.security.config.SecurityProperties;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.system.controller.admin.auth.vo.*;
 import cn.iocoder.yudao.module.system.convert.auth.AuthConvert;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
@@ -59,6 +60,8 @@ public class AuthController {
     private PermissionService permissionService;
     @Resource
     private SocialClientService socialClientService;
+    @Resource
+    private ConfigApi configApi;
 
     @Resource
     private SecurityProperties securityProperties;
@@ -104,7 +107,8 @@ public class AuthController {
         // 1.2 获得角色列表
         Set<Long> roleIds = permissionService.getUserRoleIdListByUserId(getLoginUserId());
         if (CollUtil.isEmpty(roleIds)) {
-            return success(AuthConvert.INSTANCE.convert(user, Collections.emptyList(), Collections.emptyList()));
+            return success(withDefaultAvatar(
+                    AuthConvert.INSTANCE.convert(user, Collections.emptyList(), Collections.emptyList())));
         }
         List<RoleDO> roles = roleService.getRoleList(roleIds);
         roles.removeIf(role -> !CommonStatusEnum.ENABLE.getStatus().equals(role.getStatus())); // 移除禁用的角色
@@ -115,7 +119,11 @@ public class AuthController {
         menuList = menuService.filterDisableMenus(menuList);
 
         // 2. 拼接结果返回
-        return success(AuthConvert.INSTANCE.convert(user, roles, menuList));
+        return success(withDefaultAvatar(AuthConvert.INSTANCE.convert(user, roles, menuList)));
+    }
+
+    AuthPermissionInfoRespVO withDefaultAvatar(AuthPermissionInfoRespVO permissionInfo) {
+        return permissionInfo.setDefaultAvatar(configApi.getDefaultUserAvatar());
     }
 
     @PostMapping("/register")

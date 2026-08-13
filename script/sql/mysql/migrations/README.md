@@ -32,6 +32,8 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V042__normalize_legacy_lead_filter_status.sql` repairs active submitter/owner inbox configurations left with the retired `converted` Lead state after V037. It uses JSON paths instead of serialized-text matching, preserves immutable filter-version snapshots, and is repeatable. The application normalizes a legacy snapshot to `won` only when it is read or republished as a new version.
 
+`V044__default_employee_avatar.sql` adds the global System-owned default employee avatar configuration after the order lifecycle V043 migration. It inserts only the missing empty system configuration, preserves any administrator-configured value on rerun, and does not update user rows or create file records. Rollback removes only the configuration after clients are prepared to use nickname initials directly.
+
 `V040__submitter_actions_and_complaints.sql` adds snapshotted submission channels for duplicate review, daily submitter urges, the independent public sales-complaint queue, server-owned menu permissions, and default in-app notifications. It grants no roles, changes no existing Lead ownership, and deletes no business rows.
 
 `V021__lead_intended_product_active_unique_key.sql` changes only the intended-product uniqueness metadata. It adds a stored generated active product reference, removes the old tenant/lead/product unique index, and constrains only non-deleted rows; it does not delete or rewrite intended-product history.

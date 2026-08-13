@@ -6,6 +6,7 @@ import { LEAD_HANDLING_STAGE_LABELS } from '../constants'
 import { formatTimestamp } from '../services/time'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
+import EmployeeSelect from '../components/EmployeeSelect'
 
 type ExceptionType = 'suspended' | 'recycle_pending'
 type Action = 'restore' | 'transfer' | 'recycle' | 'release'
@@ -98,7 +99,7 @@ export default function LeadQualificationExceptionPage() {
     </Spin>
     <Modal open={Boolean(action)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' }[action || 'restore']} onCancel={closeAction} footer={<Space><Button onClick={closeAction}>取消</Button><IrreversiblePopconfirm action={confirmAction} danger={action === 'recycle' || action === 'release'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" danger={action === 'recycle' || action === 'release'} loading={saving} onClick={prepareSubmit}>确认处理</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        {action === 'transfer' && <Form.Item label="目标销售" required><Select showSearch optionFilterProp="label" value={salesUserId} onChange={setSalesUserId} placeholder={candidates.length ? '选择目标销售' : '暂无可转派销售'} options={candidates.map(user => ({ value: user.id, label: `${user.nickname}${user.deptName ? ` · ${user.deptName}` : ''}` }))} style={{ width: '100%' }}/></Form.Item>}
+        {action === 'transfer' && <Form.Item label="目标销售" required><EmployeeSelect users={candidates} showSearch optionFilterProp="label" value={salesUserId} onChange={setSalesUserId} placeholder={candidates.length ? '选择目标销售' : '暂无可转派销售'} style={{ width: '100%' }}/></Form.Item>}
         <Form.Item label="处置理由" required><Input.TextArea value={reason} onChange={event => setReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/></Form.Item>
       </Space>
     </Modal>

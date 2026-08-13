@@ -152,6 +152,30 @@ Frontend code must not derive a role from a department or post name, or derive a
 from a role name. Initialization SQL must create and connect each confirmed entity using
 the repository's actual relationship tables rather than assuming a one-to-one mapping.
 
+### Employee avatar flow
+
+`system_users.avatar` remains the personal employee-avatar source of truth. The global
+`zsjos.user.default-avatar` Infra configuration is only a presentation fallback and is never
+backfilled into user rows.
+
+```text
+personal System user avatar
+  -> global default employee avatar
+  -> nickname initial
+```
+
+- The authenticated permission response returns `user.avatar` and the top-level optional
+  `defaultAvatar` together, so Workbench pages do not issue independent configuration requests.
+- Administrators update another employee's personal avatar through the existing System user save
+  contract. Employees may still update the same field through their profile; the latest update wins.
+- The default-avatar read and update endpoints require `infra:config:query` and
+  `infra:config:update`. Clearing the global value is supported and restores the nickname-initial
+  fallback for users without a personal avatar.
+- Workbench applies this fallback only to real System employee identities. Lead, student, order,
+  notification and other business-object circles keep their domain-specific presentation.
+- Avatar changes become visible when permission or employee data is fetched again; there is no
+  avatar-specific realtime push contract.
+
 ## ZSJOS authorization layers
 
 ZSJOS authorization has three independent, cumulative layers:

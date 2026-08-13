@@ -29,6 +29,7 @@ SOURCE script/sql/mysql/migrations/V040__submitter_actions_and_complaints.sql;
 SOURCE script/sql/mysql/migrations/V041__order_repurchase_and_concurrency.sql;
 SOURCE script/sql/mysql/migrations/V042__normalize_legacy_lead_filter_status.sql;
 SOURCE script/sql/mysql/migrations/V043__order_lifecycle_review_fixes.sql;
+SOURCE script/sql/mysql/migrations/V044__default_employee_avatar.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

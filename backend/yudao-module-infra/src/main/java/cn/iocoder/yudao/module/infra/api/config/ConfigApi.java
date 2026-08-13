@@ -16,4 +16,11 @@ public interface ConfigApi {
      */
     String getConfigValueByKey(String key);
 
+    /**
+     * 获得全平台默认员工头像。
+     *
+     * @return 头像地址；未配置时返回 {@code null}
+     */
+    String getDefaultUserAvatar();
+
 }

@@ -26,8 +26,9 @@ import {
   ArrowLeftOutlined,
   ReloadOutlined,
   TeamOutlined,
-  UserOutlined,
 } from "@ant-design/icons";
+import EmployeeAvatar from "../components/EmployeeAvatar";
+import EmployeeSelect from "../components/EmployeeSelect";
 import {
   api,
   type AssignmentUser,
@@ -567,6 +568,7 @@ function SalesDetail({
         >
           返回列表
         </Button>
+        <EmployeeAvatar avatar={sales.avatar} name={sales.name} size={44} />
         <div className="subordinate-detail-title">
           <Typography.Title level={4}>{sales.name}</Typography.Title>
           <Typography.Text type="secondary">
@@ -786,25 +788,19 @@ function SalesDetail({
               label="目标销售"
               rules={[{ required: true, message: "请选择目标销售" }]}
             >
-              <Select
+              <EmployeeSelect
                 showSearch
                 optionFilterProp="label"
-                options={candidates.map((item) => ({
-                  value: item.id,
-                  label: item.nickname,
-                }))}
+                users={candidates}
               />
             </Form.Item>
           ) : (
             <Form.Item name="collaboratorUserId" label="公海跟进销售（可不填）">
-              <Select
+              <EmployeeSelect
                 allowClear
                 showSearch
                 optionFilterProp="label"
-                options={candidates.map((item) => ({
-                  value: item.id,
-                  label: item.nickname,
-                }))}
+                users={candidates}
               />
             </Form.Item>
           )}
@@ -998,9 +994,7 @@ export default function SubordinateSalesPage({
                   onClick={() => setSelectedSales(row)}
                 >
                   <div className="subordinate-sales-item-title">
-                    <span className="subordinate-sales-avatar">
-                      <UserOutlined />
-                    </span>
+                    <EmployeeAvatar avatar={row.avatar} name={row.name} size={28} />
                     <strong>{row.name}</strong>
                     <Tag
                       color={row.accountStatus === 0 ? "success" : "default"}

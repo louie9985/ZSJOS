@@ -5065,5 +5065,8 @@ WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.mobi
 INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
 SELECT 'ZSJOS登录安全', 1, '免密登录天数', 'zsjos.auth.remember-days', '7', b'1', '正整数，最大 365 天'
 WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.auth.remember-days' AND deleted = b'0');
+INSERT INTO infra_config (category, type, name, config_key, value, visible, remark)
+SELECT 'ZSJOS品牌配置', 1, '默认员工头像', 'zsjos.user.default-avatar', '', b'1', '未配置个人头像时使用；空值回退昵称首字'
+WHERE NOT EXISTS (SELECT 1 FROM infra_config WHERE config_key = 'zsjos.user.default-avatar' AND deleted = b'0');
 
 SET FOREIGN_KEY_CHECKS=1;

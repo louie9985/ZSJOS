@@ -1,5 +1,14 @@
 # API 约定
 
+## 员工头像
+
+`GET /admin-api/system/auth/get-permission-info` 在 `user.avatar` 返回当前员工个人头像，并在
+顶层可选字段 `defaultAvatar` 返回全平台默认员工头像。员工头像固定按
+`个人头像 > 默认头像 > 昵称首字` 展示；图片加载失败时继续使用下一层兜底。
+
+员工列表仍由各自接口返回 System 用户的个人 `avatar`。下属销售响应新增从 System 用户 API
+透传的 `avatar`。Workbench 不把默认头像写入员工记录，也不直接请求 Infra 参数配置接口。
+
 员工工作台通过 typed service 调用现有 system 和业务接口，不建立通用 `yudao-module-zsjos` 工作台聚合接口。中世健自建业务可以提供聚焦的 `/zsjos/**` 接口，例如客资派单能力，但不能复制 system 或 CRM 已有契约。
 
 - `POST /admin-api/system/auth/login`
