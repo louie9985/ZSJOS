@@ -1,0 +1,249 @@
+/* Assignment relations page and the pending-acceptance overlays. */
+
+.assignment-page {
+  max-width: 1360px;
+}
+
+.assignment-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.assignment-search {
+  width: 260px;
+}
+
+.assignment-filter {
+  width: 180px;
+}
+
+.assignment-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.assignment-person>div,.assignment-selected-row>div,.assignment-check-row span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.assignment-pagination {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.assignment-subject {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  border-radius: 6px;
+  background: var(--crm-fill-secondary);
+}
+
+.assignment-picker {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(260px,.72fr);
+  min-height: 460px;
+  margin-top: 16px;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.assignment-candidates,.assignment-selected {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.assignment-selected {
+  border-inline-start: 1px solid var(--crm-border);
+  background: var(--crm-fill-tertiary);
+}
+
+.assignment-pane-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.assignment-check-list {
+  display: flex;
+  max-height: 380px;
+  overflow-y: auto;
+  flex-direction: column;
+}
+
+.assignment-check-row {
+  width: 100%;
+  height: auto;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.assignment-check-row .ant-checkbox+span {
+  min-width: 0;
+  flex: 1;
+}
+
+.assignment-selected-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+@media(max-width:768px) {
+  .assignment-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .assignment-search,.assignment-filter {
+    width: 100%;
+  }
+
+  .assignment-picker {
+    grid-template-columns: 1fr;
+  }
+
+  .assignment-selected {
+    border-top: 1px solid var(--crm-border);
+    border-inline-start: 0;
+  }
+}
+
+.pending-reminder {
+  position: fixed;
+  z-index: 1090;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 12px;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-raised);
+}
+
+.pending-load-error {
+  position: fixed;
+  z-index: 1090;
+  top: 56px;
+  right: 16px;
+  max-width: 420px;
+}
+
+.assignment-countdown {
+  margin-bottom: 16px;
+}
+
+.assignment-countdown strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.lead-assignment-actions {
+  width: 100%;
+  justify-content: flex-end;
+}
+
+.lead-assignment-modal .ant-modal-body {
+  max-height: min(62vh,620px);
+  overflow: auto;
+}
+
+@media(max-width:768px) {
+  .pending-reminder {
+    top: auto;
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    transform: none;
+  }
+
+  .pending-load-error {
+    right: 8px;
+    left: 64px;
+    max-width: none;
+  }
+
+  .lead-assignment-modal {
+    max-width: 100vw!important;
+    margin: 0;
+    top: auto;
+    padding: 0;
+    position: fixed;
+    right: 0;
+    bottom: 0;
+    left: 0;
+  }
+
+  .lead-assignment-modal .ant-modal-content {
+    border-radius: 8px 8px 0 0;
+    padding: 16px;
+  }
+
+  .lead-assignment-modal .ant-modal-body {
+    max-height: 62vh;
+  }
+
+  .lead-assignment-actions {
+    display: grid!important;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .lead-assignment-actions .ant-btn {
+    width: 100%;
+  }
+}
+
+.assignment-toolbar {
+  padding: 0 0 10px;
+  flex-wrap: wrap;
+}
+
+.assignment-toolbar-spacer {
+  flex: 1;
+}
+
+.assignment-pagination {
+  padding-top: 10px;
+}
+
+.assignment-page .ant-table,.assignment-page .ant-table-container {
+  border-radius: 10px!important;
+}
+
+.assignment-page .ant-table-container {
+  overflow: hidden;
+}
+
+@media(max-width:768px) {
+  .assignment-toolbar {
+    gap: 6px;
+  }
+
+  .assignment-toolbar-spacer {
+    display: none;
+  }
+
+  .assignment-toolbar>.ant-space {
+    width: 100%;
+  }
+
+  .assignment-toolbar>.ant-space .ant-btn {
+    flex: 1;
+  }
+
+  .lead-assignment-modal .ant-modal-content {
+    border-radius: 14px 14px 0 0!important;
+  }
+}

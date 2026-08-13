@@ -1,0 +1,23 @@
+/* Aggregated stylesheet. Import order defines cascade precedence; keep tokens.css first. */
+
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+@import './patterns.css';
+@import './pages/lead-submission.css';
+@import './pages/lead-management.css';
+@import './pages/lead-assignment.css';
+@import './pages/claim-pool.css';
+@import './pages/today-tasks.css';
+@import './pages/work-plan.css';
+@import './pages/message-inbox.css';
+@import './pages/sales-order.css';
+@import './components/lead-detail.css';
+@import './components/follow-up.css';
+@import './components/appeal.css';
+@import './components/lead-product.css';
+@import './components/attachment.css';
+@import './components/dispatch.css';
+@import './components/settings-drawer.css';
+@import './components/tab-bar.css';
+@import './antd-overrides.css';

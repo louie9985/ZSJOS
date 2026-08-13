@@ -1,0 +1,48 @@
+import { Card, Result, Typography } from 'antd'
+import { APP_ROUTES } from '../constants'
+import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from '../services/menuComponentRegistry'
+import type { WorkbenchMenu } from '../services/api'
+import LeadSubmissionPage from '../pages/LeadSubmissionPage'
+import LeadManagementPage from '../pages/LeadManagementPage'
+import LeadAssignmentPage from '../pages/LeadAssignmentPage'
+import LeadClaimPoolPage from '../pages/LeadClaimPoolPage'
+import TodayTasksPage from '../pages/TodayTasksPage'
+import WorkPlanPage from '../pages/WorkPlanPage'
+import LeadQualificationExceptionPage from '../pages/LeadQualificationExceptionPage'
+import MessageInboxPage from '../pages/MessageInboxPage'
+import LeadAppealPage from '../pages/LeadAppealPage'
+import SalesOrderApprovalPage from '../pages/SalesOrderApprovalPage'
+import MySalesOrderPage from '../pages/MySalesOrderPage'
+
+interface RouteHostProps {
+  menu?: WorkbenchMenu
+  permissions: string[]
+  onOpenAssignment: () => void
+}
+
+/**
+ * 根据当前菜单路径/组件名渲染对应业务页面。
+ * 未迁移的菜单显示占位提示。
+ */
+export default function RouteHost({ menu, permissions, onOpenAssignment }: RouteHostProps) {
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
+  if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
+  if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
+  if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
+  if (menu?.path === APP_ROUTES.LEAD_ASSIGNMENT) return <LeadAssignmentPage/>
+  if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
+    return <LeadClaimPoolPage canClaim={permissions.includes('zsjos:lead:claim')}/>
+  }
+  if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage onOpenAssignment={onOpenAssignment}/>
+  if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
+  if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
+  if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
+  if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
+  if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
+  if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
+  return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
+    <Result status="info" title="页面尚未迁移" subTitle="该菜单已由统一权限系统下发，前端页面尚未迁移。"/>
+    <Typography.Paragraph type="secondary">路径：{menu?.path || location.pathname}　组件：{menu?.component || '未配置'}</Typography.Paragraph>
+  </Card></section>
+}

@@ -1,0 +1,363 @@
+/* Lead inbox: filter shell, master list, detail pane, attachments. */
+
+.lead-management-page {
+  max-width: none;
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.lead-inbox-filter-shell {
+  flex: none;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  background: var(--crm-bg-container);
+}
+
+.lead-inbox-group-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.lead-inbox-group-tabs .ant-tabs-tab {
+  padding: 10px 2px;
+}
+
+.lead-inbox-group-tabs .ant-tabs-tab-btn>span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.lead-inbox-group-tabs small,.lead-inbox-filter-options small {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--crm-text-secondary);
+}
+
+.lead-inbox-filter-sections {
+  border-top: 1px solid var(--crm-border);
+}
+
+.lead-inbox-filter-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.lead-inbox-filter-row+.lead-inbox-filter-row {
+  margin-top: 8px;
+}
+
+.lead-inbox-filter-label {
+  flex: none;
+  width: 68px;
+  padding: 5px 0;
+  color: var(--crm-text-secondary);
+}
+
+.lead-inbox-filter-options {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.lead-inbox-filter-options button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lead-inbox-filter-options button:hover,.lead-inbox-filter-options button.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.lead-inbox-layout {
+  display: grid;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0,1fr);
+}
+
+.lead-inbox-list-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.lead-inbox-toolbar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.lead-list-error {
+  margin-bottom: 8px;
+}
+
+.lead-inbox-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  flex-direction: column;
+  padding-right: 8px;
+}
+
+.lead-inbox-item {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  background: var(--crm-bg-container);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lead-inbox-item:hover {
+  border-color: var(--crm-color-primary-hover);
+}
+
+.lead-inbox-item.active {
+  padding: 11px;
+  border: 2px solid var(--crm-color-primary);
+}
+
+.lead-inbox-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.lead-inbox-item-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.lead-inbox-item-copy>span,.lead-inbox-item-meta>span {
+  overflow: hidden;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-inbox-item-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.lead-inbox-item-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-inbox-item-title .ant-tag {
+  flex: none;
+  margin: 0;
+}
+
+.lead-inbox-item-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  margin-top: 8px;
+  border-top: 1px solid var(--crm-border);
+}
+
+.lead-inbox-detail-pane {
+  min-width: 0;
+  overflow-y: auto;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  background: var(--crm-bg-container);
+}
+
+.lead-inbox-detail>h5 {
+  margin-top: 24px;
+  margin-bottom: 12px;
+}
+
+.lead-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(120px,1fr));
+  gap: 12px;
+}
+
+.lead-attachment-grid a {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+}
+
+.lead-attachment-grid .ant-image,.lead-attachment-grid img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.lead-attachment-grid span {
+  overflow: hidden;
+  font-size: var(--crm-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-list-loading,.lead-list-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+}
+
+@media(max-width:768px) {
+  .lead-inbox-group-tabs .ant-tabs-nav-wrap {
+    overflow-x: auto;
+  }
+
+  .lead-inbox-group-tabs .ant-tabs-nav-list {
+    min-width: max-content;
+  }
+
+  .lead-inbox-filter-row {
+    gap: 8px;
+  }
+
+  .lead-inbox-filter-label {
+    width: 60px;
+  }
+
+  .lead-inbox-filter-options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .lead-inbox-filter-options button {
+    flex: none;
+  }
+}
+
+.lead-inbox-detail-pane {
+  display: block;
+}
+
+@media(max-width:768px) {
+  .lead-management-page {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .lead-inbox-layout {
+    display: block;
+    height: auto;
+  }
+
+  .lead-inbox-list-pane {
+    height: 50vh;
+    min-height: 320px;
+  }
+
+  .lead-inbox-detail-pane {
+    display: block;
+    margin-top: 8px;
+    overflow: visible;
+  }
+
+  .lead-inbox-scroll {
+    padding-right: 0;
+  }
+}
+
+.lead-attachment-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+  color: inherit;
+}
+
+.lead-attachment-grid .ant-image {
+  cursor: zoom-in;
+}
+
+.lead-management-page {
+  padding: var(--crm-page-pad);
+}
+
+.lead-inbox-filter-shell {
+  padding: 0 var(--crm-card-pad);
+  margin-bottom: var(--crm-gap-sm);
+}
+
+.lead-inbox-metadata-error {
+  margin-top: 10px;
+}
+
+.lead-inbox-group-tabs {
+  margin-top: 0;
+}
+
+.lead-inbox-filter-sections {
+  padding: 8px 0 10px;
+}
+
+.lead-inbox-layout {
+  gap: var(--crm-gap);
+}
+
+.lead-inbox-scroll {
+  gap: var(--crm-gap-sm);
+}
+
+.lead-inbox-detail-pane {
+  padding: var(--crm-pane-pad);
+}
+
+@media(max-width:768px) {
+  .lead-management-page {
+    padding: var(--crm-page-pad);
+  }
+
+  .lead-inbox-filter-shell {
+    padding: 0 10px;
+  }
+
+  .lead-inbox-layout {
+    gap: 8px;
+  }
+
+  .lead-inbox-detail-pane {
+    padding: 10px 12px;
+  }
+}

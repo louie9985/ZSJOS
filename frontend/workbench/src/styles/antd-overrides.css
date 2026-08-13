@@ -1,0 +1,62 @@
+/* Global antd surface overrides that must sit outside .crm-shell (portals). */
+
+.lead-detail-card .ant-card-head,.lead-follow-up-card .ant-card-head {
+  min-height: 42px;
+  padding: 0 14px;
+  background: var(--crm-fill-tertiary);
+}
+
+.lead-detail-card .ant-card-head-title,.lead-follow-up-card .ant-card-head-title {
+  padding: 10px 0;
+  font-size: var(--crm-font-lg);
+  font-weight: 600;
+}
+
+@media(max-width:768px) {
+  .lead-detail-card .ant-card-body,.lead-follow-up-card .ant-card-body {
+    padding: 10px 12px;
+  }
+
+  .lead-detail-card .ant-card-head,.lead-follow-up-card .ant-card-head {
+    padding: 0 12px;
+  }
+}
+
+.lead-detail-card-grid,.lead-follow-up-panel {
+  gap: 8px;
+}
+
+.crm-shell :where(.ant-card,.ant-alert,.ant-btn,.ant-input,.ant-input-affix-wrapper,.ant-input-number,.ant-picker,.ant-select-selector,.ant-segmented,.ant-upload-list-item-container,.ant-pagination-item),.ant-modal-content {
+  border-radius: var(--crm-radius-lg)!important;
+}
+
+.lead-inbox-filter-shell,.lead-inbox-item,.lead-inbox-detail-pane,.lead-detail-hero,.lead-detail-card,.lead-follow-up-card,.pending-reminder,.claim-pool-card,.claim-card-region,.claim-pool-state,.claim-pool-skeletons .ant-card,.assignment-subject,.assignment-picker {
+  border-radius: var(--crm-radius-lg)!important;
+}
+
+.lead-attachment-grid .ant-image,.lead-attachment-grid img,.claim-card-images .ant-image,.claim-card-images img,.follow-up-record-images img {
+  border-radius: var(--crm-radius-lg)!important;
+}
+
+.ant-drawer-content {
+  border-radius: var(--crm-radius-lg) 0 0 var(--crm-radius-lg);
+}
+
+@media(max-width:768px) {
+  .ant-drawer-content {
+    border-radius: var(--crm-radius-lg) var(--crm-radius-lg) 0 0;
+  }
+}
+
+/* 自定义背景时的磨砂玻璃模糊。
+   挂 html[data-crm-bg] 而非 .crm-shell：Modal / Drawer 走 portal 在 shell 之外。
+   blur 强度：容器面板 20px / 弹层 24px。 */
+html[data-crm-bg='custom'] :where(.ant-card,.ant-table-wrapper,.ant-collapse,.ant-list,.ant-segmented) {
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+html[data-crm-bg='custom'] :where(.ant-modal-content,.ant-drawer-content,.ant-dropdown-menu,.ant-popover-inner,.ant-select-dropdown,.ant-picker-dropdown,.ant-notification-notice,.ant-menu-submenu-popup>.ant-menu) {
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}

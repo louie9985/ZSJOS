@@ -79,7 +79,7 @@ const useCartoonTheme = () => {
           Layout: {
             bodyBg: '#FFF9F5',
             footerBg: '#FFF9F5',
-            headerBg: '#F6D878',
+            headerBg: '#F2DFA8',
             headerColor: '#51463B',
             siderBg: '#FFF4E6',
             triggerBg: '#E8D29A',

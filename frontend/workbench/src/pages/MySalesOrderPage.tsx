@@ -82,7 +82,7 @@ export default function MySalesOrderPage() {
 
   return <section className="workspace-page sales-order-inbox-page">
     <header className="sales-order-inbox-header">
-      <div><Typography.Title level={3}>我的订单</Typography.Title><Typography.Text type="secondary">查看本人提交的全部成交订单及当前状态</Typography.Text></div>
+      <div><Typography.Title level={4}>我的订单</Typography.Title><Typography.Text type="secondary">查看本人提交的全部成交订单及当前状态</Typography.Text></div>
       <Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
     </header>
     {countsError && <Alert

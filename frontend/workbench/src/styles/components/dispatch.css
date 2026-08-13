@@ -1,0 +1,50 @@
+/* Sales dispatch status control in the header. */
+
+/* 高度跟随 antd controlHeight，使 Tag 与相邻 Button 始终同高；
+   密度切档时 antd 会改该 token，无需在此重复定义断点。 */
+.sales-dispatch-control {
+  height: var(--crm-control-h);
+  flex: none;
+}
+
+.dispatch-status-tag {
+  min-width: 72px;
+  height: var(--crm-control-h);
+  margin-inline-end: 0;
+  padding-inline: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.dispatch-mode-button {
+  width: 96px;
+  height: var(--crm-control-h);
+  padding-inline: 12px;
+}
+
+.sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {
+  font-size: var(--crm-font-base);
+  white-space: nowrap;
+}
+
+@media(max-width:768px) {
+  .sales-dispatch-control {
+    gap: 2px!important;
+  }
+
+  .dispatch-status-tag {
+    min-width: 56px;
+    padding-inline: 3px;
+  }
+
+  .dispatch-mode-button {
+    width: 72px;
+    padding-inline: 4px;
+  }
+
+  .sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {
+    font-size: var(--crm-font-sm);
+  }
+}

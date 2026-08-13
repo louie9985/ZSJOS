@@ -1,0 +1,46 @@
+/* Lead appeal panel and evidence grid. */
+
+.lead-appeal-panel {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lead-appeal-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lead-appeal-panel-header h5 {
+  margin: 0 0 4px!important;
+}
+
+.appeal-timeline-item {
+  padding-bottom: 14px;
+}
+
+.appeal-timeline-item .ant-typography {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.appeal-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(96px,120px));
+  gap: 10px;
+  margin: 8px 0;
+}
+
+.appeal-evidence-grid .ant-image,.appeal-evidence-grid img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+}
+
+.appeal-decision-actions {
+  margin-top: 18px;
+}

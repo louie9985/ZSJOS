@@ -1,0 +1,138 @@
+/* Intended-product editor. */
+
+.lead-product-editor {
+  display: grid;
+  min-width: 0;
+  gap: 12px;
+}
+
+.lead-product-primary-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2,minmax(0,1fr)) 180px;
+  align-items: end;
+  gap: 12px;
+}
+
+.lead-product-secondary-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.lead-product-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lead-product-control,.lead-product-field .ant-cascader,.lead-product-field .ant-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.lead-product-control .ant-select-selector,.lead-product-control .ant-select-selection-item,.lead-product-control .ant-select-selection-placeholder {
+  min-width: 0;
+}
+
+.lead-product-control .ant-select-selection-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-add {
+  width: 180px;
+}
+
+/* 与同行表单控件垂直对齐，故跟随 antd controlHeight */
+.lead-product-checkbox {
+  display: flex;
+  min-height: var(--crm-control-h);
+  align-items: center;
+}
+
+.lead-product-list,.lead-product-list>.ant-card,.lead-product-list>.ant-space-item,.lead-product-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.lead-product-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lead-product-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lead-product-row>.ant-btn {
+  flex: none;
+}
+
+.lead-product-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.lead-product-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.lead-product-title .ant-radio-wrapper {
+  flex: none;
+}
+
+.lead-product-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-path {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-dropdown .ant-select-item-option-content,.lead-product-dropdown .ant-cascader-menu-item-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-dropdown .ant-cascader-menus {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media(max-width:768px) {
+  .lead-product-primary-grid,.lead-product-secondary-grid {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .lead-product-add {
+    width: 100%;
+  }
+
+  .lead-product-path {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
