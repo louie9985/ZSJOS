@@ -341,7 +341,10 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         } else if ("financeReview".equals(option.getKey())) {
             option.setKey("finance_review");
         } else if ((INBOX_AUDIENCE_SUBMITTER.equals(audience) || INBOX_AUDIENCE_OWNER.equals(audience))
-                && "converted".equals(option.getKey())) {
+                && "converted".equals(option.getKey()) && option.getConditions() != null
+                && option.getConditions().stream().anyMatch(condition -> condition != null
+                && INBOX_FILTER_FIELD_STATUS.equals(condition.getField()) && condition.getValues() != null
+                && condition.getValues().contains("converted"))) {
             option.setKey("won");
             if ("已进入转化".equals(option.getLabel())) {
                 option.setLabel("已成交");

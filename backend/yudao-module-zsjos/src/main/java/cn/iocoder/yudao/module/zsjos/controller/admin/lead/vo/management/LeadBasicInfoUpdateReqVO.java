@@ -13,7 +13,7 @@ import java.util.List;
 public class LeadBasicInfoUpdateReqVO {
     @NotBlank @Size(max = 100) private String name;
     @Size(max = 32) private String mobile;
-    @Size(max = 128) private String wechatId;
+    @Size(max = 64) private String wechatId;
     @NotBlank @Size(max = 32) private String provinceCode;
     @NotBlank @Size(max = 32) private String cityCode;
     @Size(max = 64) private String leadCategory;
