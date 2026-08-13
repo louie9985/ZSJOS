@@ -22,6 +22,11 @@ The workbench HTTP client centralizes:
 - Authentication storage cleanup on logout or failed recovery.
 - Unwrapping the backend's standard response envelope.
 
+The Today Tasks page may show the ZSJOS business-task panel to users with
+`zsjos:business-task:query`. It requests and renders the separate BPM task panel only when the
+permission response also contains `bpm:task:query`; access to Today Tasks alone never implies the
+broader BPM task permission.
+
 ZSJOS employee login separates computer and mobile sessions with the OAuth2 clients
 `zsjos-pc` and `zsjos-mobile`. The login request sends an explicit `platform` value; the
 backend does not infer it from a URL, IP address, or user-agent string. Each client has an

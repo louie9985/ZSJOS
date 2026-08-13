@@ -268,7 +268,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             group.getOptions().sort(Comparator.comparing(LeadInboxFilterConfigVO.OptionVO::getSort));
             Set<String> optionKeys = new HashSet<>();
             for (LeadInboxFilterConfigVO.OptionVO option : group.getOptions()) {
-                normalizeLegacyOptionKey(option);
+                normalizeLegacyOptionKey(option, audience);
                 if (!isValidKey(option.getKey()) || !optionKeys.add(option.getKey()) || isInvalidLabel(option.getLabel())
                         || option.getSort() == null || option.getEnabled() == null) {
                     throw exception(LEAD_INBOX_FILTER_INVALID);
@@ -299,6 +299,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             if (condition == null || !ALLOWED_FIELDS_BY_AUDIENCE.get(audience).contains(condition.getField())) {
                 throw exception(LEAD_INBOX_FILTER_INVALID);
             }
+            normalizeLegacyLeadStatus(condition, audience);
             Set<String> allowed = ALLOWED_VALUES.get(condition.getField());
             if (allowed == null || !fields.add(condition.getField()) || condition.getValues() == null
                     || condition.getValues().isEmpty() || condition.getValues().size() > 20
@@ -334,12 +335,28 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                 Map.copyOf(valuesByField));
     }
 
-    private static void normalizeLegacyOptionKey(LeadInboxFilterConfigVO.OptionVO option) {
+    private static void normalizeLegacyOptionKey(LeadInboxFilterConfigVO.OptionVO option, String audience) {
         if ("registrationReview".equals(option.getKey())) {
             option.setKey("registration_review");
         } else if ("financeReview".equals(option.getKey())) {
             option.setKey("finance_review");
+        } else if ((INBOX_AUDIENCE_SUBMITTER.equals(audience) || INBOX_AUDIENCE_OWNER.equals(audience))
+                && "converted".equals(option.getKey())) {
+            option.setKey("won");
+            if ("已进入转化".equals(option.getLabel())) {
+                option.setLabel("已成交");
+            }
         }
+    }
+
+    private static void normalizeLegacyLeadStatus(LeadInboxFilterConfigVO.ConditionVO condition, String audience) {
+        if (!(INBOX_AUDIENCE_SUBMITTER.equals(audience) || INBOX_AUDIENCE_OWNER.equals(audience))
+                || !INBOX_FILTER_FIELD_STATUS.equals(condition.getField()) || condition.getValues() == null) {
+            return;
+        }
+        condition.setValues(condition.getValues().stream()
+                .map(value -> "converted".equals(value) ? "won" : value)
+                .distinct().toList());
     }
 
     private static boolean isValidKey(String key) {

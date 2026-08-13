@@ -98,6 +98,51 @@ class LeadInboxFilterConfigServiceImplTest {
     }
 
     @Test
+    void getAdminConfigNormalizesLegacyConvertedLeadStatus() {
+        LeadInboxFilterSaveReqVO config = validRequest();
+        LeadInboxFilterConfigVO.GroupVO convertedGroup = group("valid", "有效客资", 20);
+        convertedGroup.setConditions(List.of(condition("status", "converted")));
+        LeadInboxFilterConfigVO.OptionVO converted = option("converted", "已进入转化", 10);
+        converted.setConditions(List.of(condition("status", "converted")));
+        convertedGroup.setOptions(List.of(option("all", "全部", 0), converted));
+        config.setGroups(List.of(config.getGroups().getFirst(), convertedGroup));
+        LeadInboxFilterSchemeDO scheme = scheme(config);
+        when(schemeMapper.selectByAudience("submitter")).thenReturn(scheme);
+
+        var result = service.getAdminConfig("submitter");
+
+        LeadInboxFilterConfigVO.GroupVO normalized = result.getDraftGroups().get(1);
+        assertEquals(List.of("won"), normalized.getConditions().getFirst().getValues());
+        assertEquals("won", normalized.getOptions().get(1).getKey());
+        assertEquals("已成交", normalized.getOptions().get(1).getLabel());
+        assertEquals(List.of("won"), normalized.getOptions().get(1).getConditions().getFirst().getValues());
+    }
+
+    @Test
+    void rollbackNormalizesHistoricalConvertedLeadStatus() {
+        LeadInboxFilterSaveReqVO historical = validRequest();
+        historical.getGroups().get(1).getConditions().getFirst().setValues(List.of("submitted", "converted"));
+        LeadInboxFilterSchemeDO scheme = scheme(validRequest());
+        scheme.setPublishedVersion(4);
+        LeadInboxFilterVersionDO history = new LeadInboxFilterVersionDO();
+        history.setConfigJson(JsonUtils.toJsonString(historical));
+        when(schemeMapper.selectByAudience("submitter")).thenReturn(scheme);
+        when(versionMapper.selectBySchemeIdAndVersion(1L, 2)).thenReturn(history);
+        when(schemeMapper.updatePublished(org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.eq(4),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.eq(5),
+                org.mockito.ArgumentMatchers.eq(9L), org.mockito.ArgumentMatchers.any())).thenReturn(1);
+
+        service.rollback("submitter", 2, 9L);
+
+        ArgumentCaptor<LeadInboxFilterVersionDO> versionCaptor = ArgumentCaptor.forClass(LeadInboxFilterVersionDO.class);
+        verify(versionMapper).insert(versionCaptor.capture());
+        LeadInboxFilterConfigVO normalized = JsonUtils.parseObject(versionCaptor.getValue().getConfigJson(),
+                LeadInboxFilterConfigVO.class);
+        assertEquals(List.of("submitted", "won"), normalized.getGroups().get(1)
+                .getConditions().getFirst().getValues());
+    }
+
+    @Test
     void publishCreatesImmutableVersionSnapshot() {
         LeadInboxFilterSaveReqVO config = validRequest();
         LeadInboxFilterSchemeDO scheme = scheme(config);
