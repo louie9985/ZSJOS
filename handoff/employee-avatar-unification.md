@@ -55,3 +55,17 @@
 - Verification evidence: Version search found no active SQL/bootstrap reference to `V043__default_employee_avatar`; `git diff --check` passed before commit; prior backend/frontend tests and builds remain applicable.
 - Dependency or integration impact: Merge current `main` containing order V043 into this branch, preserve both migrations, and resolve shared bootstrap/schema/Workbench files before final integration.
 - Remaining work: Merge latest `main`, resolve overlaps, rerun checks, merge to `main`, and record final merged status.
+
+## Delivery Entry - 2026-08-13 13:18:00 +08:00
+
+- Beijing time: `2026-08-13 13:18:00 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7e364c4dc5080c80008f24cc442250d90a2d27a6`
+- User goal: Merge all active branches and registered worktrees into `main`, then clean up the merged worktrees and local branches.
+- Key decisions: Preserved order lifecycle as V043 and renumbered default employee avatar to V044; resolved shared bootstrap verification to require both versions and exactly 23 module versions; retained both order lifecycle behavior and employee avatar rendering in overlapping Workbench files.
+- Execution or analysis result: Merged current `main` into `codex/employee-avatar-unification` as `a2b5d3dd72`, then merged the verified avatar branch into `main` as `7e364c4dc5`. Status is `merged`.
+- Changed files: This handoff delivery entry; integrated implementation and migration files are recorded in preceding entries and merge commits.
+- Verification evidence: Combined Infra/System/ZSJOS Reactor focused tests passed (44); Workbench avatar tests passed (5), all executable tests passed (76), typecheck and production build passed; the unrelated `loginFormCache.test.ts` suite remains unloadable because `jsencrypt/lib/index.js` is missing; Admin target ESLint and Prettier checks and `build:local` passed; `git diff --check` passed; schema baselines are byte-identical; bootstrap sources V042, V043, then V044.
+- Dependency or integration impact: No new npm or Maven dependency. V044 depends on V043 being integrated first. No push, database migration, real configuration mutation, or preview service restart was performed.
+- Remaining work: Authenticated desktop/mobile browser checks and real MySQL migration execution remain pending for an authorized environment; local registered worktree and merged branch cleanup follows this handoff commit.
