@@ -41,6 +41,7 @@ public class LeadBasicInfoService {
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadDuplicateMatcher duplicateMatcher;
+    @Resource private PersonIdentityWriteService personIdentityWriteService;
 
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "basic-info-update")
@@ -72,8 +73,7 @@ public class LeadBasicInfoService {
                 || !Objects.equals(lead.getCityCode(), region.cityCode())) changedFields.add("region");
         if (!Objects.equals(lead.getLeadCategory(), category)) changedFields.add("leadCategory");
         String productsBefore = productSummary(productMapper.selectListByLeadId(leadId));
-        person.setName(req.getName().trim()); person.setMobile(mobile); person.setWechatId(wechat);
-        person.setLastSeenAt(LocalDateTime.now()); personMapper.updateById(person);
+        personIdentityWriteService.update(person.getId(), req.getName().trim(), mobile, wechat);
         lead.setSubmittedName(req.getName().trim()); lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechat);
         lead.setProvinceCode(region.provinceCode()); lead.setProvinceName(region.provinceName());
         lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName()); lead.setLeadCategory(category);
@@ -103,12 +103,6 @@ public class LeadBasicInfoService {
     }
 
     private void checkIdentityConflict(LeadDO lead, LeadBasicInfoUpdateReqVO req, String mobile, String wechat) {
-        PersonDO byMobile = mobile == null ? null : personMapper.selectByMobile(mobile);
-        PersonDO byWechat = wechat == null ? null : personMapper.selectByWechatId(wechat);
-        if (byMobile != null && !Objects.equals(byMobile.getId(), lead.getPersonId())
-                || byWechat != null && !Objects.equals(byWechat.getId(), lead.getPersonId())) {
-            throw exception(LEAD_BASIC_INFO_CONTACT_CONFLICT);
-        }
         LeadCreateReqVO probe = new LeadCreateReqVO();
         probe.setName(req.getName()); probe.setMobile(mobile); probe.setWechatId(wechat);
         probe.setProvinceCode(req.getProvinceCode()); probe.setCityCode(req.getCityCode());

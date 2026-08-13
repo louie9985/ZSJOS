@@ -31,6 +31,7 @@ import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
+import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -77,10 +78,13 @@ class SalesOrderServiceImplTest {
     @Mock private DeptApi deptApi;
     @Mock private LeadInboxFilterConfigService inboxFilterConfigService;
     @Mock private LeadAgingPoolService agingPoolService;
+    @Mock private PersonIdentityWriteService personIdentityWriteService;
+    @Mock private SalesOrderCommandService commandService;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
         lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
+        lenient().when(commandService.fingerprint(any())).thenReturn("fingerprint");
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 

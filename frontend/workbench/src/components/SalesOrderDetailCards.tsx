@@ -45,6 +45,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </Space>
     </div>
     {order.status === 'revision_required' && <Alert type="error" showIcon message="订单已驳回，等待补正" description={order.decisionReason || '审批人未填写可展示的驳回原因'}/>}
+    {order.status === 'terminated' && <Alert type="warning" showIcon message="订单审批已终止"
+      description={order.terminationReason || '未记录终止原因'}/>}
     <div className="sales-order-card-grid">
       <Card size="small" title="双中心审批状态" className="sales-order-card sales-order-card-wide">
         <Table rowKey="key" size="small" pagination={false} scroll={{ x: 640 }} dataSource={approvalRows} columns={[

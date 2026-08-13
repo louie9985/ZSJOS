@@ -134,7 +134,7 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
         {!submitterOnly && <div className="follow-up-field-grid">
           <Form.Item name="name" label="姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item>
           <Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: (_, value) => value?.trim() || form.getFieldValue('wechatId')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号')) }]}><Input maxLength={32}/></Form.Item>
-          <Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: (_, value) => value?.trim() || form.getFieldValue('mobile')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号')) }]}><Input maxLength={128}/></Form.Item>
+          <Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: (_, value) => value?.trim() || form.getFieldValue('mobile')?.trim() ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号')) }]}><Input maxLength={64}/></Form.Item>
         </div>}
         <Form.Item name="regionPath" label="所在地区" rules={[{ required: true, message: '请选择所在地区' }]}>
           <Cascader options={areaOptions} showSearch disabled={loadingSources.area || Boolean(configErrors.area)}

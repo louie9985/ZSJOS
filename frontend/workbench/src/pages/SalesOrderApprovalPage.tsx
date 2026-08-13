@@ -30,10 +30,10 @@ export default function SalesOrderApprovalPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [decision, setDecision] = useState<'approve' | 'reject'>()
   const [reason, setReason] = useState('')
-  const { submitting: saving, run: runDecision } = useSubmissionGuard()
+  const { submitting: saving, run: runDecision, resetIntent } = useSubmissionGuard()
   const requestVersion = useRef(0)
   const [confirmOpen, setConfirmOpen] = useState(false)
-  const closeDecision = () => { setConfirmOpen(false); setDecision(undefined) }
+  const closeDecision = () => { setConfirmOpen(false); setDecision(undefined); resetIntent() }
 
   const loadProfile = useCallback(async () => {
     setProfileLoading(true); setProfileError('')
@@ -77,12 +77,13 @@ export default function SalesOrderApprovalPage() {
     if (!selectedItem?.taskId || !decision) return
     const order = selectedItem
     const nextDecision = decision
-    await runDecision(async ({ complete }) => {
+    await runDecision(async ({ complete, idempotencyKey }) => {
       if (!detail) return
       await api.decideSalesOrder(order.id, nextDecision, { taskId: order.taskId!, reason: reason.trim(),
         approvalRoundId: detail.currentApprovalRoundId, orderVersion: detail.version,
-        roundVersion: detail.approvalRoundVersion, idempotencyKey: crypto.randomUUID() })
-      complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); reload()
+        roundVersion: detail.approvalRoundVersion, idempotencyKey })
+      complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回销售补正');
+      setConfirmOpen(false); setDecision(undefined); setReason(''); reload()
     }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '审批失败'))
   }
   const prepareDecision = () => {
@@ -91,7 +92,8 @@ export default function SalesOrderApprovalPage() {
   }
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
-      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={groupKey === 'done' ? 'approval-done' : 'approval-todo'} onApprove={() => setDecision('approve')} onReject={() => setDecision('reject')}/>
+      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={groupKey === 'done' ? 'approval-done' : 'approval-todo'}
+        onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}/>
         : <Empty description="从左侧选择一条订单"/>
   const hasMore = items.length < total
 

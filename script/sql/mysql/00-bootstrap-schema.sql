@@ -4473,6 +4473,29 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   KEY `idx_tenant_order_status` (`tenant_id`,`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 订单审批轮次与 BPM 引用';
 
+-- zsjos_order_command
+CREATE TABLE IF NOT EXISTS `zsjos_order_command` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客户端命令幂等键',
+  `order_id` bigint NOT NULL COMMENT '订单编号',
+  `approval_round_id` bigint NOT NULL COMMENT '审批轮次编号',
+  `process_instance_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'BPM 流程实例编号',
+  `command_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'approve/reject/terminate',
+  `task_definition_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '审批节点；终止为空',
+  `bpm_task_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT 'BPM 任务编号；终止为空',
+  `operator_user_id` bigint NOT NULL COMMENT '操作人用户编号',
+  `request_fingerprint` char(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规范化请求指纹',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_order_command_key` (`tenant_id`,`idempotency_key`),
+  KEY `idx_tenant_order_round` (`tenant_id`,`order_id`,`approval_round_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单审批与终止命令账本';
+
 -- zsjos_order_approval_config
 CREATE TABLE IF NOT EXISTS `zsjos_order_approval_config` (
   `id` bigint NOT NULL AUTO_INCREMENT,
@@ -4626,7 +4649,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_person` (
   `person_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'Person 业务编号',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '姓名',
   `mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '手机号（脱敏展示）',
-  `wechat_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '微信号（脱敏展示）',
+  `wechat_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '微信号（脱敏展示）',
   `identity_status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '身份状态，协议值待确认',
   `first_seen_at` datetime NOT NULL COMMENT '首次发现时间',
   `last_seen_at` datetime NOT NULL COMMENT '最近发现时间',
@@ -4643,6 +4666,23 @@ CREATE TABLE IF NOT EXISTS `zsjos_person` (
   KEY `idx_tenant_wechat_id` (`tenant_id`,`wechat_id`),
   KEY `idx_tenant_identity_status` (`tenant_id`,`identity_status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客户与学员身份主档';
+
+-- zsjos_person_contact_claim
+CREATE TABLE IF NOT EXISTS `zsjos_person_contact_claim` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `contact_value` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL COMMENT 'trim 后手机号或微信号',
+  `person_id` bigint DEFAULT NULL COMMENT '占用客户编号',
+  `reservation_key` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '事务预占键',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_contact_value` (`tenant_id`,`contact_value`),
+  KEY `idx_tenant_person` (`tenant_id`,`person_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Person 联系方式唯一占用';
 
 -- zsjos_person_merge_event
 CREATE TABLE IF NOT EXISTS `zsjos_person_merge_event` (

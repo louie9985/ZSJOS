@@ -47,6 +47,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private OpportunityFollowUpRecordMapper opportunityFollowUpRecordMapper;
     @Resource private SalesOrderMapper orderMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService salesOrderPermissionService;
     @Resource private LeadFollowUpRuleService ruleService;
     @Resource private LeadAssignmentService assignmentService;
     @Resource private AdminUserApi adminUserApi;
@@ -435,9 +436,10 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (canManage(cycle, userId) && !hasActiveApproval(cycle.getLeadId())) { actions.add("ASSIGN"); actions.add("EXIT"); }
         if (isOwnerOrCollaborator(cycle, userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
             actions.add(ACTION_ADD_FOLLOW_UP);
-            if (order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())) {
+            if (order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())
+                    && salesOrderPermissionService.canRevise(order, userId)) {
                 actions.add(ACTION_REVISE_DEAL);
-            } else {
+            } else if (order == null) {
                 actions.add(ACTION_ENTER_DEAL);
             }
         }

@@ -90,7 +90,7 @@ export type ManagedLead = {
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
 }
 export type LeadComplaint = {
   id: number; leadId: number; complainantUserId: number; salesUserId: number; reason: string
@@ -153,7 +153,7 @@ export type SalesOrderSubmitRequest = {
 export type SalesOrder = {
   id: number; orderNo: string; leadId?: number; opportunityId?: number; personId: number; orderType: 'first_purchase' | 'repurchase'
   status: 'pending_approval' | 'revision_required' | 'effective' | 'terminated'
-  submitterUserId: number; formalSalesUserId: number; buyerName: string; studentName: string; studentNature: string
+  submitterUserId: number; formalSalesUserId?: number; buyerName: string; studentName: string; studentNature: string
   studentMobile?: string; studentWechatId?: string; provinceCode: string; provinceName: string; cityCode: string; cityName: string
   agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string; totalAmount: number
   customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string

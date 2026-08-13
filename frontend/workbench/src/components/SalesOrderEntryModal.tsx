@@ -13,6 +13,7 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 
 type Values = {
+  repurchaseReason?: string
   buyerName?: string; studentName: string; studentNature: string; mobile?: string; wechatId?: string; regionPath: string[]
   agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string
   customerPaidAt: Dayjs; feeMode: string; paymentMethod: string; remark?: string
@@ -51,7 +52,6 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingValues, setPendingValues] = useState<Values>()
   const [orderNo, setOrderNo] = useState<string>()
-  const [repurchaseReason, setRepurchaseReason] = useState('')
 
   const items = Form.useWatch('items', form) || []
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
@@ -96,8 +96,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     if (!open) return
     resetIntent()
     setConfirmOpen(false); setPendingValues(undefined)
-    form.resetFields(); setVouchers([]); setRepurchaseReason(''); void load()
-  }, [open, lead.id, orderId, resetIntent])
+    form.resetFields(); setVouchers([]); void load()
+  }, [open, lead.id, lead.submittedName, lead.submittedMobile, lead.submittedWechatId, orderId, resetIntent])
 
   const close = () => { setConfirmOpen(false); setPendingValues(undefined); onClose() }
 
@@ -136,7 +136,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         if (uploadResult.failed) { message.error('有缴费凭证上传失败，请重试失败项'); return }
         request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
         if (repurchase) {
-          if (!repurchaseReason.trim()) { message.warning('请填写复购说明'); return }
+          const repurchaseReason = values.repurchaseReason!.trim()
           const submittedOrderId = externalCustomer
             ? await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason: repurchaseReason.trim(), order: request })
             : await api.submitSystemRepurchase(lead.id, repurchaseReason.trim(), request)
@@ -162,7 +162,10 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
       <Form form={form} layout="vertical" disabled={Boolean(loadError) || saving}>
-        {repurchase && <Form.Item label="复购说明" required><Input.TextArea rows={3} maxLength={1000} showCount value={repurchaseReason} onChange={event => setRepurchaseReason(event.target.value)}/></Form.Item>}
+         {repurchase && <Form.Item name="repurchaseReason" label="复购说明"
+           rules={[{ required: true, whitespace: true, message: '请填写复购说明' }, { max: 1000 }]}>
+           <Input.TextArea rows={3} maxLength={1000} showCount/>
+         </Form.Item>}
         <Divider titlePlacement="start">学员信息</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
