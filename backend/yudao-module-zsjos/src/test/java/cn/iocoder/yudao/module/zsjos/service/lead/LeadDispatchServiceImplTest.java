@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentRuleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadClaimDailyCounterMapper;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import org.springframework.context.ApplicationEventPublisher;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
@@ -55,7 +56,7 @@ import static org.mockito.Mockito.times;
 @ExtendWith(MockitoExtension.class)
 class LeadDispatchServiceImplTest {
 
-    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
+    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @InjectMocks
@@ -78,6 +79,8 @@ class LeadDispatchServiceImplTest {
     private LeadLifecycleTaskService lifecycleTaskService;
     @Mock
     private ApplicationEventPublisher applicationEventPublisher;
+    @Mock
+    private AdvancedFilterService advancedFilterService;
     @Mock
     private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock
@@ -120,7 +123,7 @@ class LeadDispatchServiceImplTest {
         LeadClaimPoolPageReqVO reqVO = request();
         LeadDO lead = lead();
         when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
-        when(leadMapper.selectPublicPoolPage(reqVO)).thenReturn(new PageResult<>(List.of(lead), 1L));
+        when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(new PageResult<>(List.of(lead), 1L));
         when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of(product()));
         when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of(attachment()));
         when(dictDataApi.getDictDataList(DICT_SOURCE_CHANNEL)).thenReturn(List.of(dict("douyin", "抖音")));
@@ -151,7 +154,7 @@ class LeadDispatchServiceImplTest {
         LeadClaimPoolPageReqVO reqVO = request();
         LeadDO lead = lead();
         when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
-        when(leadMapper.selectPublicPoolPage(reqVO)).thenReturn(new PageResult<>(List.of(lead), 1L));
+        when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(new PageResult<>(List.of(lead), 1L));
         when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(dictDataApi.getDictDataList(DICT_SOURCE_CHANNEL)).thenReturn(List.of());
@@ -170,12 +173,12 @@ class LeadDispatchServiceImplTest {
         LeadClaimPoolPageReqVO reqVO = request();
         when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
-        when(leadMapper.selectPublicPoolPage(reqVO)).thenReturn(PageResult.empty());
+        when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(PageResult.empty());
 
         PageResult<LeadPendingRespVO> result = service.getClaimPoolPage(reqVO, 10L);
 
         assertEquals(0L, result.getTotal());
-        verify(leadMapper).selectPublicPoolPage(reqVO);
+        verify(leadMapper).selectPublicPoolPage(reqVO, null, null);
     }
 
     @Test

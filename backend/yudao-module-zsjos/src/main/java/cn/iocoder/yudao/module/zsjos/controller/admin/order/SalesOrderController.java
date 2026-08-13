@@ -107,6 +107,7 @@ public class SalesOrderController {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/approval/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> searchInboxPage(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }

@@ -22,6 +22,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
+import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -72,9 +74,14 @@ class LeadManagementServiceImplTest {
     private SalesOrderMapper salesOrderMapper;
     @Mock
     private LeadAgingPoolService agingPoolService;
+    @Mock
+    private AdvancedFilterService advancedFilterService;
+    @Mock
+    private SalesOrderObjectPermissionService salesOrderPermissionService;
 
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null);
         org.mockito.Mockito.lenient().when(agingPoolService.canOperate(
                         org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(Long.class),
                         org.mockito.ArgumentMatchers.anyLong()))
@@ -87,7 +94,7 @@ class LeadManagementServiceImplTest {
         LeadDO lead = lead(1L, 10L, 20L);
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
         when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of());
-        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of(), false))
+        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of(), List.of(), false, null))
                 .thenReturn(new PageResult<>(List.of(lead), 1L));
         when(intendedProductMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
@@ -97,18 +104,18 @@ class LeadManagementServiceImplTest {
         assertEquals(1L, result.getTotal());
         assertEquals(List.of("submitter"), result.getList().getFirst().getRelationTypes());
         assertEquals("13800138000", result.getList().getFirst().getSubmittedMobile());
-        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of(), false);
+        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of(), List.of(), false, null);
     }
 
     @Test
     void pageAllowsQueryAllPermissionWithoutRelationScope() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
-        when(leadMapper.selectManagementPage(reqVO, null, List.of(), List.of(), false)).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementPage(reqVO, null, List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
-        verify(leadMapper).selectManagementPage(reqVO, null, List.of(), List.of(), false);
+        verify(leadMapper).selectManagementPage(reqVO, null, List.of(), List.of(), List.of(), false, null);
     }
 
     @Test
@@ -135,6 +142,7 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:lead:qualify")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:sales-order:create")).thenReturn(true);
+        when(salesOrderPermissionService.canRevise(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(20L))).thenReturn(true);
 
         assertActions(actionLead("submitted", "owned", false), null,
                 "EDIT_BASIC_INFO", "ADD_FOLLOW_UP");
@@ -341,11 +349,11 @@ class LeadManagementServiceImplTest {
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
         when(inboxFilterConfigService.resolveQuery(config, "all", null))
                 .thenReturn(new LeadInboxFilterQuery(java.util.Set.of(), java.util.Set.of(), false));
-        when(leadMapper.selectManagementPage(reqVO, 99L, List.of(), List.of(), false)).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementPage(reqVO, 99L, List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
-        verify(leadMapper).selectManagementPage(reqVO, 99L, List.of(), List.of(), false);
+        verify(leadMapper).selectManagementPage(reqVO, 99L, List.of(), List.of(), List.of(), false, null);
     }
 
     @Test
@@ -377,13 +385,13 @@ class LeadManagementServiceImplTest {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
         when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 21L));
-        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(20L, 21L), List.of(), List.of(), false))
+        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(20L, 21L), List.of(), List.of(), false, null))
                 .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
         verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(20L, 21L),
-                List.of(), List.of(), false);
+                List.of(), List.of(), false, null);
     }
 
     @Test

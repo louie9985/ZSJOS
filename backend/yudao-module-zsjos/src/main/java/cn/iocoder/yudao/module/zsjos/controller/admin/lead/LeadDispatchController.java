@@ -50,7 +50,7 @@ public class LeadDispatchController {
         return success(dispatchService.getClaimPoolPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/claim-pool/search-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:claim', 'zsjos:lead:query-all')")
     public CommonResult<PageResult<LeadPendingRespVO>> searchClaimPool(@Valid @RequestBody LeadClaimPoolPageReqVO reqVO) {
         return success(dispatchService.getClaimPoolPage(reqVO, getLoginUserId()));
     }

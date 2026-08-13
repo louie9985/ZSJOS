@@ -5,14 +5,23 @@ import { api, type AdvancedFilterCondition, type AdvancedFilterField, type Advan
 
 const operatorLabels: Record<string, string> = { contains: '包含', eq: '等于', ne: '不等于', in: '属于', not_in: '不属于', gt: '大于', lt: '小于', between: '区间', is_empty: '为空', is_not_empty: '不为空' }
 const blank = (): AdvancedFilterGroup => ({ logic: 'AND', conditions: [], groups: [] })
-export const filterCount = (group?: AdvancedFilterGroup): number => group ? group.conditions.length + group.groups.reduce((sum, item) => sum + filterCount(item), 0) : 0
+const hasValue = (value: unknown) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== ''
+const isComplete = (condition: AdvancedFilterCondition) => condition.operator === 'is_empty' || condition.operator === 'is_not_empty'
+  || (condition.operator === 'between' ? hasValue(condition.valueFrom) && hasValue(condition.valueTo) : hasValue(condition.value))
+const conditionCount = (group?: AdvancedFilterGroup): number => group ? group.conditions.length + group.groups.reduce((sum, item) => sum + conditionCount(item), 0) : 0
+const effectiveGroup = (group: AdvancedFilterGroup): AdvancedFilterGroup => ({
+  logic: group.logic,
+  conditions: group.conditions.filter(isComplete),
+  groups: group.groups.map(effectiveGroup).filter(item => item.conditions.length > 0 || item.groups.length > 0)
+})
+export const filterCount = (group?: AdvancedFilterGroup): number => group ? effectiveGroup(group).conditions.length + effectiveGroup(group).groups.reduce((sum, item) => sum + filterCount(item), 0) : 0
 type Change = (value: AdvancedFilterGroup, immediate?: boolean) => void
 
 function ConditionRow({ value, fields, onChange, onRemove }: { value: AdvancedFilterCondition; fields: AdvancedFilterField[]; onChange: (value: AdvancedFilterCondition, immediate?: boolean) => void; onRemove: () => void }) {
   const field = fields.find(item => item.fieldKey === value.fieldKey) || fields[0]
   const noValue = value.operator === 'is_empty' || value.operator === 'is_not_empty'
   const setField = (fieldKey: string) => { const next = fields.find(item => item.fieldKey === fieldKey)!; onChange({ fieldKey, operator: next.operators[0] }, true) }
-  const dateValue = (key: 'value' | 'valueFrom' | 'valueTo', item: { toISOString(): string } | null) => onChange({ ...value, [key]: item?.toISOString() })
+  const dateValue = (key: 'value' | 'valueFrom' | 'valueTo', item: { valueOf(): number } | null) => onChange({ ...value, [key]: item?.valueOf() })
   const control = !field || noValue ? null : value.operator === 'between' ? <Space.Compact block>
     {field.valueType === 'date' ? <><DatePicker showTime onChange={item => dateValue('valueFrom', item)}/><DatePicker showTime onChange={item => dateValue('valueTo', item)}/></> : <><InputNumber value={value.valueFrom as number} onChange={item => onChange({ ...value, valueFrom: item })}/><InputNumber value={value.valueTo as number} onChange={item => onChange({ ...value, valueTo: item })}/></>}
   </Space.Compact> : field.valueType === 'select' ? <Select mode="multiple" showSearch optionFilterProp="label" value={(value.value as Array<string | number>) || []} options={field.options} loading={field.optionsLoading} notFoundContent={field.optionsError ? <Button type="link" size="small" onClick={field.retryOptions}>加载失败，重试</Button> : '暂无可选项'} onChange={item => onChange({ ...value, value: item }, true)}/>
@@ -62,16 +71,16 @@ export function AdvancedFilterToolbar({ scene, placeholder, value, keyword, onKe
   useEffect(() => { void loadCatalog() }, [loadCatalog])
   const emit = useCallback((next: AdvancedFilterGroup, immediate = false) => {
     setDraft(next); window.clearTimeout(timer.current)
-    const deliver = () => onChangeRef.current(filterCount(next) ? next : undefined)
+    const deliver = () => { const effective = effectiveGroup(next); onChangeRef.current(filterCount(effective) ? effective : undefined) }
     if (immediate) deliver(); else timer.current = window.setTimeout(deliver, 500)
   }, [])
   useEffect(() => () => window.clearTimeout(timer.current), [])
-  const count = filterCount(value), flat = useMemo(() => [...draft.conditions.map((condition, index) => ({ condition, path: ['conditions', index] as const })), ...draft.groups.flatMap((group, groupIndex) => group.conditions.map((condition, index) => ({ condition, path: [groupIndex, index] as const })))], [draft])
+  const count = filterCount(value), flat = useMemo(() => [...draft.conditions.map((condition, index) => ({ condition, path: ['conditions', index] as const })), ...draft.groups.flatMap((group, groupIndex) => group.conditions.map((condition, index) => ({ condition, path: [groupIndex, index] as const })))].filter(item => isComplete(item.condition)), [draft])
   const removeTag = (path: readonly unknown[]) => typeof path[0] === 'string' ? emit({ ...draft, conditions: draft.conditions.filter((_, index) => index !== path[1]) }, true) : emit({ ...draft, groups: draft.groups.map((group, groupIndex) => groupIndex === path[0] ? { ...group, conditions: group.conditions.filter((_, index) => index !== path[1]) } : group) }, true)
   const submitKeyword = () => onKeyword(searchText.trim())
   return <><div className="advanced-filter-toolbar"><Input allowClear value={searchText} placeholder={placeholder} suffix={<SearchOutlined role="button" aria-label="搜索" tabIndex={0} onClick={submitKeyword} onKeyDown={event => event.key === 'Enter' && submitKeyword()}/>} onChange={event => { setSearchText(event.target.value); if (!event.target.value) onKeyword('') }} onPressEnter={submitKeyword}/><Badge count={count}><Button icon={<FilterOutlined/>} onClick={() => setOpen(true)}>筛选</Button></Badge></div>
     {count > 0 && <div className="advanced-filter-tags">{flat.map(({ condition, path }, index) => { const field = fields.find(item => item.fieldKey === condition.fieldKey); return <Tag closable key={`${condition.fieldKey}-${index}`} onClose={event => { event.preventDefault(); removeTag(path) }}>{field?.group} · {field?.label} {operatorLabels[condition.operator]}</Tag> })}<Button size="small" type="link" onClick={() => emit(blank(), true)}>清空全部</Button></div>}
     <Drawer className="advanced-filter-drawer" open={open} placement="right" width={560} title={<div><Typography.Text strong>高级筛选</Typography.Text><Typography.Text type="secondary"> · 修改后自动生效</Typography.Text></div>} onClose={() => setOpen(false)} footer={<Space><Button onClick={() => emit(blank(), true)}>清空全部</Button><Button type="primary" onClick={() => setOpen(false)}>关闭</Button></Space>}>
-      {catalogState === 'loading' ? <div className="advanced-filter-state"><Spin/><span>正在加载可筛选字段</span></div> : catalogState === 'error' ? <Alert type="error" showIcon message="筛选字段加载失败" action={<Button icon={<ReloadOutlined/>} onClick={() => void loadCatalog()}>重试</Button>}/> : fields.length ? <GroupEditor value={draft} fields={fields} depth={0} total={filterCount(draft)} onChange={emit}/> : <Empty description="当前场景没有可用筛选字段"/>}
+      {catalogState === 'loading' ? <div className="advanced-filter-state"><Spin/><span>正在加载可筛选字段</span></div> : catalogState === 'error' ? <Alert type="error" showIcon message="筛选字段加载失败" action={<Button icon={<ReloadOutlined/>} onClick={() => void loadCatalog()}>重试</Button>}/> : fields.length ? <GroupEditor value={draft} fields={fields} depth={0} total={conditionCount(draft)} onChange={emit}/> : <Empty description="当前场景没有可用筛选字段"/>}
     </Drawer></>
 }

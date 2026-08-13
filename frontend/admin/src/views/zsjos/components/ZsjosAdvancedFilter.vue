@@ -1,59 +1,93 @@
 <template>
   <div class="advanced-toolbar">
-    <el-input v-model="searchText" clearable :placeholder="placeholder" @keyup.enter="emit('search', searchText.trim())">
-      <template #suffix><Icon icon="ep:search" class="cursor-pointer" @click="emit('search', searchText.trim())" /></template>
+    <el-input v-model="searchText" clearable :placeholder="placeholder" @clear="submitSearch" @keyup.enter="submitSearch">
+      <template #suffix><Icon icon="ep:search" class="search-icon" tabindex="0" @click="submitSearch" @keyup.enter="submitSearch" /></template>
     </el-input>
     <el-badge :value="count || ''"><el-button :icon="Filter" @click="visible = true">筛选</el-button></el-badge>
   </div>
   <div v-if="count" class="advanced-tags">
-    <el-tag v-for="(item, index) in flatConditions" :key="index">{{ fieldMap[item.fieldKey]?.group }} · {{ fieldMap[item.fieldKey]?.label }} {{ operatorLabels[item.operator] }}</el-tag>
+    <el-tag v-for="item in flatConditions" :key="item.key" closable @close="removeTag(item)">{{ fieldMap[item.condition.fieldKey]?.group }} · {{ fieldMap[item.condition.fieldKey]?.label }} {{ operatorLabels[item.condition.operator] }}</el-tag>
     <el-button link type="primary" @click="clear">清空全部</el-button>
   </div>
-  <el-drawer v-model="visible" title="高级筛选 · 修改后自动生效" size="560px">
-    <GroupEditor :model-value="draft" :fields="fields" :depth="0" @update:model-value="draft = $event" />
+  <el-drawer v-model="visible" class="advanced-filter-drawer" title="高级筛选 · 修改后自动生效" size="min(560px, 100%)">
+    <div v-if="catalogLoading" class="catalog-state"><el-icon class="is-loading"><Loading /></el-icon><span>正在加载可筛选字段</span></div>
+    <el-alert v-else-if="catalogError" type="error" title="筛选字段加载失败" show-icon :closable="false"><template #default><el-button link type="primary" @click="loadCatalog">重试</el-button></template></el-alert>
+    <el-empty v-else-if="!fields.length" description="当前场景没有可用筛选字段" />
+    <ZsjosAdvancedFilterGroup v-else :model-value="draft" :fields="fields" :depth="0" :total="draftCount" @update:model-value="updateDraft" @retry-options="retryOptions" />
     <template #footer><el-button @click="clear">清空全部</el-button><el-button type="primary" @click="visible = false">关闭</el-button></template>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { Filter } from '@element-plus/icons-vue'
-import { computed, defineComponent, h, onMounted, ref, watch } from 'vue'
+import { Filter, Loading } from '@element-plus/icons-vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as Api from '@/api/zsjos/advancedFilter'
+import * as DictDataApi from '@/api/system/dict/dict.data'
+import * as UserApi from '@/api/system/user'
+import ZsjosAdvancedFilterGroup from './ZsjosAdvancedFilterGroup.vue'
 
 const props = defineProps<{ scene: 'lead' | 'order'; placeholder: string; keyword?: string }>()
 const emit = defineEmits<{ change: [value?: Api.AdvancedFilterGroup]; search: [value: string] }>()
 const visible = ref(false), fields = ref<Api.AdvancedFilterField[]>([]), searchText = ref(props.keyword || '')
+const catalogLoading = ref(true), catalogError = ref(false)
 const blank = (): Api.AdvancedFilterGroup => ({ logic: 'AND', conditions: [], groups: [] })
 const draft = ref(blank())
+const hasValue = (value: unknown) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== ''
+const isComplete = (condition: Api.AdvancedFilterCondition) => condition.operator === 'is_empty' || condition.operator === 'is_not_empty' || (condition.operator === 'between' ? hasValue(condition.valueFrom) && hasValue(condition.valueTo) : hasValue(condition.value))
 const countGroup = (group: Api.AdvancedFilterGroup): number => group.conditions.length + group.groups.reduce((sum, item) => sum + countGroup(item), 0)
-const count = computed(() => countGroup(draft.value))
-const flatConditions = computed(() => [...draft.value.conditions, ...draft.value.groups.flatMap(group => group.conditions)])
-const fieldMap = computed(() => Object.fromEntries(fields.value.map(field => [field.fieldKey, field])))
+const effectiveGroup = (group: Api.AdvancedFilterGroup): Api.AdvancedFilterGroup => ({ logic: group.logic, conditions: group.conditions.filter(isComplete), groups: group.groups.map(effectiveGroup).filter((item) => item.conditions.length || item.groups.length) })
+const count = computed(() => countGroup(effectiveGroup(draft.value)))
+const draftCount = computed(() => countGroup(draft.value))
+const flatConditions = computed(() => [
+  ...draft.value.conditions.map((condition, index) => ({ key: `root-${index}`, condition, groupIndex: -1, index })),
+  ...draft.value.groups.flatMap((group, groupIndex) => group.conditions.map((condition, index) => ({ key: `${groupIndex}-${index}`, condition, groupIndex, index })))
+].filter((item) => isComplete(item.condition)))
+const fieldMap = computed(() => Object.fromEntries(fields.value.map((field) => [field.fieldKey, field])))
 const operatorLabels: Record<string, string> = { contains: '包含', eq: '等于', ne: '不等于', in: '属于', not_in: '不属于', gt: '大于', lt: '小于', between: '区间', is_empty: '为空', is_not_empty: '不为空' }
 let timer: number | undefined
-watch(draft, () => { window.clearTimeout(timer); timer = window.setTimeout(() => emit('change', count.value ? structuredClone(draft.value) : undefined), 500) }, { deep: true })
-onMounted(async () => { try { fields.value = (await Api.getCatalog(props.scene)).fields || [] } catch { fields.value = [] } })
-const clear = () => { draft.value = blank() }
-
-const GroupEditor = defineComponent({
-  name: 'GroupEditor', props: { modelValue: { type: Object, required: true }, fields: { type: Array, required: true }, depth: { type: Number, required: true } }, emits: ['update:modelValue'],
-  setup(p, { emit: update }) {
-    const group = computed(() => p.modelValue as Api.AdvancedFilterGroup), list = computed(() => p.fields as Api.AdvancedFilterField[])
-    const change = (next: Api.AdvancedFilterGroup) => update('update:modelValue', next)
-    return () => h('div', { class: ['advanced-group', `depth-${p.depth}`] }, [
-      h('div', { class: 'advanced-group-head' }, [h('select', { value: group.value.logic, onChange: (e: Event) => change({ ...group.value, logic: (e.target as HTMLSelectElement).value as 'AND' | 'OR' }) }, [h('option', { value: 'AND' }, '满足全部'), h('option', { value: 'OR' }, '满足任一')]),
-        h('button', { disabled: !list.value.length, onClick: () => { const f = list.value[0]; change({ ...group.value, conditions: [...group.value.conditions, { fieldKey: f.fieldKey, operator: f.operators[0] }] }) } }, '添加条件'),
-        p.depth === 0 ? h('button', { onClick: () => change({ ...group.value, groups: [...group.value.groups, blank()] }) }, '添加条件组') : null]),
-      ...group.value.conditions.map((condition, index) => h('div', { class: 'advanced-condition' }, [
-        h('select', { value: condition.fieldKey, onChange: (e: Event) => { const f = list.value.find(item => item.fieldKey === (e.target as HTMLSelectElement).value)!; const conditions = [...group.value.conditions]; conditions[index] = { fieldKey: f.fieldKey, operator: f.operators[0] }; change({ ...group.value, conditions }) } }, list.value.map(field => h('option', { value: field.fieldKey }, `${field.group} · ${field.label}`))),
-        h('select', { value: condition.operator, onChange: (e: Event) => { const conditions = [...group.value.conditions]; conditions[index] = { fieldKey: condition.fieldKey, operator: (e.target as HTMLSelectElement).value }; change({ ...group.value, conditions }) } }, (list.value.find(f => f.fieldKey === condition.fieldKey)?.operators || []).map(op => h('option', { value: op }, operatorLabels[op]))),
-        !['is_empty','is_not_empty'].includes(condition.operator) ? h('input', { value: String(condition.value ?? ''), onInput: (e: Event) => { const conditions = [...group.value.conditions]; conditions[index] = { ...condition, value: (e.target as HTMLInputElement).value }; change({ ...group.value, conditions }) } }) : null,
-        h('button', { onClick: () => change({ ...group.value, conditions: group.value.conditions.filter((_, i) => i !== index) }) }, '删除')
-      ])),
-      ...group.value.groups.map((child, index) => h(GroupEditor, { modelValue: child, fields: list.value, depth: 1, 'onUpdate:modelValue': (next: Api.AdvancedFilterGroup) => { const groups = [...group.value.groups]; groups[index] = next; change({ ...group.value, groups }) } }))
-    ])
+watch(() => props.keyword, (value) => { searchText.value = value || '' })
+const submitSearch = () => emit('search', searchText.value.trim())
+const deliver = (immediate = false) => { window.clearTimeout(timer); const run = () => { const value = effectiveGroup(draft.value); emit('change', countGroup(value) ? structuredClone(value) : undefined) }; if (immediate) run(); else timer = window.setTimeout(run, 500) }
+const updateDraft = (value: Api.AdvancedFilterGroup, immediate = false) => { draft.value = value; deliver(immediate) }
+const clear = () => updateDraft(blank(), true)
+const removeTag = (item: { groupIndex: number; index: number }) => {
+  if (item.groupIndex < 0) updateDraft({ ...draft.value, conditions: draft.value.conditions.filter((_, index) => index !== item.index) }, true)
+  else updateDraft({ ...draft.value, groups: draft.value.groups.map((group, index) => index === item.groupIndex ? { ...group, conditions: group.conditions.filter((_, conditionIndex) => conditionIndex !== item.index) } : group) }, true)
+}
+const sourceOptions = async (source?: string): Promise<Api.AdvancedFilterOption[]> => {
+  if (!source) return []
+  if (source.startsWith('dict:')) return (await DictDataApi.getDictDataByType(source.slice(5))).map((item) => ({ value: item.value, label: item.label }))
+  if (source === 'visible-users') return (await UserApi.getSimpleUserList()).map((item) => ({ value: item.id, label: item.nickname }))
+  return []
+}
+const retryOptions = async (fieldKey: string) => {
+  const field = fields.value.find((item) => item.fieldKey === fieldKey)
+  if (!field?.optionSource) return
+  fields.value = fields.value.map((item) => item.fieldKey === fieldKey ? { ...item, optionsLoading: true, optionsError: false } : item)
+  try {
+    const options = await sourceOptions(field.optionSource)
+    fields.value = fields.value.map((item) => item.fieldKey === fieldKey ? { ...item, options, optionsLoading: false } : item)
+  } catch {
+    fields.value = fields.value.map((item) => item.fieldKey === fieldKey ? { ...item, optionsLoading: false, optionsError: true } : item)
   }
-})
+}
+const loadCatalog = async () => {
+  catalogLoading.value = true; catalogError.value = false
+  try {
+    const catalog = await Api.getCatalog(props.scene)
+    fields.value = catalog.fields.map((field) => field.optionSource && !field.options.length ? { ...field, optionsLoading: true } : field)
+    await Promise.all(catalog.fields.map(async (field) => {
+      if (!field.optionSource || field.options.length) return
+      try { const options = await sourceOptions(field.optionSource); fields.value = fields.value.map((item) => item.fieldKey === field.fieldKey ? { ...item, options, optionsLoading: false } : item) }
+      catch { fields.value = fields.value.map((item) => item.fieldKey === field.fieldKey ? { ...item, optionsLoading: false, optionsError: true } : item) }
+    }))
+  } catch { catalogError.value = true; fields.value = [] }
+  finally { catalogLoading.value = false }
+}
+onMounted(loadCatalog)
+onBeforeUnmount(() => window.clearTimeout(timer))
 </script>
 
-<style scoped>.advanced-toolbar{display:flex;gap:8px;max-width:520px}.advanced-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.advanced-group{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:10px;background:var(--el-fill-color-light)}.advanced-group.depth-1{margin-left:16px;background:var(--el-fill-color)}.advanced-group-head,.advanced-condition{display:flex;gap:8px;align-items:center}.advanced-condition select,.advanced-condition input{min-width:0;flex:1;height:32px;border:1px solid var(--el-border-color);border-radius:4px;background:var(--el-bg-color);padding:0 8px}.advanced-group button{height:32px;border:1px solid var(--el-border-color);border-radius:4px;background:var(--el-bg-color);padding:0 10px;cursor:pointer}@media(max-width:768px){.advanced-toolbar{max-width:none}.advanced-condition{flex-wrap:wrap}.advanced-condition select,.advanced-condition input{flex-basis:40%}}</style>
+<style scoped>
+.advanced-toolbar{display:flex;gap:8px;max-width:520px;margin-top:12px}.advanced-toolbar>.el-input{flex:1}.search-icon{cursor:pointer}.advanced-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.catalog-state{display:flex;align-items:center;justify-content:center;gap:8px;min-height:160px;color:var(--el-text-color-secondary)}@media(max-width:768px){.advanced-toolbar{max-width:none}.advanced-toolbar>.el-input{min-width:0}:global(.advanced-filter-drawer){width:100%!important}}
+</style>

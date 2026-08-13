@@ -57,7 +57,7 @@ export default function SalesOrderApprovalPage() {
       setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey)); setTotal(result.total); setPageNo(targetPage)
       if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
     } catch (loadError) {
-      if (version === requestVersion.current) { setError(loadError instanceof Error ? loadError.message : '成交审批加载失败'); if (replace) { setItems([]); setSelectedKey(undefined) } }
+      if (version === requestVersion.current) setError(loadError instanceof Error ? loadError.message : '成交审批加载失败')
     } finally { if (version === requestVersion.current) setLoading(false) }
   }, [advancedFilter, center, groupKey, keyword, optionKey])
 

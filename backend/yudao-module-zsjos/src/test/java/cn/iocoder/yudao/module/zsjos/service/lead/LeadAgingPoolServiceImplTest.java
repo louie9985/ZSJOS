@@ -16,6 +16,7 @@ import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -52,8 +53,9 @@ class LeadAgingPoolServiceImplTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
     @Mock private SecurityFrameworkService securityFrameworkService;
+    @Mock private AdvancedFilterService advancedFilterService;
 
-    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
+    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Test
