@@ -352,6 +352,13 @@ SELECT 'account_personnel_partner_permissions' AS check_name,
              AND permission IN ('zsjos:personnel:query','zsjos:personnel:update-state','zsjos:partner:query',
                                 'zsjos:partner:create','zsjos:partner:update-state','zsjos:partner:convert'))=6,
           'PASS', 'FAIL') AS result;
+SELECT 'maintenance_mode_config' AS check_name,
+       IF((SELECT COUNT(*) FROM infra_config WHERE config_key='zsjos.system.maintenance-enabled'
+             AND type=1 AND deleted=b'0')=1, 'PASS', 'FAIL') AS result;
+SELECT 'maintenance_mode_menu' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6860 AND component='system/maintenance/index')
+               OR (id=6861 AND permission='system:maintenance:update')))=2, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_official_count' AS check_name,
        IF((SELECT COUNT(*) FROM system_area WHERE selection_code<>'OTHER' AND deleted=b'0')=3879, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_other_count' AS check_name,

@@ -1,5 +1,9 @@
 # Data and Permission Flow
 
+## Global maintenance mode
+
+System owns the database-authoritative `zsjos.system.maintenance-enabled` configuration and its public read API. Only the stable `super_admin` role may toggle it. The request filter blocks ordinary writes with HTTP 503 without role or IP bypass; fixed authentication/callback recovery routes and the toggle itself are the only write exemptions. ZSJOS schedulers query the System public API before tenant enumeration, and business deadlines are not shifted by maintenance windows.
+
 ## Authentication and tenant flow
 
 The employee workbench currently uses the administration API prefix and the system

@@ -76,6 +76,9 @@ public interface ConfigService {
      */
     void updateDefaultUserAvatar(String avatar);
 
+    /** Updates an existing system-owned configuration without changing its metadata. */
+    void updateSystemConfigValue(String key, String value);
+
     /**
      * 获得参数配置分页列表
      *

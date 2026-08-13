@@ -275,6 +275,27 @@ public class ConfigServiceImplTest extends BaseDbUnitTest {
         assertNull(configService.getDefaultUserAvatar());
     }
 
+    @Test
+    public void testUpdateSystemConfigValue() {
+        ConfigDO config = randomConfigDO(o -> o.setConfigKey("zsjos.system.maintenance-enabled")
+                .setType(ConfigTypeEnum.SYSTEM.getType()).setValue("false"));
+        configMapper.insert(config);
+
+        configService.updateSystemConfigValue(config.getConfigKey(), "true");
+
+        assertEquals("true", configMapper.selectById(config.getId()).getValue());
+    }
+
+    @Test
+    public void testUpdateSystemConfigValue_rejectsCustomConfig() {
+        ConfigDO config = randomConfigDO(o -> o.setConfigKey("custom.key")
+                .setType(ConfigTypeEnum.CUSTOM.getType()));
+        configMapper.insert(config);
+
+        assertServiceException(() -> configService.updateSystemConfigValue(config.getConfigKey(), "changed"),
+                CONFIG_NOT_EXISTS);
+    }
+
     // ========== 随机对象 ==========
 
     @SafeVarargs

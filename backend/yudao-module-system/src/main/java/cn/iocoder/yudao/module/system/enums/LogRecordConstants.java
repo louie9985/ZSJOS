@@ -8,6 +8,10 @@ package cn.iocoder.yudao.module.system.enums;
  */
 public interface LogRecordConstants {
 
+    String SYSTEM_MAINTENANCE_TYPE = "SYSTEM 维护模式";
+    String SYSTEM_MAINTENANCE_UPDATE_SUB_TYPE = "切换维护模式";
+    String SYSTEM_MAINTENANCE_UPDATE_SUCCESS = "将维护模式设置为【{{#enabled}}】";
+
     // ======================= SYSTEM_USER 用户 =======================
 
     String SYSTEM_USER_TYPE = "SYSTEM 用户";
