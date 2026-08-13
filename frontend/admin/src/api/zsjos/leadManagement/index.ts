@@ -1,5 +1,6 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
+import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export interface LeadProductVO {
   id: number
@@ -82,6 +83,7 @@ export interface LeadManagementPageReqVO extends PageParam {
   sourceUserId?: number
   ownerUserId?: number
   submittedAt?: string[]
+  advancedFilter?: AdvancedFilterGroup
 }
 
 export interface LeadQualificationExceptionVO {
@@ -131,7 +133,7 @@ export const DISPATCH_MODE_LABELS: Record<string, string> = {
 }
 
 export const getLeadPage = (params: LeadManagementPageReqVO) =>
-  request.get({ url: '/zsjos/lead/page', params })
+  params.advancedFilter ? request.post({ url: '/zsjos/lead/search-page', data: params }) : request.get({ url: '/zsjos/lead/page', params })
 
 export const getLead = (id: number): Promise<LeadManagementVO> =>
   request.get({ url: '/zsjos/lead/get', params: { id } })

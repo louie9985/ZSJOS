@@ -28,7 +28,8 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
     }
     default PageResult<LeadAgingPoolCycleDO> selectPage(LeadAgingPoolPageReqVO reqVO, List<Long> scopedOwnerUserIds,
                                                         Long participantUserId,
-                                                        List<String> configuredStatuses, boolean matchNone) {
+                                                        List<String> configuredStatuses, boolean matchNone,
+                                                        List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadAgingPoolCycleDO> query = new LambdaQueryWrapperX<>();
         if (participantUserId != null) {
             query.and(scope -> {
@@ -51,6 +52,10 @@ public interface LeadAgingPoolCycleMapper extends BaseMapperX<LeadAgingPoolCycle
                         AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING));
         if (matchNone) query.apply("1 = 0");
         else query.inIfPresent(LeadAgingPoolCycleDO::getStatus, configuredStatuses);
+        if (matchedLeadIds != null) {
+            if (matchedLeadIds.isEmpty()) query.eq(LeadAgingPoolCycleDO::getLeadId, -1L);
+            else query.in(LeadAgingPoolCycleDO::getLeadId, matchedLeadIds);
+        }
         query.orderByAsc(LeadAgingPoolCycleDO::getEnteredAt).orderByAsc(LeadAgingPoolCycleDO::getId);
         return selectPage(reqVO, query);
     }

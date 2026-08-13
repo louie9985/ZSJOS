@@ -39,7 +39,7 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     default SalesOrderDO selectBySupersedesOrderId(Long orderId) {
         return selectOne(SalesOrderDO::getSupersedesOrderId, orderId);
     }
-    default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
+    default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO, List<Long> matchedOrderIds) {
         LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
                 .eq(SalesOrderDO::getSubmitterUserId, userId)
                 .eqIfPresent(SalesOrderDO::getStatus, reqVO.getStatus());
@@ -49,8 +49,14 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
                     .or().like(SalesOrderDO::getStudentName, keyword)
                     .or().like(SalesOrderDO::getStudentMobile, keyword));
         }
+        if (matchedOrderIds != null) {
+            if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
+        }
         query.orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId);
         return selectPage(reqVO, query);
+    }
+    default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
+        return selectMyPage(userId, reqVO, null);
     }
     default long selectMyCount(Long userId, String status) {
         return selectCount(new LambdaQueryWrapperX<SalesOrderDO>()
