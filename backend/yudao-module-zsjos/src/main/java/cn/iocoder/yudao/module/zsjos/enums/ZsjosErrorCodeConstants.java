@@ -45,6 +45,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_DUPLICATE_REVIEW_PERMISSION_DENIED = new ErrorCode(1_900_003_064, "无权访问或处理该重复客资复核任务");
     ErrorCode LEAD_INBOX_FILTER_NOT_EXISTS = new ErrorCode(1_900_003_019, "客资筛选方案不存在或尚未发布");
     ErrorCode LEAD_INBOX_FILTER_INVALID = new ErrorCode(1_900_003_020, "客资筛选方案配置无效");
+    ErrorCode ADVANCED_FILTER_INVALID = new ErrorCode(1_900_003_021, "高级筛选条件无效");
     ErrorCode LEAD_INBOX_FILTER_VERSION_NOT_EXISTS = new ErrorCode(1_900_003_021, "客资筛选方案版本不存在");
     ErrorCode LEAD_FOLLOW_UP_RULE_NOT_EXISTS = new ErrorCode(1_900_003_022, "客资跟进规则不存在");
     ErrorCode LEAD_FOLLOW_UP_RULE_INVALID = new ErrorCode(1_900_003_023, "客资跟进规则参数无效");

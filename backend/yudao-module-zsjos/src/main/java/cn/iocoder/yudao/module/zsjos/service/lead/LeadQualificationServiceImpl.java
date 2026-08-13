@@ -22,6 +22,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -43,6 +44,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private DictDataApi dictDataApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private LeadAssignmentService assignmentService;
+    @Resource private AdvancedFilterService advancedFilterService;
     @Resource private LeadObjectPermissionService permissionService;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadAttachmentService attachmentService;
@@ -152,7 +154,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         Set<Long> managedUserIds = manageAll ? Set.of() : permissionService.getManagedUserIds(userId);
         if (!manageAll && managedUserIds.isEmpty()) return PageResult.empty();
         PageResult<LeadDO> page = leadMapper.selectQualificationExceptionPage(reqVO, reqVO.getType(),
-                managedUserIds, manageAll);
+                managedUserIds, manageAll, reqVO.getKeyword(), advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         Set<Long> userIds = new HashSet<>();
         page.getList().forEach(lead -> {
             if (lead.getOwnerUserId() != null) userIds.add(lead.getOwnerUserId());

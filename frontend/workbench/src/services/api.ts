@@ -12,6 +12,10 @@ export type AssignmentUser = SalesUser & { deptId?: number; status: number }
 export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]; validSalesCount: number; invalidSalesCount: number; updateTime?: Timestamp }
 export type AssignmentLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
 export type PageResult<T> = { list: T[]; total: number }
+export type AdvancedFilterCondition = { fieldKey: string; operator: string; value?: unknown; valueFrom?: unknown; valueTo?: unknown }
+export type AdvancedFilterGroup = { logic: 'AND' | 'OR'; conditions: AdvancedFilterCondition[]; groups: AdvancedFilterGroup[] }
+export type AdvancedFilterField = { fieldKey: string; group: string; label: string; valueType: 'text' | 'select' | 'number' | 'date'; operators: string[]; optionSource?: string; options: Array<{ value: string | number; label: string }>; optionsLoading?: boolean; optionsError?: boolean; retryOptions?: () => void }
+export type AdvancedFilterCatalog = { fields: AdvancedFilterField[] }
 export type AreaNode = {
   id: number
   name: string
@@ -114,6 +118,7 @@ export type ManagedLeadPageParams = {
   status?: string
   inboxGroup?: string
   inboxStage?: string
+  advancedFilter?: AdvancedFilterGroup
 }
 export type LeadFollowUpImage = { infraFileId: number; originalName: string; contentType: string; fileSize: number; sort: number; url?: string }
 export type LeadFollowUp = {
@@ -450,14 +455,17 @@ export const api = {
   dispatchOffline: async () => unwrap<SalesDispatchStatus>(await http.post('/zsjos/lead/dispatch-status/offline')),
   acceptLead: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/lead/${id}/accept`)),
   rejectLead: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/lead/${id}/reject`)),
-  claimPoolPage: async (params: { pageNo: number; pageSize: number }) =>
-    unwrap<PageResult<PendingLead>>(await http.get('/zsjos/lead/claim-pool/page', { params })),
+  claimPoolPage: async (params: { pageNo: number; pageSize: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<PendingLead>>(await http.post('/zsjos/lead/claim-pool/search-page', params))
+      : unwrap<PageResult<PendingLead>>(await http.get('/zsjos/lead/claim-pool/page', { params })),
   claimLead: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/lead/${id}/claim`)),
   managedLeadInboxPage: async (audience: 'submitter' | 'owner', params: ManagedLeadPageParams) =>
-    unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/page`, { params })),
+    params.advancedFilter ? unwrap<PageResult<ManagedLead>>(await http.post(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/search-page`, params))
+      : unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/page`, { params })),
   managedLead: async (id: number) => unwrap<ManagedLead>(await http.get('/zsjos/lead/get', { params: { id } })),
-  agingPoolPage: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: LeadAgingPoolStatus; inboxGroup?: string; inboxStage?: string }) =>
-    unwrap<PageResult<LeadAgingPoolItem>>(await http.get('/zsjos/lead/aging-pool/page', { params })),
+  agingPoolPage: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: LeadAgingPoolStatus; inboxGroup?: string; inboxStage?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<LeadAgingPoolItem>>(await http.post('/zsjos/lead/aging-pool/search-page', params))
+      : unwrap<PageResult<LeadAgingPoolItem>>(await http.get('/zsjos/lead/aging-pool/page', { params })),
   agingPoolCounts: async () => unwrap<Record<string, number>>(await http.get('/zsjos/lead/aging-pool/counts')),
   agingPoolFilterProfile: async () => unwrap<LeadInboxFilterProfile>(await http.get('/zsjos/lead/aging-pool/filter-profile')),
   agingPoolCandidates: async (cycleId: number) =>
@@ -494,8 +502,9 @@ export const api = {
   decideLeadComplaint: async (id: number, result: 'founded' | 'unfounded', opinion: string, evidenceFileIds: number[]) => unwrap<boolean>(
     await http.post(`/zsjos/lead-complaint/${id}/decision`, { result, opinion, evidenceFileIds, idempotencyKey: crypto.randomUUID() })
   ),
-  qualificationExceptionPage: async (type: 'suspended' | 'recycle_pending', params: { pageNo: number; pageSize: number }) =>
-    unwrap<PageResult<LeadQualificationException>>(await http.get('/zsjos/lead/qualification-exception/page', { params: { type, ...params } })),
+  qualificationExceptionPage: async (type: 'suspended' | 'recycle_pending', params: { pageNo: number; pageSize: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<LeadQualificationException>>(await http.post('/zsjos/lead/qualification-exception/search-page', { type, ...params }))
+      : unwrap<PageResult<LeadQualificationException>>(await http.get('/zsjos/lead/qualification-exception/page', { params: { type, ...params } })),
   leadTransferCandidates: async (id: number) =>
     unwrap<AssignmentUser[]>(await http.get(`/zsjos/lead/${id}/transfer-candidates`)),
   restoreLead: async (id: number, data: { reason: string; idempotencyKey: string }) =>
@@ -540,13 +549,17 @@ export const api = {
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
   salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
   mySalesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
-  mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string }) =>
-    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-page', { params })),
+  mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/my-search-page', params))
+      : unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-page', { params })),
   mySalesOrderStatusCounts: async () =>
     unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
   salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
-  salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean }) =>
-    unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
+  salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/approval/search-page', params))
+      : unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
+  advancedFilterCatalog: async (scene: 'lead' | 'order') =>
+    unwrap<AdvancedFilterCatalog>(await http.get('/zsjos/advanced-filter/catalog', { params: { scene } })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
   terminateSalesOrder: async (orderId: number, data: { reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
@@ -626,8 +639,9 @@ export const api = {
     unwrap<PageResult<SubordinateSales>>(await http.get('/zsjos/subordinate-sales/page', { params })),
   subordinateSalesOverview: async (salesUserId: number) =>
     unwrap<SubordinateSales>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/overview`)),
-  subordinateSalesLeads: async (salesUserId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
-    unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/leads`, { params })),
+  subordinateSalesLeads: async (salesUserId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<ManagedLead>>(await http.post(`/zsjos/subordinate-sales/${salesUserId}/leads/search-page`, params))
+      : unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/leads`, { params })),
   subordinateSalesTasks: async (salesUserId: number, params: { pageNo: number; pageSize: number; bucket?: BusinessTaskBucket }) =>
     unwrap<PageResult<SubordinateTask>>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/tasks`, { params })),
   subordinateTransferCandidates: async () =>

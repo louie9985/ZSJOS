@@ -27,6 +27,10 @@ public class LeadAgingPoolController {
     public CommonResult<PageResult<LeadAgingPoolRespVO>> page(@Valid LeadAgingPoolPageReqVO reqVO) {
         return success(service.getPage(reqVO, getLoginUserId()));
     }
+    @PostMapping("/search-page")
+    public CommonResult<PageResult<LeadAgingPoolRespVO>> searchPage(@Valid @RequestBody LeadAgingPoolPageReqVO reqVO) {
+        return success(service.getPage(reqVO, getLoginUserId()));
+    }
     @GetMapping("/get")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-aging-pool:query')")
     public CommonResult<LeadAgingPoolRespVO> get(@RequestParam Long id) { return success(service.get(id, getLoginUserId())); }
