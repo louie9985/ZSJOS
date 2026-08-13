@@ -17,6 +17,7 @@ import errorCode from './errorCode'
 import { resetRouter } from '@/router'
 import { deleteUserCache } from '@/hooks/web/useCache'
 import { ApiEncrypt } from '@/utils/encrypt'
+import { getStoredImpersonation, IMPERSONATION_STORAGE_KEY } from '@/utils/impersonation'
 
 const tenantEnable = import.meta.env.VITE_APP_TENANT_ENABLE
 const { result_code, base_url, request_timeout } = config
@@ -57,6 +58,10 @@ service.interceptors.request.use(
     }
     if (getAccessToken() && isToken) {
       config.headers.Authorization = 'Bearer ' + getAccessToken() // 让每个请求携带自定义 token
+    }
+    const impersonation = getStoredImpersonation()
+    if (impersonation && !config.url?.includes('/zsjos/impersonation/')) {
+      config.headers['X-ZSJOS-Impersonation-Session'] = impersonation.id
     }
     // 设置租户
     if (tenantEnable && tenantEnable === 'true') {
@@ -100,6 +105,9 @@ service.interceptors.request.use(
     return config
   },
   (error: AxiosError) => {
+    if (error.response?.data && (error.response.data as any).code === 1_900_007_002) {
+      sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY)
+    }
     // Do something with request error
     console.log(error) // for debug
     return Promise.reject(error)
@@ -242,8 +250,12 @@ service.interceptors.response.use(
 const refreshToken = async () => {
   axios.defaults.headers.common['tenant-id'] = getTenantId()
   const clientId = getClientId()
-  return await axios.post(base_url + '/system/auth/refresh-token?refreshToken=' + getRefreshToken()
-    + (clientId ? '&clientId=' + encodeURIComponent(clientId) : ''))
+  return await axios.post(
+    base_url +
+      '/system/auth/refresh-token?refreshToken=' +
+      getRefreshToken() +
+      (clientId ? '&clientId=' + encodeURIComponent(clientId) : '')
+  )
 }
 const handleAuthorized = () => {
   const { t } = useI18n()

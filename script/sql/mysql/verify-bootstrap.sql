@@ -359,6 +359,25 @@ SELECT 'maintenance_mode_menu' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
              ((id=6860 AND component='system/maintenance/index')
                OR (id=6861 AND permission='system:maintenance:update')))=2, 'PASS', 'FAIL') AS result;
+SELECT 'readonly_impersonation_tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name IN ('zsjos_impersonation_session','zsjos_impersonation_request_log',
+                                'zsjos_business_audit_log','zsjos_export_task'))=4,
+          'PASS', 'FAIL') AS result;
+SELECT 'readonly_impersonation_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6870 AND permission='zsjos:impersonation:query')
+               OR (id=6871 AND permission='zsjos:impersonation:start')))=2, 'PASS', 'FAIL') AS result;
+SELECT 'async_export_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6872,6873,6874,6875,6876)
+             AND permission IN ('zsjos:export:query','zsjos:export:lead','zsjos:export:order',
+                                'zsjos:export:cashback','zsjos:export:withdrawal'))=5,
+          'PASS', 'FAIL') AS result;
+SELECT 'business_audit_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6877 AND permission='zsjos:audit:query')
+               OR (id=6878 AND permission='zsjos:audit:query-impersonation')))=2,
+          'PASS', 'FAIL') AS result;
 SELECT 'system_area_official_count' AS check_name,
        IF((SELECT COUNT(*) FROM system_area WHERE selection_code<>'OTHER' AND deleted=b'0')=3879, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_other_count' AS check_name,

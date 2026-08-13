@@ -35,6 +35,7 @@ SOURCE script/sql/mysql/migrations/V046__customer_order_advanced_filter_indexes.
 SOURCE script/sql/mysql/migrations/V047__split_lead_pending_handling_stages.sql;
 SOURCE script/sql/mysql/migrations/V048__account_personnel_partner_lifecycle.sql;
 SOURCE script/sql/mysql/migrations/V049__maintenance_mode_and_scheduler_guard.sql;
+SOURCE script/sql/mysql/migrations/V050__readonly_impersonation_and_audit_catalog.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

@@ -5064,6 +5064,65 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 用户关系场景表';
 
+CREATE TABLE `zsjos_impersonation_session` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `administrator_user_id` bigint NOT NULL,
+  `administrator_name_snapshot` varchar(100) NOT NULL, `target_user_id` bigint NOT NULL,
+  `target_name_snapshot` varchar(100) NOT NULL, `reason` varchar(500) NOT NULL,
+  `status` varchar(20) NOT NULL COMMENT 'active/ended/expired',
+  `started_at` datetime NOT NULL, `last_active_at` datetime NOT NULL,
+  `ended_at` datetime DEFAULT NULL, `ended_reason` varchar(500) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_admin_status` (`tenant_id`,`administrator_user_id`,`status`),
+  KEY `idx_idle` (`tenant_id`,`status`,`last_active_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 只读借视图会话';
+
+CREATE TABLE `zsjos_impersonation_request_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `session_id` bigint NOT NULL,
+  `administrator_user_id` bigint NOT NULL, `target_user_id` bigint NOT NULL,
+  `http_method` varchar(10) NOT NULL, `request_path` varchar(500) NOT NULL,
+  `occurred_at` datetime NOT NULL, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_session_time` (`tenant_id`,`session_id`,`occurred_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 借视图请求审计';
+
+CREATE TABLE `zsjos_business_audit_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `operator_user_id` bigint DEFAULT NULL,
+  `operator_name_snapshot` varchar(100) NOT NULL, `operator_role_snapshot` varchar(500) NOT NULL,
+  `category_code` varchar(64) NOT NULL, `action_code` varchar(100) NOT NULL,
+  `target_type` varchar(64) NOT NULL, `target_id` varchar(100) NOT NULL,
+  `detail_json` varchar(2000) NOT NULL, `source_ip` varchar(50) DEFAULT NULL,
+  `occurred_at` datetime NOT NULL, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_category_action_time` (`tenant_id`,`category_code`,`action_code`,`occurred_at`),
+  KEY `idx_target` (`tenant_id`,`target_type`,`target_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 固定目录业务审计';
+
+CREATE TABLE `zsjos_export_task` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `task_no` varchar(32) NOT NULL, `export_type` varchar(32) NOT NULL,
+  `status` varchar(32) NOT NULL COMMENT 'queued/prechecking/generating/ready/failed/cancelled/expired',
+  `creator_user_id` bigint NOT NULL, `creator_name_snapshot` varchar(100) NOT NULL,
+  `creator_role_snapshot` varchar(500) NOT NULL, `filter_json` text NOT NULL,
+  `permission_snapshot_json` varchar(2000) NOT NULL, `attempt_count` int NOT NULL DEFAULT 0,
+  `next_attempt_at` datetime DEFAULT NULL, `lease_expires_at` datetime DEFAULT NULL,
+  `result_file_id` bigint DEFAULT NULL, `result_file_name` varchar(255) DEFAULT NULL,
+  `result_file_size` bigint DEFAULT NULL, `ready_at` datetime DEFAULT NULL, `expires_at` datetime DEFAULT NULL,
+  `failure_code` varchar(64) DEFAULT NULL, `failure_message` varchar(500) DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL, `last_active_at` datetime NOT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_task_no` (`tenant_id`,`task_no`),
+  KEY `idx_worker_scan` (`tenant_id`,`status`,`next_attempt_at`,`lease_expires_at`),
+  KEY `idx_creator_time` (`tenant_id`,`creator_user_id`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 异步导出任务';
+
 -- ZSJOS 登录安全默认客户端与配置（可重复执行）
 INSERT INTO system_oauth2_client
     (client_id, secret, name, logo, description, status, access_token_validity_seconds,

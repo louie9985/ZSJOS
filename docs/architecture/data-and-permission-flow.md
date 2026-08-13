@@ -4,6 +4,10 @@
 
 System owns the database-authoritative `zsjos.system.maintenance-enabled` configuration and its public read API. Only the stable `super_admin` role may toggle it. The request filter blocks ordinary writes with HTTP 503 without role or IP bypass; fixed authentication/callback recovery routes and the toggle itself are the only write exemptions. ZSJOS schedulers query the System public API before tenant enumeration, and business deadlines are not shifted by maintenance windows.
 
+## Read-only impersonation
+
+ZSJOS owns temporary impersonation sessions and their dedicated per-request audit. System remains authoritative for both administrator and target accounts. An active session replaces the request user ID before ZSJOS method and object permission checks, so permissions are resolved from System for the target user; the original administrator and session ID remain in request context and the dedicated audit. Non-read methods and cross-tenant visit contexts are rejected before identity replacement. Query strings, request bodies, filter values, and response content are never persisted in impersonation audit.
+
 ## Authentication and tenant flow
 
 The employee workbench currently uses the administration API prefix and the system

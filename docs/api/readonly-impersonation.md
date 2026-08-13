@@ -1,0 +1,9 @@
+# Read-only Impersonation API
+
+ZSJOS impersonation is a temporary read-only view of an enabled System user. It never creates a login token and does not copy roles, departments, menus, or permissions into ZSJOS.
+
+`POST /admin-api/zsjos/impersonation/start` requires `zsjos:impersonation:start`, an enabled target user, a non-empty reason, and a normal tenant context. It returns the session identifier and immutable administrator/target name snapshots. A user cannot target their own account.
+
+The browser sends the returned identifier in `X-ZSJOS-Impersonation-Session` for subsequent ZSJOS reads. The server accepts only `GET`, `HEAD`, and `OPTIONS`, revalidates the original administrator and active session, changes the request identity to the target user before controller and method-permission evaluation, and writes a dedicated request audit containing only method and path. Query strings, request bodies, filters, and response content are not recorded.
+
+`POST /admin-api/zsjos/impersonation/{id}/end` ends an active session owned by the current administrator. Sessions idle for 30 minutes expire through the minute scheduler; maintenance mode pauses that scheduler without extending the natural idle deadline. Impersonation cannot be combined with cross-tenant visit mode.

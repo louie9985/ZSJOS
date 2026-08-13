@@ -44,6 +44,8 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V049__maintenance_mode_and_scheduler_guard.sql` seeds the database-authoritative global maintenance switch and its server-owned System administration menu without granting roles. It does not change business rows, is repeatable through stable keys and IDs, and must not be executed without separate environment approval. Rollback means setting the switch to `false` and disabling the menu rather than deleting history.
 
+`V050__readonly_impersonation_and_audit_catalog.sql` adds empty read-only impersonation session and dedicated request-audit tables plus server-owned permissions without granting roles. It is additive and repeatable; rollback disables the feature while retaining audit history. Do not execute it without separate environment approval.
+
 `V040__submitter_actions_and_complaints.sql` adds snapshotted submission channels for duplicate review, daily submitter urges, the independent public sales-complaint queue, server-owned menu permissions, and default in-app notifications. It grants no roles, changes no existing Lead ownership, and deletes no business rows.
 
 `V021__lead_intended_product_active_unique_key.sql` changes only the intended-product uniqueness metadata. It adds a stored generated active product reference, removes the old tenant/lead/product unique index, and constrains only non-deleted rows; it does not delete or rewrite intended-product history.

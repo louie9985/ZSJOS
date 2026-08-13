@@ -154,4 +154,14 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
     ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
 
+    ErrorCode IMPERSONATION_TARGET_INVALID = new ErrorCode(1_900_007_001, "借视图目标账号不存在、已停用或与当前账号相同");
+    ErrorCode IMPERSONATION_SESSION_INVALID = new ErrorCode(1_900_007_002, "借视图会话不存在、已结束或已超时");
+    ErrorCode IMPERSONATION_READ_ONLY = new ErrorCode(1_900_007_003, "借视图仅允许只读操作");
+    ErrorCode AUDIT_ACTION_INVALID = new ErrorCode(1_900_007_004, "审计分类、动作或详情字段不符合固定目录");
+    ErrorCode EXPORT_TYPE_INVALID = new ErrorCode(1_900_007_005, "导出类型不存在或尚未启用");
+    ErrorCode EXPORT_PERMISSION_DENIED = new ErrorCode(1_900_007_006, "无权创建或访问该类型导出任务");
+    ErrorCode EXPORT_TASK_NOT_EXISTS = new ErrorCode(1_900_007_007, "导出任务不存在或不属于当前账号");
+    ErrorCode EXPORT_STATE_INVALID = new ErrorCode(1_900_007_008, "当前导出任务状态不允许该操作");
+    ErrorCode EXPORT_FILTER_INVALID = new ErrorCode(1_900_007_009, "导出筛选条件格式无效");
+
 }
