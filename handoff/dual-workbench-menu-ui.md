@@ -1,7 +1,7 @@
 # Workstream Handoff: dual-workbench-menu-ui
 
 - Workstream ID: `dual-workbench-menu-ui`
-- Status: `active`
+- Status: `ready-to-merge`
 - Goal: Complete Vue Admin and React Workbench interfaces for every visible page menu directly under the Workbench root menu `6735`.
 - Non-goals: Creating pages for button permission nodes or the hidden lead-management menu; adding backend aggregation APIs; changing business tables, role grants, menu IDs, paths, permissions, or ordering; redesigning existing usable pages.
 - Branch: `codex/dual-workbench-menu-ui`
@@ -54,3 +54,16 @@
 - Verification evidence: Task-file Prettier and ESLint passed; final Admin local production build passed with the existing legacy `*zoom` CSS warning; `git diff --check` passed.
 - Dependency or integration impact: None beyond the existing `/zsjos/sales-order/{id}/resubmit` contract.
 - Remaining work: Same environment-level verification blockers as the prior entry. No commit, push, migration execution, service startup, or role authorization was performed.
+
+### 2026-08-13 15:33:04 +08:00
+
+- Branch: `codex/dual-workbench-menu-ui`
+- Worktree: `D:\ZSJ-OS-worktrees\dual-workbench-menu-ui`
+- HEAD commit: `b8e5f72017db6674be4fac63c52a42f1af63ff53`
+- User goal: Commit and integrate all branches and worktrees into `main`, then clean up the merged worktree and branch.
+- Key decisions: Prepared this single remaining workstream for fast-forward integration; preserved documented environment-level verification limitations; did not push or execute migrations.
+- Execution or analysis result: Committed the complete implementation as `b8e5f72017db6674be4fac63c52a42f1af63ff53` and marked the workstream `ready-to-merge`.
+- Changed files: All 27 implementation, test, SQL, and handoff files recorded in the prior entries; this readiness update.
+- Verification evidence: Before commit, `git diff --cached --check` passed. Workstream verification remains: Workbench 20 test files/86 tests, typecheck, and build passed; Admin scoped lint and local build passed; V045 eight-menu static validation passed; `git diff --check` passed.
+- Dependency or integration impact: Ready for fast-forward merge into `main`; no remaining local workstream dependency.
+- Remaining work: Fast-forward merge, rerun integration checks on `main`, record merged status, and remove the merged worktree/branch. Browser validation, full Admin typecheck baseline, and Core schema check blockers remain as previously documented.
