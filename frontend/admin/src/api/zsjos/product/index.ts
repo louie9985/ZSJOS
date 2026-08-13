@@ -15,6 +15,8 @@ export interface ZsjosProductVO {
   studyDuration?: string
   studyMode?: string
   coverImage?: string
+  validCashbackAmount?: number
+  dealCashbackRate?: number
   categoryId: number
   categoryName?: string
   categoryPath?: Array<{ id: number; name: string }>
@@ -34,6 +36,8 @@ export interface ZsjosProductSaveReqVO {
   studyDuration?: string
   studyMode?: string
   coverImage?: string
+  validCashbackAmount?: number
+  dealCashbackRate?: number
   categoryId: number
   status: number
   sort: number
@@ -54,6 +58,8 @@ export interface ZsjosProductCategoryVO {
   parentId: number
   level: number
   name: string
+  defaultValidCashbackAmount?: number
+  defaultDealCashbackRate?: number
   status: number
   sort: number
   remark?: string

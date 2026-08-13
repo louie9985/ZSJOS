@@ -1,0 +1,16 @@
+package cn.iocoder.yudao.module.zsjos.service.cashback;
+
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackRespVO;
+import java.math.BigDecimal;
+
+public interface CashbackService {
+    Long ensureValidCashback(Long leadId);
+    Long ensureDealCashback(DealCashbackCommand command);
+    int settleMatured();
+    PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId);
+
+    record DealCashbackCommand(Long leadId, Long orderId, Long orderItemId, String productRef,
+                               String productName, BigDecimal actualAmount, BigDecimal rateSnapshot) {}
+}

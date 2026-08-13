@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import java.math.BigDecimal;
 
 @TableName("zsjos_product")
 @KeySequence("zsjos_product_seq")
@@ -23,6 +24,8 @@ public class ZsjosProductDO extends TenantBaseDO {
     private String studyDuration;
     private String studyMode;
     private String coverImage;
+    private BigDecimal validCashbackAmount;
+    private BigDecimal dealCashbackRate;
     private Integer status;
     private Integer sort;
     private String remark;

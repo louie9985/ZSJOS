@@ -4751,6 +4751,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_product` (
   `study_duration` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学习时长',
   `study_mode` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学习方式',
   `cover_image` varchar(1024) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '课程封面',
+  `valid_cashback_amount` decimal(12,2) DEFAULT NULL COMMENT '有效返现额，空则继承一级分类',
+  `deal_cashback_rate` decimal(8,4) DEFAULT NULL COMMENT '成交返现比例，0到1，空则继承一级分类',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_product_ref` (`tenant_id`,`product_ref`),
   KEY `idx_tenant_status_sort` (`tenant_id`,`status`,`sort`),
@@ -4803,6 +4805,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_product_category` (
   `parent_id` bigint NOT NULL DEFAULT '0' COMMENT '父分类编号，一级为0',
   `level` tinyint NOT NULL COMMENT '分类树深度（1-10，由服务端维护）',
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '分类名称',
+  `default_valid_cashback_amount` decimal(12,2) DEFAULT NULL COMMENT '一级分类默认有效返现额',
+  `default_deal_cashback_rate` decimal(8,4) DEFAULT NULL COMMENT '一级分类默认成交返现比例，0到1',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态（0启用 1停用）',
   `sort` int NOT NULL DEFAULT '0' COMMENT '展示排序',
   `remark` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
@@ -5063,6 +5067,19 @@ CREATE TABLE IF NOT EXISTS `zsjos_user_relation_scene` (
   UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`),
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 用户关系场景表';
+
+CREATE TABLE `zsjos_cashback` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `cashback_no` varchar(32) NOT NULL, `business_key` varchar(100) NOT NULL,
+  `type` varchar(20) NOT NULL, `status` varchar(32) NOT NULL, `beneficiary_user_id` bigint NOT NULL, `partner_id` bigint NOT NULL, `lead_id` bigint NOT NULL,
+  `order_id` bigint DEFAULT NULL, `order_item_id` bigint DEFAULT NULL, `product_ref_snapshot` varchar(128) NOT NULL, `product_name_snapshot` varchar(200) NOT NULL,
+  `rule_snapshot_json` varchar(2000) NOT NULL, `base_amount` decimal(12,2) DEFAULT NULL, `rate_snapshot` decimal(8,4) DEFAULT NULL, `amount` decimal(12,2) NOT NULL,
+  `observation_days_snapshot` int NOT NULL, `generated_at` datetime NOT NULL, `available_at` datetime NOT NULL, `settled_at` datetime DEFAULT NULL,
+  `cancelled_at` datetime DEFAULT NULL, `cancel_reason` varchar(500) DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_cashback_no` (`tenant_id`,`cashback_no`), UNIQUE KEY `uk_tenant_business_key` (`tenant_id`,`business_key`),
+  KEY `idx_beneficiary_status` (`tenant_id`,`beneficiary_user_id`,`status`,`generated_at`), KEY `idx_settlement` (`tenant_id`,`status`,`available_at`), KEY `idx_order` (`tenant_id`,`order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 兼职返现';
 
 CREATE TABLE `zsjos_impersonation_session` (
   `id` bigint NOT NULL AUTO_INCREMENT, `administrator_user_id` bigint NOT NULL,

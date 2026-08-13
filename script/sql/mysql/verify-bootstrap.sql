@@ -433,6 +433,15 @@ FROM (
   UNION ALL SELECT 'zsjos_work_attachment' UNION ALL SELECT 'zsjos_work_plan_field_definition'
   UNION ALL SELECT 'zsjos_work_field_value' UNION ALL SELECT 'zsjos_work_change'
   UNION ALL SELECT 'zsjos_module_schema_version'
+  UNION ALL SELECT 'zsjos_cashback'
 ) expected
 LEFT JOIN information_schema.tables actual
   ON actual.table_schema=DATABASE() AND actual.table_name=expected.table_name;
+
+SELECT 'cashback_rule_columns' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND ((table_name='zsjos_product' AND column_name IN ('valid_cashback_amount','deal_cashback_rate'))
+               OR (table_name='zsjos_product_category' AND column_name IN ('default_valid_cashback_amount','default_deal_cashback_rate'))))=4,
+          'PASS','FAIL') AS result;
+SELECT 'cashback_permissions_ungranted' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6880,6881))=2,'PASS','FAIL') AS result;
