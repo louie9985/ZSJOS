@@ -80,3 +80,16 @@
 - Verification evidence: On integrated `main`, Workbench `npm test` passed 20 files/86 tests, `npm run typecheck` passed, and `npm run build` passed with the existing large-chunk warning. Admin local production build passed with the existing legacy `*zoom` CSS warning. V045 static validation confirmed eight unique matching CASE/WHERE IDs. `git diff --check` passed and the worktree was clean after restoring generated `tsconfig.tsbuildinfo`. `zsjos_db.py check` reproduced only the known unrelated missing Core mappings `zsjos_lead_claim_daily_counter` and `zsjos_lead_transfer_request`.
 - Dependency or integration impact: Workstream is integrated into local `main`; remote `origin/main` was not changed.
 - Remaining work: Remove `D:\ZSJ-OS-worktrees\dual-workbench-menu-ui` and delete local branch `codex/dual-workbench-menu-ui`. Browser verification and the documented repository baseline blockers remain outside this merge operation.
+
+### 2026-08-13 15:48 CST
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c4a7bea8fc07aba13ac80c39c9990aa9fc740dd3`
+- User goal: Merge and retain the dual-workbench menu UI work, but do not merge the separately discovered advanced-filter branch.
+- Key decisions: Reverted only the advanced-filter handoff integration commit and merge commit; retained the dual-workbench integration at `dc00d1b6a42208a97130a51e1a5266f33fda9bda` unchanged.
+- Execution or analysis result: `main` now has an identical file tree to `dc00d1b6a4`, while the advanced-filter work remains isolated on its restored branch and worktree.
+- Changed files: This handoff correction entry only; the two revert commits removed advanced-filter files and restored pre-integration versions of overlapping files.
+- Verification evidence: `git diff --quiet dc00d1b6a4 HEAD` returned success; `git diff --check` passed; `main` is clean.
+- Dependency or integration impact: No advanced-filter behavior remains on `main`. No push, migration execution, service operation, or permission change occurred.
+- Remaining work: Commit this correction record and clean only stale, unregistered physical directories; retain the registered advanced-filter worktree.
