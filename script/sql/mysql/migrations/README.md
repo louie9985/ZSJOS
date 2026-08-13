@@ -1,5 +1,7 @@
 # Versioned migrations
 
+`V045__dual_frontend_workbench_menu_components.sql` assigns Vue-loadable component metadata to the eight Workbench routes that previously used the React-only `zsjos-workbench` marker. React continues to resolve the same server-owned paths locally. The migration changes no menu identity, permission, role grant, ordering, visibility, or business data and is repeatable through stable targeted updates.
+
 V043 is the forward repair for already-applied V041/V042 environments. It independently restores missing concurrency objects, blocks on ambiguous Person contact data, installs cross-field contact ownership and the order command ledger, and path-normalizes only legacy Lead status conditions. Run `../audit-v043-person-contacts.sql` first; V043 never merges, truncates, deletes, or auto-corrects conflicting Person rows. Its backfill scope is active, non-deleted Person phone/WeChat values only. Reruns are supported; rollback is limited to the application because dropping the additive audit tables would lose command and contact-ownership evidence.
 
 Use one immutable, forward-only SQL file per schema change. Each file must be

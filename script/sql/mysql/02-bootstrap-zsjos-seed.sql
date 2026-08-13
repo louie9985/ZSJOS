@@ -359,6 +359,12 @@ INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V038','Duplicate Lead review queue and permissions',SHA2('duplicate-lead-review-v1',256),'legacy',NOW());
 
+INSERT IGNORE INTO `system_menu`
+(`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6844,'销售自拓','zsjos:lead:self-sourced:create',2,14,6735,'leads/self-sourced','ep:user','zsjos/leadSelfSourced/index','LeadSelfSourcedPage',0,b'1',b'0',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6848,'销售投诉处理','zsjos:lead-complaint:handle',2,19,6735,'leads/complaints','ep:warning','zsjos/leadComplaint/index','LeadComplaintPage',0,b'1',b'0',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
+(6849,'历史客户复购','zsjos:sales-order:create',2,20,6735,'orders/external-repurchase','ep:refresh','zsjos/externalRepurchase/index','ExternalRepurchasePage',0,b'1',b'0',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0');
+
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V040', 'Submitter actions and sales complaint queue', 'submitter-actions-complaints-v1');
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
@@ -384,3 +390,11 @@ VALUES ('core','V043','Repair order lifecycle review findings',SHA2('order-lifec
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V044','Add global default employee avatar configuration',SHA2('default-employee-avatar-v1',256),'legacy',NOW());
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V045', 'Register Vue components for dual-frontend Workbench menus',
+        'dual-frontend-workbench-menu-components-v1');
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V045','Register Vue components for dual-frontend Workbench menus',
+        SHA2('dual-frontend-workbench-menu-components-v1',256),'pending',NOW());

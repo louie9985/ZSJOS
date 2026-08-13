@@ -300,7 +300,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core'
-            AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042','V043','V044'))=23,
+            AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042','V043','V044','V045'))=24,
           'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
@@ -334,6 +334,17 @@ SELECT 'lead_appeal_boss_role' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_role WHERE code='boss' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_appeal_status_dict' AS check_name,
        IF((SELECT COUNT(*) FROM system_dict_data WHERE dict_type='zsjos_lead_appeal_status' AND deleted=b'0')=6, 'PASS', 'FAIL') AS result;
+SELECT 'dual_frontend_workbench_menu_components' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu
+           WHERE parent_id=6735 AND type=2 AND deleted=b'0'
+             AND ((id=6736 AND component='zsjos/leadSubmission/index')
+               OR (id=6778 AND component='zsjos/leadInbox/submitted')
+               OR (id=6779 AND component='zsjos/leadInbox/owned')
+               OR (id=6780 AND component='zsjos/todayTask/index')
+               OR (id=6840 AND component='zsjos/leadDuplicateReview/index')
+               OR (id=6844 AND component='zsjos/leadSelfSourced/index')
+               OR (id=6848 AND component='zsjos/leadComplaint/index')
+               OR (id=6849 AND component='zsjos/externalRepurchase/index')))=8, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_official_count' AS check_name,
        IF((SELECT COUNT(*) FROM system_area WHERE selection_code<>'OTHER' AND deleted=b'0')=3879, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_other_count' AS check_name,
