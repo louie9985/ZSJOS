@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -91,6 +91,30 @@ describe('lead management paging helpers', () => {
     expect(canJudgeLeadQualification({ ...pending, operationalStatus: 'suspended' }, 'owner', true)).toBe(false)
     expect(canJudgeLeadQualification(pending, 'submitter', true)).toBe(false)
     expect(canJudgeLeadQualification(pending, 'owner', false)).toBe(false)
+  })
+
+  it('shows the first follow-up task before qualification starts', () => {
+    expect(leadPendingTaskAlert({
+      handlingStage: 'first_follow_pending', operationalStatus: 'active',
+      currentAssignmentFirstFollowUpDeadlineAt: 1786669200000
+    })).toEqual({ message: '待完成首次跟进', deadline: 1786669200000 })
+  })
+
+  it('shows qualification only when its deadline exists', () => {
+    expect(leadPendingTaskAlert({
+      handlingStage: 'qualification_pending', operationalStatus: 'active',
+      qualificationDeadlineAt: 1786928400000
+    })).toEqual({ message: '待完成有效性判定', deadline: 1786928400000 })
+    expect(leadPendingTaskAlert({
+      handlingStage: 'qualification_pending', operationalStatus: 'active'
+    })).toBeUndefined()
+  })
+
+  it('does not show a pending task while the lead is suspended', () => {
+    expect(leadPendingTaskAlert({
+      handlingStage: 'qualification_pending', operationalStatus: 'suspended',
+      qualificationDeadlineAt: 1786928400000
+    })).toBeUndefined()
   })
 
   it('replaces the current invalid remark with the selected independent template', () => {

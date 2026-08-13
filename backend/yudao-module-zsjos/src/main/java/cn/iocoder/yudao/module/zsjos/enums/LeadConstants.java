@@ -60,6 +60,7 @@ public interface LeadConstants {
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
     String INBOX_FILTER_FIELD_STATUS = "status";
     String INBOX_FILTER_FIELD_ASSIGNMENT_STATUS = "assignment_status";
+    String INBOX_FILTER_FIELD_HANDLING_STAGE = "handling_stage";
     String INBOX_FILTER_FIELD_HANDLED = "handled";
     String INBOX_FILTER_FIELD_TASK_DEFINITION_KEY = "task_definition_key";
     String INBOX_FILTER_FIELD_POOL_STATUS = "pool_status";

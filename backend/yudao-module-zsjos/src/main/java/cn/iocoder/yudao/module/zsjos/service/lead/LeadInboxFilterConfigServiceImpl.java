@@ -41,14 +41,19 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
             INBOX_AUDIENCE_REVIEWER, INBOX_AUDIENCE_AGING_POOL);
     private static final Pattern CONFIG_KEY_PATTERN = Pattern.compile("[a-z][a-z0-9_]{1,63}");
     private static final Map<String, Set<String>> ALLOWED_FIELDS_BY_AUDIENCE = Map.of(
-            INBOX_AUDIENCE_SUBMITTER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS),
-            INBOX_AUDIENCE_OWNER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS),
+            INBOX_AUDIENCE_SUBMITTER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
+                    INBOX_FILTER_FIELD_HANDLING_STAGE),
+            INBOX_AUDIENCE_OWNER, Set.of(INBOX_FILTER_FIELD_STATUS, INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
+                    INBOX_FILTER_FIELD_HANDLING_STAGE),
             INBOX_AUDIENCE_REVIEWER, Set.of(INBOX_FILTER_FIELD_HANDLED, INBOX_FILTER_FIELD_TASK_DEFINITION_KEY),
             INBOX_AUDIENCE_AGING_POOL, Set.of(INBOX_FILTER_FIELD_POOL_STATUS));
     private static final Map<String, LinkedHashSet<String>> ALLOWED_VALUES = Map.of(
             INBOX_FILTER_FIELD_STATUS, new LinkedHashSet<>(List.of("submitted", "valid", "invalid", "closed", "won")),
             INBOX_FILTER_FIELD_ASSIGNMENT_STATUS,
             new LinkedHashSet<>(List.of("unassigned", "pending_acceptance", "public_pool", "owned")),
+            INBOX_FILTER_FIELD_HANDLING_STAGE,
+            new LinkedHashSet<>(List.of(LeadHandlingStage.FIRST_FOLLOW_PENDING,
+                    LeadHandlingStage.QUALIFICATION_PENDING)),
             INBOX_FILTER_FIELD_HANDLED, new LinkedHashSet<>(List.of("todo", "done")),
             INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(List.of("registrationReview", "financeReview")),
             INBOX_FILTER_FIELD_POOL_STATUS, new LinkedHashSet<>(List.of(AGING_POOL_WAITING_ASSIGNMENT,
@@ -148,7 +153,10 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
                         value("closed", "已关闭"), value("won", "已成交"))),
                 capability(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, "分配状态", List.of(
                         value("unassigned", "待分配"), value("pending_acceptance", "待接单"),
-                        value("public_pool", "抢单池"), value("owned", "已归属"))));
+                        value("public_pool", "抢单池"), value("owned", "已归属"))),
+                capability(INBOX_FILTER_FIELD_HANDLING_STAGE, "处理阶段", List.of(
+                        value(LeadHandlingStage.FIRST_FOLLOW_PENDING, "待首跟"),
+                        value(LeadHandlingStage.QUALIFICATION_PENDING, "待判定"))));
     }
 
     @Override
@@ -331,7 +339,8 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
         }
         return new LeadInboxFilterQuery(
                 valuesByField.getOrDefault(INBOX_FILTER_FIELD_STATUS, Set.of()),
-                valuesByField.getOrDefault(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, Set.of()), matchNone,
+                valuesByField.getOrDefault(INBOX_FILTER_FIELD_ASSIGNMENT_STATUS, Set.of()),
+                valuesByField.getOrDefault(INBOX_FILTER_FIELD_HANDLING_STAGE, Set.of()), matchNone,
                 Map.copyOf(valuesByField));
     }
 

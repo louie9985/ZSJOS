@@ -19,6 +19,7 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadHandlingStage;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_PENDING;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_UNASSIGNED;
@@ -100,6 +101,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                      List<String> inboxStatuses,
                                                      List<String> inboxAssignmentStatuses,
                                                      boolean inboxMatchNone, List<Long> matchedLeadIds) {
+        return selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds, inboxStatuses,
+                inboxAssignmentStatuses, List.of(), inboxMatchNone, matchedLeadIds);
+    }
+    default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
+                                                     List<Long> managedOwnerUserIds,
+                                                     List<String> inboxStatuses,
+                                                     List<String> inboxAssignmentStatuses,
+                                                     List<String> inboxHandlingStages,
+                                                     boolean inboxMatchNone, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
@@ -116,6 +126,16 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             }
             if (inboxAssignmentStatuses != null && !inboxAssignmentStatuses.isEmpty()) {
                 query.in(LeadDO::getAssignmentStatus, inboxAssignmentStatuses);
+            }
+            if (inboxHandlingStages != null && !inboxHandlingStages.isEmpty()) {
+                query.eq(LeadDO::getStatus, "submitted").eq(LeadDO::getAssignmentStatus, "owned");
+                if (inboxHandlingStages.size() == 1
+                        && inboxHandlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
+                    query.isNull(LeadDO::getQualificationDeadlineAt);
+                } else if (inboxHandlingStages.size() == 1
+                        && inboxHandlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
+                    query.isNotNull(LeadDO::getQualificationDeadlineAt);
+                }
             }
         }
         if (matchedLeadIds != null) {
@@ -171,8 +191,12 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
 
     default List<Map<String, Object>> selectManagementInboxStateCounts(Long visibleUserId, String audience) {
         QueryWrapper<LeadDO> query = new QueryWrapper<LeadDO>()
-                .select("status", "assignment_status", "COUNT(*) AS total")
-                .groupBy("status", "assignment_status");
+                .select("status", "assignment_status",
+                        "CASE WHEN status='submitted' AND assignment_status='owned' "
+                                + "THEN CASE WHEN qualification_deadline_at IS NULL "
+                                + "THEN 'first_follow_pending' ELSE 'qualification_pending' END ELSE NULL END AS handling_stage",
+                        "COUNT(*) AS total")
+                .groupBy("status", "assignment_status", "handling_stage");
         if (visibleUserId != null) {
             if ("submitter".equals(audience)) {
                 query.eq("source_user_id", visibleUserId);

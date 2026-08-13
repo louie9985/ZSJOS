@@ -1,3 +1,5 @@
+import type { Timestamp } from './time'
+
 export function mergeUniqueLeads<T extends { id: number }>(current: T[], incoming: T[]): T[] {
   const byId = new Map(current.map(item => [item.id, item]))
   incoming.forEach(item => byId.set(item.id, item))
@@ -79,6 +81,20 @@ export function canJudgeLeadQualification(
 ): boolean {
   return audience === 'owner' && hasPermission && lead.qualificationStatus === 'pending'
     && lead.followUpStatus === 'following' && lead.operationalStatus === 'active'
+}
+
+export function leadPendingTaskAlert(
+  lead: Pick<import('./api').ManagedLead,
+    'handlingStage' | 'operationalStatus' | 'currentAssignmentFirstFollowUpDeadlineAt' | 'qualificationDeadlineAt'>
+): { message: string; deadline: Timestamp } | undefined {
+  if (lead.operationalStatus !== 'active') return undefined
+  if (lead.handlingStage === 'first_follow_pending' && lead.currentAssignmentFirstFollowUpDeadlineAt) {
+    return { message: '待完成首次跟进', deadline: lead.currentAssignmentFirstFollowUpDeadlineAt }
+  }
+  if (lead.handlingStage === 'qualification_pending' && lead.qualificationDeadlineAt) {
+    return { message: '待完成有效性判定', deadline: lead.qualificationDeadlineAt }
+  }
+  return undefined
 }
 
 export function applyInvalidRemarkTemplate(_currentRemark: string, templateLabel: string): string {
