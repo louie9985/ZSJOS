@@ -26,7 +26,8 @@
   - Full `verify-bootstrap.sql` reports pre-existing local seed/version failures; the new `lead_filter_status_v042` check passes.
   - User 231 gained `bpm:task:query` from an administrator-created role-menu grant at 10:04:12, outside this workstream; this workstream did not modify permissions.
 - Dependency state: V037 through V041 are present in the local database; V042 is now applied locally.
-- Status: ready-to-merge
+- Merge commit: `ed6bac6cdadfd1826d2744a95897c323f5007ad1`
+- Status: merged
 
 ## Delivery Entries
 
@@ -41,4 +42,17 @@
 - Changed files: Lead inbox filter service/tests; Today Tasks page, shell wiring, layout and test; V042, bootstrap seed/order and verification SQL; permission-flow and migration documentation; this handoff.
 - Verification evidence: backend 11/11; frontend focused 2/2, typecheck and build passed; V042 repeatability and read-back passed; details recorded above.
 - Dependency or integration impact: adds Core migration V042; no new library dependency; requires integration after phase-five lifecycle commits.
-- Remaining work: merge into `main`, rerun affected integration checks, and record the merge commit.
+- Remaining work: authenticated browser verification and the pre-existing Core schema-baseline omissions recorded above.
+
+### 2026-08-13 10:37:18 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `ed6bac6cdadfd1826d2744a95897c323f5007ad1`
+- User goal: integrate and verify the lifecycle hotfix after repairing the local database.
+- Key decisions: keep the isolated worktree because it contains the pre-V042 logical backup; do not change the administrator-owned BPM grant added outside this workstream.
+- Execution or analysis result: merged `codex/lifecycle-hotfix-v042` into `main`; integration checks passed.
+- Changed files: this handoff entry records the completed integration; functional files are contained in the merge commit.
+- Verification evidence: main-branch reactor build and 11 backend tests passed; Today Tasks 2 frontend tests and typecheck passed; database reports V042 present, zero active converted filter rows, and the V034 ownership column present.
+- Dependency or integration impact: Core database is at V042 locally; no permissions were changed by this workstream.
+- Remaining work: authenticated desktop/mobile UI verification remains pending because the isolated Vite origin had no login session. The pre-existing schema-baseline omissions remain outside this hotfix.
