@@ -94,6 +94,14 @@ Database DDL is not automatically rolled back. If application startup fails afte
 a compatible migration, roll back the application image and keep the schema.
 Destructive cleanup requires a separate approved release and recovery plan.
 
+## V043 order lifecycle repair
+
+V043 is a forward repair for environments where V041 or V042 may have been only partially applied. Do not edit or re-checksum V041/V042. Before migration, run `script/sql/mysql/audit-v043-person-contacts.sql`; any blank contact, WeChat value longer than 64 characters, or cross-field contact mapped to multiple Person rows blocks the release and requires an independently reviewed data correction.
+
+The migration independently checks every required V041 column and index, creates the Person contact-claim and order-command tables, backfills only unambiguous active Person contacts, narrows the Person WeChat column after the audit, and updates only structured Lead status filter paths. It does not merge Person rows, truncate conflicting values, delete business data, or rewrite immutable filter-version snapshots. Reruns are supported after a blocked audit is corrected.
+
+After applying V043, run `verify-bootstrap.sql` and confirm the V041 objects, command-ledger unique index, contact-claim completeness/no-orphan checks, and structured legacy-status check all return `PASS`. Rollback is application-only: retain the additive tables and columns because removing them would discard idempotency and ownership audit data.
+
 ## Optional modules
 
 An approved optional module adds its own manifest under

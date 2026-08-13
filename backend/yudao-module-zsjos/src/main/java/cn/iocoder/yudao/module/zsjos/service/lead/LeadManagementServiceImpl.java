@@ -76,6 +76,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private LeadBasicInfoService leadBasicInfoService;
     @Resource private SalesOrderMapper salesOrderMapper;
     @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService salesOrderPermissionService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -325,8 +326,17 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (activeOrder == null) {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder));
             } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
-                actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL, canCreateOrder));
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL,
+                        canCreateOrder && salesOrderPermissionService.canRevise(activeOrder, currentUserId)));
             }
+        } else if (STATUS_WON.equals(lead.getStatus())) {
+            boolean enabled = securityFrameworkService.hasPermission("zsjos:sales-order:create")
+                    && lead.getSuspendedAt() == null
+                    && agingPoolService.canOperate(lead.getId(), lead.getOwnerUserId(), currentUserId)
+                    && salesOrderMapper.hasEffectiveOrder(lead.getPersonId())
+                    && salesOrderMapper.selectActiveRepurchaseByPersonId(lead.getPersonId(),
+                    cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES) == null;
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_REPURCHASE, enabled));
         }
         return actions;
     }

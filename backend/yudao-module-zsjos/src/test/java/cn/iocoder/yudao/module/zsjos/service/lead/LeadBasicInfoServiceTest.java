@@ -6,7 +6,6 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
@@ -38,6 +37,8 @@ class LeadBasicInfoServiceTest {
     @Mock private DictDataApi dictDataApi;
     @Mock private ZsjosProductSkuService productSkuService;
     @Mock private BusinessEventMapper eventMapper;
+    @Mock private LeadDuplicateMatcher duplicateMatcher;
+    @Mock private PersonIdentityWriteService personIdentityWriteService;
 
     @Test
     void updateRejectsNonOwnerBeforeMutation() {
@@ -53,8 +54,10 @@ class LeadBasicInfoServiceTest {
     void updateRejectsContactOwnedByAnotherPerson() {
         LeadDO lead = editableLead();
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
-        PersonDO conflict = new PersonDO(); conflict.setId(200L);
-        when(personMapper.selectByMobile("13900000000")).thenReturn(conflict);
+        when(duplicateMatcher.match(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(100L)))
+                .thenReturn(new LeadDuplicateMatcher.MatchResult(null, java.util.List.of(
+                        new LeadDuplicateMatcher.Candidate(200L, 2L, "重复客户", "valid", "owned",
+                                new java.util.HashSet<>(java.util.Set.of("same_mobile"))))));
 
         ServiceException error = withTenantError(() -> service.update(1L, 20L, request()));
 

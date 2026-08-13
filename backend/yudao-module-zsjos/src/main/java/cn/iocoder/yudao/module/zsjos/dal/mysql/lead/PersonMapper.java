@@ -1,9 +1,10 @@
 package cn.iocoder.yudao.module.zsjos.dal.mysql.lead;
 
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
-import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -11,29 +12,12 @@ import java.util.Set;
 
 @Mapper
 public interface PersonMapper extends BaseMapperX<PersonDO> {
-    default PersonDO selectByMobile(String mobile) {
-        return selectOne(new LambdaQueryWrapperX<PersonDO>().eqIfPresent(PersonDO::getMobile, mobile));
-    }
-    default PersonDO selectByWechatId(String wechatId) {
-        return selectOne(new LambdaQueryWrapperX<PersonDO>().eqIfPresent(PersonDO::getWechatId, wechatId));
-    }
-
-    default List<PersonDO> selectDuplicateCandidates(String mobile, String wechatId) {
-        if (mobile == null && wechatId == null) return List.of();
-        Set<Long> ids = new LinkedHashSet<>();
-        LambdaQueryWrapperX<PersonDO> query = new LambdaQueryWrapperX<>();
-        query.and(q -> {
-            boolean hasPrevious = false;
-            if (mobile != null) {
-                q.eq(PersonDO::getMobile, mobile).or().eq(PersonDO::getWechatId, mobile);
-                hasPrevious = true;
-            }
-            if (wechatId != null) {
-                if (hasPrevious) q.or();
-                q.eq(PersonDO::getWechatId, wechatId).or().eq(PersonDO::getMobile, wechatId);
-            }
-        });
-        List<PersonDO> rows = selectList(query);
-        return rows.stream().filter(row -> ids.add(row.getId())).toList();
-    }
+    @Select("SELECT * FROM zsjos_person WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
+    PersonDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+    @Select("<script>SELECT * FROM zsjos_person WHERE deleted=b'0' AND ("
+            + "<if test='mobile != null'>(BINARY mobile=BINARY #{mobile} OR BINARY wechat_id=BINARY #{mobile})</if>"
+            + "<if test='mobile != null and wechatId != null'> OR </if>"
+            + "<if test='wechatId != null'>(BINARY wechat_id=BINARY #{wechatId} OR BINARY mobile=BINARY #{wechatId})</if>"
+            + ")</script>")
+    List<PersonDO> selectDuplicateCandidates(@Param("mobile") String mobile, @Param("wechatId") String wechatId);
 }

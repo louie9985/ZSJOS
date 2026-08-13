@@ -66,6 +66,82 @@ SELECT 'lead_filter_status_v042' AS check_name,
               AND (JSON_SEARCH(draft_config_json,'one','converted') IS NOT NULL
                 OR JSON_SEARCH(published_config_json,'one','converted') IS NOT NULL)),
           'PASS', 'FAIL') AS result;
+SELECT 'order_lifecycle_review_v043' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V043')
+          AND (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+               AND table_name IN ('zsjos_person_contact_claim','zsjos_order_command'))=2,
+          'PASS','FAIL') AS result;
+SELECT 'order_concurrency_objects_v043' AS check_name,
+       IF(EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                 AND table_name='zsjos_order' AND column_name='terminated_at')
+          AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+               AND table_name='zsjos_order_approval_round'
+               AND column_name IN ('registration_decision_idempotency_key','finance_decision_idempotency_key',
+                                   'termination_idempotency_key','version'))=4
+          AND (SELECT COUNT(DISTINCT index_name) FROM information_schema.statistics WHERE table_schema=DATABASE()
+               AND ((table_name='zsjos_order' AND index_name='uk_tenant_active_repurchase')
+                 OR (table_name='zsjos_order_approval_round' AND index_name IN
+                    ('uk_tenant_registration_decision_key','uk_tenant_finance_decision_key','uk_tenant_termination_key'))))=4,
+          'PASS','FAIL') AS result;
+SELECT 'order_command_ledger_v043' AS check_name,
+       IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+                 AND table_name='zsjos_order_command' AND index_name='uk_tenant_order_command_key' AND non_unique=0),
+          'PASS','FAIL') AS result;
+SELECT 'person_contact_claim_completeness_v043' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM (
+              SELECT tenant_id,id person_id,CONVERT(TRIM(mobile) USING utf8mb4) COLLATE utf8mb4_bin contact_value
+                FROM zsjos_person WHERE deleted=b'0' AND mobile IS NOT NULL
+              UNION
+              SELECT tenant_id,id,CONVERT(TRIM(wechat_id) USING utf8mb4) COLLATE utf8mb4_bin
+                FROM zsjos_person WHERE deleted=b'0' AND wechat_id IS NOT NULL
+            ) expected LEFT JOIN zsjos_person_contact_claim claim
+              ON claim.tenant_id=expected.tenant_id AND claim.contact_value=expected.contact_value
+             AND claim.person_id=expected.person_id AND claim.deleted=b'0'
+            WHERE claim.id IS NULL)
+          AND NOT EXISTS (
+            SELECT 1 FROM zsjos_person_contact_claim claim
+            LEFT JOIN (
+              SELECT tenant_id,id person_id,CONVERT(TRIM(mobile) USING utf8mb4) COLLATE utf8mb4_bin contact_value
+                FROM zsjos_person WHERE deleted=b'0' AND mobile IS NOT NULL
+              UNION
+              SELECT tenant_id,id,CONVERT(TRIM(wechat_id) USING utf8mb4) COLLATE utf8mb4_bin
+                FROM zsjos_person WHERE deleted=b'0' AND wechat_id IS NOT NULL
+            ) expected ON expected.tenant_id=claim.tenant_id AND expected.contact_value=claim.contact_value
+                      AND expected.person_id=claim.person_id
+            WHERE claim.deleted=b'0' AND (claim.person_id IS NULL OR claim.reservation_key IS NOT NULL OR expected.person_id IS NULL)),
+          'PASS','FAIL') AS result;
+WITH filter_documents AS (
+  SELECT id,draft_config_json document FROM zsjos_lead_inbox_filter_scheme WHERE audience IN('submitter','owner') AND deleted=b'0'
+  UNION ALL
+  SELECT id,published_config_json FROM zsjos_lead_inbox_filter_scheme WHERE audience IN('submitter','owner') AND deleted=b'0'
+), legacy_status AS (
+  SELECT documents.id
+  FROM filter_documents documents
+  JOIN JSON_TABLE(documents.document,'$.groups[*]' COLUMNS(group_doc JSON PATH '$')) groups_json
+  JOIN JSON_TABLE(groups_json.group_doc,'$.conditions[*]' COLUMNS(condition_doc JSON PATH '$')) conditions_json
+  JOIN JSON_TABLE(conditions_json.condition_doc,'$.values[*]' COLUMNS(condition_value varchar(64) PATH '$')) values_json
+  WHERE JSON_UNQUOTE(JSON_EXTRACT(conditions_json.condition_doc,'$.field'))='status'
+    AND values_json.condition_value='converted'
+  UNION ALL
+  SELECT documents.id
+  FROM filter_documents documents
+  JOIN JSON_TABLE(documents.document,'$.groups[*]' COLUMNS(group_doc JSON PATH '$')) groups_json
+  JOIN JSON_TABLE(groups_json.group_doc,'$.options[*]' COLUMNS(option_doc JSON PATH '$')) options_json
+  JOIN JSON_TABLE(options_json.option_doc,'$.conditions[*]' COLUMNS(condition_doc JSON PATH '$')) conditions_json
+  JOIN JSON_TABLE(conditions_json.condition_doc,'$.values[*]' COLUMNS(condition_value varchar(64) PATH '$')) values_json
+  WHERE JSON_UNQUOTE(JSON_EXTRACT(conditions_json.condition_doc,'$.field'))='status'
+    AND values_json.condition_value='converted'
+), legacy_option AS (
+  SELECT documents.id
+  FROM filter_documents documents
+  JOIN JSON_TABLE(documents.document,'$.groups[*]' COLUMNS(group_doc JSON PATH '$')) groups_json
+  JOIN JSON_TABLE(groups_json.group_doc,'$.options[*]' COLUMNS(option_doc JSON PATH '$')) options_json
+  WHERE JSON_UNQUOTE(JSON_EXTRACT(options_json.option_doc,'$.key'))='converted'
+    AND JSON_UNQUOTE(JSON_EXTRACT(options_json.option_doc,'$.label'))='已进入转化'
+)
+SELECT 'lead_filter_status_v043_structured' AS check_name,
+       IF(NOT EXISTS(SELECT 1 FROM legacy_status) AND NOT EXISTS(SELECT 1 FROM legacy_option),'PASS','FAIL') AS result;
 SELECT 'default_follow_up_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_accept_permission' AS check_name,
@@ -219,7 +295,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core'
-            AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042'))=21,
+            AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042','V043'))=22,
           'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()

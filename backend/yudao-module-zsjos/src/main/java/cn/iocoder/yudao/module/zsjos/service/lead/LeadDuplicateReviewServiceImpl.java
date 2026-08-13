@@ -44,6 +44,7 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private SecurityFrameworkService securityFrameworkService;
+    @Resource private PersonIdentityWriteService personIdentityWriteService;
 
     @Override
     public PageResult<LeadDuplicateReviewRespVO> getPage(LeadDuplicateReviewPageReqVO request) {
@@ -168,8 +169,8 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         before.put("person", person); before.put("lead", lead);
         before.put("products", productMapper.selectListByLeadId(lead.getId()));
         before.put("attachments", attachmentMapper.selectListByLeadId(lead.getId()));
-        person.setName(submission.getName().trim()); person.setMobile(submission.getMobile());
-        person.setWechatId(submission.getWechatId()); person.setLastSeenAt(now); personMapper.updateById(person);
+        personIdentityWriteService.update(person.getId(), submission.getName().trim(),
+                submission.getMobile(), submission.getWechatId());
         lead.setSubmittedName(submission.getName().trim()); lead.setSubmittedMobile(submission.getMobile());
         lead.setSubmittedWechatId(submission.getWechatId()); lead.setProvinceCode(submission.getProvinceCode());
         lead.setCityCode(submission.getCityCode()); lead.setLeadCategory(submission.getLeadCategory());

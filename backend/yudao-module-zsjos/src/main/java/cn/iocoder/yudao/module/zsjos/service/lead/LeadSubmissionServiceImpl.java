@@ -43,6 +43,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private LeadDuplicateMatcher duplicateMatcher;
     @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private PersonIdentityWriteService personIdentityWriteService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -138,17 +139,13 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                                             LeadSubmissionIdentityService.Resolution identity) {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
-        PersonDO person = reusePersonId == null ? createPerson(reqVO.getName().trim(), mobile, wechatId)
-                : personMapper.selectById(reusePersonId);
+        PersonDO person = reusePersonId == null
+                ? personIdentityWriteService.createNew(reqVO.getName().trim(), mobile, wechatId, "lead")
+                : personIdentityWriteService.update(reusePersonId, reqVO.getName().trim(), mobile, wechatId);
         if (person == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         if (leadMapper.selectLatestByPersonId(person.getId()) != null) {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
-        person.setName(reqVO.getName().trim());
-        person.setMobile(mobile);
-        person.setWechatId(wechatId);
-        person.setLastSeenAt(LocalDateTime.now());
-        personMapper.updateById(person);
         LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, submitterUserId, identity);
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);
@@ -250,16 +247,6 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                 ? dispatchService.getEligibleSalesUsers().stream().anyMatch(user -> Objects.equals(user.getId(), reqVO.getSpecifiedSalesUserId()))
                 : dispatchService.getAssignableSalesUsers(userId).stream().anyMatch(user -> Objects.equals(user.getId(), reqVO.getSpecifiedSalesUserId()));
         if (!allowed) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
-    }
-
-    private PersonDO createPerson(String name, String mobile, String wechatId) {
-        PersonDO person = new PersonDO();
-        person.setPersonNo("P" + UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT));
-        person.setName(name); person.setMobile(mobile); person.setWechatId(wechatId);
-        person.setIdentityStatus("lead"); person.setFirstSeenAt(LocalDateTime.now());
-        person.setLastSeenAt(person.getFirstSeenAt()); person.setVersion(0);
-        personMapper.insert(person);
-        return person;
     }
 
     private LeadDO createLead(PersonDO person, LeadCreateReqVO reqVO, String mobile, String wechatId,

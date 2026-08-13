@@ -39,6 +39,7 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
+import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -82,6 +83,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
     @Resource private DeptApi deptApi;
     @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private SalesOrderCommandService commandService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -131,22 +134,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (StrUtil.isBlank(name) || StrUtil.isAllBlank(mobile, wechatId)) {
             throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         }
-        List<PersonDO> candidates = personMapper.selectDuplicateCandidates(mobile, wechatId);
-        if (candidates.size() > 1) throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
-        PersonDO person;
-        if (candidates.isEmpty()) {
-            LocalDateTime now = LocalDateTime.now();
-            person = new PersonDO();
-            person.setPersonNo("P" + UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT));
-            person.setName(name); person.setMobile(mobile); person.setWechatId(wechatId);
-            person.setIdentityStatus("active"); person.setFirstSeenAt(now); person.setLastSeenAt(now); person.setVersion(0);
-            personMapper.insert(person);
-        } else {
-            person = candidates.getFirst();
-            if (!Objects.equals(StrUtil.trim(person.getName()), name)
-                    || leadMapper.selectLatestByPersonId(person.getId()) != null) {
-                throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
-            }
+        PersonDO person = personIdentityWriteService.resolveOrCreate(name, mobile, wechatId, "active");
+        if (!Objects.equals(StrUtil.trim(person.getName()), name)
+                || leadMapper.selectLatestByPersonId(person.getId()) != null) {
+            throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         }
         return createRepurchase(person.getId(), userId, userId, reqVO.getRepurchaseReason(), reqVO.getOrder(), false);
     }
@@ -414,8 +405,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 TenantContextHolder.getRequiredTenantId());
         if (round == null || !Objects.equals(round.getOrderId(), orderId)
                 || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) throw exception(SALES_ORDER_VERSION_CONFLICT);
-        if (Objects.equals(round.getRegistrationDecisionIdempotencyKey(), reqVO.getIdempotencyKey())
-                || Objects.equals(round.getFinanceDecisionIdempotencyKey(), reqVO.getIdempotencyKey())) return;
+        String commandType = approve ? "approve" : "reject";
+        String fingerprint = commandService.fingerprint(reqVO.getReason().trim(), reqVO.getOrderVersion(),
+                reqVO.getRoundVersion());
+        SalesOrderCommandService.Command replay = new SalesOrderCommandService.Command(orderId, round.getId(),
+                round.getProcessInstanceId(), commandType, null, reqVO.getTaskId(), userId, fingerprint);
+        if (commandService.replayDecision(reqVO.getIdempotencyKey(), replay)) return;
         if (!STATUS_PENDING_APPROVAL.equals(order.getStatus())) throw exception(SALES_ORDER_ALREADY_HANDLED);
         if (!Objects.equals(order.getVersion(), reqVO.getOrderVersion())
                 || !Objects.equals(round.getVersion(), reqVO.getRoundVersion())) throw exception(SALES_ORDER_VERSION_CONFLICT);
@@ -430,6 +425,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 || !Set.of(TASK_REGISTRATION, TASK_FINANCE).contains(task.getTaskDefinitionKey())) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
         }
+        SalesOrderCommandService.Command command = new SalesOrderCommandService.Command(orderId, round.getId(),
+                round.getProcessInstanceId(), commandType, task.getTaskDefinitionKey(), reqVO.getTaskId(), userId,
+                fingerprint);
+        commandService.register(reqVO.getIdempotencyKey(), command);
         if (TASK_REGISTRATION.equals(task.getTaskDefinitionKey())) {
             if (round.getRegistrationDecisionIdempotencyKey() != null) throw exception(SALES_ORDER_ALREADY_HANDLED);
             round.setRegistrationDecisionIdempotencyKey(reqVO.getIdempotencyKey());
@@ -450,14 +449,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderDO order = requireOrderForUpdate(orderId);
         SalesOrderApprovalRoundDO round = roundMapper.selectByIdForUpdate(reqVO.getApprovalRoundId(),
                 TenantContextHolder.getRequiredTenantId());
-        if (round != null && Objects.equals(round.getTerminationIdempotencyKey(), reqVO.getIdempotencyKey())) return;
-        if (!STATUS_PENDING_APPROVAL.equals(order.getStatus()) || !Objects.equals(order.getSubmitterUserId(), userId)
+        if (!Objects.equals(order.getSubmitterUserId(), userId)
                 || round == null || !Objects.equals(round.getOrderId(), orderId)
                 || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) {
             throw exception(SALES_ORDER_TERMINATE_FORBIDDEN);
         }
+        String fingerprint = commandService.fingerprint(reqVO.getReason().trim(), reqVO.getOrderVersion(),
+                reqVO.getRoundVersion());
+        SalesOrderCommandService.Command command = new SalesOrderCommandService.Command(orderId, round.getId(),
+                round.getProcessInstanceId(), "terminate", null, null, userId, fingerprint);
+        if (commandService.replay(reqVO.getIdempotencyKey(), command)) return;
+        if (!STATUS_PENDING_APPROVAL.equals(order.getStatus())) throw exception(SALES_ORDER_TERMINATE_FORBIDDEN);
         if (!Objects.equals(order.getVersion(), reqVO.getOrderVersion())
                 || !Objects.equals(round.getVersion(), reqVO.getRoundVersion())) throw exception(SALES_ORDER_VERSION_CONFLICT);
+        commandService.register(reqVO.getIdempotencyKey(), command);
         LocalDateTime now = LocalDateTime.now();
         order.setStatus(STATUS_TERMINATED); order.setTerminationReason(reqVO.getReason().trim()); order.setTerminatedAt(now);
         order.setVersion(order.getVersion() + 1);

@@ -119,6 +119,22 @@ class LeadInboxFilterConfigServiceImplTest {
     }
 
     @Test
+    void getAdminConfigKeepsCustomConvertedOptionWithoutLegacyStatusCondition() {
+        LeadInboxFilterSaveReqVO config = validRequest();
+        LeadInboxFilterConfigVO.OptionVO custom = option("converted", "自定义选项", 20);
+        custom.setConditions(List.of(condition("assignment_status", "owned")));
+        config.getGroups().get(1).setOptions(new java.util.ArrayList<>(config.getGroups().get(1).getOptions()));
+        config.getGroups().get(1).getOptions().add(custom);
+        LeadInboxFilterSchemeDO scheme = scheme(config);
+        when(schemeMapper.selectByAudience("submitter")).thenReturn(scheme);
+
+        var result = service.getAdminConfig("submitter");
+
+        assertEquals("converted", result.getDraftGroups().get(1).getOptions().get(2).getKey());
+        assertEquals("自定义选项", result.getDraftGroups().get(1).getOptions().get(2).getLabel());
+    }
+
+    @Test
     void rollbackNormalizesHistoricalConvertedLeadStatus() {
         LeadInboxFilterSaveReqVO historical = validRequest();
         historical.getGroups().get(1).getConditions().getFirst().setValues(List.of("submitted", "converted"));

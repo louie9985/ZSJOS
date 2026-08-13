@@ -6,6 +6,7 @@ import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LA
 import SalesOrderEntryModal, { type SalesOrderEntryLead } from '../components/SalesOrderEntryModal'
 import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems } from '../services/salesOrder'
+import { useSubmissionGuard } from '../services/submissionGuard'
 
 const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
@@ -29,6 +30,7 @@ export default function MySalesOrderPage() {
   const [revisionOpen, setRevisionOpen] = useState(false)
   const [terminateOpen, setTerminateOpen] = useState(false)
   const [terminationReason, setTerminationReason] = useState('')
+  const { submitting: terminating, run: runTermination, resetIntent: resetTerminationIntent } = useSubmissionGuard()
   const listVersion = useRef(0)
   const detailVersion = useRef(0)
   const activePages = useRef(new Set<string>())
@@ -73,7 +75,8 @@ export default function MySalesOrderPage() {
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
-      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)} onTerminate={() => setTerminateOpen(true)}/>
+      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)}
+        onTerminate={() => { resetTerminationIntent(); setTerminateOpen(true) }}/>
         : <Empty description="从左侧选择一条订单"/>
   const hasMore = items.length < total
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
@@ -115,12 +118,15 @@ export default function MySalesOrderPage() {
     </div>
     <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="订单详情" width="100%">{detailContent}</Drawer>
     {revisionLead && <SalesOrderEntryModal lead={revisionLead} orderId={detail?.id} open={revisionOpen} onClose={() => setRevisionOpen(false)}
-      onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}<Modal title="终止订单审批" open={terminateOpen} onCancel={() => setTerminateOpen(false)} okButtonProps={{ danger: true }} okText="确认终止"
+      onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}<Modal title="终止订单审批" open={terminateOpen}
+      onCancel={() => { setTerminateOpen(false); setTerminationReason(''); resetTerminationIntent() }} okText="确认终止"
       onOk={async () => { if (!detail || !terminationReason.trim()) { message.warning('请填写终止原因'); return }
-        try { await api.terminateSalesOrder(detail.id, { reason: terminationReason.trim(), approvalRoundId: detail.currentApprovalRoundId,
-          orderVersion: detail.version, roundVersion: detail.approvalRoundVersion, idempotencyKey: crypto.randomUUID() })
-          message.success('订单审批已终止'); setTerminateOpen(false); setTerminationReason(''); reload() }
-        catch (error) { message.error(error instanceof Error ? error.message : '终止失败') } }}>
+        await runTermination(async ({ complete, idempotencyKey }) => {
+          await api.terminateSalesOrder(detail.id, { reason: terminationReason.trim(), approvalRoundId: detail.currentApprovalRoundId,
+            orderVersion: detail.version, roundVersion: detail.approvalRoundVersion, idempotencyKey })
+          complete(); message.success('订单审批已终止'); setTerminateOpen(false); setTerminationReason(''); reload()
+        }).catch(error => message.error(error instanceof Error ? error.message : '终止失败')) }}
+      confirmLoading={terminating} okButtonProps={{ danger: true, disabled: terminating }}>
       <Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写终止原因（必填）"/>
     </Modal>
   </section>
