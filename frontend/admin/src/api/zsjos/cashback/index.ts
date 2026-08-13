@@ -14,3 +14,5 @@ export interface CashbackVO {
 
 export const getFinanceCashbackPage = (params: any) =>
   request.get({ url: '/zsjos/cashback/page', params })
+export const getMyCashbackPage = (params: any) =>
+  request.get({ url: '/zsjos/cashback/my-page', params })

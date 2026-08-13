@@ -445,3 +445,9 @@ SELECT 'cashback_rule_columns' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'cashback_permissions_ungranted' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6880,6881))=2,'PASS','FAIL') AS result;
+SELECT 'V052 withdrawal tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('zsjos_partner_bank_card','zsjos_withdrawal','zsjos_withdrawal_item'))=3,'PASS','FAIL') AS result;
+SELECT 'V052 withdrawal active uniqueness' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='zsjos_withdrawal_item' AND index_name='uk_active_cashback')>0,'PASS','FAIL') AS result;
+SELECT 'V052 withdrawal menus' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id BETWEEN 6890 AND 6895)=6,'PASS','FAIL') AS result;

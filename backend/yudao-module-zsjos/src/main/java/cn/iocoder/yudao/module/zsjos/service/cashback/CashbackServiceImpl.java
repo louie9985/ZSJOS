@@ -111,6 +111,17 @@ public class CashbackServiceImpl implements CashbackService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assertOrderRejectable(Long orderId) {
+        if (orderId == null) throw exception(CASHBACK_SOURCE_INVALID);
+        boolean locked = mapper.selectByOrderIdForUpdate(orderId,
+                        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())
+                .stream().anyMatch(item -> STATUS_WITHDRAWING.equals(item.getStatus())
+                        || STATUS_WITHDRAWN.equals(item.getStatus()));
+        if (locked) throw exception(CASHBACK_ORDER_REJECTION_LOCKED);
+    }
+
+    @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
         return BeanUtils.toBean(mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
     }

@@ -166,5 +166,16 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode CASHBACK_RULE_NOT_CONFIGURED = new ErrorCode(1_900_008_001, "主意向课程未配置有效返现规则");
     ErrorCode CASHBACK_STATE_INVALID = new ErrorCode(1_900_008_002, "当前返现状态不允许该操作");
     ErrorCode CASHBACK_SOURCE_INVALID = new ErrorCode(1_900_008_003, "返现来源客资、订单或明细无效");
+    ErrorCode CASHBACK_ORDER_REJECTION_LOCKED = new ErrorCode(1_900_008_004, "成交返现已进入提现中或已提现，禁止驳回订单");
+    ErrorCode WITHDRAWAL_PARTNER_INVALID = new ErrorCode(1_900_009_001, "仅启用的普通兼职可发起提现");
+    ErrorCode WITHDRAWAL_CASHBACK_INVALID = new ErrorCode(1_900_009_002, "所选返现不存在、不属于本人或当前不可提现");
+    ErrorCode WITHDRAWAL_AMOUNT_TOO_LOW = new ErrorCode(1_900_009_003, "申请金额低于当前最低提现金额");
+    ErrorCode WITHDRAWAL_BANK_CARD_INVALID = new ErrorCode(1_900_009_004, "银行卡资料格式无效");
+    ErrorCode WITHDRAWAL_NOT_EXISTS = new ErrorCode(1_900_009_005, "提现单不存在或无权访问");
+    ErrorCode WITHDRAWAL_STATE_INVALID = new ErrorCode(1_900_009_006, "当前提现单或返现状态不允许该操作");
+    ErrorCode WITHDRAWAL_PROCESS_UNAVAILABLE = new ErrorCode(1_900_009_007, "提现财务审批流程未部署、无有效审批人或当前不可用");
+    ErrorCode WITHDRAWAL_TRANSACTION_DUPLICATE = new ErrorCode(1_900_009_008, "银行流水号已登记");
+    ErrorCode WITHDRAWAL_PROOF_INVALID = new ErrorCode(1_900_009_009, "打款凭证不存在、无权使用或文件类型不支持");
+    ErrorCode WITHDRAWAL_PERMISSION_DENIED = new ErrorCode(1_900_009_010, "无权查看或处理该提现单");
 
 }

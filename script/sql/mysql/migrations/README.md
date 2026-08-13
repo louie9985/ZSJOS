@@ -64,4 +64,6 @@ Adds the non-destructive `reviewer` audience to the shared filter-scheme table w
 
 V051 additively introduces product/category cashback rules, an empty cashback table, observation configuration, and ungranted permissions. Populated financial history is retained on rollback.
 
+V052 adds empty partner-card, withdrawal and withdrawal-item tables, BPM references, active-cashback uniqueness, offline payout evidence, default rules and ungranted permissions. Deploy BPM key `zsjos_partner_withdrawal` separately; rollback disables the process and menus while retaining financial history.
+
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.

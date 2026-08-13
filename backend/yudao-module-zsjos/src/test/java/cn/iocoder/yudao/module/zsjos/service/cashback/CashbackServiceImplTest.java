@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.cashback;
 
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
@@ -72,6 +73,18 @@ class CashbackServiceImplTest {
         when(orderMapper.selectById(2L)).thenReturn(new SalesOrderDO().setStatus("effective"));
         when(mapper.transition(eq(10L), eq(0), eq("pending_settlement"), eq("available"), any())).thenReturn(1);
         assertEquals(1, service.settleMatured());
+    }
+
+    @Test void withdrawalStateLocksOrderRejection() {
+        TenantContextHolder.setTenantId(9L);
+        try {
+            when(mapper.selectByOrderIdForUpdate(2L, 9L)).thenReturn(List.of(
+                    new CashbackDO().setStatus("withdrawing")));
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.assertOrderRejectable(2L));
+        } finally {
+            TenantContextHolder.clear();
+        }
     }
 
     private void eligibleLead() {

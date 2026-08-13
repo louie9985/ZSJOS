@@ -9,6 +9,7 @@ public interface CashbackService {
     Long ensureValidCashback(Long leadId);
     Long ensureDealCashback(DealCashbackCommand command);
     int settleMatured();
+    void assertOrderRejectable(Long orderId);
     PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId);
 
     record DealCashbackCommand(Long leadId, Long orderId, Long orderItemId, String productRef,
