@@ -7,6 +7,8 @@ import org.springframework.format.annotation.DateTimeFormat;
 import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDateTime;
+import cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO;
+import jakarta.validation.Valid;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
 
@@ -33,4 +35,5 @@ public class LeadManagementPageReqVO extends PageParam {
 
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] submittedAt;
+    @Valid private AdvancedFilterGroupReqVO advancedFilter;
 }

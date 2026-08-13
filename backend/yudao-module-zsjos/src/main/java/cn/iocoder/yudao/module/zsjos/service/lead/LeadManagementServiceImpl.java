@@ -26,6 +26,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
 import lombok.Data;
 import org.springframework.stereotype.Service;
@@ -77,6 +78,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private SalesOrderMapper salesOrderMapper;
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService salesOrderPermissionService;
+    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -90,11 +92,17 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         Long visibleUserId = reqVO.getAudience() != null || !queryAll ? userId : null;
         List<Long> managedOwnerUserIds = reqVO.getAudience() == null && !queryAll
                 ? sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId)) : List.of();
+        List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
+        boolean advanced = matchedLeadIds != null;
         PageResult<LeadDO> page = managedOwnerUserIds.isEmpty()
-                ? leadMapper.selectManagementPage(reqVO, visibleUserId,
-                        List.copyOf(inboxQuery.statuses()), List.copyOf(inboxQuery.assignmentStatuses()), inboxQuery.matchNone())
+                ? leadMapper.selectManagementPage(reqVO, visibleUserId, List.of(),
+                        advanced ? List.of() : List.copyOf(inboxQuery.statuses()),
+                        advanced ? List.of() : List.copyOf(inboxQuery.assignmentStatuses()),
+                        advanced ? false : inboxQuery.matchNone(), matchedLeadIds)
                 : leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,
-                        List.copyOf(inboxQuery.statuses()), List.copyOf(inboxQuery.assignmentStatuses()), inboxQuery.matchNone());
+                        advanced ? List.of() : List.copyOf(inboxQuery.statuses()),
+                        advanced ? List.of() : List.copyOf(inboxQuery.assignmentStatuses()),
+                        advanced ? false : inboxQuery.matchNone(), matchedLeadIds);
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -118,7 +126,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
         reqVO.setOwnerUserId(ownerUserId);
         PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, ownerUserId,
-                List.of(), List.of(), false);
+                List.of(), List.of(), List.of(), false, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(

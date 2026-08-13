@@ -1,5 +1,6 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
+import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export type LeadAgingPoolStatus = 'waiting_assignment' | 'assigned' | 'deal_pending'
 export interface LeadAgingPoolVO {
@@ -31,9 +32,12 @@ export interface LeadAgingPoolVO {
 export interface LeadAgingPoolPageReqVO extends PageParam {
   keyword?: string
   status?: LeadAgingPoolStatus
+  advancedFilter?: AdvancedFilterGroup
 }
 export const getPage = (params: LeadAgingPoolPageReqVO): Promise<{ list: LeadAgingPoolVO[]; total: number }> =>
-  request.get({ url: '/zsjos/lead/aging-pool/page', params })
+  params.advancedFilter
+    ? request.post({ url: '/zsjos/lead/aging-pool/search-page', data: params })
+    : request.get({ url: '/zsjos/lead/aging-pool/page', params })
 export const getCandidates = (cycleId: number): Promise<Array<{ id: number; nickname: string }>> =>
   request.get({ url: `/zsjos/lead/aging-pool/${cycleId}/candidates` })
 export const assign = (cycleId: number, salesUserId: number) =>

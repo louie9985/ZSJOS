@@ -34,6 +34,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
@@ -73,6 +74,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private PersonMapper personMapper;
     @Resource private ZsjosProductSkuService skuService;
     @Resource private SalesOrderObjectPermissionService permissionService;
+    @Resource private AdvancedFilterService advancedFilterService;
     @Resource private FileApi fileApi;
     @Resource private AreaApi areaApi;
     @Resource private DictDataApi dictDataApi;
@@ -232,7 +234,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     @Override
     public PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId) {
-        PageResult<SalesOrderDO> page = orderMapper.selectMyPage(userId, reqVO);
+        List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
+        if (matchedOrderIds != null) reqVO.setStatus(null);
+        PageResult<SalesOrderDO> page = orderMapper.selectMyPage(userId, reqVO, matchedOrderIds);
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
         return new PageResult<>(page.getList().stream()
                 .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList(), page.getTotal());
@@ -255,9 +259,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (!allowedTaskKeys.contains(centerTaskKey)) throw exception(SALES_ORDER_PERMISSION_DENIED);
             allowedTaskKeys = Set.of(centerTaskKey);
         }
+        boolean advanced = advancedFilterService.hasConditions(reqVO.getAdvancedFilter());
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
         LeadInboxFilterQuery filter;
-        if (reqVO.getGroupKey() == null && reqVO.getHandled() != null) {
+        if (advanced) {
+            filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of());
+        } else if (reqVO.getGroupKey() == null && reqVO.getHandled() != null) {
             filter = new LeadInboxFilterQuery(Set.of(), Set.of(), false, Map.of(
                     INBOX_FILTER_FIELD_HANDLED, Set.of(Boolean.TRUE.equals(reqVO.getHandled()) ? "done" : "todo")));
         } else {
@@ -268,7 +275,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         filter = restrictTaskFilter(filter, allowedTaskKeys);
         if (filter.matchNone()) return PageResult.empty();
-        List<String> processIds = searchProcessIds(reqVO.getKeyword());
+        List<String> processIds = advanced
+                ? roundMapper.selectProcessInstanceIdsByOrderIdsAndKeyword(
+                        TenantContextHolder.getTenantId(), advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter()),
+                        StrUtil.blankToDefault(reqVO.getKeyword(), null))
+                : searchProcessIds(reqVO.getKeyword());
         if (processIds != null && processIds.isEmpty()) return PageResult.empty();
         List<BpmTaskRespDTO> tasks = loadApprovalTasks(userId, reqVO, filter, processIds);
         List<SalesOrderListItemRespVO> result = new ArrayList<>();

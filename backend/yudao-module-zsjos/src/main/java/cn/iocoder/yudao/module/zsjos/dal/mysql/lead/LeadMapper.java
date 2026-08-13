@@ -92,6 +92,14 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                      List<String> inboxStatuses,
                                                      List<String> inboxAssignmentStatuses,
                                                      boolean inboxMatchNone) {
+        return selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds, inboxStatuses,
+                inboxAssignmentStatuses, inboxMatchNone, null);
+    }
+    default PageResult<LeadDO> selectManagementPage(LeadManagementPageReqVO reqVO, Long visibleUserId,
+                                                     List<Long> managedOwnerUserIds,
+                                                     List<String> inboxStatuses,
+                                                     List<String> inboxAssignmentStatuses,
+                                                     boolean inboxMatchNone, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
@@ -109,6 +117,10 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             if (inboxAssignmentStatuses != null && !inboxAssignmentStatuses.isEmpty()) {
                 query.in(LeadDO::getAssignmentStatus, inboxAssignmentStatuses);
             }
+        }
+        if (matchedLeadIds != null) {
+            if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L);
+            else query.in(LeadDO::getId, matchedLeadIds);
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) {
             String keyword = reqVO.getKeyword().trim();
@@ -232,11 +244,20 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .set(LeadDO::getPendingExpiresAt, expiresAt)
                 .set(LeadDO::getAssignmentAttemptCount, attempt));
     }
-    default PageResult<LeadDO> selectPublicPoolPage(PageParam pageParam) {
-        return selectPage(pageParam, new LambdaQueryWrapperX<LeadDO>()
-                .eq(LeadDO::getAssignmentStatus, "public_pool")
+    default PageResult<LeadDO> selectPublicPoolPage(PageParam pageParam, String keyword, List<Long> matchedLeadIds) {
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
+                .eq(LeadDO::getAssignmentStatus, "public_pool");
+        if (keyword != null && !keyword.isBlank()) query.and(q -> q.like(LeadDO::getSubmittedName, keyword.trim())
+                .or().like(LeadDO::getSubmittedMobile, keyword.trim()).or().like(LeadDO::getSubmittedWechatId, keyword.trim()));
+        if (matchedLeadIds != null) {
+            if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L); else query.in(LeadDO::getId, matchedLeadIds);
+        }
+        return selectPage(pageParam, query
                 .orderByAsc(LeadDO::getPublicPoolAt)
                 .orderByAsc(LeadDO::getId));
+    }
+    default PageResult<LeadDO> selectPublicPoolPage(PageParam pageParam) {
+        return selectPublicPoolPage(pageParam, null, null);
     }
     default int updatePublicPoolToOwned(Long id, Long ownerId) {
         return update(null, new LambdaUpdateWrapper<LeadDO>()
@@ -274,7 +295,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
 
     default PageResult<LeadDO> selectQualificationExceptionPage(PageParam pageParam, String type,
                                                                  Set<Long> managedOwnerIds,
-                                                                 boolean manageAll) {
+                                                                 boolean manageAll, String keyword, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<>();
         if ("suspended".equals(type)) {
             query.eq(LeadDO::getStatus, "suspended");
@@ -283,7 +304,16 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             query.eq(LeadDO::getAssignmentStatus, "recycle_pending");
             if (!manageAll) query.in(LeadDO::getRecycleSourceOwnerUserId, managedOwnerIds);
         }
+        if (keyword != null && !keyword.isBlank()) query.and(q -> q.like(LeadDO::getSubmittedName, keyword.trim())
+                .or().like(LeadDO::getSubmittedMobile, keyword.trim()).or().like(LeadDO::getSubmittedWechatId, keyword.trim()));
+        if (matchedLeadIds != null) {
+            if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L); else query.in(LeadDO::getId, matchedLeadIds);
+        }
         query.orderByAsc(LeadDO::getSuspendedAt).orderByAsc(LeadDO::getId);
         return selectPage(pageParam, query);
+    }
+    default PageResult<LeadDO> selectQualificationExceptionPage(PageParam pageParam, String type,
+                                                                 Set<Long> managedOwnerIds, boolean manageAll) {
+        return selectQualificationExceptionPage(pageParam, type, managedOwnerIds, manageAll, null, null);
     }
 }

@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Badge, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { api, type SalesOrder, type SalesOrderApprovalFilterProfile, type SalesOrderListItem } from '../services/api'
+import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderApprovalFilterProfile, type SalesOrderListItem } from '../services/api'
+import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderTaskKey } from '../services/salesOrder'
@@ -16,6 +17,7 @@ export default function SalesOrderApprovalPage() {
   const [groupKey, setGroupKey] = useState<string>()
   const [optionKey, setOptionKey] = useState('all')
   const [keyword, setKeyword] = useState('')
+  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<SalesOrderListItem[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
@@ -50,14 +52,14 @@ export default function SalesOrderApprovalPage() {
     const version = ++requestVersion.current
     setLoading(true); setError('')
     try {
-      const result = await api.salesOrderApprovalInbox({ pageNo: targetPage, pageSize: PAGE_SIZE, center, groupKey, optionKey, keyword: keyword.trim() || undefined })
+      const result = await api.salesOrderApprovalInbox({ pageNo: targetPage, pageSize: PAGE_SIZE, center, groupKey, optionKey, keyword: keyword.trim() || undefined, advancedFilter })
       if (version !== requestVersion.current) return
       setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey)); setTotal(result.total); setPageNo(targetPage)
       if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
     } catch (loadError) {
       if (version === requestVersion.current) { setError(loadError instanceof Error ? loadError.message : '成交审批加载失败'); if (replace) { setItems([]); setSelectedKey(undefined) } }
     } finally { if (version === requestVersion.current) setLoading(false) }
-  }, [center, groupKey, keyword, optionKey])
+  }, [advancedFilter, center, groupKey, keyword, optionKey])
 
   useEffect(() => { void loadProfile() }, [loadProfile])
   useEffect(() => { if (!profileLoading && !profileError && groupKey && center) void loadPage(1, true) }, [center, groupKey, optionKey, keyword, profileLoading, profileError, loadPage])
@@ -98,14 +100,14 @@ export default function SalesOrderApprovalPage() {
   const hasMore = items.length < total
 
   return <section className="workspace-page lead-management-page sales-order-approval-page">
-    <header className="lead-inbox-filter-shell">
+    {filterCount(advancedFilter) === 0 && <header className="lead-inbox-filter-shell">
       {profileError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={profileError} action={<Button type="link" size="small" onClick={() => void loadProfile()}>重试</Button>}/>}
       {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.groups.length > 0 ? <>
         {profile.centers.length > 1 && <Tabs className="lead-inbox-center-tabs" activeKey={center} onChange={key => { setCenter(key as 'registration' | 'finance'); setOptionKey('all') }} items={profile.centers.map(item => ({ key: item.key, label: item.label }))}/>}
         <Tabs className="lead-inbox-group-tabs" activeKey={groupKey} onChange={key => { setGroupKey(key); setOptionKey('all') }} items={profile.groups.map(group => ({ key: group.key, label: group.label }))}/>
       </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用审批筛选配置"/>}
-    </header>
-    <div className="lead-inbox-layout"><aside className="lead-inbox-list-pane"><div className="lead-inbox-toolbar"><Input.Search allowClear placeholder="搜索订单号 / 学员姓名 / 手机号" onSearch={value => setKeyword(value.trim())}/></div>
+    </header>}
+    <div className="lead-inbox-layout"><aside className="lead-inbox-list-pane"><div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="order" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
       {error && <Alert className="lead-list-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(1, true)}>重试</Button>}/>}
       <div className="lead-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(pageNo + 1, false) }}>
         {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'lead-inbox-item active' : 'lead-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>

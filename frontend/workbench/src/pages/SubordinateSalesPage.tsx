@@ -32,6 +32,7 @@ import EmployeeSelect from "../components/EmployeeSelect";
 import {
   api,
   type AssignmentUser,
+  type AdvancedFilterGroup,
   type BusinessTaskBucket,
   type LeadAppeal,
   type LeadFollowUp,
@@ -40,6 +41,7 @@ import {
   type SubordinateSales,
   type SubordinateTask,
 } from "../services/api";
+import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import { LEAD_STATUS_LABELS } from "../constants";
 import { formatTimestamp } from "../services/time";
 import {
@@ -371,6 +373,8 @@ function SalesDetail({
   const [leads, setLeads] = useState<ManagedLead[]>([]);
   const [leadTotal, setLeadTotal] = useState(0);
   const [leadPage, setLeadPage] = useState(1);
+  const [leadKeyword, setLeadKeyword] = useState("");
+  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [selected, setSelected] = useState<React.Key[]>([]);
   const [tasks, setTasks] = useState<SubordinateTask[]>([]);
   const [taskTotal, setTaskTotal] = useState(0);
@@ -393,6 +397,8 @@ function SalesDetail({
       const page = await api.subordinateSalesLeads(sales.userId, {
         pageNo: leadPage,
         pageSize: PAGE_SIZE,
+        keyword: leadKeyword || undefined,
+        advancedFilter,
       });
       setLeads(page.list);
       setLeadTotal(page.total);
@@ -401,7 +407,7 @@ function SalesDetail({
     } finally {
       setLoading(false);
     }
-  }, [leadPage, sales.userId]);
+  }, [advancedFilter, leadKeyword, leadPage, sales.userId]);
   const loadTasks = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -671,6 +677,7 @@ function SalesDetail({
             label: "名下客资",
             children: (
               <>
+                <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={leadKeyword} value={advancedFilter} onKeyword={setLeadKeyword} onChange={setAdvancedFilter}/>
                 <div className="subordinate-batch-bar">
                   <Typography.Text>已选 {selected.length} 条</Typography.Text>
                   <Space>

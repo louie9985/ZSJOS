@@ -61,6 +61,12 @@ public class LeadQualificationController {
             @Valid LeadQualificationExceptionPageReqVO reqVO) {
         return success(qualificationService.getExceptionPage(reqVO, getLoginUserId()));
     }
+    @PostMapping("/qualification-exception/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:qualification:query')")
+    public CommonResult<PageResult<LeadQualificationExceptionRespVO>> searchExceptionPage(
+            @Valid @RequestBody LeadQualificationExceptionPageReqVO reqVO) {
+        return success(qualificationService.getExceptionPage(reqVO, getLoginUserId()));
+    }
 
     @GetMapping("/{id}/transfer-candidates")
     @Operation(summary = "获得主管可转派销售")

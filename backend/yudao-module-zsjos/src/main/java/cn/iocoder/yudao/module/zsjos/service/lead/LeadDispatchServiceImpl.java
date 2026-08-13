@@ -17,6 +17,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.rule.LeadAssignmen
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
@@ -61,6 +62,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -186,7 +188,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         if (!securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)) {
             requireSalesUser(userId);
         }
-        PageResult<LeadDO> page = leadMapper.selectPublicPoolPage(reqVO);
+        PageResult<LeadDO> page = leadMapper.selectPublicPoolPage(reqVO, reqVO.getKeyword(),
+                advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         return new PageResult<>(toPendingRespList(page.getList()), page.getTotal());
     }
 

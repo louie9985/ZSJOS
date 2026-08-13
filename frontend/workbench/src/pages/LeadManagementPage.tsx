@@ -22,7 +22,8 @@ import {
 import { message } from 'antd'
 import { BellOutlined, CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
-import { api, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
+import { api, type AdvancedFilterGroup, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
+import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
 import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
@@ -381,6 +382,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const [initialError, setInitialError] = useState('')
   const [loadMoreError, setLoadMoreError] = useState('')
   const [keyword, setKeyword] = useState('')
+  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [inboxGroup, setInboxGroup] = useState('all')
   const [inboxStage, setInboxStage] = useState('all')
   const [filterProfile, setFilterProfile] = useState<LeadInboxFilterProfile>({ groups: [] })
@@ -436,7 +438,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
       const result = await api.managedLeadInboxPage(audience, {
         pageNo: targetPage,
         pageSize: PAGE_SIZE,
-        keyword: keyword || undefined,
+        keyword: keyword || undefined, advancedFilter,
         inboxGroup: inboxGroup === 'all' ? undefined : inboxGroup,
         inboxStage: inboxStage === 'all' ? undefined : inboxStage
       })
@@ -464,7 +466,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
         else setLoadingMore(false)
       }
     }
-  }, [audience, inboxGroup, inboxStage, keyword, requestedLeadId])
+  }, [advancedFilter, audience, inboxGroup, inboxStage, keyword, requestedLeadId])
 
   useEffect(() => { void loadMetadata() }, [loadMetadata])
   useEffect(() => {
@@ -557,7 +559,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
         : <Empty description="从左侧选择一条客资"/>
 
   return <section className="workspace-page lead-management-page">
-    <header className="lead-inbox-filter-shell">
+    {filterCount(advancedFilter) === 0 && <header className="lead-inbox-filter-shell">
       {metadataError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={metadataError} action={<Button type="link" size="small" onClick={() => void loadMetadata()}>重试</Button>}/>} 
       {filterLoading
         ? <Skeleton active title={false} paragraph={{ rows: 2 }}/>
@@ -588,12 +590,10 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
             </div> : null}
           </>
           : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用筛选配置"/>}
-    </header>
+    </header>}
     <div className="lead-inbox-layout">
       <aside className="lead-inbox-list-pane">
-        <div className="lead-inbox-toolbar">
-          <Input.Search allowClear placeholder="搜索姓名 / 手机号 / 微信号" onSearch={value => setKeyword(value.trim())}/>
-        </div>
+        <div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
         {initialError && <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
           message={isLeadInboxUnauthorized(initialError) ? '无权查看客资收件箱' : '客资列表加载失败'} description={initialError}
           action={!isLeadInboxUnauthorized(initialError) ? <Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button> : undefined}/>}

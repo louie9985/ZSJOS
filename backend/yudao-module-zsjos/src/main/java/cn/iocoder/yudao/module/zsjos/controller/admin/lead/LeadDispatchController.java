@@ -49,6 +49,11 @@ public class LeadDispatchController {
     public CommonResult<PageResult<LeadPendingRespVO>> getClaimPoolPage(@Valid LeadClaimPoolPageReqVO reqVO) {
         return success(dispatchService.getClaimPoolPage(reqVO, getLoginUserId()));
     }
+    @PostMapping("/claim-pool/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<PageResult<LeadPendingRespVO>> searchClaimPool(@Valid @RequestBody LeadClaimPoolPageReqVO reqVO) {
+        return success(dispatchService.getClaimPoolPage(reqVO, getLoginUserId()));
+    }
 
     @PostMapping("/{id}/claim")
     @Operation(summary = "抢单")
