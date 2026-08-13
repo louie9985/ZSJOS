@@ -1,7 +1,7 @@
 # Workstream Handoff: dual-workbench-menu-ui
 
 - Workstream ID: `dual-workbench-menu-ui`
-- Status: `ready-to-merge`
+- Status: `merged`
 - Goal: Complete Vue Admin and React Workbench interfaces for every visible page menu directly under the Workbench root menu `6735`.
 - Non-goals: Creating pages for button permission nodes or the hidden lead-management menu; adding backend aggregation APIs; changing business tables, role grants, menu IDs, paths, permissions, or ordering; redesigning existing usable pages.
 - Branch: `codex/dual-workbench-menu-ui`
@@ -67,3 +67,16 @@
 - Verification evidence: Before commit, `git diff --cached --check` passed. Workstream verification remains: Workbench 20 test files/86 tests, typecheck, and build passed; Admin scoped lint and local build passed; V045 eight-menu static validation passed; `git diff --check` passed.
 - Dependency or integration impact: Ready for fast-forward merge into `main`; no remaining local workstream dependency.
 - Remaining work: Fast-forward merge, rerun integration checks on `main`, record merged status, and remove the merged worktree/branch. Browser validation, full Admin typecheck baseline, and Core schema check blockers remain as previously documented.
+
+### 2026-08-13 15:35:23 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `76b591120b34bdb4708727023517265434960d1f`
+- User goal: Merge all branches and worktrees, verify the integrated result, and clean up merged Git resources.
+- Key decisions: Used `git merge --ff-only` because `main` had not diverged from the workstream base; retained the known unrelated Admin typecheck and Core schema limitations; did not push or execute migrations.
+- Execution or analysis result: Fast-forwarded `main` through implementation commit `b8e5f72017db6674be4fac63c52a42f1af63ff53` and readiness commit `76b591120b34bdb4708727023517265434960d1f`; marked this workstream `merged`.
+- Changed files: The 27 workstream files plus this integration handoff update.
+- Verification evidence: On integrated `main`, Workbench `npm test` passed 20 files/86 tests, `npm run typecheck` passed, and `npm run build` passed with the existing large-chunk warning. Admin local production build passed with the existing legacy `*zoom` CSS warning. V045 static validation confirmed eight unique matching CASE/WHERE IDs. `git diff --check` passed and the worktree was clean after restoring generated `tsconfig.tsbuildinfo`. `zsjos_db.py check` reproduced only the known unrelated missing Core mappings `zsjos_lead_claim_daily_counter` and `zsjos_lead_transfer_request`.
+- Dependency or integration impact: Workstream is integrated into local `main`; remote `origin/main` was not changed.
+- Remaining work: Remove `D:\ZSJ-OS-worktrees\dual-workbench-menu-ui` and delete local branch `codex/dual-workbench-menu-ui`. Browser verification and the documented repository baseline blockers remain outside this merge operation.
