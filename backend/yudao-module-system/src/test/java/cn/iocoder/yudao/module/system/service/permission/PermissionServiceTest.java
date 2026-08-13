@@ -31,6 +31,8 @@ import static cn.iocoder.yudao.framework.common.util.collection.SetUtils.asSet;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomLongId;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomPojo;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_LAST_SUPER_ADMIN_FORBIDDEN;
+import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static java.util.Collections.singleton;
 import static java.util.Collections.singletonList;
 import static org.junit.jupiter.api.Assertions.*;
@@ -262,6 +264,45 @@ public class PermissionServiceTest extends BaseDbUnitTest {
         assertEquals(200L, userRoleDOList.get(0).getRoleId());
         assertEquals(1L, userRoleDOList.get(1).getUserId());
         assertEquals(300L, userRoleDOList.get(1).getRoleId());
+    }
+
+    @Test
+    public void testAssignUserRole_removeLastEnabledSuperAdmin() {
+        Long userId = 1L;
+        Long superAdminRoleId = 100L;
+        userRoleMapper.insert(randomPojo(UserRoleDO.class).setUserId(userId).setRoleId(superAdminRoleId));
+        when(roleService.getRoleByCode("super_admin"))
+                .thenReturn(randomPojo(RoleDO.class).setId(superAdminRoleId).setCode("super_admin"));
+        when(userService.getUser(userId)).thenReturn(new AdminUserDO().setId(userId)
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        when(userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()))
+                .thenReturn(singletonList(new AdminUserDO().setId(userId)
+                        .setStatus(CommonStatusEnum.ENABLE.getStatus())));
+
+        assertServiceException(() -> permissionService.assignUserRole(userId, Set.of()),
+                USER_LAST_SUPER_ADMIN_FORBIDDEN);
+        assertEquals(singleton(superAdminRoleId), permissionService.getUserRoleIdListByUserId(userId));
+    }
+
+    @Test
+    public void testAssignUserRole_removeSuperAdminWhenAnotherEnabledExists() {
+        Long userId = 1L;
+        Long anotherUserId = 2L;
+        Long superAdminRoleId = 100L;
+        userRoleMapper.insert(randomPojo(UserRoleDO.class).setUserId(userId).setRoleId(superAdminRoleId));
+        userRoleMapper.insert(randomPojo(UserRoleDO.class).setUserId(anotherUserId).setRoleId(superAdminRoleId));
+        when(roleService.getRoleByCode("super_admin"))
+                .thenReturn(randomPojo(RoleDO.class).setId(superAdminRoleId).setCode("super_admin"));
+        when(userService.getUser(userId)).thenReturn(new AdminUserDO().setId(userId)
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        when(userService.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()))
+                .thenReturn(List.of(new AdminUserDO().setId(userId).setStatus(CommonStatusEnum.ENABLE.getStatus()),
+                        new AdminUserDO().setId(anotherUserId).setStatus(CommonStatusEnum.ENABLE.getStatus())));
+
+        permissionService.assignUserRole(userId, Set.of());
+
+        assertEquals(singleton(superAdminRoleId), permissionService.getUserRoleIdListByUserId(anotherUserId));
+        assertTrue(permissionService.getUserRoleIdListByUserId(userId).isEmpty());
     }
 
     @Test

@@ -343,8 +343,15 @@ SELECT 'dual_frontend_workbench_menu_components' AS check_name,
                OR (id=6780 AND component='zsjos/todayTask/index')
                OR (id=6840 AND component='zsjos/leadDuplicateReview/index')
                OR (id=6844 AND component='zsjos/leadSelfSourced/index')
+               OR (id=6850 AND component='zsjos/personnel/index')
+               OR (id=6852 AND component='zsjos/partner/index')
                OR (id=6848 AND component='zsjos/leadComplaint/index')
-               OR (id=6849 AND component='zsjos/externalRepurchase/index')))=8, 'PASS', 'FAIL') AS result;
+               OR (id=6849 AND component='zsjos/externalRepurchase/index')))=10, 'PASS', 'FAIL') AS result;
+SELECT 'account_personnel_partner_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6850,6851,6852,6853,6854,6855)
+             AND permission IN ('zsjos:personnel:query','zsjos:personnel:update-state','zsjos:partner:query',
+                                'zsjos:partner:create','zsjos:partner:update-state','zsjos:partner:convert'))=6,
+          'PASS', 'FAIL') AS result;
 SELECT 'system_area_official_count' AS check_name,
        IF((SELECT COUNT(*) FROM system_area WHERE selection_code<>'OTHER' AND deleted=b'0')=3879, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_other_count' AS check_name,

@@ -3424,7 +3424,7 @@ CREATE TABLE IF NOT EXISTS `system_user_role` (
 -- system_users
 CREATE TABLE IF NOT EXISTS `system_users` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '用户ID',
-  `username` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户账号',
+  `username` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户账号',
   `password` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT '' COMMENT '密码',
   `nickname` varchar(30) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '用户昵称',
   `remark` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '备注',
@@ -3847,6 +3847,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `submitted_wechat_id` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '表单原始微信号',
   `source_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资来源类型',
   `source_user_id` bigint DEFAULT NULL COMMENT '内部提交员工用户编号',
+  `source_dept_id` bigint DEFAULT NULL COMMENT '提交时组织快照',
   `partner_id` bigint DEFAULT NULL COMMENT '兼职提交主体编号',
   `source_channel_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '来源渠道编号',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资主状态',
@@ -4561,6 +4562,26 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_payment_allocation` (
   KEY `idx_tenant_account_ledger` (`tenant_id`,`customer_account_ledger_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 订单资金分配';
 
+-- zsjos_personnel_state
+CREATE TABLE IF NOT EXISTS `zsjos_personnel_state` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `system_user_id` bigint NOT NULL,
+  `business_state` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'enabled/disabled/departed',
+  `change_reason` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `changed_by_user_id` bigint NOT NULL,
+  `changed_at` datetime NOT NULL,
+  `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_user` (`tenant_id`,`system_user_id`),
+  KEY `idx_tenant_state` (`tenant_id`,`business_state`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 人员业务状态';
+
 -- zsjos_partner
 CREATE TABLE IF NOT EXISTS `zsjos_partner` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '兼职主体编号',
@@ -4582,7 +4603,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_partner` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_partner_no` (`tenant_id`,`partner_no`),
   KEY `idx_tenant_mobile` (`tenant_id`,`mobile`),
-  KEY `idx_tenant_bound_user` (`tenant_id`,`bound_system_user_id`),
+  UNIQUE KEY `uk_tenant_bound_user` (`tenant_id`,`bound_system_user_id`),
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 兼职客资提交主体';
 

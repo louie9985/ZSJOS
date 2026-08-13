@@ -93,7 +93,7 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
     @BeforeEach
     public void before() {
         // mock 初始化密码
-        when(configApi.getConfigValueByKey(USER_INIT_PASSWORD_KEY)).thenReturn("yudaoyuanma");
+        when(configApi.getConfigValueByKey(USER_INIT_PASSWORD_KEY)).thenReturn("yudao2026");
     }
 
     @Test
@@ -251,6 +251,7 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         // 断言
         AdminUserDO user = userMapper.selectById(userId);
         assertEquals("encode:yuanma", user.getPassword());
+        verify(oauth2TokenService).removeAccessToken(userId, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -270,6 +271,7 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         // 断言
         AdminUserDO user = userMapper.selectById(userId);
         assertEquals("encode:" + password, user.getPassword());
+        verify(oauth2TokenService).removeAccessToken(userId, UserTypeEnum.ADMIN.getValue());
     }
 
     @Test
@@ -454,7 +456,7 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         });
         when(deptService.getDept(eq(dept.getId()))).thenReturn(dept);
         // mock passwordEncoder 的方法
-        when(passwordEncoder.encode(eq("yudaoyuanma"))).thenReturn("java");
+        when(passwordEncoder.encode(eq("yudao2026"))).thenReturn("java");
 
         // 调用
         UserImportRespVO respVO = userService.importUserList(newArrayList(importUser), true);
@@ -610,6 +612,24 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         // 调用，校验异常
         assertServiceException(() -> userService.validateMobileUnique(id, mobile),
                 USER_MOBILE_EXISTS);
+    }
+
+    @Test
+    public void testValidateLoginIdentifierCrossField_usernameMatchesMobile() {
+        String identifier = "13800138000";
+        userMapper.insert(randomAdminUserDO(o -> o.setMobile(identifier)));
+
+        assertServiceException(() -> userService.validateLoginIdentifierCrossField(null, identifier, null),
+                USER_LOGIN_IDENTIFIER_EXISTS);
+    }
+
+    @Test
+    public void testValidateLoginIdentifierCrossField_mobileMatchesUsername() {
+        String identifier = "13800138000";
+        userMapper.insert(randomAdminUserDO(o -> o.setUsername(identifier)));
+
+        assertServiceException(() -> userService.validateLoginIdentifierCrossField(null, null, identifier),
+                USER_LOGIN_IDENTIFIER_EXISTS);
     }
 
     @Test

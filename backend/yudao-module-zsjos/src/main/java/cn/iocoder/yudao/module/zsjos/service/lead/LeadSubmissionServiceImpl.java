@@ -9,6 +9,8 @@ import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
@@ -30,6 +32,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     @Resource private PersonMapper personMapper;
+    @Resource private AdminUserApi adminUserApi;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadActivationMapper activationMapper;
     @Resource private LeadDuplicateReviewMapper duplicateReviewMapper;
@@ -257,6 +260,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechatId);
         lead.setSourceType(sourceType(identity));
         lead.setSourceUserId(submitterUserId); lead.setPartnerId(identity.partnerId());
+        AdminUserRespDTO submitter = adminUserApi.getUser(submitterUserId);
+        lead.setSourceDeptId(submitter == null ? null : submitter.getDeptId());
         lead.setSourceChannelId(reqVO.getSourceChannel());
         applyRegion(lead, region); lead.setLeadCategory(reqVO.getLeadCategory()); lead.setRemark(reqVO.getRemark());
         lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_UNASSIGNED);

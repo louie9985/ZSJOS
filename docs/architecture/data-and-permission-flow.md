@@ -44,6 +44,26 @@ store opaque tokens and must not persist the account password for this behavior.
 Tenant values come from environment configuration. A current local default is not a
 license to hard-code tenant assumptions into business components.
 
+Account-password login accepts either the tenant-scoped username or mobile number. New usernames
+are 4-32 letters, digits, or underscores; newly set passwords are 8-20 characters and contain both
+letters and digits. Login validation deliberately remains compatible with historical password hashes.
+New or edited usernames and mobiles cannot collide with either login-identifier field. Historical
+cross-field collisions are retained, but an ambiguous login is rejected for administrator correction.
+Any self-service password change or administrator reset revokes every access and refresh token for
+that user across OAuth clients.
+
+ZSJOS personnel state is a business projection over the System account, not a replacement identity.
+`enabled`, `disabled`, and `departed` are stored by ZSJOS; disabling or departing synchronously disables
+the System account and revokes sessions. Re-enabling restores the original account, posts, roles, and
+profile. Direct System account disable does not rewrite the ZSJOS personnel state. Lead and order
+ownership is never reassigned by a personnel-state change.
+
+Partner subjects are administrator-created and bind one existing System account identity. An enabled
+partner account cannot simultaneously hold employee business posts. Partner conversion reuses the
+same account and may assign only the stable new-media employee or manager posts; the partner profile
+and history remain with `converted` status. Historical Lead submission-department snapshots remain by
+default and are updated only when the administrator explicitly requests migration.
+
 ## Menu and route flow
 
 ```text

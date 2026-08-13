@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
+import cn.iocoder.yudao.module.zsjos.service.personnel.PersonnelStateService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class LeadSubmissionIdentityServiceTest {
@@ -36,9 +38,15 @@ class LeadSubmissionIdentityServiceTest {
     @Mock private PostApi postApi;
     @Mock private DeptApi deptApi;
     @Mock private PartnerMapper partnerMapper;
+    @Mock private PersonnelStateService personnelStateService;
+
+    private void allowEnabledPersonnel(Long userId) {
+        lenient().when(personnelStateService.isEnabled(userId)).thenReturn(true);
+    }
 
     @Test
     void ordinarySubmissionAllowsNewMediaOperator() {
+        allowEnabledPersonnel(1L);
         AdminUserRespDTO user = user(1L, 10L, Set.of(100L));
         when(adminUserApi.getUser(1L)).thenReturn(user);
         when(postApi.getPostByCode("new_media_operator")).thenReturn(post(100L));
@@ -49,6 +57,7 @@ class LeadSubmissionIdentityServiceTest {
 
     @Test
     void ordinarySubmissionAllowsLeaderWithManagerPostAndNewMediaStaff() {
+        allowEnabledPersonnel(2L);
         AdminUserRespDTO manager = user(2L, 20L, Set.of(200L));
         AdminUserRespDTO operator = user(3L, 20L, Set.of(100L));
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(20L); dept.setLeaderUserId(2L);
@@ -64,20 +73,22 @@ class LeadSubmissionIdentityServiceTest {
 
     @Test
     void historicalNewMediaRightsSurvivePostChangeWhileAccountEnabled() {
+        allowEnabledPersonnel(4L);
         when(adminUserApi.getUser(4L)).thenReturn(user(4L, 30L, Set.of()));
 
         assertDoesNotThrow(() -> service.resolveHistoricalSubmission(4L, SOURCE_INTERNAL_NEW_MEDIA, null));
     }
 
     @Test
-    void historicalPartnerRightsRequireSameEnabledPartnerSubject() {
+    void historicalPartnerRightsRequireSamePartnerSubjectWhileAccountEnabled() {
+        allowEnabledPersonnel(5L);
         when(adminUserApi.getUser(5L)).thenReturn(user(5L, null, Set.of()));
         PartnerDO partner = new PartnerDO(); partner.setId(50L); partner.setBoundSystemUserId(5L);
         partner.setEnabledAt(LocalDateTime.now());
         when(partnerMapper.selectById(50L)).thenReturn(partner);
         assertDoesNotThrow(() -> service.resolveHistoricalSubmission(5L, SOURCE_PARTNER, 50L));
 
-        partner.setDisabledAt(LocalDateTime.now());
+        partner.setBoundSystemUserId(9L);
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.resolveHistoricalSubmission(5L, SOURCE_PARTNER, 50L));
         assertEquals(LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());

@@ -40,6 +40,8 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V047__split_lead_pending_handling_stages.sql` follows V046 and upgrades only active submitter/owner schemes that still exactly match the old system defaults. It splits owned submitted leads into `first_follow_pending` and `qualification_pending`, appends an immutable published-version snapshot, preserves custom draft or published configurations, and records both schema-version formats. It is repeatable and forward-only; rollback requires publishing a replacement configuration. Do not execute it without separate environment approval.
 
+`V048__account_personnel_partner_lifecycle.sql` widens System usernames to 32 characters, adds the ZSJOS personnel-state record and Lead submission-department snapshot, enforces one partner per bound account, and registers server-owned personnel/partner permissions without granting roles. It preserves existing accounts and business rows, is repeatable through metadata guards, and must not be executed without separate environment approval.
+
 `V040__submitter_actions_and_complaints.sql` adds snapshotted submission channels for duplicate review, daily submitter urges, the independent public sales-complaint queue, server-owned menu permissions, and default in-app notifications. It grants no roles, changes no existing Lead ownership, and deletes no business rows.
 
 `V021__lead_intended_product_active_unique_key.sql` changes only the intended-product uniqueness metadata. It adds a stored generated active product reference, removes the old tenant/lead/product unique index, and constrains only non-deleted rows; it does not delete or rewrite intended-product history.

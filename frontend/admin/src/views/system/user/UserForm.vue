@@ -154,9 +154,24 @@ const formData = ref({
   avatar: ''
 })
 const formRules = reactive<FormRules>({
-  username: [{ required: true, message: '用户名称不能为空', trigger: 'blur' }],
+  username: [
+    { required: true, message: '用户名称不能为空', trigger: 'blur' },
+    {
+      pattern: /^[A-Za-z0-9_]{4,32}$/,
+      message: '用户名为 4-32 位字母、数字或下划线',
+      trigger: 'blur'
+    }
+  ],
   nickname: [{ required: true, message: '用户昵称不能为空', trigger: 'blur' }],
-  password: [{ required: true, message: '用户密码不能为空', trigger: 'blur' }],
+  password: [
+    { required: true, message: '用户密码不能为空', trigger: 'blur' },
+    { min: 8, max: 20, message: '密码长度为 8-20 位', trigger: 'blur' },
+    {
+      pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
+      message: '密码必须同时包含字母和数字',
+      trigger: 'blur'
+    }
+  ],
   email: [
     {
       type: 'email',

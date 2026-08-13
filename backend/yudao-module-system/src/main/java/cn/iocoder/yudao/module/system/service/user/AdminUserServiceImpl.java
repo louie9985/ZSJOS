@@ -51,6 +51,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.system.enums.LogRecordConstants.*;
+import static cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum.SUPER_ADMIN;
 
 /**
  * 后台用户 Service 实现类
@@ -198,6 +199,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         AdminUserDO oldUser = validateUserExists(id);
         validateEmailUnique(id, reqVO.getEmail());
         validateMobileUnique(id, reqVO.getMobile());
+        validateLoginIdentifierCrossField(id, null, reqVO.getMobile());
 
         // 2. 执行更新
         userMapper.updateById(BeanUtils.toBean(reqVO, AdminUserDO.class).setId(id));
@@ -228,6 +230,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         AdminUserDO updateObj = new AdminUserDO().setId(id);
         updateObj.setPassword(encodePassword(reqVO.getNewPassword())); // 加密密码
         userMapper.updateById(updateObj);
+        oauth2TokenService.removeAccessToken(id, UserTypeEnum.ADMIN.getValue());
     }
 
     @Override
@@ -242,6 +245,7 @@ public class AdminUserServiceImpl implements AdminUserService {
         updateObj.setId(id);
         updateObj.setPassword(encodePassword(password)); // 加密密码
         userMapper.updateById(updateObj);
+        oauth2TokenService.removeAccessToken(id, UserTypeEnum.ADMIN.getValue());
 
         // 3. 记录操作日志上下文
         LogRecordContext.putVariable("user", user);
@@ -251,7 +255,10 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Override
     public void updateUserStatus(Long id, Integer status) {
         // 校验用户存在
-        validateUserExists(id);
+        AdminUserDO user = validateUserExists(id);
+        if (CommonStatusEnum.isDisable(status)) {
+            validateRetainsEnabledSuperAdmin(Collections.singletonList(user));
+        }
         // 更新状态
         AdminUserDO updateObj = new AdminUserDO();
         updateObj.setId(id);
@@ -271,6 +278,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     public void deleteUser(Long id) {
         // 1. 校验用户存在
         AdminUserDO user = validateUserExists(id);
+        validateRetainsEnabledSuperAdmin(Collections.singletonList(user));
 
         // 2.1 删除用户
         userMapper.deleteById(id);
@@ -287,6 +295,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Transactional(rollbackFor = Exception.class)
     public void deleteUserList(List<Long> ids) {
         // 1. 批量删除用户
+        List<AdminUserDO> users = userMapper.selectByIds(ids);
+        validateRetainsEnabledSuperAdmin(users);
         userMapper.deleteByIds(ids);
 
         // 2. 批量删除用户关联数据
@@ -409,6 +419,7 @@ public class AdminUserServiceImpl implements AdminUserService {
             validateUsernameUnique(id, username);
             // 校验手机号唯一
             validateMobileUnique(id, mobile);
+            validateLoginIdentifierCrossField(id, username, mobile);
             // 校验邮箱唯一
             validateEmailUnique(id, email);
             // 校验部门处于开启状态
@@ -482,6 +493,38 @@ public class AdminUserServiceImpl implements AdminUserService {
         }
         if (!user.getId().equals(id)) {
             throw exception(USER_MOBILE_EXISTS);
+        }
+    }
+
+    @VisibleForTesting
+    void validateLoginIdentifierCrossField(Long id, String username, String mobile) {
+        if (StrUtil.isNotBlank(username)) {
+            AdminUserDO mobileOwner = userMapper.selectByMobile(username);
+            if (mobileOwner != null && !Objects.equals(mobileOwner.getId(), id)) {
+                throw exception(USER_LOGIN_IDENTIFIER_EXISTS);
+            }
+        }
+        if (StrUtil.isNotBlank(mobile)) {
+            AdminUserDO usernameOwner = userMapper.selectByUsername(mobile);
+            if (usernameOwner != null && !Objects.equals(usernameOwner.getId(), id)) {
+                throw exception(USER_LOGIN_IDENTIFIER_EXISTS);
+            }
+        }
+    }
+
+    private void validateRetainsEnabledSuperAdmin(Collection<AdminUserDO> affectedUsers) {
+        Set<Long> affectedIds = convertSet(affectedUsers, AdminUserDO::getId);
+        boolean removesEnabledSuperAdmin = affectedUsers.stream()
+                .anyMatch(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())
+                        && permissionService.hasAnyRoles(user.getId(), SUPER_ADMIN.getCode()));
+        if (!removesEnabledSuperAdmin) {
+            return;
+        }
+        boolean anotherEnabledSuperAdminExists = userMapper.selectListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
+                .filter(user -> !affectedIds.contains(user.getId()))
+                .anyMatch(user -> permissionService.hasAnyRoles(user.getId(), SUPER_ADMIN.getCode()));
+        if (!anotherEnabledSuperAdminExists) {
+            throw exception(USER_LAST_SUPER_ADMIN_FORBIDDEN);
         }
     }
 

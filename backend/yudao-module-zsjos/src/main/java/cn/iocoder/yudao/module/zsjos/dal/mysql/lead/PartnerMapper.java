@@ -7,6 +7,14 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface PartnerMapper extends BaseMapperX<PartnerDO> {
+    default PartnerDO selectByBoundUserId(Long userId) {
+        return selectOne(new LambdaQueryWrapperX<PartnerDO>()
+                .eq(PartnerDO::getBoundSystemUserId, userId).last("LIMIT 1"));
+    }
+
+    default PartnerDO selectByPartnerNo(String partnerNo) {
+        return selectOne(PartnerDO::getPartnerNo, partnerNo);
+    }
     default PartnerDO selectEnabledByUserId(Long userId) {
         return selectOne(new LambdaQueryWrapperX<PartnerDO>()
                 .eq(PartnerDO::getBoundSystemUserId, userId)
