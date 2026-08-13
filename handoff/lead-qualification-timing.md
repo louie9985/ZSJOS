@@ -12,8 +12,9 @@
 - Integration order: 独立完成并验证后，由用户另行确认提交和合入 `main`。
 - Ownership scope: `yudao-module-zsjos` 客资处理阶段筛选契约、查询和测试；WorkBench 客资详情阶段提示；MySQL V047、ZSJOS 初始化种子；直接相关业务、API、权限流文档；本 handoff。
 - Verification plan: ZSJOS 聚焦测试与模块构建；WorkBench test/typecheck/build；桌面和移动端浏览器检查；SQL 语法、数据范围、版本快照和可重复性审查；不执行真实数据库迁移。
-- Status: ready-to-merge
+- Status: merged
 - Final commit: `bd19734cdc42ec1ab1acb6291c0480f173aa8ced`
+- Merge commit: `cf58124214f46a853b0ddc2873404055a9916df0`
 
 ## Delivery Entries
 
@@ -42,3 +43,16 @@
 - Verification evidence: 功能提交前后 `git diff --check` passed；此前 Maven 聚焦测试 36/36、WorkBench 聚焦测试 15/15、typecheck 和生产构建均通过；种子 JSON 解析通过。
 - Dependency or integration impact: V047 仍未执行；无新增依赖；合入后需在 `main` 重跑受影响检查并记录集成提交。
 - Remaining work: 合并到 `main`、执行集成态验证、记录 merge commit 和 merged 状态；真实迁移、推送和认证浏览器检查仍需另行处理。
+
+### 2026-08-13 16:59 CST
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `cf58124214f46a853b0ddc2873404055a9916df0`
+- User goal: 将客资判定阶段和截止时间修复合并至主分支。
+- Key decisions: 使用 `--no-ff` 保留独立工作流历史；完整保留主工作区未提交的 PersonMapper、DAL 测试和 `duplicate-contact-sql-parser-fix.md`；不推送、不执行 V047、不删除功能工作树或分支。
+- Execution or analysis result: `codex/lead-qualification-timing` 已通过 merge commit `cf58124214` 合入 `main`，主分支包含阶段提示、收件箱拆分、V047、种子、测试和文档变更。
+- Changed files: 本 handoff 状态、merge commit 和本条交付记录；功能文件由 merge commit `cf58124214` 引入。
+- Verification evidence: 集成态 Maven 聚焦测试 36/36 passed；WorkBench 聚焦测试 15/15 passed、typecheck passed、生产构建 passed（仅既有大 chunk warning）；`git diff --check` passed；bootstrap submitter/owner JSON 解析与阶段选项检查通过。
+- Dependency or integration impact: `main` 已包含但未执行 V047；无新增依赖；主工作区原有未提交内容仍未暂存且未改写。
+- Remaining work: 真实数据库迁移和认证桌面/移动浏览器验收仍需另行确认；按需推送 `main`。功能工作树与分支保留，清理需另行确认。
