@@ -111,6 +111,22 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
+    public String getDefaultUserAvatar() {
+        ConfigDO config = getConfigByKey(DEFAULT_USER_AVATAR_KEY);
+        return config == null || config.getValue() == null || config.getValue().isBlank() ? null : config.getValue();
+    }
+
+    @Override
+    public void updateDefaultUserAvatar(String avatar) {
+        String normalizedAvatar = avatar == null ? "" : avatar.trim();
+        ConfigDO config = getConfigByKey(DEFAULT_USER_AVATAR_KEY);
+        if (config == null) {
+            throw exception(CONFIG_NOT_EXISTS);
+        }
+        configMapper.updateById(new ConfigDO().setId(config.getId()).setValue(normalizedAvatar));
+    }
+
+    @Override
     public PageResult<ConfigDO> getConfigPage(ConfigPageReqVO pageReqVO) {
         return configMapper.selectPage(pageReqVO);
     }

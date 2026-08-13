@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import {
   Alert,
   App,
-  Avatar,
   Badge,
   Breadcrumb,
   Button,
@@ -64,6 +63,7 @@ import SubordinateSalesPage from './pages/SubordinateSalesPage'
 import LeadComplaintPage from './pages/LeadComplaintPage'
 import ExternalRepurchasePage from './pages/ExternalRepurchasePage'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
+import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import {
   clearLoginFormCache,
@@ -328,7 +328,7 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
             { type: 'divider' },
             { key: 'logout', label: <><LogoutOutlined/> 退出登录</>, onClick: onLogout }
           ] }}>
-            <Avatar style={{ backgroundColor: token.colorPrimary, cursor: 'pointer' }}>{info.user?.nickname?.slice(0, 1) || '员'}</Avatar>
+            <EmployeeAvatar avatar={info.user?.avatar} name={info.user?.nickname || info.user?.username} style={{ backgroundColor: token.colorPrimary, cursor: 'pointer' }}/>
           </Dropdown>
         </Space>
       </Header>
@@ -370,12 +370,12 @@ function Root() {
   if (!logged) return <Login initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLogged(true) }}/>
   if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(); setError(''); setInfo(undefined); setLogged(false) }}>返回登录</Button></Space></Card></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
-  return <OverlayCoordinatorProvider><Shell info={info} onLogout={async () => {
+  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell info={info} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)
       await api.logout()
     } finally { setInfo(undefined); setError(''); setLogged(false) }
-  }}/></OverlayCoordinatorProvider>
+  }}/></OverlayCoordinatorProvider></DefaultEmployeeAvatarProvider>
 }
 
 createRoot(document.getElementById('root')!).render(

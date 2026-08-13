@@ -100,6 +100,9 @@
             >
               <Icon icon="ep:delete" />批量删除
             </el-button>
+            <el-button v-if="checkPermi(['infra:config:query'])" @click="openDefaultAvatarForm">
+              <Icon icon="ep:user-filled" />默认员工头像
+            </el-button>
           </el-form-item>
         </el-form>
       </ContentWrap>
@@ -107,6 +110,18 @@
         <el-table v-loading="loading" :data="list" @selection-change="handleRowCheckboxChange">
           <el-table-column type="selection" width="55" />
           <el-table-column label="用户编号" align="center" key="id" prop="id" />
+          <el-table-column label="头像" align="center" width="110">
+            <template #default="scope">
+              <div class="flex flex-col items-center gap-1">
+                <el-avatar :src="scope.row.avatar || defaultAvatar">
+                  {{ scope.row.nickname?.slice(0, 1) || '员' }}
+                </el-avatar>
+                <span v-if="!scope.row.avatar" class="text-11px text-gray-400">
+                  {{ defaultAvatar ? '使用默认' : '昵称首字' }}
+                </span>
+              </div>
+            </template>
+          </el-table-column>
           <el-table-column
             label="用户名称"
             align="center"
@@ -208,6 +223,7 @@
   <UserImportForm ref="importFormRef" @success="getList" />
   <!-- 分配角色 -->
   <UserAssignRoleForm ref="assignRoleFormRef" @success="getList" />
+  <DefaultUserAvatarForm ref="defaultAvatarFormRef" @success="handleDefaultAvatarUpdated" />
 </template>
 <script lang="ts" setup>
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
@@ -220,6 +236,8 @@ import UserForm from './UserForm.vue'
 import UserImportForm from './UserImportForm.vue'
 import UserAssignRoleForm from './UserAssignRoleForm.vue'
 import DeptTreeSelect from '@/views/system/dept/components/DeptTreeSelect.vue'
+import DefaultUserAvatarForm from './DefaultUserAvatarForm.vue'
+import * as ConfigApi from '@/api/infra/config'
 
 defineOptions({ name: 'SystemUser' })
 
@@ -229,6 +247,7 @@ const { t } = useI18n() // 国际化
 const loading = ref(true) // 列表的加载中
 const total = ref(0) // 列表的总页数
 const list = ref([]) // 列表的数
+const defaultAvatar = ref('')
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -250,6 +269,17 @@ const getList = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const loadDefaultAvatar = async () => {
+  if (!checkPermi(['infra:config:query'])) return
+  defaultAvatar.value = (await ConfigApi.getDefaultUserAvatar()) || ''
+}
+
+const defaultAvatarFormRef = ref()
+const openDefaultAvatarForm = () => defaultAvatarFormRef.value.open()
+const handleDefaultAvatarUpdated = (avatar: string) => {
+  defaultAvatar.value = avatar || ''
 }
 
 /** 搜索按钮操作 */
@@ -388,5 +418,6 @@ const handleRole = (row: UserApi.UserVO) => {
 /** 初始化 */
 onMounted(() => {
   getList()
+  loadDefaultAvatar()
 })
 </script>

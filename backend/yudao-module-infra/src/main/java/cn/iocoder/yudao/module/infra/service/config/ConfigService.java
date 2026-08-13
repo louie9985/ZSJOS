@@ -15,6 +15,8 @@ import java.util.List;
  */
 public interface ConfigService {
 
+    String DEFAULT_USER_AVATAR_KEY = "zsjos.user.default-avatar";
+
     /**
      * 创建参数配置
      *
@@ -59,6 +61,20 @@ public interface ConfigService {
      * @return 参数配置
      */
     ConfigDO getConfigByKey(String key);
+
+    /**
+     * 获得全平台默认员工头像。
+     *
+     * @return 头像地址；未配置或已清空时返回 {@code null}
+     */
+    String getDefaultUserAvatar();
+
+    /**
+     * 更新全平台默认员工头像。
+     *
+     * @param avatar 头像地址；{@code null} 或空白表示清空
+     */
+    void updateDefaultUserAvatar(String avatar);
 
     /**
      * 获得参数配置分页列表

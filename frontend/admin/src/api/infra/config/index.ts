@@ -27,6 +27,19 @@ export const getConfigKey = (configKey: string) => {
   return request.get({ url: '/infra/config/get-value-by-key?key=' + configKey })
 }
 
+// 查询全平台默认员工头像
+export const getDefaultUserAvatar = () => {
+  return request.get({ url: '/infra/config/default-user-avatar' })
+}
+
+// 更新全平台默认员工头像
+export const updateDefaultUserAvatar = (avatar?: string) => {
+  return request.put({
+    url: '/infra/config/default-user-avatar',
+    data: { avatar: avatar?.trim() || null }
+  })
+}
+
 // 新增参数
 export const createConfig = (data: ConfigVO) => {
   return request.post({ url: '/infra/config/create', data })

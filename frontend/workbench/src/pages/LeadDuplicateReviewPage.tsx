@@ -6,6 +6,7 @@ import { formatTimestamp } from '../services/time'
 import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import type { LeadAttachment } from '../services/api'
+import EmployeeSelect from '../components/EmployeeSelect'
 
 type ResultType = LeadDuplicateReviewDecision['resultType']
 const labels: Record<ResultType, string> = {
@@ -86,7 +87,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
         <Form.Item name="resultType" label="复核结论" rules={[{ required: true }]}><Select options={Object.entries(labels).map(([value, label]) => ({ value, label }))}/></Form.Item>
         {resultType === 'reuse_person' && <Form.Item name="matchedPersonId" label="客户编号" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }}/></Form.Item>}
         {(resultType === 'reactivate_lead' || resultType === 'notify_owner') && <Form.Item name="matchedLeadId" label="客资编号" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }}/></Form.Item>}
-        {resultType === 'reactivate_lead' && <Form.Item name="selectedSalesUserId" label="归属销售" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={sales.map(user => ({ value: user.id, label: `${user.nickname}${user.deptName ? ` · ${user.deptName}` : ''}` }))}/></Form.Item>}
+        {resultType === 'reactivate_lead' && <Form.Item name="selectedSalesUserId" label="归属销售" rules={[{ required: true }]}><EmployeeSelect users={sales} showSearch optionFilterProp="label" /></Form.Item>}
         <Form.Item name="opinion" label="复核意见" rules={[{ required: true, whitespace: true }, { max: 2000 }]}><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
         <Form.Item label="复核附件"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" disabled={saving}/></Form.Item>
       </Form>

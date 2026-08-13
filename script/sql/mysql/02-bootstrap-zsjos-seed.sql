@@ -365,6 +365,8 @@ INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V041', 'Order repurchase and approval concurrency', 'order-repurchase-concurrency-v1');
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V042', 'Normalize legacy Lead inbox filter status', 'normalize-legacy-lead-filter-status-v1');
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V044', 'Add global default employee avatar configuration', 'default-employee-avatar-v1');
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V040','Submitter actions and sales complaint queue',SHA2('submitter-actions-complaints-v1',256),'legacy',NOW());
@@ -374,3 +376,6 @@ VALUES ('core','V041','Order repurchase and approval concurrency',SHA2('order-re
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V042','Normalize legacy Lead inbox filter status',SHA2('normalize-legacy-lead-filter-status-v1',256),'legacy',NOW());
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V044','Add global default employee avatar configuration',SHA2('default-employee-avatar-v1',256),'legacy',NOW());

@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons'
 import {
   App,
-  Avatar,
   Button,
   Checkbox,
   Drawer,
@@ -28,6 +27,7 @@ import { api, type AssignmentLog, type AssignmentRelation, type AssignmentUser }
 import { useBusinessOverlay } from '../components/OverlayCoordinator'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import { assignmentConfirmAction } from '../services/irreversibleConfirm'
+import EmployeeAvatar from '../components/EmployeeAvatar'
 
 const { Text } = Typography
 type SaveMode = 'append' | 'replace' | 'remove'
@@ -172,14 +172,14 @@ export default function LeadAssignmentPage() {
       title: '派单员工',
       key: 'user',
       width: 220,
-      render: (_, row) => <div className="assignment-person"><Avatar src={row.avatar}>{row.nickname?.slice(0, 1)}</Avatar><div><Text strong>{row.nickname}</Text><Text type="secondary">{row.maskedMobile || '未填写手机号'}</Text></div></div>
+      render: (_, row) => <div className="assignment-person"><EmployeeAvatar avatar={row.avatar} name={row.nickname}/><div><Text strong>{row.nickname}</Text><Text type="secondary">{row.maskedMobile || '未填写手机号'}</Text></div></div>
     },
     { title: '所属部门', dataIndex: 'deptName', width: 160, render: value => value || '-' },
     {
       title: '已绑定销售',
       key: 'sales',
       render: (_, row) => row.salesUsers.length > 0
-        ? <Space size={[4, 4]} wrap>{row.salesUsers.slice(0, 3).map(user => <Tag key={user.id}>{user.nickname}</Tag>)}{row.salesUsers.length > 3 && <Tag>+{row.salesUsers.length - 3}</Tag>}</Space>
+        ? <Space size={[4, 4]} wrap>{row.salesUsers.slice(0, 3).map(user => <Tag key={user.id}><span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><EmployeeAvatar avatar={user.avatar} name={user.nickname} size={20}/>{user.nickname}</span></Tag>)}{row.salesUsers.length > 3 && <Tag>+{row.salesUsers.length - 3}</Tag>}</Space>
         : <Text type="secondary">尚未配置</Text>
     },
     {
@@ -209,11 +209,11 @@ export default function LeadAssignmentPage() {
       <div className="assignment-picker">
         <div className="assignment-candidates"><div className="assignment-pane-title"><Text strong>可选销售</Text><Text type="secondary">{filteredSales.length} 人</Text></div><Input value={salesKeyword} onChange={event => setSalesKeyword(event.target.value)} allowClear prefix={<SearchOutlined/>} placeholder="搜索姓名、手机号或部门"/>
           <Checkbox.Group value={selectedSalesIds} onChange={values => setSelectedSalesIds(values.map(Number))} className="assignment-check-list">
-            {filteredSales.map(user => <Checkbox key={user.id} value={user.id} className="assignment-check-row"><span><Text strong>{user.nickname}</Text><Text type="secondary">{user.maskedMobile || '未填写手机号'} · {user.deptName || '未分配部门'}</Text></span></Checkbox>)}
+            {filteredSales.map(user => <Checkbox key={user.id} value={user.id} className="assignment-check-row"><span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><EmployeeAvatar avatar={user.avatar} name={user.nickname} size={28}/><span><Text strong>{user.nickname}</Text><Text type="secondary">{user.maskedMobile || '未填写手机号'} · {user.deptName || '未分配部门'}</Text></span></span></Checkbox>)}
           </Checkbox.Group>
           {filteredSales.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="没有符合条件的销售账号"/>}
         </div>
-        <div className="assignment-selected"><div className="assignment-pane-title"><Text strong>已选择</Text><Tag color="blue">{selectedSales.length} 人</Tag></div>{selectedSales.map(user => <div key={user.id} className="assignment-selected-row"><div><Text strong>{user.nickname}</Text><Text type="secondary">{user.deptName || '未分配部门'}</Text></div><Button type="text" danger icon={<CloseOutlined/>} onClick={() => setSelectedSalesIds(ids => ids.filter(id => id !== user.id))}/></div>)}{selectedSales.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂未选择销售"/>}</div>
+        <div className="assignment-selected"><div className="assignment-pane-title"><Text strong>已选择</Text><Tag color="blue">{selectedSales.length} 人</Tag></div>{selectedSales.map(user => <div key={user.id} className="assignment-selected-row"><div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><EmployeeAvatar avatar={user.avatar} name={user.nickname} size={28}/><span><Text strong>{user.nickname}</Text><Text type="secondary">{user.deptName || '未分配部门'}</Text></span></div><Button type="text" danger icon={<CloseOutlined/>} onClick={() => setSelectedSalesIds(ids => ids.filter(id => id !== user.id))}/></div>)}{selectedSales.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂未选择销售"/>}</div>
       </div>
     </Drawer>
 

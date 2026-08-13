@@ -1,9 +1,11 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchResultVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchTransferReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesRespVO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,6 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Set;
+import java.time.LocalDateTime;
+import java.lang.reflect.Method;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SUBORDINATE_LEAD_OWNER_CHANGED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -26,6 +30,26 @@ class SubordinateSalesServiceImplTest {
     @Mock private LeadObjectPermissionService permissionService;
     @Mock private LeadAssignmentService assignmentService;
     @Mock private SubordinateSalesCommandService commandService;
+    @Mock private SalesDispatchStatusService dispatchStatusService;
+
+    @Test
+    void subordinateSalesProjectsSystemAvatar() throws Exception {
+        AdminUserRespDTO user = new AdminUserRespDTO();
+        user.setId(20L); user.setNickname("销售甲"); user.setUsername("sales-a");
+        user.setAvatar("https://example.com/sales-a.png"); user.setStatus(0);
+        when(dispatchStatusService.getStatus(20L)).thenReturn(new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.SalesDispatchStatusRespVO()
+                .setPresence("offline").setMode("paused"));
+        Method buildRow = SubordinateSalesServiceImpl.class.getDeclaredMethod("buildRow", AdminUserRespDTO.class,
+                List.class, List.class, List.class, List.class, boolean.class,
+                LocalDateTime.class, LocalDateTime.class, LocalDateTime.class);
+        buildRow.setAccessible(true);
+        LocalDateTime now = LocalDateTime.now();
+
+        SubordinateSalesRespVO result = (SubordinateSalesRespVO) buildRow.invoke(service, user,
+                List.of(), List.of(), List.of(), List.of(), false, now, now.plusDays(1), now);
+
+        assertEquals("https://example.com/sales-a.png", result.getAvatar());
+    }
 
     @Test
     void batchTransferReturnsPartialSuccessPerLead() {

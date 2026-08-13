@@ -230,6 +230,51 @@ public class ConfigServiceImplTest extends BaseDbUnitTest {
         assertPojoEquals(dbConfig, config);
     }
 
+    @Test
+    public void testUpdateDefaultUserAvatar_updateSystemConfig() {
+        String avatar = "https://example.com/default-avatar.png";
+        ConfigDO config = randomConfigDO(o -> o.setConfigKey(ConfigService.DEFAULT_USER_AVATAR_KEY)
+                .setType(ConfigTypeEnum.SYSTEM.getType()).setValue(""));
+        configMapper.insert(config);
+
+        configService.updateDefaultUserAvatar("  " + avatar + "  ");
+
+        assertEquals(avatar, configMapper.selectById(config.getId()).getValue());
+        assertEquals(avatar, configService.getDefaultUserAvatar());
+    }
+
+    @Test
+    public void testUpdateDefaultUserAvatar_missingConfigFailsWithoutInsert() {
+        assertServiceException(() -> configService.updateDefaultUserAvatar("https://example.com/avatar.png"), CONFIG_NOT_EXISTS);
+        assertNull(configMapper.selectByKey(ConfigService.DEFAULT_USER_AVATAR_KEY));
+    }
+
+    @Test
+    public void testUpdateDefaultUserAvatar_updateOnlyFixedKey() {
+        ConfigDO defaultAvatar = randomConfigDO(o -> o.setConfigKey(ConfigService.DEFAULT_USER_AVATAR_KEY)
+                .setType(ConfigTypeEnum.SYSTEM.getType()).setValue("https://example.com/old.png"));
+        ConfigDO unrelated = randomConfigDO(o -> o.setConfigKey("unrelated.key").setValue("unchanged"));
+        configMapper.insert(defaultAvatar);
+        configMapper.insert(unrelated);
+
+        configService.updateDefaultUserAvatar("https://example.com/new.png");
+
+        assertEquals("https://example.com/new.png", configMapper.selectById(defaultAvatar.getId()).getValue());
+        assertEquals("unchanged", configMapper.selectById(unrelated.getId()).getValue());
+    }
+
+    @Test
+    public void testUpdateDefaultUserAvatar_clearReturnsNull() {
+        ConfigDO defaultAvatar = randomConfigDO(o -> o.setConfigKey(ConfigService.DEFAULT_USER_AVATAR_KEY)
+                .setType(ConfigTypeEnum.SYSTEM.getType()).setValue("https://example.com/old.png"));
+        configMapper.insert(defaultAvatar);
+
+        configService.updateDefaultUserAvatar(null);
+
+        assertEquals("", configMapper.selectById(defaultAvatar.getId()).getValue());
+        assertNull(configService.getDefaultUserAvatar());
+    }
+
     // ========== 随机对象 ==========
 
     @SafeVarargs

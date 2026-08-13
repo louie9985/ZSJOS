@@ -180,7 +180,8 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
                                               LocalDateTime start, LocalDateTime end, LocalDateTime now) {
         SalesDispatchStatusRespVO dispatch = dispatchStatusService.getStatus(user.getId());
         SubordinateSalesRespVO row = new SubordinateSalesRespVO();
-        row.setUserId(user.getId()); row.setName(user.getNickname()); row.setUsername(user.getUsername());
+        row.setUserId(user.getId()); row.setName(user.getNickname()); row.setAvatar(user.getAvatar());
+        row.setUsername(user.getUsername());
         row.setMobile(user.getMobile()); row.setAccountStatus(user.getStatus()); row.setPresence(dispatch.getPresence());
         row.setAccepting("accepting".equals(dispatch.getMode())); row.setEligible(eligible);
         row.setCanReceiveNewLeads(CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()) && eligible

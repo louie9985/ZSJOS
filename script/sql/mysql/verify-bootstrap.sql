@@ -66,6 +66,11 @@ SELECT 'lead_filter_status_v042' AS check_name,
               AND (JSON_SEARCH(draft_config_json,'one','converted') IS NOT NULL
                 OR JSON_SEARCH(published_config_json,'one','converted') IS NOT NULL)),
           'PASS', 'FAIL') AS result;
+SELECT 'default_employee_avatar_v044' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V044')
+          AND (SELECT COUNT(*) FROM infra_config
+               WHERE config_key='zsjos.user.default-avatar' AND type=1 AND visible=b'1' AND deleted=b'0')=1,
+          'PASS', 'FAIL') AS result;
 SELECT 'default_follow_up_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_rule WHERE tenant_id=1 AND code='default' AND first_follow_up_timeout_minutes=1440 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'sales_accept_permission' AS check_name,
@@ -219,7 +224,7 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'module_schema_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core'
-            AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042'))=21,
+            AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042','V044'))=22,
           'PASS', 'FAIL') AS result;
 SELECT 'enabled_crm_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()

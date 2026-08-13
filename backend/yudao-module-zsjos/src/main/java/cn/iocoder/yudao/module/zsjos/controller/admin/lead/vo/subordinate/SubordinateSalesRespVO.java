@@ -8,6 +8,7 @@ import java.util.List;
 public class SubordinateSalesRespVO {
     private Long userId;
     private String name;
+    private String avatar;
     private String username;
     private String mobile;
     private Integer accountStatus;

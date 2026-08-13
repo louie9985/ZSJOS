@@ -24,4 +24,9 @@ public class ConfigApiImpl implements ConfigApi {
         return config != null ? config.getValue() : null;
     }
 
+    @Override
+    public String getDefaultUserAvatar() {
+        return configService.getDefaultUserAvatar();
+    }
+
 }

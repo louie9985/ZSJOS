@@ -28,6 +28,9 @@ public class AuthPermissionInfoRespVO {
     @Schema(description = "菜单树", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<MenuVO> menus;
 
+    @Schema(description = "全平台默认员工头像；未配置时为空", example = "https://www.iocoder.cn/default-avatar.png")
+    private String defaultAvatar;
+
     @Schema(description = "用户信息 VO")
     @Data
     @NoArgsConstructor

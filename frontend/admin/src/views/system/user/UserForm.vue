@@ -29,7 +29,11 @@
       <el-row>
         <el-col :span="12">
           <el-form-item label="企微 userid" prop="wecomUserId">
-            <el-input v-model="formData.wecomUserId" maxlength="64" placeholder="请输入企业微信 userid" />
+            <el-input
+              v-model="formData.wecomUserId"
+              maxlength="64"
+              placeholder="请输入企业微信 userid"
+            />
           </el-form-item>
         </el-col>
       </el-row>
@@ -89,6 +93,19 @@
         </el-col>
       </el-row>
       <el-row>
+        <el-col :span="12">
+          <el-form-item label="用户头像" prop="avatar">
+            <UploadImg
+              v-model="formData.avatar"
+              width="100px"
+              height="100px"
+              borderradius="50%"
+              directory="system/user/avatar"
+              :file-size="2"
+              :is-show-tip="false"
+            />
+          </el-form-item>
+        </el-col>
         <el-col :span="24">
           <el-form-item label="备注">
             <el-input v-model="formData.remark" placeholder="请输入内容" type="textarea" />
@@ -133,7 +150,8 @@ const formData = ref({
   postIds: [],
   remark: '',
   status: CommonStatusEnum.ENABLE,
-  roleIds: []
+  roleIds: [],
+  avatar: ''
 })
 const formRules = reactive<FormRules>({
   username: [{ required: true, message: '用户名称不能为空', trigger: 'blur' }],
@@ -221,7 +239,8 @@ const resetForm = () => {
     postIds: [],
     remark: '',
     status: CommonStatusEnum.ENABLE,
-    roleIds: []
+    roleIds: [],
+    avatar: ''
   }
   formRef.value?.resetFields()
 }
