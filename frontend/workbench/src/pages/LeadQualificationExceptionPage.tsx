@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { api, type AdvancedFilterGroup, type AssignmentUser, type LeadQualificationException } from '../services/api'
-import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
+import { api, type AssignmentUser, type LeadQualificationException } from '../services/api'
 import { LEAD_HANDLING_STAGE_LABELS } from '../constants'
 import { formatTimestamp } from '../services/time'
 import { useSubmissionGuard } from '../services/submissionGuard'
@@ -17,8 +16,6 @@ export default function LeadQualificationExceptionPage() {
   const [items, setItems] = useState<LeadQualificationException[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [selected, setSelected] = useState<LeadQualificationException>()
   const [action, setAction] = useState<Action>()
   const [reason, setReason] = useState('')
@@ -30,10 +27,10 @@ export default function LeadQualificationExceptionPage() {
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    try { setItems((await api.qualificationExceptionPage(type, { pageNo: 1, pageSize: 100, keyword: keyword || undefined, advancedFilter })).list) }
+    try { setItems((await api.qualificationExceptionPage(type, { pageNo: 1, pageSize: 100 })).list) }
     catch (loadError) { setError(loadError instanceof Error ? loadError.message : '异常客资加载失败'); setItems([]) }
     finally { setLoading(false) }
-  }, [advancedFilter, keyword, type])
+  }, [type])
 
   useEffect(() => { void load() }, [load])
 
@@ -80,11 +77,10 @@ export default function LeadQualificationExceptionPage() {
       <div><Typography.Title level={3}>异常客资</Typography.Title><Typography.Text type="secondary">处理判定超时挂起和已回收待重新分配的客资</Typography.Text></div>
       <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
     </div>
-    <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
-    {filterCount(advancedFilter) === 0 && <Tabs activeKey={type} onChange={key => setType(key as ExceptionType)} items={[
+    <Tabs activeKey={type} onChange={key => setType(key as ExceptionType)} items={[
       { key: 'suspended', label: '挂起客资' },
       { key: 'recycle_pending', label: '回收待处理' }
-    ]}/>}
+    ]}/>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
     <Spin spinning={loading}>
       <Table rowKey="id" dataSource={items} pagination={false} locale={{ emptyText: <Empty description="暂无异常客资"/> }} scroll={{ x: 860 }} columns={[

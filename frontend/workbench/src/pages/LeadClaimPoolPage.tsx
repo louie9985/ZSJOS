@@ -7,8 +7,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, App, Button, Card, Empty, Image, Skeleton, Spin, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { api, type AdvancedFilterGroup, type PendingLead } from '../services/api'
-import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
+import { api, type PendingLead } from '../services/api'
 import { mergeUniqueLeads, resolvedDisplayLabel, tryStartLeadPageRequest } from '../services/leadManagement'
 import { formatTimestamp } from '../services/time'
 
@@ -91,8 +90,6 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
   const [pageNo, setPageNo] = useState(0)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [keyword, setKeyword] = useState('')
-  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [claiming, setClaiming] = useState<number>()
   const requestVersion = useRef(0)
   const activeRequests = useRef(new Set<string>())
@@ -104,7 +101,7 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
     setLoading(true)
     setError('')
     try {
-      const result = await api.claimPoolPage({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: keyword || undefined, advancedFilter })
+      const result = await api.claimPoolPage({ pageNo: targetPage, pageSize: PAGE_SIZE })
       if (version !== requestVersion.current) return
       setItems(current => replace ? result.list : mergeUniqueLeads(current, result.list))
       setTotal(result.total)
@@ -121,7 +118,7 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
       activeRequests.current.delete(requestKey)
       if (version === requestVersion.current) setLoading(false)
     }
-  }, [advancedFilter, keyword])
+  }, [])
 
   const refresh = useCallback(() => {
     const version = ++requestVersion.current
@@ -185,7 +182,6 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
 
   return <section className="workspace-page claim-pool-page">
     <div className="claim-pool-toolbar">
-      <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
       <Button icon={<ReloadOutlined />} loading={loading && !items.length} onClick={refresh}>刷新</Button>
     </div>
     <div className="claim-pool-container">{content}</div>

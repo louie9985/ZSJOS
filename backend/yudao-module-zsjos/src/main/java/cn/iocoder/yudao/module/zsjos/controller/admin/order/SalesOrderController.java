@@ -81,11 +81,6 @@ public class SalesOrderController {
     public CommonResult<PageResult<SalesOrderListItemRespVO>> getMyPage(@Valid SalesOrderMyPageReqVO reqVO) {
         return success(orderService.getMyPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
-    @PostMapping("/my-search-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
-    public CommonResult<PageResult<SalesOrderListItemRespVO>> searchMyPage(@Valid @RequestBody SalesOrderMyPageReqVO reqVO) {
-        return success(orderService.getMyPage(reqVO, WebFrameworkUtils.getLoginUserId()));
-    }
 
     @GetMapping("/my-status-counts")
     @Operation(summary = "获得本人提交的成交订单状态统计")
@@ -104,10 +99,6 @@ public class SalesOrderController {
     @GetMapping("/approval/inbox-page")
     @Operation(summary = "获得成交订单会签待办或已办")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> getInboxPage(@Valid SalesOrderPageReqVO reqVO) {
-        return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
-    }
-    @PostMapping("/approval/search-page")
-    public CommonResult<PageResult<SalesOrderListItemRespVO>> searchInboxPage(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 

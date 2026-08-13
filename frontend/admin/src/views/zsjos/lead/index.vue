@@ -1,6 +1,15 @@
 <template>
   <ContentWrap>
     <el-form ref="queryFormRef" :model="queryParams" inline label-width="76px">
+      <el-form-item label="客户搜索" prop="keyword">
+        <el-input
+          v-model="queryParams.keyword"
+          clearable
+          placeholder="姓名 / 手机号 / 微信号"
+          class="!w-220px"
+          @keyup.enter="handleQuery"
+        />
+      </el-form-item>
       <el-form-item label="客资状态" prop="status">
         <el-select v-model="queryParams.status" clearable class="!w-150px">
           <el-option v-for="item in LeadApi.LEAD_STATUS_OPTIONS" :key="item.value" v-bind="item" />
@@ -60,7 +69,6 @@
         <el-button @click="resetQuery"><Icon icon="ep:refresh" />重置</el-button>
       </el-form-item>
     </el-form>
-    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" @search="handleAdvancedSearch" @change="handleAdvancedFilter" />
   </ContentWrap>
 
   <ContentWrap>
@@ -312,8 +320,6 @@ import * as LeadApi from '@/api/zsjos/leadManagement'
 import * as LeadFollowUpApi from '@/api/zsjos/leadFollowUp'
 import { DICT_TYPE, getStrDictOptions } from '@/utils/dict'
 import { formatZsjosTimestamp } from '@/utils/zsjosTime'
-import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
-import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosLeadManagement' })
 
@@ -357,8 +363,6 @@ const handleQuery = () => {
   queryParams.pageNo = 1
   getList()
 }
-const handleAdvancedSearch = (keyword: string) => { queryParams.keyword = keyword || undefined; handleQuery() }
-const handleAdvancedFilter = (advancedFilter?: AdvancedFilterGroup) => { queryParams.advancedFilter = advancedFilter; handleQuery() }
 const resetQuery = () => {
   queryFormRef.value?.resetFields()
   handleQuery()

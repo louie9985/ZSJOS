@@ -19,7 +19,6 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
-import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -59,7 +58,6 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private LeadAgingPoolNotifyStageMapper notifyStageMapper;
     @Resource private TransactionTemplate transactionTemplate;
     @Resource private LeadInboxFilterConfigService inboxFilterConfigService;
-    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     public PageResult<LeadAgingPoolRespVO> getPage(LeadAgingPoolPageReqVO reqVO, Long userId) {
@@ -70,11 +68,9 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                 : inboxFilterConfigService.resolveQuery(
                         inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_AGING_POOL),
                         reqVO.getInboxGroup(), reqVO.getInboxStage());
-        List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
-        boolean advanced = matchedLeadIds != null;
         PageResult<LeadAgingPoolCycleDO> page = cycleMapper.selectPage(reqVO, manageAll ? null : scopedOwnerUserIds,
-                manageAll ? null : userId, advanced ? List.of() : List.copyOf(filter.values(INBOX_FILTER_FIELD_POOL_STATUS)),
-                advanced ? false : filter.matchNone(), matchedLeadIds);
+                manageAll ? null : userId,
+                List.copyOf(filter.values(INBOX_FILTER_FIELD_POOL_STATUS)), filter.matchNone());
         List<LeadAgingPoolRespVO> rows = page.getList().stream().map(cycle -> convert(cycle, userId)).toList();
         return new PageResult<>(rows, page.getTotal());
     }

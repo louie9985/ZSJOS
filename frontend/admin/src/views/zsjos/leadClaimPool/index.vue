@@ -7,7 +7,6 @@
       </div>
       <el-button :loading="loading" @click="getList"> <Icon icon="ep:refresh" />刷新 </el-button>
     </div>
-    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" @search="handleSearch" @change="handleFilter" />
   </ContentWrap>
 
   <ContentWrap>
@@ -104,8 +103,6 @@
 
 <script setup lang="ts">
 import * as ClaimPoolApi from '@/api/zsjos/leadClaimPool'
-import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
-import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosLeadClaimPool' })
 
@@ -133,8 +130,6 @@ const getList = async () => {
     loading.value = false
   }
 }
-const handleSearch = (keyword: string) => { queryParams.keyword = keyword || undefined; queryParams.pageNo = 1; void getList() }
-const handleFilter = (advancedFilter?: AdvancedFilterGroup) => { queryParams.advancedFilter = advancedFilter; queryParams.pageNo = 1; void getList() }
 
 const areaText = (row: ClaimPoolApi.LeadClaimPoolVO) =>
   [row.provinceName, row.cityName].filter(Boolean).join(' / ') || '-'

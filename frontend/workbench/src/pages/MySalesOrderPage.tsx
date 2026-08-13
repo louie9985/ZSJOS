@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
-import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderListItem, type SalesOrderStatusCounts } from '../services/api'
-import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
+import { api, type SalesOrder, type SalesOrderListItem, type SalesOrderStatusCounts } from '../services/api'
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS } from '../components/SalesOrderDetailCards'
 import SalesOrderEntryModal, { type SalesOrderEntryLead } from '../components/SalesOrderEntryModal'
 import { formatTimestamp } from '../services/time'
@@ -16,7 +15,6 @@ const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revi
 export default function MySalesOrderPage() {
   const [status, setStatus] = useState<StatusTab>('all')
   const [keyword, setKeyword] = useState('')
-  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<SalesOrderListItem[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
@@ -48,14 +46,14 @@ export default function MySalesOrderPage() {
     if (activePages.current.has(key)) return
     activePages.current.add(key); setLoading(true); setError('')
     try {
-      const result = await api.mySalesOrderPage({ pageNo: targetPage, pageSize: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+      const result = await api.mySalesOrderPage({ pageNo: targetPage, pageSize: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined })
       if (version !== listVersion.current) return
       setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list)); setTotal(result.total); setPageNo(targetPage)
       if (replace) setSelectedId(current => current && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
     } catch (loadError) {
       if (version === listVersion.current) { setError(loadError instanceof Error ? loadError.message : '我的订单加载失败'); if (replace) { setItems([]); setSelectedId(undefined) } }
     } finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
-  }, [advancedFilter, keyword, status])
+  }, [keyword, status])
 
   const reload = useCallback(() => {
     const version = ++listVersion.current
@@ -96,13 +94,13 @@ export default function MySalesOrderPage() {
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => setStatus(key as StatusTab)} items={[
+    <Tabs activeKey={status} onChange={key => setStatus(key as StatusTab)} items={[
       { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
       { key: 'revision_required', label: `已驳回待修改 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }
-    ]}/>}
+    ]}/>
     <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">
-        <AdvancedFilterToolbar scene="order" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+        <Input.Search allowClear placeholder="搜索订单号 / 学员姓名 / 手机号" onSearch={value => setKeyword(value.trim())}/>
         {error && <Alert
           className="sales-order-inbox-error" type="error" showIcon message={error}
           action={<Button size="small" onClick={reload}>重试</Button>}/>

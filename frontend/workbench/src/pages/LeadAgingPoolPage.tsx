@@ -28,13 +28,11 @@ import {
   type LeadAgingPoolItem,
   type LeadAgingPoolStatus,
   type LeadInboxFilterProfile,
-  type AdvancedFilterGroup,
   type ManagedLead,
 } from "../services/api";
 import LeadFollowUpPanel from "../components/LeadFollowUpPanel";
 import SalesOrderEntryModal from "../components/SalesOrderEntryModal";
 import { formatTimestamp } from "../services/time";
-import { AdvancedFilterToolbar, filterCount } from "../components/AdvancedFilter";
 
 const statusLabel: Record<LeadAgingPoolStatus, string> = {
   waiting_assignment: "待指派",
@@ -51,7 +49,6 @@ export default function LeadAgingPoolPage() {
   });
   const [inboxStage, setInboxStage] = useState<string>();
   const [keyword, setKeyword] = useState("");
-  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<LeadAgingPoolItem>();
@@ -118,7 +115,6 @@ export default function LeadAgingPoolPage() {
             keyword: nextKeyword || undefined,
             inboxGroup: agingPoolGroup?.key || "all",
             inboxStage: inboxStage || "all",
-            advancedFilter,
           }),
           api.agingPoolCounts(),
           api.agingPoolFilterProfile(),
@@ -149,7 +145,7 @@ export default function LeadAgingPoolPage() {
         if (requestId === listRequestRef.current) setLoading(false);
       }
     },
-    [advancedFilter, agingPoolGroup?.key, inboxStage, keyword, loadDetail, pageNo, pageSize],
+    [agingPoolGroup?.key, inboxStage, keyword, loadDetail, pageNo, pageSize],
   );
 
   useEffect(() => {
@@ -230,7 +226,7 @@ export default function LeadAgingPoolPage() {
   return (
     <section className="workspace-page aging-pool-page">
       <div className="aging-pool-toolbar">
-        {filterCount(advancedFilter) === 0 && <Space wrap>
+        <Space wrap>
           <Button
             type={!inboxStage ? "primary" : "default"}
             onClick={() => {
@@ -256,9 +252,16 @@ export default function LeadAgingPoolPage() {
                 </Button>
               );
             })}
-        </Space>}
+        </Space>
         <Space>
-          <AdvancedFilterToolbar scene="lead" placeholder="姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
+          <Input.Search
+            allowClear
+            placeholder="姓名 / 手机号 / 微信号"
+            onSearch={(value) => {
+              setKeyword(value.trim());
+              setPageNo(1);
+            }}
+          />
           <Button icon={<ReloadOutlined />} onClick={() => void load()} />
         </Space>
       </div>

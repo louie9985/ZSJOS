@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.PostMapping;
 
 import java.util.Map;
 import java.util.List;
@@ -49,25 +48,6 @@ public class LeadManagementController {
     public CommonResult<PageResult<LeadManagementRespVO>> getLeadPage(
             @Valid LeadManagementPageReqVO reqVO) {
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
-    }
-
-    @PostMapping("/search-page")
-    @Operation(summary = "高级筛选客资分页")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
-    public CommonResult<PageResult<LeadManagementRespVO>> searchLeadPage(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
-    }
-
-    @PostMapping("/inbox/submitted/search-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
-    public CommonResult<PageResult<LeadManagementRespVO>> searchSubmitted(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
-    }
-
-    @PostMapping("/inbox/owned/search-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
-    public CommonResult<PageResult<LeadManagementRespVO>> searchOwned(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/inbox/submitted/page")

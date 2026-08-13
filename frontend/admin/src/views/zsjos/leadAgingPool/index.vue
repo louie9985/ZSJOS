@@ -1,12 +1,13 @@
 <template>
   <ContentWrap>
     <el-form :inline="true" :model="queryParams" class="mb-12px" @submit.prevent>
-      <el-form-item v-if="!queryParams.advancedFilter" label="状态"><el-select v-model="queryParams.status" clearable placeholder="全部状态" style="width: 180px">
+      <el-form-item label="关键词"><el-input v-model="queryParams.keyword" clearable placeholder="姓名 / 手机号 / 微信号" @keyup.enter="search" /></el-form-item>
+      <el-form-item label="状态"><el-select v-model="queryParams.status" clearable placeholder="全部状态" style="width: 180px">
         <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
       </el-select></el-form-item>
-      <el-form-item><el-button @click="reset"><Icon icon="ep:refresh" />重置</el-button></el-form-item>
+      <el-form-item><el-button type="primary" @click="search"><Icon icon="ep:search" />查询</el-button>
+        <el-button @click="reset"><Icon icon="ep:refresh" />重置</el-button></el-form-item>
     </el-form>
-    <ZsjosAdvancedFilter scene="lead" placeholder="姓名 / 手机号 / 微信号" :keyword="queryParams.keyword" @search="handleSearch" @change="handleFilter" />
   </ContentWrap>
   <ContentWrap>
     <el-alert v-if="error" type="error" :title="error" show-icon :closable="false" class="mb-16px">
@@ -44,8 +45,6 @@
 <script setup lang="ts">
 import { formatDate } from '@/utils/formatTime'
 import * as AgingPoolApi from '@/api/zsjos/leadAgingPool'
-import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
-import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosLeadAgingPool' })
 const message = useMessage()
@@ -58,8 +57,6 @@ const statusLabel = (status: AgingPoolApi.LeadAgingPoolStatus) => statusOptions.
 const statusType = (status: AgingPoolApi.LeadAgingPoolStatus) => status === 'waiting_assignment' ? 'warning' : status === 'deal_pending' ? 'info' : 'success'
 const getList = async () => { loading.value=true; error.value=''; try { const data=await AgingPoolApi.getPage(queryParams); list.value=data.list||[]; total.value=data.total||0 } catch(e:any){ error.value=e?.msg||e?.message||'公海池加载失败'; list.value=[]; total.value=0 } finally { loading.value=false } }
 const search = () => { queryParams.pageNo=1; void getList() }; const reset = () => { queryParams.keyword=undefined; queryParams.status=undefined; search() }
-const handleSearch = (keyword:string) => { queryParams.keyword=keyword||undefined; search() }
-const handleFilter = (advancedFilter?:AdvancedFilterGroup) => { queryParams.advancedFilter=advancedFilter; if(advancedFilter) queryParams.status=undefined; search() }
 const openAssign = async (row:AgingPoolApi.LeadAgingPoolVO) => { current.value=row; try{candidates.value=await AgingPoolApi.getCandidates(row.cycleId);salesUserId.value=row.collaboratorUserId;assignVisible.value=true}catch(e:any){message.error(e?.msg||e?.message||'候选销售加载失败')} }
 const submitAssign = async () => { if(!current.value||!salesUserId.value){message.warning('请选择协同销售');return} saving.value=true; try{await AgingPoolApi.assign(current.value.cycleId,salesUserId.value);message.success('协同销售已更新');assignVisible.value=false;await getList()}catch(e:any){message.error(e?.msg||e?.message||'协同销售更新失败')}finally{saving.value=false} }
 const openExit = (row:AgingPoolApi.LeadAgingPoolVO) => { current.value=row; exitReason.value=''; exitVisible.value=true }

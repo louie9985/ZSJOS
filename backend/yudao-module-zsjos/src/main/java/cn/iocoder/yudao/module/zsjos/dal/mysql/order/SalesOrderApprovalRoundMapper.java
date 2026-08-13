@@ -33,22 +33,4 @@ public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApp
             + "OR o.student_mobile LIKE CONCAT('%', #{keyword}, '%'))")
     List<String> selectProcessInstanceIdsByKeyword(@Param("tenantId") Long tenantId,
                                                     @Param("keyword") String keyword);
-
-    default List<String> selectProcessInstanceIdsByOrderIdsAndKeyword(Long tenantId, List<Long> orderIds, String keyword) {
-        if (orderIds == null || orderIds.isEmpty()) return List.of();
-        return selectList(new LambdaQueryWrapperX<SalesOrderApprovalRoundDO>()
-                .select(SalesOrderApprovalRoundDO::getProcessInstanceId)
-                .eq(SalesOrderApprovalRoundDO::getTenantId, tenantId)
-                .in(SalesOrderApprovalRoundDO::getOrderId, orderIds)
-                .in(keyword != null, SalesOrderApprovalRoundDO::getOrderId,
-                        keyword == null ? List.of() : selectOrderIdsByKeyword(tenantId, keyword))
-                .isNotNull(SalesOrderApprovalRoundDO::getProcessInstanceId))
-                .stream().map(SalesOrderApprovalRoundDO::getProcessInstanceId).distinct().toList();
-    }
-
-    @Select("SELECT id FROM zsjos_order WHERE tenant_id = #{tenantId} AND deleted = b'0' "
-            + "AND (order_no LIKE CONCAT('%', #{keyword}, '%') "
-            + "OR student_name LIKE CONCAT('%', #{keyword}, '%') "
-            + "OR student_mobile LIKE CONCAT('%', #{keyword}, '%'))")
-    List<Long> selectOrderIdsByKeyword(@Param("tenantId") Long tenantId, @Param("keyword") String keyword);
 }

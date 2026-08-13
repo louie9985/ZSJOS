@@ -45,13 +45,6 @@ public class SubordinateSalesController {
         return success(service.getLeadPage(salesUserId, reqVO, getLoginUserId()));
     }
 
-    @PostMapping("/{salesUserId}/leads/search-page")
-    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
-    public CommonResult<PageResult<LeadManagementRespVO>> searchLeads(@PathVariable Long salesUserId,
-            @Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        return success(service.getLeadPage(salesUserId, reqVO, getLoginUserId()));
-    }
-
     @GetMapping("/{salesUserId}/tasks")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
     public CommonResult<PageResult<SubordinateTaskRespVO>> getTasks(@PathVariable Long salesUserId,

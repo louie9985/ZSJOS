@@ -1,6 +1,5 @@
 import request from '@/config/axios'
 import type { Timestamp } from '../types'
-import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export interface LeadClaimPoolVO {
   id: number
@@ -20,14 +19,9 @@ export interface LeadClaimPoolVO {
   expiresAt?: Timestamp
 }
 
-export interface LeadClaimPoolPageReqVO extends PageParam {
-  keyword?: string
-  advancedFilter?: AdvancedFilterGroup
-}
+export interface LeadClaimPoolPageReqVO extends PageParam {}
 
 export const getClaimPoolPage = (
   params: LeadClaimPoolPageReqVO
 ): Promise<{ list: LeadClaimPoolVO[]; total: number }> =>
-  params.advancedFilter
-    ? request.post({ url: '/zsjos/lead/claim-pool/search-page', data: params })
-    : request.get({ url: '/zsjos/lead/claim-pool/page', params })
+  request.get({ url: '/zsjos/lead/claim-pool/page', params })
