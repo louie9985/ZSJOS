@@ -32,6 +32,7 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -80,9 +81,11 @@ class SalesOrderServiceImplTest {
     @Mock private LeadAgingPoolService agingPoolService;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private SalesOrderCommandService commandService;
+    @Mock private AdvancedFilterService advancedFilterService;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(advancedFilterService.matchOrderIds(any())).thenReturn(null);
         lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
         lenient().when(commandService.fingerprint(any())).thenReturn("fingerprint");
     }
@@ -260,7 +263,7 @@ class SalesOrderServiceImplTest {
         order.setId(100L); order.setCurrentApprovalRoundId(200L); order.setOrderNo("SO-100"); order.setLeadId(1L);
         order.setStatus(STATUS_PENDING_APPROVAL); order.setStudentName("测试学员"); order.setTotalAmount(BigDecimal.TEN);
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setRoundNo(2);
-        when(orderMapper.selectMyPage(20L, reqVO)).thenReturn(new PageResult<>(List.of(order), 1L));
+        when(orderMapper.selectMyPage(20L, reqVO, null)).thenReturn(new PageResult<>(List.of(order), 1L));
         when(roundMapper.selectBatchIds(List.of(200L))).thenReturn(List.of(round));
 
         var result = service.getMyPage(reqVO, 20L);
@@ -268,7 +271,7 @@ class SalesOrderServiceImplTest {
         assertEquals(1L, result.getTotal()); assertEquals(1, result.getList().size());
         assertEquals("SO-100", result.getList().getFirst().getOrderNo());
         assertEquals(2, result.getList().getFirst().getApprovalRoundNo());
-        verify(orderMapper).selectMyPage(20L, reqVO);
+        verify(orderMapper).selectMyPage(20L, reqVO, null);
         verifyNoInteractions(itemMapper, fileApi);
     }
 

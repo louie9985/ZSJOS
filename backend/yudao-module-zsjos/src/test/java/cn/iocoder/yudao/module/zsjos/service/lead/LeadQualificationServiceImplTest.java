@@ -16,6 +16,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -48,6 +49,10 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
+    @Mock private AdvancedFilterService advancedFilterService;
+
+    @org.junit.jupiter.api.BeforeEach
+    void setUpAdvancedFilter() { lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
 
     @Test
     void judgeValidCompletesCurrentQualificationRound() {

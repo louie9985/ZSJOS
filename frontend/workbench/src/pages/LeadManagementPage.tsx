@@ -453,8 +453,6 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
         const message = loadError instanceof Error ? loadError.message : '客资列表加载失败'
         if (replace) {
           setInitialError(message)
-          setItems([])
-          setTotal(0)
         } else {
           setLoadMoreError(message)
         }
@@ -471,10 +469,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   useEffect(() => { void loadMetadata() }, [loadMetadata])
   useEffect(() => {
     const version = ++requestVersion.current
-    setItems([])
-    setTotal(0)
     setPageNo(1)
-    setSelectedId(undefined)
     setInitialLoading(false)
     setLoadingMore(false)
     setInitialError('')

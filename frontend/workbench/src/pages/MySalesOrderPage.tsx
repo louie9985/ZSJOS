@@ -53,13 +53,13 @@ export default function MySalesOrderPage() {
       setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list)); setTotal(result.total); setPageNo(targetPage)
       if (replace) setSelectedId(current => current && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
     } catch (loadError) {
-      if (version === listVersion.current) { setError(loadError instanceof Error ? loadError.message : '我的订单加载失败'); if (replace) { setItems([]); setSelectedId(undefined) } }
+      if (version === listVersion.current) setError(loadError instanceof Error ? loadError.message : '我的订单加载失败')
     } finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
   }, [advancedFilter, keyword, status])
 
   const reload = useCallback(() => {
     const version = ++listVersion.current
-    setItems([]); setTotal(0); setPageNo(1); setSelectedId(undefined)
+    setPageNo(1)
     void Promise.all([loadPage(1, true, version), loadCounts()])
   }, [loadCounts, loadPage])
 

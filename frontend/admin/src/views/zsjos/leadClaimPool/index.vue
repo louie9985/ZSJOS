@@ -117,20 +117,21 @@ const queryParams = reactive<ClaimPoolApi.LeadClaimPoolPageReqVO>({ pageNo: 1, p
 const unauthorized = computed(
   () => error.value.includes('403') || error.value.includes('无权') || error.value.includes('权限')
 )
+let requestVersion = 0
 
 const getList = async () => {
+  const version = ++requestVersion
   loading.value = true
   error.value = ''
   try {
     const data = await ClaimPoolApi.getClaimPoolPage(queryParams)
+    if (version !== requestVersion) return
     list.value = data.list || []
     total.value = data.total || 0
   } catch (e: any) {
-    error.value = e?.msg || e?.message || '抢单池加载失败'
-    list.value = []
-    total.value = 0
+    if (version === requestVersion) error.value = e?.msg || e?.message || '抢单池加载失败'
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 const handleSearch = (keyword: string) => { queryParams.keyword = keyword || undefined; queryParams.pageNo = 1; void getList() }

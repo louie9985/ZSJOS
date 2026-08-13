@@ -19,7 +19,9 @@ public class AdvancedFilterController {
 
     @GetMapping("/catalog")
     @Operation(summary = "获得高级筛选字段目录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:sales-order:query-own','zsjos:sales-order:review')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted','zsjos:lead:query-owned',"
+            + "'zsjos:lead:claim','zsjos:lead:query-all','zsjos:lead-aging-pool:query','zsjos:lead:qualification:query',"
+            + "'zsjos:subordinate-sales:query','zsjos:sales-order:query-own','zsjos:sales-order:review')")
     public CommonResult<AdvancedFilterCatalogRespVO> catalog(@RequestParam String scene) {
         return success(service.catalog(scene));
     }

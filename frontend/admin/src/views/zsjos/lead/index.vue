@@ -337,20 +337,22 @@ const followUps = ref<LeadFollowUpApi.LeadFollowUpVO[]>([])
 const followUpLoading = ref(false)
 const followUpError = ref('')
 const route = useRoute()
+let listRequestVersion = 0
 
 const getList = async () => {
+  const version = ++listRequestVersion
   loading.value = true
   error.value = ''
   try {
     const data = await LeadApi.getLeadPage(queryParams)
+    if (version !== listRequestVersion) return
     list.value = data.list || []
     total.value = data.total || 0
+    if (detailId.value && !list.value.some((item) => item.id === detailId.value)) detailId.value = list.value[0]?.id
   } catch (e: any) {
-    error.value = e?.msg || e?.message || '客资列表加载失败'
-    list.value = []
-    total.value = 0
+    if (version === listRequestVersion) error.value = e?.msg || e?.message || '客资列表加载失败'
   } finally {
-    loading.value = false
+    if (version === listRequestVersion) loading.value = false
   }
 }
 const handleQuery = () => {

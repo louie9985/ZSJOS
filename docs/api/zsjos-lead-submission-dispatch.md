@@ -31,6 +31,7 @@
 | `PUT /zsjos/lead/dispatch-status/mode` | `zsjos:lead:accept`；请求体为 `{ "accepting": true|false }` |
 | `POST /zsjos/lead/dispatch-status/offline` | `zsjos:lead:accept`；正常退出时尽力移出轮询池 |
 | `GET /zsjos/lead/claim-pool/page` | `zsjos:lead:claim` + 启用销售专员校验 |
+| `POST /zsjos/lead/claim-pool/search-page` | 与抢单池相同固定范围；组合关键词和受控高级条件树 |
 
 Ordinary submission identity and dispatch restrictions, submitter actions, and the independent complaint queue are defined in `docs/api/zsjos-lead-submitter-actions.md`.
 | `POST /zsjos/lead/{id}/claim` | `zsjos:lead:claim` + 抢单池对象权限 |
@@ -38,6 +39,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead/inbox/submitted/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-submitted` |
 | `GET /zsjos/lead/inbox/owned/page` | `zsjos:lead:query` + `zsjos:lead:query-owned` |
 | `GET /zsjos/lead/inbox/owned/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-owned` |
+| `POST /zsjos/lead/inbox/submitted/search-page` | 提交人固定范围内组合关键词与高级条件；忽略可选状态分组 |
+| `POST /zsjos/lead/inbox/owned/search-page` | 负责人固定范围内组合关键词与高级条件；忽略可选状态分组 |
 | `POST /zsjos/lead/{id}/judge-valid` | `zsjos:lead:qualify` + 当前负责人对象权限 |
 | `POST /zsjos/lead/{id}/judge-invalid` | `zsjos:lead:qualify` + 当前负责人对象权限 |
 | `POST /zsjos/lead/qualification/attachment/upload` | `zsjos:lead:qualify`；上传后仍需由判无效命令校验引用归属 |
@@ -50,6 +53,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 ## 管理接口与权限
 
+高级筛选字段目录由 `GET /zsjos/advanced-filter/catalog?scene=lead|order` 返回。请求只提交白名单 `fieldKey`、运算符和值，不接受数据库列名或 SQL。根组和一级子组支持 `AND/OR`，最多 5 个子组和 20 个条件；JSON 日期值使用 Unix epoch 毫秒。关联商机和订单采用 `EXISTS/NOT EXISTS`，租户、对象关系、部门范围和固定业务池条件始终先行。
+
 | 接口 | 权限 |
 | --- | --- |
 | `GET /zsjos/lead/assignment-rule/get` | `zsjos:lead-rule:query` |
@@ -58,6 +63,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead-follow-up-rule/get` | `zsjos:lead-follow-up-rule:query` |
 | `PUT /zsjos/lead-follow-up-rule/update` | `zsjos:lead-follow-up-rule:update` |
 | `GET /zsjos/lead/qualification-exception/page` | `zsjos:lead:qualification:query` + 部门范围或全租户处置权限 |
+| `POST /zsjos/lead/qualification-exception/search-page` | 同异常客资固定范围，组合关键词与高级条件 |
+| `POST /zsjos/lead/search-page` | 通用客资管理范围内组合关键词与高级条件 |
+| `POST /zsjos/lead/aging-pool/search-page` | 商机公海固定范围内组合关键词与高级条件 |
 | `GET /zsjos/lead/{id}/transfer-candidates` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
 | `POST /zsjos/lead/{id}/restore` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
 | `POST /zsjos/lead/{id}/transfer` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |

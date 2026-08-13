@@ -4435,7 +4435,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`),
   KEY `idx_tenant_opportunity` (`tenant_id`,`opportunity_id`),
   KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
-  KEY `idx_tenant_submitter_status_submitted` (`tenant_id`,`submitter_user_id`,`status`,`submitted_at`,`id`)
+  KEY `idx_tenant_submitter_status_submitted` (`tenant_id`,`submitter_user_id`,`status`,`submitted_at`,`id`),
+  KEY `idx_tenant_formal_sales_status` (`tenant_id`,`formal_sales_user_id`,`status`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 业务订单';
 
 -- zsjos_order_approval_round
@@ -4664,7 +4665,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_person` (
   UNIQUE KEY `uk_tenant_person_no` (`tenant_id`,`person_no`),
   KEY `idx_tenant_mobile` (`tenant_id`,`mobile`),
   KEY `idx_tenant_wechat_id` (`tenant_id`,`wechat_id`),
-  KEY `idx_tenant_identity_status` (`tenant_id`,`identity_status`)
+  KEY `idx_tenant_identity_status` (`tenant_id`,`identity_status`),
+  KEY `idx_tenant_last_seen` (`tenant_id`,`last_seen_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客户与学员身份主档';
 
 -- zsjos_person_contact_claim

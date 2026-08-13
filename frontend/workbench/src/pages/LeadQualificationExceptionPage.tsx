@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AdvancedFilterGroup, type AssignmentUser, type LeadQualificationException } from '../services/api'
@@ -26,13 +26,18 @@ export default function LeadQualificationExceptionPage() {
   const [candidates, setCandidates] = useState<AssignmentUser[]>([])
   const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const requestVersion = useRef(0)
   const closeAction = () => { setConfirmOpen(false); setAction(undefined) }
 
   const load = useCallback(async () => {
+    const version = ++requestVersion.current
     setLoading(true); setError('')
-    try { setItems((await api.qualificationExceptionPage(type, { pageNo: 1, pageSize: 100, keyword: keyword || undefined, advancedFilter })).list) }
-    catch (loadError) { setError(loadError instanceof Error ? loadError.message : '异常客资加载失败'); setItems([]) }
-    finally { setLoading(false) }
+    try {
+      const nextItems = (await api.qualificationExceptionPage(type, { pageNo: 1, pageSize: 100, keyword: keyword || undefined, advancedFilter })).list
+      if (version === requestVersion.current) setItems(nextItems)
+    }
+    catch (loadError) { if (version === requestVersion.current) setError(loadError instanceof Error ? loadError.message : '异常客资加载失败') }
+    finally { if (version === requestVersion.current) setLoading(false) }
   }, [advancedFilter, keyword, type])
 
   useEffect(() => { void load() }, [load])

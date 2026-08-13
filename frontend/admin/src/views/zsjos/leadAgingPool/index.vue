@@ -56,10 +56,11 @@ const assignVisible = ref(false); const exitVisible = ref(false); const exitReas
 const statusOptions = [{ value: 'waiting_assignment', label: '待指派' }, { value: 'assigned', label: '协同跟进中' }, { value: 'deal_pending', label: '成交审批中' }] as const
 const statusLabel = (status: AgingPoolApi.LeadAgingPoolStatus) => statusOptions.find(item => item.value === status)?.label || status
 const statusType = (status: AgingPoolApi.LeadAgingPoolStatus) => status === 'waiting_assignment' ? 'warning' : status === 'deal_pending' ? 'info' : 'success'
-const getList = async () => { loading.value=true; error.value=''; try { const data=await AgingPoolApi.getPage(queryParams); list.value=data.list||[]; total.value=data.total||0 } catch(e:any){ error.value=e?.msg||e?.message||'公海池加载失败'; list.value=[]; total.value=0 } finally { loading.value=false } }
+let requestVersion=0
+const getList = async () => { const version=++requestVersion; loading.value=true; error.value=''; try { const data=await AgingPoolApi.getPage(queryParams); if(version!==requestVersion)return; list.value=data.list||[]; total.value=data.total||0; if(current.value&&!list.value.some((item)=>item.cycleId===current.value?.cycleId))current.value=list.value[0] } catch(e:any){ if(version===requestVersion)error.value=e?.msg||e?.message||'公海池加载失败' } finally { if(version===requestVersion)loading.value=false } }
 const search = () => { queryParams.pageNo=1; void getList() }; const reset = () => { queryParams.keyword=undefined; queryParams.status=undefined; search() }
 const handleSearch = (keyword:string) => { queryParams.keyword=keyword||undefined; search() }
-const handleFilter = (advancedFilter?:AdvancedFilterGroup) => { queryParams.advancedFilter=advancedFilter; if(advancedFilter) queryParams.status=undefined; search() }
+const handleFilter = (advancedFilter?:AdvancedFilterGroup) => { queryParams.advancedFilter=advancedFilter; search() }
 const openAssign = async (row:AgingPoolApi.LeadAgingPoolVO) => { current.value=row; try{candidates.value=await AgingPoolApi.getCandidates(row.cycleId);salesUserId.value=row.collaboratorUserId;assignVisible.value=true}catch(e:any){message.error(e?.msg||e?.message||'候选销售加载失败')} }
 const submitAssign = async () => { if(!current.value||!salesUserId.value){message.warning('请选择协同销售');return} saving.value=true; try{await AgingPoolApi.assign(current.value.cycleId,salesUserId.value);message.success('协同销售已更新');assignVisible.value=false;await getList()}catch(e:any){message.error(e?.msg||e?.message||'协同销售更新失败')}finally{saving.value=false} }
 const openExit = (row:AgingPoolApi.LeadAgingPoolVO) => { current.value=row; exitReason.value=''; exitVisible.value=true }

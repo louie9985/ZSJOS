@@ -112,10 +112,6 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
     } catch (loadError) {
       if (version === requestVersion.current) {
         setError(loadError instanceof Error ? loadError.message : '抢单池加载失败')
-        if (replace) {
-          setItems([])
-          setTotal(0)
-        }
       }
     } finally {
       activeRequests.current.delete(requestKey)
@@ -125,8 +121,6 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
 
   const refresh = useCallback(() => {
     const version = ++requestVersion.current
-    setItems([])
-    setTotal(0)
     setPageNo(0)
     void loadPage(1, true, version)
   }, [loadPage])

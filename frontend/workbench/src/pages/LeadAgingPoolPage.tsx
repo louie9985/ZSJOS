@@ -136,11 +136,6 @@ export default function LeadAgingPoolPage() {
         await loadDetail(nextSelected);
       } catch (loadError) {
         if (requestId === listRequestRef.current) {
-          setItems([]);
-          setTotal(0);
-          setSelected(undefined);
-          selectedCycleRef.current = undefined;
-          setDetail(undefined);
           setError(
             loadError instanceof Error ? loadError.message : "公海池加载失败",
           );
