@@ -12,8 +12,8 @@
 - Integration order: 独立完成并验证后，由用户另行确认提交和合入 `main`。
 - Ownership scope: `yudao-module-zsjos` 客资处理阶段筛选契约、查询和测试；WorkBench 客资详情阶段提示；MySQL V047、ZSJOS 初始化种子；直接相关业务、API、权限流文档；本 handoff。
 - Verification plan: ZSJOS 聚焦测试与模块构建；WorkBench test/typecheck/build；桌面和移动端浏览器检查；SQL 语法、数据范围、版本快照和可重复性审查；不执行真实数据库迁移。
-- Status: in-progress
-- Final commit: None
+- Status: ready-to-merge
+- Final commit: `bd19734cdc42ec1ab1acb6291c0480f173aa8ced`
 
 ## Delivery Entries
 
@@ -29,3 +29,16 @@
 - Verification evidence: `git diff --check` passed；PowerShell 只读解析 bootstrap 两个 JSON 成功，选项分别为 `all,unassigned,pending_acceptance,public_pool,first_follow_pending,qualification_pending` 和 `all,first_follow_pending,qualification_pending`；Maven 聚焦测试 36/36 passed（LeadInboxFilterConfigServiceImplTest、LeadManagementServiceImplTest）；WorkBench 聚焦测试 15/15 passed、`npm run typecheck` passed、`npm run build` passed（保留既有大 chunk warning）。未执行真实数据库迁移；未完成认证浏览器桌面/移动交互检查。
 - Dependency or integration impact: 无新增 npm/Maven 依赖；V047 依赖 V005/V014/V046，迁移记录两种 schema version，需在受控环境按序执行；工作区使用过主工作区依赖的临时 junction，已删除且主工作区依赖仍存在。
 - Remaining work: 需要用户另行确认后提交、合入 `main`、执行真实迁移或进行带认证的浏览器验收；当前分支保持 `in-progress`，未标记 `ready-to-merge`。
+
+### 2026-08-13 16:57 CST
+
+- Branch: `codex/lead-qualification-timing`
+- Worktree: `D:\ZSJ-OS-worktrees\lead-qualification-timing`
+- HEAD commit: `bd19734cdc42ec1ab1acb6291c0480f173aa8ced`
+- User goal: 将已验证的客资判定阶段修复合并至主分支。
+- Key decisions: 以独立功能提交保留工作流历史；合并前将状态记录为 `ready-to-merge`；主工作区未提交的 PersonMapper/DAL 测试/其他 handoff 与本工作流无文件重叠，合并时必须原样保留；不推送或执行 V047。
+- Execution or analysis result: 功能代码、测试、V047、默认种子和直接相关文档已提交为 `bd19734cdc`，分支具备合入 `main` 的条件。
+- Changed files: 本 handoff 状态和本条交付记录。
+- Verification evidence: 功能提交前后 `git diff --check` passed；此前 Maven 聚焦测试 36/36、WorkBench 聚焦测试 15/15、typecheck 和生产构建均通过；种子 JSON 解析通过。
+- Dependency or integration impact: V047 仍未执行；无新增依赖；合入后需在 `main` 重跑受影响检查并记录集成提交。
+- Remaining work: 合并到 `main`、执行集成态验证、记录 merge commit 和 merged 状态；真实迁移、推送和认证浏览器检查仍需另行处理。
