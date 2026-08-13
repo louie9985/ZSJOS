@@ -9,6 +9,8 @@ import { formatTimestamp } from '../services/time'
 const PAGE_SIZE = 6
 type TaskView = 'pending' | 'done'
 
+export const canQueryBpmTasks = (permissions: readonly string[]) => permissions.includes('bpm:task:query')
+
 const errorText = (error: unknown, fallback: string) => error instanceof ApiError && error.code === 403
   ? '暂无权限，请联系管理员配置对应功能权限'
   : error instanceof Error ? error.message : fallback
@@ -95,8 +97,9 @@ function BpmTaskPanel() {
   </section>
 }
 
-export default function TodayTasksPage({ onOpenAssignment }: { onOpenAssignment: () => void }) {
+export default function TodayTasksPage({ permissions, onOpenAssignment }: { permissions: string[]; onOpenAssignment: () => void }) {
+  const showBpmTasks = canQueryBpmTasks(permissions)
   return <section className="workspace-page today-tasks-page">
-    <div className="task-center-grid"><BusinessTaskPanel onOpenAssignment={onOpenAssignment}/><BpmTaskPanel/></div>
+    <div className={`task-center-grid${showBpmTasks ? '' : ' single-panel'}`}><BusinessTaskPanel onOpenAssignment={onOpenAssignment}/>{showBpmTasks && <BpmTaskPanel/>}</div>
   </section>
 }
