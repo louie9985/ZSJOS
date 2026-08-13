@@ -339,6 +339,38 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void inboxFilterProfileSeparatesFirstFollowAndQualificationStages() {
+        LeadInboxFilterConfigVO config = filterConfig();
+        config.getGroups().get(1).getOptions().getFirst().setKey("first_follow_pending");
+        LeadInboxFilterConfigVO.OptionVO qualification = new LeadInboxFilterConfigVO.OptionVO();
+        qualification.setKey("qualification_pending"); qualification.setLabel("待判定");
+        qualification.setSort(20); qualification.setEnabled(true);
+        config.getGroups().get(1).setOptions(List.of(config.getGroups().get(1).getOptions().getFirst(), qualification));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
+        when(inboxFilterConfigService.getPublishedConfig("submitter")).thenReturn(config);
+        when(inboxFilterConfigService.resolveQuery(config, "all", "all"))
+                .thenReturn(new LeadInboxFilterQuery(Set.of(), Set.of(), false));
+        when(inboxFilterConfigService.resolveQuery(config, "pending", "all"))
+                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false));
+        when(inboxFilterConfigService.resolveQuery(config, "pending", "first_follow_pending"))
+                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
+                        Set.of("first_follow_pending"), false, Map.of()));
+        when(inboxFilterConfigService.resolveQuery(config, "pending", "qualification_pending"))
+                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
+                        Set.of("qualification_pending"), false, Map.of()));
+        when(leadMapper.selectManagementInboxStateCounts(10L, "submitter")).thenReturn(List.of(
+                Map.of("status", "submitted", "assignment_status", "owned",
+                        "handling_stage", "first_follow_pending", "total", 2L),
+                Map.of("status", "submitted", "assignment_status", "owned",
+                        "handling_stage", "qualification_pending", "total", 3L)));
+
+        LeadInboxFilterProfileRespVO result = service.getInboxFilterProfile(10L, "submitter");
+
+        assertEquals(2L, result.getGroups().get(1).getSections().getFirst().getOptions().getFirst().getCount());
+        assertEquals(3L, result.getGroups().get(1).getSections().getFirst().getOptions().get(1).getCount());
+    }
+
+    @Test
     void pageUsesOwnerAudienceEvenForQueryAllUser() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         reqVO.setAudience("owner");
@@ -354,6 +386,26 @@ class LeadManagementServiceImplTest {
         service.getLeadPage(reqVO, 99L);
 
         verify(leadMapper).selectManagementPage(reqVO, 99L, List.of(), List.of(), List.of(), false, null);
+    }
+
+    @Test
+    void pagePassesHandlingStageToDatabaseFilter() {
+        LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
+        reqVO.setAudience("owner"); reqVO.setInboxGroup("pending"); reqVO.setInboxStage("first_follow_pending");
+        LeadInboxFilterConfigVO config = filterConfig();
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
+        when(inboxFilterConfigService.resolveQuery(config, "pending", "first_follow_pending"))
+                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
+                        Set.of("first_follow_pending"), false, Map.of()));
+        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
+                List.of("first_follow_pending"), false, null)).thenReturn(PageResult.empty());
+
+        service.getLeadPage(reqVO, 10L);
+
+        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
+                List.of("first_follow_pending"), false, null);
     }
 
     @Test

@@ -31,6 +31,7 @@ import {
   invalidReasonSnapshotLabel,
   hasNextLeadInboxPage,
   isLeadInboxUnauthorized,
+  leadPendingTaskAlert,
   mergeUniqueLeads,
   protocolDisplayLabel,
   tryStartLeadPageRequest
@@ -85,6 +86,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
 }) {
+  const pendingTaskAlert = leadPendingTaskAlert(lead)
   const [activeTab, setActiveTab] = useState<LeadDetailTab>(defaultLeadDetailTab(autoExpandFollowUp))
   const [followUpTotal, setFollowUpTotal] = useState(0)
   const [invalidOpen, setInvalidOpen] = useState(false)
@@ -231,7 +233,8 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
     {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReason ? invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot) : undefined, lead.invalidDescription].filter(Boolean).join('：')}/>}
-    {lead.qualificationStatus === 'pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}/>}
+    {pendingTaskAlert && <Alert type="info" showIcon message={pendingTaskAlert.message}
+      description={`截止时间：${formatTimestamp(pendingTaskAlert.deadline)}`}/>}
     <Tabs
       className="lead-detail-tabs"
       activeKey={activeTab}

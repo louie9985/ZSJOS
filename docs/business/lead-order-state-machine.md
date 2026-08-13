@@ -356,7 +356,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 派单时为当前候选销售创建 `lead_assignment_accept` 任务；接受时完成，拒绝、超时、转派或进入抢单池时取消。销售通过接单、抢单或管理员转派取得归属时，在同一事务内创建 `lead_first_follow_up` 任务。首次跟进任务按对应分配历史编号幂等，payload 固化跟进规则版本和归属开始时间；本阶段逾期只形成任务逾期事实，不自动回收客资。
 
-客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；首次记录完成当前归属周期的 `lead_first_follow_up`，并创建 `lead_qualification` 任务。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
+客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；当前归属周期首次记录完成 `lead_first_follow_up`，并以该首次跟进成功时间为起点创建 `lead_qualification` 任务，截止时间为起点加当时启用规则的 `qualification_timeout_minutes`。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。首次跟进完成前只有首次跟进截止时间，不能展示有效性判定截止时间。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
 
 判定有效在同一事务内完成判定任务、保存必填有效备注、创建或恢复唯一 `initial_conversion` Opportunity，并让 Lead 保持 `valid + owned`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时取消待处理的首跟、判定和跟进提醒任务，并把未结束 Opportunity 改为 `lost`。`V034` 负责取消规则上线前的历史遗留记录。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
 
@@ -670,7 +670,8 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 
 - 待接单：`assignment_status = pending_acceptance`。
 - 待首跟：`status = submitted`、`assignment_status = owned` 且当前归属尚无首次跟进。
-- 待判定：`status = submitted`、`assignment_status = owned` 且存在当前判定截止时间。
+- 待首跟：`status = submitted`、`assignment_status = owned` 且当前归属周期没有首次跟进，`qualification_deadline_at IS NULL`。
+- 待判定：`status = submitted`、`assignment_status = owned` 且当前归属周期已完成首次跟进，存在当前判定截止时间。
 - 已挂起：`status = suspended`；销售只读，等待主管处置。
 - 回收待处理：`assignment_status = recycle_pending`；无当前销售。
 - 审批待办：来自 BPM 当前运行中的审批任务。

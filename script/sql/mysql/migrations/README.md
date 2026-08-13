@@ -38,6 +38,8 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V046__customer_order_advanced_filter_indexes.sql` follows the menu-component V045 migration and adds only two missing secondary indexes used by customer/order advanced-filter plans. It changes no business rows, dictionaries, menus, or permissions. Each DDL statement checks `information_schema.statistics`, records both schema-version formats, and is safe to rerun. Migration execution still requires separate environment approval.
 
+`V047__split_lead_pending_handling_stages.sql` follows V046 and upgrades only active submitter/owner schemes that still exactly match the old system defaults. It splits owned submitted leads into `first_follow_pending` and `qualification_pending`, appends an immutable published-version snapshot, preserves custom draft or published configurations, and records both schema-version formats. It is repeatable and forward-only; rollback requires publishing a replacement configuration. Do not execute it without separate environment approval.
+
 `V040__submitter_actions_and_complaints.sql` adds snapshotted submission channels for duplicate review, daily submitter urges, the independent public sales-complaint queue, server-owned menu permissions, and default in-app notifications. It grants no roles, changes no existing Lead ownership, and deletes no business rows.
 
 `V021__lead_intended_product_active_unique_key.sql` changes only the intended-product uniqueness metadata. It adds a stored generated active product reference, removes the old tenant/lead/product unique index, and constrains only non-deleted rows; it does not delete or rewrite intended-product history.

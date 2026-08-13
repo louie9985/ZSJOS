@@ -206,6 +206,31 @@ class LeadInboxFilterConfigServiceImplTest {
     }
 
     @Test
+    void resolveQueryCompilesHandlingStageForLeadAudience() {
+        LeadInboxFilterSaveReqVO config = validRequest();
+        LeadInboxFilterConfigVO.OptionVO firstFollow = option("first_follow_pending", "待首跟", 20);
+        firstFollow.setConditions(List.of(condition("handling_stage", "first_follow_pending")));
+        config.getGroups().get(1).setOptions(new java.util.ArrayList<>(config.getGroups().get(1).getOptions()));
+        config.getGroups().get(1).getOptions().add(firstFollow);
+
+        LeadInboxFilterQuery query = service.resolveQuery(config, "pending", "first_follow_pending");
+
+        assertEquals(Set.of("submitted"), query.statuses());
+        assertEquals(Set.of("first_follow_pending"), query.handlingStages());
+    }
+
+    @Test
+    void saveDraftRejectsUnsupportedHandlingStage() {
+        LeadInboxFilterSaveReqVO reqVO = validRequest();
+        reqVO.getGroups().get(1).getOptions().get(1)
+                .setConditions(List.of(condition("handling_stage", "invented")));
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.saveDraft(reqVO));
+
+        assertEquals(LEAD_INBOX_FILTER_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
     void saveDraftAcceptsAgingPoolStatusAudience() {
         LeadInboxFilterSaveReqVO reqVO = new LeadInboxFilterSaveReqVO();
         reqVO.setAudience("agingPool");

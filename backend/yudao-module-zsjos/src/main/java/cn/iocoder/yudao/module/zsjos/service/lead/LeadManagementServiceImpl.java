@@ -94,15 +94,18 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 ? sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId)) : List.of();
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
         boolean advanced = matchedLeadIds != null;
-        PageResult<LeadDO> page = managedOwnerUserIds.isEmpty()
-                ? leadMapper.selectManagementPage(reqVO, visibleUserId, List.of(),
-                        advanced ? List.of() : List.copyOf(inboxQuery.statuses()),
-                        advanced ? List.of() : List.copyOf(inboxQuery.assignmentStatuses()),
-                        advanced ? false : inboxQuery.matchNone(), matchedLeadIds)
-                : leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,
-                        advanced ? List.of() : List.copyOf(inboxQuery.statuses()),
-                        advanced ? List.of() : List.copyOf(inboxQuery.assignmentStatuses()),
-                        advanced ? false : inboxQuery.matchNone(), matchedLeadIds);
+        List<String> statuses = advanced ? List.of() : List.copyOf(inboxQuery.statuses());
+        List<String> assignmentStatuses = advanced ? List.of() : List.copyOf(inboxQuery.assignmentStatuses());
+        List<String> handlingStages = advanced ? List.of() : List.copyOf(inboxQuery.handlingStages());
+        boolean matchNone = !advanced && inboxQuery.matchNone();
+        PageResult<LeadDO> page;
+        if (handlingStages.isEmpty()) {
+            page = leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,
+                    statuses, assignmentStatuses, matchNone, matchedLeadIds);
+        } else {
+            page = leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,
+                    statuses, assignmentStatuses, handlingStages, matchNone, matchedLeadIds);
+        }
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -236,7 +239,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     private static long countRows(List<Map<String, Object>> rows, LeadInboxFilterQuery query) {
         return rows.stream().filter(row -> query.matches(stringValue(row.get("status")),
-                        stringValue(row.get("assignment_status"))))
+                        stringValue(row.get("assignment_status")), stringValue(row.get("handling_stage"))))
                 .mapToLong(row -> row.get("total") instanceof Number number ? number.longValue() : 0L)
                 .sum();
     }
