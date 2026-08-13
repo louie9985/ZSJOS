@@ -12,7 +12,9 @@
 - Integration order: 独立完成并验证后合入 `main`。
 - Ownership scope: `yudao-module-zsjos` 高级筛选契约、查询与测试；WorkBench 客资/订单业务池；Admin ZSJOS 客资/商机业务池；新增迁移、直接相关 API/架构文档与本 handoff。
 - Verification plan: ZSJOS Maven 聚焦测试与模块测试；WorkBench test/typecheck/build；Admin typecheck/scoped lint/build；SQL 语法、索引、顺序和可重复性审查；可用环境下桌面/移动端浏览器检查。
-- Status: in-progress
+- Status: ready-to-merge
+- Final feature commit: `a572d76795a4ef890cf1ac2ec885c81ac19f9d95`
+- Main synchronization commit: `64f701e1de516ee1651c925c8b330ceb64df21e9`
 
 ## Delivery Entries
 
