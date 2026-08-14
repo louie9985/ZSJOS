@@ -24,6 +24,7 @@ export interface LeadAttachmentVO {
 
 export interface LeadManagementVO {
   id: number
+  leadNo: string
   personId: number
   submittedName: string
   submittedMobile?: string
@@ -88,6 +89,7 @@ export interface LeadManagementPageReqVO extends PageParam {
 
 export interface LeadQualificationExceptionVO {
   id: number
+  leadNo: string
   submittedName: string
   submittedMobile?: string
   status: string

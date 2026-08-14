@@ -12,6 +12,24 @@ const form = reactive({
   opinion: ''
 })
 const saving = ref(false)
+const leadCandidates = computed(() => {
+  try {
+    const candidates = JSON.parse(current.value?.candidateSnapshot || '[]') as Array<{
+      leadId?: number
+      leadNo?: string
+      personName: string
+      leadStatus?: string
+    }>
+    return candidates
+      .filter((item) => item.leadId)
+      .map((item) => ({
+        value: item.leadId!,
+        label: `${item.leadNo || `内部记录 ${item.leadId}`} · ${item.personName} · ${item.leadStatus || '未知状态'}`
+      }))
+  } catch {
+    return []
+  }
+})
 let reloadList = () => {}
 const show = (row: any, fn: () => void) => {
   current.value = row
@@ -74,7 +92,12 @@ const submit = async () => {
       ><el-form-item
         v-if="['reactivate_lead', 'notify_owner'].includes(form.resultType)"
         label="客资编号"
-        ><el-input-number v-model="form.matchedLeadId" :min="1" /></el-form-item
+        ><el-select v-model="form.matchedLeadId" filterable class="w-100%"
+          ><el-option
+            v-for="item in leadCandidates"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value" /></el-select></el-form-item
       ><el-form-item label="销售编号"
         ><el-input-number v-model="form.selectedSalesUserId" :min="1" /></el-form-item
       ><el-form-item label="复核意见"

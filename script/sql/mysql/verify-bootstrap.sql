@@ -419,7 +419,8 @@ FROM (
   SELECT 'system_users' table_name UNION ALL SELECT 'system_dept' UNION ALL SELECT 'system_post'
   UNION ALL SELECT 'system_role' UNION ALL SELECT 'system_menu' UNION ALL SELECT 'bpm_category'
   UNION ALL SELECT 'pay_app' UNION ALL SELECT 'crm_customer' UNION ALL SELECT 'ai_model'
-  UNION ALL SELECT 'zsjos_lead' UNION ALL SELECT 'zsjos_product' UNION ALL SELECT 'zsjos_product_sku'
+  UNION ALL SELECT 'zsjos_lead' UNION ALL SELECT 'zsjos_lead_no_daily_counter'
+  UNION ALL SELECT 'zsjos_product' UNION ALL SELECT 'zsjos_product_sku'
   UNION ALL SELECT 'zsjos_lead_inbox_filter_scheme' UNION ALL SELECT 'zsjos_lead_inbox_filter_version'
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
   UNION ALL SELECT 'zsjos_business_task_notify_stage'
@@ -457,3 +458,40 @@ SELECT 'V053 withdrawal finance query permission' AS check_name,
 SELECT 'V053 withdrawal finance query permission unique' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0'
              AND permission='zsjos:withdrawal:finance-query')=1,'PASS','FAIL') AS result;
+SELECT 'V054 Lead business number schema' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND table_name='zsjos_lead' AND column_name='lead_no' AND is_nullable='NO')=1
+          AND (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name='zsjos_lead_no_daily_counter')=1
+          AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
+             AND table_name='zsjos_lead' AND index_name='uk_tenant_lead_no')>0,
+          'PASS','FAIL') AS result;
+SELECT 'V054 Lead business number data' AS check_name,
+       IF((SELECT COUNT(*) FROM zsjos_lead WHERE lead_no IS NULL OR lead_no NOT REGEXP '^KZ[0-9]{18}$')=0
+          AND (SELECT COUNT(*) FROM (SELECT tenant_id,lead_no FROM zsjos_lead
+               GROUP BY tenant_id,lead_no HAVING COUNT(*)>1) duplicates)=0,
+          'PASS','FAIL') AS result;
+SELECT 'V054 Lead business number counters' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1
+         FROM zsjos_lead_no_daily_counter counter_row
+         LEFT JOIN zsjos_lead latest ON latest.tenant_id=counter_row.tenant_id
+           AND DATE(latest.submitted_at)=counter_row.sequence_date
+         LEFT JOIN zsjos_lead later ON later.tenant_id=latest.tenant_id
+           AND DATE(later.submitted_at)=DATE(latest.submitted_at)
+           AND (later.submitted_at>latest.submitted_at
+             OR (later.submitted_at=latest.submitted_at AND later.id>latest.id))
+         WHERE later.id IS NULL AND (latest.id IS NULL
+           OR counter_row.current_value<>CAST(SUBSTRING(latest.lead_no,17) AS UNSIGNED))
+       ) AND NOT EXISTS (
+         SELECT 1
+         FROM (
+           SELECT tenant_id, DATE(submitted_at) sequence_date
+           FROM zsjos_lead
+           GROUP BY tenant_id, DATE(submitted_at)
+         ) allocated
+         LEFT JOIN zsjos_lead_no_daily_counter counter_row
+           ON counter_row.tenant_id=allocated.tenant_id
+          AND counter_row.sequence_date=allocated.sequence_date
+         WHERE counter_row.id IS NULL
+       ), 'PASS','FAIL') AS result;

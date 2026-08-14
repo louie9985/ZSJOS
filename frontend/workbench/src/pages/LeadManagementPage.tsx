@@ -213,7 +213,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       <Avatar size={48}>{lead.submittedName.slice(0, 1)}</Avatar>
       <div className="lead-detail-title">
         <Space wrap><Typography.Title level={4}>{lead.submittedName}</Typography.Title><LeadStateTags lead={lead}/></Space>
-        <Typography.Text type="secondary">{lead.submittedMobile || '无手机号'} · {lead.submittedWechatId || '无微信号'} · 客资 #{lead.id}</Typography.Text>
+        <Typography.Text type="secondary">{lead.submittedMobile || '无手机号'} · {lead.submittedWechatId || '无微信号'} · {lead.leadNo}</Typography.Text>
       </div>
       <Space wrap className="lead-detail-actions">
         {actions.has('EDIT_BASIC_INFO') && <Button icon={<EditOutlined/>} onClick={() => setBasicInfoOpen(true)}>修改基础信息</Button>}

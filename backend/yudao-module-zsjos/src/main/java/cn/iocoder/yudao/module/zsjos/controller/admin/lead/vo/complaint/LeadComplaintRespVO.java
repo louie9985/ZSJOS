@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 public class LeadComplaintRespVO {
     private Long id;
     private Long leadId;
+    private String leadNo;
     private Long complainantUserId;
     private Long salesUserId;
     private String reason;

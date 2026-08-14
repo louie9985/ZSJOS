@@ -9,6 +9,7 @@ import java.util.List;
 public class LeadAgingPoolRespVO {
     private Long cycleId;
     private Long leadId;
+    private String leadNo;
     private Integer cycleNo;
     private String status;
     private Long originalOwnerUserId;

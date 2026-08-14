@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class LeadDO extends TenantBaseDO {
     @TableId private Long id;
+    private String leadNo;
     private Long personId;
     private String submittedName;
     private String submittedMobile;

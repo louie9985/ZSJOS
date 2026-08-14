@@ -9,6 +9,7 @@ import java.util.List;
 public class LeadAppealRespVO {
     private Long id;
     private Long leadId;
+    private String leadNo;
     private String leadName;
     private Integer roundNo;
     private String reviewStage;

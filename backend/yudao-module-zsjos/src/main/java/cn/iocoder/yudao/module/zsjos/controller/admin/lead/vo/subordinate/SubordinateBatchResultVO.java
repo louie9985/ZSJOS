@@ -16,6 +16,7 @@ public class SubordinateBatchResultVO {
     @AllArgsConstructor
     public static class ItemVO {
         private Long leadId;
+        private String leadNo;
         private Boolean success;
         private String code;
         private String message;

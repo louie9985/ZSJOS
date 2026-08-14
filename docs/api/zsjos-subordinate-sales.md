@@ -19,6 +19,6 @@ The list includes disabled sales accounts that still hold the stable `sales_spec
 - `POST /leads/batch-transfer`: permission `zsjos:subordinate-sales:batch-transfer`; body `{leadIds, targetUserId, reason}`.
 - `POST /leads/batch-public-sea`: permission `zsjos:subordinate-sales:batch-public-sea`; body `{leadIds, collaboratorUserId?, reason}`.
 
-Every reason is trimmed, required, and limited to 500 characters. Batch commands accept 1 to 200 IDs and return `{successCount, failureCount, items[]}`. Each item contains `leadId`, `success`, stable `code`, and `message`; each Lead runs in an independent transaction.
+Every reason is trimmed, required, and limited to 500 characters. Batch commands accept 1 to 200 IDs and return `{successCount, failureCount, items[]}`. Each item contains internal `leadId`, user-visible `leadNo`, `success`, stable `code`, and `message`; each Lead runs in an independent transaction.
 
 Manual public-sea release preserves Lead owner, main status, and assignment status. It does not use the claim-pool value `assignment_status=public_pool` and does not make the Lead claimable.

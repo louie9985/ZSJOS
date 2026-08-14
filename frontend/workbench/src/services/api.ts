@@ -40,7 +40,7 @@ export type LeadCreateRequest = {
   specifiedSalesUserId?: number; idempotencyKey: string
 }
 export type LeadCreateResult = {
-  leadId?: number; reviewId?: number; outcome: 'created' | 'activated' | 'review_pending' | 'duplicate_rejected'
+  leadId?: number; leadNo?: string; reviewId?: number; outcome: 'created' | 'activated' | 'review_pending' | 'duplicate_rejected'
   assignmentStatus?: string; pendingAssigneeUserId?: number; existingLeadStatus?: string
   existingQualificationStatus?: string; existingOperationalStatus?: string
 }
@@ -55,7 +55,7 @@ export type LeadDuplicateReviewDecision = {
   opinion: string; attachments: Array<{ infraFileId: number }>; idempotencyKey: string
 }
 export type PendingLead = {
-  id: number; dispatchMode: 'auto' | 'specified'; maskedName: string; maskedMobile?: string; maskedWechatId?: string
+  id: number; leadNo: string; dispatchMode: 'auto' | 'specified'; maskedName: string; maskedMobile?: string; maskedWechatId?: string
   provinceName: string; cityName: string; intendedProducts: string[]; primaryIntendedProduct?: string
   sourceChannel: string; sourceChannelLabel?: string; leadCategory: string; leadCategoryLabel?: string
   remark?: string; attachmentUrls: string[]
@@ -74,7 +74,7 @@ export type ManagedLeadProduct = {
 }
 export type ManagedLeadAttachment = { id: number; fileUrl: string; originalName: string; contentType: string; fileSize: number }
 export type ManagedLead = {
-  id: number; personId: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
+  id: number; leadNo: string; personId: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
   sourceType: string; sourceUserId?: number; sourceUserName?: string; sourceChannel?: string
   provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string; leadCategory?: string
   remark?: string; status: string; assignmentStatus: string; handlingStage: string
@@ -97,12 +97,12 @@ export type ManagedLead = {
   availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
 }
 export type LeadComplaint = {
-  id: number; leadId: number; complainantUserId: number; salesUserId: number; reason: string
+  id: number; leadId: number; leadNo: string; complainantUserId: number; salesUserId: number; reason: string
   evidenceRefs?: string; status: 'pending' | 'handled'; result?: 'founded' | 'unfounded'
   handlerUserId?: number; handlerOpinion?: string; handlerEvidenceRefs?: string; handledAt?: Timestamp; createTime: Timestamp
 }
 export type LeadQualificationException = {
-  id: number; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
+  id: number; leadNo: string; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
   handlingStage: string; ownerUserId?: number; ownerUserName?: string
   recycleSourceOwnerUserId?: number; recycleSourceOwnerUserName?: string
   qualificationDeadlineAt?: Timestamp; suspendedAt?: Timestamp
@@ -137,7 +137,7 @@ export type LeadBasicInfoUpdateRequest = {
 }
 export type LeadAppealEvidence = { infraFileId: number; fileUrl?: string; originalName: string; contentType: string; fileSize: number; sort?: number }
 export type LeadAppeal = {
-  id: number; leadId: number; leadName: string; roundNo: number; reviewStage: 'sales_manager' | 'quality' | 'chairman'
+  id: number; leadId: number; leadNo: string; leadName: string; roundNo: number; reviewStage: 'sales_manager' | 'quality' | 'chairman'
   status: 'sales_manager_reviewing' | 'quality_reviewing' | 'chairman_reviewing' | 'overturned' | 'upheld' | 'withdrawn'
   applicantUserId: number; applicantUserName?: string; reason: string; evidence: LeadAppealEvidence[]
   invalidReasonSnapshot?: string; invalidDescriptionSnapshot?: string; invalidEvidenceSnapshot: LeadAppealEvidence[]
@@ -267,7 +267,7 @@ export type SubordinateSales = {
 }
 export type LeadAgingPoolStatus = 'waiting_assignment' | 'assigned' | 'deal_pending'
 export type LeadAgingPoolItem = {
-  cycleId: number; leadId: number; cycleNo: number; status: LeadAgingPoolStatus
+  cycleId: number; leadId: number; leadNo: string; cycleNo: number; status: LeadAgingPoolStatus
   originalOwnerUserId: number; originalOwnerUserName?: string; collaboratorUserId?: number; collaboratorUserName?: string
   frozenDeptId: number; frozenDeptName?: string; submittedName: string; submittedMobile?: string; submittedWechatId?: string
   leadCategory?: string; sourceChannel?: string; ownershipStartedAt: Timestamp; dueAt: Timestamp; enteredAt: Timestamp
@@ -275,8 +275,8 @@ export type LeadAgingPoolItem = {
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
   availableActions: Array<'ASSIGN' | 'EXIT' | 'REQUEST_TRANSFER' | 'ADD_FOLLOW_UP' | 'ENTER_DEAL' | 'REVISE_DEAL'>
 }
-export type SubordinateTask = { id: number; taskType: string; leadId: number; leadName?: string; dueAt?: Timestamp; overdue: boolean }
-export type SubordinateBatchItem = { leadId: number; success: boolean; code: string; message: string }
+export type SubordinateTask = { id: number; taskType: string; leadId: number; leadNo: string; leadName?: string; dueAt?: Timestamp; overdue: boolean }
+export type SubordinateBatchItem = { leadId: number; leadNo?: string; success: boolean; code: string; message: string }
 export type SubordinateBatchResult = { successCount: number; failureCount: number; items: SubordinateBatchItem[] }
 export type NotifyMessage = {
   id: number

@@ -13,7 +13,7 @@
       <template #default><el-button link type="primary" @click="getList">重试</el-button></template>
     </el-alert>
     <el-table v-loading="loading" :data="list" stripe table-layout="fixed" empty-text="暂无公海商机">
-      <el-table-column label="客资" min-width="150" fixed="left"><template #default="scope"><strong>{{ scope.row.submittedName }}</strong><div class="muted">#{{ scope.row.leadId }}</div></template></el-table-column>
+      <el-table-column label="客资" min-width="230" fixed="left"><template #default="scope"><strong>{{ scope.row.submittedName }}</strong><div class="muted">{{ scope.row.leadNo }}</div></template></el-table-column>
       <el-table-column label="联系方式" min-width="190"><template #default="scope"><div>{{ scope.row.submittedMobile || '-' }}</div><div>{{ scope.row.submittedWechatId || '-' }}</div></template></el-table-column>
       <el-table-column label="状态" width="120"><template #default="scope"><el-tag :type="statusType(scope.row.status)">{{ statusLabel(scope.row.status) }}</el-tag></template></el-table-column>
       <el-table-column label="原销售A" prop="originalOwnerUserName" min-width="130" />

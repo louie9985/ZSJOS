@@ -438,7 +438,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                                              Map<String, String> categoryLabels,
                                              LeadAssignmentHistoryDO dispatchHistory) {
         LeadPendingRespVO result = new LeadPendingRespVO();
-        result.setId(lead.getId()); result.setDispatchMode(lead.getDispatchMode());
+        result.setId(lead.getId()); result.setLeadNo(lead.getLeadNo()); result.setDispatchMode(lead.getDispatchMode());
         result.setMaskedName(DesensitizedUtil.chineseName(lead.getSubmittedName()));
         result.setMaskedMobile(DesensitizedUtil.mobilePhone(lead.getSubmittedMobile()));
         result.setMaskedWechatId(maskWechat(lead.getSubmittedWechatId()));

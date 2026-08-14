@@ -10,6 +10,7 @@ import java.util.List;
 public class LeadManagementRespVO {
 
     private Long id;
+    private String leadNo;
     private Long personId;
     private String submittedName;
     private String submittedMobile;

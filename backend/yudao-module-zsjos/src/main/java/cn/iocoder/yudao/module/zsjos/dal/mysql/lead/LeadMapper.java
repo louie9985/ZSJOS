@@ -69,11 +69,10 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                    @Param("latestStart") LocalDateTime latestStart);
 
     default List<Long> selectIdsByContactKeyword(String keyword) {
-        return selectList(new LambdaQueryWrapperX<LeadDO>()
-                .select(LeadDO::getId)
-                .and(query -> query.like(LeadDO::getSubmittedName, keyword)
-                        .or().like(LeadDO::getSubmittedMobile, keyword)
-                        .or().like(LeadDO::getSubmittedWechatId, keyword)))
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<>();
+        query.select(LeadDO::getId);
+        applyLeadKeyword(query, keyword);
+        return selectList(query)
                 .stream().map(LeadDO::getId).toList();
     }
 
@@ -147,10 +146,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             else query.in(LeadDO::getId, matchedLeadIds);
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) {
-            String keyword = reqVO.getKeyword().trim();
-            query.and(wrapper -> wrapper.like(LeadDO::getSubmittedName, keyword)
-                    .or().like(LeadDO::getSubmittedMobile, keyword)
-                    .or().like(LeadDO::getSubmittedWechatId, keyword));
+            applyLeadKeyword(query, reqVO.getKeyword());
         }
         if (visibleUserId != null) {
             if ("submitter".equals(reqVO.getAudience())) {
@@ -275,8 +271,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     default PageResult<LeadDO> selectPublicPoolPage(PageParam pageParam, String keyword, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eq(LeadDO::getAssignmentStatus, "public_pool");
-        if (keyword != null && !keyword.isBlank()) query.and(q -> q.like(LeadDO::getSubmittedName, keyword.trim())
-                .or().like(LeadDO::getSubmittedMobile, keyword.trim()).or().like(LeadDO::getSubmittedWechatId, keyword.trim()));
+        if (keyword != null && !keyword.isBlank()) applyLeadKeyword(query, keyword);
         if (matchedLeadIds != null) {
             if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L); else query.in(LeadDO::getId, matchedLeadIds);
         }
@@ -332,8 +327,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             query.eq(LeadDO::getAssignmentStatus, "recycle_pending");
             if (!manageAll) query.in(LeadDO::getRecycleSourceOwnerUserId, managedOwnerIds);
         }
-        if (keyword != null && !keyword.isBlank()) query.and(q -> q.like(LeadDO::getSubmittedName, keyword.trim())
-                .or().like(LeadDO::getSubmittedMobile, keyword.trim()).or().like(LeadDO::getSubmittedWechatId, keyword.trim()));
+        if (keyword != null && !keyword.isBlank()) applyLeadKeyword(query, keyword);
         if (matchedLeadIds != null) {
             if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L); else query.in(LeadDO::getId, matchedLeadIds);
         }
@@ -343,5 +337,24 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     default PageResult<LeadDO> selectQualificationExceptionPage(PageParam pageParam, String type,
                                                                  Set<Long> managedOwnerIds, boolean manageAll) {
         return selectQualificationExceptionPage(pageParam, type, managedOwnerIds, manageAll, null, null);
+    }
+
+    private static void applyLeadKeyword(LambdaQueryWrapperX<LeadDO> query, String rawKeyword) {
+        String keyword = rawKeyword.trim();
+        if (keyword.regionMatches(true, 0, "KZ", 0, 2)) {
+            query.eq(LeadDO::getLeadNo, keyword.toUpperCase(java.util.Locale.ROOT));
+            return;
+        }
+        if (keyword.chars().allMatch(Character::isDigit)) {
+            try {
+                query.eq(LeadDO::getId, Long.valueOf(keyword));
+            } catch (NumberFormatException ex) {
+                query.eq(LeadDO::getId, -1L);
+            }
+            return;
+        }
+        query.and(wrapper -> wrapper.like(LeadDO::getSubmittedName, keyword)
+                .or().like(LeadDO::getSubmittedMobile, keyword)
+                .or().like(LeadDO::getSubmittedWechatId, keyword));
     }
 }

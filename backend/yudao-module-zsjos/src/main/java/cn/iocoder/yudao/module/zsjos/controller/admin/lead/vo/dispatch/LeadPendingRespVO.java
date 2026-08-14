@@ -8,6 +8,7 @@ import java.util.List;
 @Data
 public class LeadPendingRespVO {
     private Long id;
+    private String leadNo;
     private String dispatchMode;
     private String maskedName;
     private String maskedMobile;

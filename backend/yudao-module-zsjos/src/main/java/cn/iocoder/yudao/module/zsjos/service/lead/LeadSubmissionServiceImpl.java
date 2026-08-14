@@ -21,6 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -30,6 +31,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class LeadSubmissionServiceImpl implements LeadSubmissionService {
+
+    private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
 
     @Resource private PersonMapper personMapper;
     @Resource private AdminUserApi adminUserApi;
@@ -46,6 +49,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private LeadDuplicateMatcher duplicateMatcher;
     @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private LeadNumberService leadNumberService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
 
     @Override
@@ -87,7 +91,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
         if (match.strongActiveMatch() != null) {
             LeadDO existingLead = leadMapper.selectById(match.strongActiveMatch().leadId());
-            return LeadCreateRespVO.duplicateRejected(existingLead.getId(), existingLead.getStatus(),
+            return LeadCreateRespVO.duplicateRejected(existingLead.getId(), existingLead.getLeadNo(), existingLead.getStatus(),
                     LeadStateProjection.qualification(existingLead), LeadStateProjection.operational(existingLead));
         }
         if (match.hasMatches()) {
@@ -149,7 +153,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         if (leadMapper.selectLatestByPersonId(person.getId()) != null) {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
-        LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, submitterUserId, identity);
+        LocalDateTime submittedAt = LocalDateTime.now(BEIJING);
+        LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, submitterUserId, identity, submittedAt);
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);
         notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), submitterUserId,
@@ -254,8 +259,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     private LeadDO createLead(PersonDO person, LeadCreateReqVO reqVO, String mobile, String wechatId,
                               RegionSnapshot region, Long submitterUserId,
-                              LeadSubmissionIdentityService.Resolution identity) {
+                              LeadSubmissionIdentityService.Resolution identity, LocalDateTime submittedAt) {
         LeadDO lead = new LeadDO();
+        lead.setLeadNo(leadNumberService.next(submittedAt));
         lead.setPersonId(person.getId()); lead.setSubmittedName(reqVO.getName().trim());
         lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechatId);
         lead.setSourceType(sourceType(identity));
@@ -266,7 +272,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         applyRegion(lead, region); lead.setLeadCategory(reqVO.getLeadCategory()); lead.setRemark(reqVO.getRemark());
         lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_UNASSIGNED);
         lead.setDispatchMode(reqVO.getDispatchMode()); lead.setAssignmentAttemptCount(0);
-        lead.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); lead.setSubmittedAt(LocalDateTime.now());
+        lead.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); lead.setSubmittedAt(submittedAt);
         lead.setVersion(0); leadMapper.insert(lead);
         return lead;
     }
@@ -362,7 +368,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     }
 
     private static LeadCreateRespVO response(LeadDO lead, String outcome) {
-        return new LeadCreateRespVO(lead.getId(), outcome, lead.getAssignmentStatus(), lead.getPendingAssigneeUserId());
+        LeadCreateRespVO response = new LeadCreateRespVO(
+                lead.getId(), outcome, lead.getAssignmentStatus(), lead.getPendingAssigneeUserId());
+        response.setLeadNo(lead.getLeadNo());
+        return response;
     }
 
     public record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}

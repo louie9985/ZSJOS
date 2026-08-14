@@ -346,7 +346,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     private LeadAppealRespVO convert(LeadAppealDO source, LeadDO lead, String taskId) {
         LeadAppealRespVO result = new LeadAppealRespVO();
-        result.setId(source.getId()); result.setLeadId(source.getLeadId()); result.setLeadName(lead.getSubmittedName());
+        result.setId(source.getId()); result.setLeadId(source.getLeadId()); result.setLeadNo(lead.getLeadNo());
+        result.setLeadName(lead.getSubmittedName());
         result.setRoundNo(source.getRoundNo()); result.setReviewStage(source.getReviewStage()); result.setStatus(source.getStatus());
         result.setApplicantUserId(source.getApplicantUserId()); result.setApplicantUserName(userName(source.getApplicantUserId()));
         result.setReason(source.getReason()); result.setEvidence(toEvidenceVO(source.getEvidenceRefs()));

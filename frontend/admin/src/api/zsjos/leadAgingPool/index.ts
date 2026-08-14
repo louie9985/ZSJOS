@@ -6,6 +6,7 @@ export type LeadAgingPoolStatus = 'waiting_assignment' | 'assigned' | 'deal_pend
 export interface LeadAgingPoolVO {
   cycleId: number
   leadId: number
+  leadNo: string
   cycleNo: number
   status: LeadAgingPoolStatus
   originalOwnerUserId: number

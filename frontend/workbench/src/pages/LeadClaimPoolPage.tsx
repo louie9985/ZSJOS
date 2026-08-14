@@ -30,7 +30,7 @@ function ClaimCard({ lead, canClaim, claiming, onClaim }: {
       <div className="claim-card-header">
         <div className="claim-card-identity">
           <Typography.Title level={5}>{lead.maskedName || '未命名客户'}</Typography.Title>
-          <Typography.Text type="secondary">客资 #{lead.id} · {formatTimestamp(lead.submittedAt)}</Typography.Text>
+          <Typography.Text type="secondary">{lead.leadNo} · {formatTimestamp(lead.submittedAt)}</Typography.Text>
         </div>
         <Tag color="blue">待抢单</Tag>
       </div>

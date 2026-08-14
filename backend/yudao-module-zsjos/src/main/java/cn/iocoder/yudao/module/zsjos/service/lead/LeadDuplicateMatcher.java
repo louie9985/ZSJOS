@@ -89,6 +89,7 @@ public class LeadDuplicateMatcher {
         Candidate existing = candidates.get(person.getId());
         if (existing == null) {
             candidates.put(person.getId(), new Candidate(person.getId(), lead == null ? null : lead.getId(),
+                    lead == null ? null : lead.getLeadNo(),
                     person.getName(), lead == null ? null : lead.getStatus(),
                     lead == null ? null : lead.getAssignmentStatus(), rules));
         } else {
@@ -113,7 +114,7 @@ public class LeadDuplicateMatcher {
         public boolean hasMatches() { return !candidates.isEmpty(); }
     }
 
-    public record Candidate(Long personId, Long leadId, String personName, String leadStatus,
+    public record Candidate(Long personId, Long leadId, String leadNo, String personName, String leadStatus,
                             String assignmentStatus, Set<String> rules) {
         public boolean activeLead() {
             return leadId != null && !Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(leadStatus);

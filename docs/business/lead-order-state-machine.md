@@ -208,6 +208,8 @@ ServiceRelation 1:N ServiceRecord
 
 | 字段 | 类型建议 | 必填 | 含义 |
 | --- | --- | --- | --- |
+| `id` | bigint | 是 | 内部主键；继续用于外键、URL、权限和事件关联，不作为用户可见客资编号 |
+| `lead_no` | varchar(32) | 是 | 用户可见客资业务编号；`KZ` + 北京时间 `yyyyMMddHHmmss` + 租户当日四位循环序号，`9999` 后回到 `0001` |
 | `person_id` | bigint | 是 | 关联 ZSJOS `Person`；新客资与新 Person 在同一事务创建，命中已有 Person 时不创建新 Lead |
 | `submitted_name`、`submitted_mobile`、`submitted_wechat_id` | varchar | 是/条件必填 | 本次表单的原始身份快照，用于查重和审计，不因 Person 后续变更而覆盖 |
 | `source_type` | varchar | 是 | `internal_new_media` 或 `part_time_partner` |
@@ -235,6 +237,8 @@ ServiceRelation 1:N ServiceRecord
 | `closed_at`、`close_reason` | datetime/varchar | 条件必填 | 关闭时间和原因 |
 
 提交人身份必须满足二选一：内部来源填写 `source_user_id`，兼职来源填写 `partner_id`。提交先执行统一查重：活动客资手机号或微信号同字段强命中时直接拒绝并展示已有业务阶段；交叉联系方式、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中进入独立重复客资复核；完全无命中才在同一事务创建 Person 与 Lead。
+
+`lead_no` 在实际创建 Lead 的事务内分配。每个租户按北京时间自然日独立计数，从 `0001` 开始，递增到 `9999` 后重新从 `0001` 开始。幂等重试和活动客资强命中返回既有编号，复核任务本身不预占编号，重新激活保留原编号。所有持久化关联继续使用 `id`。同一租户同一秒内若循环到已使用的四位序号，租户唯一索引会拒绝重复编号。
 
 新提交必须至少选择一个启用课程、同一课程不可重复且恰好一个主意向。稳定产品引用与提交时名称保存在 `zsjos_lead_intended_product`；最多九张图片的 Infra 文件编号和提交时元数据快照保存在 `zsjos_lead_attachment`。附件保持私有读，只有在对象读取权限校验通过后才通过 Infra 公共 API 生成短期访问地址。疑似重复提交的完整资料、命中规则和候选对象保存在 `zsjos_lead_duplicate_review`，强命中活动客资不落复核任务。
 

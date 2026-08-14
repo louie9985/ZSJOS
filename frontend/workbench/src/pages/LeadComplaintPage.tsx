@@ -31,7 +31,7 @@ export default function LeadComplaintPage() {
     <Segmented value={status} onChange={value => setStatus(value as typeof status)} options={[{ label: '待处理', value: 'pending' }, { label: '已处理', value: 'handled' }]}/>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
     <Spin spinning={loading}><Table rowKey="id" dataSource={items} pagination={false} locale={{ emptyText: <Empty description="暂无投诉"/> }} scroll={{ x: 900 }} columns={[
-      { title: '投诉', dataIndex: 'id', width: 90, render: id => `#${id}` }, { title: '客资', dataIndex: 'leadId', width: 90, render: id => `#${id}` },
+      { title: '投诉', dataIndex: 'id', width: 90, render: id => `#${id}` }, { title: '客资编号', dataIndex: 'leadNo', width: 220 },
       { title: '投诉原因', dataIndex: 'reason' }, { title: '提交时间', dataIndex: 'createTime', width: 180, render: value => formatTimestamp(value) },
       { title: '状态', dataIndex: 'status', width: 100, render: value => <Tag color={value === 'pending' ? 'processing' : 'success'}>{value === 'pending' ? '待处理' : '已处理'}</Tag> },
       { title: '结论', dataIndex: 'result', width: 100, render: value => value === 'founded' ? '成立' : value === 'unfounded' ? '不成立' : '-' },
