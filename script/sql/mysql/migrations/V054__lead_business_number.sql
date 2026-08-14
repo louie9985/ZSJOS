@@ -48,9 +48,10 @@ FROM (
   FROM `zsjos_lead`
 ) ranked;
 
+-- Avoid `generated` as an alias because it is reserved by MySQL 8.4.
 UPDATE `zsjos_lead` lead_row
-JOIN `tmp_v054_lead_no` generated ON generated.id=lead_row.id
-SET lead_row.lead_no=generated.lead_no
+JOIN `tmp_v054_lead_no` generated_row ON generated_row.id=lead_row.id
+SET lead_row.lead_no=generated_row.lead_no
 WHERE lead_row.lead_no IS NULL;
 
 INSERT INTO `zsjos_lead_no_daily_counter`

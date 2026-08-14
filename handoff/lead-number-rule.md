@@ -82,3 +82,17 @@
 - Remaining work: Real MySQL and authenticated browser verification remain unexecuted; local branch/worktree will be removed under the confirmed cleanup scope.
 - Status: `merged`
 - Merge commit: `9ccc859242`
+
+## V054 Execution 2026-08-14 16:31:00 +08:00
+- Beijing time: `2026-08-14 16:31:00 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `b53811751a47193e3666b1fa97ad4d629f83717c`
+- User goal: Fix the V054 MySQL syntax error and execute the migration against the confirmed local database.
+- Key decisions: Renamed the `generated` JOIN alias to `generated_row` because MySQL 8.4 reserves `GENERATED`; retained the `lead-business-number-v2` semantics and checksum; applied only to Docker `yudao-mysql` database `ruoyi-vue-pro` while the application port was not listening.
+- Execution or analysis result: The earlier partial run had created the nullable column and counter table but assigned no numbers and recorded no version. The corrected migration completed twice without changing identifiers on the second run.
+- Changed files: `script/sql/mysql/migrations/V054__lead_business_number.sql`; this handoff.
+- Verification evidence: MySQL `8.4.11`; preflight found 17 null Lead numbers and zero generated-number collisions. After execution: 17 rows, zero nulls, zero format failures, zero tenant-number duplicates, five counter rows, zero counter mismatches, unique index present, both V054 version records present, and identical pre/post-rerun SHA-256 identifier digest `1c06a7416c64851fed8b642d5101c50fdac7a17885b3a41baad78bf3a9e8659b`.
+- Dependency or integration impact: Local `ruoyi-vue-pro` now requires application code that supplies `lead_no`; V054 is durable and precedes V055. No rows were deleted, no service was started or stopped, and no remote database was changed.
+- Remaining work: MySQL 8.4 reports the existing `VALUES()` upsert form as deprecated but still supported; migrate those upserts in a future forward migration or repository-wide compatibility task. Authenticated application verification remains unexecuted because port 48080 was not listening.
+- Status: `migration-applied-local`
