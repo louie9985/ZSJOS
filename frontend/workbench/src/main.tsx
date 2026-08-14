@@ -384,7 +384,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
             { type: 'divider' },
             { key: 'logout', label: <><LogoutOutlined/> 退出登录</>, onClick: onLogout }
           ] }}>
-            <EmployeeAvatar avatar={info.user?.avatar} name={info.user?.nickname || info.user?.username} style={{ backgroundColor: token.colorPrimary, cursor: 'pointer' }}/>
+            <EmployeeAvatar avatar={info.user?.avatar} name={info.user?.nickname || info.user?.username} style={{ backgroundColor: 'transparent', cursor: 'pointer' }}/>
           </Dropdown>
         </Space>
       </Header>
