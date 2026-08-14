@@ -57,7 +57,10 @@
 
 <script setup lang="ts">
 import * as CashbackApi from '@/api/zsjos/cashback'
+import { useUserStore } from '@/store/modules/user'
+import { cashbackDataScope } from '@/utils/zsjosDataScope'
 defineOptions({ name: 'ZsjosCashback' })
+const userStore = useUserStore()
 const loading = ref(false)
 const error = ref('')
 const list = ref<CashbackApi.CashbackVO[]>([])
@@ -80,7 +83,11 @@ const load = async () => {
   loading.value = true
   error.value = ''
   try {
-    const data = await CashbackApi.getFinanceCashbackPage(query)
+    const scope = cashbackDataScope(userStore.getPermissions)
+    if (scope === 'unauthorized') throw new Error('暂无返现查询权限')
+    const data = await (scope === 'all'
+      ? CashbackApi.getFinanceCashbackPage(query)
+      : CashbackApi.getMyCashbackPage(query))
     list.value = data.list
     total.value = data.total
   } catch (e: any) {

@@ -87,3 +87,44 @@
 - Verification evidence: Eight focused Cashback/Withdrawal tests passed, covering ordered selection locks, single-node BPM assignees, approve/reject state mapping, Cashback release, proof ownership, payout transition and order-rejection lock; full `yudao-server` dependency graph package passed; Admin Vite production build passed with 8104 transformed modules; focused Prettier and ESLint passed by directly invoking repository-installed binaries; `git diff --check` passed; Core and fresh schema SHA-256 hashes both equal `801F61454507AC07B2E57FF84BB9BA15EA1020D681D7C0A7D50502106EB62645`; V052 menu IDs 6890-6895 have no repository collision. Vite emitted only the existing NODE_ENV and legacy `*zoom` warnings.
 - Dependency or integration impact: No new dependency, role grant, real migration, BPM deployment, external message, shared-service mutation or remote push. The exact BPM process key is `zsjos_partner_withdrawal`, task key `financeReview`, business key `withdrawal:<id>`; an undeployed process or empty reviewer set safely rolls back the application.
 - Remaining work: After `order-supervisor-confirmation` is committed/integrated, invoke deal-Cashback generation for order items and call `CashbackService.assertOrderRejectable(orderId)` inside every registration/finance rejection transaction while holding the order lock; then rerun combined order/Cashback/Withdrawal concurrency tests. Deploy and verify the BPM process through the existing BPM management facility. The repository has no versioned BPMN business-asset convention, so no speculative XML was added. Real MySQL repeatability, authenticated HTTP/BPM/Infra-file requests, real notifications, desktop/mobile browser verification and scheduler execution remain unverified. `zsjos-db check` still reports only the pre-existing missing Core mappings `zsjos_lead_claim_daily_counter` and `zsjos_lead_transfer_request`; repository-wide `vue-tsc` retains unrelated auto-import failures. Actual Cashback/Withdrawal spreadsheet providers still require the separately unconfirmed Excel dependency decision.
+
+## Delivery entry - 2026-08-14 10:05:10 +08:00
+
+- Branch: `codex/crm3-gap-completion`
+- Worktree: `D:\ZSJ-OS-worktrees\crm3-gap-completion`
+- HEAD commit: `1dda13f3d59d86ac4f5e25fe886856f8a718376f`
+- User goal: Implement the confirmed code-review remediation plan without changing existing roles or applied V048-V052 migrations.
+- Key decisions: Preserve existing authorization semantics; use a dedicated own-detail endpoint for own-scope withdrawal users; retain export file references until expiry/terminal cleanup; fail closed on a conflicting V053 menu ID rather than marking the permission applied.
+- Execution result: Fixed import update self-collision, unexpired export deletion, orphan-file cleanup on failed attachment, batch cleanup starvation, own withdrawal detail authorization, and V053 collision handling. Re-ran OCR review after fixes.
+- Changed files: `AdminUserServiceImpl.java`, `ExportTaskMapper.java`, `ExportTaskServiceImpl.java`, withdrawal frontend API/view, `V053__withdrawal_finance_query_permission.sql`, and this handoff.
+- Verification evidence: Focused Maven tests passed (12 tests); frontend Node tests passed (4 tests); focused Prettier and ESLint passed; Admin production Vite build passed; `git diff --check` passed. OCR initial review found 8 issues and all actionable findings were addressed; follow-up review result is pending at handoff append time. MySQL client is unavailable, so live SQL execution/repeatability is unverified.
+- Dependency or integration impact: No new dependency, role grant, branch/commit/merge, remote push, or applied migration rewrite. V053 remains additive and checks the expected permission before recording its schema version.
+- Remaining work: Collect the follow-up OCR result, run live MySQL/bootstrap verification when a database client/environment is available, and perform authenticated HTTP/BPM/file-cleanup and desktop/mobile browser checks.
+
+## Delivery correction - 2026-08-14 10:08:39 +08:00
+
+- Branch: `codex/crm3-gap-completion`
+- Worktree: `D:\ZSJ-OS-worktrees\crm3-gap-completion`
+- HEAD commit: `1dda13f3d59d86ac4f5e25fe886856f8a718376f`
+- User goal: Address follow-up review findings without changing the approved permission model or cancellation notification decision.
+- Key decisions: Treat `*:*:*` as all-scope in the shared frontend helper; move failed cleanup rows to the back of the retry queue; leave BPM-cancelled withdrawals without reviewer attribution or rejection reason; make V053 conditional for both menu-ID and permission collisions.
+- Execution result: Applied follow-up OCR fixes and added the V053 uniqueness verification query plus wildcard scope tests.
+- Changed files: Shared data-scope helper/tests, export mapper/service, withdrawal service, V053 migration, bootstrap verification SQL, and this handoff.
+- Verification evidence: Focused ZSJOS Maven tests passed; frontend Node tests (4), Prettier, ESLint, and `git diff --check` passed. Production build was already green before these helper-only changes and should be rerun for final release evidence. Live MySQL remains unavailable.
+- Dependency or integration impact: No dependency, role grant, migration rewrite, branch operation, commit, merge, or push.
+- Remaining work: Rerun the frontend production build, then deliver with SQL runtime and authenticated integration checks explicitly marked unverified.
+
+## Delivery correction - 2026-08-14 10:10:00 +08:00
+
+- Branch: `codex/crm3-gap-completion`
+- Worktree: `D:\ZSJ-OS-worktrees\crm3-gap-completion`
+- HEAD commit: `1dda13f3d59d86ac4f5e25fe886856f8a718f`
+- User goal: Finish the follow-up review remediation and verification.
+- Key decisions: Wildcard permissions resolve to all-scope; retry failures advance `lastActiveAt`; BPM cancellation leaves finance-review metadata unset; V053 inserts only when both the target ID and permission are free and records its version only after the expected row exists.
+- Execution result: Completed the follow-up code fixes and added V053 active-permission uniqueness verification.
+- Changed files: Shared scope helper/tests, export cleanup mapper/service, withdrawal BPM result handling, V053 SQL, verification SQL, and this handoff.
+- Verification evidence: ZSJOS focused Maven tests passed; frontend Node tests (4), Prettier, ESLint, and production Vite build passed. Build emitted only existing `NODE_ENV` and `*zoom` warnings. `git diff --check` passed. MySQL client/runtime and isolated destructive collision fixture remain unavailable/unrun.
+- Dependency or integration impact: No dependency, role grant, branch operation, commit, merge, or push.
+- Remaining work: Run MySQL migration repeatability/collision fixture and authenticated BPM, file-storage, browser, and scheduler checks in an available environment.
+
+Correction: The HEAD commit recorded in the preceding entry is `1dda13f3d59d86ac4f5e25fe886856f8a718376f`.

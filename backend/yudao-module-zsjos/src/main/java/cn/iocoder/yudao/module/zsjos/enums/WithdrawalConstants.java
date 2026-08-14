@@ -19,6 +19,7 @@ public interface WithdrawalConstants {
     String SCENE_REJECTED = "zsjos.withdrawal.rejected";
     String SCENE_PAID = "zsjos.withdrawal.paid";
     String SCENE_FINANCE_REMINDER = "zsjos.withdrawal.finance_reminder";
+    String NOTIFICATION_REJECTION_REASON = "withdrawal.rejectionReason";
     String ROLE_APPLICANT = "applicant";
     String ROLE_FINANCE = "finance";
 }

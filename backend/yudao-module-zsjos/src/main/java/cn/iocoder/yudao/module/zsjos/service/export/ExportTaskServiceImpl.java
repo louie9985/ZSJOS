@@ -147,12 +147,36 @@ public class ExportTaskServiceImpl implements ExportTaskService {
                     .setResultFileSize((long) result.content().length).setReadyAt(now).setExpiresAt(now.plusDays(7))
                     .setLeaseExpiresAt(null).setLastActiveAt(now).setFailureCode(null).setFailureMessage(null)
                     .setNextAttemptAt(null);
-            if (mapper.transition(task.getId(), task.getVersion(), List.of(GENERATING), ready) != 1) return;
+            if (mapper.transition(task.getId(), task.getVersion(), List.of(GENERATING), ready) != 1) {
+                if (mapper.attachTerminalFile(task.getId(), file.getId(), file.getName(), file.getSize()) == 0) {
+                    try {
+                        fileApi.deleteFileIfExists(file.getId());
+                    } catch (Exception cleanupError) {
+                        // The task may be reclaimed by another worker; keep the failure visible for the scheduler log.
+                        throw new IllegalStateException("导出结果文件无法挂载或删除: " + task.getId(), cleanupError);
+                    }
+                }
+                return;
+            }
             auditService.record("export", "export.generate", "export_task", task.getId().toString(),
                     "系统", Map.of("exportType", task.getExportType(), "taskNo", task.getTaskNo(),
                             "rowCount", result.rowCount()));
         } catch (Exception error) {
             retryOrFail(task, error);
+        }
+    }
+
+    @Override
+    public void cleanupTerminalFiles() {
+        for (ExportTaskDO task : mapper.selectTerminalWithFiles()) {
+            try {
+                fileApi.deleteFileIfExists(task.getResultFileId());
+                mapper.clearResultFile(task.getId(), task.getVersion(), task.getResultFileId());
+            } catch (Exception error) {
+                // Keep processing other files; the failed row remains referenced for the next retry.
+                mapper.touchCleanupAttempt(task.getId(), task.getVersion());
+                continue;
+            }
         }
     }
 

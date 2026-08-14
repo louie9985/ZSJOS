@@ -38,6 +38,7 @@ SOURCE script/sql/mysql/migrations/V049__maintenance_mode_and_scheduler_guard.sq
 SOURCE script/sql/mysql/migrations/V050__readonly_impersonation_and_audit_catalog.sql;
 SOURCE script/sql/mysql/migrations/V051__cashback_domain.sql;
 SOURCE script/sql/mysql/migrations/V052__withdrawal_and_offline_payout.sql;
+SOURCE script/sql/mysql/migrations/V053__withdrawal_finance_query_permission.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

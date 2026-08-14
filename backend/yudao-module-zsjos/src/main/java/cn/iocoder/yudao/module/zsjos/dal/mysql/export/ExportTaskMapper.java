@@ -47,9 +47,17 @@ public interface ExportTaskMapper extends BaseMapperX<ExportTaskDO> {
                 .le(ExportTaskDO::getExpiresAt, now).last("LIMIT 200"));
     }
 
+    default List<ExportTaskDO> selectTerminalWithFiles() {
+        return selectList(new LambdaQueryWrapperX<ExportTaskDO>()
+                .in(ExportTaskDO::getStatus, List.of(FAILED, CANCELLED, EXPIRED))
+                .isNotNull(ExportTaskDO::getResultFileId)
+                .orderByAsc(ExportTaskDO::getLastActiveAt).last("LIMIT 200"));
+    }
+
     default int deleteInactiveTerminal(LocalDateTime inactiveBefore) {
         return delete(new LambdaQueryWrapperX<ExportTaskDO>()
                 .in(ExportTaskDO::getStatus, List.of(READY, FAILED, CANCELLED, EXPIRED))
+                .isNull(ExportTaskDO::getResultFileId)
                 .le(ExportTaskDO::getLastActiveAt, inactiveBefore));
     }
 
@@ -61,5 +69,35 @@ public interface ExportTaskMapper extends BaseMapperX<ExportTaskDO> {
         org.springframework.beans.BeanUtils.copyProperties(values, updateValues);
         updateValues.setId(null).setVersion(version + 1);
         return update(updateValues, update);
+    }
+
+    default int clearResultFile(Long id, Integer version, Long fileId) {
+        return update(null, new LambdaUpdateWrapper<ExportTaskDO>()
+                .eq(ExportTaskDO::getId, id).eq(ExportTaskDO::getVersion, version)
+                .eq(ExportTaskDO::getResultFileId, fileId)
+                .set(ExportTaskDO::getResultFileId, null)
+                .set(ExportTaskDO::getResultFileName, null)
+                .set(ExportTaskDO::getResultFileSize, null)
+                .set(ExportTaskDO::getLastActiveAt, LocalDateTime.now())
+                .set(ExportTaskDO::getVersion, version + 1));
+    }
+
+    default int touchCleanupAttempt(Long id, Integer version) {
+        return update(null, new LambdaUpdateWrapper<ExportTaskDO>()
+                .eq(ExportTaskDO::getId, id)
+                .eq(ExportTaskDO::getVersion, version)
+                .isNotNull(ExportTaskDO::getResultFileId)
+                .set(ExportTaskDO::getLastActiveAt, LocalDateTime.now())
+                .set(ExportTaskDO::getVersion, version + 1));
+    }
+
+    default int attachTerminalFile(Long id, Long fileId, String fileName, Long fileSize) {
+        return update(null, new LambdaUpdateWrapper<ExportTaskDO>()
+                .eq(ExportTaskDO::getId, id)
+                .in(ExportTaskDO::getStatus, List.of(FAILED, CANCELLED, EXPIRED))
+                .isNull(ExportTaskDO::getResultFileId)
+                .set(ExportTaskDO::getResultFileId, fileId)
+                .set(ExportTaskDO::getResultFileName, fileName)
+                .set(ExportTaskDO::getResultFileSize, fileSize));
     }
 }

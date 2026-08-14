@@ -36,6 +36,7 @@ public class ExportTaskScheduler {
             TenantUtils.execute(tenantId, () -> {
                 try {
                     service.expireFiles();
+                    service.cleanupTerminalFiles();
                     service.cleanInactiveTasks();
                 } catch (RuntimeException error) {
                     log.error("[expireFiles][tenantId({}) 清理过期导出失败]", tenantId, error);

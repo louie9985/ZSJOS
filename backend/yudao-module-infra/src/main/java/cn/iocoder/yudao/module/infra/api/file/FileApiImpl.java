@@ -38,6 +38,11 @@ public class FileApiImpl implements FileApi {
     }
 
     @Override
+    public boolean deleteFileIfExists(Long fileId) throws Exception {
+        return fileService.deleteFileIfExists(fileId);
+    }
+
+    @Override
     public String presignGetUrl(String url, Integer expirationSeconds) {
         return fileService.presignGetUrl(url, expirationSeconds);
     }

@@ -16,12 +16,16 @@ public final class AuditActionCatalog {
     public static final String IMPERSONATION_END = "impersonation.end";
     public static final String IMPERSONATION_READ = "impersonation.read";
     public static final String WITHDRAWAL_CARD_VIEW = "withdrawal.card.view";
+    public static final String WITHDRAWAL_SUBMITTED = "withdrawal.submitted";
+    public static final String WITHDRAWAL_APPROVED = "withdrawal.approved";
+    public static final String WITHDRAWAL_REJECTED = "withdrawal.rejected";
     public static final String WITHDRAWAL_PAYOUT = "withdrawal.payout";
 
     public static final Map<String, Set<String>> ACTIONS = Map.of(
             CATEGORY_EXPORT, Set.of(EXPORT_CREATE, EXPORT_GENERATE, EXPORT_DOWNLOAD, EXPORT_CANCEL),
             CATEGORY_IMPERSONATION, Set.of(IMPERSONATION_START, IMPERSONATION_END, IMPERSONATION_READ),
-            CATEGORY_WITHDRAWAL, Set.of(WITHDRAWAL_CARD_VIEW, WITHDRAWAL_PAYOUT));
+            CATEGORY_WITHDRAWAL, Set.of(WITHDRAWAL_CARD_VIEW, WITHDRAWAL_SUBMITTED,
+                    WITHDRAWAL_APPROVED, WITHDRAWAL_REJECTED, WITHDRAWAL_PAYOUT));
 
     private AuditActionCatalog() {
     }

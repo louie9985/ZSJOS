@@ -571,9 +571,11 @@ public class AdminUserServiceImpl implements AdminUserService {
                 respVO.getFailureUsernames().put(key, ex.getMessage());
                 return;
             }
-            // 2.1.2 校验，判断是否有不符合的原因
+            // 2.1.2 校验，判断是否有不符合的原因。更新模式需要排除同名的当前账号。
+            AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
+            Long userId = isUpdateSupport && existUser != null ? existUser.getId() : null;
             try {
-                validateUserForCreateOrUpdate(null, null, importUser.getMobile(), importUser.getEmail(),
+                validateUserForCreateOrUpdate(userId, importUser.getUsername(), importUser.getMobile(), importUser.getEmail(),
                         importUser.getDeptId(), null);
             } catch (ServiceException ex) {
                 respVO.getFailureUsernames().put(importUser.getUsername(), ex.getMessage());
@@ -581,7 +583,6 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
 
             // 2.2.1 判断如果不存在，在进行插入
-            AdminUserDO existUser = userMapper.selectByUsername(importUser.getUsername());
             if (existUser == null) {
                 userMapper.insert(BeanUtils.toBean(importUser, AdminUserDO.class)
                         .setPassword(encodePassword(initPassword)).setPostIds(new HashSet<>())); // 设置默认密码及空岗位编号数组

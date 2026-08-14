@@ -11,5 +11,6 @@ public interface ExportTaskService {
     String getDownloadUrl(Long userId, Long taskId);
     int processAvailable();
     int expireFiles();
+    void cleanupTerminalFiles();
     int cleanInactiveTasks();
 }

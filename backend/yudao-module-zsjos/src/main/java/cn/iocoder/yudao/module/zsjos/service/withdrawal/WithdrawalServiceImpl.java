@@ -124,6 +124,8 @@ public class WithdrawalServiceImpl implements WithdrawalService {
             throw exception(WITHDRAWAL_PROCESS_UNAVAILABLE);
         }
         withdrawalMapper.updateById(record);
+        auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_SUBMITTED, "withdrawal", String.valueOf(record.getId()),
+                "partner", Map.of("amount", amount, "cashbackCount", selected.size()));
         notifyPublisher.publish(SCENE_SUBMITTED, record.getId(), "withdrawal-submitted:" + record.getId(), userId,
                 notifyPayload(record, financeUsers));
         return record.getId();
@@ -138,8 +140,6 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         if (!STATUS_PENDING.equals(record.getStatus())) throw exception(WITHDRAWAL_STATE_INVALID);
         record.setStatus(STATUS_CANCELLED).setCancelledByUserId(userId).setCancelledAt(LocalDateTime.now());
         withdrawalMapper.updateById(record); releaseCashbacks(record.getId());
-        notifyPublisher.publish(SCENE_REJECTED, id, "withdrawal-rejected-after-approval:" + id,
-                userId, notifyPayload(record, financeReviewers()));
         processInstanceApi.cancelProcessInstanceByStartUser(userId, record.getProcessInstanceId(), "兼职撤销提现申请");
     }
 
@@ -152,6 +152,10 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         record.setStatus(STATUS_REJECTED).setReviewedByUserId(userId).setReviewedAt(LocalDateTime.now())
                 .setRejectionReason(reason.trim());
         withdrawalMapper.updateById(record); releaseCashbacks(record.getId());
+        auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_REJECTED, "withdrawal", String.valueOf(id),
+                "finance", Map.of("amount", record.getApplicationAmount(), "reason", record.getRejectionReason()));
+        notifyPublisher.publish(SCENE_REJECTED, id, "withdrawal-rejected:" + id,
+                userId, notifyPayload(record, financeReviewers()));
     }
 
     @Override
@@ -194,15 +198,27 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         WithdrawalDO record = lock(found.getId());
         if (!STATUS_PENDING.equals(record.getStatus())) return;
         LocalDateTime now = LocalDateTime.now();
+        var statuses = processTaskApi.getProcessNodeStatuses(processInstanceId, Set.of(TASK_DEFINITION_KEY));
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
-            record.setStatus(STATUS_APPROVED).setApprovedAmount(record.getApplicationAmount());
-            var statuses = processTaskApi.getProcessNodeStatuses(processInstanceId, Set.of(TASK_DEFINITION_KEY));
             if (!statuses.isEmpty()) record.setReviewedByUserId(statuses.getFirst().getReviewerUserId());
             record.setReviewedAt(now);
+            record.setStatus(STATUS_APPROVED).setApprovedAmount(record.getApplicationAmount());
+            auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_APPROVED, "withdrawal",
+                    String.valueOf(record.getId()), "finance", Map.of("amount", record.getApplicationAmount()));
         } else {
-            record.setStatus(BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)
-                    ? STATUS_REJECTED : STATUS_CANCELLED).setRejectionReason(reason).setReviewedAt(now);
+            boolean rejected = BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus);
+            if (rejected) {
+                if (!statuses.isEmpty()) record.setReviewedByUserId(statuses.getFirst().getReviewerUserId());
+                record.setReviewedAt(now);
+            }
+            record.setStatus(rejected ? STATUS_REJECTED : STATUS_CANCELLED)
+                    .setRejectionReason(rejected ? reason : null);
             releaseCashbacks(record.getId());
+            if (STATUS_REJECTED.equals(record.getStatus())) {
+                auditService.record(CATEGORY_WITHDRAWAL, WITHDRAWAL_REJECTED, "withdrawal",
+                        String.valueOf(record.getId()), "finance", Map.of("amount", record.getApplicationAmount(),
+                                "reason", StrUtil.nullToEmpty(reason)));
+            }
         }
         withdrawalMapper.updateById(record);
         notifyPublisher.publish(STATUS_APPROVED.equals(record.getStatus()) ? SCENE_APPROVED : SCENE_REJECTED,
@@ -313,6 +329,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     private Map<String, Object> notifyPayload(WithdrawalDO record, List<Long> financeUsers) {
         Map<String, Object> payload = new LinkedHashMap<>(); payload.put("withdrawal.id", record.getId());
         payload.put("withdrawal.amount", record.getApplicationAmount()); payload.put("applicantUserId", record.getApplicantUserId());
+        if (StrUtil.isNotBlank(record.getRejectionReason())) payload.put(NOTIFICATION_REJECTION_REASON, record.getRejectionReason());
         payload.put("financeUserIds", financeUsers); return payload;
     }
 

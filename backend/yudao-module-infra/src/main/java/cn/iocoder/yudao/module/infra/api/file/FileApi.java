@@ -59,6 +59,11 @@ public interface FileApi {
     FileInfoRespDTO getFileInfo(@NotNull(message = "文件编号不能为空") Long fileId);
 
     /**
+     * 删除文件；文件已经不存在时返回 false，不视为失败。
+     */
+    boolean deleteFileIfExists(@NotNull(message = "文件编号不能为空") Long fileId) throws Exception;
+
+    /**
      * 生成文件预签名地址，用于读取
      *
      * @param url 完整的文件访问地址

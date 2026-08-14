@@ -66,4 +66,6 @@ V051 additively introduces product/category cashback rules, an empty cashback ta
 
 V052 adds empty partner-card, withdrawal and withdrawal-item tables, BPM references, active-cashback uniqueness, offline payout evidence, default rules and ungranted permissions. Deploy BPM key `zsjos_partner_withdrawal` separately; rollback disables the process and menus while retaining financial history.
 
+V053 adds the ungranted `zsjos:withdrawal:finance-query` child permission required for finance full-card queries. It does not grant the permission to any role and is repeatable through `INSERT IGNORE` and schema-version upserts.
+
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.

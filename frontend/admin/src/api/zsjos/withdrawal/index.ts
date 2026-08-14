@@ -21,6 +21,7 @@ export interface WithdrawalVO {
 export const getPage = (params: any) => request.get({ url: '/zsjos/withdrawal/page', params })
 export const getMyPage = (params: any) => request.get({ url: '/zsjos/withdrawal/my-page', params })
 export const getDetail = (id: number) => request.get({ url: `/zsjos/withdrawal/${id}` })
+export const getMyDetail = (id: number) => request.get({ url: `/zsjos/withdrawal/my/${id}` })
 export const getFinanceDetail = (id: number) =>
   request.get({ url: `/zsjos/withdrawal/${id}/finance-detail` })
 export const apply = (data: any) => request.post({ url: '/zsjos/withdrawal/apply', data })

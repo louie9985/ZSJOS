@@ -42,7 +42,10 @@
         <template #default="scope">
           <el-button link @click="openDetail(scope.row.id)">详情</el-button>
           <el-button
-            v-if="scope.row.status === 'pending_review'"
+            v-if="
+              scope.row.status === 'pending_review' &&
+              scope.row.applicantUserId === userStore.getUser.id
+            "
             v-hasPermi="['zsjos:withdrawal:apply']"
             link
             type="danger"
@@ -174,6 +177,7 @@
 import * as Api from '@/api/zsjos/withdrawal'
 import * as CashbackApi from '@/api/zsjos/cashback'
 import { useUserStore } from '@/store/modules/user'
+import { withdrawalDataScope } from '@/utils/zsjosDataScope'
 defineOptions({ name: 'ZsjosWithdrawal' })
 const userStore = useUserStore()
 const loading = ref(false),
@@ -216,10 +220,9 @@ const load = async () => {
   loading.value = true
   error.value = ''
   try {
-    const own =
-      userStore.getPermissions.has('zsjos:withdrawal:my-query') &&
-      !userStore.getPermissions.has('zsjos:withdrawal:finance-query')
-    const data = await (own ? Api.getMyPage(query) : Api.getPage(query))
+    const scope = withdrawalDataScope(userStore.getPermissions)
+    if (scope === 'unauthorized') throw new Error('暂无提现查询权限')
+    const data = await (scope === 'own' ? Api.getMyPage(query) : Api.getPage(query))
     list.value = data.list
     total.value = data.total
   } catch (e: any) {
@@ -229,8 +232,12 @@ const load = async () => {
   }
 }
 const openDetail = async (id: number) => {
-  const finance = userStore.getPermissions.has('zsjos:withdrawal:finance-query')
-  detail.value = await (finance ? Api.getFinanceDetail(id) : Api.getDetail(id))
+  const scope = withdrawalDataScope(userStore.getPermissions)
+  detail.value = await (scope === 'all'
+    ? userStore.getPermissions.has('zsjos:withdrawal:finance-query')
+      ? Api.getFinanceDetail(id)
+      : Api.getDetail(id)
+    : Api.getMyDetail(id))
   detailVisible.value = true
 }
 const openReject = (id: number) => {

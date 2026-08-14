@@ -34,7 +34,8 @@ public class WithdrawalNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("pendingCount", "待审核笔数", false),
                 new NotifySceneVariableRespDTO("approvedCount", "待打款笔数", false),
                 new NotifySceneVariableRespDTO("approvedAmount", "待打款金额", false),
-                new NotifySceneVariableRespDTO("overdueCount", "超时未完成笔数", false)),
+                new NotifySceneVariableRespDTO("overdueCount", "超时未完成笔数", false),
+                new NotifySceneVariableRespDTO(NOTIFICATION_REJECTION_REASON, "驳回原因", false)),
                 Arrays.stream(roles).map(role -> new NotifySceneRoleRespDTO(role,
                         ROLE_FINANCE.equals(role) ? "财务" : "申请人")).toList(),
                 List.of(NotifyActionType.NONE, NotifyActionType.BUSINESS_DETAIL), false);

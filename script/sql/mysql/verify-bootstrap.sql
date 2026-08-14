@@ -451,3 +451,9 @@ SELECT 'V052 withdrawal active uniqueness' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='zsjos_withdrawal_item' AND index_name='uk_active_cashback')>0,'PASS','FAIL') AS result;
 SELECT 'V052 withdrawal menus' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id BETWEEN 6890 AND 6895)=6,'PASS','FAIL') AS result;
+SELECT 'V053 withdrawal finance query permission' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id=6896
+             AND permission='zsjos:withdrawal:finance-query')=1,'PASS','FAIL') AS result;
+SELECT 'V053 withdrawal finance query permission unique' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0'
+             AND permission='zsjos:withdrawal:finance-query')=1,'PASS','FAIL') AS result;
