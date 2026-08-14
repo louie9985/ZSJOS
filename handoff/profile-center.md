@@ -53,3 +53,17 @@
 - Dependency or integration impact: Overlaps Workbench routing, API, constants, styles, and permission-flow documentation with other authorized workstreams.
 - Remaining work: Create the feature commit, record it, merge into main, and run integrated verification.
 - Status: ready-to-merge
+
+## Final commit record 2026-08-14 16:05:00 +08:00
+- Beijing time: 2026-08-14 16:05:00 +08:00
+- Branch: codex/profile-center
+- Worktree: D:\ZSJ-OS-profile-center
+- HEAD commit: e9c38fc62f1a26500dbd71d4e8e3eac7bb553623
+- User goal: Record the authorized feature commit before integration.
+- Key decisions: Treat e9c38fc62f1a26500dbd71d4e8e3eac7bb553623 as the final functional commit; this entry changes handoff metadata only.
+- Execution or analysis result: Feature commit created successfully and the worktree is clean.
+- Changed files: handoff/profile-center.md only.
+- Verification evidence: git diff --cached --check passed before the feature commit; prior focused verification remains recorded above.
+- Dependency or integration impact: None beyond the recorded profile-center implementation.
+- Remaining work: Merge into local main and run integrated verification.
+- Final commit: e9c38fc62f1a26500dbd71d4e8e3eac7bb553623
