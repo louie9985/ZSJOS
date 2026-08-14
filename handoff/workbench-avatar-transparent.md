@@ -40,3 +40,16 @@
 - Dependency or integration impact: UI-only overlap in `frontend/workbench/src/main.tsx`.
 - Remaining work: Create the feature commit, record it, merge last among header changes, and run integrated verification.
 - Status: `ready-to-merge`
+
+### 2026-08-14 16:05:00 +08:00
+- Branch: `codex/workbench-avatar-transparent`
+- Worktree: `D:\ZSJ-OS-worktrees\workbench-avatar-transparent`
+- HEAD commit: `510a7ade661943c73192efccc633ad4a8639615c`
+- User goal: Record the authorized feature commit before integration.
+- Key decisions: Treat `510a7ade661943c73192efccc633ad4a8639615c` as the final functional commit; this entry changes handoff metadata only.
+- Execution or analysis result: Feature commit created successfully and the worktree is clean.
+- Changed files: `handoff/workbench-avatar-transparent.md` only.
+- Verification evidence: `git diff --cached --check` passed before the feature commit; prior focused verification remains recorded above.
+- Dependency or integration impact: None beyond the isolated avatar style.
+- Remaining work: Merge last among Workbench header changes and run integrated verification.
+- Final commit: `510a7ade661943c73192efccc633ad4a8639615c`
