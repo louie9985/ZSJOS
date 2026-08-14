@@ -8,6 +8,8 @@ public interface SalesOrderConstants {
     String BUSINESS_KEY_PREFIX = "sales-order:";
     String TASK_REGISTRATION = "registrationReview";
     String TASK_FINANCE = "financeReview";
+    String CENTER_REGISTRATION = "registration";
+    String CENTER_FINANCE = "finance";
 
     String STATUS_PENDING_APPROVAL = "pending_approval";
     String STATUS_REVISION_REQUIRED = "revision_required";

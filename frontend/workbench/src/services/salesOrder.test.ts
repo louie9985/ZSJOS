@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { mergeSalesOrderListItems, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
-import type { SalesOrderListItem } from './api'
+import { canReviewSalesOrderTask, mergeSalesOrderListItems, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
+import type { SalesOrderApprovalStatus, SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
   it('requires mobile or WeChat', () => {
@@ -31,5 +31,15 @@ describe('sales-order inbox helpers', () => {
   it('keeps two approval-center tasks for the same order', () => {
     const merged = mergeSalesOrderListItems([item(1, 'registration-task')], [item(1, 'finance-task')], salesOrderTaskKey)
     expect(merged.map(value => value.taskId)).toEqual(['registration-task', 'finance-task'])
+  })
+
+  it('only allows actions while the selected center task is still pending', () => {
+    const task = { ...item(1, 'registration-task'), taskDefinitionKey: 'registrationReview' as const }
+    const order: { status: 'pending_approval'; registrationApproval: SalesOrderApprovalStatus } = {
+      status: 'pending_approval', registrationApproval: { status: 'pending' }
+    }
+    expect(canReviewSalesOrderTask(order, task)).toBe(true)
+    order.registrationApproval = { status: 'approved', reviewerUserId: 233, reviewerUserName: '审核员甲', endTime: 1 }
+    expect(canReviewSalesOrderTask(order, task)).toBe(false)
   })
 })

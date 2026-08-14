@@ -223,15 +223,18 @@ zsjos:lead:query-all
 otherwise
   -> lead.source_user_id = current user
      OR lead.owner_user_id = current user
+     OR lead.owner_user_id belongs to a department currently led by the user,
+        including child departments
 ```
 
 - `source_user_id` is the original Lead submitter. A later `LeadActivation` submitter
   does not inherit visibility to the existing Lead from the activation alone.
 - A user who is both submitter and owner receives the Lead once, with both relation
   types in the response.
-- Page, status-count, and single-record queries apply the same rule. A direct detail
-  request cannot bypass row visibility.
-- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案，通过 `/zsjos/sales-order/approval/filter-profile` 和 `inbox-page` 消费待处理/已处理及报名履约中心/财务结算中心审批环节；页面不允许用前端选项扩大服务端返回的任务范围。
+- Page, status-count, and single-record queries apply the same team boundary. A direct
+  detail request cannot bypass row visibility. A leader of a peer department receives
+  no access, while a leader of a parent department may access owners in child departments.
+- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案：后端根据审批配置根部门及子部门解析用户可用中心，报名履约用户固定查询 `registrationReview`，财务用户固定查询 `financeReview`，同时属于两个范围的用户才可切换中心。`inbox-page` 必须将请求中心、已发布筛选条件和用户可用 BPM 节点取交集，页面隐藏另一中心不能代替授权。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询和数量统计只消费已发布版本；保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
@@ -242,6 +245,11 @@ otherwise
   owner, or `query-all` administrator. Frontends must not broaden that authorization.
 - `query-all` is an explicit permission-based bypass for the current tenant; it is
   never inferred from a role, post, department, or display name.
+- Team visibility is resolved from current System department leader relationships, not
+  from the `sales_manager` role name or its generic role data scope. The lead-management
+  user filters use `GET /zsjos/lead/visible-users`: `query-all` users receive all enabled
+  users in the tenant; other users receive only themselves and enabled users in departments
+  they currently lead, including child departments.
 - V007 通过既有菜单权限关系分配固定入口：提交权限映射到“我提交的”，抢单或接单权限映射到“我负责的”，`query-all` 映射到两者；不根据角色名或岗位名推断。
 - V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
 
@@ -303,6 +311,7 @@ lead-category labels, remark, and attachment images.
 - `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. Each approval round snapshots all enabled users in each root department and its children; department names, role names and frontend menus are not reviewer sources.
 - 成交订单提交/补正只通知本轮两个配置部门解析出的实际审批人；最终通过、拒绝或取消只通知订单提交销售。通知显示配置根部门名称，内部任务键仍保持 `registrationReview` / `financeReview`。
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
+- 订单详情通过 BPM 公共 API 汇总当前轮次两个节点的 `pending/approved/rejected/cancelled` 状态并展示给已有订单读取权限的用户；汇总优先保留实际通过或驳回决定，不能让同组后续取消的会签任务覆盖结果。ZSJOS 不新增审批任务或节点状态表。
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`.
 - 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。筛选项稳定编码使用小写下划线格式 `registration_review` / `finance_review`，与保持 BPM 契约的驼峰条件值相互独立；读取历史配置时兼容旧筛选项编码，并在下一次保存或发布时规范化。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
 - 工作台业务附件选择后先保留本地文件和预览地址，确认提交时才通过 Infra 文件 API 上传 COS；任一上传失败都不会发送业务命令，成功引用和失败项会保留以便重试。删除只移除当前表单引用，不物理删除已上传文件。

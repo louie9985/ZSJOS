@@ -23,6 +23,7 @@ import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
   dictionaryDisplayLabel,
+  invalidReasonSnapshotLabel,
   mergeUniqueLeads,
   protocolDisplayLabel,
   tryStartLeadPageRequest
@@ -50,6 +51,7 @@ import {
   unseenLeadIds,
   type UnseenLeadDetail
 } from '../services/leadInboxUnseen'
+import { useSubmissionGuard } from '../services/submissionGuard'
 
 const PAGE_SIZE = 20
 
@@ -90,7 +92,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidReason, setInvalidReason] = useState<string>()
   const [invalidDescription, setInvalidDescription] = useState('')
   const [invalidEvidence, setInvalidEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
-  const [qualificationSaving, setQualificationSaving] = useState(false)
+  const { submitting: qualificationSaving, run: runQualification, resetIntent: resetQualificationIntent } = useSubmissionGuard()
   const [followUpOpen, setFollowUpOpen] = useState(autoExpandFollowUp)
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
@@ -119,16 +121,17 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
 
   const judgeValid = async () => {
     if (!validRemark.trim()) { message.warning('请填写有效备注'); return }
-    setQualificationSaving(true)
-    try {
-      await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey: crypto.randomUUID() })
+    await runQualification(async ({ idempotencyKey, complete }) => {
+      await api.judgeLeadValid(lead.id, { leadCategory: validCategory, remark: validRemark.trim(), idempotencyKey })
+      complete()
       message.success('已判定为有效客资')
       setValidOpen(false); setValidRemark('')
       onChanged()
-    } finally { setQualificationSaving(false) }
+    }).catch(error => message.error(error instanceof Error ? error.message : '有效判定失败'))
   }
 
   const openValid = async () => {
+    resetQualificationIntent()
     setValidCategory(lead.leadCategory); setValidRemark(''); setValidOpen(true); setValidTemplateError('')
     try { setValidTemplates(await api.dictDataByType(DICT_TYPE.LEAD_VALID_REMARK_TEMPLATE)) }
     catch (error) { setValidTemplates([]); setValidTemplateError(error instanceof Error ? error.message : '快捷备注加载失败') }
@@ -155,6 +158,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   }
 
   const openInvalid = () => {
+    resetQualificationIntent()
     setInvalidOpen(true)
     if (!invalidReasons.length && !invalidReasonLoading) void loadInvalidReasons()
     if (!invalidRemarkTemplates.length && !invalidRemarkTemplateLoading) void loadInvalidRemarkTemplates()
@@ -165,18 +169,18 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       message.warning('请选择无效原因并填写备注')
       return
     }
-    setQualificationSaving(true)
-    try {
+    await runQualification(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(invalidEvidence, api.uploadLeadQualificationImage, setInvalidEvidence)
       if (uploadResult.failed) { message.error('有判定附件上传失败，请重试失败项'); return }
-      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
+      await api.judgeLeadInvalid(lead.id, { reasonCode: invalidReason, description: invalidDescription.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
+      complete()
       message.success('已判定为无效客资')
       setInvalidOpen(false)
       setInvalidReason(undefined)
       setInvalidDescription('')
       setInvalidEvidence([])
       onChanged()
-    } finally { setQualificationSaving(false) }
+    }).catch(error => message.error(error instanceof Error ? error.message : '无效判定失败'))
   }
 
   useEffect(() => {
@@ -206,6 +210,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         </div>
       )}
     </div>
+    {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
+    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReason ? invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot) : undefined, lead.invalidDescription].filter(Boolean).join('：')}/>}
+    {lead.qualificationStatus === 'pending' && <Alert type="info" showIcon message="待完成有效性判定" description={`截止时间：${formatTimestamp(lead.qualificationDeadlineAt)}`}/>}
     <Tabs
       className="lead-detail-tabs"
       activeKey={activeTab}

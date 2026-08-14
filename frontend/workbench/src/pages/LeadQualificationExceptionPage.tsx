@@ -4,6 +4,7 @@ import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AssignmentUser, type LeadQualificationException } from '../services/api'
 import { LEAD_HANDLING_STAGE_LABELS } from '../constants'
 import { formatTimestamp } from '../services/time'
+import { useSubmissionGuard } from '../services/submissionGuard'
 
 type ExceptionType = 'suspended' | 'recycle_pending'
 type Action = 'restore' | 'transfer' | 'recycle' | 'release'
@@ -18,7 +19,7 @@ export default function LeadQualificationExceptionPage() {
   const [reason, setReason] = useState('')
   const [salesUserId, setSalesUserId] = useState<number>()
   const [candidates, setCandidates] = useState<AssignmentUser[]>([])
-  const [saving, setSaving] = useState(false)
+  const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -30,6 +31,7 @@ export default function LeadQualificationExceptionPage() {
   useEffect(() => { void load() }, [load])
 
   const openAction = async (lead: LeadQualificationException, nextAction: Action) => {
+    resetIntent()
     setSelected(lead); setAction(nextAction); setReason(''); setSalesUserId(undefined); setCandidates([])
     if (nextAction === 'transfer') {
       try { setCandidates(await api.leadTransferCandidates(lead.id)) }
@@ -40,17 +42,17 @@ export default function LeadQualificationExceptionPage() {
   const submit = async () => {
     if (!selected || !action || !reason.trim()) { message.warning('请填写处置理由'); return }
     if (action === 'transfer' && !salesUserId) { message.warning('请选择目标销售'); return }
-    setSaving(true)
-    const command = { reason: reason.trim(), idempotencyKey: crypto.randomUUID() }
-    try {
+    await runSubmission(async ({ idempotencyKey, complete }) => {
+      const command = { reason: reason.trim(), idempotencyKey }
       if (action === 'restore') await api.restoreLead(selected.id, command)
       if (action === 'transfer') await api.transferLead(selected.id, { ...command, salesUserId: salesUserId! })
       if (action === 'recycle') await api.recycleLead(selected.id, command)
       if (action === 'release') await api.releaseLeadToClaimPool(selected.id, command)
+      complete()
       message.success('异常客资已处理')
       setAction(undefined); setSelected(undefined)
       await load()
-    } finally { setSaving(false) }
+    }).catch(submitError => message.error(submitError instanceof Error ? submitError.message : '异常客资处理失败'))
   }
 
   return <section className="workspace-page">
@@ -66,7 +68,7 @@ export default function LeadQualificationExceptionPage() {
     <Spin spinning={loading}>
       <Table rowKey="id" dataSource={items} pagination={false} locale={{ emptyText: <Empty description="暂无异常客资"/> }} scroll={{ x: 860 }} columns={[
         { title: '客户', key: 'name', render: (_, row) => <div><strong>{row.submittedName}</strong><div>{row.submittedMobile || '无手机号'}</div></div> },
-        { title: '阶段', dataIndex: 'handlingStage', render: value => <Tag color="warning">{LEAD_HANDLING_STAGE_LABELS[value] || value}</Tag> },
+        { title: '阶段', dataIndex: 'handlingStage', render: value => <Tag color="warning">{LEAD_HANDLING_STAGE_LABELS[value] || '未知处理阶段'}</Tag> },
         { title: type === 'suspended' ? '当前销售' : '回收来源销售', key: 'owner', render: (_, row) => type === 'suspended' ? row.ownerUserName || `用户 #${row.ownerUserId}` : row.recycleSourceOwnerUserName || `用户 #${row.recycleSourceOwnerUserId}` },
         { title: '判定截止', dataIndex: 'qualificationDeadlineAt', render: value => formatTimestamp(value) },
         { title: '挂起时间', dataIndex: 'suspendedAt', render: value => formatTimestamp(value) },

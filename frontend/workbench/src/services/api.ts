@@ -143,6 +143,12 @@ export type SalesOrder = {
   processInstanceId?: string; taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'
   taskStatus?: number; taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp; decisionReason?: string; canRevise?: boolean
   submittedAt: Timestamp; effectiveAt?: Timestamp
+  registrationApproval?: SalesOrderApprovalStatus
+  financeApproval?: SalesOrderApprovalStatus
+}
+export type SalesOrderApprovalStatus = {
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  reviewerUserId?: number; reviewerUserName?: string; createTime?: Timestamp; endTime?: Timestamp
 }
 export type SalesOrderListItem = Pick<SalesOrder, 'id' | 'orderNo' | 'leadId' | 'status' | 'studentName' | 'studentMobile' | 'totalAmount' | 'approvalRoundNo' | 'submittedAt' | 'effectiveAt'> & {
   taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'; taskStatus?: number
@@ -152,7 +158,8 @@ export type SalesOrderStatusCounts = { total: number; pendingApproval: number; r
 export type SalesOrderApprovalFilterOption = { key: string; label: string; count: number }
 export type SalesOrderApprovalFilterSection = { key: string; label: string; options: SalesOrderApprovalFilterOption[] }
 export type SalesOrderApprovalFilterGroup = { key: string; label: string; count: number; sections: SalesOrderApprovalFilterSection[] }
-export type SalesOrderApprovalFilterProfile = { groups: SalesOrderApprovalFilterGroup[] }
+export type SalesOrderApprovalCenter = { key: 'registration' | 'finance'; label: string }
+export type SalesOrderApprovalFilterProfile = { groups: SalesOrderApprovalFilterGroup[]; centers: SalesOrderApprovalCenter[] }
 export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
 export type BusinessTask = {
@@ -436,7 +443,7 @@ export const api = {
   mySalesOrderStatusCounts: async () =>
     unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
   salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
-  salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean }) =>
+  salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean }) =>
     unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),

@@ -50,6 +50,17 @@ public class SalesOrderRespVO {
     private Boolean canRevise;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
+    private ApprovalStatusVO registrationApproval;
+    private ApprovalStatusVO financeApproval;
+
+    @Data
+    public static class ApprovalStatusVO {
+        private String status;
+        private Long reviewerUserId;
+        private String reviewerUserName;
+        private LocalDateTime createTime;
+        private LocalDateTime endTime;
+    }
 
     @Data
     public static class ItemVO {

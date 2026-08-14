@@ -4,11 +4,15 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskDecisionReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskApproveReqVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskPageReqVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskRejectReqVO;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
 import cn.iocoder.yudao.module.bpm.service.task.BpmTaskService;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.hutool.core.util.NumberUtil;
 import jakarta.annotation.Resource;
 import org.flowable.engine.history.HistoricProcessInstance;
 import org.flowable.engine.runtime.ProcessInstance;
@@ -19,6 +23,9 @@ import org.springframework.validation.annotation.Validated;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.List;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.Date;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -38,6 +45,63 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     private BpmTaskService bpmTaskService;
     @Resource
     private BpmProcessInstanceService processInstanceService;
+    @Resource
+    private AdminUserApi adminUserApi;
+
+    @Override
+    public List<BpmProcessNodeStatusRespDTO> getProcessNodeStatuses(String processInstanceId, Set<String> taskDefinitionKeys) {
+        if (processInstanceId == null || taskDefinitionKeys == null || taskDefinitionKeys.isEmpty()) return List.of();
+        Map<String, BpmProcessNodeStatusRespDTO> result = new HashMap<>();
+        for (Task task : bpmTaskService.getRunningTaskListByProcessInstanceId(processInstanceId, null, null)) {
+            if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey())) continue;
+            BpmProcessNodeStatusRespDTO status = new BpmProcessNodeStatusRespDTO();
+            status.setTaskDefinitionKey(task.getTaskDefinitionKey()); status.setStatus("pending");
+            status.setCreateTime(toLocalDateTime(task.getCreateTime()));
+            result.put(task.getTaskDefinitionKey(), status);
+        }
+        for (HistoricTaskInstance task : bpmTaskService.getTaskListByProcessInstanceId(processInstanceId, true)) {
+            if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getEndTime() == null) continue;
+            Integer rawStatus = task.getTaskLocalVariables() == null ? null
+                    : (Integer) task.getTaskLocalVariables().get(cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants.TASK_VARIABLE_STATUS);
+            String status = rawStatus == null ? "cancelled" : switch (rawStatus) {
+                case 2, 7 -> "approved";
+                case 3, 5 -> "rejected";
+                case 4 -> "cancelled";
+                default -> "pending";
+            };
+            BpmProcessNodeStatusRespDTO current = result.get(task.getTaskDefinitionKey());
+            LocalDateTime taskEndTime = toLocalDateTime(task.getEndTime());
+            if (current == null || statusRank(status) > statusRank(current.getStatus())
+                    || statusRank(status) == statusRank(current.getStatus())
+                    && (current.getEndTime() == null || current.getEndTime().isBefore(taskEndTime))) {
+                BpmProcessNodeStatusRespDTO value = new BpmProcessNodeStatusRespDTO();
+                value.setTaskDefinitionKey(task.getTaskDefinitionKey()); value.setStatus(status);
+                value.setReviewerUserId(NumberUtil.parseLong(task.getAssignee(), null));
+                value.setCreateTime(toLocalDateTime(task.getCreateTime())); value.setEndTime(taskEndTime);
+                result.put(task.getTaskDefinitionKey(), value);
+            }
+        }
+        Set<Long> reviewerUserIds = result.values().stream().map(BpmProcessNodeStatusRespDTO::getReviewerUserId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        if (!reviewerUserIds.isEmpty()) {
+            Map<Long, AdminUserRespDTO> reviewerUsers = adminUserApi.getUserMap(reviewerUserIds);
+            result.values().forEach(item -> {
+                AdminUserRespDTO reviewer = reviewerUsers.get(item.getReviewerUserId());
+                item.setReviewerUserName(reviewer == null ? null : reviewer.getNickname());
+            });
+        }
+        return result.values().stream().sorted(Comparator.comparing(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey)).toList();
+    }
+
+    private int statusRank(String status) {
+        return switch (status) {
+            case "rejected" -> 4;
+            case "approved" -> 3;
+            case "pending" -> 2;
+            case "cancelled" -> 1;
+            default -> 0;
+        };
+    }
 
     @Override
     public void triggerTask(String processInstanceId, String taskDefineKey) {

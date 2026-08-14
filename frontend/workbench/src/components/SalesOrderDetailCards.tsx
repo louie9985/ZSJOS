@@ -2,6 +2,7 @@ import { Alert, Button, Card, Descriptions, Empty, Image, Space, Table, Tag, Typ
 import { CheckOutlined, CloseOutlined, EditOutlined } from '@ant-design/icons'
 import type { SalesOrder, SalesOrderListItem } from '../services/api'
 import { formatTimestamp } from '../services/time'
+import { canReviewSalesOrderTask } from '../services/salesOrder'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
   pending_approval: '待审核', revision_required: '已驳回待修改', effective: '已通过'
@@ -13,6 +14,8 @@ export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
   registrationReview: '报名履约中心', financeReview: '财务结算中心'
 }
 const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批通过', 3: '审批不通过', 4: '已取消', 5: '已退回', 7: '审批通过中' }
+const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
+const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
 
 export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRevise }: {
   order: SalesOrder
@@ -23,6 +26,11 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
   onRevise?: () => void
 }) {
   const task = approvalContext || order
+  const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
+  const approvalRows = [
+    { key: 'registration', center: '报名履约中心', approval: order.registrationApproval },
+    { key: 'finance', center: '财务中心', approval: order.financeApproval }
+  ]
   return <div className="sales-order-detail">
     <div className="sales-order-detail-hero">
       <div className="sales-order-detail-heading">
@@ -31,11 +39,19 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </div>
       <Space wrap className="sales-order-detail-actions">
         {mode === 'mine' && order.status === 'revision_required' && order.canRevise && onRevise && <Button type="primary" icon={<EditOutlined/>} onClick={onRevise}>补正并重新提交</Button>}
-        {mode === 'approval-todo' && task.taskId && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button></>}
+        {mode === 'approval-todo' && canReview && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button></>}
       </Space>
     </div>
     {order.status === 'revision_required' && <Alert type="error" showIcon message="订单已驳回，等待补正" description={order.decisionReason || '审批人未填写可展示的驳回原因'}/>}
     <div className="sales-order-card-grid">
+      <Card size="small" title="双中心审批状态" className="sales-order-card sales-order-card-wide">
+        <Table rowKey="key" size="small" pagination={false} scroll={{ x: 640 }} dataSource={approvalRows} columns={[
+          { title: '审核中心', dataIndex: 'center' },
+          { title: '审核结果', render: (_, row) => <Tag color={APPROVAL_NODE_STATUS_COLORS[row.approval?.status || '']}>{APPROVAL_NODE_STATUS_LABELS[row.approval?.status || ''] || '-'}</Tag> },
+          { title: '审核人', render: (_, row) => row.approval?.reviewerUserName || '-' },
+          { title: '审核时间', render: (_, row) => formatTimestamp(row.approval?.endTime) }
+        ]}/>
+      </Card>
       <Card size="small" title="订单与审批" className="sales-order-card">
         <Descriptions column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
           <Descriptions.Item label="订单号">{order.orderNo}</Descriptions.Item><Descriptions.Item label="审批轮次">第 {order.approvalRoundNo || 1} 轮</Descriptions.Item>

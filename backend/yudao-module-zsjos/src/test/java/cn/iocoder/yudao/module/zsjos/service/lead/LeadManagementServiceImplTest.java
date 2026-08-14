@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
@@ -73,7 +74,8 @@ class LeadManagementServiceImplTest {
     void pageRestrictsOrdinaryUserToRelatedLeads() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         LeadDO lead = lead(1L, 10L, 20L);
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of());
         when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of(), false))
                 .thenReturn(new PageResult<>(List.of(lead), 1L));
         when(intendedProductMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
@@ -90,7 +92,7 @@ class LeadManagementServiceImplTest {
     @Test
     void pageAllowsQueryAllPermissionWithoutRelationScope() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
         when(leadMapper.selectManagementPage(reqVO, null, List.of(), List.of(), false)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
@@ -242,24 +244,25 @@ class LeadManagementServiceImplTest {
 
     @Test
     void statusCountsRestrictOrdinaryUserToRelatedLeads() {
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
-        when(leadMapper.selectManagementStatusCounts(10L)).thenReturn(Map.of("valid", 2L));
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(leadMapper.selectManagementStatusCounts(10L, List.of(20L))).thenReturn(Map.of("valid", 2L));
 
         Map<String, Long> result = service.getStatusCounts(10L);
 
         assertEquals(Map.of("valid", 2L), result);
-        verify(leadMapper).selectManagementStatusCounts(10L);
+        verify(leadMapper).selectManagementStatusCounts(10L, List.of(20L));
     }
 
     @Test
     void statusCountsAllowQueryAllWithoutRelationScope() {
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
-        when(leadMapper.selectManagementStatusCounts(null)).thenReturn(Map.of("valid", 3L));
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
+        when(leadMapper.selectManagementStatusCounts(null, List.of())).thenReturn(Map.of("valid", 3L));
 
         Map<String, Long> result = service.getStatusCounts(99L);
 
         assertEquals(Map.of("valid", 3L), result);
-        verify(leadMapper).selectManagementStatusCounts(null);
+        verify(leadMapper).selectManagementStatusCounts(null, List.of());
     }
 
     @Test
@@ -296,7 +299,7 @@ class LeadManagementServiceImplTest {
         reqVO.setInboxGroup("all");
         LeadInboxFilterConfigVO config = filterConfig();
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
         when(inboxFilterConfigService.resolveQuery(config, "all", null))
                 .thenReturn(new LeadInboxFilterQuery(java.util.Set.of(), java.util.Set.of(), false));
@@ -331,6 +334,41 @@ class LeadManagementServiceImplTest {
         assertEquals("read", permission.action());
     }
 
+    @Test
+    void pageIncludesManagedDepartmentOwnersForTeamView() {
+        LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 21L));
+        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(20L, 21L), List.of(), List.of(), false))
+                .thenReturn(PageResult.empty());
+
+        service.getLeadPage(reqVO, 10L);
+
+        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(20L, 21L),
+                List.of(), List.of(), false);
+    }
+
+    @Test
+    void visibleUsersExcludeParallelDepartmentUsersAndDisabledAccounts() {
+        AdminUserRespDTO self = user(10L, 0);
+        AdminUserRespDTO managed = user(20L, 0);
+        AdminUserRespDTO disabled = user(21L, 1);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L, 20L, 21L));
+        when(adminUserApi.getUserList(Set.of(10L, 20L, 21L))).thenReturn(List.of(self, managed, disabled));
+
+        assertEquals(List.of(10L, 20L), service.getVisibleUsers(10L).stream().map(LeadAssignmentUserRespVO::getId).toList());
+    }
+
+    @Test
+    void visibleUsersAllowQueryAll() {
+        List<AdminUserRespDTO> users = List.of(user(20L, 0), user(30L, 0));
+        when(adminUserApi.getUserListByStatus(0)).thenReturn(users);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
+
+        assertEquals(List.of(20L, 30L), service.getVisibleUsers(10L).stream().map(LeadAssignmentUserRespVO::getId).toList());
+    }
+
     private static LeadDO lead(Long id, Long sourceUserId, Long ownerUserId) {
         LeadDO lead = new LeadDO();
         lead.setId(id);
@@ -340,6 +378,14 @@ class LeadManagementServiceImplTest {
         lead.setSourceUserId(sourceUserId);
         lead.setOwnerUserId(ownerUserId);
         return lead;
+    }
+
+    private static AdminUserRespDTO user(Long id, Integer status) {
+        AdminUserRespDTO user = new AdminUserRespDTO();
+        user.setId(id);
+        user.setNickname("用户" + id);
+        user.setStatus(status);
+        return user;
     }
 
     private LeadDO actionLead(String status, String assignmentStatus, boolean qualificationPending) {

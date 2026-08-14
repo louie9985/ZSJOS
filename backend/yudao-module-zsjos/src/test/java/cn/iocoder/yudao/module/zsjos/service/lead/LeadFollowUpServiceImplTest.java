@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMap
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
@@ -33,6 +34,7 @@ import java.util.Map;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_FOLLOW_UP_TIME_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mockStatic;
 import static org.mockito.ArgumentMatchers.*;
@@ -107,6 +109,24 @@ class LeadFollowUpServiceImplTest {
 
         verify(lifecycleTaskService).replaceFollowUpReminder(eq(1L), eq(20L), eq("lead"), eq(40L),
                 any(LocalDateTime.class), any(LocalDateTime.class));
+    }
+
+    @Test
+    void createDoesNotStoreCategoryKeyWhenDictionaryLabelIsMissing() {
+        LeadDO lead = validLead();
+        stubSuccessfulCreate(lead);
+        when(dictDataApi.getDictDataList("zsjos_lead_category")).thenReturn(List.of());
+        doAnswer(invocation -> {
+            invocation.<LeadFollowUpRecordDO>getArgument(0).setId(40L);
+            return 1;
+        }).when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
+
+        withTenant(() -> service.create(1L, 20L, request(LocalDateTime.now().plusHours(1))));
+
+        ArgumentCaptor<LeadFollowUpRecordDO> captor = ArgumentCaptor.forClass(LeadFollowUpRecordDO.class);
+        verify(recordMapper).insert(captor.capture());
+        assertNull(captor.getValue().getCategoryBeforeLabelSnapshot());
+        assertNull(captor.getValue().getCategoryAfterLabelSnapshot());
     }
 
     @Test

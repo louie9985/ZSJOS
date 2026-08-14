@@ -82,12 +82,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualify")
     public Long createAndSubmit(Long leadId, Long userId, SalesOrderSubmitReqVO reqVO) {
-        SalesOrderDO duplicate = orderMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
-        if (duplicate != null) {
-            if (Objects.equals(duplicate.getLeadId(), leadId) && Objects.equals(duplicate.getSubmitterUserId(), userId)) return duplicate.getId();
-            throw exception(SALES_ORDER_IDEMPOTENCY_CONFLICT);
-        }
+        Long duplicateId = findIdempotentOrder(leadId, userId, reqVO.getIdempotencyKey());
+        if (duplicateId != null) return duplicateId;
         LeadDO lead = requireEligibleLead(leadId, userId);
+        // The lead row serializes concurrent submissions. Recheck after acquiring it so a retry can replay the winner.
+        duplicateId = findIdempotentOrder(leadId, userId, reqVO.getIdempotencyKey());
+        if (duplicateId != null) return duplicateId;
         if (orderMapper.selectActiveByLeadId(leadId, ACTIVE_ORDER_STATUSES) != null) throw exception(SALES_ORDER_ACTIVE_DUPLICATE);
         OpportunityDO opportunity = requireEligibleOpportunity(leadId);
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
@@ -103,6 +103,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         insertItems(order.getId(), validated.items());
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
         return order.getId();
+    }
+
+    private Long findIdempotentOrder(Long leadId, Long userId, String idempotencyKey) {
+        SalesOrderDO duplicate = orderMapper.selectByIdempotencyKey(idempotencyKey);
+        if (duplicate == null) return null;
+        if (Objects.equals(duplicate.getLeadId(), leadId)
+                && Objects.equals(duplicate.getSubmitterUserId(), userId)) return duplicate.getId();
+        throw exception(SALES_ORDER_IDEMPOTENCY_CONFLICT);
     }
 
     @Override
@@ -136,7 +144,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     public SalesOrderRespVO get(Long orderId, Long userId) {
         SalesOrderDO order = orderMapper.selectById(orderId);
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
-        return convert(order, roundMapper.selectLatestByOrderId(orderId), null, userId);
+        SalesOrderApprovalRoundDO round = roundMapper.selectLatestByOrderId(orderId);
+        return convert(order, round, null, userId);
     }
 
     @Override
@@ -165,7 +174,13 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     @Override
     public PageResult<SalesOrderListItemRespVO> getInboxPage(SalesOrderPageReqVO reqVO, Long userId) {
-        if (!permissionService.isApprovalPoolMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        Set<String> allowedTaskKeys = permissionService.approvalTaskKeys(userId);
+        if (allowedTaskKeys.isEmpty()) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        if (StrUtil.isNotBlank(reqVO.getCenter())) {
+            String centerTaskKey = centerTaskKey(reqVO.getCenter());
+            if (!allowedTaskKeys.contains(centerTaskKey)) throw exception(SALES_ORDER_PERMISSION_DENIED);
+            allowedTaskKeys = Set.of(centerTaskKey);
+        }
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
         LeadInboxFilterQuery filter;
         if (reqVO.getGroupKey() == null && reqVO.getHandled() != null) {
@@ -177,6 +192,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                     .orElseThrow(() -> exception(LEAD_INBOX_FILTER_INVALID)).getKey();
             filter = inboxFilterConfigService.resolveQuery(config, groupKey, reqVO.getOptionKey());
         }
+        filter = restrictTaskFilter(filter, allowedTaskKeys);
+        if (filter.matchNone()) return PageResult.empty();
         List<String> processIds = searchProcessIds(reqVO.getKeyword());
         if (processIds != null && processIds.isEmpty()) return PageResult.empty();
         List<BpmTaskRespDTO> tasks = loadApprovalTasks(userId, reqVO, filter, processIds);
@@ -193,7 +210,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     @Override
     public SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId) {
-        if (!permissionService.isApprovalPoolMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        Set<String> allowedTaskKeys = permissionService.approvalTaskKeys(userId);
+        if (allowedTaskKeys.isEmpty()) throw exception(SALES_ORDER_PERMISSION_DENIED);
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_REVIEWER);
         List<SalesOrderApprovalFilterProfileRespVO.GroupVO> groups = config.getGroups().stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
@@ -201,6 +219,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                     LeadInboxFilterQuery groupQuery = inboxFilterConfigService.resolveQuery(config, group.getKey(), "all");
                     List<SalesOrderApprovalFilterProfileRespVO.OptionVO> options = group.getOptions().stream()
                             .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
+                            .filter(option -> optionTaskKey(option.getKey()) == null || allowedTaskKeys.contains(optionTaskKey(option.getKey())))
                             .map(option -> new SalesOrderApprovalFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel(),
                                     countApprovalTasks(userId, inboxFilterConfigService.resolveQuery(config, group.getKey(), option.getKey()), null)))
                             .toList();
@@ -210,7 +229,36 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                     return new SalesOrderApprovalFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(),
                             countApprovalTasks(userId, groupQuery, null), sections);
                 }).toList();
-        return new SalesOrderApprovalFilterProfileRespVO(groups);
+        List<SalesOrderApprovalFilterProfileRespVO.CenterVO> centers = new ArrayList<>();
+        if (allowedTaskKeys.contains(TASK_REGISTRATION)) centers.add(new SalesOrderApprovalFilterProfileRespVO.CenterVO(CENTER_REGISTRATION, "报名履约中心"));
+        if (allowedTaskKeys.contains(TASK_FINANCE)) centers.add(new SalesOrderApprovalFilterProfileRespVO.CenterVO(CENTER_FINANCE, "财务中心"));
+        return new SalesOrderApprovalFilterProfileRespVO(groups, centers);
+    }
+
+    private String centerTaskKey(String center) {
+        return switch (center) {
+            case CENTER_REGISTRATION -> TASK_REGISTRATION;
+            case CENTER_FINANCE -> TASK_FINANCE;
+            default -> throw exception(LEAD_INBOX_FILTER_INVALID);
+        };
+    }
+
+    private String optionTaskKey(String optionKey) {
+        if ("registrationReview".equals(optionKey) || "registration_review".equals(optionKey)) return TASK_REGISTRATION;
+        if ("financeReview".equals(optionKey) || "finance_review".equals(optionKey)) return TASK_FINANCE;
+        return null;
+    }
+
+    private LeadInboxFilterQuery restrictTaskFilter(LeadInboxFilterQuery filter, Set<String> allowedTaskKeys) {
+        Set<String> requested = filter.values(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY);
+        if (requested.isEmpty()) {
+            Map<String, Set<String>> values = new LinkedHashMap<>(filter.valuesByField());
+            values.put(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, new LinkedHashSet<>(allowedTaskKeys));
+            return new LeadInboxFilterQuery(filter.statuses(), filter.assignmentStatuses(), filter.matchNone(), values);
+        }
+        Set<String> restricted = requested.stream().filter(allowedTaskKeys::contains).collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        return new LeadInboxFilterQuery(filter.statuses(), filter.assignmentStatuses(), restricted.isEmpty(),
+                Map.of(INBOX_FILTER_FIELD_TASK_DEFINITION_KEY, restricted));
     }
 
     private List<BpmTaskRespDTO> loadApprovalTasks(Long userId, SalesOrderPageReqVO reqVO,
@@ -543,9 +591,26 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
         result.setItems(itemMapper.selectListByOrderId(order.getId()).stream().map(this::convertItem).toList());
         result.setPaymentVouchers(convertVouchers(order.getPaymentVoucherRefs()));
-        if (round != null) { result.setApprovalRoundNo(round.getRoundNo()); result.setApprovalRoundStatus(round.getStatus()); result.setProcessInstanceId(round.getProcessInstanceId()); result.setDecisionReason(round.getDecisionReason()); }
+        if (round != null) {
+            result.setApprovalRoundNo(round.getRoundNo()); result.setApprovalRoundStatus(round.getStatus());
+            result.setProcessInstanceId(round.getProcessInstanceId()); result.setDecisionReason(round.getDecisionReason());
+            Map<String, BpmProcessNodeStatusRespDTO> nodeStatuses = processTaskApi.getProcessNodeStatuses(
+                    round.getProcessInstanceId(), Set.of(TASK_REGISTRATION, TASK_FINANCE)).stream()
+                    .collect(java.util.stream.Collectors.toMap(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey, item -> item, (left, right) -> right));
+            result.setRegistrationApproval(convertApprovalStatus(nodeStatuses.get(TASK_REGISTRATION)));
+            result.setFinanceApproval(convertApprovalStatus(nodeStatuses.get(TASK_FINANCE)));
+        }
         if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
         result.setCanRevise(STATUS_REVISION_REQUIRED.equals(order.getStatus()) && permissionService.canRevise(order, userId));
+        return result;
+    }
+
+    private SalesOrderRespVO.ApprovalStatusVO convertApprovalStatus(BpmProcessNodeStatusRespDTO source) {
+        if (source == null) return null;
+        SalesOrderRespVO.ApprovalStatusVO result = new SalesOrderRespVO.ApprovalStatusVO();
+        result.setStatus(source.getStatus()); result.setReviewerUserId(source.getReviewerUserId());
+        result.setReviewerUserName(source.getReviewerUserName());
+        result.setCreateTime(source.getCreateTime()); result.setEndTime(source.getEndTime());
         return result;
     }
 

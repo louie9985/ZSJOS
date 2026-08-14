@@ -5,6 +5,8 @@ import { api, type LeadAppeal, type LeadAppealEvidence, type ManagedLead } from 
 import { formatTimestamp } from '../services/time'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
+import { useSubmissionGuard } from '../services/submissionGuard'
+import { invalidReasonSnapshotLabel } from '../services/leadManagement'
 
 const STAGE_LABELS = { sales_manager: '销售主管复核', quality: '质控复核', chairman: '董事长终审' }
 const STATUS_LABELS = {
@@ -29,7 +31,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [evidence, setEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
-  const [saving, setSaving] = useState(false)
+  const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -44,16 +46,18 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
     && (!latest || (latest.status === 'upheld' && latest.roundNo < 3))
   const nextRound = latest ? latest.roundNo + 1 : 1
 
+  const openAppeal = () => { resetIntent(); setOpen(true) }
+
   const submit = async () => {
     if (!reason.trim()) { message.warning('请填写申诉理由'); return }
-    setSaving(true)
-    try {
+    await runSubmission(async ({ idempotencyKey, complete }) => {
       const uploadResult = await uploadDeferredFiles(evidence, api.uploadLeadAppealImage, setEvidence)
       if (uploadResult.failed) { message.error('有申诉图片上传失败，请重试失败项'); return }
-      await api.submitLeadAppeal(lead.id, { reason: reason.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
+      await api.submitLeadAppeal(lead.id, { reason: reason.trim(), attachments: uploadResult.items.filter(item => item.uploaded).map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey })
+      complete()
       message.success(`第 ${nextRound} 次申诉已提交`)
       setOpen(false); setReason(''); setEvidence([]); await load(); onChanged()
-    } finally { setSaving(false) }
+    }).catch(submitError => message.error(submitError instanceof Error ? submitError.message : '申诉提交失败'))
   }
 
   if (loading) return <Skeleton active paragraph={{ rows: 6 }}/>
@@ -61,7 +65,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
   return <div className="lead-appeal-panel">
     <div className="lead-appeal-panel-header">
       <div><Typography.Title level={5}>申诉记录</Typography.Title><Typography.Text type="secondary">最多三次，每次维持无效后由提交人手动发起下一轮。</Typography.Text></div>
-      {canSubmit && <Button type="primary" onClick={() => setOpen(true)}>发起第 {nextRound} 次申诉</Button>}
+      {canSubmit && <Button type="primary" onClick={openAppeal}>发起第 {nextRound} 次申诉</Button>}
     </div>
     {!items.length ? <Empty description={canSubmit ? '尚未发起申诉' : '暂无申诉记录'}/> : <Timeline items={items.map(item => ({
       color: item.status === 'overturned' ? 'green' : item.status === 'upheld' ? 'red' : 'blue',
@@ -69,7 +73,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
         <Space wrap><Typography.Text strong>第 {item.roundNo} 次申诉</Typography.Text><Tag>{STAGE_LABELS[item.reviewStage]}</Tag><Tag color={item.status === 'overturned' ? 'success' : item.status === 'upheld' ? 'error' : 'processing'}>{STATUS_LABELS[item.status]}</Tag></Space>
         <Typography.Paragraph type="secondary">提交人：{item.applicantUserName || `用户 #${item.applicantUserId}`} · {formatTimestamp(item.submittedAt)}</Typography.Paragraph>
         <Typography.Text type="secondary">原无效结论</Typography.Text>
-        <Typography.Paragraph>{[item.invalidReasonSnapshot, item.invalidDescriptionSnapshot].filter(Boolean).join('：') || '-'}</Typography.Paragraph>
+        <Typography.Paragraph>{[invalidReasonSnapshotLabel(item.invalidReasonSnapshot), item.invalidDescriptionSnapshot].filter(Boolean).join('：') || '-'}</Typography.Paragraph>
         <Evidence items={item.invalidEvidenceSnapshot}/>
         <Typography.Text type="secondary">申诉理由</Typography.Text><Typography.Paragraph>{item.reason}</Typography.Paragraph><Evidence items={item.evidence}/>
         {item.decisionReason && <><Typography.Text type="secondary">裁决意见</Typography.Text><Typography.Paragraph>{item.decisionReason}</Typography.Paragraph><Evidence items={item.decisionEvidence}/><Typography.Text type="secondary">处理人：{item.reviewerUserName || `用户 #${item.reviewerUserId}`} · {formatTimestamp(item.decidedAt)}</Typography.Text></>}

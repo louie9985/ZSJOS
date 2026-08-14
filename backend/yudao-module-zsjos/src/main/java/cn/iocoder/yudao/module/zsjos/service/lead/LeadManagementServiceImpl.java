@@ -7,8 +7,8 @@ import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
-import cn.iocoder.yudao.module.system.api.dept.DeptApi;
-import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
@@ -32,6 +32,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -70,7 +71,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource
     private LeadInboxFilterConfigService inboxFilterConfigService;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
-    @Resource private DeptApi deptApi;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadBasicInfoService leadBasicInfoService;
     @Resource private SalesOrderMapper salesOrderMapper;
@@ -78,7 +78,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
         validateInboxAudiencePermission(reqVO.getAudience());
-        boolean queryAll = securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
+        boolean queryAll = leadObjectPermissionService.hasQueryAll();
         LeadInboxFilterQuery inboxQuery = reqVO.getAudience() == null
                 ? new LeadInboxFilterQuery(Set.of(), Set.of(), false)
                 : inboxFilterConfigService.resolveQuery(
@@ -86,7 +86,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                         reqVO.getInboxGroup(), reqVO.getInboxStage());
         Long visibleUserId = reqVO.getAudience() != null || !queryAll ? userId : null;
         List<Long> managedOwnerUserIds = reqVO.getAudience() == null && !queryAll
-                ? getManagedOwnerUserIds(userId) : List.of();
+                ? sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId)) : List.of();
         PageResult<LeadDO> page = managedOwnerUserIds.isEmpty()
                 ? leadMapper.selectManagementPage(reqVO, visibleUserId,
                         List.copyOf(inboxQuery.statuses()), List.copyOf(inboxQuery.assignmentStatuses()), inboxQuery.matchNone())
@@ -104,16 +104,6 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                         List.of(), Map.of(), false))
                 .toList();
         return new PageResult<>(result, page.getTotal());
-    }
-
-    private List<Long> getManagedOwnerUserIds(Long leaderUserId) {
-        Set<Long> deptIds = new LinkedHashSet<>();
-        for (DeptRespDTO dept : deptApi.getDeptListByLeaderUserId(leaderUserId)) {
-            deptIds.add(dept.getId());
-            deptApi.getChildDeptList(dept.getId()).forEach(child -> deptIds.add(child.getId()));
-        }
-        if (deptIds.isEmpty()) return List.of();
-        return adminUserApi.getUserListByDeptIds(deptIds).stream().map(AdminUserRespDTO::getId).toList();
     }
 
     @Override
@@ -139,8 +129,37 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Override
     public Map<String, Long> getStatusCounts(Long userId) {
-        boolean queryAll = securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
-        return leadMapper.selectManagementStatusCounts(queryAll ? null : userId);
+        boolean queryAll = leadObjectPermissionService.hasQueryAll();
+        List<Long> managedUserIds = queryAll ? List.of()
+                : sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId));
+        return leadMapper.selectManagementStatusCounts(queryAll ? null : userId, managedUserIds);
+    }
+
+    @Override
+    public List<LeadAssignmentUserRespVO> getVisibleUsers(Long userId) {
+        List<AdminUserRespDTO> users;
+        if (leadObjectPermissionService.hasQueryAll()) {
+            users = adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        } else {
+            users = adminUserApi.getUserList(leadObjectPermissionService.getRelatedAndManagedUserIds(userId)).stream()
+                    .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
+                    .toList();
+        }
+        return users.stream()
+                .sorted(Comparator.comparing(AdminUserRespDTO::getNickname,
+                                Comparator.nullsLast(String::compareToIgnoreCase))
+                        .thenComparing(AdminUserRespDTO::getId))
+                .map(user -> {
+                    LeadAssignmentUserRespVO result = new LeadAssignmentUserRespVO();
+                    result.setId(user.getId());
+                    result.setNickname(user.getNickname());
+                    result.setDeptId(user.getDeptId());
+                    return result;
+                }).toList();
+    }
+
+    private static List<Long> sortedUserIds(Collection<Long> userIds) {
+        return userIds.stream().sorted().toList();
     }
 
     @Override

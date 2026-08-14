@@ -83,13 +83,17 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         return selectPage(reqVO, query);
     }
 
-    default Map<String, Long> selectManagementStatusCounts(Long visibleUserId) {
+    default Map<String, Long> selectManagementStatusCounts(Long visibleUserId, List<Long> managedOwnerUserIds) {
         QueryWrapper<LeadDO> query = new QueryWrapper<LeadDO>()
                 .select("status", "COUNT(*) AS total")
                 .groupBy("status");
         if (visibleUserId != null) {
-            query.and(wrapper -> wrapper.eq("source_user_id", visibleUserId)
-                    .or().eq("owner_user_id", visibleUserId));
+            query.and(wrapper -> {
+                wrapper.eq("source_user_id", visibleUserId).or().eq("owner_user_id", visibleUserId);
+                if (managedOwnerUserIds != null && !managedOwnerUserIds.isEmpty()) {
+                    wrapper.or().in("owner_user_id", managedOwnerUserIds);
+                }
+            });
         }
         Map<String, Long> result = new LinkedHashMap<>();
         for (Map<String, Object> row : selectMaps(query)) {

@@ -73,6 +73,8 @@ class LeadAppealServiceImplTest {
     @Test
     void submitSnapshotsDirectDepartmentSupervisor() {
         LeadDO lead = invalidLead(20L);
+        lead.setInvalidReason("duplicate_lead");
+        lead.setInvalidReasonLabelSnapshot(null);
         AdminUserRespDTO owner = user(20L, 100L);
         AdminUserRespDTO supervisor = user(30L, 10L);
         DeptRespDTO dept = dept(100L, 10L, 30L);
@@ -102,6 +104,7 @@ class LeadAppealServiceImplTest {
         assertEquals(100L, appeal.getOwnerDeptIdSnapshot());
         assertEquals(100L, appeal.getReviewerDeptIdSnapshot());
         assertEquals("[30]", appeal.getReviewerUserIdsSnapshot());
+        assertNull(appeal.getInvalidReasonSnapshot());
         ArgumentCaptor<BpmProcessInstanceCreateReqDTO> processCaptor = ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
         verify(processInstanceApi).createProcessInstance(eq(7L), processCaptor.capture());
         BpmProcessInstanceCreateReqDTO processRequest = processCaptor.getValue();

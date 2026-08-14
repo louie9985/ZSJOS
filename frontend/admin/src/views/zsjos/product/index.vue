@@ -7,19 +7,63 @@
     </el-alert>
     <el-row v-else :gutter="16">
       <el-col :xs="24" :md="8">
-        <div class="panel-heading"><span>课程分类树</span><span>
-          <el-button v-if="selectedCategory" link type="primary" v-hasPermi="['zsjos:product-category:update']" @click="openCategory(selectedCategory)">编辑</el-button>
-          <el-button v-if="selectedCategory" link type="danger" v-hasPermi="['zsjos:product-category:delete']" @click="removeCategory(selectedCategory)">删除</el-button>
-          <el-button link type="primary" v-hasPermi="['zsjos:product-category:create']" @click="openCategory()"><Icon icon="ep:plus" />新增</el-button>
-        </span></div>
+        <div class="panel-heading"
+          ><span>课程分类树</span
+          ><span>
+            <el-button
+              v-if="selectedCategory"
+              link
+              type="primary"
+              v-hasPermi="['zsjos:product-category:update']"
+              @click="openCategory(selectedCategory)"
+              >编辑</el-button
+            >
+            <el-button
+              v-if="selectedCategory"
+              link
+              type="danger"
+              :loading="isProcessing(`category-delete:${selectedCategory.id}`)"
+              v-hasPermi="['zsjos:product-category:delete']"
+              @click="removeCategory(selectedCategory)"
+              >删除</el-button
+            >
+            <el-button
+              link
+              type="primary"
+              v-hasPermi="['zsjos:product-category:create']"
+              @click="openCategory()"
+              ><Icon icon="ep:plus" />新增</el-button
+            >
+          </span></div
+        >
         <el-empty v-if="!categories.length" description="暂无分类，可先创建根分类" />
-        <el-tree v-else node-key="id" :data="categories" default-expand-all highlight-current :expand-on-click-node="false" @node-click="selectCategory">
-          <template #default="{ data }"><span class="tree-node"><span>{{ data.name }}</span><span>
-            <el-tag size="small" type="info">第 {{ data.level }} 层</el-tag>
-            <el-tag v-if="data.hasProducts" size="small">有课程</el-tag>
-            <el-tag v-if="data.status !== 0" size="small" type="info">停用</el-tag>
-            <el-button link size="small" v-hasPermi="['zsjos:product-category:status']" @click.stop="toggleCategory(data)">{{ data.status === 0 ? '停用' : '启用' }}</el-button>
-          </span></span></template>
+        <el-tree
+          v-else
+          node-key="id"
+          :data="categories"
+          default-expand-all
+          highlight-current
+          :expand-on-click-node="false"
+          @node-click="selectCategory"
+        >
+          <template #default="{ data }"
+            ><span class="tree-node"
+              ><span>{{ data.name }}</span
+              ><span>
+                <el-tag size="small" type="info">第 {{ data.level }} 层</el-tag>
+                <el-tag v-if="data.hasProducts" size="small">有课程</el-tag>
+                <el-tag v-if="data.status !== 0" size="small" type="info">停用</el-tag>
+                <el-button
+                  link
+                  size="small"
+                  :loading="isProcessing(`category-status:${data.id}`)"
+                  v-hasPermi="['zsjos:product-category:status']"
+                  @click.stop="toggleCategory(data)"
+                  >{{ data.status === 0 ? '停用' : '启用' }}</el-button
+                >
+              </span></span
+            ></template
+          >
         </el-tree>
       </el-col>
       <el-col :xs="24" :md="16">
@@ -34,7 +78,12 @@
             ><Icon icon="ep:plus" class="mr-5px" />新增</el-button
           ></div
         >
-        <el-alert v-if="selectedCategory?.children?.length" type="info" :closable="false" title="当前分类还有子分类，SPU 只能挂在叶子分类。" />
+        <el-alert
+          v-if="selectedCategory?.children?.length"
+          type="info"
+          :closable="false"
+          title="当前分类还有子分类，SPU 只能挂在叶子分类。"
+        />
         <el-empty v-if="!selectedCategory" description="请选择分类" />
         <el-empty v-else-if="!products.length" description="暂无产品" />
         <el-table v-else :data="products" size="small" :show-overflow-tooltip="true">
@@ -64,11 +113,13 @@
               ><el-button
                 link
                 v-hasPermi="['zsjos:product:status']"
+                :loading="isProcessing(`product-status:${scope.row.id}`)"
                 @click="toggleProduct(scope.row)"
                 >{{ scope.row.status === 0 ? '停用' : '启用' }}</el-button
               ><el-button
                 link
                 type="danger"
+                :loading="isProcessing(`product-delete:${scope.row.id}`)"
                 v-hasPermi="['zsjos:product:delete']"
                 @click="removeProduct(scope.row)"
                 >删除</el-button
@@ -90,7 +141,14 @@
         ><el-input v-model="categoryForm.name" maxlength="100"
       /></el-form-item>
       <el-form-item label="父分类">
-        <el-cascader v-model="categoryForm.parentId" class="w-full" :options="parentCategoryOptions" :props="parentCascaderProps" clearable placeholder="清空表示根分类" />
+        <el-cascader
+          v-model="categoryForm.parentId"
+          class="w-full"
+          :options="parentCategoryOptions"
+          :props="parentCascaderProps"
+          clearable
+          placeholder="清空表示根分类"
+        />
       </el-form-item>
       <el-form-item label="排序" prop="sort"
         ><el-input-number v-model="categoryForm.sort" :min="0"
@@ -123,7 +181,12 @@
         ><el-input :model-value="productForm.productRef" disabled
       /></el-form-item>
       <el-form-item label="所属分类" prop="categoryId"
-        ><el-cascader v-model="productForm.categoryId" class="w-full" :options="productCategoryOptions" :props="productCascaderProps" clearable
+        ><el-cascader
+          v-model="productForm.categoryId"
+          class="w-full"
+          :options="productCategoryOptions"
+          :props="productCascaderProps"
+          clearable
       /></el-form-item>
       <el-form-item label="课程名称" prop="name"
         ><el-input v-model="productForm.name" maxlength="200"
@@ -207,7 +270,11 @@
       </el-tab-pane>
       <el-tab-pane label="SKU与价格" name="skus">
         <div class="mb-16px"
-          ><el-button type="primary" v-hasPermi="['zsjos:product:sku-create']" @click="generateSku"
+          ><el-button
+            type="primary"
+            :loading="Boolean(currentSpu && isProcessing(`sku-generate:${currentSpu.id}`))"
+            v-hasPermi="['zsjos:product:sku-create']"
+            @click="generateSku"
             >生成缺失组合</el-button
           ></div
         >
@@ -239,11 +306,13 @@
               ><el-button
                 link
                 v-hasPermi="['zsjos:product:sku-status']"
+                :loading="isProcessing(`sku-status:${scope.row.id}`)"
                 @click="toggleSku(scope.row)"
                 >{{ scope.row.status === 0 ? '停用' : '启用' }}</el-button
               ><el-button
                 link
                 type="danger"
+                :loading="isProcessing(`sku-delete:${scope.row.id}`)"
                 v-hasPermi="['zsjos:product:sku-delete']"
                 @click="removeSku(scope.row)"
                 >删除</el-button
@@ -289,6 +358,19 @@ defineOptions({ name: 'ZsjosProduct' })
 const message = useMessage()
 const loading = ref(true)
 const saving = ref(false)
+const processingKeys = ref(new Set<string>())
+const isProcessing = (key: string) => processingKeys.value.has(key)
+const withProcessing = async (key: string, task: () => Promise<void>) => {
+  if (processingKeys.value.has(key)) return
+  processingKeys.value = new Set(processingKeys.value).add(key)
+  try {
+    await task()
+  } finally {
+    const next = new Set(processingKeys.value)
+    next.delete(key)
+    processingKeys.value = next
+  }
+}
 const error = ref('')
 const categories = ref<ProductApi.ZsjosProductCategoryVO[]>([])
 const selectedCategory = ref<ProductApi.ZsjosProductCategoryVO>()
@@ -364,13 +446,32 @@ const toCascader = (
     children: node.children?.length ? toCascader(node.children, mode, disabledIds) : undefined
   }))
 const parentCategoryOptions = computed(() =>
-  toCascader(categories.value, 'parent', collectIds(categoryEditing.value ? selectedCategory.value : undefined))
+  toCascader(
+    categories.value,
+    'parent',
+    collectIds(categoryEditing.value ? selectedCategory.value : undefined)
+  )
 )
 const productCategoryOptions = computed(() => toCascader(categories.value, 'product'))
-const parentCascaderProps = { checkStrictly: true, emitPath: false, value: 'value', label: 'label', children: 'children' }
-const productCascaderProps = { checkStrictly: true, emitPath: false, value: 'value', label: 'label', children: 'children' }
+const parentCascaderProps = {
+  checkStrictly: true,
+  emitPath: false,
+  value: 'value',
+  label: 'label',
+  children: 'children'
+}
+const productCascaderProps = {
+  checkStrictly: true,
+  emitPath: false,
+  value: 'value',
+  label: 'label',
+  children: 'children'
+}
 
-const findCategory = (id: number, nodes = categories.value): ProductApi.ZsjosProductCategoryVO | undefined => {
+const findCategory = (
+  id: number,
+  nodes = categories.value
+): ProductApi.ZsjosProductCategoryVO | undefined => {
   for (const node of nodes) {
     if (node.id === id) return node
     const found = findCategory(id, node.children || [])
@@ -430,6 +531,7 @@ const openCategory = (row?: ProductApi.ZsjosProductCategoryVO) => {
   categoryDialog.value = true
 }
 const saveCategory = async () => {
+  if (saving.value) return
   if (!(await categoryFormRef.value?.validate())) return
   saving.value = true
   try {
@@ -458,6 +560,7 @@ const openProduct = (row?: ProductApi.ZsjosProductVO) => {
   productDialog.value = true
 }
 const saveProduct = async () => {
+  if (saving.value) return
   if (!(await productFormRef.value?.validate())) return
   saving.value = true
   try {
@@ -471,36 +574,44 @@ const saveProduct = async () => {
   }
 }
 const toggleProduct = async (row: ProductApi.ZsjosProductVO) => {
-  await ProductApi.updateProductStatus({ id: row.id, status: row.status === 0 ? 1 : 0 })
-  await loadProducts()
-  message.success('状态已更新')
+  await withProcessing(`product-status:${row.id}`, async () => {
+    await ProductApi.updateProductStatus({ id: row.id, status: row.status === 0 ? 1 : 0 })
+    await loadProducts()
+    message.success('状态已更新')
+  })
 }
 const removeProduct = async (row: ProductApi.ZsjosProductVO) => {
-  try {
-    await message.delConfirm()
-    await ProductApi.deleteProduct(row.id)
-    await loadProducts()
-    message.success('产品已删除')
-  } catch (e: any) {
-    if (e?.msg) message.error(e.msg)
-  }
+  await withProcessing(`product-delete:${row.id}`, async () => {
+    try {
+      await message.delConfirm()
+      await ProductApi.deleteProduct(row.id)
+      await loadProducts()
+      message.success('产品已删除')
+    } catch (e: any) {
+      if (e?.msg) message.error(e.msg)
+    }
+  })
 }
 const toggleCategory = async (row: ProductApi.ZsjosProductCategoryVO) => {
-  await ProductApi.updateCategoryStatus(row.id, row.status === 0 ? 1 : 0)
-  await load()
-  message.success('分类状态已更新')
+  await withProcessing(`category-status:${row.id}`, async () => {
+    await ProductApi.updateCategoryStatus(row.id, row.status === 0 ? 1 : 0)
+    await load()
+    message.success('分类状态已更新')
+  })
 }
 const removeCategory = async (row?: ProductApi.ZsjosProductCategoryVO) => {
   if (!row) return
-  try {
-    await message.delConfirm()
-    await ProductApi.deleteCategory(row.id)
-    if (selectedCategory.value?.id === row.id) selectedCategory.value = undefined
-    await load()
-    message.success('分类已删除')
-  } catch (e: any) {
-    if (e?.msg) message.error(e.msg)
-  }
+  await withProcessing(`category-delete:${row.id}`, async () => {
+    try {
+      await message.delConfirm()
+      await ProductApi.deleteCategory(row.id)
+      if (selectedCategory.value?.id === row.id) selectedCategory.value = undefined
+      await load()
+      message.success('分类已删除')
+    } catch (e: any) {
+      if (e?.msg) message.error(e.msg)
+    }
+  })
 }
 const openSkuConfig = async (row: ProductApi.ZsjosProductVO) => {
   currentSpu.value = row
@@ -525,6 +636,7 @@ const addAttr = () =>
     valuesText: ''
   })
 const saveAttrs = async () => {
+  if (saving.value) return
   if (!currentSpu.value) return
   const attrs = attrForms.value.map((attr, index) => ({
     attrKey: attr.attrKey,
@@ -549,9 +661,12 @@ const saveAttrs = async () => {
 }
 const generateSku = async () => {
   if (!currentSpu.value) return
-  const count = await ProductApi.generateSkus(currentSpu.value.id)
-  skus.value = await ProductApi.getSkuList(currentSpu.value.id)
-  message.success(count ? `已生成 ${count} 个缺失组合，请设置价格后启用` : '没有需要生成的新组合')
+  const spuId = currentSpu.value.id
+  await withProcessing(`sku-generate:${spuId}`, async () => {
+    const count = await ProductApi.generateSkus(spuId)
+    skus.value = await ProductApi.getSkuList(spuId)
+    message.success(count ? `已生成 ${count} 个缺失组合，请设置价格后启用` : '没有需要生成的新组合')
+  })
 }
 const formatAttrs = (attrs?: Record<string, string>) =>
   Object.values(attrs || {}).join(' / ') || '无销售属性'
@@ -560,6 +675,7 @@ const openSku = (row: ProductApi.ProductSkuVO) => {
   skuEditDialog.value = true
 }
 const saveSku = async () => {
+  if (saving.value) return
   saving.value = true
   try {
     await ProductApi.updateSku(skuForm)
@@ -571,17 +687,21 @@ const saveSku = async () => {
   }
 }
 const toggleSku = async (row: ProductApi.ProductSkuVO) => {
-  await ProductApi.updateSkuStatus(row.id, row.status === 0 ? 1 : 0)
-  if (currentSpu.value) skus.value = await ProductApi.getSkuList(currentSpu.value.id)
+  await withProcessing(`sku-status:${row.id}`, async () => {
+    await ProductApi.updateSkuStatus(row.id, row.status === 0 ? 1 : 0)
+    if (currentSpu.value) skus.value = await ProductApi.getSkuList(currentSpu.value.id)
+  })
 }
 const removeSku = async (row: ProductApi.ProductSkuVO) => {
-  try {
-    await message.delConfirm()
-    await ProductApi.deleteSku(row.id)
-    if (currentSpu.value) skus.value = await ProductApi.getSkuList(currentSpu.value.id)
-  } catch (e: any) {
-    if (e?.msg) message.error(e.msg)
-  }
+  await withProcessing(`sku-delete:${row.id}`, async () => {
+    try {
+      await message.delConfirm()
+      await ProductApi.deleteSku(row.id)
+      if (currentSpu.value) skus.value = await ProductApi.getSkuList(currentSpu.value.id)
+    } catch (e: any) {
+      if (e?.msg) message.error(e.msg)
+    }
+  })
 }
 onMounted(load)
 </script>

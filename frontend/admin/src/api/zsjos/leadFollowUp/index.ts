@@ -16,7 +16,9 @@ export interface LeadFollowUpVO {
   operatorName?: string
   occurredAt: Timestamp
   firstInAssignment: boolean
+  method: string
   methodLabel: string
+  result: string
   resultLabel: string
   categoryBefore: string
   categoryBeforeLabel: string

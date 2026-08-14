@@ -9,6 +9,7 @@ import { validateSalesOrderSubmission } from '../services/salesOrder'
 import SalesOrderCoursePicker from './SalesOrderCoursePicker'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
+import { useSubmissionGuard } from '../services/submissionGuard'
 
 type Values = {
   buyerName?: string; studentName: string; studentNature: string; mobile?: string; wechatId?: string; regionPath: string[]
@@ -41,7 +42,7 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
   const [catalog, setCatalog] = useState<LeadCatalog>(emptyCatalog)
   const [dicts, setDicts] = useState<Record<string, DictData[]>>({})
   const [loading, setLoading] = useState(false)
-  const [saving, setSaving] = useState(false)
+  const { submitting: saving, run: runSubmission, resetIntent } = useSubmissionGuard()
   const [loadError, setLoadError] = useState('')
   const [vouchers, setVouchers] = useState<DeferredUploadItem<SalesOrderVoucher>[]>([])
 
@@ -85,8 +86,9 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
 
   useEffect(() => {
     if (!open) return
+    resetIntent()
     form.resetFields(); setVouchers([]); void load()
-  }, [open, lead.id, orderId])
+  }, [open, lead.id, orderId, resetIntent])
 
   const options = (type: string) => (dicts[type] || []).map(item => ({ value: item.value, label: item.label }))
   const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
@@ -97,42 +99,43 @@ export default function SalesOrderEntryModal({ lead, orderId, open, onClose, onS
     const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
     const region = findRegion(areas, values.regionPath)
     if (!region.provinceName) { message.warning('请选择有效省市'); return }
-    const request: SalesOrderSubmitRequest = {
-      buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
-      studentMobile: values.mobile?.trim() || undefined, studentWechatId: values.wechatId?.trim() || undefined,
-      provinceCode, provinceName: region.provinceName, cityCode, cityName: region.cityName,
-      agreedExamTime: values.agreedExamTime?.trim() || undefined, classType: values.classType?.trim() || undefined,
-      servicePeriod: values.servicePeriod, studentSource: values.studentSource, customerPaidAt: values.customerPaidAt.valueOf(),
-      feeMode: values.feeMode, paymentMethod: values.paymentMethod, remark: values.remark?.trim() || undefined,
-      studentSpecialRequirements: values.specialRequirements?.trim() || undefined,
-      materialDeliveryContact: values.materialDeliveryContact?.trim() || undefined,
-      items: values.items.map(item => { const [spuRef, skuRef] = item.courseKey!.split('::'); return { spuRef, skuRef, actualAmount: Number(item.actualAmount) } }),
-      paymentVouchers: [], idempotencyKey: crypto.randomUUID()
-    }
-    setSaving(true)
-    try {
-      const uploadResult = await uploadDeferredFiles(vouchers, api.uploadSalesOrderVoucher, setVouchers)
-      if (uploadResult.failed) { message.error('有缴费凭证上传失败，请重试失败项'); return }
-      request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
-      if (orderId) {
-        await api.resubmitSalesOrder(orderId, request)
-        message.success('成交订单已补正并重新提交会签')
-        onSubmitted(orderId)
-      } else {
-        const submittedOrderId = await api.submitSalesOrder(lead.id, request)
-        message.success('成交订单已提交会签')
-        onSubmitted(submittedOrderId)
+    await runSubmission(async ({ idempotencyKey, complete }) => {
+      const request: SalesOrderSubmitRequest = {
+        buyerName: values.buyerName?.trim() || undefined, studentName: values.studentName.trim(), studentNature: values.studentNature,
+        studentMobile: values.mobile?.trim() || undefined, studentWechatId: values.wechatId?.trim() || undefined,
+        provinceCode, provinceName: region.provinceName, cityCode, cityName: region.cityName,
+        agreedExamTime: values.agreedExamTime?.trim() || undefined, classType: values.classType?.trim() || undefined,
+        servicePeriod: values.servicePeriod, studentSource: values.studentSource, customerPaidAt: values.customerPaidAt.valueOf(),
+        feeMode: values.feeMode, paymentMethod: values.paymentMethod, remark: values.remark?.trim() || undefined,
+        studentSpecialRequirements: values.specialRequirements?.trim() || undefined,
+        materialDeliveryContact: values.materialDeliveryContact?.trim() || undefined,
+        items: values.items.map(item => { const [spuRef, skuRef] = item.courseKey!.split('::'); return { spuRef, skuRef, actualAmount: Number(item.actualAmount) } }),
+        paymentVouchers: [], idempotencyKey
       }
-    }
-    catch (error) { message.error(errorText(error)) }
-    finally { setSaving(false) }
+      try {
+        const uploadResult = await uploadDeferredFiles(vouchers, api.uploadSalesOrderVoucher, setVouchers)
+        if (uploadResult.failed) { message.error('有缴费凭证上传失败，请重试失败项'); return }
+        request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
+        if (orderId) {
+          await api.resubmitSalesOrder(orderId, request)
+          message.success('成交订单已补正并重新提交会签')
+          onSubmitted(orderId)
+        } else {
+          const submittedOrderId = await api.submitSalesOrder(lead.id, request)
+          message.success('成交订单已提交会签')
+          onSubmitted(submittedOrderId)
+        }
+        complete()
+      }
+      catch (error) { message.error(errorText(error)) }
+    })
   }
 
   return <Modal title={orderId ? '补正成交' : '录入成交'} open={open} onCancel={onClose} footer={null} width={980} destroyOnHidden>
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
-      <Form form={form} layout="vertical" onFinish={submit} disabled={Boolean(loadError)}>
+      <Form form={form} layout="vertical" onFinish={submit} disabled={Boolean(loadError) || saving}>
         <Divider titlePlacement="start">学员信息</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>

@@ -5,11 +5,13 @@ import { api, type SalesOrder, type SalesOrderApprovalFilterProfile, type SalesO
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS, SALES_ORDER_TASK_LABELS } from '../components/SalesOrderDetailCards'
 import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderTaskKey } from '../services/salesOrder'
+import { useSubmissionGuard } from '../services/submissionGuard'
 
 const PAGE_SIZE = 20
 
 export default function SalesOrderApprovalPage() {
-  const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [] })
+  const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [], centers: [] })
+  const [center, setCenter] = useState<'registration' | 'finance'>()
   const [groupKey, setGroupKey] = useState<string>()
   const [optionKey, setOptionKey] = useState('all')
   const [keyword, setKeyword] = useState('')
@@ -27,7 +29,7 @@ export default function SalesOrderApprovalPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [decision, setDecision] = useState<'approve' | 'reject'>()
   const [reason, setReason] = useState('')
-  const [saving, setSaving] = useState(false)
+  const { submitting: saving, run: runDecision } = useSubmissionGuard()
   const requestVersion = useRef(0)
 
   const loadProfile = useCallback(async () => {
@@ -35,6 +37,7 @@ export default function SalesOrderApprovalPage() {
     try {
       const next = await api.salesOrderApprovalFilterProfile()
       setProfile(next)
+      setCenter(current => current && next.centers.some(item => item.key === current) ? current : next.centers[0]?.key)
       setGroupKey(current => current && next.groups.some(group => group.key === current) ? current : next.groups[0]?.key)
     } catch (loadError) { setProfileError(loadError instanceof Error ? loadError.message : '审批筛选方案加载失败') }
     finally { setProfileLoading(false) }
@@ -44,19 +47,18 @@ export default function SalesOrderApprovalPage() {
     const version = ++requestVersion.current
     setLoading(true); setError('')
     try {
-      const result = await api.salesOrderApprovalInbox({ pageNo: targetPage, pageSize: PAGE_SIZE, groupKey, optionKey, keyword: keyword.trim() || undefined })
+      const result = await api.salesOrderApprovalInbox({ pageNo: targetPage, pageSize: PAGE_SIZE, center, groupKey, optionKey, keyword: keyword.trim() || undefined })
       if (version !== requestVersion.current) return
       setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey)); setTotal(result.total); setPageNo(targetPage)
       if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
     } catch (loadError) {
       if (version === requestVersion.current) { setError(loadError instanceof Error ? loadError.message : '成交审批加载失败'); if (replace) { setItems([]); setSelectedKey(undefined) } }
     } finally { if (version === requestVersion.current) setLoading(false) }
-  }, [groupKey, keyword, optionKey])
+  }, [center, groupKey, keyword, optionKey])
 
   useEffect(() => { void loadProfile() }, [loadProfile])
-  useEffect(() => { if (!profileLoading && !profileError && groupKey) void loadPage(1, true) }, [groupKey, optionKey, keyword, profileLoading, profileError, loadPage])
+  useEffect(() => { if (!profileLoading && !profileError && groupKey && center) void loadPage(1, true) }, [center, groupKey, optionKey, keyword, profileLoading, profileError, loadPage])
 
-  const selectedGroup = useMemo(() => profile.groups.find(group => group.key === groupKey), [groupKey, profile.groups])
   const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey), [items, selectedKey])
   const loadDetail = useCallback(async (id: number) => {
     setDetailLoading(true); setDetailError('')
@@ -66,13 +68,15 @@ export default function SalesOrderApprovalPage() {
   }, [])
   useEffect(() => { if (selectedItem) void loadDetail(selectedItem.id); else setDetail(undefined) }, [loadDetail, selectedItem])
 
-  const reload = () => { void loadProfile(); if (groupKey) void loadPage(1, true) }
+  const reload = () => { void loadProfile(); if (groupKey && center) void loadPage(1, true) }
   const submitDecision = async () => {
     if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
-    setSaving(true)
-    try { await api.decideSalesOrder(selectedItem.id, decision, { taskId: selectedItem.taskId, reason: reason.trim() }); message.success(decision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); reload() }
-    catch (saveError) { message.error(saveError instanceof Error ? saveError.message : '审批失败') }
-    finally { setSaving(false) }
+    const order = selectedItem
+    const nextDecision = decision
+    await runDecision(async ({ complete }) => {
+      await api.decideSalesOrder(order.id, nextDecision, { taskId: order.taskId!, reason: reason.trim() })
+      complete(); message.success(nextDecision === 'approve' ? '已通过' : '已驳回并退回销售补正'); setDecision(undefined); setReason(''); reload()
+    }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '审批失败'))
   }
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
@@ -84,8 +88,8 @@ export default function SalesOrderApprovalPage() {
     <header className="lead-inbox-filter-shell">
       {profileError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={profileError} action={<Button type="link" size="small" onClick={() => void loadProfile()}>重试</Button>}/>}
       {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.groups.length > 0 ? <>
-        <Tabs className="lead-inbox-group-tabs" activeKey={groupKey} onChange={key => { setGroupKey(key); setOptionKey('all') }} items={profile.groups.map(group => ({ key: group.key, label: <span>{group.label}<small>{group.count}</small></span> }))}/>
-        {selectedGroup?.sections.map(section => <div className="lead-inbox-filter-sections" key={section.key}><div className="lead-inbox-filter-row"><span className="lead-inbox-filter-label">{section.label}</span><div className="lead-inbox-filter-options">{section.options.map(option => <button type="button" key={option.key} className={optionKey === option.key ? 'active' : ''} aria-pressed={optionKey === option.key} onClick={() => setOptionKey(option.key)}>{option.label}<small>{option.count}</small></button>)}</div></div></div>)}
+        {profile.centers.length > 1 && <Tabs className="lead-inbox-center-tabs" activeKey={center} onChange={key => { setCenter(key as 'registration' | 'finance'); setOptionKey('all') }} items={profile.centers.map(item => ({ key: item.key, label: item.label }))}/>}
+        <Tabs className="lead-inbox-group-tabs" activeKey={groupKey} onChange={key => { setGroupKey(key); setOptionKey('all') }} items={profile.groups.map(group => ({ key: group.key, label: group.label }))}/>
       </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用审批筛选配置"/>}
     </header>
     <div className="lead-inbox-layout"><aside className="lead-inbox-list-pane"><div className="lead-inbox-toolbar"><Input.Search allowClear placeholder="搜索订单号 / 学员姓名 / 手机号" onSearch={value => setKeyword(value.trim())}/></div>
