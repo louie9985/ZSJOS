@@ -42,3 +42,17 @@
 - Verification evidence: Existing 16 focused tests, 239 filtered ZSJOS tests, server package, XLSX parsing, and diff-check evidence remains applicable; integrated checks will be rerun on main.
 - Dependency or integration impact: Adds the existing repository Excel starter as a direct ZSJOS dependency; no schema changes.
 - Remaining work: Create the feature commit, record it, merge into main, and run integrated verification.
+
+## Final commit record 2026-08-14 16:05:00 +08:00
+- Beijing time: `2026-08-14 16:05:00 +08:00`
+- Branch: `codex/async-export-complete-fix`
+- Worktree: `D:\ZSJ-OS-worktrees\async-export-complete-fix`
+- HEAD commit: `07782258e2a0278ef6c3f48e7cbaa8e9b9cb7f34`
+- User goal: Record the authorized feature commit before integration.
+- Key decisions: Treat `07782258e2a0278ef6c3f48e7cbaa8e9b9cb7f34` as the final functional commit; this entry changes handoff metadata only.
+- Execution or analysis result: Feature commit created successfully and the worktree is clean.
+- Changed files: `handoff/async-export-complete-fix.md` only.
+- Verification evidence: `git diff --cached --check` passed before the feature commit; prior focused verification remains recorded above.
+- Dependency or integration impact: None beyond the recorded direct Excel starter dependency.
+- Remaining work: Merge into local main and run integrated verification.
+- Final commit: `07782258e2a0278ef6c3f48e7cbaa8e9b9cb7f34`
