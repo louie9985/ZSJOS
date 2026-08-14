@@ -50,13 +50,51 @@
 
 /* 自定义背景时的磨砂玻璃模糊。
    挂 html[data-crm-bg] 而非 .crm-shell：Modal / Drawer 走 portal 在 shell 之外。
-   blur 强度：容器面板 20px / 弹层 24px。 */
-html[data-crm-bg='custom'] :where(.ant-card,.ant-table-wrapper,.ant-collapse,.ant-list,.ant-segmented) {
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+   blur 强度由主题设置的「背景模糊」滑块下发（--crm-glass-blur，浮层再加 4px）。
+   data-crm-glass='flat'（模糊为 0）时整条规则不匹配，避免下发 blur(0px) 白建合成层。
+
+   关键：backdrop-filter 要求元素自身的背景是半透明的，否则实色盖住模糊等于没有。
+   antd v5 的 CSS-in-JS 给这些组件注入了高优先级的实色 background，
+   所以必须在同一条规则里用 !important 强制改成半透明。 */
+html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-card,.ant-table-wrapper,.ant-collapse,.ant-list,.ant-segmented) {
+  background: var(--crm-bg-container) !important;
+  backdrop-filter: blur(var(--crm-glass-blur));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur));
 }
 
-html[data-crm-bg='custom'] :where(.ant-modal-content,.ant-drawer-content,.ant-dropdown-menu,.ant-popover-inner,.ant-select-dropdown,.ant-picker-dropdown,.ant-notification-notice,.ant-menu-submenu-popup>.ant-menu) {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-modal-content,.ant-drawer-content) {
+  background: var(--crm-bg-overlay) !important;
+  backdrop-filter: blur(var(--crm-glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur-strong));
+}
+
+/* ant-drawer-content-wrapper 可能也有 antd 注入的实色背景，必须透掉否则挡住 backdrop */
+html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-drawer-content-wrapper) {
+  background: transparent !important;
+}
+
+html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-dropdown-menu,.ant-popover-inner,.ant-select-dropdown,.ant-picker-dropdown,.ant-notification-notice,.ant-menu-submenu-popup>.ant-menu) {
+  background: var(--crm-bg-elevated) !important;
+  backdrop-filter: blur(var(--crm-glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur-strong));
+}
+
+/* 玻璃态下调淡对话框遮罩。
+   默认遮罩是 45% 纯黑，铺满整个视口压在面板背后 —— 背后没有可辨识的内容，
+   backdrop-filter 糊的就是一层均匀的黑，效果等于没有（即五要素之⑤：
+   毛玻璃需要背后有丰富的背景才显现）。调淡后渐变能透上来，模糊才看得见。 */
+html[data-crm-bg='custom'] :where(.ant-modal-mask,.ant-drawer-mask) {
+  background: var(--crm-bg-mask);
+}
+
+/* 玻璃边缘高光（五要素之③）：1px 半透明白描边模拟玻璃片的物理厚度。
+   透明度随模糊增强，见 themeTokens.ts 的 edgeAlpha。
+   与既有 elevation 阴影叠加而非替换，故 --crm-glass-edge 的「无」值必须是
+   合法的阴影列表成员（零尺寸透明），不能是 none。 */
+html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-card,.ant-collapse) {
+  box-shadow: var(--crm-glass-edge), var(--crm-shadow-card);
+}
+
+html[data-crm-bg='custom'][data-crm-glass='frosted'] :where(.ant-modal-content,.ant-drawer-content,.ant-dropdown-menu,.ant-popover-inner,.ant-select-dropdown,.ant-picker-dropdown,.ant-notification-notice) {
+  box-shadow: var(--crm-glass-edge), var(--crm-shadow-float);
 }

@@ -73,4 +73,75 @@ describe('buildCrmVars', () => {
     const offenders = Object.keys(vars).filter(name => !name.startsWith('--crm-'))
     expect(offenders).toEqual([])
   })
+
+  describe('对话框遮罩（mask）', () => {
+    it('lightens the mask under glass so the gradient shows through', () => {
+      // 45% 纯黑遮罩铺满视口时，浮层背后是一层均匀的黑，模糊等于没有效果
+      const plain = buildCrmVars(token, { hasBackground: false })
+      const glass = buildCrmVars(token, { hasBackground: true })
+      expect(plain['--crm-bg-mask']).toBe(token.colorBgMask)
+      expect(glass['--crm-bg-mask']).toContain('color-mix(in srgb,')
+      expect(glass['--crm-bg-mask']).toContain('55%')
+    })
+  })
+
+  describe('导航栏底色（chrome）', () => {
+    it('tints chrome toward the layout colour so it is not the same white as cards', () => {
+      // 色阶意图是 layout → sunken → chrome → container → elevated，
+      // chrome 若直接等于 container，导航栏就和白卡片糊成一片
+      const vars = buildCrmVars(token, { hasBackground: false })
+      expect(vars['--crm-bg-chrome']).not.toBe(vars['--crm-bg-container'])
+      expect(vars['--crm-bg-chrome']).toContain(token.colorBgLayout)
+    })
+  })
+
+  describe('背景模糊（glassBlur）', () => {
+    it('defaults to 20px and gives overlays 4px more', () => {
+      const vars = buildCrmVars(token, { hasBackground: true })
+      expect(vars['--crm-glass-blur']).toBe('20px')
+      expect(vars['--crm-glass-blur-strong']).toBe('24px')
+    })
+
+    it('follows the configured radius', () => {
+      const vars = buildCrmVars(token, { hasBackground: true, glassBlur: 36 })
+      expect(vars['--crm-glass-blur']).toBe('36px')
+      expect(vars['--crm-glass-blur-strong']).toBe('40px')
+    })
+
+    it('zeroes out blur when no custom background is active', () => {
+      // 纯色背景下没有可透视的内容，模糊只会白白多出合成层
+      const vars = buildCrmVars(token, { hasBackground: false, glassBlur: 30 })
+      expect(vars['--crm-glass-blur']).toBe('0px')
+      expect(vars['--crm-glass-blur-strong']).toBe('0px')
+    })
+
+    it('keeps the strong radius at 0 rather than 4px when blur is off', () => {
+      const vars = buildCrmVars(token, { hasBackground: true, glassBlur: 0 })
+      expect(vars['--crm-glass-blur']).toBe('0px')
+      expect(vars['--crm-glass-blur-strong']).toBe('0px')
+    })
+  })
+
+  describe('玻璃边缘高光（glassEdge）', () => {
+    it('strengthens the highlight as blur increases', () => {
+      const light = buildCrmVars(token, { hasBackground: true, glassBlur: 8 })
+      const heavy = buildCrmVars(token, { hasBackground: true, glassBlur: 40 })
+      const alphaOf = (v: string) => Number(v.match(/,\s*([\d.]+)\)/)?.[1])
+      expect(alphaOf(light['--crm-glass-edge'])).toBeLessThan(
+        alphaOf(heavy['--crm-glass-edge']),
+      )
+      expect(heavy['--crm-glass-edge']).toContain('inset 0 1px 0 0 rgba(255, 255, 255,')
+    })
+
+    it('falls back to a transparent shadow, never `none`', () => {
+      // 该变量会被拼进 box-shadow 列表，`none` 不是合法成员，整条声明会被丢弃
+      for (const vars of [
+        buildCrmVars(token, { hasBackground: false }),
+        buildCrmVars(token, { hasBackground: true, glassBlur: 0 }),
+      ]) {
+        expect(vars['--crm-glass-edge']).not.toContain('none')
+        expect(vars['--crm-glass-edge']).toBe('inset 0 0 0 0 transparent')
+      }
+    })
+  })
 })

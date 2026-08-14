@@ -170,6 +170,10 @@ export const PRESET_COLORS = [
   { key: 'cyan', label: '明青', color: '#13c2c2' }
 ] as const
 
+/** 玻璃背景模糊滑块范围（px）。ThemeContext 的钳制与 ThemeSwitcher 的 Slider 共用，避免两处漂移。 */
+export const GLASS_BLUR_MIN = 0
+export const GLASS_BLUR_MAX = 40
+
 export const DEFAULT_THEME = {
   preset: 'default-light' as ThemePreset,
   colorPrimary: '#1677ff',
@@ -178,6 +182,8 @@ export const DEFAULT_THEME = {
   background: 'theme' as BackgroundKey,
   /** 玻璃不透明度 0–100，仅自定义背景时生效 */
   glassOpacity: 60,
+  /** 玻璃背景模糊（backdrop-filter 模糊半径）0–40px，仅自定义背景时生效；0 表示完全关闭磨砂 */
+  glassBlur: 20,
   density: 'default' as Density,
   fontScale: 'default' as FontScale,
   layoutMode: 'side' as LayoutMode,

@@ -12,6 +12,8 @@ import {
   DEFAULT_THEME,
   DENSITIES,
   FONT_SCALES,
+  GLASS_BLUR_MAX,
+  GLASS_BLUR_MIN,
   LAYOUT_MODES,
   STORAGE_KEYS,
   TAB_STYLE_OPTIONS,
@@ -42,6 +44,8 @@ export interface ThemeState {
   background: BackgroundKey;
   /** 玻璃不透明度 0–100，仅自定义背景时生效 */
   glassOpacity: number;
+  /** 玻璃背景模糊半径 0–40px，仅自定义背景时生效；0 表示彻底关闭 backdrop-filter */
+  glassBlur: number;
   density: Density;
   fontScale: FontScale;
   layoutMode: LayoutMode;
@@ -65,6 +69,7 @@ export interface ThemeContextValue extends ThemeState {
   setCompact: (compact: boolean) => void;
   setBackground: (bg: BackgroundKey) => void;
   setGlassOpacity: (opacity: number) => void;
+  setGlassBlur: (blur: number) => void;
   setDensity: (density: Density) => void;
   setFontScale: (scale: FontScale) => void;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -103,6 +108,14 @@ function readStorage(): ThemeState {
     }
     if (typeof merged.glassOpacity !== 'number' || merged.glassOpacity < 0 || merged.glassOpacity > 100) {
       merged.glassOpacity = DEFAULT_THEME.glassOpacity;
+    }
+    // 迁移：glassBlur 面世前模糊强度写死在 CSS 里，旧数据无此字段，回落到默认档
+    if (
+      typeof merged.glassBlur !== 'number' ||
+      merged.glassBlur < GLASS_BLUR_MIN ||
+      merged.glassBlur > GLASS_BLUR_MAX
+    ) {
+      merged.glassBlur = DEFAULT_THEME.glassBlur;
     }
     if (!BORDER_RADIUS_OPTIONS.some((o) => o.value === merged.borderRadius)) {
       merged.borderRadius = DEFAULT_THEME.borderRadius;
@@ -152,6 +165,14 @@ export function useThemeState(): ThemeContextValue {
   );
   const setGlassOpacity = useCallback(
     (glassOpacity: number) => setState((s) => ({ ...s, glassOpacity: Math.max(0, Math.min(100, glassOpacity)) })),
+    [],
+  );
+  const setGlassBlur = useCallback(
+    (glassBlur: number) =>
+      setState((s) => ({
+        ...s,
+        glassBlur: Math.max(GLASS_BLUR_MIN, Math.min(GLASS_BLUR_MAX, glassBlur)),
+      })),
     [],
   );
   const setDensity = useCallback(
@@ -214,6 +235,7 @@ export function useThemeState(): ThemeContextValue {
       setCompact,
       setBackground,
       setGlassOpacity,
+      setGlassBlur,
       setDensity,
       setFontScale,
       setLayoutMode,
@@ -235,6 +257,7 @@ export function useThemeState(): ThemeContextValue {
       setCompact,
       setBackground,
       setGlassOpacity,
+      setGlassBlur,
       setDensity,
       setFontScale,
       setLayoutMode,

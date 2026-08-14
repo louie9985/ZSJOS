@@ -43,14 +43,27 @@ describe('withGlassSurface', () => {
     expect(components.Table.borderColor).toBe('#e2dcd5')
   })
 
-  it('applies elevated (85%) to Modal and Drawer', () => {
+  it('keeps modal and drawer at the base opacity so the blur stays visible', () => {
+    // 它们背后有遮罩做分隔，不需要像 dropdown 那样加实；加到 85% 只透 15% 的光，
+    // backdrop-filter 会被压得完全看不出来
     const config: ConfigProviderProps = {
       theme: { token: { colorBgElevated: '#fcfaf8' }, components: {} }
     }
     const result = withGlassSurface(config, true)
     const components = (result.theme as any)?.components
-    expect(components.Modal.contentBg).toContain('85%')
-    expect(components.Drawer.colorBgElevated).toContain('85%')
+    expect(components.Modal.contentBg).toContain('60%')
+    expect(components.Drawer.colorBgElevated).toContain('60%')
+  })
+
+  it('keeps maskless popups at elevated (85%) for legibility over content', () => {
+    const config: ConfigProviderProps = {
+      theme: { token: { colorBgElevated: '#fcfaf8' }, components: {} }
+    }
+    const result = withGlassSurface(config, true)
+    const components = (result.theme as any)?.components
+    expect(components.Dropdown.colorBgElevated).toContain('85%')
+    expect(components.Select.colorBgElevated).toContain('85%')
+    expect(components.Menu.popupBg).toContain('85%')
   })
 
   it('applies input strength (68%) to Input / InputNumber', () => {

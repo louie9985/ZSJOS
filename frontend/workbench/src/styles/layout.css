@@ -218,9 +218,9 @@
   background: transparent;
 }
 
-.custom-background .crm-sider,.custom-background .crm-header,.custom-background .ai-sider {
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass='frosted'] .custom-background .crm-header,html[data-crm-glass='frosted'] .custom-background .ai-sider {
+  backdrop-filter: blur(var(--crm-glass-blur));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur));
 }
 
 .workspace-page {

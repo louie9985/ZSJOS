@@ -10,9 +10,10 @@
 
 .lead-inbox-filter-shell {
   flex: none;
-  border: 1px solid var(--crm-border);
-  border-radius: 6px;
-  background: var(--crm-bg-container);
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--crm-border);
+  background: transparent;
 }
 
 .lead-inbox-group-tabs .ant-tabs-nav {
@@ -20,7 +21,7 @@
 }
 
 .lead-inbox-group-tabs .ant-tabs-tab {
-  padding: 10px 2px;
+  padding: 8px 0;
 }
 
 .lead-inbox-group-tabs .ant-tabs-tab-btn>span {
@@ -36,7 +37,8 @@
 }
 
 .lead-inbox-filter-sections {
-  border-top: 1px solid var(--crm-border);
+  border-top: none;
+  padding: 4px 0 8px;
 }
 
 .lead-inbox-filter-row {
@@ -139,6 +141,38 @@
   border: 2px solid var(--crm-color-primary);
 }
 
+/**
+ * 刚接下、还没看过的客资。
+ * 底色 + 起始边一条竖条，在整列白底卡片里可以扫视识别；点进去后类名撤掉。
+ */
+.lead-inbox-item.unseen {
+  position: relative;
+  border-color: color-mix(in srgb, var(--crm-color-error) 35%, var(--crm-border));
+  background: color-mix(in srgb, var(--crm-color-error) 6%, var(--crm-bg-container));
+}
+
+.lead-inbox-item.unseen::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--crm-color-error);
+}
+
+.lead-inbox-item.unseen:hover {
+  border-color: color-mix(in srgb, var(--crm-color-error) 55%, var(--crm-border));
+}
+
+.lead-inbox-new-tag {
+  flex: none;
+  margin-inline: 0;
+  font-size: var(--crm-font-sm);
+}
+
 .lead-inbox-item-main {
   display: flex;
   align-items: flex-start;
@@ -169,6 +203,13 @@
   gap: 8px;
 }
 
+.lead-inbox-item-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
 .lead-inbox-item-title strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -195,7 +236,7 @@
   overflow-y: auto;
   border: 1px solid var(--crm-border);
   border-radius: 6px;
-  background: var(--crm-bg-container);
+  background: color-mix(in srgb, var(--crm-bg-sunken) 50%, var(--crm-bg-container));
 }
 
 .lead-inbox-detail>h5 {
@@ -316,7 +357,7 @@
 }
 
 .lead-inbox-filter-shell {
-  padding: 0 var(--crm-card-pad);
+  padding: 0;
   margin-bottom: var(--crm-gap-sm);
 }
 
@@ -329,7 +370,7 @@
 }
 
 .lead-inbox-filter-sections {
-  padding: 8px 0 10px;
+  padding: 4px 0 6px;
 }
 
 .lead-inbox-layout {
@@ -350,7 +391,7 @@
   }
 
   .lead-inbox-filter-shell {
-    padding: 0 10px;
+    padding: 0;
   }
 
   .lead-inbox-layout {
@@ -360,4 +401,43 @@
   .lead-inbox-detail-pane {
     padding: 10px 12px;
   }
+}
+
+/* ==================== 插画风格适配 ==================== */
+
+[data-crm-preset="illustration"] .lead-inbox-item {
+  border-width: 3px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--crm-border);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item:hover {
+  box-shadow: 5px 5px 0 var(--crm-color-primary-hover);
+  transform: translate(-1px, -1px);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item.active {
+  border-width: 3px;
+  padding: 12px;
+  box-shadow: 4px 4px 0 var(--crm-color-primary);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item.unseen {
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--crm-color-error) 50%, var(--crm-border));
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item.unseen:hover {
+  box-shadow: 5px 5px 0 var(--crm-color-error);
+  transform: translate(-1px, -1px);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-detail-pane {
+  border-width: 3px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--crm-border);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-filter-shell {
+  border-bottom-width: 3px;
 }

@@ -16,6 +16,8 @@ import {
   BACKGROUND_METAS,
   DENSITY_OPTIONS,
   FONT_SCALE_OPTIONS,
+  GLASS_BLUR_MAX,
+  GLASS_BLUR_MIN,
   LAYOUT_MODE_OPTIONS,
   PRESET_COLORS,
   THEME_METAS,
@@ -37,6 +39,7 @@ const ThemeSwitcher: React.FC = () => {
     isDark,
     background,
     glassOpacity,
+    glassBlur,
     density,
     fontScale,
     layoutMode,
@@ -44,6 +47,7 @@ const ThemeSwitcher: React.FC = () => {
     setColorPrimary,
     setBackground,
     setGlassOpacity,
+    setGlassBlur,
     setDensity,
     setFontScale,
     setLayoutMode,
@@ -266,7 +270,7 @@ const ThemeSwitcher: React.FC = () => {
         })}
       </Flex>
 
-      {/* 玻璃不透明度（仅选了自定义背景时显示） */}
+      {/* 玻璃质感微调（仅选了自定义背景时显示——纯色背景下没有可透视的内容，两项都无效果） */}
       {background !== 'theme' && (
         <>
           <Divider style={{ margin: '16px 0' }} />
@@ -279,6 +283,19 @@ const ThemeSwitcher: React.FC = () => {
             value={glassOpacity}
             onChange={setGlassOpacity}
             tooltip={{ formatter: (v) => `${v}%` }}
+            style={{ marginTop: 4 }}
+          />
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            背景模糊
+          </Text>
+          <Slider
+            min={GLASS_BLUR_MIN}
+            max={GLASS_BLUR_MAX}
+            value={glassBlur}
+            onChange={setGlassBlur}
+            marks={{ [GLASS_BLUR_MIN]: '关', [GLASS_BLUR_MAX]: '强' }}
+            tooltip={{ formatter: (v) => (v ? `${v}px` : '关闭') }}
             style={{ marginTop: 4 }}
           />
         </>

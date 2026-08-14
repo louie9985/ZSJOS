@@ -54,6 +54,6 @@ describe('buildCrmVars across default presets', () => {
     const plain = buildCrmVars(token, { hasBackground: false })
     const glass = buildCrmVars(token, { hasBackground: true })
     const changed = Object.keys(plain).filter(k => plain[k] !== glass[k])
-    expect(changed.sort()).toEqual(['--crm-bg-chrome', '--crm-bg-container', '--crm-bg-elevated', '--crm-bg-layout', '--crm-border'])
+    expect(changed.sort()).toEqual(['--crm-bg-chrome', '--crm-bg-container', '--crm-bg-elevated', '--crm-bg-layout', '--crm-bg-mask', '--crm-bg-overlay', '--crm-bg-sunken', '--crm-border', '--crm-glass-blur', '--crm-glass-blur-strong', '--crm-glass-edge', '--crm-shadow-inset'])
   })
 })

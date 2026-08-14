@@ -34,7 +34,12 @@ export function withGlassSurface(
 
   const { bgContainer, bgElevated } = extractColors(config)
   const containerVal = glass(bgContainer, glassOpacity)
+  // 弹层分两档，依据是「背后有没有遮罩兜底」：
+  // - popup（dropdown / select / menu 等）直接浮在正文上，没有遮罩，必须更实才读得清
+  // - overlay（modal / drawer）背后有遮罩做分隔，可以用基础不透明度，否则
+  //   85% 的实底只透 15% 的光，backdrop-filter 再怎么调都看不出变化
   const elevatedVal = glass(bgElevated, Math.min(100, glassOpacity + 25))
+  const overlayVal = glass(bgElevated, glassOpacity)
   const inputVal = glass(bgContainer, Math.min(100, glassOpacity + 8))
   const headerVal = glass(bgContainer, Math.max(0, glassOpacity - 10))
 
@@ -43,8 +48,8 @@ export function withGlassSurface(
     List: { colorBgContainer: containerVal },
     Collapse: { colorBgContainer: containerVal, headerBg: headerVal },
     Table: { colorBgContainer: containerVal, headerBg: headerVal },
-    Modal: { contentBg: elevatedVal, headerBg: 'transparent' },
-    Drawer: { colorBgElevated: elevatedVal },
+    Modal: { contentBg: overlayVal, headerBg: 'transparent' },
+    Drawer: { colorBgElevated: overlayVal },
     // mini-float / top-only 的二级浮层。popupBg 默认取 colorBgElevated 的实色，
     // 不覆盖就是玻璃背景上唯一一块不透明弹层。darkPopupBg 是 antd 写死的 #001529，
     // 同样要盖。

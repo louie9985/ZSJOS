@@ -19,6 +19,8 @@ import {
   BORDER_RADIUS_OPTIONS,
   DENSITY_OPTIONS,
   FONT_SCALE_OPTIONS,
+  GLASS_BLUR_MAX,
+  GLASS_BLUR_MIN,
   LAYOUT_MODE_OPTIONS,
   PRESET_COLORS,
   TAB_STYLE_OPTIONS,
@@ -45,6 +47,7 @@ const SettingsDrawer: React.FC = () => {
     customizable,
     background,
     glassOpacity,
+    glassBlur,
     density,
     fontScale,
     layoutMode,
@@ -60,6 +63,7 @@ const SettingsDrawer: React.FC = () => {
     setCompact,
     setBackground,
     setGlassOpacity,
+    setGlassBlur,
     setDensity,
     setFontScale,
     setLayoutMode,
@@ -259,6 +263,16 @@ const SettingsDrawer: React.FC = () => {
               value={glassOpacity}
               onChange={setGlassOpacity}
               tooltip={{ formatter: (v) => `${v}%` }}
+              style={{ marginTop: 4 }}
+            />
+            <Text type="secondary" style={{ fontSize: 12, display: 'block' }}>背景模糊</Text>
+            <Slider
+              min={GLASS_BLUR_MIN}
+              max={GLASS_BLUR_MAX}
+              value={glassBlur}
+              onChange={setGlassBlur}
+              marks={{ [GLASS_BLUR_MIN]: '关', [GLASS_BLUR_MAX]: '强' }}
+              tooltip={{ formatter: (v) => (v ? `${v}px` : '关闭') }}
               style={{ marginTop: 4 }}
             />
           </>

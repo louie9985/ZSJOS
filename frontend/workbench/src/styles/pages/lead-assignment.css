@@ -142,22 +142,168 @@
   max-width: 420px;
 }
 
-.assignment-countdown {
-  margin-bottom: 16px;
+/* ========== 待接单弹窗 ========== */
+
+.assignment-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.assignment-countdown strong {
+.assignment-modal-title .ant-tag {
+  margin: 0;
+}
+
+/* 倒计时条：秒数是这里唯一需要一眼看清的信息，故独立成条而非 Alert 正文 */
+.assignment-countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 10px 12px;
+  margin-bottom: var(--crm-gap);
+  border-radius: var(--crm-radius-md);
+  background: color-mix(in srgb, var(--crm-color-warning) 12%, var(--crm-bg-container));
+  color: var(--crm-color-warning);
+}
+
+.assignment-countdown.critical {
+  background: color-mix(in srgb, var(--crm-color-error) 12%, var(--crm-bg-container));
+  color: var(--crm-color-error);
+}
+
+.assignment-countdown-value {
+  font-size: var(--crm-font-display);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.assignment-countdown-hint {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+.assignment-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.assignment-sheet-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.assignment-sheet-identity-info {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assignment-sheet-name {
+  font-size: var(--crm-font-lg);
+}
+
+.assignment-sheet-identity .ant-tag {
+  margin: 0;
+}
+
+.assignment-sheet-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+}
+
+.assignment-field {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 8px;
+}
+
+.assignment-field-label {
+  flex: none;
+  width: 56px;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+  text-align-last: justify;
+}
+
+.assignment-field-value {
+  font-size: var(--crm-font-base);
+  color: var(--crm-text);
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assignment-sheet-block {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.assignment-sheet-block > .lead-field-label {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}
+
+.assignment-sheet-products {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.assignment-sheet-products .ant-tag {
+  margin: 0;
+}
+
+.assignment-sheet-remark {
+  padding: 10px 12px;
+  margin: 0!important;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-fill-quaternary);
+  font-size: var(--crm-font-base);
+  line-height: 1.6;
+}
+
+.assignment-sheet-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.assignment-sheet-attachments .ant-image {
+  overflow: hidden;
+  border-radius: var(--crm-radius-sm);
+}
+
+.assignment-sheet-attachments .ant-image img {
+  object-fit: cover;
 }
 
 .lead-assignment-actions {
+  display: flex;
   width: 100%;
-  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 接单是主路径，给它更大的点击面积 */
+.assignment-accept-btn {
+  flex: 1;
 }
 
 .lead-assignment-modal .ant-modal-body {
-  max-height: min(62vh,620px);
+  max-height: min(68vh, 680px);
   overflow: auto;
+  padding: 20px 24px;
 }
 
 @media(max-width:768px) {
@@ -195,13 +341,12 @@
     max-height: 62vh;
   }
 
-  .lead-assignment-actions {
-    display: grid!important;
-    grid-template-columns: 1fr 1fr;
+  .lead-assignment-actions .ant-btn {
+    flex: 1;
   }
 
-  .lead-assignment-actions .ant-btn {
-    width: 100%;
+  .assignment-sheet-fields {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -21,25 +21,55 @@
   --crm-color-warning: #faad14;
   --crm-color-error: #ff4d4f;
 
+  /* ---- 表面色阶（由深到浅，形成 5 级视觉层次）----
+   * layout → sunken → chrome → container → elevated
+   * 每级色差 ~3-5%，肉眼可辨但不突兀                   */
+  --crm-bg-layout: #edeef0;
+  --crm-bg-chrome: #fafafb;
   --crm-bg-container: #ffffff;
-  --crm-bg-chrome: #ffffff;
-  --crm-bg-layout: #f5f5f5;
   --crm-bg-elevated: #ffffff;
+  --crm-bg-overlay: #ffffff;
+  --crm-bg-sunken: #f3f4f6;
   --crm-bg-mask: rgba(0, 0, 0, 0.45);
 
-  --crm-border: #f0f0f0;
-  --crm-border-strong: #d9d9d9;
+  /* ---- 描边（仅用于结构分隔线，不做卡片边缘）---- */
+  --crm-border: #eeeff1;
+  --crm-border-strong: #dcdee2;
 
   --crm-text: rgba(0, 0, 0, 0.88);
   --crm-text-secondary: rgba(0, 0, 0, 0.65);
   --crm-text-tertiary: rgba(0, 0, 0, 0.45);
+  --crm-text-on-fill: #ffffff;
+  --crm-glow-white: rgba(255, 255, 255, 0.25);
 
   --crm-fill-secondary: rgba(0, 0, 0, 0.06);
   --crm-fill-tertiary: rgba(0, 0, 0, 0.04);
   --crm-fill-quaternary: rgba(0, 0, 0, 0.02);
 
-  --crm-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03), 0 1px 6px -1px rgba(0, 0, 0, 0.02);
-  --crm-shadow-raised: 0 6px 16px 0 rgba(0, 0, 0, 0.08);
+  /* ---- 阴影：elevation 体系 ----
+   * level-0: 无阴影（sunken 凹陷区域用 inset）
+   * level-1 (shadow): 静态面板
+   * level-2 (shadow-card): 可交互卡片
+   * level-3 (shadow-raised): hover 抬起
+   * level-4 (shadow-float): 浮层 / modal            */
+  --crm-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  --crm-shadow-card:
+    0 2px 8px -2px rgba(0, 0, 0, 0.08),
+    0 1px 4px -1px rgba(0, 0, 0, 0.05);
+  --crm-shadow-raised:
+    0 8px 24px -4px rgba(0, 0, 0, 0.10),
+    0 2px 6px -1px rgba(0, 0, 0, 0.05);
+  --crm-shadow-float:
+    0 12px 32px -4px rgba(0, 0, 0, 0.12),
+    0 4px 12px -2px rgba(0, 0, 0, 0.06);
+  --crm-shadow-inset: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+
+  /* ---- 玻璃：模糊半径与边缘高光 ----
+   * 兜底为「无玻璃」，运行时由 ThemeVars 依 glassBlur 覆盖。
+   * edge 用零尺寸透明阴影而非 none：它会被拼进 box-shadow 列表，none 不是合法成员。 */
+  --crm-glass-blur: 0px;
+  --crm-glass-blur-strong: 0px;
+  --crm-glass-edge: inset 0 0 0 0 transparent;
 
   /* 控件高度兜底，运行时由 ThemeVars 依 antd controlHeight 覆盖 */
   --crm-control-h: 32px;
@@ -70,6 +100,8 @@
   --crm-font-sm: 12px;
   --crm-font-base: 14px;
   --crm-font-lg: 15px;
+  /* 读数字号：倒计时一类需要一眼看清的数字，比正文层级明显高一档 */
+  --crm-font-display: 22px;
 
   /* 列表行高 */
   --crm-row-h: 48px;
@@ -124,12 +156,14 @@ html[data-crm-font='small'] {
   --crm-font-sm: 11px;
   --crm-font-base: 13px;
   --crm-font-lg: 14px;
+  --crm-font-display: 20px;
 }
 
 html[data-crm-font='large'] {
   --crm-font-sm: 13px;
   --crm-font-base: 15px;
   --crm-font-lg: 16px;
+  --crm-font-display: 24px;
 }
 
 /* ==================== 圆角分档 ==================== */
