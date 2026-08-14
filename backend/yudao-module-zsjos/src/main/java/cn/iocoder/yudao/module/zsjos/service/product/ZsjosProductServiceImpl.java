@@ -30,6 +30,7 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public Long createProduct(ZsjosProductSaveReqVO reqVO) {
+        validateCashbackRule(reqVO.getValidCashbackAmount(), reqVO.getDealCashbackRate());
         ZsjosProductCategoryDO category = validateLeafCategory(reqVO.getCategoryId());
         if (CommonStatusEnum.ENABLE.getStatus().equals(reqVO.getStatus())) availablePath(category.getId(), true);
         validateProductName(category.getId(), reqVO.getName(), null);
@@ -42,6 +43,7 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void updateProduct(ZsjosProductSaveReqVO reqVO) {
+        validateCashbackRule(reqVO.getValidCashbackAmount(), reqVO.getDealCashbackRate());
         ZsjosProductDO existing = validateExists(reqVO.getId());
         validateLeafCategory(reqVO.getCategoryId());
         if (CommonStatusEnum.ENABLE.getStatus().equals(reqVO.getStatus())) availablePath(reqVO.getCategoryId(), true);
@@ -106,6 +108,11 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
         ZsjosProductDO product = productMapper.selectById(id);
         if (product == null) throw exception(PRODUCT_NOT_EXISTS);
         return product;
+    }
+
+    private void validateCashbackRule(java.math.BigDecimal amount, java.math.BigDecimal rate) {
+        if ((amount != null && amount.signum() < 0) || (rate != null && (rate.signum() < 0
+                || rate.compareTo(java.math.BigDecimal.ONE) > 0))) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
     }
 
     private ZsjosProductCategoryDO validateLeafCategory(Long categoryId) {

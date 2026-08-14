@@ -6,6 +6,9 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.framework.datapermission.core.util.DataPermissionUtils;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCreateReqDTO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserOrganizationUpdateReqDTO;
+import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
@@ -27,6 +30,21 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
  */
 @Service
 public class AdminUserApiImpl implements AdminUserApi {
+
+    @Override
+    public Long createUser(AdminUserCreateReqDTO reqDTO) {
+        return userService.createUser(BeanUtils.toBean(reqDTO, UserSaveReqVO.class));
+    }
+
+    @Override
+    public void updateUserOrganization(AdminUserOrganizationUpdateReqDTO reqDTO) {
+        AdminUserDO current = userService.getUser(reqDTO.getUserId());
+        UserSaveReqVO reqVO = BeanUtils.toBean(current, UserSaveReqVO.class);
+        reqVO.setId(reqDTO.getUserId());
+        reqVO.setDeptId(reqDTO.getDeptId());
+        reqVO.setPostIds(reqDTO.getPostIds());
+        userService.updateUser(reqVO);
+    }
 
     @Resource
     private AdminUserService userService;

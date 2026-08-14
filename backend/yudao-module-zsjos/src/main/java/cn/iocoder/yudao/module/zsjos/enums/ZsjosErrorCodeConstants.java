@@ -4,6 +4,14 @@ import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface ZsjosErrorCodeConstants {
 
+    ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
+    ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
+    ErrorCode PARTNER_NOT_EXISTS = new ErrorCode(1_900_000_003, "兼职主体不存在");
+    ErrorCode PARTNER_STATE_INVALID = new ErrorCode(1_900_000_004, "兼职主体当前状态不允许该操作");
+    ErrorCode PARTNER_ACCOUNT_CONFLICT = new ErrorCode(1_900_000_005, "该账号已持有员工业务岗位，不能同时作为启用兼职");
+    ErrorCode PARTNER_BOUND_USER_DUPLICATE = new ErrorCode(1_900_000_006, "该账号已绑定其他兼职主体");
+    ErrorCode PARTNER_CONVERSION_POST_INVALID = new ErrorCode(1_900_000_007, "兼职仅可转为新媒体员工或新媒体主管");
+
     ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
     ErrorCode LEAD_ASSIGNMENT_TARGET_INVALID = new ErrorCode(1_900_001_002, "所选销售不存在、已停用或不属于销售专员岗位");
     ErrorCode LEAD_ASSIGNMENT_SCOPE_DENIED = new ErrorCode(1_900_001_003, "无权配置该员工的派单关系");
@@ -145,5 +153,29 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
     ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
+
+    ErrorCode IMPERSONATION_TARGET_INVALID = new ErrorCode(1_900_007_001, "借视图目标账号不存在、已停用或与当前账号相同");
+    ErrorCode IMPERSONATION_SESSION_INVALID = new ErrorCode(1_900_007_002, "借视图会话不存在、已结束或已超时");
+    ErrorCode IMPERSONATION_READ_ONLY = new ErrorCode(1_900_007_003, "借视图仅允许只读操作");
+    ErrorCode AUDIT_ACTION_INVALID = new ErrorCode(1_900_007_004, "审计分类、动作或详情字段不符合固定目录");
+    ErrorCode EXPORT_TYPE_INVALID = new ErrorCode(1_900_007_005, "导出类型不存在或尚未启用");
+    ErrorCode EXPORT_PERMISSION_DENIED = new ErrorCode(1_900_007_006, "无权创建或访问该类型导出任务");
+    ErrorCode EXPORT_TASK_NOT_EXISTS = new ErrorCode(1_900_007_007, "导出任务不存在或不属于当前账号");
+    ErrorCode EXPORT_STATE_INVALID = new ErrorCode(1_900_007_008, "当前导出任务状态不允许该操作");
+    ErrorCode EXPORT_FILTER_INVALID = new ErrorCode(1_900_007_009, "导出筛选条件格式无效");
+    ErrorCode CASHBACK_RULE_NOT_CONFIGURED = new ErrorCode(1_900_008_001, "主意向课程未配置有效返现规则");
+    ErrorCode CASHBACK_STATE_INVALID = new ErrorCode(1_900_008_002, "当前返现状态不允许该操作");
+    ErrorCode CASHBACK_SOURCE_INVALID = new ErrorCode(1_900_008_003, "返现来源客资、订单或明细无效");
+    ErrorCode CASHBACK_ORDER_REJECTION_LOCKED = new ErrorCode(1_900_008_004, "成交返现已进入提现中或已提现，禁止驳回订单");
+    ErrorCode WITHDRAWAL_PARTNER_INVALID = new ErrorCode(1_900_009_001, "仅启用的普通兼职可发起提现");
+    ErrorCode WITHDRAWAL_CASHBACK_INVALID = new ErrorCode(1_900_009_002, "所选返现不存在、不属于本人或当前不可提现");
+    ErrorCode WITHDRAWAL_AMOUNT_TOO_LOW = new ErrorCode(1_900_009_003, "申请金额低于当前最低提现金额");
+    ErrorCode WITHDRAWAL_BANK_CARD_INVALID = new ErrorCode(1_900_009_004, "银行卡资料格式无效");
+    ErrorCode WITHDRAWAL_NOT_EXISTS = new ErrorCode(1_900_009_005, "提现单不存在或无权访问");
+    ErrorCode WITHDRAWAL_STATE_INVALID = new ErrorCode(1_900_009_006, "当前提现单或返现状态不允许该操作");
+    ErrorCode WITHDRAWAL_PROCESS_UNAVAILABLE = new ErrorCode(1_900_009_007, "提现财务审批流程未部署、无有效审批人或当前不可用");
+    ErrorCode WITHDRAWAL_TRANSACTION_DUPLICATE = new ErrorCode(1_900_009_008, "银行流水号已登记");
+    ErrorCode WITHDRAWAL_PROOF_INVALID = new ErrorCode(1_900_009_009, "打款凭证不存在、无权使用或文件类型不支持");
+    ErrorCode WITHDRAWAL_PERMISSION_DENIED = new ErrorCode(1_900_009_010, "无权查看或处理该提现单");
 
 }

@@ -64,6 +64,16 @@ class NotifyRuleServiceImplTest {
     }
 
     @Test
+    void createRejectsSmsBusinessChannel() {
+        NotifyRuleSaveReqVO request = request();
+        request.setChannelCode("sms");
+
+        assertThrows(ServiceException.class, () -> service.createNotifyRule(request));
+
+        verify(notifyRuleMapper, never()).insert(any(NotifyRuleDO.class));
+    }
+
+    @Test
     void createRejectsUnknownTimingStage() {
         NotifyRuleSaveReqVO request = request();
         request.setTimingStage("later");

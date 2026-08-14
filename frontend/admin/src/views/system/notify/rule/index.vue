@@ -116,7 +116,12 @@
       </el-form-item>
       <el-form-item label="通知渠道" prop="channelCode">
         <el-select v-model="form.channelCode" class="!w-100%" @change="channelChanged">
-          <el-option v-for="item in channels" :key="item.value" :label="item.label" :value="item.value" />
+          <el-option
+            v-for="item in channels"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
         </el-select>
       </el-form-item>
       <el-form-item label="消息模板" prop="templateId">
@@ -224,9 +229,10 @@ const timingName = (rule: RuleApi.NotifyRuleVO) => {
 }
 const channels = [
   { value: 'in_app', label: '站内信（含实时提醒）' },
-  { value: 'wecom', label: '企业微信（待配置）' }, { value: 'sms', label: '短信（待配置）' }
+  { value: 'wecom', label: '企业微信（投递接口待配置）' }
 ]
-const channelName = (code?: string) => channels.find((item) => item.value === code)?.label || '站内信'
+const channelName = (code?: string) =>
+  channels.find((item) => item.value === code)?.label || '站内信'
 const roleNames = (rule: RuleApi.NotifyRuleVO) => {
   const scene = scenes.value.find((item) => item.code === rule.sceneCode)
   return rule.recipientRoles
@@ -278,9 +284,13 @@ const currentScene = computed(() =>
   scenes.value.find((scene) => scene.code === form.value.sceneCode)
 )
 const sceneTemplates = computed(() =>
-  templates.value.filter((template) => template.sceneCode === form.value.sceneCode
-    && (!template.channelCode || template.channelCode === form.value.channelCode
-      || (form.value.channelCode === 'websocket' && template.channelCode === 'in_app')))
+  templates.value.filter(
+    (template) =>
+      template.sceneCode === form.value.sceneCode &&
+      (!template.channelCode ||
+        template.channelCode === form.value.channelCode ||
+        (form.value.channelCode === 'websocket' && template.channelCode === 'in_app'))
+  )
 )
 const rules = {
   name: [{ required: true, message: '规则名称不能为空' }],
@@ -301,7 +311,9 @@ const sceneChanged = () => {
 const timingStageChanged = () => {
   form.value.timingOffsetMinutes = form.value.timingStage === 'due' ? 0 : 30
 }
-const channelChanged = () => { form.value.templateId = undefined }
+const channelChanged = () => {
+  form.value.templateId = undefined
+}
 const openForm = async (id?: number) => {
   dialogVisible.value = true
   form.value = emptyForm()

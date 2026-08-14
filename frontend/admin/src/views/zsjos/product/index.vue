@@ -163,6 +163,30 @@
       <el-form-item label="排序" prop="sort"
         ><el-input-number v-model="categoryForm.sort" :min="0"
       /></el-form-item>
+      <el-form-item
+        v-if="categoryForm.parentId === undefined || categoryForm.parentId === 0"
+        label="有效返现"
+      >
+        <el-input-number
+          v-model="categoryForm.defaultValidCashbackAmount"
+          :min="0"
+          :precision="2"
+          class="w-full"
+        />
+      </el-form-item>
+      <el-form-item
+        v-if="categoryForm.parentId === undefined || categoryForm.parentId === 0"
+        label="成交比例"
+      >
+        <el-input-number
+          v-model="categoryForm.defaultDealCashbackRate"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          :precision="4"
+          class="w-full"
+        />
+      </el-form-item>
       <el-form-item label="状态"
         ><el-switch
           v-model="categoryForm.status"
@@ -232,6 +256,26 @@
       <el-form-item label="排序" prop="sort"
         ><el-input-number v-model="productForm.sort" :min="0"
       /></el-form-item>
+      <el-form-item label="有效返现">
+        <el-input-number
+          v-model="productForm.validCashbackAmount"
+          :min="0"
+          :precision="2"
+          class="w-full"
+          placeholder="留空继承一级分类"
+        />
+      </el-form-item>
+      <el-form-item label="成交比例">
+        <el-input-number
+          v-model="productForm.dealCashbackRate"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          :precision="4"
+          class="w-full"
+          placeholder="留空继承一级分类"
+        />
+      </el-form-item>
       <el-form-item label="状态"
         ><el-switch
           v-model="productForm.status"

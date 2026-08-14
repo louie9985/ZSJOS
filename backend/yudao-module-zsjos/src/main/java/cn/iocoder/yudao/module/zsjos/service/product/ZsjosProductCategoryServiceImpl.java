@@ -21,6 +21,7 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
 
     @Override @Transactional(rollbackFor = Exception.class)
     public Long create(ZsjosProductCategorySaveReqVO reqVO) {
+        validateCashbackRule(reqVO);
         Long parentId = reqVO.getParentId() == null ? 0L : reqVO.getParentId();
         int level = resolveChildLevel(parentId, null);
         validateName(parentId, reqVO.getName(), null);
@@ -31,6 +32,7 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void update(ZsjosProductCategorySaveReqVO reqVO) {
+        validateCashbackRule(reqVO);
         ZsjosProductCategoryDO current = validateExists(reqVO.getId());
         Long parentId = reqVO.getParentId() == null ? 0L : reqVO.getParentId();
         int newLevel = current.getLevel();
@@ -103,6 +105,14 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         ZsjosProductCategoryDO item = categoryMapper.selectById(id);
         if (item == null) throw exception(PRODUCT_CATEGORY_NOT_EXISTS);
         return item;
+    }
+    private void validateCashbackRule(ZsjosProductCategorySaveReqVO request) {
+        if ((request.getDefaultValidCashbackAmount() != null && request.getDefaultValidCashbackAmount().signum() < 0)
+                || (request.getDefaultDealCashbackRate() != null
+                && (request.getDefaultDealCashbackRate().signum() < 0
+                || request.getDefaultDealCashbackRate().compareTo(java.math.BigDecimal.ONE) > 0))) {
+            throw exception(CASHBACK_RULE_NOT_CONFIGURED);
+        }
     }
     private int resolveChildLevel(Long parentId, Long selfId) {
         if (parentId == 0) return 1;

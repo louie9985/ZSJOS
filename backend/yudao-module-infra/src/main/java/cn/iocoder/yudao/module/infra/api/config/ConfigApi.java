@@ -23,4 +23,7 @@ public interface ConfigApi {
      */
     String getDefaultUserAvatar();
 
+    /** Updates an existing system-owned configuration value. */
+    void updateConfigValueByKey(String key, String value);
+
 }

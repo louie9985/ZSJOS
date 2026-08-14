@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.workplan;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.workplan.WorkTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workplan.WorkTaskMapper;
 import cn.iocoder.yudao.framework.tenant.core.service.TenantFrameworkService;
+import cn.iocoder.yudao.module.system.api.maintenance.MaintenanceModeApi;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -24,10 +25,12 @@ public class WorkPlanReminderService {
     @Resource private WorkTaskMapper taskMapper;
     @Resource private WorkPlanNotifyEventPublisher notifyPublisher;
     @Resource private TenantFrameworkService tenantFrameworkService;
+    @Resource private MaintenanceModeApi maintenanceModeApi;
     @Resource @Lazy private WorkPlanReminderService self;
 
     @Scheduled(fixedDelayString = "${zsjos.work-plan.reminder-scan-delay:60000}")
     public void scanAllTenants() {
+        if (maintenanceModeApi.isEnabled()) return;
         for (Long tenantId : tenantFrameworkService.getTenantIds()) {
             TenantUtils.execute(tenantId, () -> {
                 try {

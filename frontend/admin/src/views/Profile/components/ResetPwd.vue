@@ -43,11 +43,16 @@ const equalToPassword = (_rule, value) => {
 const rules = reactive<FormRules>({
   oldPassword: [
     { required: true, message: t('profile.password.oldPwdMsg'), trigger: 'blur' },
-    { min: 4, max: 16, message: t('profile.password.pwdRules'), trigger: 'blur' }
+    { min: 4, max: 100, message: '旧密码格式不正确', trigger: 'blur' }
   ],
   newPassword: [
     { required: true, message: t('profile.password.newPwdMsg'), trigger: 'blur' },
-    { min: 4, max: 16, message: t('profile.password.pwdRules'), trigger: 'blur' }
+    { min: 8, max: 20, message: '密码长度为 8-20 位', trigger: 'blur' },
+    {
+      pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/,
+      message: '密码必须同时包含字母和数字',
+      trigger: 'blur'
+    }
   ],
   confirmPassword: [
     { required: true, message: t('profile.password.cfPwdMsg'), trigger: 'blur' },

@@ -23,8 +23,8 @@ public class UserSaveReqVO {
 
     @Schema(description = "用户账号", requiredMode = Schema.RequiredMode.REQUIRED, example = "yudao")
     @NotBlank(message = "用户账号不能为空")
-    @Pattern(regexp = "^[a-zA-Z0-9]{4,30}$", message = "用户账号由 数字、字母 组成")
-    @Size(min = 4, max = 30, message = "用户账号长度为 4-30 个字符")
+    @Pattern(regexp = "^[a-zA-Z0-9_]{4,32}$", message = "用户账号只能包含字母、数字和下划线")
+    @Size(min = 4, max = 32, message = "用户账号长度为 4-32 个字符")
     @DiffLogField(name = "用户账号")
     private String username;
 
@@ -71,7 +71,8 @@ public class UserSaveReqVO {
     // ========== 仅【创建】时，需要传递的字段 ==========
 
     @Schema(description = "密码", requiredMode = Schema.RequiredMode.REQUIRED, example = "123456")
-    @Length(min = 4, max = 16, message = "密码长度为 4-16 位")
+    @Length(min = 8, max = 20, message = "密码长度为 8-20 位")
+    @Pattern(regexp = "^(?=.*[A-Za-z])(?=.*\\d).+$", message = "密码必须同时包含字母和数字")
     private String password;
 
     @AssertTrue(message = "密码不能为空")

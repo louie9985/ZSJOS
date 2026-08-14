@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.enums.LeadConstants;
+import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,6 +60,7 @@ class LeadAppealServiceImplTest {
     @Mock private BpmProcessTaskApi processTaskApi;
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
+    @Mock private CashbackService cashbackService;
 
     @BeforeEach
     void setUp() {

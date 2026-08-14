@@ -27,6 +27,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    default void updateSourceDeptByPartnerId(Long partnerId, Long deptId) {
+        update(new LeadDO().setSourceDeptId(deptId), new LambdaUpdateWrapper<LeadDO>()
+                .eq(LeadDO::getPartnerId, partnerId));
+    }
     @Select("""
             SELECT l.* FROM zsjos_lead l
             JOIN zsjos_opportunity o ON o.lead_id=l.id AND o.type='initial_conversion'

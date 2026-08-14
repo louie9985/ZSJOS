@@ -84,8 +84,14 @@ public class AdminAuthServiceImpl implements AdminAuthService {
     @Override
     public AdminUserDO authenticate(String username, String password) {
         final LoginLogTypeEnum logTypeEnum = LoginLogTypeEnum.LOGIN_USERNAME;
-        // 校验账号是否存在
-        AdminUserDO user = userService.getUserByUsername(username);
+        // 用户名和手机号共用登录标识。历史数据可能存在跨字段冲突，此时不能猜测登录主体。
+        AdminUserDO usernameUser = userService.getUserByUsername(username);
+        AdminUserDO mobileUser = userService.getUserByMobile(username);
+        if (usernameUser != null && mobileUser != null && !Objects.equals(usernameUser.getId(), mobileUser.getId())) {
+            createLoginLog(null, username, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
+            throw exception(AUTH_LOGIN_IDENTIFIER_AMBIGUOUS);
+        }
+        AdminUserDO user = usernameUser != null ? usernameUser : mobileUser;
         if (user == null) {
             createLoginLog(null, username, logTypeEnum, LoginResultEnum.BAD_CREDENTIALS);
             throw exception(AUTH_LOGIN_BAD_CREDENTIALS);

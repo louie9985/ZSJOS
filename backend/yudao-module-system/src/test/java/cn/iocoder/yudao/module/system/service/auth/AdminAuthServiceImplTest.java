@@ -82,6 +82,7 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
         AdminUserDO user = randomPojo(AdminUserDO.class, o -> o.setUsername(username)
                 .setPassword(password).setStatus(CommonStatusEnum.ENABLE.getStatus()));
         when(userService.getUserByUsername(eq(username))).thenReturn(user);
+        when(userService.getUserByMobile(eq(username))).thenReturn(null);
         // mock password 匹配
         when(userService.isPasswordMatch(eq(password), eq(user.getPassword()))).thenReturn(true);
 
@@ -89,6 +90,31 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
         AdminUserDO loginUser = authService.authenticate(username, password);
         // 校验
         assertPojoEquals(user, loginUser);
+    }
+
+    @Test
+    public void testAuthenticate_mobileSuccess() {
+        String mobile = "13800138000";
+        String password = randomString();
+        AdminUserDO user = randomPojo(AdminUserDO.class, o -> o.setMobile(mobile)
+                .setPassword(password).setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        when(userService.getUserByMobile(mobile)).thenReturn(user);
+        when(userService.isPasswordMatch(password, user.getPassword())).thenReturn(true);
+
+        assertPojoEquals(user, authService.authenticate(mobile, password));
+    }
+
+    @Test
+    public void testAuthenticate_identifierAmbiguous() {
+        String identifier = "13800138000";
+        AdminUserDO usernameUser = randomPojo(AdminUserDO.class, o -> o.setId(1L).setUsername(identifier));
+        AdminUserDO mobileUser = randomPojo(AdminUserDO.class, o -> o.setId(2L).setMobile(identifier));
+        when(userService.getUserByUsername(identifier)).thenReturn(usernameUser);
+        when(userService.getUserByMobile(identifier)).thenReturn(mobileUser);
+
+        assertServiceException(() -> authService.authenticate(identifier, randomString()),
+                AUTH_LOGIN_IDENTIFIER_AMBIGUOUS);
+        verify(userService, never()).isPasswordMatch(anyString(), anyString());
     }
 
     @Test

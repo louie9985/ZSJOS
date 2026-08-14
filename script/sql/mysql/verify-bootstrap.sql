@@ -343,8 +343,41 @@ SELECT 'dual_frontend_workbench_menu_components' AS check_name,
                OR (id=6780 AND component='zsjos/todayTask/index')
                OR (id=6840 AND component='zsjos/leadDuplicateReview/index')
                OR (id=6844 AND component='zsjos/leadSelfSourced/index')
+               OR (id=6850 AND component='zsjos/personnel/index')
+               OR (id=6852 AND component='zsjos/partner/index')
                OR (id=6848 AND component='zsjos/leadComplaint/index')
-               OR (id=6849 AND component='zsjos/externalRepurchase/index')))=8, 'PASS', 'FAIL') AS result;
+               OR (id=6849 AND component='zsjos/externalRepurchase/index')))=10, 'PASS', 'FAIL') AS result;
+SELECT 'account_personnel_partner_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6850,6851,6852,6853,6854,6855)
+             AND permission IN ('zsjos:personnel:query','zsjos:personnel:update-state','zsjos:partner:query',
+                                'zsjos:partner:create','zsjos:partner:update-state','zsjos:partner:convert'))=6,
+          'PASS', 'FAIL') AS result;
+SELECT 'maintenance_mode_config' AS check_name,
+       IF((SELECT COUNT(*) FROM infra_config WHERE config_key='zsjos.system.maintenance-enabled'
+             AND type=1 AND deleted=b'0')=1, 'PASS', 'FAIL') AS result;
+SELECT 'maintenance_mode_menu' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6860 AND component='system/maintenance/index')
+               OR (id=6861 AND permission='system:maintenance:update')))=2, 'PASS', 'FAIL') AS result;
+SELECT 'readonly_impersonation_tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name IN ('zsjos_impersonation_session','zsjos_impersonation_request_log',
+                                'zsjos_business_audit_log','zsjos_export_task'))=4,
+          'PASS', 'FAIL') AS result;
+SELECT 'readonly_impersonation_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6870 AND permission='zsjos:impersonation:query')
+               OR (id=6871 AND permission='zsjos:impersonation:start')))=2, 'PASS', 'FAIL') AS result;
+SELECT 'async_export_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6872,6873,6874,6875,6876)
+             AND permission IN ('zsjos:export:query','zsjos:export:lead','zsjos:export:order',
+                                'zsjos:export:cashback','zsjos:export:withdrawal'))=5,
+          'PASS', 'FAIL') AS result;
+SELECT 'business_audit_permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6877 AND permission='zsjos:audit:query')
+               OR (id=6878 AND permission='zsjos:audit:query-impersonation')))=2,
+          'PASS', 'FAIL') AS result;
 SELECT 'system_area_official_count' AS check_name,
        IF((SELECT COUNT(*) FROM system_area WHERE selection_code<>'OTHER' AND deleted=b'0')=3879, 'PASS', 'FAIL') AS result;
 SELECT 'system_area_other_count' AS check_name,
@@ -400,6 +433,27 @@ FROM (
   UNION ALL SELECT 'zsjos_work_attachment' UNION ALL SELECT 'zsjos_work_plan_field_definition'
   UNION ALL SELECT 'zsjos_work_field_value' UNION ALL SELECT 'zsjos_work_change'
   UNION ALL SELECT 'zsjos_module_schema_version'
+  UNION ALL SELECT 'zsjos_cashback'
 ) expected
 LEFT JOIN information_schema.tables actual
   ON actual.table_schema=DATABASE() AND actual.table_name=expected.table_name;
+
+SELECT 'cashback_rule_columns' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND ((table_name='zsjos_product' AND column_name IN ('valid_cashback_amount','deal_cashback_rate'))
+               OR (table_name='zsjos_product_category' AND column_name IN ('default_valid_cashback_amount','default_deal_cashback_rate'))))=4,
+          'PASS','FAIL') AS result;
+SELECT 'cashback_permissions_ungranted' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6880,6881))=2,'PASS','FAIL') AS result;
+SELECT 'V052 withdrawal tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('zsjos_partner_bank_card','zsjos_withdrawal','zsjos_withdrawal_item'))=3,'PASS','FAIL') AS result;
+SELECT 'V052 withdrawal active uniqueness' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE() AND table_name='zsjos_withdrawal_item' AND index_name='uk_active_cashback')>0,'PASS','FAIL') AS result;
+SELECT 'V052 withdrawal menus' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id BETWEEN 6890 AND 6895)=6,'PASS','FAIL') AS result;
+SELECT 'V053 withdrawal finance query permission' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id=6896
+             AND permission='zsjos:withdrawal:finance-query')=1,'PASS','FAIL') AS result;
+SELECT 'V053 withdrawal finance query permission unique' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0'
+             AND permission='zsjos:withdrawal:finance-query')=1,'PASS','FAIL') AS result;

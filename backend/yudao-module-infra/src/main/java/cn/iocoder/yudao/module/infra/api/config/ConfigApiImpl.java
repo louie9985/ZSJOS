@@ -29,4 +29,9 @@ public class ConfigApiImpl implements ConfigApi {
         return configService.getDefaultUserAvatar();
     }
 
+    @Override
+    public void updateConfigValueByKey(String key, String value) {
+        configService.updateSystemConfigValue(key, value);
+    }
+
 }

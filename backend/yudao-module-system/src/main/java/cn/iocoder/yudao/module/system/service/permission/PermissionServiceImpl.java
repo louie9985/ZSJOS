@@ -34,7 +34,10 @@ import java.util.*;
 import java.util.function.Supplier;
 
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.USER_LAST_SUPER_ADMIN_FORBIDDEN;
+import static cn.iocoder.yudao.module.system.enums.permission.RoleCodeEnum.SUPER_ADMIN;
 
 /**
  * 权限 Service 实现类
@@ -211,6 +214,7 @@ public class PermissionServiceImpl implements PermissionService {
                 UserRoleDO::getRoleId);
         // 计算新增和删除的角色编号
         Set<Long> roleIdList = CollUtil.emptyIfNull(roleIds);
+        validateRetainsEnabledSuperAdmin(userId, dbRoleIds, roleIdList);
         Collection<Long> createRoleIds = CollUtil.subtract(roleIdList, dbRoleIds);
         Collection<Long> deleteMenuIds = CollUtil.subtract(dbRoleIds, roleIdList);
         // 执行新增和删除。对于已经授权的角色，不用做任何处理
@@ -224,6 +228,24 @@ public class PermissionServiceImpl implements PermissionService {
         }
         if (!CollectionUtil.isEmpty(deleteMenuIds)) {
             userRoleMapper.deleteListByUserIdAndRoleIdIds(userId, deleteMenuIds);
+        }
+    }
+
+    private void validateRetainsEnabledSuperAdmin(Long userId, Set<Long> currentRoleIds, Set<Long> nextRoleIds) {
+        RoleDO superAdminRole = roleService.getRoleByCode(SUPER_ADMIN.getCode());
+        if (superAdminRole == null || !currentRoleIds.contains(superAdminRole.getId())
+                || nextRoleIds.contains(superAdminRole.getId())) {
+            return;
+        }
+        if (!CommonStatusEnum.ENABLE.getStatus().equals(userService.getUser(userId).getStatus())) {
+            return;
+        }
+        Set<Long> superAdminUserIds = getUserRoleIdListByRoleId(Collections.singleton(superAdminRole.getId()));
+        boolean anotherEnabledSuperAdminExists = userService
+                .getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
+                .anyMatch(user -> !Objects.equals(user.getId(), userId) && superAdminUserIds.contains(user.getId()));
+        if (!anotherEnabledSuperAdminExists) {
+            throw exception(USER_LAST_SUPER_ADMIN_FORBIDDEN);
         }
     }
 

@@ -21,6 +21,7 @@ public class LeadDO extends TenantBaseDO {
     private String submittedWechatId;
     private String sourceType;
     private Long sourceUserId;
+    private Long sourceDeptId;
     private Long partnerId;
     private String sourceChannelId;
     private String provinceCode;

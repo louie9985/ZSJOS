@@ -24,6 +24,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
+import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +53,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private BusinessTaskReminderService taskReminderService;
+    @Resource private CashbackService cashbackService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -92,6 +94,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         addEvent(EVENT_LEAD_QUALIFIED_VALID, lead, userId, STATUS_SUBMITTED, STATUS_VALID,
                 reqVO.getRemark().trim(), key, Map.of("roundNo", lead.getQualificationRoundNo(),
                         "opportunityId", opportunity.getId()));
+        cashbackService.ensureValidCashback(leadId);
         notifyEventPublisher.publish(QUALIFIED_VALID, leadId, "notify:" + key, userId, now,
                 notificationContext(lead));
     }

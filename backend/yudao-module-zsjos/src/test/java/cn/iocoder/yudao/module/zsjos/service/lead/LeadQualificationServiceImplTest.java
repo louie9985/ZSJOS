@@ -17,6 +17,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskReminderService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
+import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -50,6 +51,7 @@ class LeadQualificationServiceImplTest {
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private AdvancedFilterService advancedFilterService;
+    @Mock private CashbackService cashbackService;
 
     @org.junit.jupiter.api.BeforeEach
     void setUpAdvancedFilter() { lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
@@ -76,6 +78,7 @@ class LeadQualificationServiceImplTest {
                         && "open".equals(opportunity.getStatus())
                         && opportunity.getLeadId().equals(1L)));
         verify(lifecycleTaskService).completeQualificationTask(eq(1L), eq(2), any(LocalDateTime.class));
+        verify(cashbackService).ensureValidCashback(1L);
         verify(eventMapper).insert(argThat((BusinessEventDO event) ->
                 "lead_qualified_valid".equals(event.getEventType())));
     }

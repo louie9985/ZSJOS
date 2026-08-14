@@ -30,6 +30,15 @@ SOURCE script/sql/mysql/migrations/V041__order_repurchase_and_concurrency.sql;
 SOURCE script/sql/mysql/migrations/V042__normalize_legacy_lead_filter_status.sql;
 SOURCE script/sql/mysql/migrations/V043__order_lifecycle_review_fixes.sql;
 SOURCE script/sql/mysql/migrations/V044__default_employee_avatar.sql;
+SOURCE script/sql/mysql/migrations/V045__dual_frontend_workbench_menu_components.sql;
+SOURCE script/sql/mysql/migrations/V046__customer_order_advanced_filter_indexes.sql;
+SOURCE script/sql/mysql/migrations/V047__split_lead_pending_handling_stages.sql;
+SOURCE script/sql/mysql/migrations/V048__account_personnel_partner_lifecycle.sql;
+SOURCE script/sql/mysql/migrations/V049__maintenance_mode_and_scheduler_guard.sql;
+SOURCE script/sql/mysql/migrations/V050__readonly_impersonation_and_audit_catalog.sql;
+SOURCE script/sql/mysql/migrations/V051__cashback_domain.sql;
+SOURCE script/sql/mysql/migrations/V052__withdrawal_and_offline_payout.sql;
+SOURCE script/sql/mysql/migrations/V053__withdrawal_finance_query_permission.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

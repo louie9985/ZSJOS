@@ -30,4 +30,8 @@ public interface FileMapper extends BaseMapperX<FileDO> {
                 .orderByAsc(FileDO::getId));
     }
 
+    default FileDO selectByIdForUpdate(Long id) {
+        return selectOne(new LambdaQueryWrapperX<FileDO>().eq(FileDO::getId, id).last("FOR UPDATE"));
+    }
+
 }

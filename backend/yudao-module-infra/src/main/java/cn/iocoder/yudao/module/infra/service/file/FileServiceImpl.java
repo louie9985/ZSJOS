@@ -21,6 +21,7 @@ import com.google.common.annotations.VisibleForTesting;
 import jakarta.annotation.Resource;
 import lombok.SneakyThrows;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -218,6 +219,19 @@ public class FileServiceImpl implements FileService {
     @Override
     public FileDO getFile(Long id) {
         return validateFileExists(id);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean deleteFileIfExists(Long id) throws Exception {
+        FileDO file = fileMapper.selectByIdForUpdate(id);
+        if (file == null) return false;
+        FilePathUtils.validatePath(file.getPath());
+        FileClient client = fileConfigService.getFileClient(file.getConfigId());
+        Assert.notNull(client, "客户端({}) 不能为空", file.getConfigId());
+        client.delete(file.getPath());
+        fileMapper.deleteById(id);
+        return true;
     }
 
     @Override

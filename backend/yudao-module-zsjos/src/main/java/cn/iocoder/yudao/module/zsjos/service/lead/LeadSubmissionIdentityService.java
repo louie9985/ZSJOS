@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import cn.iocoder.yudao.module.zsjos.service.personnel.PersonnelStateService;
 
 import java.util.Objects;
 
@@ -28,6 +29,7 @@ public class LeadSubmissionIdentityService {
     @Resource private PostApi postApi;
     @Resource private DeptApi deptApi;
     @Resource private PartnerMapper partnerMapper;
+    @Resource private PersonnelStateService personnelStateService;
 
     public Resolution requireOrdinarySubmitter(Long userId) {
         AdminUserRespDTO user = requireEnabledUser(userId);
@@ -56,8 +58,7 @@ public class LeadSubmissionIdentityService {
         if (SOURCE_PARTNER.equals(sourceType)) {
             PartnerDO partner = partnerId == null ? partnerMapper.selectEnabledByUserId(userId)
                     : partnerMapper.selectById(partnerId);
-            if (partner == null || !Objects.equals(partner.getBoundSystemUserId(), userId)
-                    || partner.getEnabledAt() == null || partner.getDisabledAt() != null) {
+            if (partner == null || !Objects.equals(partner.getBoundSystemUserId(), userId)) {
                 throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
             }
             return new Resolution(Identity.PARTNER, partner.getId());
@@ -77,6 +78,7 @@ public class LeadSubmissionIdentityService {
         if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) {
             throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
         }
+        if (!personnelStateService.isEnabled(userId)) throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
         return user;
     }
 

@@ -4,6 +4,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.math.BigDecimal;
 
 @Data
 public class ZsjosProductRespVO {
@@ -23,6 +24,8 @@ public class ZsjosProductRespVO {
     private String studyDuration;
     private String studyMode;
     private String coverImage;
+    private BigDecimal validCashbackAmount;
+    private BigDecimal dealCashbackRate;
     private Integer status;
     private Integer sort;
     private String remark;

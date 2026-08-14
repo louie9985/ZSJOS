@@ -127,6 +127,15 @@ public class ConfigServiceImpl implements ConfigService {
     }
 
     @Override
+    public void updateSystemConfigValue(String key, String value) {
+        ConfigDO config = getConfigByKey(key);
+        if (config == null || !ConfigTypeEnum.SYSTEM.getType().equals(config.getType())) {
+            throw exception(CONFIG_NOT_EXISTS);
+        }
+        configMapper.updateById(new ConfigDO().setId(config.getId()).setValue(value));
+    }
+
+    @Override
     public PageResult<ConfigDO> getConfigPage(ConfigPageReqVO pageReqVO) {
         return configMapper.selectPage(pageReqVO);
     }

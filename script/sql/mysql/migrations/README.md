@@ -40,6 +40,12 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V047__split_lead_pending_handling_stages.sql` follows V046 and upgrades only active submitter/owner schemes that still exactly match the old system defaults. It splits owned submitted leads into `first_follow_pending` and `qualification_pending`, appends an immutable published-version snapshot, preserves custom draft or published configurations, and records both schema-version formats. It is repeatable and forward-only; rollback requires publishing a replacement configuration. Do not execute it without separate environment approval.
 
+`V048__account_personnel_partner_lifecycle.sql` widens System usernames to 32 characters, adds the ZSJOS personnel-state record and Lead submission-department snapshot, enforces one partner per bound account, and registers server-owned personnel/partner permissions without granting roles. It preserves existing accounts and business rows, is repeatable through metadata guards, and must not be executed without separate environment approval.
+
+`V049__maintenance_mode_and_scheduler_guard.sql` seeds the database-authoritative global maintenance switch and its server-owned System administration menu without granting roles. It does not change business rows, is repeatable through stable keys and IDs, and must not be executed without separate environment approval. Rollback means setting the switch to `false` and disabling the menu rather than deleting history.
+
+`V050__readonly_impersonation_and_audit_catalog.sql` adds empty read-only impersonation session and dedicated request-audit tables plus server-owned permissions without granting roles. It is additive and repeatable; rollback disables the feature while retaining audit history. Do not execute it without separate environment approval.
+
 `V040__submitter_actions_and_complaints.sql` adds snapshotted submission channels for duplicate review, daily submitter urges, the independent public sales-complaint queue, server-owned menu permissions, and default in-app notifications. It grants no roles, changes no existing Lead ownership, and deletes no business rows.
 
 `V021__lead_intended_product_active_unique_key.sql` changes only the intended-product uniqueness metadata. It adds a stored generated active product reference, removes the old tenant/lead/product unique index, and constrains only non-deleted rows; it does not delete or rewrite intended-product history.
@@ -55,5 +61,11 @@ V008 contains the explicitly approved system-owned defaults for follow-up method
 Adds the non-destructive `reviewer` audience to the shared filter-scheme table with published defaults for pending/completed approval and registration/finance task stages. It depends on the existing filter tables from V005 and the BPM sales-order process from V023. It is repeatable through `NOT EXISTS` guards and does not delete or rewrite existing schemes. Apply after V028 in migration order; rollback is limited to removing the newly inserted reviewer rows in a controlled environment.
 
 ### V032 - normalize reviewer filter option keys
+
+V051 additively introduces product/category cashback rules, an empty cashback table, observation configuration, and ungranted permissions. Populated financial history is retained on rollback.
+
+V052 adds empty partner-card, withdrawal and withdrawal-item tables, BPM references, active-cashback uniqueness, offline payout evidence, default rules and ungranted permissions. Deploy BPM key `zsjos_partner_withdrawal` separately; rollback disables the process and menus while retaining financial history.
+
+V053 adds the ungranted `zsjos:withdrawal:finance-query` child permission required for finance full-card queries. It does not grant the permission to any role and is repeatable through `INSERT IGNORE` and schema-version upserts.
 
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.

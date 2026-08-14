@@ -403,6 +403,15 @@ const handleResetPwd = async (row: UserApi.UserVO) => {
       t('common.reminder')
     )
     const password = result.value
+    if (
+      password.length < 8 ||
+      password.length > 20 ||
+      !/[A-Za-z]/.test(password) ||
+      !/\d/.test(password)
+    ) {
+      message.warning('密码需为 8-20 位，并同时包含字母和数字')
+      return
+    }
     // 发起重置
     await UserApi.resetUserPassword(row.id, password)
     message.success('修改成功，新密码是：' + password)

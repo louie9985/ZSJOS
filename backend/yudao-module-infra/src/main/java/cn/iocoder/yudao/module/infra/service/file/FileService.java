@@ -73,6 +73,11 @@ public interface FileService {
     FileDO getFile(Long id);
 
     /**
+     * 幂等删除文件；文件不存在时返回 false。
+     */
+    boolean deleteFileIfExists(Long id) throws Exception;
+
+    /**
      * 删除文件
      *
      * @param id 编号

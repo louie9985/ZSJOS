@@ -29,6 +29,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -64,6 +65,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
+    @Resource private CashbackService cashbackService;
 
     @Override
     public List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId) {
@@ -243,6 +245,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             lead.setConvertedAt(now);
             lead.setValidDescription(reqVO.getReason().trim());
             leadMapper.updateById(lead);
+            cashbackService.ensureValidCashback(lead.getId());
         }
         String eventType = overturn ? EVENT_LEAD_APPEAL_OVERTURNED : EVENT_LEAD_APPEAL_UPHELD;
         String scene = overturn ? cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.APPEAL_OVERTURNED
