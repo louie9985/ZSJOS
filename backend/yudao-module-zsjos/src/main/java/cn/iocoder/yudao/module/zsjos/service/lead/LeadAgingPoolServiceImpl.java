@@ -425,7 +425,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         LeadDO lead = leadMapper.selectById(cycle.getLeadId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         LeadAgingPoolRespVO result = new LeadAgingPoolRespVO();
-        result.setCycleId(cycle.getId()); result.setLeadId(lead.getId()); result.setCycleNo(cycle.getCycleNo()); result.setStatus(cycle.getStatus());
+        result.setCycleId(cycle.getId()); result.setLeadId(lead.getId()); result.setLeadNo(lead.getLeadNo());
+        result.setCycleNo(cycle.getCycleNo()); result.setStatus(cycle.getStatus());
         result.setOriginalOwnerUserId(cycle.getOriginalOwnerUserId()); result.setOriginalOwnerUserName(userName(cycle.getOriginalOwnerUserId()));
         result.setCollaboratorUserId(cycle.getCollaboratorUserId()); result.setCollaboratorUserName(userName(cycle.getCollaboratorUserId()));
         Long ownerDeptId = currentOwnerDeptId(cycle);

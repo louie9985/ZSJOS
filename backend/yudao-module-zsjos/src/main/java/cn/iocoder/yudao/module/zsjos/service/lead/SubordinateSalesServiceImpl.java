@@ -99,7 +99,9 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         List<SubordinateTaskRespVO> rows = tasks.stream().map(task -> {
             SubordinateTaskRespVO row = new SubordinateTaskRespVO();
             row.setId(task.getId()); row.setTaskType(task.getTaskType()); row.setLeadId(task.getBizId());
-            LeadDO lead = leads.get(task.getBizId()); row.setLeadName(lead == null ? null : lead.getSubmittedName());
+            LeadDO lead = leads.get(task.getBizId());
+            row.setLeadNo(lead == null ? null : lead.getLeadNo());
+            row.setLeadName(lead == null ? null : lead.getSubmittedName());
             row.setDueAt(task.getDueAt()); row.setOverdue(task.getDueAt() != null && task.getDueAt().isBefore(LocalDateTime.now(BEIJING)));
             return row;
         }).toList();
@@ -236,15 +238,20 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     }
 
     private SubordinateBatchResultVO executeBatch(List<Long> ids, BatchAction action) {
+        Set<Long> uniqueIds = new LinkedHashSet<>(ids);
+        Map<Long, LeadDO> leads = leadMapper.selectBatchIds(uniqueIds).stream()
+                .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
         List<SubordinateBatchResultVO.ItemVO> items = new ArrayList<>();
-        for (Long id : new LinkedHashSet<>(ids)) {
+        for (Long id : uniqueIds) {
+            LeadDO lead = leads.get(id);
+            String leadNo = lead == null ? null : lead.getLeadNo();
             try {
                 action.execute(id);
-                items.add(new SubordinateBatchResultVO.ItemVO(id, true, "SUCCESS", "操作成功"));
+                items.add(new SubordinateBatchResultVO.ItemVO(id, leadNo, true, "SUCCESS", "操作成功"));
             } catch (ServiceException ex) {
-                items.add(new SubordinateBatchResultVO.ItemVO(id, false, String.valueOf(ex.getCode()), ex.getMessage()));
+                items.add(new SubordinateBatchResultVO.ItemVO(id, leadNo, false, String.valueOf(ex.getCode()), ex.getMessage()));
             } catch (RuntimeException ex) {
-                items.add(new SubordinateBatchResultVO.ItemVO(id, false, "INTERNAL_ERROR", "操作失败，请刷新后重试"));
+                items.add(new SubordinateBatchResultVO.ItemVO(id, leadNo, false, "INTERNAL_ERROR", "操作失败，请刷新后重试"));
             }
         }
         SubordinateBatchResultVO result = new SubordinateBatchResultVO();

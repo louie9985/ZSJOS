@@ -235,7 +235,16 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
 
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
-      <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
+      <Avatar size={48}>{lead.submittedName.slice(0, 1)}</Avatar>
+      <div className="lead-detail-title">
+        <Space wrap>
+          <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
+          <LeadStateTags lead={lead}/>
+        </Space>
+        <Typography.Text type="secondary">
+          {lead.submittedMobile || '无手机号'} · {lead.submittedWechatId || '无微信号'} · {lead.leadNo}
+        </Typography.Text>
+      </div>
       {nextFollowUpAt && (
         <div className="lead-hero-next-followup">
           <ClockCircleOutlined />

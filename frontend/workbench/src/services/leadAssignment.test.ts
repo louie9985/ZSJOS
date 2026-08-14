@@ -11,7 +11,8 @@ import {
 } from './leadAssignment'
 
 const pending = (id: number, remainingSeconds?: number, submittedAt = 1786240800000): PendingLead => ({
-  id, dispatchMode: remainingSeconds == null ? 'specified' : 'auto', maskedName: `客户 ${id}`,
+  id, leadNo: `KZ20260814000000${String(id).padStart(4, '0')}`,
+  dispatchMode: remainingSeconds == null ? 'specified' : 'auto', maskedName: `客户 ${id}`,
   provinceName: '浙江省', cityName: '杭州市', intendedProducts: [], sourceChannel: '抖音',
   leadCategory: '成人学历', attachmentUrls: [], submittedAt, remainingSeconds,
   rejectable: remainingSeconds != null, deferrable: remainingSeconds == null

@@ -3841,6 +3841,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_customer_account_ledger` (
 -- zsjos_lead
 CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '客资编号',
+  `lead_no` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资业务编号',
   `person_id` bigint NOT NULL COMMENT 'Person 编号',
   `submitted_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '表单原始姓名',
   `submitted_mobile` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '表单原始手机号',
@@ -3901,6 +3902,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交幂等键',
   `active_person_id` bigint GENERATED ALWAYS AS (CASE WHEN (`deleted` = b'0') THEN `person_id` ELSE NULL END) STORED COMMENT '活动客户主客资唯一键',
   PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_lead_no` (`tenant_id`,`lead_no`),
   UNIQUE KEY `uk_tenant_submission_idempotency` (`tenant_id`,`submission_idempotency_key`),
   UNIQUE KEY `uk_tenant_active_person` (`tenant_id`,`active_person_id`),
   KEY `idx_tenant_person_status` (`tenant_id`,`person_id`,`status`),
@@ -3914,6 +3916,21 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   KEY `idx_tenant_recycle_source` (`tenant_id`,`assignment_status`,`recycle_source_owner_user_id`),
   KEY `idx_tenant_aging_pool_scan` (`tenant_id`,`assignment_status`,`status`,`ownership_started_at`,`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资';
+
+-- zsjos_lead_no_daily_counter
+CREATE TABLE IF NOT EXISTS `zsjos_lead_no_daily_counter` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `sequence_date` date NOT NULL COMMENT '北京时间业务日期',
+  `current_value` bigint NOT NULL COMMENT '当日最后已分配循环序号',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_sequence_date` (`tenant_id`,`sequence_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资业务编号日序';
 
 -- zsjos_lead_activation
 CREATE TABLE IF NOT EXISTS `zsjos_lead_duplicate_review` (

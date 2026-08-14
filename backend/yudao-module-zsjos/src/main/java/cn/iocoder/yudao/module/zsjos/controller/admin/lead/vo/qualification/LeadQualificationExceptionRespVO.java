@@ -7,6 +7,7 @@ import java.time.LocalDateTime;
 @Data
 public class LeadQualificationExceptionRespVO {
     private Long id;
+    private String leadNo;
     private String submittedName;
     private String submittedMobile;
     private String status;

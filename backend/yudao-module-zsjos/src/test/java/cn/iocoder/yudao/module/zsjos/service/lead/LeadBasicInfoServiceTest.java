@@ -56,7 +56,7 @@ class LeadBasicInfoServiceTest {
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(duplicateMatcher.match(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(100L)))
                 .thenReturn(new LeadDuplicateMatcher.MatchResult(null, java.util.List.of(
-                        new LeadDuplicateMatcher.Candidate(200L, 2L, "重复客户", "valid", "owned",
+                        new LeadDuplicateMatcher.Candidate(200L, 2L, "KZ202608140000000001", "重复客户", "valid", "owned",
                                 new java.util.HashSet<>(java.util.Set.of("same_mobile"))))));
 
         ServiceException error = withTenantError(() -> service.update(1L, 20L, request()));

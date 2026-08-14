@@ -4,6 +4,7 @@ import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export interface LeadClaimPoolVO {
   id: number
+  leadNo: string
   dispatchMode?: 'auto' | 'specified'
   maskedName: string
   maskedMobile?: string

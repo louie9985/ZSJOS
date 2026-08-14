@@ -4,6 +4,7 @@ import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStag
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
+  leadNo: `KZ20260814000000${String(id).padStart(4, '0')}`,
   personId: id,
   submittedName: name,
   sourceType: 'internal_new_media',

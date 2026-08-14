@@ -70,7 +70,7 @@
       >
     </el-alert>
     <el-table v-loading="loading" :data="list" stripe :show-overflow-tooltip="true">
-      <el-table-column label="客资编号" prop="id" width="100" fixed="left" />
+      <el-table-column label="客资编号" prop="leadNo" width="220" fixed="left" />
       <el-table-column label="客户" min-width="120" fixed="left">
         <template #default="scope">
           <el-button link type="primary" @click="openDetail(scope.row)">{{
@@ -145,7 +145,7 @@
       <template v-else-if="detail">
         <el-descriptions title="客户资料" :column="2" border>
           <el-descriptions-item label="客户姓名">{{ detail.submittedName }}</el-descriptions-item>
-          <el-descriptions-item label="客资编号">{{ detail.id }}</el-descriptions-item>
+          <el-descriptions-item label="客资编号">{{ detail.leadNo }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{
             detail.submittedMobile || '-'
           }}</el-descriptions-item>

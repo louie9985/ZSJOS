@@ -8,6 +8,7 @@ public class SubordinateTaskRespVO {
     private Long id;
     private String taskType;
     private Long leadId;
+    private String leadNo;
     private String leadName;
     private LocalDateTime dueAt;
     private Boolean overdue;

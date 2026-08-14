@@ -32,7 +32,7 @@
       empty-text="当前没有抢单池客资"
       table-layout="fixed"
     >
-      <el-table-column label="客资编号" prop="id" width="100" fixed="left" />
+      <el-table-column label="客资编号" prop="leadNo" width="220" fixed="left" />
       <el-table-column label="客户" min-width="120" fixed="left">
         <template #default="scope">
           <span class="customer-name">{{ scope.row.maskedName || '-' }}</span>

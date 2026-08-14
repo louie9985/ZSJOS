@@ -112,10 +112,10 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
         dispatchMode: selfSourced ? 'auto' : values.dispatchMode,
         specifiedSalesUserId: selfSourced ? undefined : values.specifiedSalesUserId, idempotencyKey
       })
-      if (result.outcome === 'created') message.success('客资已提交')
-      if (result.outcome === 'review_pending') message.info(`疑似重复，已进入复核队列 #${result.reviewId}`)
-      if (result.outcome === 'duplicate_rejected') message.warning('已有活动客资，本次提交未创建复核任务')
-      if (result.outcome === 'activated') message.success('历史重复提交已记录')
+      if (result.outcome === 'created') message.success(`客资 ${result.leadNo || ''} 提交成功`)
+      else if (result.outcome === 'review_pending') message.info(`疑似重复，已进入复核队列 #${result.reviewId}`)
+      else if (result.outcome === 'duplicate_rejected') message.warning(`已有活动客资 ${result.leadNo || ''}，本次提交未创建复核任务`)
+      else message.success(`历史重复提交已记录：${result.leadNo || ''}`)
       form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined); setPendingValues(undefined); idempotencyKeyRef.current = undefined
     } catch (error) { message.error(error instanceof Error ? error.message : '提交失败') }
     finally { submittingRef.current = false; setSubmitting(false) }

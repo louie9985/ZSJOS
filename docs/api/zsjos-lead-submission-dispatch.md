@@ -10,6 +10,7 @@
 - `eventType` 包含 `assigned`、`reassigned`、`accepted`、`rejected`、`expired`、`cancelled`；客户端只将消息作为重新查询信号。
 - 待接列表项返回 `remainingSeconds`、`rejectable`、`deferrable` 和 `assignmentHistoryId`。自动派单可拒绝且不可延后，指定派单不可拒绝但可收起稍后处理。
 - 待接列表和抢单池中的 `sourceChannel`、`leadCategory` 始终是持久化的稳定字典键；`sourceChannelLabel`、`leadCategoryLabel` 是当前启用字典解析出的展示标签。字典缺项时标签字段为空，客户端必须显示未配置状态，不得把稳定键当作展示标签。
+- 用户可见客资响应同时返回字符串 `leadNo` 和数值 `leadId`/`id`。`leadNo` 格式为 `KZyyyyMMddHHmmss` 加租户当日四位序号，序号从 `0001` 到 `9999` 循环，超过 `9999` 后重新从 `0001` 开始；时间固定使用北京时间。URL、命令、WebSocket 和对象权限继续使用数值 ID。
 
 ## 员工接口与权限
 
@@ -47,7 +48,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 派单、接单、拒单和超时同时维护 `lead_assignment_accept` 业务任务。接单、抢单和管理员转派在归属事务内创建 `lead_first_follow_up` 任务，截止时间由接单时启用的独立跟进规则计算。
 
-提交接口先执行统一查重。活动客资手机号或微信号同字段强命中时返回 `outcome=duplicate_rejected`、已有客资编号、主状态、判定状态和运营状态，不创建复核任务。手机号/微信交叉、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中返回 `outcome=review_pending + reviewId`。完全无命中返回 `created`。旧 `activated` 只用于读取历史 `LeadActivation` 幂等结果，新提交不再直接激活。
+提交接口先执行统一查重。活动客资手机号或微信号同字段强命中时返回 `outcome=duplicate_rejected`、已有 `leadId`、`leadNo`、主状态、判定状态和运营状态，不创建复核任务。手机号/微信交叉、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中返回 `outcome=review_pending + reviewId`，此时不分配 `leadNo`。完全无命中返回 `created + leadId + leadNo`。旧 `activated` 只用于读取历史 `LeadActivation` 幂等结果，新提交不再直接激活。
+
+管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
 复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；决定事务对任务加行锁，第一位提交者成功。结论固定为 `new_person`、`reuse_person`、`reactivate_lead`、`notify_owner`，意见必填、附件可选。重新激活覆盖当前 Person/Lead 资料，选择范围内启用销售并回到待首次跟进；旧 Opportunity 保持 `lost`，重新判有效时恢复。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
 

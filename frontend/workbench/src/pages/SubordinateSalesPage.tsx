@@ -129,7 +129,7 @@ function BatchResultModal({
               <Tag color={item.success ? "success" : "error"}>
                 {item.success ? "成功" : "失败"}
               </Tag>
-              <span>客资 #{item.leadId}</span>
+              <span>{item.leadNo || `内部记录 ${item.leadId}`}</span>
               <Typography.Text type={item.success ? undefined : "danger"}>
                 {item.message}
               </Typography.Text>
@@ -202,7 +202,7 @@ function ManagedLeadDetail({
           <Typography.Title level={4}>
             {lead?.submittedName || "客资详情"}
           </Typography.Title>
-          <Typography.Text type="secondary">客资 #{leadId}</Typography.Text>
+          <Typography.Text type="secondary">{lead?.leadNo}</Typography.Text>
         </div>
       </div>
       {error && <Alert type="error" showIcon message={error} />}
@@ -532,7 +532,7 @@ function SalesDetail({
     {
       title: "客资",
       dataIndex: "leadName",
-      render: (value, row) => value || `客资 #${row.leadId}`,
+      render: (value, row) => `${row.leadNo} · ${value || '未命名客资'}`,
     },
     { title: "任务类型", dataIndex: "taskType", width: 180 },
     {

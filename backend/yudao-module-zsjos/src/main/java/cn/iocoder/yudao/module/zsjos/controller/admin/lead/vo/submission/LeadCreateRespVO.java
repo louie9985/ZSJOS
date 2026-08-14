@@ -5,6 +5,7 @@ import lombok.Data;
 @Data
 public class LeadCreateRespVO {
     private Long leadId;
+    private String leadNo;
     private Long reviewId;
     private String outcome;
     private String assignmentStatus;
@@ -26,9 +27,10 @@ public class LeadCreateRespVO {
         return response;
     }
 
-    public static LeadCreateRespVO duplicateRejected(Long leadId, String status,
+    public static LeadCreateRespVO duplicateRejected(Long leadId, String leadNo, String status,
                                                      String qualificationStatus, String operationalStatus) {
         LeadCreateRespVO response = new LeadCreateRespVO(leadId, "duplicate_rejected", null, null);
+        response.setLeadNo(leadNo);
         response.setExistingLeadStatus(status);
         response.setExistingQualificationStatus(qualificationStatus);
         response.setExistingOperationalStatus(operationalStatus);

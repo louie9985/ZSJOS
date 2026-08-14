@@ -6,6 +6,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAss
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchResultVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchTransferReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesRespVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -31,6 +33,7 @@ class SubordinateSalesServiceImplTest {
     @Mock private LeadAssignmentService assignmentService;
     @Mock private SubordinateSalesCommandService commandService;
     @Mock private SalesDispatchStatusService dispatchStatusService;
+    @Mock private LeadMapper leadMapper;
 
     @Test
     void subordinateSalesProjectsSystemAvatar() throws Exception {
@@ -55,6 +58,9 @@ class SubordinateSalesServiceImplTest {
     void batchTransferReturnsPartialSuccessPerLead() {
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L));
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(30L)));
+        when(leadMapper.selectBatchIds(Set.of(1L, 2L))).thenReturn(List.of(
+                new LeadDO().setId(1L).setLeadNo("KZ202608141200000001"),
+                new LeadDO().setId(2L).setLeadNo("KZ202608141200000002")));
         doAnswer(invocation -> {
             if (Long.valueOf(2L).equals(invocation.getArgument(0))) {
                 throw new ServiceException(SUBORDINATE_LEAD_OWNER_CHANGED);
@@ -71,7 +77,9 @@ class SubordinateSalesServiceImplTest {
         assertEquals(1, result.getSuccessCount(), result.getItems().toString());
         assertEquals(1, result.getFailureCount());
         assertEquals("SUCCESS", result.getItems().get(0).getCode());
+        assertEquals("KZ202608141200000001", result.getItems().get(0).getLeadNo());
         assertEquals(String.valueOf(SUBORDINATE_LEAD_OWNER_CHANGED.getCode()), result.getItems().get(1).getCode());
+        assertEquals("KZ202608141200000002", result.getItems().get(1).getLeadNo());
         verify(commandService).transferOne(1L, 30L, 10L, "团队调整");
         verify(commandService).transferOne(2L, 30L, 10L, "团队调整");
     }

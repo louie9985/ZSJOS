@@ -430,6 +430,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     private LeadQualificationExceptionRespVO convert(LeadDO lead, Map<Long, AdminUserRespDTO> users) {
         LeadQualificationExceptionRespVO result = new LeadQualificationExceptionRespVO();
         result.setId(lead.getId());
+        result.setLeadNo(lead.getLeadNo());
         result.setSubmittedName(lead.getSubmittedName());
         result.setSubmittedMobile(lead.getSubmittedMobile());
         result.setStatus(lead.getStatus());

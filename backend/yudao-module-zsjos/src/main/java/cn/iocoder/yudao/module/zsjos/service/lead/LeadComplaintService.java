@@ -22,6 +22,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_CLOSED;
@@ -67,7 +69,11 @@ public class LeadComplaintService {
 
     public PageResult<LeadComplaintRespVO> page(LeadComplaintPageReqVO req) {
         PageResult<LeadComplaintDO> page = complaintMapper.selectPage(req);
-        return new PageResult<>(page.getList().stream().map(this::toResp).toList(), page.getTotal());
+        Set<Long> leadIds = page.getList().stream().map(LeadComplaintDO::getLeadId).collect(Collectors.toSet());
+        Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
+        return new PageResult<>(page.getList().stream().map(row -> toResp(row, leads.get(row.getLeadId()))).toList(),
+                page.getTotal());
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -111,10 +117,11 @@ public class LeadComplaintService {
         )).toList());
     }
 
-    private LeadComplaintRespVO toResp(LeadComplaintDO row) {
+    private LeadComplaintRespVO toResp(LeadComplaintDO row, LeadDO lead) {
         LeadComplaintRespVO result = new LeadComplaintRespVO();
         result.setId(row.getId());
         result.setLeadId(row.getLeadId());
+        result.setLeadNo(lead == null ? null : lead.getLeadNo());
         result.setComplainantUserId(row.getComplainantUserId());
         result.setSalesUserId(row.getSalesUserId());
         result.setReason(row.getReason());

@@ -338,7 +338,7 @@ export default function LeadAgingPoolPage() {
                     {detail.submittedName}
                   </Typography.Title>
                   <Typography.Text type="secondary">
-                    客资 #{detail.id} ·{" "}
+                    {detail.leadNo} ·{" "}
                     {selected.frozenDeptName ||
                       `部门 #${selected.frozenDeptId}`}
                   </Typography.Text>

@@ -68,4 +68,6 @@ V052 adds empty partner-card, withdrawal and withdrawal-item tables, BPM referen
 
 V053 adds the ungranted `zsjos:withdrawal:finance-query` child permission required for finance full-card queries. It does not grant the permission to any role and is repeatable through `INSERT IGNORE` and schema-version upserts.
 
+V054 adds tenant-daily Lead business numbers and a transactional daily counter. Existing Leads are backfilled in stable `submitted_at, id` order per tenant and Beijing-local date; no business rows are deleted. The suffix is fixed at four digits and wraps from 9999 to 0001. If one tenant already has more than 9999 Leads in the same second, tenant-scoped uniqueness intentionally blocks the migration for manual review. Rollback must retain assigned numbers.
+
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.
