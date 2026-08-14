@@ -1,0 +1,44 @@
+/* SettingsDrawer 内部样式 */
+
+.settings-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.settings-layout-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 4px 6px;
+  border: 1.5px solid;
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.settings-layout-item:hover {
+  box-shadow: 0 0 0 2px var(--crm-color-primary-bg);
+}
+
+.settings-layout-item.active {
+  border-width: 2px;
+  box-shadow: 0 0 0 2px var(--crm-color-primary-bg);
+}
+
+.settings-layout-label {
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}

@@ -81,8 +81,8 @@ export default function LeadQualificationExceptionPage() {
   } satisfies Record<Action, string>)[action]
 
   return <section className="workspace-page">
-    <div className="workspace-page-heading">
-      <div><Typography.Title level={3}>异常客资</Typography.Title><Typography.Text type="secondary">处理判定超时挂起和已回收待重新分配的客资</Typography.Text></div>
+    <div className="page-heading">
+      <div><Typography.Title level={4}>异常客资</Typography.Title><Typography.Text type="secondary">处理判定超时挂起和已回收待重新分配的客资</Typography.Text></div>
       <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
     </div>
     <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>

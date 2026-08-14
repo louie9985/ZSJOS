@@ -1,0 +1,82 @@
+/* Work plan page: list pane, detail pane, plan/task forms. */
+
+.work-plan-page {
+  height: 100%;
+  min-height: 0;
+}
+
+/* 高度不再用 calc(100% - 48px)：那个 48px 是为已删除的 .work-plan-page-header
+   预留的，且本布局位于纵向 Space 中，兄弟节点（工具栏 / 告警 / 分页）高度动态，
+   固定偏移无对应物。min-height 已提供下限。 */
+.work-plan-layout {
+  display: grid;
+  min-height: 520px;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0,1fr);
+  gap: var(--crm-gap);
+}
+
+.work-plan-list-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.work-plan-list-pane>.ant-pagination {
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.work-plan-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--crm-pane-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  background: var(--crm-bg-container);
+}
+
+.work-plan-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 0 12px;
+}
+
+.work-plan-form-item-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.work-plan-form-item {
+  padding: 12px;
+  margin-top: 10px;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+}
+
+.work-plan-form-item .ant-form-item {
+  margin-bottom: 12px;
+}
+
+@media(max-width:900px) {
+  .work-plan-layout {
+    display: block;
+    height: auto;
+  }
+
+  .work-plan-list-pane {
+    min-height: 480px;
+  }
+
+  .work-plan-detail-pane {
+    display: none;
+  }
+
+  .work-plan-form-grid {
+    grid-template-columns: 1fr;
+  }
+}

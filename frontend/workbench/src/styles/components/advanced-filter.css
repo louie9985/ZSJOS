@@ -1,0 +1,77 @@
+/* Reusable advanced-filter toolbar and nested condition editor. */
+
+.advanced-filter-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.advanced-filter-toolbar>.ant-input-affix-wrapper {
+  min-width: 0;
+  flex: 1;
+}
+
+.advanced-filter-toolbar .ant-input-suffix {
+  cursor: pointer;
+}
+
+.advanced-filter-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 0;
+}
+
+.advanced-filter-tags .ant-tag {
+  margin: 0;
+}
+
+.advanced-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--crm-fill-secondary);
+}
+
+.advanced-filter-group.depth-1 {
+  margin-left: 18px;
+  background: var(--crm-fill-tertiary);
+}
+
+.advanced-filter-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.advanced-filter-condition {
+  display: grid;
+  grid-template-columns: minmax(150px,1.2fr) 110px minmax(130px,1fr) 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.advanced-filter-condition>div,
+.advanced-filter-condition .ant-picker,
+.advanced-filter-condition .ant-input-number {
+  width: 100%;
+}
+
+@media(max-width:768px) {
+  .advanced-filter-condition {
+    grid-template-columns: 1fr 100px 34px;
+  }
+
+  .advanced-filter-condition>div {
+    grid-row: 2;
+    grid-column: 1/-1;
+  }
+
+  .advanced-filter-group.depth-1 {
+    margin-left: 8px;
+  }
+}

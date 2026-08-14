@@ -1,0 +1,217 @@
+/**
+ * 设计变量定义层。
+ *
+ * Tier 1（颜色）：静态兜底值，运行时由 ThemeVars.tsx 依当前 antd token 覆盖。
+ *   兜底值取 default-light preset，作用是：JS 执行前的首屏不出现无色降级，
+ *   且 ThemeVars 若未挂载，样式仍可用。
+ * Tier 2（尺度）：间距 / 圆角 / 字号，纯静态。Step 3 将在此挂密度档（data-crm-density）。
+ * Tier 3（布局）：语义化布局尺寸，供 shell 与页面模板取用。
+ *
+ * 本文件须在 styles.css 之前引入。
+ */
+
+:root {
+  /* ==================== Tier 1 兜底（default-light）==================== */
+  --crm-color-primary: #1677ff;
+  --crm-color-primary-hover: #4096ff;
+  --crm-color-primary-bg: #e6f4ff;
+  --crm-color-primary-border: #91caff;
+
+  --crm-color-success: #52c41a;
+  --crm-color-warning: #faad14;
+  --crm-color-error: #ff4d4f;
+
+  /* ---- 表面色阶（由深到浅，形成 5 级视觉层次）----
+   * layout → sunken → chrome → container → elevated
+   * 每级色差 ~3-5%，肉眼可辨但不突兀                   */
+  --crm-bg-layout: #edeef0;
+  --crm-bg-chrome: #fafafb;
+  --crm-bg-container: #ffffff;
+  --crm-bg-elevated: #ffffff;
+  --crm-bg-overlay: #ffffff;
+  --crm-bg-sunken: #f3f4f6;
+  --crm-bg-mask: rgba(0, 0, 0, 0.45);
+
+  /* ---- 描边（仅用于结构分隔线，不做卡片边缘）---- */
+  --crm-border: #eeeff1;
+  --crm-border-strong: #dcdee2;
+
+  --crm-text: rgba(0, 0, 0, 0.88);
+  --crm-text-secondary: rgba(0, 0, 0, 0.65);
+  --crm-text-tertiary: rgba(0, 0, 0, 0.45);
+  --crm-text-on-fill: #ffffff;
+  --crm-glow-white: rgba(255, 255, 255, 0.25);
+
+  --crm-fill-secondary: rgba(0, 0, 0, 0.06);
+  --crm-fill-tertiary: rgba(0, 0, 0, 0.04);
+  --crm-fill-quaternary: rgba(0, 0, 0, 0.02);
+
+  /* ---- 阴影：elevation 体系 ----
+   * level-0: 无阴影（sunken 凹陷区域用 inset）
+   * level-1 (shadow): 静态面板
+   * level-2 (shadow-card): 可交互卡片
+   * level-3 (shadow-raised): hover 抬起
+   * level-4 (shadow-float): 浮层 / modal            */
+  --crm-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+  --crm-shadow-card:
+    0 2px 8px -2px rgba(0, 0, 0, 0.08),
+    0 1px 4px -1px rgba(0, 0, 0, 0.05);
+  --crm-shadow-raised:
+    0 8px 24px -4px rgba(0, 0, 0, 0.10),
+    0 2px 6px -1px rgba(0, 0, 0, 0.05);
+  --crm-shadow-float:
+    0 12px 32px -4px rgba(0, 0, 0, 0.12),
+    0 4px 12px -2px rgba(0, 0, 0, 0.06);
+  --crm-shadow-inset: inset 0 2px 4px 0 rgba(0, 0, 0, 0.05);
+
+  /* ---- 玻璃：模糊半径与边缘高光 ----
+   * 兜底为「无玻璃」，运行时由 ThemeVars 依 glassBlur 覆盖。
+   * edge 用零尺寸透明阴影而非 none：它会被拼进 box-shadow 列表，none 不是合法成员。 */
+  --crm-glass-blur: 0px;
+  --crm-glass-blur-strong: 0px;
+  --crm-glass-edge: inset 0 0 0 0 transparent;
+
+  /* 控件高度兜底，运行时由 ThemeVars 依 antd controlHeight 覆盖 */
+  --crm-control-h: 32px;
+  --crm-control-h-sm: 24px;
+
+  /* ==================== Tier 2 尺度 ==================== */
+  /* 间距阶梯。当前值对齐 styles.css 现行实际渲染（偏紧），Step 3 起随密度档切换。 */
+  --crm-sp-1: 4px;
+  --crm-sp-2: 6px;
+  --crm-sp-3: 8px;
+  --crm-sp-4: 12px;
+  --crm-sp-5: 16px;
+  --crm-sp-6: 24px;
+
+  /* 语义间距别名，避免业务 CSS 直接依赖阶梯序号。随密度档切换。 */
+  --crm-page-pad: 12px;    /* 页面外边距，现 .workspace-page / .message-inbox-page */
+  --crm-card-pad: 14px;    /* 卡片内边距，现 .claim-pool-card / .lead-follow-up-card */
+  --crm-pane-pad: 16px;    /* 详情区内边距，统一四个主从页各自的取值 */
+  --crm-gap: 10px;         /* 主从布局列间距，现 .lead-inbox-layout */
+  --crm-gap-sm: 8px;
+
+  /* 圆角。现行 styles.css 用 47 处 !important 统一改成 10px，Step 3 收敛到此处。 */
+  --crm-radius-sm: 6px;
+  --crm-radius-md: 8px;
+  --crm-radius-lg: 10px;
+
+  /* 字号 */
+  --crm-font-sm: 12px;
+  --crm-font-base: 14px;
+  --crm-font-lg: 15px;
+  /* 读数字号：倒计时一类需要一眼看清的数字，比正文层级明显高一档 */
+  --crm-font-display: 22px;
+
+  /* 列表行高 */
+  --crm-row-h: 48px;
+
+  /* ==================== Tier 3 布局 ==================== */
+  --crm-header-h: 48px;
+
+  --crm-sider-1-w: 72px;
+  --crm-sider-1-collapsed: 56px;
+  --crm-sider-2-w: 180px;
+  --crm-sider-2-collapsed: 48px;
+  --crm-aside-w: 320px;
+
+  /* 主从页列表列宽，四个主从页统一（原 320/320/320/300） */
+  --crm-list-pane-w: 320px;
+
+  /* 页面限宽。现散落各页：1120 / 1360 / 960→1200 */
+  --crm-page-max-form: 1120px;
+  --crm-page-max-table: 1360px;
+  --crm-page-max-narrow: 1200px;
+}
+
+/* ==================== 密度分档 ==================== */
+/* default 档即上面 :root 的取值，无需重复声明。
+   档位由 ThemeVars.tsx 写在 html[data-crm-density] 上。 */
+
+html[data-crm-density='loose'] {
+  --crm-page-pad: 16px;
+  --crm-card-pad: 18px;
+  --crm-pane-pad: 20px;
+  --crm-gap: 14px;
+  --crm-gap-sm: 10px;
+  --crm-header-h: 56px;
+  --crm-row-h: 56px;
+}
+
+html[data-crm-density='compact'] {
+  --crm-page-pad: 8px;
+  --crm-card-pad: 10px;
+  --crm-pane-pad: 12px;
+  --crm-gap: 8px;
+  --crm-gap-sm: 6px;
+  --crm-header-h: 40px;
+  --crm-row-h: 40px;
+}
+
+/* ==================== 字号档 ==================== */
+/* antd 组件字号由 ConfigProvider 的 fontSize token 控制（见 ThemeProvider），
+   这里只管自有 CSS。两侧取值须保持一致。 */
+
+html[data-crm-font='small'] {
+  --crm-font-sm: 11px;
+  --crm-font-base: 13px;
+  --crm-font-lg: 14px;
+  --crm-font-display: 20px;
+}
+
+html[data-crm-font='large'] {
+  --crm-font-sm: 13px;
+  --crm-font-base: 15px;
+  --crm-font-lg: 16px;
+  --crm-font-display: 24px;
+}
+
+/* ==================== 圆角分档 ==================== */
+/* default 档（small）即上面 :root 的取值。 */
+
+html[data-crm-radius='sharp'] {
+  --crm-radius-sm: 2px;
+  --crm-radius-md: 3px;
+  --crm-radius-lg: 4px;
+}
+
+/* small 使用 :root 默认值，无需重复声明 */
+
+html[data-crm-radius='round'] {
+  --crm-radius-sm: 8px;
+  --crm-radius-md: 10px;
+  --crm-radius-lg: 12px;
+}
+
+html[data-crm-radius='full'] {
+  --crm-radius-sm: 12px;
+  --crm-radius-md: 14px;
+  --crm-radius-lg: 16px;
+}
+
+/* ==================== 动画开关 ==================== */
+/* data-crm-no-motion 存在时禁止所有过渡与动画 */
+
+html[data-crm-no-motion] *,
+html[data-crm-no-motion] *::before,
+html[data-crm-no-motion] *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+/**
+ * 移动端密度下限保护。
+ * compact 档的 40px 行高配合 antd compactAlgorithm 的 28px 控件高度，
+ * 低于触控目标建议值，窄屏强制回落到 default 档。
+ */
+@media (max-width: 768px) {
+  html[data-crm-density='compact'] {
+    --crm-page-pad: 12px;
+    --crm-card-pad: 14px;
+    --crm-pane-pad: 16px;
+    --crm-gap: 10px;
+    --crm-gap-sm: 8px;
+    --crm-header-h: 48px;
+    --crm-row-h: 48px;
+  }
+}

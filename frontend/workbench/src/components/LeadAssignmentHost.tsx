@@ -1,8 +1,10 @@
-import { Alert, App, Button, Descriptions, Image, Modal, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Image, Modal, Space, Tag, Typography } from 'antd'
 import { BellOutlined, ClockCircleOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type PendingLead } from '../services/api'
-import { resolvedDisplayLabel } from '../services/leadManagement'
+import { protocolDisplayLabel, resolvedDisplayLabel } from '../services/leadManagement'
+import { LEAD_DISPATCH_MODE_LABELS } from '../constants'
+import { formatTimestamp } from '../services/time'
 import {
   ASSIGNMENT_REFRESH_RETRY_DELAYS_MS,
   formatCountdown,
@@ -12,6 +14,8 @@ import {
   shouldShowAssignmentModal,
   sortPendingLeads
 } from '../services/leadAssignment'
+import { markLeadUnseen } from '../services/leadInboxUnseen'
+import { NameAvatar } from './LeadDetailOverview'
 import { useOverlayCoordinator } from './OverlayCoordinator'
 import { useRealtime, useRealtimeEvent } from './RealtimeProvider'
 
@@ -145,6 +149,8 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
       if (action === 'accept') await api.acceptLead(current.id)
       else await api.rejectLead(current.id)
       setDeferred(ids => { const next = new Set(ids); next.delete(current.id); return next })
+      // 标记要在刷新之前：客资列表页监听该事件自行拉取，标记晚到会漏掉高亮
+      if (action === 'accept') markLeadUnseen(current.id)
       await loadPending()
       if (action === 'accept') {
         message.success('接单成功，首次跟进任务已经开始计时')
@@ -178,36 +184,94 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
     <Modal
       open={shouldShowAssignmentModal(Boolean(current), businessOverlayCount)}
       className="lead-assignment-modal"
-      title={current?.dispatchMode === 'auto' ? '新客资待接单' : '指定客资待接单'}
+      width={640}
+      title={<span className="assignment-modal-title">
+        <BellOutlined />
+        {current?.dispatchMode === 'auto' ? '新客资待接单' : '指定客资待接单'}
+        {ordered.length > 1 && <Tag bordered={false} color="blue">共 {ordered.length} 条</Tag>}
+      </span>}
       closable={false}
       maskClosable={false}
       keyboard={false}
       destroyOnHidden
-      footer={current && <Space className="lead-assignment-actions">
+      footer={current && <div className="lead-assignment-actions">
         {current.rejectable
-          ? <><Button danger loading={processing} onClick={() => void handle('reject')}>不接单</Button><Button type="primary" loading={processing} onClick={() => void handle('accept')}>接单</Button></>
-          : <><Button disabled={!current.deferrable} onClick={() => setDeferred(ids => new Set(ids).add(current.id))}>稍后接单</Button><Button type="primary" loading={processing} onClick={() => void handle('accept')}>接单</Button></>}
-      </Space>}
+          ? <Button size="large" danger loading={processing} onClick={() => void handle('reject')}>不接单</Button>
+          : <Button size="large" disabled={!current.deferrable}
+            onClick={() => setDeferred(ids => new Set(ids).add(current.id))}>稍后接单</Button>}
+        <Button className="assignment-accept-btn" size="large" type="primary" loading={processing}
+          onClick={() => void handle('accept')}>接单</Button>
+      </div>}
     >
       {current && <>
-        {countdown != null && <Alert className="assignment-countdown" type="warning" showIcon icon={<ClockCircleOutlined/>}
-          title={<>请在 <strong>{formatCountdown(countdown)}</strong> 内处理，超时后将自动派给下一位销售</>} />}
+        {countdown != null && <div className={countdown <= 10 ? 'assignment-countdown critical' : 'assignment-countdown'} role="timer">
+          <ClockCircleOutlined />
+          <span className="assignment-countdown-value">{formatCountdown(countdown)}</span>
+          <span className="assignment-countdown-hint">内处理，超时后自动派给下一位销售</span>
+        </div>}
         <LeadDetails lead={current} />
       </>}
     </Modal>
   </>
 }
 
+function AssignmentField({ label, value }: { label: string; value?: string }) {
+  return <div className="assignment-field">
+    <span className="assignment-field-label">{label}</span>
+    <span className={value ? 'assignment-field-value' : 'assignment-field-value lead-field-empty'}>{value || '未填写'}</span>
+  </div>
+}
+
 export function LeadDetails({ lead }: { lead: PendingLead }) {
-  return <Descriptions column={1} size="small" bordered>
-    <Descriptions.Item label="客户姓名">{lead.maskedName || '-'}</Descriptions.Item>
-    <Descriptions.Item label="手机号">{lead.maskedMobile || '-'}</Descriptions.Item>
-    <Descriptions.Item label="微信号">{lead.maskedWechatId || '-'}</Descriptions.Item>
-    <Descriptions.Item label="地区">{lead.provinceName} / {lead.cityName}</Descriptions.Item>
-    <Descriptions.Item label="意向课程"><Space wrap>{lead.intendedProducts.map(name => <Tag key={name} color={name === lead.primaryIntendedProduct ? 'blue' : undefined}>{name}</Tag>)}</Space></Descriptions.Item>
-    <Descriptions.Item label="来源渠道">{resolvedDisplayLabel(lead.sourceChannelLabel, lead.sourceChannel)}</Descriptions.Item>
-    <Descriptions.Item label="客资分类">{resolvedDisplayLabel(lead.leadCategoryLabel, lead.leadCategory)}</Descriptions.Item>
-    <Descriptions.Item label="备注">{lead.remark || '-'}</Descriptions.Item>
-    {lead.attachmentUrls.length > 0 && <Descriptions.Item label="附件"><Image.PreviewGroup>{lead.attachmentUrls.map(url => <Image key={url} width={64} height={64} src={url} />)}</Image.PreviewGroup></Descriptions.Item>}
-  </Descriptions>
+  const region = [lead.provinceName, lead.cityName].filter(Boolean).join(' / ')
+  return <div className="assignment-sheet">
+    <div className="assignment-sheet-identity">
+      <NameAvatar name={lead.maskedName || '客'} size={44} />
+      <div className="assignment-sheet-identity-info">
+        <Typography.Text strong className="assignment-sheet-name">{lead.maskedName || '未填写姓名'}</Typography.Text>
+        <Space size={4} wrap>
+          <Tag color={lead.dispatchMode === 'auto' ? 'blue' : 'purple'} bordered={false}>
+            {protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, lead.dispatchMode, '待接')}
+          </Tag>
+          <Tag bordered={false}>{resolvedDisplayLabel(lead.sourceChannelLabel, lead.sourceChannel)}</Tag>
+          <Tag bordered={false}>{resolvedDisplayLabel(lead.leadCategoryLabel, lead.leadCategory)}</Tag>
+        </Space>
+      </div>
+    </div>
+
+    <div className="assignment-sheet-fields">
+      <AssignmentField label="手机号" value={lead.maskedMobile} />
+      <AssignmentField label="微信号" value={lead.maskedWechatId} />
+      <AssignmentField label="地区" value={region} />
+      <AssignmentField label="提交时间" value={formatTimestamp(lead.submittedAt)} />
+    </div>
+
+    <div className="assignment-sheet-block">
+      <span className="lead-field-label">意向课程</span>
+      {lead.intendedProducts.length
+        ? <div className="assignment-sheet-products">
+          {lead.intendedProducts.map(name => <Tag key={name}
+            color={name === lead.primaryIntendedProduct ? 'green' : undefined}
+            bordered={name !== lead.primaryIntendedProduct}>{name}</Tag>)}
+        </div>
+        : <span className="assignment-field-value lead-field-empty">未填写</span>}
+    </div>
+
+    {lead.remark && <div className="assignment-sheet-block">
+      <span className="lead-field-label">备注</span>
+      <Typography.Paragraph className="assignment-sheet-remark"
+        ellipsis={{ rows: 3, expandable: 'collapsible', symbol: (expanded: boolean) => expanded ? '收起' : '展开' }}>
+        {lead.remark}
+      </Typography.Paragraph>
+    </div>}
+
+    {lead.attachmentUrls.length > 0 && <div className="assignment-sheet-block">
+      <span className="lead-field-label">附件</span>
+      <div className="assignment-sheet-attachments">
+        <Image.PreviewGroup>
+          {lead.attachmentUrls.map(url => <Image key={url} width={64} height={64} src={url} />)}
+        </Image.PreviewGroup>
+      </div>
+    </div>}
+  </div>
 }

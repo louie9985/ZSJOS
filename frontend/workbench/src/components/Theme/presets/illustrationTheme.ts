@@ -100,7 +100,7 @@ const useIllustrationTheme = () => {
           },
           Card: {
             boxShadow: '4px 4px 0 #2C2C2C',
-            colorBgContainer: '#FFF0F6',
+            colorBgContainer: '#FFFDF9',
           },
           Tooltip: {
             colorBorder: '#2C2C2C',
@@ -127,7 +127,7 @@ const useIllustrationTheme = () => {
             footerBg: '#FFF9F0',
             headerBg: '#FFFFFF',
             headerColor: '#2C2C2C',
-            siderBg: '#FFF0F6',
+            siderBg: '#FFFDF9',
             triggerBg: '#FFE7BA',
             triggerColor: '#2C2C2C',
           },

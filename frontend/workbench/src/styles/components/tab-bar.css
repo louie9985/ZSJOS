@@ -1,0 +1,137 @@
+/* TabBar: 页签栏位于 header 下方 */
+
+.crm-tab-bar {
+  flex-shrink: 0;
+  padding: 4px 12px 0;
+  background: var(--crm-bg-container);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.crm-tab-bar .ant-tabs {
+  margin-bottom: 0;
+}
+
+.crm-tab-bar .ant-tabs-nav {
+  margin: 0;
+}
+
+.crm-tab-bar .ant-tabs-tab {
+  padding: 4px 12px;
+  font-size: var(--crm-font-sm);
+}
+
+.crm-tab-bar .ant-tabs-tab+.ant-tabs-tab {
+  margin-left: 2px;
+}
+
+@media (max-width: 768px) {
+  .crm-tab-bar {
+    padding: 2px 8px 0;
+  }
+}
+
+/* ===== card 样式（默认 editable-card）===== */
+.tab-style-card .ant-tabs-tab {
+  border-radius: var(--crm-radius-sm) var(--crm-radius-sm) 0 0;
+}
+
+/* ===== line 样式：下划线指示 ===== */
+.tab-style-line {
+  padding-bottom: 0;
+}
+
+.tab-style-line .ant-tabs-tab {
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0;
+}
+
+.tab-style-line .ant-tabs-tab-active {
+  border-bottom: 2px solid var(--crm-color-primary) !important;
+}
+
+.tab-style-line .ant-tabs-tab::before {
+  display: none;
+}
+
+/* antd editable-card 默认给 tab 上方加一道边线；line 模式去掉 */
+.tab-style-line .ant-tabs-nav::before {
+  display: none;
+}
+
+/* ===== pill 样式：胶囊填色 ===== */
+.tab-style-pill {
+  padding: 6px 12px;
+  border-bottom: none;
+  background: var(--crm-fill-tertiary);
+  border-radius: var(--crm-radius-lg);
+}
+
+.tab-style-pill .ant-tabs-tab {
+  border: none !important;
+  background: transparent !important;
+  border-radius: var(--crm-radius-lg) !important;
+  padding: 4px 14px;
+  margin-right: 4px;
+  transition: all 0.2s ease;
+  color: var(--crm-text-secondary);
+}
+
+.tab-style-pill .ant-tabs-tab:hover {
+  background: var(--crm-fill-secondary) !important;
+  color: var(--crm-text);
+}
+
+.tab-style-pill .ant-tabs-tab-active {
+  background: var(--crm-bg-container) !important;
+  box-shadow: var(--crm-shadow);
+  color: var(--crm-text);
+}
+
+.tab-style-pill .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--crm-text);
+  font-weight: 500;
+}
+
+.tab-style-pill .ant-tabs-tab .ant-tabs-tab-remove {
+  margin-left: 4px;
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+}
+
+.tab-style-pill .ant-tabs-tab-active .ant-tabs-tab-remove {
+  color: var(--crm-text-secondary);
+}
+
+.tab-style-pill .ant-tabs-nav::before {
+  display: none;
+}
+
+/* antd editable-card 默认 ink-bar，pill 模式隐藏 */
+.tab-style-pill .ant-tabs-ink-bar {
+  display: none;
+}
+
+/* ===== flat 样式：平铺底色高亮 ===== */
+.tab-style-flat {
+  padding-top: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+  background: var(--crm-fill-quaternary);
+}
+
+.tab-style-flat .ant-tabs-tab {
+  border: none !important;
+  background: transparent !important;
+  border-radius: 0 !important;
+  padding: 6px 16px;
+}
+
+.tab-style-flat .ant-tabs-tab-active {
+  background: var(--crm-bg-container) !important;
+  border-bottom: 2px solid var(--crm-color-primary) !important;
+}
+
+.tab-style-flat .ant-tabs-nav::before {
+  display: none;
+}

@@ -27,7 +27,10 @@ const useV4Theme = () => {
             itemBg: 'transparent',
             subMenuItemBg: 'transparent',
           },
-          Button: {},
+          Button: {
+            defaultShadow: 'none',
+            dangerShadow: 'none',
+          },
           Alert: {},
           Modal: {},
           Card: {},

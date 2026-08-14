@@ -1,0 +1,25 @@
+/* Lead submission form page. */
+
+.lead-submission-page {
+  max-width: 1120px;
+}
+
+.lead-form-card {
+  box-shadow: var(--crm-shadow);
+}
+
+.lead-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+@media(max-width:768px) {
+  .lead-form-actions .ant-space {
+    width: 100%;
+  }
+
+  .lead-form-actions .ant-btn {
+    flex: 1;
+  }
+}

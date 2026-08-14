@@ -13,11 +13,11 @@ const useBlossomTheme = () => {
         },
         components: {
           Layout: {
-            bodyBg: '#fff4fa',
-            footerBg: '#fff4fa',
+            bodyBg: '#fdf6f9',
+            footerBg: '#fdf6f9',
             headerBg: '#ffffff',
             headerColor: '#3f2330',
-            siderBg: '#fff7fb',
+            siderBg: '#fffcfd',
             triggerBg: '#ffe4f0',
             triggerColor: '#ED4192',
           },
@@ -26,7 +26,10 @@ const useBlossomTheme = () => {
             itemBg: 'transparent',
             subMenuItemBg: 'transparent',
           },
-          Button: {},
+          Button: {
+            defaultShadow: 'none',
+            dangerShadow: 'none',
+          },
           Alert: {},
           Modal: {},
           Card: {},

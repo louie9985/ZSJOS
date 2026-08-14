@@ -1,15 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
-  Avatar,
   Badge,
   Button,
-  Card,
-  Descriptions,
   Empty,
-  Image,
   Input,
-  List,
   Modal,
   Select,
   Skeleton,
@@ -20,10 +15,11 @@ import {
   Typography
 } from 'antd'
 import { message } from 'antd'
-import { BellOutlined, CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
+import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
 import { api, type AdvancedFilterGroup, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
 import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
+import LeadDetailOverview, { NameAvatar } from '../components/LeadDetailOverview'
 import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
@@ -38,8 +34,6 @@ import {
 } from '../services/leadManagement'
 import {
   DICT_TYPE,
-  LEAD_ASSIGNMENT_STATUS_LABELS,
-  LEAD_DISPATCH_MODE_LABELS,
   LEAD_QUALIFICATION_STATUS_LABELS,
   LEAD_FOLLOW_UP_STATUS_LABELS
 } from '../constants'
@@ -48,18 +42,23 @@ import LeadAppealPanel from '../components/LeadAppealPanel'
 import LeadAppealEvidenceUpload from '../components/LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import LeadBasicInfoModal from '../components/LeadBasicInfoModal'
+import OverflowToolbar, { type ToolbarAction } from '../components/OverflowToolbar'
 import SalesOrderEntryModal from '../components/SalesOrderEntryModal'
 import type { LeadAppealEvidence } from '../services/api'
 import { defaultLeadDetailTab, shouldBlockLeadSwitch, type LeadDetailTab } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
+import { useRealtimeEvent } from '../components/RealtimeProvider'
+import {
+  LEAD_INBOX_REFRESH_RETRY_DELAYS_MS,
+  LEAD_INBOX_UNSEEN_EVENT,
+  clearLeadUnseen,
+  unseenLeadIds,
+  type UnseenLeadDetail
+} from '../services/leadInboxUnseen'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 
 const PAGE_SIZE = 20
-
-function userText(id?: number, name?: string) {
-  return name || (id ? `用户 #${id}` : '未分配')
-}
 
 function productText(lead: ManagedLead) {
   const product = lead.primaryProduct
@@ -121,9 +120,21 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
   const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
+  const [nextFollowUpAt, setNextFollowUpAt] = useState<number | undefined>(lead.opportunity?.nextFollowUpAt)
   const actions = new Map((lead.availableActions || []).map(item => [item.code, item]))
   useEffect(() => { onDirtyChange(followUpFormDirty || basicInfoDirty) },
     [basicInfoDirty, followUpFormDirty, onDirtyChange])
+
+  // 拿最新跟进记录的下次应跟进时间（兜底 opportunity 上没有的情况）
+  useEffect(() => {
+    if (lead.opportunity?.nextFollowUpAt) {
+      setNextFollowUpAt(lead.opportunity.nextFollowUpAt)
+      return
+    }
+    api.leadFollowUpPage(lead.id, { pageNo: 1, pageSize: 1 })
+      .then(page => setNextFollowUpAt(page.list[0]?.nextFollowUpAt))
+      .catch(() => setNextFollowUpAt(undefined))
+  }, [lead.id, lead.opportunity?.nextFollowUpAt])
 
   const judgeValid = async () => {
     setValidConfirmOpen(false)
@@ -208,28 +219,30 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     setFollowUpOpen(autoExpandFollowUp)
   }, [autoExpandFollowUp, lead.id])
 
+  // 所有操作统一为按钮，宽度不足时自动溢出到「更多」下拉
+  const toolbarActions: ToolbarAction[] = [
+    actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpOpen(true) },
+    actions.has('JUDGE_VALID') && { key: 'judge-valid', icon: <CheckOutlined/>, label: '判有效', onClick: () => void openValid() },
+    actions.has('JUDGE_INVALID') && { key: 'judge-invalid', icon: <CloseOutlined/>, label: '判无效', danger: true, onClick: () => void openInvalid() },
+    actions.has('ENTER_DEAL') && { key: 'enter-deal', icon: <FileAddOutlined/>, label: '录入成交', disabled: !actions.get('ENTER_DEAL')?.enabled, onClick: () => setSalesOrderOpen(true) },
+    actions.has('REVISE_DEAL') && { key: 'revise-deal', icon: <FileAddOutlined/>, label: '补正成交', disabled: !actions.get('REVISE_DEAL')?.enabled, onClick: () => setSalesOrderOpen(true) },
+    actions.has('EDIT_BASIC_INFO') && { key: 'edit-info', icon: <EditOutlined/>, label: '修改信息', onClick: () => setBasicInfoOpen(true) },
+    actions.has('SUBMITTER_SUPPLEMENT') && { key: 'submitter-supplement', icon: <EditOutlined/>, label: '补充资料', onClick: () => setSubmitterSupplementOpen(true) },
+    actions.has('SUBMITTER_URGE') && { key: 'submitter-urge', icon: <BellOutlined/>, label: '催促', onClick: () => setUrgeOpen(true) },
+    actions.has('SUBMITTER_COMPLAINT') && { key: 'submitter-complaint', icon: <WarningOutlined/>, label: '投诉', danger: true, onClick: () => setComplaintOpen(true) },
+    actions.has('ENTER_REPURCHASE') && { key: 'enter-repurchase', icon: <FileAddOutlined/>, label: '录入复购', disabled: !actions.get('ENTER_REPURCHASE')?.enabled, onClick: () => setRepurchaseOpen(true) },
+  ].filter(Boolean) as ToolbarAction[]
+
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
-      <Avatar size={48}>{lead.submittedName.slice(0, 1)}</Avatar>
-      <div className="lead-detail-title">
-        <Space wrap><Typography.Title level={4}>{lead.submittedName}</Typography.Title><LeadStateTags lead={lead}/></Space>
-        <Typography.Text type="secondary">{lead.submittedMobile || '无手机号'} · {lead.submittedWechatId || '无微信号'} · 客资 #{lead.id}</Typography.Text>
-      </div>
-      <Space wrap className="lead-detail-actions">
-        {actions.has('EDIT_BASIC_INFO') && <Button icon={<EditOutlined/>} onClick={() => setBasicInfoOpen(true)}>修改基础信息</Button>}
-        {actions.has('SUBMITTER_SUPPLEMENT') && <Button icon={<EditOutlined/>} onClick={() => setSubmitterSupplementOpen(true)}>补充资料</Button>}
-        {actions.has('SUBMITTER_URGE') && <Button icon={<BellOutlined/>} onClick={() => setUrgeOpen(true)}>催促</Button>}
-        {actions.has('SUBMITTER_COMPLAINT') && <Button danger icon={<WarningOutlined/>} onClick={() => setComplaintOpen(true)}>投诉</Button>}
-        {actions.has('ADD_FOLLOW_UP') && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setFollowUpOpen(true)}>跟进</Button>}
-        {actions.has('JUDGE_VALID') && <Button icon={<CheckOutlined/>} onClick={() => void openValid()}>判有效</Button>}
-        {actions.has('JUDGE_INVALID') && <Button danger icon={<CloseOutlined/>} onClick={() => void openInvalid()}>判无效</Button>}
-        {actions.has('ENTER_DEAL') && <Button icon={<FileAddOutlined/>}
-          disabled={!actions.get('ENTER_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>录入成交</Button>}
-        {actions.has('REVISE_DEAL') && <Button icon={<FileAddOutlined/>}
-          disabled={!actions.get('REVISE_DEAL')?.enabled} onClick={() => setSalesOrderOpen(true)}>补正成交</Button>}
-        {actions.has('ENTER_REPURCHASE') && <Button icon={<FileAddOutlined/>}
-          disabled={!actions.get('ENTER_REPURCHASE')?.enabled} onClick={() => setRepurchaseOpen(true)}>录入复购</Button>}
-      </Space>
+      <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
+      {nextFollowUpAt && (
+        <div className="lead-hero-next-followup">
+          <ClockCircleOutlined />
+          <span className="lead-hero-next-label">下次应跟进</span>
+          <span className="lead-hero-next-time">{formatTimestamp(nextFollowUpAt)}</span>
+        </div>
+      )}
     </div>
     {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
     {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReason ? invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot) : undefined, lead.invalidDescription].filter(Boolean).join('：')}/>}
@@ -243,68 +256,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         {
           key: 'overview',
           label: '概览',
-          children: <div className="lead-detail-tab-content lead-detail-overview">
-            <div className="lead-detail-card-grid">
-              <Card size="small" title="客户资料" className="lead-detail-card">
-                <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
-                  <Descriptions.Item label="手机号">{lead.submittedMobile || '-'}</Descriptions.Item>
-                  <Descriptions.Item label="微信号">{lead.submittedWechatId || '-'}</Descriptions.Item>
-                  <Descriptions.Item label="所在地区">{[lead.provinceName, lead.cityName].filter(Boolean).join(' / ') || '-'}</Descriptions.Item>
-                </Descriptions>
-              </Card>
-
-              <Card size="small" title="客资信息" className="lead-detail-card">
-                <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
-                  <Descriptions.Item label="客资分类">{categoryLabel(lead.leadCategory)}</Descriptions.Item>
-                  <Descriptions.Item label="来源渠道">{channelLabel(lead.sourceChannel)}</Descriptions.Item>
-                  <Descriptions.Item label="客资有效状态">{protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}</Descriptions.Item>
-                  <Descriptions.Item label="客资跟进状态">{protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, lead.followUpStatus, '未知跟进状态')}</Descriptions.Item>
-                  <Descriptions.Item label="分配状态">{protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, lead.assignmentStatus, '未知分配状态')}</Descriptions.Item>
-                  <Descriptions.Item label="提交备注" span={2}>{lead.remark || '-'}</Descriptions.Item>
-                  {lead.currentAssignmentFirstFollowUpDeadlineAt && <Descriptions.Item label="首次跟进截止">{formatTimestamp(lead.currentAssignmentFirstFollowUpDeadlineAt)}</Descriptions.Item>}
-                  {lead.qualificationDeadlineAt && <Descriptions.Item label="判定截止">{formatTimestamp(lead.qualificationDeadlineAt)}</Descriptions.Item>}
-                  {lead.closeReason && <Descriptions.Item label="关闭原因" span={2}>{lead.closeReason}</Descriptions.Item>}
-                </Descriptions>
-              </Card>
-
-              <Card size="small" title="意向产品" className="lead-detail-card">
-                <List
-                  size="small"
-                  dataSource={lead.intendedProducts || []}
-                  locale={{ emptyText: '暂无意向产品' }}
-                  renderItem={product => <List.Item extra={product.price == null ? null : `¥${Number(product.price).toFixed(2)}`}>
-                    <List.Item.Meta
-                      title={<Space wrap>{product.primary && <Tag color="green">主意向</Tag>}<span>{product.spuName || '未明确课程'}</span></Space>}
-                      description={[product.skuName, product.categoryName].filter(Boolean).join(' · ') || '未明确 SKU'}
-                    />
-                  </List.Item>}
-                />
-              </Card>
-
-              <Card size="small" title="提交与分配" className="lead-detail-card">
-                <Descriptions className="lead-detail-table" column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
-                  <Descriptions.Item label="提交人">{userText(lead.sourceUserId, lead.sourceUserName)}</Descriptions.Item>
-                  <Descriptions.Item label="负责人">{userText(lead.ownerUserId, lead.ownerUserName)}</Descriptions.Item>
-                  <Descriptions.Item label="派单方式">{protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, lead.dispatchMode, '未知派单方式')}</Descriptions.Item>
-                  <Descriptions.Item label="待接单人">{userText(lead.pendingAssigneeUserId, lead.pendingAssigneeUserName)}</Descriptions.Item>
-                  <Descriptions.Item label="提交时间">{formatTimestamp(lead.submittedAt)}</Descriptions.Item>
-                  <Descriptions.Item label="更新时间">{formatTimestamp(lead.updateTime)}</Descriptions.Item>
-                  {lead.invalidReason && <Descriptions.Item label="无效原因" span={2}>{invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot)}</Descriptions.Item>}
-                  {lead.invalidDescription && <Descriptions.Item label="判定备注" span={2}>{lead.invalidDescription}</Descriptions.Item>}
-                  {lead.status === 'invalid' && <Descriptions.Item label="判定附件" span={2}>{lead.invalidEvidence?.length ? <Image.PreviewGroup><Space wrap>{lead.invalidEvidence.map(file => <Image key={file.infraFileId} width={64} height={64} src={file.fileUrl} alt={file.originalName} title={file.originalName}/>)}</Space></Image.PreviewGroup> : '-'}</Descriptions.Item>}
-                </Descriptions>
-              </Card>
-
-              <Card size="small" title="附件" className="lead-detail-card lead-detail-card-wide">
-                {lead.attachments?.length ? <Image.PreviewGroup>
-                  <div className="lead-attachment-grid">
-                    {lead.attachments.map(file => <div key={file.id} className="lead-attachment-item" title={file.originalName}>
-                      <Image src={file.fileUrl} alt={file.originalName}/><span>{file.originalName}</span>
-                    </div>)}
-                  </div>
-                </Image.PreviewGroup> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无附件"/>}
-              </Card>
-            </div>
+          children: <div className="lead-detail-tab-content">
+            <LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel}
+              toolbar={toolbarActions.length > 0 ? <OverflowToolbar actions={toolbarActions} /> : undefined} />
           </div>
         },
         {
@@ -400,11 +354,13 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
   const [detailLoading, setDetailLoading] = useState(false)
   const [detailError, setDetailError] = useState('')
   const [followUpDirty, setFollowUpDirty] = useState(false)
+  const [unseenIds, setUnseenIds] = useState<number[]>(() => unseenLeadIds())
   const requestVersion = useRef(0)
   const metadataVersion = useRef(0)
   const activePageRequests = useRef(new Set<string>())
   const listScrollRef = useRef<HTMLDivElement>(null)
   const listSentinelRef = useRef<HTMLDivElement>(null)
+  const itemIdsRef = useRef<number[]>([])
 
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
@@ -499,10 +455,45 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     else setDetail(undefined)
   }, [loadDetail, selectedId])
 
+  // 详情已经渲染出来即算看过，自动选中与手工点击一视同仁
+  useEffect(() => {
+    if (selectedId) setUnseenIds(clearLeadUnseen(selectedId))
+  }, [selectedId])
+
   const refreshAfterLeadChange = useCallback(async (id: number) => {
     const version = ++requestVersion.current
     await Promise.all([loadMetadata(), loadPage(1, true, version), loadDetail(id)])
   }, [loadDetail, loadMetadata, loadPage])
+
+  useEffect(() => { itemIdsRef.current = items.map(item => item.id) }, [items])
+
+  /**
+   * 接单后把新客资拉进列表。
+   * 接单与列表查询是两次请求，后端写入对读可见有延迟，所以按节奏重试直到新客资出现。
+   */
+  const refreshUntilVisible = useCallback(async (leadId?: number) => {
+    for (const delay of LEAD_INBOX_REFRESH_RETRY_DELAYS_MS) {
+      if (delay > 0) await new Promise(resolve => window.setTimeout(resolve, delay))
+      const version = ++requestVersion.current
+      await Promise.all([loadMetadata(), loadPage(1, true, version)])
+      if (leadId == null || itemIdsRef.current.includes(leadId)) return
+    }
+  }, [loadMetadata, loadPage])
+
+  // 接单成功由 LeadAssignmentHost 打标记，这里据此刷新，销售不必手动刷新页面
+  useEffect(() => {
+    const onUnseenChange = (event: Event) => {
+      const ids = (event as CustomEvent<UnseenLeadDetail>).detail?.leadIds ?? []
+      setUnseenIds(ids)
+      const added = ids.find(id => !itemIdsRef.current.includes(id))
+      if (added != null) void refreshUntilVisible(added)
+    }
+    window.addEventListener(LEAD_INBOX_UNSEEN_EVENT, onUnseenChange)
+    return () => window.removeEventListener(LEAD_INBOX_UNSEEN_EVENT, onUnseenChange)
+  }, [refreshUntilVisible])
+
+  // 转派、回收等由他人触发的归属变化同样要落到列表上
+  useRealtimeEvent('zsjos_lead_assignment', () => { void refreshUntilVisible() })
 
   const activeGroup = useMemo(
     () => filterProfile.groups.find(item => item.key === inboxGroup),
@@ -600,11 +591,21 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
             {Array.from({ length: 5 }, (_, index) => <div className="lead-inbox-item" key={index}><Skeleton active avatar paragraph={{ rows: 2 }}/></div>)}
           </div> : !items.length && !initialError ? <Empty description="当前筛选下暂无客资"/> : items.map(item => {
             const active = item.id === selectedId
-            return <button key={item.id} type="button" className={active ? 'lead-inbox-item active' : 'lead-inbox-item'} onClick={() => selectLead(item.id)}>
+            const unseen = !active && unseenIds.includes(item.id)
+            return <button key={item.id} type="button"
+              className={['lead-inbox-item', active && 'active', unseen && 'unseen'].filter(Boolean).join(' ')}
+              onClick={() => selectLead(item.id)}>
               <div className="lead-inbox-item-main">
-                <Avatar>{item.submittedName.slice(0, 1)}</Avatar>
+                <NameAvatar name={item.submittedName} size={36} />
                 <div className="lead-inbox-item-copy">
-                  <div className="lead-inbox-item-title"><strong>{item.submittedName}</strong><LeadStateTags lead={item}/></div>
+                  <div className="lead-inbox-item-title">
+                    {/* 标签与姓名同级：塞进 strong 会被姓名的 ellipsis 一起裁掉 */}
+                    <span className="lead-inbox-item-name">
+                      <strong>{item.submittedName}</strong>
+                      {unseen && <Tag className="lead-inbox-new-tag" color="error" bordered={false}>新</Tag>}
+                    </span>
+                    <LeadStateTags lead={item}/>
+                  </div>
                   <span>{productText(item)}</span>
                   <span>{item.submittedMobile || '无手机号'} · {item.submittedWechatId || '无微信号'}</span>
                 </div>

@@ -5,13 +5,26 @@ import {
   Divider,
   Flex,
   Popover,
-  Switch,
+  Segmented,
+  Slider,
   Tooltip,
   Typography,
   theme,
 } from 'antd';
 import type { AggregationColor } from 'antd/es/color-picker/color';
-import { BACKGROUND_METAS, PRESET_COLORS, THEME_METAS } from '../../constants';
+import {
+  BACKGROUND_METAS,
+  DENSITY_OPTIONS,
+  FONT_SCALE_OPTIONS,
+  GLASS_BLUR_MAX,
+  GLASS_BLUR_MIN,
+  LAYOUT_MODE_OPTIONS,
+  PRESET_COLORS,
+  THEME_METAS,
+  type Density,
+  type FontScale,
+  type LayoutMode,
+} from '../../constants';
 import { useTheme } from './ThemeContext';
 
 const { Text } = Typography;
@@ -22,13 +35,22 @@ const ThemeSwitcher: React.FC = () => {
   const {
     preset,
     colorPrimary,
-    compact,
     customizable,
+    isDark,
     background,
+    glassOpacity,
+    glassBlur,
+    density,
+    fontScale,
+    layoutMode,
     setPreset,
     setColorPrimary,
-    setCompact,
     setBackground,
+    setGlassOpacity,
+    setGlassBlur,
+    setDensity,
+    setFontScale,
+    setLayoutMode,
     reset,
   } = useTheme();
 
@@ -157,19 +179,45 @@ const ThemeSwitcher: React.FC = () => {
             </Tooltip>
           </Flex>
 
-          <Divider style={{ margin: '16px 0' }} />
-          <Flex align="center" justify="space-between">
-            <div>
-              <Text>紧凑模式</Text>
-              <br />
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                一屏显示更多内容
-              </Text>
-            </div>
-            <Switch checked={compact} onChange={setCompact} />
-          </Flex>
         </>
       )}
+
+      {/* 密度与字号：排版属性，与配色无关，故对全部 13 套主题可用 */}
+      <Divider style={{ margin: '16px 0' }} />
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        界面密度
+      </Text>
+      <Segmented
+        block
+        style={{ marginTop: 8 }}
+        value={density}
+        onChange={(value) => setDensity(value as Density)}
+        options={DENSITY_OPTIONS}
+      />
+
+      <Divider style={{ margin: '16px 0' }} />
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        字号
+      </Text>
+      <Segmented
+        block
+        style={{ marginTop: 8 }}
+        value={fontScale}
+        onChange={(value) => setFontScale(value as FontScale)}
+        options={FONT_SCALE_OPTIONS}
+      />
+
+      <Divider style={{ margin: '16px 0' }} />
+      <Text type="secondary" style={{ fontSize: 12 }}>
+        布局
+      </Text>
+      <Segmented
+        block
+        style={{ marginTop: 8 }}
+        value={layoutMode}
+        onChange={(value) => setLayoutMode(value as LayoutMode)}
+        options={LAYOUT_MODE_OPTIONS}
+      />
 
       {/* 背景（所有主题通用；玻璃主题下透出磨砂质感尤为明显） */}
       <Divider style={{ margin: '16px 0' }} />
@@ -177,7 +225,9 @@ const ThemeSwitcher: React.FC = () => {
         背景
       </Text>
       <Flex gap={8} wrap style={{ marginTop: 8 }}>
-        {BACKGROUND_METAS.map((b) => {
+        {BACKGROUND_METAS
+          .filter((b) => b.key === 'theme' || b.dark === undefined || b.dark === isDark)
+          .map((b) => {
           const active = b.key === background;
           const isFollow = b.key === 'theme';
           return (
@@ -219,6 +269,37 @@ const ThemeSwitcher: React.FC = () => {
           );
         })}
       </Flex>
+
+      {/* 玻璃质感微调（仅选了自定义背景时显示——纯色背景下没有可透视的内容，两项都无效果） */}
+      {background !== 'theme' && (
+        <>
+          <Divider style={{ margin: '16px 0' }} />
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            不透明度
+          </Text>
+          <Slider
+            min={20}
+            max={95}
+            value={glassOpacity}
+            onChange={setGlassOpacity}
+            tooltip={{ formatter: (v) => `${v}%` }}
+            style={{ marginTop: 4 }}
+          />
+
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            背景模糊
+          </Text>
+          <Slider
+            min={GLASS_BLUR_MIN}
+            max={GLASS_BLUR_MAX}
+            value={glassBlur}
+            onChange={setGlassBlur}
+            marks={{ [GLASS_BLUR_MIN]: '关', [GLASS_BLUR_MAX]: '强' }}
+            tooltip={{ formatter: (v) => (v ? `${v}px` : '关闭') }}
+            style={{ marginTop: 4 }}
+          />
+        </>
+      )}
 
       <Divider style={{ margin: '16px 0' }} />
 

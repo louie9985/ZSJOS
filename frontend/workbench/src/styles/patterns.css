@@ -1,0 +1,20 @@
+/* Cross-page building blocks reused by more than one business page. */
+
+.page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.page-heading h4 {
+  margin: 6px 0;
+}
+
+@media(max-width:768px) {
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

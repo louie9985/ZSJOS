@@ -1,0 +1,77 @@
+/* Today tasks page and the task centre panels. */
+
+@media(max-width:768px) {
+  .today-tasks-page {
+    padding: 12px;
+  }
+}
+
+.today-tasks-page {
+  max-width: 1200px;
+}
+
+.task-center-grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 12px;
+}
+
+.task-center-panel {
+  display: flex;
+  min-width: 0;
+  min-height: 560px;
+  flex-direction: column;
+  padding: 16px;
+  border: 1px solid var(--crm-border);
+  border-radius: 6px;
+  background: var(--crm-bg-container);
+}
+
+.task-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.task-panel-header h4 {
+  margin: 0!important;
+}
+
+.task-bucket-control {
+  margin-top: 8px;
+}
+
+.task-panel-alert {
+  margin-top: 10px;
+}
+
+.task-panel-list {
+  flex: 1;
+  margin-top: 8px;
+}
+
+.task-panel-list .ant-list-item {
+  min-height: 68px;
+}
+
+.task-panel-list .ant-list-item-meta-title,.task-panel-list .ant-list-item-meta-description {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.task-center-panel>.ant-pagination {
+  align-self: flex-end;
+  margin-top: 10px;
+}
+
+@media(max-width:900px) {
+  .task-center-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .task-center-panel {
+    min-height: 480px;
+  }
+}

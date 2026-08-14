@@ -1,0 +1,409 @@
+/* App shell: two-level siders, header, content region, assistant aside, custom backgrounds. */
+
+.crm-shell {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+}
+
+/* antd Watermark 包裹层须撑满视口 */
+.crm-watermark-wrapper {
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  inset: 0;
+}
+
+.crm-sider {
+  height: 100vh;
+  border-inline-end: 1px solid var(--crm-border);
+  background: var(--crm-bg-chrome)!important;
+  overflow: hidden;
+}
+
+.crm-sider>.ant-layout-sider-children {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.brand {
+  height: var(--crm-header-h);
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  color: var(--crm-color-primary);
+  font-size: var(--crm-font-sm);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.3;
+  white-space: pre-line;
+}
+
+.brand-mobile {
+  display: none;
+}
+
+.sider-menu-scroll,.secondary-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.transparent-menu {
+  border-inline-end: 0!important;
+  background: transparent!important;
+}
+
+.transparent-menu .ant-menu-item-selected {
+  font-weight: 600;
+}
+
+.transparent-menu .ant-menu-item-icon {
+  font-size: 16px;
+}
+
+.transparent-menu .ant-menu-item-icon+.ant-menu-title-content {
+  margin-inline-start: 10px;
+}
+
+.sider-toggle {
+  flex: none;
+  border-top: 1px solid var(--crm-border);
+  padding: 8px;
+  text-align: center;
+  background: inherit;
+}
+
+.sider-toggle .ant-btn {
+  width: 100%;
+}
+
+.secondary-title {
+  height: var(--crm-header-h);
+  min-height: var(--crm-header-h);
+  padding: 0 8px 0 12px;
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.secondary-title .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secondary-sider.ant-layout-sider-collapsed .secondary-title {
+  justify-content: center;
+  padding: 0;
+}
+
+.crm-header {
+  height: var(--crm-header-h);
+  line-height: var(--crm-header-h);
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  background: var(--crm-bg-chrome);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.header-actions {
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.content-layout {
+  height: calc(100vh - var(--crm-header-h));
+  overflow: hidden;
+}
+
+.content-layout>.ant-layout-content {
+  overflow: auto;
+  background: var(--crm-bg-layout);
+}
+
+.workspace-page {
+  max-width: 1440px;
+  margin: auto;
+}
+
+.ai-sider {
+  height: 100%;
+  background: var(--crm-bg-chrome)!important;
+  border-inline-start: 1px solid var(--crm-border);
+  padding: 16px;
+}
+
+@media(max-width:768px) {
+  .primary-sider {
+    width: 56px!important;
+    min-width: 56px!important;
+    max-width: 56px!important;
+    flex: 0 0 56px!important;
+  }
+
+  .brand-default {
+    display: none;
+  }
+
+  .brand-mobile {
+    display: inline;
+  }
+
+  .secondary-sider {
+    display: none;
+  }
+
+  .crm-header {
+    padding: 0 8px;
+  }
+
+  .crm-header>.ant-breadcrumb {
+    display: none;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .theme-action {
+    display: none!important;
+  }
+}
+
+.crm-shell {
+  background: var(--crm-bg-layout);
+}
+
+.crm-shell .crm-sider {
+  border-color: var(--crm-border);
+  background: var(--crm-bg-chrome)!important;
+}
+
+.crm-shell .crm-header {
+  border-color: var(--crm-border);
+  background: var(--crm-bg-chrome);
+}
+
+.crm-shell .secondary-title,.crm-shell .sider-toggle {
+  border-color: var(--crm-border);
+}
+
+.crm-shell .content-layout>.ant-layout-content {
+  background: var(--crm-bg-layout);
+}
+
+.crm-shell .ai-sider {
+  border-color: var(--crm-border);
+  background: var(--crm-bg-chrome)!important;
+}
+
+.custom-background>.ant-layout,.custom-background .content-layout {
+  background: transparent;
+}
+
+html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass='frosted'] .custom-background .crm-header,html[data-crm-glass='frosted'] .custom-background .ai-sider {
+  backdrop-filter: blur(var(--crm-glass-blur));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur));
+}
+
+.workspace-page {
+  padding: var(--crm-page-pad);
+}
+
+@media(max-width:768px) {
+  .header-actions {
+    gap: 4px!important;
+  }
+
+  .ai-action {
+    display: none;
+  }
+}
+
+/* ==================== 一级导航：图标 + 文字垂直排列 ==================== */
+.primary-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px 4px;
+  gap: 2px;
+}
+
+.primary-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 2px;
+  border: none;
+  border-radius: var(--crm-radius-md);
+  background: transparent;
+  color: var(--crm-text-secondary);
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+  font-size: var(--crm-font-sm);
+  line-height: 1.2;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.primary-nav-item:hover {
+  background: var(--crm-fill-secondary);
+  color: var(--crm-text);
+}
+
+.primary-nav-item.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+  font-weight: 600;
+}
+
+.primary-nav-icon {
+  font-size: 16px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary-nav-label {
+  font-size: var(--crm-font-sm);
+  line-height: 1.3;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 收起状态：只显示图标，按钮缩为正方形 */
+.primary-sider.ant-layout-sider-collapsed .primary-nav-item {
+  padding: 8px 0;
+  width: 36px;
+  height: 36px;
+}
+
+
+/* .header-scroll: 顶栏不固定，跟随内容滚动 */
+.header-scroll .content-layout {
+  height: auto;
+  overflow: visible;
+}
+
+.header-scroll .content-layout>.ant-layout-content {
+  overflow: visible;
+}
+
+/* 整个右侧 Layout 改为可滚动，header 在流中 */
+.header-scroll>:last-child {
+  overflow-y: auto;
+  height: 100vh;
+}
+
+/* ==================== 顶部导航模式 ==================== */
+/* .layout-top: 一级菜单移入 header，一级侧栏隐藏 */
+.layout-top .primary-sider {
+  display: none;
+}
+
+.top-primary-menu {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+  background: transparent!important;
+}
+
+.top-primary-menu .ant-menu-item,
+.top-primary-menu .ant-menu-submenu-title {
+  line-height: var(--crm-header-h);
+}
+
+/* ==================== 纯顶栏模式 ==================== */
+/* .layout-top-only: 一二级菜单全部在顶栏 */
+.layout-top-only .primary-sider,
+.layout-top-only .secondary-sider,
+.layout-top-only .single-sider,
+.layout-top-only .mini-sider {
+  display: none;
+}
+
+/* ==================== 左单列模式 ==================== */
+/* .layout-single-sider: 合并为一个侧栏 */
+.layout-single-sider .primary-sider,
+.layout-single-sider .secondary-sider {
+  display: none;
+}
+
+.single-sider {
+  height: 100vh;
+}
+
+/* ==================== mini-float 模式 ==================== */
+/* .layout-mini-float: 56px 图标栏 + popup 二级 */
+.layout-mini-float .primary-sider,
+.layout-mini-float .secondary-sider,
+.layout-mini-float .single-sider {
+  display: none;
+}
+
+/* 栏宽由 React 侧的 MINI_RAIL_W 以 inline style 给出，此处不重复声明，
+   避免两个真值来源漂移。 */
+.mini-sider {
+  height: 100vh;
+}
+
+/* 图标居中、label 与箭头隐藏全部由 antd 的 .ant-menu-inline-collapsed 负责。
+   前提是 Menu 的 collapsedWidth token 等于本栏宽度（见 constants.MINI_RAIL_W）——
+   否则 ul 比栏宽，居中式 padding 算出的位置被 overflow 裁掉，图标偏左。
+   这里只补 antd 不管的部分。 */
+.mini-sider .brand {
+  font-size: var(--crm-font-sm);
+}
+
+/* 二级浮层：给一级名做分组头，否则浮层里只有页面名、没有上下文 */
+.mini-flyout .ant-menu-item-group-title {
+  padding-block: 6px;
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+}
+
+/* ==================== 移动端导航入口 ==================== */
+/* 桌面端隐藏汉堡按钮，移动端显示 */
+.mobile-nav-trigger {
+  display: none;
+}
+
+@media(max-width:768px) {
+  .mobile-nav-trigger {
+    display: inline-flex;
+  }
+
+  /* 移动端统一隐藏除 primary-sider（已由 media query 收缩到 56px）之外的布局变体 */
+  .single-sider,
+  .mini-sider {
+    display: none!important;
+  }
+
+  /* 顶部模式在移动端也隐藏水平菜单，走 drawer */
+  .top-primary-menu {
+    display: none;
+  }
+}

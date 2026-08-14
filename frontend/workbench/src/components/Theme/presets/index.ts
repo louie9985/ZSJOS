@@ -10,6 +10,7 @@ export function buildDefaultConfig(
   isDark: boolean,
   colorPrimary: string,
   compact: boolean,
+  borderRadius: number,
 ): ConfigProviderProps {
   const algorithm = [
     isDark ? theme.darkAlgorithm : theme.defaultAlgorithm,
@@ -39,11 +40,15 @@ export function buildDefaultConfig(
           itemBg: 'transparent',
           subMenuItemBg: 'transparent',
         },
+        Button: {
+          defaultShadow: 'none',
+          dangerShadow: 'none',
+        },
       }
     : {
         Layout: {
-          bodyBg: '#f5f8ff',
-          footerBg: '#f5f8ff',
+          bodyBg: '#f4f6f9',
+          footerBg: '#f4f6f9',
           headerBg: '#ffffff',
           headerColor: 'rgba(0, 0, 0, 0.88)',
           siderBg: '#ffffff',
@@ -55,6 +60,10 @@ export function buildDefaultConfig(
           itemBg: 'transparent',
           subMenuItemBg: 'transparent',
         },
+        Button: {
+          defaultShadow: 'none',
+          dangerShadow: 'none',
+        },
       };
 
   return {
@@ -62,7 +71,7 @@ export function buildDefaultConfig(
       algorithm,
       token: {
         colorPrimary,
-        borderRadius: 10,
+        borderRadius,
         fontFamily: 'AlibabaSans, sans-serif',
       },
       components,

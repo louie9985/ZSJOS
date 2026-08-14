@@ -13,7 +13,7 @@ export type ThemePreset =
   | 'v4'
   | 'serene'
 
-export type BackgroundKey = 'theme' | 'aurora' | 'sunset' | 'mint' | 'lavender' | 'peach' | 'ocean' | 'dark'
+export type BackgroundKey = 'theme' | 'aurora' | 'sunset' | 'mint' | 'lavender' | 'peach' | 'ocean' | 'midnight' | 'dusk'
 
 export interface ThemeMeta {
   key: ThemePreset
@@ -26,8 +26,11 @@ export interface ThemeMeta {
 export interface BackgroundMeta {
   key: BackgroundKey
   label: string
+  /** 渐变 CSS 值（'theme' 项无此字段，跟随主题） */
   value?: string
   preview: string
+  /** 该背景是否为暗色系（供按 preset 明暗过滤） */
+  dark?: boolean
 }
 
 // ========== Application ==========
@@ -191,12 +194,119 @@ export const PRESET_COLORS = [
   { key: 'cyan', label: '明青', color: '#13c2c2' }
 ] as const
 
+/** 玻璃背景模糊滑块范围（px）。ThemeContext 的钳制与 ThemeSwitcher 的 Slider 共用，避免两处漂移。 */
+export const GLASS_BLUR_MIN = 0
+export const GLASS_BLUR_MAX = 40
+
 export const DEFAULT_THEME = {
   preset: 'default-light' as ThemePreset,
   colorPrimary: '#1677ff',
+  /** @deprecated 由 density 取代，仅保留用于旧 localStorage 数据迁移 */
   compact: false,
-  background: 'theme' as BackgroundKey
+  background: 'theme' as BackgroundKey,
+  /** 玻璃不透明度 0–100，仅自定义背景时生效 */
+  glassOpacity: 60,
+  /** 玻璃背景模糊（backdrop-filter 模糊半径）0–40px，仅自定义背景时生效；0 表示完全关闭磨砂 */
+  glassBlur: 20,
+  density: 'default' as Density,
+  fontScale: 'default' as FontScale,
+  layoutMode: 'side' as LayoutMode,
+  borderRadius: 'small' as BorderRadiusPreset,
+  headerFixed: true,
+  animation: true,
+  watermark: false,
+  tabs: false,
+  tabStyle: 'card' as TabStyle
 } as const
+
+// ========== Layout ==========
+
+export type BorderRadiusPreset = 'sharp' | 'small' | 'round' | 'full'
+
+export const BORDER_RADIUS_OPTIONS: Array<{ label: string; value: BorderRadiusPreset }> = [
+  { label: '方正', value: 'sharp' },
+  { label: '小圆', value: 'small' },
+  { label: '圆润', value: 'round' },
+  { label: '全圆', value: 'full' }
+]
+
+export const BORDER_RADIUS_VALUES: Record<BorderRadiusPreset, { sm: number; md: number; lg: number }> = {
+  sharp: { sm: 2, md: 3, lg: 4 },
+  small: { sm: 4, md: 6, lg: 8 },
+  round: { sm: 8, md: 10, lg: 12 },
+  full: { sm: 12, md: 14, lg: 16 }
+}
+
+// ========== Tab Style ==========
+
+export type TabStyle = 'card' | 'line' | 'pill' | 'flat'
+
+export const TAB_STYLE_OPTIONS: Array<{ label: string; value: TabStyle }> = [
+  { label: '卡片', value: 'card' },
+  { label: '线条', value: 'line' },
+  { label: '胶囊', value: 'pill' },
+  { label: '平铺', value: 'flat' }
+]
+
+// ========== Density ==========
+
+/**
+ * 界面密度与字号。与配色方案无关，故对全部 13 套 preset 生效
+ * （不受 ThemeMeta.customizable 限制）。
+ */
+export type Density = 'loose' | 'default' | 'compact'
+export type FontScale = 'small' | 'default' | 'large'
+
+export const DENSITIES: readonly Density[] = ['loose', 'default', 'compact']
+export const FONT_SCALES: readonly FontScale[] = ['small', 'default', 'large']
+
+export const DENSITY_OPTIONS: Array<{ label: string; value: Density }> = [
+  { label: '宽松', value: 'loose' },
+  { label: '默认', value: 'default' },
+  { label: '紧凑', value: 'compact' }
+]
+
+export const FONT_SCALE_OPTIONS: Array<{ label: string; value: FontScale }> = [
+  { label: '小', value: 'small' },
+  { label: '标准', value: 'default' },
+  { label: '大', value: 'large' }
+]
+
+/** 同步注入 antd 的 fontSize token，使组件字号与 CSS 变量一致 */
+export const FONT_SCALE_SIZE: Record<FontScale, number> = {
+  small: 13,
+  default: 14,
+  large: 15
+}
+
+// ========== Layout Mode ==========
+
+/**
+ * 布局模式：
+ * - side: 侧边双列（一级窄栏 + 二级栏），默认
+ * - top:  顶部一级 + 侧边二级（内容区多出 144px 宽度）
+ * - top-only: 纯顶栏（一二级菜单全部横排在顶部）
+ * - single-sider: 左单列（一级展开/收起包含二级子项）
+ * - mini-float: 左 mini 图标 + hover 浮层弹出二级
+ */
+export type LayoutMode = 'side' | 'top' | 'top-only' | 'single-sider' | 'mini-float'
+
+export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top', 'top-only', 'single-sider', 'mini-float']
+
+/**
+ * mini-float 图标栏宽度。
+ * 须与 Menu 的 collapsedWidth token 一起设定：token 默认 controlHeightLG*2，
+ * 与此值不一致时 ul 溢出被裁，图标偏离居中。CSS 侧对应 --crm-sider-1-collapsed。
+ */
+export const MINI_RAIL_W = 56
+
+export const LAYOUT_MODE_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
+  { label: '左双列', value: 'side' },
+  { label: '顶+左', value: 'top' },
+  { label: '纯顶栏', value: 'top-only' },
+  { label: '左单列', value: 'single-sider' },
+  { label: 'Mini浮层', value: 'mini-float' }
+]
 
 export const THEME_METAS: ThemeMeta[] = [
   { key: 'default-light', label: '默认浅色', swatch: '#1677ff', dark: false, customizable: true },
@@ -215,12 +325,16 @@ export const THEME_METAS: ThemeMeta[] = [
 ]
 
 export const BACKGROUND_METAS: BackgroundMeta[] = [
+  // 跟随主题（无渐变，不分明暗）
   { key: 'theme', label: '跟随主题', preview: 'transparent' },
-  { key: 'aurora', label: '极光', value: 'linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 40%, #fbc2eb 100%)', preview: 'linear-gradient(135deg, #a1c4fd, #fbc2eb)' },
-  { key: 'sunset', label: '日落', value: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 50%, #fbc2eb 100%)', preview: 'linear-gradient(135deg, #ff9a9e, #fbc2eb)' },
-  { key: 'mint', label: '薄荷', value: 'linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%)', preview: 'linear-gradient(135deg, #d4fc79, #96e6a1)' },
-  { key: 'lavender', label: '薰衣草', value: 'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)', preview: 'linear-gradient(135deg, #e0c3fc, #8ec5fc)' },
-  { key: 'peach', label: '蜜桃', value: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)', preview: 'linear-gradient(135deg, #ffecd2, #fcb69f)' },
-  { key: 'ocean', label: '深海', value: 'linear-gradient(135deg, #2b5876 0%, #4e4376 100%)', preview: 'linear-gradient(135deg, #2b5876, #4e4376)' },
-  { key: 'dark', label: '暗夜', value: 'linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)', preview: 'linear-gradient(135deg, #0f2027, #2c5364)' }
+  // 浅色组（饱和度适中，让磨砂玻璃层有可感知的色调）
+  { key: 'aurora', label: '极光', dark: false, value: 'linear-gradient(135deg, #c8daf0 0%, #dde4f4 50%, #ebd8ed 100%)', preview: 'linear-gradient(135deg, #c8daf0, #ebd8ed)' },
+  { key: 'sunset', label: '日落', dark: false, value: 'linear-gradient(135deg, #f0d4cc 0%, #f2ddd5 50%, #ebcfdb 100%)', preview: 'linear-gradient(135deg, #f0d4cc, #ebcfdb)' },
+  { key: 'mint', label: '薄荷', dark: false, value: 'linear-gradient(135deg, #c8e6d0 0%, #d6ebd8 50%, #dcefd4 100%)', preview: 'linear-gradient(135deg, #c8e6d0, #dcefd4)' },
+  { key: 'lavender', label: '薰衣草', dark: false, value: 'linear-gradient(135deg, #d8d0f0 0%, #d6ddf4 50%, #dde0f6 100%)', preview: 'linear-gradient(135deg, #d8d0f0, #dde0f6)' },
+  { key: 'peach', label: '蜜桃', dark: false, value: 'linear-gradient(135deg, #f2ddc8 0%, #f0d8c2 50%, #edcfbe 100%)', preview: 'linear-gradient(135deg, #f2ddc8, #edcfbe)' },
+  // 暗色雾面组（供 default-dark / geek）
+  { key: 'ocean', label: '深海', dark: true, value: 'linear-gradient(135deg, #1c2530 0%, #202a35 50%, #252b38 100%)', preview: 'linear-gradient(135deg, #1c2530, #252b38)' },
+  { key: 'midnight', label: '暗夜', dark: true, value: 'linear-gradient(135deg, #14181d 0%, #171c22 50%, #1a1f26 100%)', preview: 'linear-gradient(135deg, #14181d, #1a1f26)' },
+  { key: 'dusk', label: '暮山', dark: true, value: 'linear-gradient(135deg, #22202a 0%, #26232f 50%, #2a2733 100%)', preview: 'linear-gradient(135deg, #22202a, #2a2733)' }
 ]
