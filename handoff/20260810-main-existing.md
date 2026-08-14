@@ -758,3 +758,16 @@
 - Verification evidence: Workbench tests passed 31 files and 168 tests; `npm run typecheck` passed; production build passed with 5,040 modules and only the existing large-chunk warning; `git diff --check` passed; desktop `1280x720` and mobile `390x844` browser checks showed no horizontal overflow and resolved `--crm-scrollbar-size` to `8px`; browser console only reported the existing missing `favicon.ico` 404. The backend on port `48080` was unavailable, so authenticated lead-list/detail checks with real data were not run.
 - Dependency or integration impact: No new dependency, schema, migration, database, permission, BPM, service-state, branch-switch, history rewrite, or force-push. The commit is intended for direct integration into `origin/main`.
 - Remaining work: After the backend is available, run an authenticated browser check for first-follow and qualification deadline alerts plus selected/unseen lead-list states. The existing production bundle-size warning and favicon 404 remain outside this task.
+
+### 2026-08-14 17:47:35 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `65dfb43bc2c9f329aeac98019aaa6aa72cfc210b`
+- User goal: Complete and record the direct commit and remote push of all current product changes.
+- Key decisions: Preserve the verified feature commit as published; append this completion record instead of amending or force-pushing; use a separate documentation-only commit for the final handoff state.
+- Execution or analysis result: Created commit `65dfb43b` (`feat(workbench): refine lead detail presentation`) with 11 tracked files and pushed it successfully from local `main` to `origin/main` (`9e8cdb49..65dfb43b`).
+- Changed files: `handoff/20260810-main-existing.md` only in this completion record; the preceding feature commit contains the Workbench changes listed in the 17:44:35 entry.
+- Verification evidence: Git push reported `main -> main`; the feature commit was created with 168 insertions and 60 deletions after all recorded Workbench and browser checks passed.
+- Dependency or integration impact: The verified Workbench change is now published on `origin/main`. This completion record adds no product behavior, dependency, schema, database, permission, BPM, service, or history rewrite.
+- Remaining work: Push the documentation-only completion commit, then confirm local `HEAD` and `origin/main` resolve to the same commit and the tracked worktree is clean.
