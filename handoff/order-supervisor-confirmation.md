@@ -52,3 +52,16 @@
 - Dependency/integration impact: None beyond the recorded supervisor-confirmation implementation.
 - Remaining work: Merge into local main and run integrated verification.
 - Final commit: `0bddb5c70123a5db643801817c17838d9f5d4263`
+
+## Integration Correction 2026-08-14 16:20 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `de3c94812e` (integration in progress)
+- User goal: Integrate all completed workstreams without migration-version collisions.
+- Key decisions: Preserve the existing Lead timing V047 and renumber the unexecuted supervisor-confirmation migration to V055, immediately after V054.
+- Execution result: Renamed the migration and synchronized version markers, verification SQL, migration documentation, deployment guidance, and business documentation.
+- Changed files: `V055__sales_order_supervisor_confirmation.sql`, bootstrap seed, verification SQL, migration README, sales-order deployment/business docs, and this handoff.
+- Verification evidence: The first integrated database check identified duplicate V047 versions; the corrected check will be rerun before delivery.
+- Dependency/integration impact: Environments must apply V055, not the obsolete worktree-local V047 filename; no SQL was executed.
+- Remaining work: Rerun integrated database, backend, frontend, and Git checks.
+- Status: `merged-verification-pending`

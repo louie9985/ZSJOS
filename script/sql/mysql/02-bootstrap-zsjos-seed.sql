@@ -404,8 +404,8 @@ VALUES ('core','V045','Register Vue components for dual-frontend Workbench menus
         SHA2('dual-frontend-workbench-menu-components-v1',256),'pending',NOW());
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
-VALUES ('V047','Add sales-order supervisor confirmation','sales-order-supervisor-confirmation-v1');
+VALUES ('V055','Add sales-order supervisor confirmation','sales-order-supervisor-confirmation-v1');
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V047','Add sales-order supervisor confirmation',
+VALUES ('core','V055','Add sales-order supervisor confirmation',
         SHA2('sales-order-supervisor-confirmation-v1',256),'legacy',NOW());

@@ -70,4 +70,6 @@ V053 adds the ungranted `zsjos:withdrawal:finance-query` child permission requir
 
 V054 adds tenant-daily Lead business numbers and a transactional daily counter. Existing Leads are backfilled in stable `submitted_at, id` order per tenant and Beijing-local date; no business rows are deleted. The suffix is fixed at four digits and wraps from 9999 to 0001. If one tenant already has more than 9999 Leads in the same second, tenant-scoped uniqueness intentionally blocks the migration for manual review. Rollback must retain assigned numbers.
 
+V055 adds optional direct-supervisor confirmation to new sales-order approval rounds, its audit table, and an ungranted Workbench menu permission. It depends on V054 and a separately published sign-enabled BPM definition. It is repeatable and does not modify existing orders, tasks, roles, or users. Rollback must preserve confirmation audit history.
+
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.

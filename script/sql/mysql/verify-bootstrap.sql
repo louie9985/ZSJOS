@@ -87,8 +87,8 @@ SELECT 'order_command_ledger_v043' AS check_name,
        IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
                  AND table_name='zsjos_order_command' AND index_name='uk_tenant_order_command_key' AND non_unique=0),
           'PASS','FAIL') AS result;
-SELECT 'sales_order_supervisor_confirmation_v047' AS check_name,
-       IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V047')
+SELECT 'sales_order_supervisor_confirmation_v055' AS check_name,
+       IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V055')
           AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order_supervisor_confirmation')
           AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()

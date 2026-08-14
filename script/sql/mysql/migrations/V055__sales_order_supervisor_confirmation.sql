@@ -1,5 +1,5 @@
--- V047: add optional direct-supervisor confirmation to sales-order approval.
--- Dependencies/order: apply after V046 and publish a new sign-enabled BPM model version before use.
+-- V055: add optional direct-supervisor confirmation to sales-order approval.
+-- Dependencies/order: apply after V054 and publish a new sign-enabled BPM model version before use.
 -- Data scope: creates one audit table and one unassigned menu; no order, task, role, or user rows are changed.
 -- Repeatability: CREATE/INSERT IGNORE and version upserts make repeated execution safe.
 -- Rollback limitation: dropping the table/menu loses supervisor-confirmation audit; preserve a backup before rollback.
@@ -41,14 +41,14 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_supervisor_confirmation` (
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6850,'主管确认','zsjos:sales-order:supervisor-confirm',2,18,6735,'sales-order-supervisor-confirmations','ep:stamp','zsjos/salesOrderSupervisorConfirmation/index','ZsjosSalesOrderSupervisorConfirmation',0,b'1',b'1',b'1','migration-V047',NOW(),'migration-V047',NOW(),b'0');
+(6850,'主管确认','zsjos:sales-order:supervisor-confirm',2,18,6735,'sales-order-supervisor-confirmations','ep:stamp','zsjos/salesOrderSupervisorConfirmation/index','ZsjosSalesOrderSupervisorConfirmation',0,b'1',b'1',b'1','migration-V055',NOW(),'migration-V055',NOW(),b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
-VALUES ('V047','Add sales-order supervisor confirmation','sales-order-supervisor-confirmation-v1')
+VALUES ('V055','Add sales-order supervisor confirmation','sales-order-supervisor-confirmation-v1')
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
 
 INSERT INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
-VALUES ('core','V047','Add sales-order supervisor confirmation',
+VALUES ('core','V055','Add sales-order supervisor confirmation',
         SHA2('sales-order-supervisor-confirmation-v1',256),'legacy',NOW())
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
