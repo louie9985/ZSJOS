@@ -65,3 +65,17 @@
 - Dependency/integration impact: Environments must apply V055, not the obsolete worktree-local V047 filename; no SQL was executed.
 - Remaining work: Rerun integrated database, backend, frontend, and Git checks.
 - Status: `merged-verification-pending`
+
+## Merged 2026-08-14 16:12:37 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d7e849cecef476c54c466a1ae0f2d0b22ebadcb1`
+- User goal: Integrate all completed branches and worktrees into local main.
+- Key decisions: Migrated route/CSS changes to the current modular Workbench architecture and retained the existing Lead timing V047 by assigning supervisor confirmation V055.
+- Execution result: Merged by `317f1bfe54`; V055 correction committed by `b1cf60d096` and `6965cbea51`.
+- Changed files: Supervisor-confirmation workstream, modular route/CSS resolution, V055 migration references, and this handoff.
+- Verification evidence: BPM 6 tests and integrated ZSJOS 52 tests passed; server 25-module package, Workbench 165 tests/typecheck/build, Admin build and scoped ESLint passed.
+- Dependency/integration impact: V055, sign-enabled BPM publication, permissions, and tenant reviewer configuration remain deployment prerequisites.
+- Remaining work: Real MySQL/BPM and authenticated end-to-end browser verification remain unexecuted; local branch/worktree will be removed.
+- Status: `merged`
+- Merge commit: `317f1bfe54`

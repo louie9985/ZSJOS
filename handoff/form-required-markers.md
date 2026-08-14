@@ -54,3 +54,17 @@
 - Dependency or integration impact: None beyond the recorded UI marker changes.
 - Remaining work: Merge into local main after overlapping business workstreams and run integrated verification.
 - Final commit: `dfbb2fb8ce545353869622a87441c87f5c0ad84a`
+
+### 2026-08-14 16:12:37 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d7e849cecef476c54c466a1ae0f2d0b22ebadcb1`
+- User goal: Integrate all completed branches and worktrees into local main.
+- Key decisions: Applied marker-only changes to the latest Lead and order forms; routed the marker color through the shared error token.
+- Execution or analysis result: Merged by `de3c94812e`; three page conflicts and modular CSS migration were resolved.
+- Changed files: Required-marker workstream, integrated form resolutions, token-compliant marker CSS, and this handoff.
+- Verification evidence: Workbench 165 tests/typecheck/build, Admin build, and scoped ESLint across 20 affected files passed.
+- Dependency or integration impact: UI-only; no validation, API, database, or permission behavior changed.
+- Remaining work: Authenticated desktop/mobile visual verification remains unexecuted; local branch/worktree will be removed.
+- Status: `merged`
+- Merge commit: `de3c94812e`

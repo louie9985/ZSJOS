@@ -56,3 +56,18 @@
 - Dependency or integration impact: None beyond the recorded direct Excel starter dependency.
 - Remaining work: Merge into local main and run integrated verification.
 - Final commit: `07782258e2a0278ef6c3f48e7cbaa8e9b9cb7f34`
+
+## Merged 2026-08-14 16:12:37 +08:00
+- Beijing time: `2026-08-14 16:12:37 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d7e849cecef476c54c466a1ae0f2d0b22ebadcb1`
+- User goal: Integrate all completed branches and worktrees into local main.
+- Key decisions: Retained all four providers and the repository-managed Excel starter without schema or external-state changes.
+- Execution or analysis result: Merged cleanly by `873c823356`.
+- Changed files: Async export workstream and this handoff.
+- Verification evidence: Export tests were included in the 52 passing integrated ZSJOS tests; server package passed and the Spring wiring test passed.
+- Dependency or integration impact: Direct ZSJOS dependency on the existing Excel starter is now integrated.
+- Remaining work: Runtime file storage and authenticated export requests remain environment-dependent; local branch/worktree will be removed.
+- Status: `merged`
+- Merge commit: `873c823356`

@@ -67,3 +67,18 @@
 - Dependency or integration impact: None beyond the recorded Lead numbering implementation.
 - Remaining work: Merge into local main and run integrated verification.
 - Final commit: `b930c34758c0b113698ef5a0e8a0a75f45e0f980`
+
+## Merged 2026-08-14 16:12:37 +08:00
+- Beijing time: `2026-08-14 16:12:37 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d7e849cecef476c54c466a1ae0f2d0b22ebadcb1`
+- User goal: Integrate all completed branches and worktrees into local main.
+- Key decisions: Combined the Lead number with the current detail toolbar and retained advanced filtering; V054 remains unexecuted.
+- Execution or analysis result: Merged by `9ccc859242`; conflict resolved without dropping either behavior.
+- Changed files: Lead numbering workstream plus integrated `LeadManagementPage.tsx` resolution and this handoff.
+- Verification evidence: Integrated focused backend tests passed; Workbench 165 tests, typecheck, and build passed; server package passed; migration ordering is unique through V055.
+- Dependency or integration impact: V054 must be applied through the controlled migration flow before runtime use.
+- Remaining work: Real MySQL and authenticated browser verification remain unexecuted; local branch/worktree will be removed under the confirmed cleanup scope.
+- Status: `merged`
+- Merge commit: `9ccc859242`

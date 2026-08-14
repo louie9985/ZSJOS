@@ -67,3 +67,18 @@
 - Dependency or integration impact: None beyond the recorded profile-center implementation.
 - Remaining work: Merge into local main and run integrated verification.
 - Final commit: e9c38fc62f1a26500dbd71d4e8e3eac7bb553623
+
+## Merged 2026-08-14 16:12:37 +08:00
+- Beijing time: 2026-08-14 16:12:37 +08:00
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: d7e849cecef476c54c466a1ae0f2d0b22ebadcb1
+- User goal: Integrate all completed branches and worktrees into local main.
+- Key decisions: Kept the fixed profile route independent of server menus and migrated styling to the modular stylesheet architecture.
+- Execution or analysis result: Merged by f4f507ad34 with route and CSS integration completed.
+- Changed files: Profile-center workstream, modular user-profile CSS, and this handoff.
+- Verification evidence: Workbench 165 tests, typecheck, and production build passed, including three profile tests.
+- Dependency or integration impact: Existing System/Infra and WeCom configuration contracts remain unchanged.
+- Remaining work: Live WeCom callback and authenticated browser verification remain unexecuted; local branch/worktree will be removed.
+- Status: merged
+- Merge commit: f4f507ad34
