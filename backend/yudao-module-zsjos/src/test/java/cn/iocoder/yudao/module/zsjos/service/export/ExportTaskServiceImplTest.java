@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.export;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -50,6 +51,9 @@ class ExportTaskServiceImplTest {
         ReflectionTestUtils.setField(service, "providers", List.of(provider));
         lenient().when(provider.getType()).thenReturn("lead");
         lenient().when(provider.getCreatePermission()).thenReturn("zsjos:export:lead");
+        lenient().when(adminUserApi.getUser(anyLong())).thenReturn(new AdminUserRespDTO().setId(1L)
+                .setNickname("提交人").setDeptId(10L).setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        lenient().when(securityService.hasPermission(anyString())).thenReturn(true);
     }
 
     @AfterEach
@@ -69,7 +73,8 @@ class ExportTaskServiceImplTest {
     @Test
     void createSavesNormalizedFilterAndPermissionSnapshot() {
         when(securityService.hasPermission("zsjos:export:lead")).thenReturn(true);
-        when(adminUserApi.getUser(1L)).thenReturn(new AdminUserRespDTO().setId(1L).setNickname("提交人"));
+        when(adminUserApi.getUser(1L)).thenReturn(new AdminUserRespDTO().setId(1L).setNickname("提交人")
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
         doAnswer(invocation -> {
             invocation.<ExportTaskDO>getArgument(0).setId(10L);
             return 1;
@@ -81,6 +86,16 @@ class ExportTaskServiceImplTest {
         verify(mapper).insert(captor.capture());
         assertEquals(QUEUED, captor.getValue().getStatus());
         assertTrue(captor.getValue().getPermissionSnapshotJson().contains("zsjos:export:lead"));
+        verify(provider).validateFilter("{\"status\":\"valid\"}");
+    }
+
+    @Test
+    void createRejectsProviderSpecificInvalidFilter() {
+        doThrow(new IllegalArgumentException("invalid")).when(provider).validateFilter(anyString());
+
+        assertThrows(ServiceException.class, () -> service.create(1L, "lead", "{\"status\":\"invalid\"}"));
+
+        verifyNoInteractions(mapper);
     }
 
     @Test
@@ -142,6 +157,39 @@ class ExportTaskServiceImplTest {
     }
 
     @Test
+    void generationRunsAsCreatorAndRestoresSecurityContext() throws Exception {
+        when(mapper.transition(anyLong(), anyInt(), anyList(), any())).thenReturn(1);
+        when(provider.generate(any())).thenAnswer(invocation -> {
+            assertEquals(1L, SecurityFrameworkUtils.getLoginUserId());
+            assertEquals(1L, SecurityFrameworkUtils.getLoginUser().getTenantId());
+            return new ExportTypeProvider.ExportResult(new byte[]{1}, "lead.xlsx", 1);
+        });
+        when(fileApi.createFileInfo(any(), anyString(), anyString(), anyString()))
+                .thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO()
+                        .setId(20L).setName("lead.xlsx").setSize(1L));
+
+        service.processOne(task());
+
+        assertNull(SecurityFrameworkUtils.getLoginUser());
+        verify(provider).generate(any());
+    }
+
+    @Test
+    void revokedPermissionFailsWithoutGenerating() throws Exception {
+        when(mapper.transition(anyLong(), anyInt(), anyList(), any())).thenReturn(1);
+        when(securityService.hasPermission("zsjos:export:lead")).thenReturn(false);
+
+        service.processOne(task());
+
+        ArgumentCaptor<ExportTaskDO> values = ArgumentCaptor.forClass(ExportTaskDO.class);
+        verify(mapper, times(2)).transition(eq(10L), anyInt(), anyList(), values.capture());
+        assertEquals(FAILED, values.getAllValues().get(1).getStatus());
+        assertEquals("PERMISSION_REVOKED", values.getAllValues().get(1).getFailureCode());
+        verify(provider, never()).generate(any());
+        assertNull(SecurityFrameworkUtils.getLoginUser());
+    }
+
+    @Test
     void expiryAndRetentionAreDelegatedToConditionalMapperOperations() {
         when(mapper.selectReadyExpired(any())).thenReturn(List.of(task().setStatus(READY)));
         when(mapper.transition(eq(10L), eq(3), eq(List.of(READY)), any())).thenReturn(1);
@@ -153,8 +201,11 @@ class ExportTaskServiceImplTest {
     }
 
     private static ExportTaskDO task() {
-        return new ExportTaskDO().setId(10L).setTaskNo("EXP001").setExportType("lead")
+        ExportTaskDO task = new ExportTaskDO().setId(10L).setTaskNo("EXP001").setExportType("lead")
                 .setStatus(PRECHECKING).setCreatorUserId(1L).setCreatorRoleSnapshot("zsjos:export:lead")
-                .setAttemptCount(1).setVersion(3).setLastActiveAt(LocalDateTime.now());
+                .setAttemptCount(1).setVersion(3).setLastActiveAt(LocalDateTime.now())
+                .setCreatorNameSnapshot("提交人");
+        task.setTenantId(1L);
+        return task;
     }
 }
