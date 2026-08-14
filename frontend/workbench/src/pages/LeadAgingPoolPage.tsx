@@ -6,6 +6,7 @@ import {
   Card,
   Descriptions,
   Empty,
+  Form,
   Input,
   List,
   Modal,
@@ -451,7 +452,7 @@ export default function LeadAgingPoolPage() {
         onOk={() => void assign()}
         onCancel={() => setAssignOpen(false)}
       >
-        <Select
+        <Form.Item label="协同销售" required><Select
           style={{ width: "100%" }}
           value={candidateId}
           onChange={setCandidateId}
@@ -460,7 +461,7 @@ export default function LeadAgingPoolPage() {
             value: item.id,
             label: item.nickname,
           }))}
-        />
+        /></Form.Item>
       </Modal>
       <Modal
         title="退出公海池"
@@ -470,14 +471,14 @@ export default function LeadAgingPoolPage() {
         onCancel={() => setExitOpen(false)}
         okButtonProps={{ danger: true }}
       >
-        <Input.TextArea
+        <Form.Item label="退出原因" required><Input.TextArea
           rows={4}
           maxLength={500}
           showCount
           value={exitReason}
           onChange={(event) => setExitReason(event.target.value)}
           placeholder="填写退出原因；退出后A重新获得独占推进权，并从当前时间重新计时"
-        />
+        /></Form.Item>
       </Modal>
       <Modal
         title="申请正式转派给我"
@@ -486,14 +487,14 @@ export default function LeadAgingPoolPage() {
         onOk={() => void requestTransfer()}
         onCancel={() => setTransferOpen(false)}
       >
-        <Input.TextArea
+        <Form.Item label="申请原因" required><Input.TextArea
           rows={4}
           maxLength={500}
           showCount
           value={transferReason}
           onChange={(event) => setTransferReason(event.target.value)}
           placeholder="填写申请原因；审批通过后正式归属和业绩归属将转给你，并退出公海池"
-        />
+        /></Form.Item>
       </Modal>
     </section>
   );

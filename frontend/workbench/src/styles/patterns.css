@@ -18,3 +18,9 @@
     flex-direction: column;
   }
 }
+.required-section-title::before {
+  color: #ff4d4f;
+  content: '*';
+  font-family: SimSun, sans-serif;
+  margin-inline-end: 4px;
+}

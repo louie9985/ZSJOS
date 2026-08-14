@@ -23,7 +23,7 @@
       <el-alert v-if="error" :title="error" type="error" show-icon class="mb-16px">
         <template #default><el-button link @click="loadUsers">重试</el-button></template>
       </el-alert>
-      <el-form-item label="目标账号">
+      <el-form-item label="目标账号" required>
         <el-select v-model="targetUserId" filterable placeholder="请选择启用账号" class="!w-320px">
           <el-option
             v-for="user in users"
@@ -33,7 +33,7 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="借用原因">
+      <el-form-item label="借用原因" required>
         <el-input v-model="reason" type="textarea" maxlength="500" show-word-limit :rows="3" />
       </el-form-item>
       <el-form-item>

@@ -62,12 +62,12 @@ const submit = async () => {
       ><el-form label-width="90px"
         ><el-form-item label="订单"
           ><span>{{ detail?.orderNo || `#${current?.id}` }}</span></el-form-item
-        ><el-form-item label="结论"
+        ><el-form-item label="结论" required
           ><el-radio-group v-model="decision"
             ><el-radio value="approve">通过</el-radio
             ><el-radio value="reject">驳回</el-radio></el-radio-group
           ></el-form-item
-        ><el-form-item label="审批意见"
+        ><el-form-item label="审批意见" :required="decision === 'reject'"
           ><el-input
             v-model="reason"
             type="textarea"

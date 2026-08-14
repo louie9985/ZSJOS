@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Drawer, Empty, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Avatar, Button, Drawer, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderListItem, type SalesOrderStatusCounts } from '../services/api'
 import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
@@ -129,7 +129,7 @@ export default function MySalesOrderPage() {
           complete(); message.success('订单审批已终止'); setTerminateOpen(false); setTerminationReason(''); reload()
         }).catch(error => message.error(error instanceof Error ? error.message : '终止失败')) }}
       confirmLoading={terminating} okButtonProps={{ danger: true, disabled: terminating }}>
-      <Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写终止原因（必填）"/>
+      <Form.Item label="终止原因" required><Input.TextArea rows={4} maxLength={1000} showCount value={terminationReason} onChange={event => setTerminationReason(event.target.value)} placeholder="填写终止原因"/></Form.Item>
     </Modal>
   </section>
 }

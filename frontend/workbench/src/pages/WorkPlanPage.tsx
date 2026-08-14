@@ -119,14 +119,14 @@ function DynamicFields({ fields, section, users, departments, name = ['planField
     const fieldName = [...name, field.fieldKey || field.label]
     const fieldType = normalizeFieldType(field.fieldType)
     const rules = [{ required: field.required, message: `请填写${field.label}` }]
-    if (fieldType === 'user') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><Select showSearch optionFilterProp="label" options={users.map(user => ({ label: user.nickname, value: user.id }))} /></Form.Item>
-    if (fieldType === 'dept') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><Select showSearch optionFilterProp="label" options={departments.map(dept => ({ label: dept.name, value: dept.id }))} /></Form.Item>
-    if (fieldType === 'textarea') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><Input.TextArea placeholder={field.placeholder} rows={3} /></Form.Item>
-    if (fieldType === 'single_select' || fieldType === 'multi_select' || fieldType === 'dict') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><Select mode={fieldType === 'multi_select' ? 'multiple' : undefined} options={parseOptions(field)} /></Form.Item>
-    if (fieldType === 'integer' || fieldType === 'decimal' || fieldType === 'money') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.unit ? `${field.label}（${field.unit}）` : field.label} rules={rules}><InputNumber style={{ width: '100%' }} precision={fieldType === 'integer' ? 0 : 2} placeholder={field.placeholder} /></Form.Item>
-    if (fieldType === 'date' || fieldType === 'datetime') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><Input type={fieldType === 'date' ? 'date' : 'datetime-local'} /></Form.Item>
-    if (fieldType === 'attachment') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><AttachmentPicker /></Form.Item>
-    return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} rules={rules}><Input placeholder={field.placeholder} /></Form.Item>
+    if (fieldType === 'user') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><Select showSearch optionFilterProp="label" options={users.map(user => ({ label: user.nickname, value: user.id }))} /></Form.Item>
+    if (fieldType === 'dept') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><Select showSearch optionFilterProp="label" options={departments.map(dept => ({ label: dept.name, value: dept.id }))} /></Form.Item>
+    if (fieldType === 'textarea') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><Input.TextArea placeholder={field.placeholder} rows={3} /></Form.Item>
+    if (fieldType === 'single_select' || fieldType === 'multi_select' || fieldType === 'dict') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><Select mode={fieldType === 'multi_select' ? 'multiple' : undefined} options={parseOptions(field)} /></Form.Item>
+    if (fieldType === 'integer' || fieldType === 'decimal' || fieldType === 'money') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.unit ? `${field.label}（${field.unit}）` : field.label} required={field.required} rules={rules}><InputNumber style={{ width: '100%' }} precision={fieldType === 'integer' ? 0 : 2} placeholder={field.placeholder} /></Form.Item>
+    if (fieldType === 'date' || fieldType === 'datetime') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><Input type={fieldType === 'date' ? 'date' : 'datetime-local'} /></Form.Item>
+    if (fieldType === 'attachment') return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><AttachmentPicker /></Form.Item>
+    return <Form.Item key={fieldName.join('.')} name={fieldName} label={field.label} required={field.required} rules={rules}><Input placeholder={field.placeholder} /></Form.Item>
   })}</>
 }
 

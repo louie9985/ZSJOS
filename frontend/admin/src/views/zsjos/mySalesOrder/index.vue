@@ -49,14 +49,14 @@
       show-icon
       class="mb-12px"
     />
-    <el-input
+    <el-form label-position="top"><el-form-item label="终止原因" required><el-input
       v-model="terminationReason"
       type="textarea"
       :rows="4"
       maxlength="1000"
       show-word-limit
-      placeholder="填写终止原因（必填）"
-    />
+      placeholder="填写终止原因"
+    /></el-form-item></el-form>
     <template #footer
       ><el-button @click="terminateOpen = false">取消</el-button
       ><el-button type="danger" :loading="terminating" @click="terminate"

@@ -20,12 +20,12 @@
           ><el-form-item label="客户姓名" prop="name"
             ><el-input v-model="form.name" /></el-form-item></el-col
         ><el-col :span="12"
-          ><el-form-item label="手机号" prop="mobile"
+          ><el-form-item label="手机号" prop="mobile" :required="!form.wechatId.trim()"
             ><el-input v-model="form.mobile" /></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
         ><el-col :span="12"
-          ><el-form-item label="微信号"><el-input v-model="form.wechatId" /></el-form-item></el-col
+          ><el-form-item label="微信号" :required="!form.mobile.trim()"><el-input v-model="form.wechatId" /></el-form-item></el-col
         ><el-col :span="12"
           ><el-form-item label="客户地区" prop="region"
             ><el-cascader
