@@ -14,6 +14,21 @@
 - Integration order: Any future workstream that needs this line's changes must start from a committed integration point after this line is ready.
 - Verification plan: Apply the verification required by `AGENTS.md` for each task and record the evidence in the entries below.
 
+## Current Task Registration
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Verify all current local Git changes, commit them on `main`, and push the commit to `origin/main`.
+- Non-goals: Switching branches, rewriting history, force-pushing, adding dependencies, or changing database, permissions, BPM, or service state.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `9e8cdb498278b93813941f3210ca4f4c1b98f306`
+- Target branch: `main`
+- Ownership scope: The nine current Workbench component/style/test files plus `handoff/20260810-main-existing.md` and the resulting Git commit/push state.
+- Owner: Current main workstream
+- Dependencies: `origin/main`
+- Integration order: Verify the Workbench changes, append the delivery record, stage all current changes, commit on `main`, then push to `origin/main` without force.
+- Verification plan: Run Workbench tests, typecheck, production build, desktop/mobile browser checks, `git diff --check`, inspect the staged diff, and confirm the pushed local/remote commit hashes match.
+
 ## Entries
 
 ### 2026-08-12 12:35:43 +08:00
@@ -717,3 +732,29 @@
 - Verification evidence: Focused diff review confirmed the old `Every new parallel workstream` and primary-`main` prohibition text was removed; targeted search confirmed the default local `main` rule, prohibition on automatic branch/worktree operations, and explicit opt-in isolation rule; focused `git diff --check` passed with only line-ending conversion warnings.
 - Dependency or integration impact: Future AI file-changing work defaults to the existing local `main` worktree and must be serialized unless the user explicitly requests isolated development. No dependency, product behavior, schema, database, permission, external service, branch, worktree, commit, push, or publication change. The unrelated existing V054 working-tree modification was preserved.
 - Remaining work: None.
+
+### 2026-08-14 17:12:36 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `9e8cdb498278b93813941f3210ca4f4c1b98f306`
+- User goal: Pull the remote branch into the local branch and resolve merge conflicts.
+- Key decisions: Use the configured tracking branch `origin/main`; fetch first and merge without rebasing; preserve the seven pre-existing uncommitted Workbench style and test files; do not stage, commit, push, switch branches, or alter unrelated product behavior.
+- Execution or analysis result: Refreshed `origin` and merged `origin/main` into local `main`. Git reported `Already up to date`; no merge commit or conflict resolution was required.
+- Changed files: `handoff/20260810-main-existing.md` only. The seven pre-existing files under `frontend/workbench/src/styles/` were preserved unchanged by this task.
+- Verification evidence: `HEAD...origin/main` reported `0 0`; both refs resolve to `9e8cdb498278b93813941f3210ca4f4c1b98f306`; no unmerged paths exist; `git diff --check` passed; the original seven uncommitted Workbench files remain present.
+- Dependency or integration impact: Local `main` is synchronized with `origin/main`. No dependency, schema, database, permission, service, branch, commit, push, or publication change occurred.
+- Remaining work: None.
+
+### 2026-08-14 17:44:35 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `9e8cdb498278b93813941f3210ca4f4c1b98f306` (pre-commit HEAD)
+- User goal: Commit all current Git changes and push them directly to the remote repository.
+- Key decisions: Commit the current Workbench lead-detail, list styling, global scrollbar, style-guard, generated TypeScript build metadata, and handoff changes together; remove only the dead imports/state/request made obsolete by the simplified detail header; push local `main` to `origin/main` without force; exclude Playwright runtime artifacts.
+- Execution or analysis result: Consolidated lead lifecycle alerts in the detail overview, simplified the legacy detail header, removed its unused follow-up request path, refined lead-list selection styling and shared scrollbars, added scrollbar guard tests, refreshed tracked TypeScript build metadata, and prepared the verified change set for commit and push.
+- Changed files: `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/pages/LeadManagementPage.tsx`; `frontend/workbench/src/styles/base.css`; `frontend/workbench/src/styles/pages/claim-pool.css`; `frontend/workbench/src/styles/pages/lead-management.css`; `frontend/workbench/src/styles/pages/message-inbox.css`; `frontend/workbench/src/styles/pages/sales-order.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `frontend/workbench/src/styles/tokens.css`; `frontend/workbench/tsconfig.tsbuildinfo`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Workbench tests passed 31 files and 168 tests; `npm run typecheck` passed; production build passed with 5,040 modules and only the existing large-chunk warning; `git diff --check` passed; desktop `1280x720` and mobile `390x844` browser checks showed no horizontal overflow and resolved `--crm-scrollbar-size` to `8px`; browser console only reported the existing missing `favicon.ico` 404. The backend on port `48080` was unavailable, so authenticated lead-list/detail checks with real data were not run.
+- Dependency or integration impact: No new dependency, schema, migration, database, permission, BPM, service-state, branch-switch, history rewrite, or force-push. The commit is intended for direct integration into `origin/main`.
+- Remaining work: After the backend is available, run an authenticated browser check for first-follow and qualification deadline alerts plus selected/unseen lead-list states. The existing production bundle-size warning and favicon 404 remain outside this task.

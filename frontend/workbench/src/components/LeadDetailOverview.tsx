@@ -351,7 +351,15 @@ function AsideAlerts({ lead }: { lead: ManagedLead }) {
       detail: [lead.invalidReasonLabelSnapshot || (lead.invalidReason ? '标签未配置' : undefined), lead.invalidDescription].filter(Boolean).join('：')
     })
   }
-  if (lead.qualificationStatus === 'pending') {
+  if (lead.handlingStage === 'first_follow_pending' && lead.currentAssignmentFirstFollowUpDeadlineAt) {
+    alerts.push({
+      tone: 'info',
+      icon: <ExclamationCircleOutlined />,
+      title: '待完成首次跟进',
+      detail: `截止 ${formatTimestamp(lead.currentAssignmentFirstFollowUpDeadlineAt)}`
+    })
+  }
+  if (lead.handlingStage === 'qualification_pending' && lead.qualificationDeadlineAt) {
     alerts.push({
       tone: 'info',
       icon: <ExclamationCircleOutlined />,

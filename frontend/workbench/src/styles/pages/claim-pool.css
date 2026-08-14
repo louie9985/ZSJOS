@@ -141,8 +141,8 @@
   flex-direction: column;
 }
 
+/* 细条已由 base.css 全局下发，这里只保留滚动链隔离 */
 .claim-card-scroll-region {
-  scrollbar-width: thin;
   overscroll-behavior: contain;
 }
 
@@ -153,7 +153,7 @@
   align-content: flex-start;
   flex-wrap: wrap;
   gap: 6px;
-  padding-right: 3px;
+  padding-right: var(--crm-sp-1);
 }
 
 .claim-card-tags .ant-tag {
@@ -166,7 +166,7 @@
   min-height: 58px;
   margin: 0;
   overflow-y: auto;
-  padding-right: 4px;
+  padding-right: var(--crm-sp-1);
   line-height: 1.55;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
