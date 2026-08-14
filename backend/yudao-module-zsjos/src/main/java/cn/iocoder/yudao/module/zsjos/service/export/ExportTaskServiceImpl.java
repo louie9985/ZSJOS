@@ -2,6 +2,8 @@ package cn.iocoder.yudao.module.zsjos.service.export;
 
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
@@ -17,8 +19,12 @@ import cn.iocoder.yudao.module.zsjos.service.audit.BusinessAuditService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -47,11 +53,19 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         ExportTypeProvider provider = requireProvider(exportType);
         if (!securityService.hasPermission(provider.getCreatePermission())) throw exception(EXPORT_PERMISSION_DENIED);
         AdminUserRespDTO user = adminUserApi.getUser(userId);
-        if (user == null) throw exception(EXPORT_PERMISSION_DENIED);
+        if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) {
+            throw exception(EXPORT_PERMISSION_DENIED);
+        }
+        String normalizedFilter = normalizeFilter(filterJson);
+        try {
+            provider.validateFilter(normalizedFilter);
+        } catch (RuntimeException error) {
+            throw exception(EXPORT_FILTER_INVALID);
+        }
         LocalDateTime now = LocalDateTime.now();
         ExportTaskDO task = new ExportTaskDO().setTaskNo(newTaskNo()).setExportType(exportType)
                 .setStatus(QUEUED).setCreatorUserId(userId).setCreatorNameSnapshot(user.getNickname())
-                .setCreatorRoleSnapshot(provider.getCreatePermission()).setFilterJson(normalizeFilter(filterJson))
+                .setCreatorRoleSnapshot(provider.getCreatePermission()).setFilterJson(normalizedFilter)
                 .setPermissionSnapshotJson(JsonUtils.toJsonString(Map.of("permission", provider.getCreatePermission())))
                 .setAttemptCount(0).setNextAttemptAt(now).setLastActiveAt(now).setVersion(0);
         mapper.insert(task);
@@ -134,7 +148,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
             if (mapper.transition(task.getId(), version, List.of(PRECHECKING),
                     new ExportTaskDO().setStatus(GENERATING)) != 1) return;
             task.setStatus(GENERATING).setVersion(version + 1);
-            ExportTypeProvider.ExportResult result = provider.generate(task);
+            ExportTypeProvider.ExportResult result = generateAsCreator(task, provider);
             if (result.rowCount() > MAX_ROWS) {
                 failTerminal(task, "ROW_LIMIT_EXCEEDED", "导出数据超过 100000 行");
                 return;
@@ -161,6 +175,8 @@ public class ExportTaskServiceImpl implements ExportTaskService {
             auditService.record("export", "export.generate", "export_task", task.getId().toString(),
                     "系统", Map.of("exportType", task.getExportType(), "taskNo", task.getTaskNo(),
                             "rowCount", result.rowCount()));
+        } catch (ExportPermissionRevokedException error) {
+            failTerminal(task, "PERMISSION_REVOKED", error.getMessage());
         } catch (Exception error) {
             retryOrFail(task, error);
         }
@@ -207,6 +223,40 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     private ExportTypeProvider requireProvider(String type) {
         return providers.stream().filter(item -> item.getType().equals(type)).findFirst()
                 .orElseThrow(() -> exception(EXPORT_TYPE_INVALID));
+    }
+
+    private ExportTypeProvider.ExportResult generateAsCreator(ExportTaskDO task, ExportTypeProvider provider)
+            throws Exception {
+        AdminUserRespDTO creator = adminUserApi.getUser(task.getCreatorUserId());
+        if (creator == null || !CommonStatusEnum.ENABLE.getStatus().equals(creator.getStatus())) {
+            throw new ExportPermissionRevokedException("导出任务创建人已停用或不存在");
+        }
+        SecurityContext previousContext = SecurityContextHolder.getContext();
+        SecurityContext creatorContext = SecurityContextHolder.createEmptyContext();
+        LoginUser loginUser = new LoginUser().setId(task.getCreatorUserId())
+                .setUserType(UserTypeEnum.ADMIN.getValue()).setTenantId(task.getTenantId());
+        Map<String, String> info = new HashMap<>();
+        info.put(LoginUser.INFO_KEY_NICKNAME, creator.getNickname());
+        if (creator.getDeptId() != null) {
+            info.put(LoginUser.INFO_KEY_DEPT_ID, creator.getDeptId().toString());
+        }
+        loginUser.setInfo(info);
+        creatorContext.setAuthentication(new UsernamePasswordAuthenticationToken(loginUser, null, List.of()));
+        SecurityContextHolder.setContext(creatorContext);
+        try {
+            if (!securityService.hasPermission(provider.getCreatePermission())) {
+                throw new ExportPermissionRevokedException("导出权限已被撤销");
+            }
+            return provider.generate(task);
+        } finally {
+            SecurityContextHolder.setContext(previousContext);
+        }
+    }
+
+    private static final class ExportPermissionRevokedException extends RuntimeException {
+        private ExportPermissionRevokedException(String message) {
+            super(message);
+        }
     }
 
     private static String normalizeFilter(String filterJson) {
