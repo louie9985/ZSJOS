@@ -41,3 +41,16 @@
 - Dependency or integration impact: UI-only; overlaps several Lead/order pages and shared Workbench styles.
 - Remaining work: Create the feature commit, record it, merge after overlapping business workstreams, and run integrated verification.
 - Status: `ready-to-merge`
+
+### 2026-08-14 16:05:00 +08:00
+- Branch: `codex/form-required-markers`
+- Worktree: `D:\ZSJ-OS-worktrees\form-required-markers`
+- HEAD commit: `dfbb2fb8ce545353869622a87441c87f5c0ad84a`
+- User goal: Record the authorized feature commit before integration.
+- Key decisions: Treat `dfbb2fb8ce545353869622a87441c87f5c0ad84a` as the final functional commit; this entry changes handoff metadata only.
+- Execution or analysis result: Feature commit created successfully and the worktree is clean.
+- Changed files: `handoff/form-required-markers.md` only.
+- Verification evidence: `git diff --cached --check` passed before the feature commit; prior focused verification remains recorded above.
+- Dependency or integration impact: None beyond the recorded UI marker changes.
+- Remaining work: Merge into local main after overlapping business workstreams and run integrated verification.
+- Final commit: `dfbb2fb8ce545353869622a87441c87f5c0ad84a`
