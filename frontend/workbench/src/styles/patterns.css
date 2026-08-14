@@ -19,7 +19,7 @@
   }
 }
 .required-section-title::before {
-  color: #ff4d4f;
+  color: var(--crm-color-error);
   content: '*';
   font-family: SimSun, sans-serif;
   margin-inline-end: 4px;

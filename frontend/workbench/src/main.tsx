@@ -40,7 +40,7 @@ import {
   type PrimaryNavigationItem,
   type SecondaryNavigationItem
 } from './services/menu'
-import { MINI_RAIL_W, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
+import { APP_ROUTES, MINI_RAIL_W, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
