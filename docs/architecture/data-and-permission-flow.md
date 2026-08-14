@@ -10,6 +10,13 @@ ZSJOS owns temporary impersonation sessions and their dedicated per-request audi
 
 ## Authentication and tenant flow
 
+The employee workbench exposes the authenticated user's fixed `/user/profile` route from
+the avatar menu. This route is not derived from permission menus. It reads and updates the
+current System user through `/system/user/profile/*`, uploads avatar images through Infra
+file storage, and uses `/system/social-user/*` plus the System social-auth redirect for the
+current user's WeCom binding. The client accepts only the WeCom social type and clears OAuth
+callback parameters after binding; it does not infer organization or permission data locally.
+
 The employee workbench currently uses the administration API prefix and the system
 authentication contract:
 

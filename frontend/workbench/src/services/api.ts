@@ -3,6 +3,12 @@ import { APP_CONFIG, STORAGE_KEYS } from '../constants'
 import type { Timestamp } from './time'
 
 export type User = { id: number; nickname: string; avatar?: string; username?: string }
+export type UserProfile = {
+  id: number; username: string; nickname: string; email?: string; mobile?: string; sex: number; avatar?: string
+  createTime: Timestamp; dept?: { id: number; name: string }; posts?: Array<{ id: number; name: string }>
+}
+export type UserProfileUpdate = { nickname?: string; email?: string; mobile?: string; sex?: number; avatar?: string }
+export type SocialUser = { id: number; type: number; openid: string; nickname?: string; avatar?: string }
 export type RawMenu = { id: number; name: string; path?: string; icon?: string; component?: string; componentName?: string; visible?: boolean; keepAlive?: boolean; alwaysShow?: boolean; type?: number; sort?: number; parentId: number; children?: RawMenu[] }
 export type WorkbenchMenu = Omit<RawMenu, 'children' | 'path'> & { path: string; hidden: boolean; noCache: boolean; alwaysShow: boolean; children: WorkbenchMenu[] }
 export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; defaultAvatar?: string }
@@ -439,6 +445,17 @@ export const api = {
     }
   },
   permissionInfo: async () => unwrap<PermissionInfo>(await http.get('/system/auth/get-permission-info')),
+  userProfile: async () => unwrap<UserProfile>(await http.get('/system/user/profile/get')),
+  updateUserProfile: async (data: UserProfileUpdate) => unwrap<boolean>(await http.put('/system/user/profile/update', data)),
+  updateUserPassword: async (oldPassword: string, newPassword: string) => unwrap<boolean>(await http.put('/system/user/profile/update-password', { oldPassword, newPassword })),
+  uploadAvatar: async (file: File) => {
+    const data = new FormData(); data.append('file', file); data.append('directory', 'employee/avatar')
+    return unwrap<string>(await http.post('/infra/file/upload', data))
+  },
+  boundSocialUsers: async () => unwrap<SocialUser[]>(await http.get('/system/social-user/get-bind-list')),
+  socialAuthRedirect: async (type: number, redirectUri: string) => unwrap<string>(await http.get('/system/auth/social-auth-redirect', { params: { type, redirectUri } })),
+  bindSocialUser: async (type: number, code: string, state: string) => unwrap<boolean>(await http.post('/system/social-user/bind', { type, code, state })),
+  unbindSocialUser: async (type: number, openid: string) => unwrap<boolean>(await http.delete('/system/social-user/unbind', { data: { type, openid } })),
   dictDataByType: async (dictType: string) => {
     const dictData = unwrap<DictData[]>(await http.get('/system/dict-data/simple-list'))
     return dictData.filter(item => item.dictType === dictType)

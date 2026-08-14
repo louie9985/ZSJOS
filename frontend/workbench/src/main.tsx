@@ -24,7 +24,8 @@ import {
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  RobotOutlined
+  RobotOutlined,
+  SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { api, AuthenticationError, buildMenuTree, clearAuthStorage, type PermissionInfo } from './services/api'
@@ -57,6 +58,7 @@ import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildNavMenuItems } from './layouts/navItems'
+import UserProfilePage from './pages/UserProfilePage'
 // 聚合样式表；内部 @import 顺序即层叠优先级，tokens.css 在最前
 import './styles/index.css'
 
@@ -103,7 +105,7 @@ function NoAccessibleMenu({ hasMenus }: { hasMenus: boolean }) {
   />
 }
 
-function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void }) {
+function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { token } = theme.useToken()
@@ -378,6 +380,8 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
           <Dropdown menu={{ items: [
             { key: 'user', label: info.user?.nickname || info.user?.username || '当前用户', disabled: true },
             { type: 'divider' },
+            { key: 'profile', icon: <SettingOutlined/>, label: '个人中心', onClick: () => navigate(APP_ROUTES.USER_PROFILE) },
+            { type: 'divider' },
             { key: 'logout', label: <><LogoutOutlined/> 退出登录</>, onClick: onLogout }
           ] }}>
             <EmployeeAvatar avatar={info.user?.avatar} name={info.user?.nickname || info.user?.username} style={{ backgroundColor: token.colorPrimary, cursor: 'pointer' }}/>
@@ -388,6 +392,7 @@ function Shell({ info, onLogout }: { info: PermissionInfo; onLogout: () => void 
       <Layout className="content-layout">
         <Content>
           <Routes>
+            <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path="/" element={initialTarget ? <Navigate to={initialTarget} replace/> : <NoAccessibleMenu hasMenus={navigation.length > 0}/>}/>
             <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
           </Routes>
@@ -431,7 +436,7 @@ function Root() {
   if (!logged) return <LoginPage initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLogged(true) }}/>
   if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(); setError(''); setInfo(undefined); setLogged(false) }}>返回登录</Button></Space></Card></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
-  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell info={info} onLogout={async () => {
+  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)
       await api.logout()

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { APP_ROUTES } from '../constants'
 import { AuthenticationError, buildMenuTree, type RawMenu, unwrap } from './api'
 import {
   buildTwoLevelNavigation,
@@ -163,5 +164,6 @@ describe('workbench menu conversion', () => {
     expect(getInaccessiblePathFallback(navigation, '/zsjos/tasks/today')).toBe('/zsjos/appeals')
     expect(getInaccessiblePathFallback(navigation, '/zsjos/appeals')).toBeUndefined()
     expect(getInaccessiblePathFallback(navigation, '/')).toBeUndefined()
+    expect(getInaccessiblePathFallback(navigation, APP_ROUTES.USER_PROFILE)).toBeUndefined()
   })
 })
