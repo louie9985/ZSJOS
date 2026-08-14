@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
@@ -84,9 +85,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
     @Resource private DeptApi deptApi;
+    @Resource private AdminUserApi adminUserApi;
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private SalesOrderCommandService commandService;
+    @Resource private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -353,17 +356,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<String> handledValues = handled.isEmpty() ? List.of("todo", "done") : new ArrayList<>(handled);
         List<String> taskValues = taskKeys.isEmpty() ? Collections.singletonList(null) : new ArrayList<>(taskKeys);
         List<BpmTaskRespDTO> tasks = new ArrayList<>();
+        int requiredOrdinaryTasks = reqVO.getPageNo() * reqVO.getPageSize();
         for (String handledValue : handledValues) {
             for (String taskKey : taskValues) {
-                BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
-                taskReq.setPageNo(1);
-                taskReq.setPageSize(Math.max(reqVO.getPageNo() * reqVO.getPageSize(), reqVO.getPageSize()));
-                taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
-                taskReq.setTaskDefinitionKey(taskKey);
-                taskReq.setProcessInstanceIds(processIds);
-                PageResult<BpmTaskRespDTO> page = "done".equals(handledValue)
-                        ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
-                tasks.addAll(page.getList());
+                tasks.addAll(loadOrdinaryApprovalTasks(userId, handledValue, taskKey, processIds,
+                        requiredOrdinaryTasks));
             }
         }
         tasks.sort(Comparator.comparing(BpmTaskRespDTO::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())));
@@ -382,13 +379,35 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<String> taskValues = taskKeys.isEmpty() ? Collections.singletonList(null) : new ArrayList<>(taskKeys);
         long total = 0;
         for (String handledValue : handledValues) for (String taskKey : taskValues) {
-            BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO(); taskReq.setPageNo(1); taskReq.setPageSize(1);
-            taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); taskReq.setTaskDefinitionKey(taskKey);
-            taskReq.setProcessInstanceIds(processIds);
-            total += ("done".equals(handledValue) ? processTaskApi.getDoneTaskPage(userId, taskReq)
-                    : processTaskApi.getTodoTaskPage(userId, taskReq)).getTotal();
+            total += loadOrdinaryApprovalTasks(userId, handledValue, taskKey, processIds, null).size();
         }
         return total;
+    }
+
+    /**
+     * BPM owns sign tasks and exposes their parent relationship. Iterate its pages so sign children never consume
+     * ordinary-review pagination slots and totals stay exact even when a review pool exceeds one API page.
+     */
+    private List<BpmTaskRespDTO> loadOrdinaryApprovalTasks(Long userId, String handledValue, String taskKey,
+                                                            List<String> processIds, Integer limit) {
+        final int bpmPageSize = 100;
+        List<BpmTaskRespDTO> result = new ArrayList<>();
+        int pageNo = 1;
+        long loaded = 0;
+        do {
+            BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
+            taskReq.setPageNo(pageNo); taskReq.setPageSize(bpmPageSize);
+            taskReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); taskReq.setTaskDefinitionKey(taskKey);
+            taskReq.setProcessInstanceIds(processIds);
+            PageResult<BpmTaskRespDTO> page = "done".equals(handledValue)
+                    ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+            result.addAll(page.getList().stream().filter(task -> !Boolean.TRUE.equals(task.getSignTask())).toList());
+            loaded += page.getList().size();
+            if (limit != null && result.size() >= limit) break;
+            if (page.getList().isEmpty() || loaded >= page.getTotal()) break;
+            pageNo++;
+        } while (true);
+        return limit == null || result.size() <= limit ? result : result.subList(0, limit);
     }
 
     private List<String> searchProcessIds(String keyword) {
@@ -436,6 +455,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 || !Set.of(TASK_REGISTRATION, TASK_FINANCE).contains(task.getTaskDefinitionKey())) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
         }
+        if (Boolean.TRUE.equals(task.getSignTask())) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        if (supervisorConfirmationService.getPending(round.getId(), task.getTaskDefinitionKey()) != null) {
+            throw exception(SALES_ORDER_SUPERVISOR_PENDING);
+        }
         SalesOrderCommandService.Command command = new SalesOrderCommandService.Command(orderId, round.getId(),
                 round.getProcessInstanceId(), commandType, task.getTaskDefinitionKey(), reqVO.getTaskId(), userId,
                 fingerprint);
@@ -475,6 +498,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 || !Objects.equals(round.getVersion(), reqVO.getRoundVersion())) throw exception(SALES_ORDER_VERSION_CONFLICT);
         commandService.register(reqVO.getIdempotencyKey(), command);
         LocalDateTime now = LocalDateTime.now();
+        supervisorConfirmationService.cancelPending(round.getId(), now);
         order.setStatus(STATUS_TERMINATED); order.setTerminationReason(reqVO.getReason().trim()); order.setTerminatedAt(now);
         order.setVersion(order.getVersion() + 1);
         round.setStatus(ROUND_TERMINATED); round.setDecisionReason(reqVO.getReason().trim()); round.setCompletedAt(now);
@@ -517,6 +541,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderDO order = requireOrderForUpdate(round.getOrderId());
         if (!STATUS_PENDING_APPROVAL.equals(order.getStatus()) || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) return;
         LocalDateTime now = LocalDateTime.now();
+        supervisorConfirmationService.cancelPending(round.getId(), now);
         OpportunityDO opportunity = order.getOpportunityId() == null ? null : opportunityMapper.selectById(order.getOpportunityId());
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_APPROVED); order.setStatus(STATUS_EFFECTIVE); order.setEffectiveAt(now);
@@ -554,8 +579,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                             ValidatedSubmission validated, int roundNo, LocalDateTime now) {
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         if (config == null) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
-        List<Long> registrationUsers = new ArrayList<>(permissionService.enabledUsers(config.getRegistrationDeptId()));
-        List<Long> financeUsers = new ArrayList<>(permissionService.enabledUsers(config.getFinanceDeptId()));
+        List<Long> registrationUsers = new ArrayList<>(permissionService.enabledReviewers(config.getRegistrationDeptId()));
+        List<Long> financeUsers = new ArrayList<>(permissionService.enabledReviewers(config.getFinanceDeptId()));
         if (registrationUsers.isEmpty() || financeUsers.isEmpty()) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
         BpmProcessInstanceCreateReqDTO processReq = new BpmProcessInstanceCreateReqDTO();
         processReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
@@ -575,7 +600,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         round.setOrderId(order.getId()); round.setRoundNo(roundNo); round.setStatus(ROUND_PENDING);
         round.setOrderSnapshot(buildOrderSnapshot(order, validated)); round.setProcessInstanceId(processInstanceId);
         round.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); round.setSubmittedByUserId(userId);
-        round.setSubmittedAt(now); round.setSubmissionIdempotencyKey(idempotencyKey); round.setVersion(0); roundMapper.insert(round);
+        round.setSubmittedAt(now); round.setSubmissionIdempotencyKey(idempotencyKey);
+        round.setSupervisorConfirmationEnabled(true); round.setVersion(0); roundMapper.insert(round);
         order.setCurrentApprovalRoundId(round.getId()); order.setSubmittedAt(now); orderMapper.updateById(order);
         if (opportunity != null) {
             opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL); opportunityMapper.updateById(opportunity);
@@ -789,11 +815,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             result.setApprovalRoundNo(round.getRoundNo()); result.setApprovalRoundStatus(round.getStatus());
             result.setProcessInstanceId(round.getProcessInstanceId()); result.setDecisionReason(round.getDecisionReason());
             result.setApprovalRoundVersion(round.getVersion());
+            result.setCanRequestSupervisorConfirmation(Boolean.TRUE.equals(round.getSupervisorConfirmationEnabled()));
             Map<String, BpmProcessNodeStatusRespDTO> nodeStatuses = processTaskApi.getProcessNodeStatuses(
                     round.getProcessInstanceId(), Set.of(TASK_REGISTRATION, TASK_FINANCE)).stream()
                     .collect(java.util.stream.Collectors.toMap(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey, item -> item, (left, right) -> right));
             result.setRegistrationApproval(convertApprovalStatus(nodeStatuses.get(TASK_REGISTRATION)));
             result.setFinanceApproval(convertApprovalStatus(nodeStatuses.get(TASK_FINANCE)));
+            Map<String, SalesOrderSupervisorConfirmationDO> confirmations = supervisorConfirmationService.getByRound(round.getId())
+                    .stream().collect(java.util.stream.Collectors.toMap(
+                            SalesOrderSupervisorConfirmationDO::getTaskDefinitionKey, item -> item, (left, right) -> right));
+            result.setRegistrationSupervisorConfirmation(convertSupervisorConfirmation(confirmations.get(TASK_REGISTRATION)));
+            result.setFinanceSupervisorConfirmation(convertSupervisorConfirmation(confirmations.get(TASK_FINANCE)));
         }
         if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
         result.setCanRevise(STATUS_REVISION_REQUIRED.equals(order.getStatus()) && permissionService.canRevise(order, userId));
@@ -807,6 +839,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setStatus(source.getStatus()); result.setReviewerUserId(source.getReviewerUserId());
         result.setReviewerUserName(source.getReviewerUserName());
         result.setCreateTime(source.getCreateTime()); result.setEndTime(source.getEndTime());
+        return result;
+    }
+
+    private SalesOrderRespVO.SupervisorConfirmationVO convertSupervisorConfirmation(SalesOrderSupervisorConfirmationDO source) {
+        if (source == null) return null;
+        SalesOrderRespVO.SupervisorConfirmationVO result = new SalesOrderRespVO.SupervisorConfirmationVO();
+        result.setId(source.getId()); result.setStatus(source.getStatus()); result.setRequesterUserId(source.getRequesterUserId());
+        cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO requester = adminUserApi.getUser(source.getRequesterUserId());
+        result.setRequesterUserName(requester == null ? null : requester.getNickname());
+        result.setRequestReason(source.getRequestReason()); result.setDecisionReason(source.getDecisionReason());
+        result.setRequestedAt(source.getRequestedAt()); result.setDecidedAt(source.getDecidedAt());
         return result;
     }
 
@@ -828,6 +871,17 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (task != null) {
             result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus());
             result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime());
+        }
+        if (round != null && task != null) {
+            SalesOrderSupervisorConfirmationDO confirmation = supervisorConfirmationService.getByRound(round.getId()).stream()
+                    .filter(item -> Objects.equals(item.getTaskDefinitionKey(), task.getTaskDefinitionKey())).findFirst().orElse(null);
+            if (confirmation != null) {
+                result.setSupervisorConfirmationId(confirmation.getId());
+                result.setSupervisorConfirmationStatus(confirmation.getStatus());
+                cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO requester =
+                        adminUserApi.getUser(confirmation.getRequesterUserId());
+                result.setSupervisorRequesterName(requester == null ? null : requester.getNickname());
+            }
         }
         return result;
     }

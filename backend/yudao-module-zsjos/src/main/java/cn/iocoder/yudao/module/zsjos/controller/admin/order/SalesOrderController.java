@@ -26,6 +26,7 @@ import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 public class SalesOrderController {
     @Resource private SalesOrderService orderService;
     @Resource private ZsjosProductSkuService skuService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderSupervisorConfirmationService supervisorConfirmationService;
 
     @GetMapping("/product/catalog")
     @Operation(summary = "获得全部启用成交课程 SKU")
@@ -70,7 +71,7 @@ public class SalesOrderController {
 
     @GetMapping("/{id}")
     @Operation(summary = "获得成交订单详情")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:sales-order:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create')")
     public CommonResult<SalesOrderRespVO> get(@PathVariable Long id) {
         return success(orderService.get(id, WebFrameworkUtils.getLoginUserId()));
     }
@@ -103,6 +104,7 @@ public class SalesOrderController {
 
     @GetMapping("/approval/inbox-page")
     @Operation(summary = "获得成交订单会签待办或已办")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> getInboxPage(@Valid SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
@@ -114,20 +116,66 @@ public class SalesOrderController {
 
     @GetMapping("/approval/filter-profile")
     @Operation(summary = "获得成交审批筛选方案")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<SalesOrderApprovalFilterProfileRespVO> getApprovalFilterProfile() {
         return success(orderService.getApprovalFilterProfile(WebFrameworkUtils.getLoginUserId()));
     }
 
     @PutMapping("/{id}/approve")
     @Operation(summary = "通过当前中心会签任务")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<Boolean> approve(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {
         orderService.approve(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
     }
 
     @PutMapping("/{id}/reject")
     @Operation(summary = "驳回当前会签轮次")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<Boolean> reject(@PathVariable Long id, @Valid @RequestBody SalesOrderDecisionReqVO reqVO) {
         orderService.reject(id, WebFrameworkUtils.getLoginUserId(), reqVO); return success(true);
+    }
+
+    @PutMapping("/{id}/supervisor-confirmation/request")
+    @Operation(summary = "申请直属主管确认")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
+    public CommonResult<Boolean> requestSupervisorConfirmation(@PathVariable Long id,
+                                                                @Valid @RequestBody SalesOrderSupervisorRequestReqVO reqVO) {
+        supervisorConfirmationService.request(id, WebFrameworkUtils.getLoginUserId(), reqVO);
+        return success(true);
+    }
+
+    @GetMapping("/supervisor-confirmation/inbox-page")
+    @Operation(summary = "获得主管确认待办或已办")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
+    public CommonResult<PageResult<SalesOrderSupervisorConfirmationRespVO>> getSupervisorConfirmationInbox(
+            @Valid SalesOrderSupervisorPageReqVO reqVO) {
+        return success(supervisorConfirmationService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/supervisor-confirmation/search-page")
+    @Operation(summary = "搜索主管确认待办或已办")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
+    public CommonResult<PageResult<SalesOrderSupervisorConfirmationRespVO>> searchSupervisorConfirmationInbox(
+            @Valid @RequestBody SalesOrderSupervisorPageReqVO reqVO) {
+        return success(supervisorConfirmationService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PutMapping("/{id}/supervisor-confirmation/confirm")
+    @Operation(summary = "主管确认成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
+    public CommonResult<Boolean> confirmSupervisorConfirmation(@PathVariable Long id,
+                                                                @Valid @RequestBody SalesOrderSupervisorDecisionReqVO reqVO) {
+        supervisorConfirmationService.decide(id, WebFrameworkUtils.getLoginUserId(), reqVO, true);
+        return success(true);
+    }
+
+    @PutMapping("/{id}/supervisor-confirmation/reject")
+    @Operation(summary = "主管不确认成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
+    public CommonResult<Boolean> rejectSupervisorConfirmation(@PathVariable Long id,
+                                                               @Valid @RequestBody SalesOrderSupervisorDecisionReqVO reqVO) {
+        supervisorConfirmationService.decide(id, WebFrameworkUtils.getLoginUserId(), reqVO, false);
+        return success(true);
     }
 
     @PutMapping("/{id}/terminate")

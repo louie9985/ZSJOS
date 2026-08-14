@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
+import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskSignCreateReqVO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
 import cn.iocoder.yudao.module.bpm.service.task.BpmTaskService;
@@ -24,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.mock;
 import static cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants.TASK_VARIABLE_STATUS;
@@ -99,6 +102,41 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
                 "process-1", Set.of("registrationReview", "financeReview"));
 
         assertEquals("pending", result.getFirst().getStatus());
+    }
+
+    @Test
+    void getProcessNodeStatusesIgnoresSignChildren() {
+        Task supervisorTask = mock(Task.class);
+        when(supervisorTask.getTaskDefinitionKey()).thenReturn("registrationReview");
+        when(supervisorTask.getParentTaskId()).thenReturn("parent-task");
+        HistoricTaskInstance historicSupervisorTask = mock(HistoricTaskInstance.class);
+        when(historicSupervisorTask.getTaskDefinitionKey()).thenReturn("financeReview");
+        when(historicSupervisorTask.getParentTaskId()).thenReturn("historic-parent");
+        when(bpmTaskService.getRunningTaskListByProcessInstanceId("process-1", null, null))
+                .thenReturn(List.of(supervisorTask));
+        when(bpmTaskService.getTaskListByProcessInstanceId("process-1", true))
+                .thenReturn(List.of(historicSupervisorTask));
+
+        List<BpmProcessNodeStatusRespDTO> result = processTaskApi.getProcessNodeStatuses(
+                "process-1", Set.of("registrationReview", "financeReview"));
+
+        assertTrue(result.isEmpty());
+        verifyNoInteractions(adminUserApi);
+    }
+
+    @Test
+    void createBeforeSignTaskReturnsCreatedChildTaskId() {
+        when(bpmTaskService.createSignTask(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of("child-task-1"));
+        BpmTaskSignReqDTO request = new BpmTaskSignReqDTO();
+        request.setTaskId("parent-task"); request.setAssigneeUserId(300L); request.setReason("需要主管确认");
+
+        String result = processTaskApi.createBeforeSignTask(USER_ID, request);
+
+        assertEquals("child-task-1", result);
+        verify(bpmTaskService).createSignTask(eq(USER_ID), org.mockito.ArgumentMatchers.<BpmTaskSignCreateReqVO>argThat(value ->
+                "parent-task".equals(value.getId()) && value.getUserIds().equals(Set.of(300L))
+                        && "需要主管确认".equals(value.getReason())));
     }
 
     private HistoricTaskInstance historicTask(String taskKey, int status, long endTime) {

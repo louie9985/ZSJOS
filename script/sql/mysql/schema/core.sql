@@ -4475,6 +4475,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   `registration_decision_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '报名履约决策幂等键',
   `finance_decision_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '财务决策幂等键',
   `termination_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '终止幂等键',
+  `supervisor_confirmation_enabled` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否为上线后支持主管确认的轮次',
   `version` int NOT NULL DEFAULT '0' COMMENT '并发版本',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -4491,6 +4492,35 @@ CREATE TABLE IF NOT EXISTS `zsjos_order_approval_round` (
   UNIQUE KEY `uk_tenant_termination_key` (`tenant_id`,`termination_idempotency_key`),
   KEY `idx_tenant_order_status` (`tenant_id`,`order_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 订单审批轮次与 BPM 引用';
+
+-- zsjos_order_command
+-- zsjos_order_supervisor_confirmation
+CREATE TABLE IF NOT EXISTS `zsjos_order_supervisor_confirmation` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主管确认编号',
+  `order_id` bigint NOT NULL COMMENT '订单编号',
+  `approval_round_id` bigint NOT NULL COMMENT '审批轮次编号',
+  `task_definition_key` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '报名或财务 BPM 节点',
+  `requester_user_id` bigint NOT NULL COMMENT '申请人用户编号',
+  `supervisor_user_id` bigint NOT NULL COMMENT '直属部门负责人用户编号',
+  `parent_task_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '原普通审批任务编号',
+  `supervisor_task_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'BPM 向前加签任务编号',
+  `request_reason` varchar(1000) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '申请原因',
+  `decision_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '主管意见',
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'pending/confirmed/rejected/cancelled',
+  `requested_at` datetime NOT NULL COMMENT '申请时间',
+  `decided_at` datetime DEFAULT NULL COMMENT '决定或取消时间',
+  `version` int NOT NULL DEFAULT '0' COMMENT '并发版本',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_round_task` (`tenant_id`,`approval_round_id`,`task_definition_key`),
+  UNIQUE KEY `uk_tenant_supervisor_task` (`tenant_id`,`supervisor_task_id`),
+  KEY `idx_tenant_supervisor_status_time` (`tenant_id`,`supervisor_user_id`,`status`,`requested_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='成交订单主管确认业务审计';
 
 -- zsjos_order_command
 CREATE TABLE IF NOT EXISTS `zsjos_order_command` (

@@ -19,6 +19,7 @@
         <flowable:approveType>1</flowable:approveType>
         <flowable:approveMethod>3</flowable:approveMethod>
         <flowable:reasonRequire>true</flowable:reasonRequire>
+        <flowable:signEnable>true</flowable:signEnable>
       </extensionElements>
       <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${registrationUsers}" flowable:elementVariable="registrationAssignee">
         <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>
@@ -31,6 +32,7 @@
         <flowable:approveType>1</flowable:approveType>
         <flowable:approveMethod>3</flowable:approveMethod>
         <flowable:reasonRequire>true</flowable:reasonRequire>
+        <flowable:signEnable>true</flowable:signEnable>
       </extensionElements>
       <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${financeUsers}" flowable:elementVariable="financeAssignee">
         <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>

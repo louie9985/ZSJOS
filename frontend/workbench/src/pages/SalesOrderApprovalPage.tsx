@@ -31,6 +31,7 @@ export default function SalesOrderApprovalPage() {
   const [detailError, setDetailError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [decision, setDecision] = useState<'approve' | 'reject'>()
+  const [supervisorOpen, setSupervisorOpen] = useState(false)
   const [reason, setReason] = useState('')
   const { submitting: saving, run: runDecision, resetIntent } = useSubmissionGuard()
   const requestVersion = useRef(0)
@@ -92,10 +93,20 @@ export default function SalesOrderApprovalPage() {
     if (!selectedItem?.taskId || !reason.trim() || !decision) { message.warning('请填写审批意见'); return }
     setConfirmOpen(true)
   }
+  const submitSupervisorRequest = async () => {
+    if (!selectedItem?.taskId || !detail || !reason.trim()) { message.warning('请填写申请原因'); return }
+    await runDecision(async ({ complete, idempotencyKey }) => {
+      await api.requestSalesOrderSupervisor(detail.id, { taskId: selectedItem.taskId!, reason: reason.trim(),
+        approvalRoundId: detail.currentApprovalRoundId, orderVersion: detail.version,
+        roundVersion: detail.approvalRoundVersion, idempotencyKey })
+      complete(); setSupervisorOpen(false); setReason(''); message.success('已申请主管确认'); reload()
+    }).catch(saveError => message.error(saveError instanceof Error ? saveError.message : '申请失败'))
+  }
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedItem && void loadDetail(selectedItem.id)}>重试</Button>}/>
       : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={groupKey === 'done' ? 'approval-done' : 'approval-todo'}
-        onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}/>
+        onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}
+        onRequestSupervisor={() => { resetIntent(); setReason(''); setSupervisorOpen(true) }}/>
         : <Empty description="从左侧选择一条订单"/>
   const hasMore = items.length < total
 
@@ -120,5 +131,10 @@ export default function SalesOrderApprovalPage() {
     </aside><main className="lead-inbox-detail-pane">{detailContent}</main></div>
     <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" width="100%">{detailContent}</Drawer>
     <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} onCancel={closeDecision} footer={<><Button onClick={closeDecision}>取消</Button><IrreversiblePopconfirm action={`${decision === 'approve' ? '通过' : '驳回'}成交订单「${selectedItem?.orderNo || ''}」`} danger={decision === 'reject'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submitDecision}><Button type="primary" danger={decision === 'reject'} loading={saving} onClick={prepareDecision}>提交审批</Button></IrreversiblePopconfirm></>}><div><Typography.Text strong>审批意见</Typography.Text><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="填写审批意见（必填）"/></div></Modal>
+    <Modal title="申请主管确认" open={supervisorOpen} onCancel={() => { setSupervisorOpen(false); setReason(''); resetIntent() }}
+      onOk={() => void submitSupervisorRequest()} confirmLoading={saving} okText="提交申请">
+      <Typography.Text strong>申请原因</Typography.Text><Input.TextArea rows={5} maxLength={1000} showCount value={reason}
+        onChange={event => setReason(event.target.value)} placeholder="说明需要主管确认的事项（必填）"/>
+    </Modal>
   </section>
 }

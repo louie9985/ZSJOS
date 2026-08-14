@@ -153,6 +153,15 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
     ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
+    ErrorCode SALES_ORDER_SUPERVISOR_NOT_CONFIGURED = new ErrorCode(1_900_006_019, "当前审批人直属部门未配置负责人");
+    ErrorCode SALES_ORDER_SUPERVISOR_DISABLED = new ErrorCode(1_900_006_020, "当前审批人直属部门负责人已停用或不存在");
+    ErrorCode SALES_ORDER_SUPERVISOR_SELF = new ErrorCode(1_900_006_021, "直属部门负责人不能与申请人相同");
+    ErrorCode SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED = new ErrorCode(1_900_006_022, "本轮当前中心已申请过主管确认");
+    ErrorCode SALES_ORDER_SUPERVISOR_PENDING = new ErrorCode(1_900_006_023, "当前中心正在等待主管确认，暂不能审批");
+    ErrorCode SALES_ORDER_SUPERVISOR_CONFIRMATION_NOT_EXISTS = new ErrorCode(1_900_006_024, "主管确认记录不存在");
+    ErrorCode SALES_ORDER_SUPERVISOR_TASK_EXPIRED = new ErrorCode(1_900_006_025, "主管确认任务已处理或已失效");
+    ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_DENIED = new ErrorCode(1_900_006_026, "当前用户不是该申请指定的直属部门负责人");
+    ErrorCode SALES_ORDER_SUPERVISOR_LEGACY_ROUND = new ErrorCode(1_900_006_027, "该审批轮次创建于主管确认功能上线前，请沿用原流程完成");
 
     ErrorCode IMPERSONATION_TARGET_INVALID = new ErrorCode(1_900_007_001, "借视图目标账号不存在、已停用或与当前账号相同");
     ErrorCode IMPERSONATION_SESSION_INVALID = new ErrorCode(1_900_007_002, "借视图会话不存在、已结束或已超时");

@@ -31,6 +31,12 @@ public interface SalesOrderConstants {
     String PERMISSION_CREATE = "zsjos:sales-order:create";
     String PERMISSION_QUERY = "zsjos:sales-order:query";
     String PERMISSION_REVIEW = "zsjos:sales-order:review";
+    String PERMISSION_SUPERVISOR_CONFIRM = "zsjos:sales-order:supervisor-confirm";
+
+    String SUPERVISOR_PENDING = "pending";
+    String SUPERVISOR_CONFIRMED = "confirmed";
+    String SUPERVISOR_REJECTED = "rejected";
+    String SUPERVISOR_CANCELLED = "cancelled";
 
     String DICT_STUDENT_NATURE = "zsjos_order_student_nature";
     String DICT_SERVICE_PERIOD = "zsjos_order_service_period";

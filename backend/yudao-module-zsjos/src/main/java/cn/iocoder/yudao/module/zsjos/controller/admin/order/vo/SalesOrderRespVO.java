@@ -59,10 +59,25 @@ public class SalesOrderRespVO {
     private Integer version;
     private Long currentApprovalRoundId;
     private Integer approvalRoundVersion;
+    private Boolean canRequestSupervisorConfirmation;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
     private ApprovalStatusVO registrationApproval;
     private ApprovalStatusVO financeApproval;
+    private SupervisorConfirmationVO registrationSupervisorConfirmation;
+    private SupervisorConfirmationVO financeSupervisorConfirmation;
+
+    @Data
+    public static class SupervisorConfirmationVO {
+        private Long id;
+        private String status;
+        private Long requesterUserId;
+        private String requesterUserName;
+        private String requestReason;
+        private String decisionReason;
+        private LocalDateTime requestedAt;
+        private LocalDateTime decidedAt;
+    }
 
     @Data
     public static class ApprovalStatusVO {

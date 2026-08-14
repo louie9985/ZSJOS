@@ -25,4 +25,7 @@ public class SalesOrderListItemRespVO {
     private String taskReason;
     private LocalDateTime taskCreateTime;
     private LocalDateTime taskEndTime;
+    private Long supervisorConfirmationId;
+    private String supervisorConfirmationStatus;
+    private String supervisorRequesterName;
 }

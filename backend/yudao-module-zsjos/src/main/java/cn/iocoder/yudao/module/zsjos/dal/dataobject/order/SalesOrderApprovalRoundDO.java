@@ -30,5 +30,6 @@ public class SalesOrderApprovalRoundDO extends TenantBaseDO {
     private String registrationDecisionIdempotencyKey;
     private String financeDecisionIdempotencyKey;
     private String terminationIdempotencyKey;
+    private Boolean supervisorConfirmationEnabled;
     private Integer version;
 }

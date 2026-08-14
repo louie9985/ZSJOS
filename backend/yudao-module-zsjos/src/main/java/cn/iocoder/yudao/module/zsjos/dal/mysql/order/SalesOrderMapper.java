@@ -63,6 +63,16 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
                 .eq(SalesOrderDO::getSubmitterUserId, userId)
                 .eqIfPresent(SalesOrderDO::getStatus, status));
     }
+    default List<Long> selectIdsByKeyword(String keyword) {
+        if (!isNotBlank(keyword)) return null;
+        String value = keyword.trim();
+        return selectList(new LambdaQueryWrapperX<SalesOrderDO>()
+                .select(SalesOrderDO::getId)
+                .and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
+                        .or().like(SalesOrderDO::getStudentName, value)
+                        .or().like(SalesOrderDO::getStudentMobile, value)))
+                .stream().map(SalesOrderDO::getId).toList();
+    }
     @Select("SELECT * FROM zsjos_order WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
     SalesOrderDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
     default List<SalesOrderDO> selectEffectiveBySubmitterIds(List<Long> userIds) {

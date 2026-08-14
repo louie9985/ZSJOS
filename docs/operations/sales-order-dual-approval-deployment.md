@@ -5,15 +5,16 @@
 发布前按顺序完成：
 
 1. 先集成并执行 V021、V022，再依次执行 `V023__sales_order_dual_approval.sql`、`V024__zsjos_bpm_readonly_forms.sql`、`V025__sales_order_workbench_views.sql`、V026-V028，最后执行 `V029__sales_order_approval_filter_scheme.sql`。缺少 V022 的环境不得继续执行或发布；V029 依赖 V005 的筛选方案表和 V023 的流程定义元数据。
-2. 确认 `zsjos_order_approval_config` 的报名履约与财务根部门 ID 有效，且两个部门或子部门均至少有一名启用用户。
+2. 执行 `V047__sales_order_supervisor_confirmation.sql`。确认 `zsjos_order_approval_config` 的报名履约与财务根部门 ID 有效，且排除根部门及子部门负责人后，两个中心均至少有一名启用的普通审批人。需要申请主管确认的审批人，其直属部门必须配置启用且不同于本人的 `leaderUserId`。
 3. 在 Admin 进入“工作流程 → 流程管理 → 流程模型”，新建 BPMN 模型：流程标识填写 `zsjos_sales_order_dual_approval`，流程名称填写“成交订单双中心会签”，设为不可见、发起范围为全员，并指定流程管理员。
 4. 在“表单设计”选择“成交会签流程关联信息”。该表单只读，只展示 `orderId`、`leadId` 和 `roundNo`；订单仍由 ZSJOS 工作台提交，不从 Admin 通用流程入口手工发起。
 5. 在“流程设计”点击“打开文件”，选择 `script/bpm/zsjos_sales_order_dual_approval.bpmn20.xml`。不要使用模型列表顶部只接受 JSON 模型包的“导入模型”。
-6. 保存并发布，确认 `registrationReview` 与 `financeReview` 为并行任务组，每组首个处理结果结束同组其余任务。
-7. 确认销售拥有 `zsjos:sales-order:create`。V025 将“我的订单”复制给当前已经拥有“录入成交”的角色，不按角色名称推断；将“成交审批”菜单分配给需要在工作台看到审批池的中心人员。
-8. 用受控订单验证：销售提交后两中心均产生待办；任一驳回进入补正；重提产生新流程实例；两方通过后订单生效。
+6. 确认 `registrationReview` 与 `financeReview` 为并行任务组、已启用加签（模型 XML 为 `flowable:signEnable=true`），每组首个普通处理结果结束同组其余任务。保存并发布为新流程版本；不要迁移、重启或改写在途流程实例。
+7. 确认销售拥有 `zsjos:sales-order:create`。将“成交审批”及 `zsjos:sales-order:review` 分配给普通审批人；将独立“主管确认”及 `zsjos:sales-order:supervisor-confirm` 显式分配给需要处理主管任务的用户。V047 不按角色名称自动授权。
+8. 先发布并启用加签流程新版本，再部署创建新轮次的应用代码。上线前轮次的 `supervisor_confirmation_enabled=0`，继续绑定旧流程版本；上线后新轮次写入 `1` 并使用新版本。
+9. 用受控订单验证：销售提交后两中心均产生普通待办；一中心申请主管确认后该中心锁定而另一中心可继续；主管确认恢复本中心普通审批，主管不确认使整轮驳回；两方普通审批通过后订单生效；并行驳回、终止和取消能取消未完成主管记录。
 
-审批接口的业务授权不依赖角色名称或 `zsjos:sales-order:review` 权限：服务端实时读取 `zsjos_order_approval_config`，仅允许两个配置根部门及其子部门的启用人员处理本人 BPM 任务。菜单权限只控制工作台入口可见性，不能扩大审批对象范围。
+审批业务授权不依赖角色名称，但要求三层累计通过：普通审批接口要求 `zsjos:sales-order:review`、配置部门范围和本人普通 BPM 任务；主管接口要求 `zsjos:sales-order:supervisor-confirm`、申请记录指定主管、本人 BPM 加签任务及订单对象关系。菜单权限不能扩大部门、对象或任务范围。
 
 V023、V024 和 V025 不删除或重写业务数据。V025 仅增加本人订单入口、查询索引和审批轮次非通过原因快照。回滚只能停用菜单、技术表单和流程定义，并保留订单、订单项、审批轮次及 BPM 历史。部署或回滚前必须备份数据库；实际迁移、BPM 发布和服务重启均需单独确认。
 
