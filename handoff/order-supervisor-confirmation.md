@@ -39,3 +39,16 @@
 - Dependency/integration impact: Requires controlled V047 application, BPM definition publication, permissions, and tenant reviewer configuration before runtime use.
 - Remaining work: Create the feature commit, record it, merge into main, and run integrated verification without changing external state.
 - Status: `ready-to-merge`
+
+## Final Commit Record 2026-08-14 16:05 +08:00
+- Branch: `codex/order-supervisor-confirmation`
+- Worktree: `D:\ZSJ-OS-worktrees\order-supervisor-confirmation`
+- HEAD commit: `0bddb5c70123a5db643801817c17838d9f5d4263`
+- User goal: Record the authorized feature commit before integration.
+- Key decisions: Treat `0bddb5c70123a5db643801817c17838d9f5d4263` as the final functional commit; this entry changes handoff metadata only.
+- Execution result: Feature commit created successfully and the worktree is clean.
+- Changed files: `handoff/order-supervisor-confirmation.md` only.
+- Verification evidence: `git diff --cached --check` passed before the feature commit; prior focused verification remains recorded above.
+- Dependency/integration impact: None beyond the recorded supervisor-confirmation implementation.
+- Remaining work: Merge into local main and run integrated verification.
+- Final commit: `0bddb5c70123a5db643801817c17838d9f5d4263`
