@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskDecisionReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import jakarta.validation.constraints.NotEmpty;
 
@@ -35,5 +36,7 @@ public interface BpmProcessTaskApi {
     void approveTask(Long userId, BpmTaskDecisionReqDTO reqDTO);
 
     void rejectTask(Long userId, BpmTaskDecisionReqDTO reqDTO);
+
+    String createBeforeSignTask(Long userId, BpmTaskSignReqDTO reqDTO);
 
 }

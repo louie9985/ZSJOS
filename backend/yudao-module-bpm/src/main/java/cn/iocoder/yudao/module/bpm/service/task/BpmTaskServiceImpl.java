@@ -1155,7 +1155,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @DataPermission(enable = false) // 关闭数据权限，避免查询不到用户数据。相关案例：https://gitee.com/zhijiantianya/yudao-cloud/issues/ID1UYA
-    public void createSignTask(Long userId, BpmTaskSignCreateReqVO reqVO) {
+    public List<String> createSignTask(Long userId, BpmTaskSignCreateReqVO reqVO) {
         // 1. 获取和校验任务
         TaskEntityImpl taskEntity = validateTaskCanCreateSign(userId, reqVO);
         List<AdminUserRespDTO> userList = adminUserApi.getUserList(reqVO.getUserIds());
@@ -1182,13 +1182,14 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         }
 
         // 3. 创建加签任务
-        createSignTaskList(convertList(reqVO.getUserIds(), String::valueOf), taskEntity);
+        List<String> childTaskIds = createSignTaskList(convertList(reqVO.getUserIds(), String::valueOf), taskEntity);
 
         // 4. 记录加签的评论到 task 任务
         AdminUserRespDTO currentUser = adminUserApi.getUser(userId);
         commentService.createComment(reqVO.getId(), taskEntity.getProcessInstanceId(), BpmCommentTypeEnum.ADD_SIGN,
                 currentUser.getNickname(), BpmTaskSignTypeEnum.nameOfType(reqVO.getType()),
                 String.join(",", convertList(userList, AdminUserRespDTO::getNickname)), reqVO.getReason());
+        return childTaskIds;
     }
 
     /**
@@ -1228,17 +1229,19 @@ public class BpmTaskServiceImpl implements BpmTaskService {
      * @param userIds    被加签的用户 ID
      * @param taskEntity 被加签的任务
      */
-    private void createSignTaskList(List<String> userIds, TaskEntityImpl taskEntity) {
+    private List<String> createSignTaskList(List<String> userIds, TaskEntityImpl taskEntity) {
         if (CollUtil.isEmpty(userIds)) {
-            return;
+            return List.of();
         }
+        List<String> taskIds = new ArrayList<>();
         // 创建加签人的新任务，全部基于 taskEntity 为父任务来创建
         for (String addSignId : userIds) {
             if (StrUtil.isBlank(addSignId)) {
                 continue;
             }
-            createSignTask(taskEntity, addSignId);
+            taskIds.add(createSignTask(taskEntity, addSignId));
         }
+        return taskIds;
     }
 
     /**
@@ -1247,7 +1250,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
      * @param parentTask 父任务
      * @param assignee   子任务的执行人
      */
-    private void createSignTask(TaskEntityImpl parentTask, String assignee) {
+    private String createSignTask(TaskEntityImpl parentTask, String assignee) {
         // 1. 生成子任务
         TaskEntityImpl task = (TaskEntityImpl) taskService.newTask(IdUtil.fastSimpleUUID());
         BpmTaskConvert.INSTANCE.copyTo(parentTask, task);
@@ -1266,6 +1269,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (BpmTaskSignTypeEnum.AFTER.getType().equals(parentTask.getScopeType())) {
             updateTaskStatus(task.getId(), BpmTaskStatusEnum.WAIT.getStatus());
         }
+        return task.getId();
     }
 
     @Override

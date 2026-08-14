@@ -82,6 +82,7 @@ class SalesOrderServiceImplTest {
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private SalesOrderCommandService commandService;
     @Mock private AdvancedFilterService advancedFilterService;
+    @Mock private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
@@ -97,8 +98,8 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L, 302L));
-        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledReviewers(1030L)).thenReturn(Set.of(301L, 302L));
+        when(permissionService.enabledReviewers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(200L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
@@ -351,8 +352,8 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
-        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledReviewers(1030L)).thenReturn(Set.of(301L));
+        when(permissionService.enabledReviewers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-2");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
@@ -375,7 +376,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.hasEffectiveOrder(10L)).thenReturn(true);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledReviewers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledReviewers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-repurchase");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         AreaRespDTO province = new AreaRespDTO(); province.setId(120000); province.setName("天津市");

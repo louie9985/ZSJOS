@@ -365,6 +365,10 @@ INSERT IGNORE INTO `system_menu`
 (6848,'销售投诉处理','zsjos:lead-complaint:handle',2,19,6735,'leads/complaints','ep:warning','zsjos/leadComplaint/index','LeadComplaintPage',0,b'1',b'0',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0'),
 (6849,'历史客户复购','zsjos:sales-order:create',2,20,6735,'orders/external-repurchase','ep:refresh','zsjos/externalRepurchase/index','ExternalRepurchasePage',0,b'1',b'0',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0');
 
+INSERT IGNORE INTO `system_menu`
+(`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+(6850,'主管确认','zsjos:sales-order:supervisor-confirm',2,18,6735,'sales-order-supervisor-confirmations','ep:stamp','zsjos/salesOrderSupervisorConfirmation/index','ZsjosSalesOrderSupervisorConfirmation',0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0');
+
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V040', 'Submitter actions and sales complaint queue', 'submitter-actions-complaints-v1');
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
@@ -398,3 +402,10 @@ INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V045','Register Vue components for dual-frontend Workbench menus',
         SHA2('dual-frontend-workbench-menu-components-v1',256),'pending',NOW());
+
+INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
+VALUES ('V047','Add sales-order supervisor confirmation','sales-order-supervisor-confirmation-v1');
+INSERT IGNORE INTO `zsjos_module_schema_version`
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES ('core','V047','Add sales-order supervisor confirmation',
+        SHA2('sales-order-supervisor-confirmation-v1',256),'legacy',NOW());

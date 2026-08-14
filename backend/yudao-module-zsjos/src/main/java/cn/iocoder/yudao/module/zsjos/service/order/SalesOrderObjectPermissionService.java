@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalConfigMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderSupervisorConfirmationMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
@@ -27,6 +28,7 @@ public class SalesOrderObjectPermissionService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private LeadMapper leadMapper;
     @Resource private SalesOrderApprovalConfigMapper salesOrderApprovalConfigMapper;
+    @Resource private SalesOrderSupervisorConfirmationMapper supervisorConfirmationMapper;
     @Resource private DeptApi deptApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService agingPoolService;
@@ -53,7 +55,7 @@ public class SalesOrderObjectPermissionService {
                 || Objects.equals(order.getFormalSalesUserId(), userId)
                 || lead != null && Objects.equals(lead.getOwnerUserId(), userId)
                 || order.getLeadId() != null && agingPoolService.canRead(order.getLeadId(), userId)
-                || isApprovalPoolMember(userId);
+                || isApprovalPoolMember(userId) || isCurrentSupervisor(order, userId);
     }
 
     public boolean canRevise(SalesOrderDO order, Long userId) {
@@ -93,6 +95,24 @@ public class SalesOrderObjectPermissionService {
                 .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
                 .map(AdminUserRespDTO::getId).sorted().forEach(users::add);
         return users;
+    }
+
+    public Set<Long> enabledReviewers(Long rootDeptId) {
+        if (rootDeptId == null) return Set.of();
+        Set<Long> reviewers = new LinkedHashSet<>(enabledUsers(rootDeptId));
+        Set<Long> deptIds = new LinkedHashSet<>();
+        deptIds.add(rootDeptId);
+        deptApi.getChildDeptList(rootDeptId).forEach(item -> deptIds.add(item.getId()));
+        deptIds.stream().map(deptApi::getDept).filter(Objects::nonNull)
+                .map(cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO::getLeaderUserId)
+                .filter(Objects::nonNull).forEach(reviewers::remove);
+        return reviewers;
+    }
+
+    private boolean isCurrentSupervisor(SalesOrderDO order, Long userId) {
+        if (order.getCurrentApprovalRoundId() == null) return false;
+        return supervisorConfirmationMapper.selectByRoundId(order.getCurrentApprovalRoundId()).stream()
+                .anyMatch(item -> Objects.equals(item.getSupervisorUserId(), userId));
     }
 
     private boolean belongsTo(Long rootDeptId, Long userDeptId) {

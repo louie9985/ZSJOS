@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Descriptions, Empty, Image, Space, Table, Tag, Typography } from 'antd'
-import { CheckOutlined, CloseOutlined, EditOutlined, StopOutlined } from '@ant-design/icons'
+import { CheckOutlined, CloseOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
 import type { SalesOrder, SalesOrderListItem } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import { canReviewSalesOrderTask } from '../services/salesOrder'
@@ -17,17 +17,21 @@ const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批�
 const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
 const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
 
-export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRevise, onTerminate }: {
+export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
   mode: 'mine' | 'approval-todo' | 'approval-done'
   onApprove?: () => void
   onReject?: () => void
+  onRequestSupervisor?: () => void
   onRevise?: () => void
   onTerminate?: () => void
 }) {
   const task = approvalContext || order
   const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
+  const supervisorConfirmation = task.taskDefinitionKey === 'registrationReview'
+    ? order.registrationSupervisorConfirmation : task.taskDefinitionKey === 'financeReview' ? order.financeSupervisorConfirmation : undefined
+  const supervisorPending = supervisorConfirmation?.status === 'pending'
   const approvalRows = [
     { key: 'registration', center: '报名履约中心', approval: order.registrationApproval },
     { key: 'finance', center: '财务中心', approval: order.financeApproval }
@@ -41,9 +45,10 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       <Space wrap className="sales-order-detail-actions">
         {mode === 'mine' && order.status === 'revision_required' && order.canRevise && onRevise && <Button type="primary" icon={<EditOutlined/>} onClick={onRevise}>补正并重新提交</Button>}
         {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止审批</Button>}
-        {mode === 'approval-todo' && canReview && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button></>}
+        {mode === 'approval-todo' && canReview && !supervisorPending && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button>{onRequestSupervisor && order.canRequestSupervisorConfirmation && <Button icon={<UserSwitchOutlined/>} onClick={onRequestSupervisor}>申请主管确认</Button>}</>}
       </Space>
     </div>
+    {supervisorPending && <Alert type="info" showIcon message={`${supervisorConfirmation.requesterUserName || '审批人'}已申请主管审批`} description={supervisorConfirmation.requestReason}/>}
     {order.status === 'revision_required' && <Alert type="error" showIcon message="订单已驳回，等待补正" description={order.decisionReason || '审批人未填写可展示的驳回原因'}/>}
     {order.status === 'terminated' && <Alert type="warning" showIcon message="订单审批已终止"
       description={order.terminationReason || '未记录终止原因'}/>}

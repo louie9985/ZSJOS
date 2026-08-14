@@ -376,10 +376,12 @@ The server-owned `下属销售` menu is available only with `zsjos:subordinate-s
 
 - `zsjos:sales-order:create` exposes direct order entry only when the backend `availableActions` projection enables `ENTER_DEAL`; the Service rechecks current ownership, valid qualification, suspension, opportunity state, active-order uniqueness and enabled SKU state under a tenant-scoped row lock.
 - Sales-order field options come from System dictionaries and the enabled ZSJOS product/SKU catalog. The workbench does not keep static business options or infer product hierarchy from labels.
-- `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. Each approval round snapshots all enabled users in each root department and its children; department names, role names and frontend menus are not reviewer sources.
+- `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. New approval rounds snapshot enabled users in each root department and its children after excluding every included department's `leaderUserId`; department names, role names and frontend menus are not reviewer sources. If either center has no remaining ordinary reviewer, submission fails as invalid approval configuration.
 - 成交订单提交/补正只通知本轮两个配置部门解析出的实际审批人；最终通过、拒绝或取消只通知订单提交销售。通知显示配置根部门名称，内部任务键仍保持 `registrationReview` / `financeReview`。
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
 - 订单详情通过 BPM 公共 API 汇总当前轮次两个节点的 `pending/approved/rejected/cancelled` 状态并展示给已有订单读取权限的用户；汇总优先保留实际通过或驳回决定，不能让同组后续取消的会签任务覆盖结果。ZSJOS 不新增审批任务或节点状态表。
+- 上线后轮次允许普通审批人每轮每中心申请一次直属主管确认。直属主管只取申请人直属部门的 `leaderUserId`，必须启用且不能是申请人；BPM 通过向前加签拥有主管任务、评论和历史，ZSJOS 的 `zsjos_order_supervisor_confirmation` 只保存业务申请、决定、状态和 BPM 引用，不复制任务。`pending` 锁定同中心全部普通审批任务，另一中心继续；主管确认后解除锁并恢复父任务，主管不确认由 BPM 驳回整轮。并行驳回、销售终止或流程取消将未完成申请标记为 `cancelled`。
+- 成交普通审批累计要求 Controller 功能权限 `zsjos:sales-order:review`、配置部门范围及本人普通 BPM 任务；主管确认累计要求 `zsjos:sales-order:supervisor-confirm`、本人主管 BPM 子任务、申请记录指定主管和订单对象关系。菜单可见、部门成员、对象可读和 BPM 任务所有权互不替代。
 - 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化，复购生效不修改客资、商机或首次成交时间。
 - 报名履约和财务任务处理、驳回、创建人终止均先锁定订单及当前审批轮次，并校验当前 BPM 任务、轮次、订单/轮次版本与节点幂等键。流程取消仍由 BPM 公共 API 执行，ZSJOS 只保存订单业务状态、轮次和取消原因快照。
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`.

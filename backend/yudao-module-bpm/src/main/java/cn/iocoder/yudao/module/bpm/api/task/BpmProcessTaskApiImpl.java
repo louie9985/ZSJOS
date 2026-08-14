@@ -4,10 +4,13 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskDecisionReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskApproveReqVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskPageReqVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskRejectReqVO;
+import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskSignCreateReqVO;
+import cn.iocoder.yudao.module.bpm.enums.task.BpmTaskSignTypeEnum;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
 import cn.iocoder.yudao.module.bpm.service.task.BpmTaskService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
@@ -53,14 +56,15 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         if (processInstanceId == null || taskDefinitionKeys == null || taskDefinitionKeys.isEmpty()) return List.of();
         Map<String, BpmProcessNodeStatusRespDTO> result = new HashMap<>();
         for (Task task : bpmTaskService.getRunningTaskListByProcessInstanceId(processInstanceId, null, null)) {
-            if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey())) continue;
+            if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getParentTaskId() != null) continue;
             BpmProcessNodeStatusRespDTO status = new BpmProcessNodeStatusRespDTO();
             status.setTaskDefinitionKey(task.getTaskDefinitionKey()); status.setStatus("pending");
             status.setCreateTime(toLocalDateTime(task.getCreateTime()));
             result.put(task.getTaskDefinitionKey(), status);
         }
         for (HistoricTaskInstance task : bpmTaskService.getTaskListByProcessInstanceId(processInstanceId, true)) {
-            if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getEndTime() == null) continue;
+            if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getParentTaskId() != null
+                    || task.getEndTime() == null) continue;
             Integer rawStatus = task.getTaskLocalVariables() == null ? null
                     : (Integer) task.getTaskLocalVariables().get(cn.iocoder.yudao.module.bpm.framework.flowable.core.enums.BpmnVariableConstants.TASK_VARIABLE_STATUS);
             String status = rawStatus == null ? "cancelled" : switch (rawStatus) {
@@ -122,6 +126,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
+            result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
             return result;
         }).toList();
         return new PageResult<>(list, page.getTotal());
@@ -141,6 +146,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey());
+            result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
             result.setStatus(task.getTaskLocalVariables() == null ? null : (Integer) task.getTaskLocalVariables().get("status"));
             result.setReason(task.getDescription()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
             result.setEndTime(toLocalDateTime(task.getEndTime())); return result;
@@ -156,6 +162,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
+        result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
         return result;
     }
 
@@ -169,6 +176,14 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
     public void rejectTask(Long userId, BpmTaskDecisionReqDTO reqDTO) {
         bpmTaskService.rejectTask(userId, new BpmTaskRejectReqVO().setId(reqDTO.getTaskId())
                 .setReason(reqDTO.getReason()).setAttachments(reqDTO.getAttachments()));
+    }
+
+    @Override
+    public String createBeforeSignTask(Long userId, BpmTaskSignReqDTO reqDTO) {
+        List<String> taskIds = bpmTaskService.createSignTask(userId, new BpmTaskSignCreateReqVO()
+                .setId(reqDTO.getTaskId()).setUserIds(Set.of(reqDTO.getAssigneeUserId()))
+                .setType(BpmTaskSignTypeEnum.BEFORE.getType()).setReason(reqDTO.getReason()));
+        return taskIds.get(0);
     }
 
     private BpmTaskPageReqVO toPageReq(BpmTaskPageReqDTO reqDTO) {

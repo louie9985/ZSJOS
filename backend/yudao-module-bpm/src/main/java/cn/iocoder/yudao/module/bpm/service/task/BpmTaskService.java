@@ -272,7 +272,7 @@ public interface BpmTaskService {
      * @param userId 被加签的用户和任务 ID，加签类型
      * @param reqVO  当前用户 ID
      */
-    void createSignTask(Long userId, BpmTaskSignCreateReqVO reqVO);
+    List<String> createSignTask(Long userId, BpmTaskSignCreateReqVO reqVO);
 
     /**
      * 任务减签

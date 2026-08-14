@@ -58,6 +58,7 @@ import MessageCenter from './components/MessageCenter'
 import MessageInboxPage from './pages/MessageInboxPage'
 import LeadAppealPage from './pages/LeadAppealPage'
 import SalesOrderApprovalPage from './pages/SalesOrderApprovalPage'
+import SalesOrderSupervisorConfirmationPage from './pages/SalesOrderSupervisorConfirmationPage'
 import MySalesOrderPage from './pages/MySalesOrderPage'
 import SubordinateSalesPage from './pages/SubordinateSalesPage'
 import LeadComplaintPage from './pages/LeadComplaintPage'
@@ -185,6 +186,7 @@ function Placeholder({ menu, permissions, onOpenAssignment }: { menu?: Workbench
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
+  if (menu?.path === APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS) return <SalesOrderSupervisorConfirmationPage/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
   if (menu?.path === APP_ROUTES.LEAD_RULE) return <LeadRuleConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_FILTER) return <LeadFilterConfigPage permissions={permissions}/>

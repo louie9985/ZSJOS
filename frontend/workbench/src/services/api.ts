@@ -168,9 +168,16 @@ export type SalesOrder = {
   processInstanceId?: string; taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'
   taskStatus?: number; taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp; decisionReason?: string; canRevise?: boolean; canTerminate?: boolean
   version: number; currentApprovalRoundId: number; approvalRoundVersion: number; repurchaseReason?: string; terminationReason?: string
+  canRequestSupervisorConfirmation?: boolean
   submittedAt: Timestamp; effectiveAt?: Timestamp
   registrationApproval?: SalesOrderApprovalStatus
   financeApproval?: SalesOrderApprovalStatus
+  registrationSupervisorConfirmation?: SalesOrderSupervisorConfirmation
+  financeSupervisorConfirmation?: SalesOrderSupervisorConfirmation
+}
+export type SalesOrderSupervisorConfirmation = {
+  id: number; status: 'pending' | 'confirmed' | 'rejected' | 'cancelled'; requesterUserId: number
+  requesterUserName?: string; requestReason: string; decisionReason?: string; requestedAt?: Timestamp; decidedAt?: Timestamp
 }
 export type SalesOrderApprovalStatus = {
   status: 'pending' | 'approved' | 'rejected' | 'cancelled'
@@ -180,6 +187,14 @@ export type SalesOrderListItem = Pick<SalesOrder, 'id' | 'orderNo' | 'leadId' | 
   personId?: number; orderType?: SalesOrder['orderType']
   taskId?: string; taskDefinitionKey?: 'registrationReview' | 'financeReview'; taskStatus?: number
   taskReason?: string; taskCreateTime?: Timestamp; taskEndTime?: Timestamp
+  supervisorConfirmationId?: number; supervisorConfirmationStatus?: string; supervisorRequesterName?: string
+}
+export type SalesOrderSupervisorInboxItem = {
+  id: number; orderId: number; orderNo: string; studentName: string; approvalRoundId: number
+  taskDefinitionKey: 'registrationReview' | 'financeReview'; taskId: string; requesterUserId: number
+  requesterUserName?: string; supervisorUserId: number; requestReason: string; decisionReason?: string
+  status: 'pending' | 'confirmed' | 'rejected' | 'cancelled'; requestedAt?: Timestamp; decidedAt?: Timestamp
+  version: number; orderVersion: number; roundVersion: number
 }
 export type SalesOrderStatusCounts = { total: number; pendingApproval: number; revisionRequired: number; effective: number }
 export type SalesOrderApprovalFilterOption = { key: string; label: string; count: number }
@@ -562,6 +577,12 @@ export const api = {
     unwrap<AdvancedFilterCatalog>(await http.get('/zsjos/advanced-filter/catalog', { params: { scene } })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
+  requestSalesOrderSupervisor: async (orderId: number, data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/supervisor-confirmation/request`, data)),
+  salesOrderSupervisorInbox: async (params: { pageNo: number; pageSize: number; handled: boolean; keyword?: string }) =>
+    unwrap<PageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-page', { params })),
+  decideSalesOrderSupervisor: async (orderId: number, decision: 'confirm' | 'reject', data: { confirmationId: number; taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; confirmationVersion: number; idempotencyKey: string }) =>
+    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/supervisor-confirmation/${decision}`, data)),
   terminateSalesOrder: async (orderId: number, data: { reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/terminate`, data)),
   uploadSalesOrderVoucher: async (file: File) => {

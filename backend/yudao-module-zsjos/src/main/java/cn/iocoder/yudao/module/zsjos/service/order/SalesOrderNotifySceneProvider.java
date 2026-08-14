@@ -29,7 +29,9 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         return List.of(scene(SUBMITTED, "成交订单待审批", ROLE_REVIEWERS),
                 scene(EFFECTIVE, "成交订单已生效", ROLE_SUBMITTER),
                 scene(REJECTED, "成交订单审批拒绝", ROLE_SUBMITTER),
-                scene(CANCELLED, "成交订单审批取消", ROLE_SUBMITTER));
+                scene(CANCELLED, "成交订单审批取消", ROLE_SUBMITTER),
+                scene(SUPERVISOR_REQUESTED, "成交订单申请主管确认", ROLE_SUPERVISOR),
+                scene(SUPERVISOR_DECIDED, "成交订单主管确认结果", ROLE_REQUESTER));
     }
 
     @Override
@@ -37,6 +39,8 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         Set<Long> result = new LinkedHashSet<>();
         if (recipientRoles.contains(ROLE_REVIEWERS)) addIds(result, event.getPayload().get("reviewerUserIds"));
         if (recipientRoles.contains(ROLE_SUBMITTER)) addId(result, event.getPayload().get("submitterUserId"));
+        if (recipientRoles.contains(ROLE_SUPERVISOR)) addId(result, event.getPayload().get("supervisorUserId"));
+        if (recipientRoles.contains(ROLE_REQUESTER)) addId(result, event.getPayload().get("requesterUserId"));
         return result;
     }
 
@@ -50,6 +54,7 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         values.put("order.status", order.getStatus()); values.put("order.submittedAt", order.getSubmittedAt());
         values.put("order.approvalDepartments", event.getPayload().get("approvalDepartments"));
         values.put("order.decisionReason", event.getPayload().get("decisionReason"));
+        values.put("order.supervisorReason", event.getPayload().get("supervisorReason"));
         return values;
     }
 
@@ -62,9 +67,19 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneVariableRespDTO("order.status", "订单状态", false),
                 new NotifySceneVariableRespDTO("order.submittedAt", "提交时间", false),
                 new NotifySceneVariableRespDTO("order.approvalDepartments", "审批部门", false),
-                new NotifySceneVariableRespDTO("order.decisionReason", "审批理由", false)),
-                List.of(new NotifySceneRoleRespDTO(role, ROLE_REVIEWERS.equals(role) ? "本轮实际审批人" : "订单提交销售")),
+                new NotifySceneVariableRespDTO("order.decisionReason", "审批理由", false),
+                new NotifySceneVariableRespDTO("order.supervisorReason", "主管确认原因或意见", false)),
+                List.of(new NotifySceneRoleRespDTO(role, roleLabel(role))),
                 List.of(NotifyActionType.NONE, NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false);
+    }
+
+    private String roleLabel(String role) {
+        return switch (role) {
+            case ROLE_REVIEWERS -> "本轮实际审批人";
+            case ROLE_SUPERVISOR -> "直属部门负责人";
+            case ROLE_REQUESTER -> "主管确认申请人";
+            default -> "订单提交销售";
+        };
     }
 
     private void addIds(Set<Long> result, Object value) {

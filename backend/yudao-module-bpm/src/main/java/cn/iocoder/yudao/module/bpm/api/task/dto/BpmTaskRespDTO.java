@@ -11,6 +11,8 @@ public class BpmTaskRespDTO {
     private String processInstanceId;
     private String businessKey;
     private String taskDefinitionKey;
+    private String parentTaskId;
+    private Boolean signTask;
     private Integer status;
     private String reason;
     private LocalDateTime createTime;
