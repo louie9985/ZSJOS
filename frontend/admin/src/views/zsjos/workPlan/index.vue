@@ -41,7 +41,7 @@
       <div class="drawer-footer"><el-button v-if="['draft', 'active'].includes(detail.status)" v-hasPermi="['zsjos:work-plan:cancel']" type="danger" @click="cancelPlan">取消计划</el-button></div>
     </div>
   </el-drawer>
-  <el-dialog v-model="transferOpen" title="转派工作任务" width="480px"><el-form label-width="90px"><el-form-item label="新责任人"><el-select v-model="transferUserId" filterable><el-option v-for="user in users" :key="user.id" :label="user.nickname" :value="user.id" /></el-select></el-form-item><el-form-item label="调整原因"><el-input v-model="transferReason" type="textarea" :rows="3" /></el-form-item></el-form><template #footer><el-button @click="transferOpen = false">取消</el-button><el-button type="primary" @click="transfer">确认转派</el-button></template></el-dialog>
+  <el-dialog v-model="transferOpen" title="转派工作任务" width="480px"><el-form label-width="90px"><el-form-item label="新责任人" required><el-select v-model="transferUserId" filterable><el-option v-for="user in users" :key="user.id" :label="user.nickname" :value="user.id" /></el-select></el-form-item><el-form-item label="调整原因" required><el-input v-model="transferReason" type="textarea" :rows="3" /></el-form-item></el-form><template #footer><el-button @click="transferOpen = false">取消</el-button><el-button type="primary" @click="transfer">确认转派</el-button></template></el-dialog>
 </template>
 
 <script lang="ts" setup>

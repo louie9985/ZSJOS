@@ -143,7 +143,7 @@
     >
   </Dialog>
   <Dialog v-model="rejectVisible" title="驳回待打款提现" width="480px">
-    <el-input v-model="rejectReason" type="textarea" :rows="4" maxlength="500" show-word-limit />
+    <el-form label-position="top"><el-form-item label="驳回原因" required><el-input v-model="rejectReason" type="textarea" :rows="4" maxlength="500" show-word-limit /></el-form-item></el-form>
     <template #footer
       ><el-button @click="rejectVisible = false">取消</el-button
       ><el-button type="danger" :loading="saving" @click="submitReject"

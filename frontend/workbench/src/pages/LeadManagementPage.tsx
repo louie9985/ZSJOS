@@ -7,6 +7,7 @@ import {
   Card,
   Descriptions,
   Empty,
+  Form,
   Image,
   Input,
   List,
@@ -326,16 +327,14 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
     />
     <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为无效`} danger open={invalidConfirmOpen} onOpenChange={setInvalidConfirmOpen} onConfirm={judgeInvalid}><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={prepareJudgeInvalid}>确认判无效</Button></IrreversiblePopconfirm></Space>}>
       <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-        <Typography.Text strong>无效原因</Typography.Text>
         {invalidReasonError && <Alert type="error" showIcon message={invalidReasonError} action={<Button size="small" onClick={() => void loadInvalidReasons()}>重试</Button>}/>} 
-        <Select loading={invalidReasonLoading} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} value={invalidReason} onChange={setInvalidReason} placeholder={invalidReasonLoading ? '正在加载无效原因' : invalidReasons.length ? '选择无效原因' : '暂无可用无效原因'} options={invalidReasons.map(item => ({ value: item.value, label: item.label }))} style={{ width: '100%' }}/>
-        <Typography.Text strong>备注</Typography.Text>
+        <Form.Item label="无效原因" required style={{ marginBottom: 0, width: '100%' }}><Select loading={invalidReasonLoading} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} value={invalidReason} onChange={setInvalidReason} placeholder={invalidReasonLoading ? '正在加载无效原因' : invalidReasons.length ? '选择无效原因' : '暂无可用无效原因'} options={invalidReasons.map(item => ({ value: item.value, label: item.label }))} style={{ width: '100%' }}/></Form.Item>
         {invalidRemarkTemplateError && <Alert type="error" showIcon message={invalidRemarkTemplateError} action={<Button size="small" onClick={() => void loadInvalidRemarkTemplates()}>重试</Button>}/>} 
         {invalidRemarkTemplateLoading ? <Spin size="small"/> : invalidRemarkTemplates.length ? <Space wrap>
           {invalidRemarkTemplates.map(template => <Button size="small" key={template.value}
             onClick={() => setInvalidDescription(current => applyInvalidRemarkTemplate(current, template.label))}>{template.label}</Button>)}
         </Space> : !invalidRemarkTemplateError && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无快捷备注"/>}
-        <Input.TextArea value={invalidDescription} onChange={event => setInvalidDescription(event.target.value)} rows={4} maxLength={2000} showCount placeholder="填写无效判定备注"/>
+        <Form.Item label="备注" required style={{ marginBottom: 0, width: '100%' }}><Input.TextArea value={invalidDescription} onChange={event => setInvalidDescription(event.target.value)} rows={4} maxLength={2000} showCount placeholder="填写无效判定备注"/></Form.Item>
         <Typography.Text strong>附件</Typography.Text>
         <LeadAppealEvidenceUpload value={invalidEvidence} onChange={setInvalidEvidence} disabled={qualificationSaving}/>
       </Space>
@@ -345,11 +344,10 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
         <Typography.Text strong>客资分类</Typography.Text>
         <Select allowClear value={validCategory} onChange={setValidCategory} placeholder="可不选择"
           options={categories.map(item => ({ value: item.value, label: item.label }))} style={{ width: '100%' }}/>
-        <Typography.Text strong>有效备注</Typography.Text>
         {validTemplateError && <Alert type="error" showIcon message={validTemplateError}/>}
         {validTemplates.length > 0 && <Space wrap>{validTemplates.map(template => <Button size="small" key={template.value}
           onClick={() => setValidRemark(current => [current.trim(), template.label].filter(Boolean).join('\n'))}>{template.label}</Button>)}</Space>}
-        <Input.TextArea value={validRemark} onChange={event => setValidRemark(event.target.value)} rows={4} maxLength={2000} showCount/>
+        <Form.Item label="有效备注" required style={{ marginBottom: 0, width: '100%' }}><Input.TextArea value={validRemark} onChange={event => setValidRemark(event.target.value)} rows={4} maxLength={2000} showCount/></Form.Item>
       </Space>
     </Modal>
     <LeadBasicInfoModal lead={lead} open={basicInfoOpen} onClose={() => setBasicInfoOpen(false)}
@@ -359,12 +357,12 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       if (!urgeReason.trim()) { message.warning('请填写催促原因'); return }
       setSubmitterActionSaving(true); try { await api.urgeLead(lead.id, urgeReason.trim()); message.success('催促已发送'); setUrgeReason(''); setUrgeOpen(false) }
       catch (error) { message.error(error instanceof Error ? error.message : '催促失败') } finally { setSubmitterActionSaving(false) }
-    }}><Input.TextArea value={urgeReason} onChange={event => setUrgeReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次催促原因"/></Modal>
+    }}><Form.Item label="催促原因" required><Input.TextArea value={urgeReason} onChange={event => setUrgeReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次催促原因"/></Form.Item></Modal>
     <Modal title="发起销售投诉" open={complaintOpen} confirmLoading={submitterActionSaving} onCancel={() => setComplaintOpen(false)} onOk={async () => {
       if (!complaintReason.trim()) { message.warning('请填写投诉原因'); return }
       setSubmitterActionSaving(true); try { await api.createLeadComplaint(lead.id, complaintReason.trim(), []); message.success('投诉已提交'); setComplaintReason(''); setComplaintOpen(false) }
       catch (error) { message.error(error instanceof Error ? error.message : '投诉提交失败') } finally { setSubmitterActionSaving(false) }
-    }}><Input.TextArea value={complaintReason} onChange={event => setComplaintReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写投诉事实与诉求"/></Modal>
+    }}><Form.Item label="投诉原因" required><Input.TextArea value={complaintReason} onChange={event => setComplaintReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写投诉事实与诉求"/></Form.Item></Modal>
     <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined}
       open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)}
       onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>

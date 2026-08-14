@@ -71,7 +71,7 @@
   >
     <el-alert :title="`已选择 ${selected.length} 条客资`" type="info" show-icon class="mb-12px" />
     <el-form label-width="90px">
-      <el-form-item v-if="batchMode === 'transfer'" label="目标销售"
+      <el-form-item v-if="batchMode === 'transfer'" label="目标销售" required
         ><el-select v-model="targetUserId" filterable class="w-100%"
           ><el-option
             v-for="item in candidates"
@@ -79,7 +79,7 @@
             :label="item.nickname"
             :value="item.id" /></el-select
       ></el-form-item>
-      <el-form-item label="操作原因"
+      <el-form-item label="操作原因" required
         ><el-input v-model="reason" type="textarea" :rows="4" maxlength="500" show-word-limit
       /></el-form-item>
     </el-form>

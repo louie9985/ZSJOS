@@ -42,6 +42,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
+  const mobile = Form.useWatch('mobile', form)
+  const wechatId = Form.useWatch('wechatId', form)
   const [areas, setAreas] = useState<AreaNode[]>([])
   const [catalog, setCatalog] = useState<LeadCatalog>(emptyCatalog)
   const [dicts, setDicts] = useState<Record<string, DictData[]>>({})
@@ -171,8 +173,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentNature" label="学员性质" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_NATURE)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市"/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">报名与服务</Divider>

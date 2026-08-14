@@ -15,12 +15,12 @@
           ><el-form-item label="客户姓名" prop="customerName"
             ><el-input v-model="form.customerName" /></el-form-item></el-col
         ><el-col :span="12"
-          ><el-form-item label="手机号" prop="customerMobile"
+          ><el-form-item label="手机号" prop="customerMobile" :required="!form.customerWechatId.trim()"
             ><el-input v-model="form.customerMobile" /></el-form-item></el-col
       ></el-row>
       <el-row :gutter="16"
         ><el-col :span="12"
-          ><el-form-item label="微信号"
+          ><el-form-item label="微信号" :required="!form.customerMobile.trim()"
             ><el-input v-model="form.customerWechatId" /></el-form-item></el-col
         ><el-col :span="12"
           ><el-form-item label="学员姓名" prop="studentName"

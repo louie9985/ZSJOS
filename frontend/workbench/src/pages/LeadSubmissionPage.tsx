@@ -21,6 +21,8 @@ type RemoteState = { loading: boolean; error?: string }
 
 export default function LeadSubmissionPage({ selfSourced = false }: { selfSourced?: boolean }) {
   const [form] = Form.useForm<FormValues>()
+  const mobile = Form.useWatch('mobile', form)
+  const wechatId = Form.useWatch('wechatId', form)
   const { message } = App.useApp()
   const [areas, setAreas] = useState<AreaNode[]>([])
   const [areaState, setAreaState] = useState<RemoteState>({ loading: true })
@@ -127,14 +129,14 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
     {!areaState.loading && !areaState.error && !areas.length && <Alert showIcon type="warning" message="地区数据尚未配置" />}
     {!remote.loading && !remote.error && !catalog.spus.length && <Alert showIcon type="warning" message="课程目录尚未配置，可选择“未明确课程”继续提交" />}
     <Card bordered={false} className="lead-form-card"><Spin spinning={remote.loading || areaState.loading} tip="正在读取地区、课程和字典配置">
-      <Form<FormValues> form={form} layout="vertical" requiredMark="optional" initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
+      <Form<FormValues> form={form} layout="vertical" initialValues={{ dispatchMode: LEAD_ASSIGNMENT_MODE.AUTO }}>
         <Title level={5}>客户信息</Title><Row gutter={[24, 0]}>
           <Col xs={24} md={12}><Form.Item name="name" label="姓名" rules={[{ required: true, message: '请输入姓名' }, { max: 100 }]}><Input /></Form.Item></Col>
-          <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
-          <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} /></Form.Item></Col>
+          <Col xs={24} md={12}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ validator: validateContact }, { pattern: PHONE_PATTERN, message: '手机号格式不正确' }]}><Input maxLength={32} /></Form.Item></Col>
+          <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} /></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市" /></Form.Item></Col>
         </Row>
-        <Divider /><Title level={5}>意向课程</Title>
+        <Divider /><Title level={5}><span className="required-section-title">意向课程</span></Title>
         <LeadIntendedProductEditor catalog={catalog} value={intentions} primaryKey={primaryKey}
           onChange={setIntentions} onPrimaryChange={setPrimaryKey}/>
         <Divider /><Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>

@@ -60,7 +60,7 @@ const submit = async () => {
     ></WorkbenchListPage
   ><el-dialog v-model="open" title="重复客资复核" width="560px"
     ><el-form :model="form" label-width="110px"
-      ><el-form-item label="结论"
+      ><el-form-item label="结论" required
         ><el-select v-model="form.resultType" class="w-100%"
           ><el-option label="新建客户" value="new_person" /><el-option
             label="复用客户"
@@ -69,15 +69,16 @@ const submit = async () => {
             value="reactivate_lead" /><el-option
             label="通知原负责人"
             value="notify_owner" /></el-select></el-form-item
-      ><el-form-item v-if="form.resultType === 'reuse_person'" label="客户编号"
+      ><el-form-item v-if="form.resultType === 'reuse_person'" label="客户编号" required
         ><el-input-number v-model="form.matchedPersonId" :min="1" /></el-form-item
       ><el-form-item
         v-if="['reactivate_lead', 'notify_owner'].includes(form.resultType)"
         label="客资编号"
+        required
         ><el-input-number v-model="form.matchedLeadId" :min="1" /></el-form-item
-      ><el-form-item label="销售编号"
+      ><el-form-item v-if="form.resultType === 'reactivate_lead'" label="销售编号" required
         ><el-input-number v-model="form.selectedSalesUserId" :min="1" /></el-form-item
-      ><el-form-item label="复核意见"
+      ><el-form-item label="复核意见" required
         ><el-input
           v-model="form.opinion"
           type="textarea"

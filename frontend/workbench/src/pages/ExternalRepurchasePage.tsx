@@ -6,6 +6,8 @@ type CustomerValues = { customerName: string; customerMobile?: string; customerW
 
 export default function ExternalRepurchasePage() {
   const [form] = Form.useForm<CustomerValues>()
+  const mobile = Form.useWatch('customerMobile', form)
+  const wechatId = Form.useWatch('customerWechatId', form)
   const [customer, setCustomer] = useState<SalesOrderEntryLead>()
   return <section className="workspace-page">
     <Typography.Title level={3}>历史客户复购</Typography.Title>
@@ -16,8 +18,8 @@ export default function ExternalRepurchasePage() {
         setCustomer({ id: 0, submittedName: values.customerName.trim(), submittedMobile: values.customerMobile?.trim(), submittedWechatId: values.customerWechatId?.trim() })
       }}>
         <Form.Item name="customerName" label="客户姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item>
-        <Form.Item name="customerMobile" label="手机号"><Input maxLength={32}/></Form.Item>
-        <Form.Item name="customerWechatId" label="微信号" rules={[{ max: 64 }]}><Input maxLength={64}/></Form.Item>
+        <Form.Item name="customerMobile" label="手机号" required={!wechatId?.trim()}><Input maxLength={32}/></Form.Item>
+        <Form.Item name="customerWechatId" label="微信号" required={!mobile?.trim()} rules={[{ max: 64 }]}><Input maxLength={64}/></Form.Item>
         <Button type="primary" htmlType="submit">填写复购订单</Button>
       </Form>
     </Card>

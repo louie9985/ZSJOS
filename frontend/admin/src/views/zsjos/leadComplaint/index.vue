@@ -50,12 +50,12 @@ const submit = async () => {
     ></WorkbenchListPage
   ><el-dialog v-model="open" title="处理销售投诉" width="520px"
     ><el-form label-width="90px"
-      ><el-form-item label="结论"
+      ><el-form-item label="结论" required
         ><el-radio-group v-model="result"
           ><el-radio value="founded">成立</el-radio
           ><el-radio value="unfounded">不成立</el-radio></el-radio-group
         ></el-form-item
-      ><el-form-item label="处理意见"
+      ><el-form-item label="处理意见" required
         ><el-input
           v-model="opinion"
           type="textarea"

@@ -320,11 +320,11 @@
         <div v-for="(attr, index) in attrForms" :key="attr.attrKey || index" class="attr-card">
           <el-row :gutter="12">
             <el-col :span="7"
-              ><el-input v-model="attr.attrName" placeholder="属性名，如：级别"
-            /></el-col>
+              ><el-form-item label="属性名称" required class="attr-form-item"><el-input v-model="attr.attrName" placeholder="如：级别"
+            /></el-form-item></el-col>
             <el-col :span="12"
-              ><el-input v-model="attr.valuesText" placeholder="属性值，以英文逗号分隔"
-            /></el-col>
+              ><el-form-item label="属性值" required class="attr-form-item"><el-input v-model="attr.valuesText" placeholder="以英文逗号分隔"
+            /></el-form-item></el-col>
             <el-col :span="3"><el-checkbox v-model="attr.required">必填</el-checkbox></el-col>
             <el-col :span="2"
               ><el-button link type="danger" @click="attrForms.splice(index, 1)"
@@ -406,16 +406,16 @@
 
   <el-dialog v-model="skuEditDialog" title="编辑 SKU" width="560px">
     <el-form :model="skuForm" label-width="90px">
-      <el-form-item label="SKU名称"
+      <el-form-item label="SKU名称" required
         ><el-input v-model="skuForm.skuName" maxlength="200"
       /></el-form-item>
       <el-form-item label="属性组合"
         ><el-input :model-value="formatAttrs(skuForm.attrValues)" disabled
       /></el-form-item>
-      <el-form-item label="价格"
+      <el-form-item label="价格" required
         ><el-input-number v-model="skuForm.price" :min="0" :precision="2" class="w-full"
       /></el-form-item>
-      <el-form-item label="状态"
+      <el-form-item label="状态" required
         ><el-switch v-model="skuForm.status" :active-value="0" :inactive-value="1"
       /></el-form-item>
       <el-form-item label="排序"><el-input-number v-model="skuForm.sort" :min="0" /></el-form-item>
@@ -836,5 +836,8 @@ onMounted(load)
   margin-bottom: 12px;
   border: 1px solid var(--el-border-color);
   border-radius: 6px;
+}
+.attr-form-item {
+  margin-bottom: 0;
 }
 </style>

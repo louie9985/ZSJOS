@@ -32,11 +32,11 @@
     <Pagination :total="total" v-model:page="queryParams.pageNo" v-model:limit="queryParams.pageSize" @pagination="getList" />
   </ContentWrap>
   <el-dialog v-model="assignVisible" :title="current?.collaboratorUserId ? '更换协同销售B' : '指派协同销售B'" width="480px">
-    <el-select v-model="salesUserId" filterable placeholder="选择同部门启用销售" style="width:100%"><el-option v-for="item in candidates" :key="item.id" :label="item.nickname" :value="item.id" /></el-select>
+    <el-form label-position="top"><el-form-item label="协同销售" required><el-select v-model="salesUserId" filterable placeholder="选择同部门启用销售" style="width:100%"><el-option v-for="item in candidates" :key="item.id" :label="item.nickname" :value="item.id" /></el-select></el-form-item></el-form>
     <template #footer><el-button @click="assignVisible=false">取消</el-button><el-button type="primary" :loading="saving" @click="submitAssign">确认</el-button></template>
   </el-dialog>
   <el-dialog v-model="exitVisible" title="退出公海池" width="520px">
-    <el-input v-model="exitReason" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="填写退出原因；退出后由A独占推进并重新计时" />
+    <el-form label-position="top"><el-form-item label="退出原因" required><el-input v-model="exitReason" type="textarea" :rows="4" maxlength="500" show-word-limit placeholder="填写退出原因；退出后由A独占推进并重新计时" /></el-form-item></el-form>
     <template #footer><el-button @click="exitVisible=false">取消</el-button><el-button type="danger" :loading="saving" @click="submitExit">确认退出</el-button></template>
   </el-dialog>
 </template>

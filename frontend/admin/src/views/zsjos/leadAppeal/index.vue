@@ -47,12 +47,12 @@ const submit = async () => {
     ></WorkbenchListPage
   ><el-dialog v-model="open" title="处理客资申诉" width="520px"
     ><el-form label-width="90px"
-      ><el-form-item label="处理结论"
+      ><el-form-item label="处理结论" required
         ><el-radio-group v-model="decision"
           ><el-radio value="overturn">撤销原判</el-radio
           ><el-radio value="uphold">维持原判</el-radio></el-radio-group
         ></el-form-item
-      ><el-form-item label="处理原因"
+      ><el-form-item label="处理原因" required
         ><el-input
           v-model="reason"
           type="textarea"

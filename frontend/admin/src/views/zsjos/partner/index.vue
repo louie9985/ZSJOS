@@ -48,10 +48,10 @@
       <el-form-item label="手机号"
         ><el-input v-model="createForm.mobile" maxlength="11"
       /></el-form-item>
-      <el-form-item label="用户名"
+      <el-form-item label="用户名" required
         ><el-input v-model="createForm.username" maxlength="32"
       /></el-form-item>
-      <el-form-item label="初始密码"
+      <el-form-item label="初始密码" required
         ><el-input v-model="createForm.password" type="password" show-password maxlength="20"
       /></el-form-item>
       <el-form-item label="渠道编号"
@@ -65,13 +65,13 @@
   </Dialog>
   <Dialog v-model="convertVisible" title="兼职转为新媒体员工">
     <el-form :model="convertForm" label-width="120px">
-      <el-form-item label="员工类型"
+      <el-form-item label="员工类型" required
         ><el-radio-group v-model="convertForm.targetType"
           ><el-radio-button value="new_media_employee">新媒体员工</el-radio-button
           ><el-radio-button value="new_media_manager">新媒体主管</el-radio-button></el-radio-group
         ></el-form-item
       >
-      <el-form-item label="归属部门"
+      <el-form-item label="归属部门" required
         ><el-tree-select
           v-model="convertForm.deptId"
           :data="deptList"
@@ -82,7 +82,7 @@
       <el-form-item label="迁移历史快照"
         ><el-switch v-model="convertForm.migrateHistoricalOrganization"
       /></el-form-item>
-      <el-form-item label="转换原因"
+      <el-form-item label="转换原因" required
         ><el-input v-model="convertForm.reason" type="textarea" maxlength="500"
       /></el-form-item>
     </el-form>
