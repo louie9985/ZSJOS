@@ -20,7 +20,7 @@ INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V049','Global maintenance mode and scheduler guard','maintenance-mode-v1')
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
 INSERT INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`source`,`applied_at`)
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V049','Global maintenance mode and scheduler guard',SHA2('maintenance-mode-v1',256),'legacy',NOW())
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`),
-  `source`=VALUES(`source`),`applied_at`=VALUES(`applied_at`);
+  `release_version`=VALUES(`release_version`),`installed_at`=VALUES(`installed_at`);

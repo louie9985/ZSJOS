@@ -650,3 +650,31 @@
 - Verification evidence: Workbench `npm run typecheck` passed; all 30 Vitest files and 162 tests passed, including CSS hygiene, route/navigation, theme, lead management, subordinate sales, submission guard, and realtime unseen tests; `npm run build` passed with 5,085 modules transformed and only the existing large-chunk warning; `git diff --check` passed. Authenticated browser checks passed at `1280x720` and `390x844` with zero document/shell horizontal overflow; Today Tasks and Subordinate Sales loaded real API data, and Subordinate Sales changed from a desktop grid to the intended mobile single-column/list-only state. Browser logs contained only existing Ant Design deprecation warnings for Drawer `width` and `List`, with no runtime exception.
 - Dependency or integration impact: Integrates the remote declared `@types/node` development dependency and lockfile state; no new dependency beyond the remote commits, backend/schema/migration/database/permission/BPM change, external-service reconfiguration, branch/worktree switch, rebase, push, or publication. The local development server already listening on port 5174 was reused and remains available.
 - Remaining work: Push the resulting local merge commit only after separate explicit authorization. Ant Design Drawer `width` and List deprecation warnings can be handled in a separately scoped cleanup before a future major-version upgrade.
+
+### Workstream registration: 2026-08-14 14:34:59 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Correct the unapplied V049 and V050 module-schema version column names so the migrations match the established Core migration metadata table.
+- Non-goals: Do not execute migrations, alter database state, change application behavior, modify V051-V053 without a demonstrated defect, or touch unrelated mapper/test work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `221ac2da75ae66a33e11d805a45a8a6f991f4971`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V049__maintenance_mode_and_scheduler_guard.sql`, `script/sql/mysql/migrations/V050__readonly_impersonation_and_audit_catalog.sql`, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing V020 `zsjos_module_schema_version` contract with `release_version` and `installed_at`; user confirmation that V049 and later migrations have not been executed.
+- Integration order: Direct correction on the user-designated current `main` workstream before any V049+ migration execution.
+- Verification plan: Scan V049-V053 metadata columns against the baseline schema, run database migration static checks, and inspect the focused diff without executing SQL against a database.
+
+### 2026-08-14 14:38:08 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `221ac2da75ae66a33e11d805a45a8a6f991f4971`
+- User goal: Fix the V049 MySQL error `Unknown column 'source' in 'field list'`; V049 and later migrations were confirmed unapplied and may be corrected directly.
+- Key decisions: Preserve the established V020 module-version schema; replace only the invalid V049/V050 metadata columns `source`/`applied_at` with `release_version`/`installed_at`; leave V051-V053 unchanged after confirming they do not contain this defect; do not execute migrations or touch unrelated mapper/test work.
+- Execution or analysis result: Corrected both unapplied migration files. V049 and V050 now use the same six-column module-version contract as the Core baseline and adjacent migrations.
+- Changed files: `script/sql/mysql/migrations/V049__maintenance_mode_and_scheduler_guard.sql`; `script/sql/mysql/migrations/V050__readonly_impersonation_and_audit_catalog.sql`; `handoff/20260810-main-existing.md`.
+- Verification evidence: A focused contract check passed for both corrected inserts; scan of V049-V053 found no remaining migration-metadata `source` or `applied_at` reference; `git diff --check` passed. Repository-wide `python script/sql/mysql/tools/zsjos_db.py check` remains blocked by pre-existing missing Core schema mappings for `zsjos_lead_claim_daily_counter` and `zsjos_lead_transfer_request`, outside this task. No database SQL was executed.
+- Dependency or integration impact: No dependency, schema shape, business data, permission, runtime, branch, commit, or external-state change. The correction must be present before V049 or V050 is executed.
+- Remaining work: Apply V049 and later only through the controlled migration flow when separately authorized. Resolve the unrelated Core schema mapping drift in its owning workstream before relying on the full repository database check.

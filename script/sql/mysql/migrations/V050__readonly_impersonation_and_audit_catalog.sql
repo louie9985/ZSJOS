@@ -80,7 +80,7 @@ INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
 VALUES ('V050','Read-only impersonation and audit catalog','readonly-impersonation-v1')
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);
 INSERT INTO `zsjos_module_schema_version`
-(`module_code`,`version`,`description`,`checksum`,`source`,`applied_at`)
+(`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V050','Read-only impersonation and audit catalog',SHA2('readonly-impersonation-v1',256),'legacy',NOW())
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`),
-  `source`=VALUES(`source`),`applied_at`=VALUES(`applied_at`);
+  `release_version`=VALUES(`release_version`),`installed_at`=VALUES(`installed_at`);
