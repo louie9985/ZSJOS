@@ -689,3 +689,31 @@
 - Verification evidence: BPM focused tests 6/6 and ZSJOS focused tests 52/52 passed; 25-module server package passed; Workbench 31 files/165 tests, typecheck, and production build passed; Admin scoped ESLint across 20 affected files and `build:local` passed; Git unmerged/conflict/diff checks passed. Full Maven remains blocked by existing Infra `CodegenEngineUniappTest.testExecute_treeSearch`; Admin `ts:check` remains blocked by 14 existing cross-module errors; database check confirms unique migration ordering but remains blocked by existing missing Core mappings for `zsjos_lead_claim_daily_counter` and `zsjos_lead_transfer_request`.
 - Dependency or integration impact: Local main contains all workstreams and is ahead of origin; no push, migration execution, BPM publication, service restart, permission change, or external-state mutation was performed.
 - Remaining work: Real database/BPM/authenticated browser checks and the recorded baseline failures remain separate work; auxiliary worktrees and local codex branches are removed after this entry is committed.
+
+### Workstream registration: 2026-08-14 16:24:56 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Make the existing local `main` worktree the default location for future AI changes and require explicit user direction before creating or switching branches or worktrees.
+- Non-goals: Do not create, switch, delete, merge, commit, or push branches or worktrees; do not change nested `AGENTS.md` files; do not alter unrelated repository changes or remove the handoff requirement.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `b53811751a47193e3666b1fa97ad4d629f83717c`
+- Target branch: `main`
+- Ownership scope: Root `AGENTS.md` section 8 and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: User confirmation to replace mandatory per-workstream branch/worktree isolation with default serialized development in the current local `main` worktree.
+- Integration order: Direct documentation update in the user-designated current `main` workstream; no separate integration step.
+- Verification plan: Review the focused diff, search the root rules for branch/worktree requirements, and run `git diff --check` without touching the unrelated V054 change.
+
+### 2026-08-14 16:25:57 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `b53811751a47193e3666b1fa97ad4d629f83717c`
+- User goal: Remove the rule that makes new work use an independent branch and worktree, so future development defaults to the local `main` worktree unless the user explicitly requests isolation.
+- Key decisions: Make the currently checked-out local branch and worktree the default; prohibit AI-created, deleted, or switched branches/worktrees without an explicit user request; serialize file-changing tasks in a shared worktree; retain workstream registration, ownership, verification, and handoff requirements; keep isolated branch/worktree rules only as a conditional workflow requested by the user.
+- Execution or analysis result: Replaced the mandatory parallel-workstream isolation section with default local development rules and explicit opt-in isolation rules. No Git branch or worktree operation was performed.
+- Changed files: `AGENTS.md`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Focused diff review confirmed the old `Every new parallel workstream` and primary-`main` prohibition text was removed; targeted search confirmed the default local `main` rule, prohibition on automatic branch/worktree operations, and explicit opt-in isolation rule; focused `git diff --check` passed with only line-ending conversion warnings.
+- Dependency or integration impact: Future AI file-changing work defaults to the existing local `main` worktree and must be serialized unless the user explicitly requests isolated development. No dependency, product behavior, schema, database, permission, external service, branch, worktree, commit, push, or publication change. The unrelated existing V054 working-tree modification was preserved.
+- Remaining work: None.

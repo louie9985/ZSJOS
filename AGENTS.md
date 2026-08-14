@@ -107,16 +107,16 @@ Verification is proportional to risk, but evidence is mandatory:
 - Local and production must use the same schema baseline and migration order. A read-only verification script and schema-difference check are required before release.
 - Database scripts must document dependencies, execution order, repeatability, rollback limitations, and the exact data scope they seed.
 
-## 8. Parallel development and workstream isolation
+## 8. Default local development and optional workstream isolation
 
-- Every new parallel workstream **MUST** use its own Git branch and worktree. AI-owned branches **MUST** use the `codex/<workstream-id>` naming convention.
-- A worktree **MUST** belong to exactly one workstream and **MUST NOT** be shared by concurrent AI tasks. New feature work **MUST NOT** run directly in the primary `main` worktree unless the user explicitly designates it as a transitional or integration workstream.
-- A new workstream **MUST** start from a committed base. It **MUST NOT** depend on another workstream's uncommitted changes.
-- Before changing files, each workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan in `handoff/<workstream-id>.md`.
-- Each file **MUST** have one active workstream owner. When workstreams need the same file, they **MUST** name a primary owner and integration order before either line changes it; otherwise the work must be serialized.
-- A workstream **MUST NOT** modify files outside its recorded scope without first updating its handoff record and coordinating any affected workstream.
-- Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`. After integration, affected checks **MUST** be rerun on the integration branch before the workstream is marked `merged`.
-- Branch, worktree, commit, rebase, merge, push, and publication operations remain subject to the explicit-confirmation requirements in sections 2 and 4.
+- Unless the user explicitly requests otherwise, new AI file-changing work **MUST** use the currently checked-out local branch and worktree. In the primary repository, the default development location is the existing local `main` worktree.
+- The AI **MUST NOT** create, delete, or switch Git branches or worktrees for new work unless the user explicitly requests that operation. Branch and worktree operations remain subject to the separate explicit-confirmation requirements in sections 2 and 4.
+- File-changing tasks in the same worktree **MUST** be serialized. Concurrent AI tasks may inspect or analyze the repository, but they **MUST NOT** modify files in a shared worktree.
+- Before changing files, the active workstream **MUST** register its ID, goal, non-goals, branch, absolute worktree path, base commit, target branch, ownership scope, owner, dependencies, integration order, and verification plan in `handoff/<workstream-id>.md`. Work performed directly on local `main` may reuse and update the designated `main` workstream record.
+- Each file **MUST** have one active workstream owner. A workstream **MUST NOT** modify files outside its recorded scope without first updating its handoff record and coordinating any affected workstream.
+- Only when the user explicitly requests isolated or parallel development, each file-changing workstream **MUST** use its own branch and worktree, start from a committed base, and avoid dependencies on another workstream's uncommitted changes. AI-owned branches **MUST** use the `codex/<workstream-id>` naming convention unless the user specifies otherwise.
+- For an explicitly requested isolated workstream, the worktree **MUST** belong to exactly one workstream. Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`; affected checks **MUST** be rerun on the integration branch before it is marked `merged`.
+- Commit, rebase, merge, push, and publication operations remain subject to the explicit-confirmation requirements in sections 2 and 4.
 
 ## 9. AI file-change handoff log
 
