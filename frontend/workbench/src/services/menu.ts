@@ -1,4 +1,5 @@
 import type { WorkbenchMenu } from './api'
+import { APP_ROUTES } from '../constants'
 
 export type SecondaryNavigationItem = {
   key: string
@@ -76,6 +77,6 @@ export function getInitialTarget(items: PrimaryNavigationItem[]) {
 }
 
 export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path: string) {
-  if (path === '/' || findPageByPath(items, path)) return
+  if (path === '/' || path === APP_ROUTES.USER_PROFILE || findPageByPath(items, path)) return
   return getInitialTarget(items)
 }

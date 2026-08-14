@@ -47,6 +47,7 @@ export const STORAGE_KEYS = {
 } as const
 
 export const APP_ROUTES = {
+  USER_PROFILE: '/user/profile',
   LEAD_SUBMISSION: '/zsjos/leads/submit',
   LEAD_SELF_SOURCED: '/zsjos/leads/self-sourced',
   LEAD_COMPLAINTS: '/zsjos/leads/complaints',
