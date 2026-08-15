@@ -771,3 +771,170 @@
 - Verification evidence: Git push reported `main -> main`; the feature commit was created with 168 insertions and 60 deletions after all recorded Workbench and browser checks passed.
 - Dependency or integration impact: The verified Workbench change is now published on `origin/main`. This completion record adds no product behavior, dependency, schema, database, permission, BPM, service, or history rewrite.
 - Remaining work: Push the documentation-only completion commit, then confirm local `HEAD` and `origin/main` resolve to the same commit and the tracked worktree is clean.
+
+### Workstream registration: 2026-08-15 13:05:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Synchronize the Gitee yudao-ui-admin-vue3 HRM and FMS frontend feature commits into the local `frontend/admin` tree.
+- Non-goals: Do not change backend or database files; do not create, switch, merge, commit, push, or delete branches/worktrees; do not import unrelated upstream IM/CRM changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- Target branch: `main`
+- Ownership scope: `frontend/admin` and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Gitee `master` fetched as `gitee/master`; HRM commit `319723b33b` and FMS commit `6ff17f98d8`.
+- Integration order: Apply HRM patch, apply FMS patch, review shared-file conflicts, then run frontend checks.
+- Verification plan: `git diff --check`; `pnpm ts:check`; `pnpm lint`; `pnpm build:local` from `frontend/admin`; inspect unmerged paths and changed-file scope.
+
+### 2026-08-15 13:06:03 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- User goal: Synchronize the Gitee `yudao-ui-admin-vue3` HRM and FMS frontend additions into the local administrator frontend.
+- Key decisions: Applied upstream HRM commit `319723b33b` and FMS commit `6ff17f98d8` as path-prefixed patches under `frontend/admin`; retained the local ZSJOS `user-relation` hidden route alongside the upstream FMS auxiliary route; excluded unrelated upstream IM/CRM, README, dependency, and lockfile changes; did not stage, commit, push, or alter backend/database files.
+- Execution or analysis result: Added HRM/FMS API and view trees, HRM detail routes, FMS auxiliary route, FMS account-set header switch, shared chart/upload/dictionary/date utility updates. No unmerged paths remain. Existing concurrent backend HRM/FMS and related frontend area-selector changes were preserved untouched.
+- Changed files: `frontend/admin/src/api/fms/**`; `frontend/admin/src/api/hrm/**`; `frontend/admin/src/views/fms/**`; `frontend/admin/src/views/hrm/**`; `frontend/admin/src/components/Echart/src/Echart.vue`; `frontend/admin/src/components/UploadFile/src/UploadFile.vue`; `frontend/admin/src/layout/components/ToolHeader.vue`; `frontend/admin/src/router/modules/remaining.ts`; `frontend/admin/src/utils/dict.ts`; `frontend/admin/src/utils/formatTime.ts`; this handoff record.
+- Verification evidence: `git diff --check` passed; `pnpm build:local` passed after transforming 8,780 modules; no unmerged paths reported. `pnpm ts:check` remains failing with 14 errors: 12 pre-existing ZSJOS/shared errors and 2 new upstream FMS `FmsReportFormulaForm.vue` literal-union errors. `pnpm lint` remains failing with 76 style errors across existing ZSJOS files and newly imported HRM/FMS files; no auto-fix was run. No browser or authenticated API check was run.
+- Dependency or integration impact: No npm/Maven dependency, lockfile, schema, database, permission, branch, commit, push, or external service change. Backend HRM/FMS files already present as concurrent user changes are required for runtime API integration but were not modified by this turn.
+- Remaining work: Resolve the recorded baseline lint/type errors and the two FMS formula-rule type errors in a separate authorized cleanup task; perform authenticated browser/API checks when backend services are available; stage/commit only when explicitly requested.
+### Workstream registration: 2026-08-15 14:03:31 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Repair imported HRM/FMS database state by removing incompatible tenant/demo business rows, synchronizing authoritative upstream menu and dictionary metadata, granting the new menus only to tenant 1 `super_admin`, and verifying the resulting local database.
+- Non-goals: Do not modify System users, departments, posts, roles, tenant records, ZSJOS business data, unrelated modules, global FMS subject/report templates, the global HRM salary-slip template, or HRM salary-option templates; do not seed HRM/FMS business/demo records; do not create, switch, merge, commit, or push branches.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V058__hrm_fms_metadata_and_data_cleanup.sql`, the focused HRM/FMS read-only verification and generation tooling under `script/sql/mysql/`, directly affected migration/bootstrap documentation, external local backup artifacts, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: User-confirmed destructive local-database scope; existing HRM/FMS schemas; System-owned menu, role, tenant, and dictionary tables; upstream Yudao SQL commit `2bbe79b34ab8c9c7b0148300599dc8d4881c8db1`; V057 migration ordering.
+- Integration order: Create and verify an external backup; delete confirmed HRM/FMS tenant/demo rows child-to-parent; synchronize dictionaries; insert remapped menus in the reserved `600000-699999` namespace; grant only tenant 1 `super_admin`; record V058; run read-only verification.
+- Verification plan: Review SQL syntax, relationships, guards, scope, and rollback limitations; validate generated metadata counts and menu parent remapping; verify backup completeness; execute against the local MySQL database; confirm cleanup, preserved global templates, dictionaries, menus, exclusive role grants, unchanged protected System/ZSJOS row counts, and migration-version records; run repository database checks where available.
+
+### 2026-08-15 14:17:18 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- User goal: Repair HRM/FMS database data imported from an incompatible tenant/account/organization baseline and make the modules usable with local authoritative System metadata.
+- Key decisions: Treat the imported HRM/FMS business rows as non-remappable demo data; physically remove 2,391 HRM rows and 3,101 FMS rows in the confirmed tenant scope; preserve the four reviewed global template sets; use upstream commit `2bbe79b34ab8c9c7b0148300599dc8d4881c8db1` for menus and dictionaries; remap menu IDs by adding 600000; grant the resulting 294 nodes only to tenant 1 `super_admin`; guard all destructive work with the V058 version record and retain a full external logical backup for recovery.
+- Execution or analysis result: Created and applied V058 to local database `ruoyi-vue-pro`. The migration removed 5,492 incompatible business/demo rows, installed 60 dictionary types and 244 dictionary entries, installed the complete 294-node HRM/FMS menu trees, created 294 tenant-1 `super_admin` grants, and recorded both schema-version rows. The first client invocation rejected an unsupported option before connecting; the corrected invocation completed successfully. No System identity, organization, role, tenant, or ZSJOS business row was changed.
+- Changed files: `script/sql/mysql/migrations/V058__hrm_fms_metadata_and_data_cleanup.sql`; `script/sql/mysql/tools/generate-hrm-fms-v058.ps1`; `script/sql/mysql/verify/hrm-fms-v058.sql`; `script/sql/mysql/migrations/README.md`; `handoff/20260810-main-existing.md`. External recovery artifacts: `D:\ZSJ-OS-backups\hrm-fms-repair\ruoyi-vue-pro-before-v058-20260815-140909.sql` and its `.sha256` sidecar.
+- Verification evidence: Backup is 136,759,959 bytes, contains 329 table sections and a dump-completion marker, SHA-256 `47DE799334F192151F7F6F41990289E888424680741E69DEAF25D03E453E9AB1`; all 17 focused SQL verification checks passed; target HRM/FMS residual counts are zero; global template counts remain 190/135/84/1; menu counts are 294 total, 146 HRM permissions, 101 FMS permissions, two roots, and zero orphans; dictionary counts are 60/244; unauthorized grants are zero; protected System counts remain users 18, departments 29, posts 30, roles 36, tenants 3; the ZSJOS aggregate increased only by the two expected V058 version rows; a second V058 execution produced an identical database fingerprint; generator hashes matched at `494AA1D56D21890EFE27A4C4E56AE87CDB0CF091286728FA3A03469ACD5E0206`; `zsjos-db check` and focused `git diff --check` passed.
+- Dependency or integration impact: The local database now exposes HRM/FMS server-owned menus and dictionaries and no longer contains the incompatible imported business/demo data. No dependency, branch, worktree, commit, push, service restart, cache clear, user/department/post/role/tenant mutation, or ZSJOS business mutation occurred. V058 assumes HRM/FMS tables are installed for meaningful cleanup; fresh HRM/FMS schema integration remains separate from the non-destructive core bootstrap.
+- Remaining work: A running backend may retain menu or dictionary cache populated before the direct SQL migration; refresh it through the normal approved operational flow before authenticated UI validation. Authenticated HRM/FMS browser/API checks were not run. No business records are seeded, so HRM employees and FMS account sets must be created through their normal administrator workflows.
+
+### Workstream registration: 2026-08-15 14:33:34 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Fully reconcile the local database migration state by applying the confirmed repository-aligned V003 menu/permission behavior, applying missing V047/V056/V057 behavior, registering effective V001, and adding a forward V059 registry reconciliation.
+- Non-goals: Do not change Lead, order, HRM/FMS, user, department, post, role-definition, tenant, or unrelated business rows except the exact filter-version and notification metadata owned by the confirmed migrations; do not clear caches or restart services; do not create, switch, merge, commit, or push branches.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V059__migration_registry_reconciliation.sql`, focused migration-registry verification, directly affected migration documentation, external backup artifacts, the local `ruoyi-vue-pro` migration/menu/filter/schema/notification metadata described in the confirmed plan, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: User selection A; existing V001-V058 migration files; local database backup; repository menu baseline for IDs 6749/6772; exact-default V047 filters; successful V056 account uniqueness preflight; V058 already installed.
+- Integration order: Backup; register effective V001; apply V003; apply V047; apply V056; apply V057; apply V059; run structure, behavior, registry, repeatability, and protected-row verification.
+- Verification plan: Verify the backup marker/hash; check V003 route/button separation and grants; confirm V047 changes exactly two active schemes and appends expected immutable versions; run V056 bootstrap contract and account-uniqueness checks; confirm V057 columns/defaults; require all V001-V059 versions in both registries with no false pending versions; rerun repeatable scripts and compare protected fingerprints; run `zsjos-db check` and focused `git diff --check`.
+
+### 2026-08-15 14:37:42 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- User goal: Fully repair missing and inconsistent local SQL migration state, pausing for user decisions when repository intent conflicts with actual database behavior.
+- Key decisions: Applied user-selected option A for V003 by aligning menu 6749 with the repository route/permission baseline; registered the already-effective V001 behavior; stopped before V056/V057/V059 after V047 exposed a new JSON type conflict requiring user direction.
+- Execution or analysis result: Created and verified a fresh full logical backup; V001 now has its legacy version record; V003 now separates the permission-free route from the `zsjos:lead:claim` button and gives all three existing query-all roles the route grant; V047 matched and updated exactly two default schemes and appended two version-2 snapshots, but MySQL serialized each replacement `options` array as a JSON string rather than an array. V056, V057, and the draft V059 have not been executed.
+- Changed files: Draft `script/sql/mysql/migrations/V059__migration_registry_reconciliation.sql`; draft `script/sql/mysql/verify/migration-registry-v059.sql`; `script/sql/mysql/migrations/README.md`; `handoff/20260810-main-existing.md`. External recovery artifacts: `D:\ZSJ-OS-backups\migration-reconciliation\ruoyi-vue-pro-before-migration-reconciliation-20260815-143403.sql` and its `.sha256` sidecar.
+- Verification evidence: Backup is 135,123,199 bytes with 329 table sections and a valid completion marker, SHA-256 `3875ABFC2FC08ECD9E5C4E3DA8434E8307A8AB8AED0E6A06731F0A4DDCDDADBF`; `zsjos-db check` and focused `git diff --check` passed; V003 route/button SQL checks passed and query-all roles missing the route are zero; V047 preflight found two exact published and draft matches with no next-version conflict, execution produced two snapshots, and structured inspection proved `$.groups[1].options` is now JSON type STRING rather than ARRAY.
+- Dependency or integration impact: The local database currently contains correct V001/V003 state and recorded V047, but the two active submitter/owner filter schemes require a forward JSON-array repair before application use. No V056/V057 schema or notification changes and no registry reconciliation were applied. No business Lead/order rows, identities, organization rows, role definitions, HRM/FMS rows, service state, branch, commit, or push changed.
+- Remaining work: User must choose whether to preserve the malformed V047 version-2 snapshots and append corrected version-3 snapshots (recommended), rewrite the newly created version-2 snapshots in place, or restore the pre-reconciliation backup and restart the sequence. After that decision, finish V056/V057, renumber or revise the registry migration as needed, verify repeatability and protected fingerprints, and append the final delivery record.
+
+### Workstream registration: 2026-08-15 14:40:04 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Apply user-selected option A by preserving malformed V047 version-2 audit snapshots, creating a forward V059 JSON-array repair with version-3 snapshots, completing V056/V057, and reconciling registries through V060.
+- Non-goals: Do not rewrite or delete immutable V047 snapshots; do not change non-default filter schemes, Lead/order/identity/organization/HRM/FMS business rows, role definitions, or unrelated metadata; do not clear caches, restart services, commit, or push.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- Target branch: `main`
+- Ownership scope: V059 filter JSON repair, V060 registry reconciliation, their read-only verification scripts, directly affected migration documentation, local confirmed migration metadata/schema/configuration, external backup artifacts, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: User-selected option A; completed V001/V003/V047; preserved V047 version-2 snapshots; verified pre-reconciliation backup; V056 uniqueness preflight; V058 installed.
+- Integration order: Replace draft V059 with the forward filter repair; move registry reconciliation to V060; validate SQL; execute V056, V057, V059, and V060 in effective dependency order; verify current version-3 arrays while retaining version-2 strings; rerun migrations and compare protected fingerprints.
+- Verification plan: Require two preserved V047 snapshots and two new V059 snapshots; require current draft/published `options` JSON type ARRAY with expected stable keys; run V056/V057 structural and notification checks; require V001-V060 in both registries; check zero pending versions, repeatability, protected row counts, `zsjos-db check`, and focused `git diff --check`.
+
+### 2026-08-15 14:48:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- User goal: Continue the complete migration repair with option A for the V047 JSON conflict and surface any additional source/data conflicts for a user decision.
+- Key decisions: Preserved malformed V047 version-2 snapshots, added and applied V059 to append correct version-3 arrays, moved registry reconciliation to V060, applied V056/V057, and paused when extended baseline verification exposed the pre-existing V048/V055 menu-ID collision and a configurable follow-up timeout difference.
+- Execution or analysis result: V056 installed two required tables, three columns, two user uniqueness indexes, eight templates and eight tenant rules; V057 installed both runtime columns; V059 repaired exactly two active schemes to JSON-array version 3 while preserving two V047 string snapshots; V060 reconciled both registries to 60/60. Extended verification found that V055 menu 6850 was skipped because V048 already owns 6850 for personnel, and the current tenant-1 follow-up timeout is 30 minutes versus the fresh-baseline default of 1440 minutes. No V061 repair has been created or applied.
+- Changed files: `script/sql/mysql/migrations/V059__split_filter_json_array_repair.sql`; `script/sql/mysql/migrations/V060__migration_registry_reconciliation.sql`; `script/sql/mysql/verify/migration-reconciliation-v060.sql`; `script/sql/mysql/migrations/README.md`; `handoff/20260810-main-existing.md`. The prior draft V059 registry filename was removed before application.
+- Verification evidence: Migration-state verifier passed 12/12; all 60 repository migrations exist in both registries with no missing versions; V059/V060 repeat fingerprint remained `60|60|2|2|6|2|5|8|8`; `zsjos-db check`, focused `git diff --check`, and all 17 HRM/FMS checks passed. Extended fresh-bootstrap verification passed 97/103; four failures are expected existing-environment differences (populated business dictionaries and upgraded filter versions), while V055 menu ID and the 30-versus-1440 follow-up timeout require explicit resolution.
+- Dependency or integration impact: Database migration registries and V001/V003/V047/V056/V057/V058/V059/V060 effective behavior are now aligned. V055 schema behavior exists, but its independent supervisor-confirmation menu is absent due to an upstream repository ID collision. No V061, role grant, timeout change, service restart, cache clear, branch, commit, or push occurred.
+- Remaining work: User must decide whether to allocate unused menu ID 6856 to supervisor confirmation through a forward V061 repair and correct fresh bootstrap/verification references, and whether to preserve the current administrator-owned 30-minute first-follow timeout or restore the 1440-minute baseline default. Then apply the approved repair, rerun registry/contract/repeatability checks, and append the final delivery record.
+
+### Workstream registration: 2026-08-15 14:50:18 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Apply the user-selected option A to resolve the V048/V055 menu-ID collision with a forward V061 migration, align fresh bootstrap and verification artifacts, and preserve the administrator-owned 30-minute follow-up timeout.
+- Non-goals: Do not rewrite applied V048 or V055 migrations; do not change personnel menus 6850-6855, grant the supervisor-confirmation menu to any role, overwrite tenant follow-up settings, alter business dictionaries or filter history, touch unrelated HRM/FMS frontend/backend changes, restart services, commit, or push.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V061__sales_order_supervisor_menu_id_collision.sql`, `script/sql/mysql/02-bootstrap-zsjos-seed.sql`, `script/sql/mysql/verify-bootstrap.sql`, the V061 migration-reconciliation verifier under `script/sql/mysql/verify/`, `script/sql/mysql/migrations/README.md`, `docs/operations/sales-order-dual-approval-deployment.md`, the exact local database menu and migration-registry rows owned by V061, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: User-selected option A for both remaining decisions; completed V001-V060 reconciliation; V048 personnel menu ownership of IDs 6850-6855; V055 supervisor-confirmation schema behavior; unused menu ID 6856; verified pre-reconciliation database backup.
+- Integration order: Add repeatable forward V061; align fresh seed and bootstrap verification; update focused migration verification and documentation; validate repository SQL; confirm ID 6856 remains free; execute V061 locally; verify registries, menus, zero grants, preserved settings and prior repair invariants; rerun V061 to prove repeatability.
+- Verification plan: Require 61 numbered migration files and V001-V061 in both registries; require personnel query at 6850 and supervisor confirmation at 6856; require zero role grants for 6856; confirm the follow-up timeout remains 30, V059 snapshot/current JSON states remain unchanged, and all V058 checks pass; run extended bootstrap verification, `zsjos-db check`, focused `git diff --check`, and a second V061 execution with an unchanged fingerprint.
+
+### 2026-08-15 14:55:37 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- User goal: Resolve all remaining migration-reconciliation conflicts with option A, including the V048/V055 menu collision, while preserving the current administrator-owned follow-up timeout.
+- Key decisions: Kept personnel menus at IDs 6850-6855; added a forward V061 migration that installs the supervisor-confirmation menu at unused ID 6856; retained applied V048/V055 history; added hard conflict assertions for an occupied ID or duplicate stable permission; created no role grant; preserved the tenant-1 default follow-up timeout at 30 minutes and all prior V047/V059 snapshots.
+- Execution or analysis result: Added and applied V061 to local database `ruoyi-vue-pro`, synchronized the fresh seed, bootstrap verification, focused migration verifier, migration documentation, and deployment instructions. Both migration registries now contain V001-V061. Personnel remains at 6850 and supervisor confirmation now exists independently at 6856 with zero role grants. A second V061 execution was a no-op by database fingerprint.
+- Changed files: `script/sql/mysql/migrations/V061__sales_order_supervisor_menu_id_collision.sql`; `script/sql/mysql/02-bootstrap-zsjos-seed.sql`; `script/sql/mysql/verify-bootstrap.sql`; renamed `script/sql/mysql/verify/migration-reconciliation-v060.sql` to `script/sql/mysql/verify/migration-reconciliation-v061.sql` and extended it; `script/sql/mysql/migrations/README.md`; `docs/operations/sales-order-dual-approval-deployment.md`; `handoff/20260810-main-existing.md`.
+- Verification evidence: The focused V001-V061 verifier passed all 15 checks; both registries are 61/61; menu 6850 is the V048 personnel route and menu 6856 is the V061 supervisor-confirmation route; active grants for 6856 are zero; the temporary assertion procedure was removed; both first and second execution fingerprints were `61|61|2|0|4|1`; all 17 V058 HRM/FMS checks passed; the V047 malformed version-2 and V059 corrected version-3 snapshots remain 2/2; tenant-1 default follow-up timeout remains 30; `zsjos-db check` passed; 61 migration files are continuous; focused `git diff --check` passed with line-ending warnings only. Extended bootstrap verification passed 99/104; the five failures are the explicitly preserved existing-environment differences: populated Lead category/source dictionaries, V059-upgraded filter schemes/versions, and administrator-owned 30-minute follow-up timeout.
+- Dependency or integration impact: Existing environments gain one unassigned server-owned menu and two V061 registry rows. Fresh environments use the collision-free menu ID. No order, personnel, account, role, permission grant, business dictionary, filter history, HRM/FMS data, service state, branch, commit, push, or publication change occurred. The verified full recovery backup remains at `D:\ZSJ-OS-backups\migration-reconciliation\ruoyi-vue-pro-before-migration-reconciliation-20260815-143403.sql` with its checksum sidecar.
+- Remaining work: Refresh backend menu caches through the normal approved operational flow before authenticated UI validation. Assign menu 6856 only to intended supervisor users through System role management. The five intentional existing-environment differences should remain documented rather than forced to fresh-bootstrap values. No commit or push was requested.
+
+### Workstream registration: 2026-08-15 15:04:32 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Consolidate every compatible local branch and the current confirmed HRM/FMS, Admin, and SQL repair work into one local `main` commit.
+- Non-goals: Do not force-merge unrelated-history `gitee/master`; do not alter imported feature behavior, delete branches, push, publish, restart services, or change database state beyond the already completed V058-V061 work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0d6d656398670835f3bf90950b3777010c11a9d8`
+- Target branch: `main`
+- Ownership scope: All currently modified and untracked HRM/FMS backend and Admin files, the already completed V058-V061 SQL/tooling/documentation changes, `frontend/admin` shared adaptations required by HRM/FMS, Maven module wiring, and this handoff record; Git index and one local integration commit.
+- Owner: Codex `/root`
+- Dependencies: User confirmation to exclude unrelated `gitee/master`, retain the already merged `codex/crm-lifecycle-gap-implementation`, commit the current verified work directly on local `main`, and avoid push or branch deletion.
+- Integration order: Inspect the exact worktree; verify compatible branch ancestry; run database checks, Admin type/lint/build checks, and focused backend compile/tests; append final delivery evidence; stage the exact current worktree; commit once on `main`; verify clean status and branch containment.
+- Verification plan: Require `codex/crm-lifecycle-gap-implementation` to remain an ancestor of `main`; require `gitee/master` to remain excluded because no merge base exists; run `zsjos-db check`, Admin `pnpm ts:check`, `pnpm lint`, and `pnpm build:local`, backend Maven compile/test checks appropriate to HRM/FMS wiring, `git diff --check`, staged-file review, post-commit clean-status and containment checks.
+
+### 2026-08-15 15:07:16 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0d6d656398670835f3bf90950b3777010c11a9d8` (pre-commit HEAD)
+- User goal: Merge all compatible branches and consolidate the current confirmed HRM/FMS, Admin, and migration work into local `main`.
+- Key decisions: Excluded `gitee/master` because it is an unrelated-history upstream Admin repository with no merge base; treated `codex/crm-lifecycle-gap-implementation` as already merged because it is an ancestor of `main`; committed the complete current 1,322-file integration snapshot without rewriting imported behavior, auto-formatting unrelated files, deleting branches, or pushing.
+- Execution or analysis result: Prepared the imported HRM/FMS backend and Admin modules, shared Admin adaptations, Maven wiring, and V058-V061 database reconciliation artifacts as one local `main` integration commit. The database repair itself remains applied and verified from the preceding workstream. Code verification identified compatibility debt in the imported upstream modules that is recorded below rather than silently changed during branch consolidation.
+- Changed files: 1,322 files: `backend/yudao-module-hrm/**`; `backend/yudao-module-fms/**`; `frontend/admin/src/api/hrm/**`; `frontend/admin/src/api/fms/**`; `frontend/admin/src/views/hrm/**`; `frontend/admin/src/views/fms/**`; required shared Admin components/routes/utilities; `backend/pom.xml`; `backend/yudao-server/pom.xml`; V058-V061 migrations, tools, verifiers and directly affected SQL/deployment documentation; `handoff/20260810-main-existing.md`.
+- Verification evidence: `codex/crm-lifecycle-gap-implementation` is an ancestor of `main` and contributes no unmerged commit; `gitee/master` has no merge base and was not merged. `zsjos-db check` passed; `git diff --check` passed with line-ending warnings only; Admin `pnpm build:local` completed successfully after transforming 8,780 modules, with the existing Lightning CSS `*zoom` warning. Admin `pnpm ts:check` reported 16 errors: two FMS formula-rule narrowing errors and 14 existing BPM/CRM/MES/System/ZSJOS baseline errors. Admin `pnpm lint` reported zero ESLint errors, one generated declaration warning, and 76 Stylelint errors spanning both existing baseline and eight imported HRM/FMS property-order findings. Backend aggregate Maven compilation is blocked during model loading because FMS declares Aviator without a managed version; isolated HRM compilation reached 577 Java sources but failed on upstream/current-framework compatibility gaps including missing date, collection and money helpers plus generated accessor/type mismatches. Backend tests could not run because compilation failed.
+- Dependency or integration impact: Local `main` now records HRM/FMS as enabled Maven modules and Admin surfaces, plus the reconciled V058-V061 SQL chain. FMS introduces an unresolved `com.googlecode.aviator:aviator` declaration that requires a separately reviewed version/maintenance/security decision before backend compilation can pass. No unrelated-history merge, database mutation, service restart, branch deletion, push, publication, or force operation occurred in this consolidation turn.
+- Remaining work: Repair the imported HRM/FMS compatibility gaps against the current Yudao framework; explicitly review and pin or centrally manage Aviator; fix the two FMS TypeScript errors and imported Stylelint findings; rerun backend compile/tests, Admin typecheck/lint/build, and authenticated desktop/mobile HRM/FMS checks before release. Push remains pending explicit user request.

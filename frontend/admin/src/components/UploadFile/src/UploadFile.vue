@@ -97,10 +97,19 @@ const uploadNumber = ref<number>(0)
 
 const { uploadUrl, httpRequest } = useUpload(props.directory)
 
+// 移除校验未通过的待上传文件
+const removeRejectedFile = (file: UploadRawFile) => {
+  const index = fileList.value.findIndex((item) => item.uid === file.uid)
+  if (index > -1) {
+    fileList.value.splice(index, 1)
+  }
+}
+
 // 文件上传之前判断
 const beforeUpload: UploadProps['beforeUpload'] = (file: UploadRawFile) => {
   if (fileList.value.length >= props.limit) {
     message.error(`上传文件数量不能超过${props.limit}个!`)
+    removeRejectedFile(file)
     return false
   }
   let fileExtension = ''
@@ -114,10 +123,12 @@ const beforeUpload: UploadProps['beforeUpload'] = (file: UploadRawFile) => {
   const isLimit = file.size < props.fileSize * 1024 * 1024
   if (!isImg) {
     message.error(`文件格式不正确, 请上传${props.fileType.join('/')}格式!`)
+    removeRejectedFile(file)
     return false
   }
   if (!isLimit) {
     message.error(`上传文件大小不能超过${props.fileSize}MB!`)
+    removeRejectedFile(file)
     return false
   }
   message.success('正在上传文件，请稍候...')

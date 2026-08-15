@@ -151,6 +151,32 @@ const remainingRouter: AppRouteRecordRaw[] = [
     ]
   },
   {
+    path: '/fms/auxiliary',
+    component: Layout,
+    name: 'FmsAuxiliaryRoot',
+    meta: {
+      hidden: true
+    },
+    children: [
+      {
+        path: 'type/item/:auxiliaryTypeId',
+        redirect: (to) => ({
+          path: '/fms/config/auxiliary',
+          query: { auxiliaryTypeId: to.params.auxiliaryTypeId }
+        }),
+        name: 'FmsAuxiliaryItem',
+        meta: {
+          title: '辅助核算项目',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          icon: '',
+          activeMenu: '/fms/config/auxiliary'
+        }
+      }
+    ]
+  },
+  {
     path: '/codegen',
     component: Layout,
     name: 'CodegenEdit',
@@ -620,6 +646,169 @@ const remainingRouter: AppRouteRecordRaw[] = [
           activeMenu: '/crm/product'
         },
         component: () => import('@/views/crm/product/detail/index.vue')
+      }
+    ]
+  },
+  {
+    path: '/hrm',
+    component: Layout,
+    name: 'HrmCenter',
+    meta: { hidden: true },
+    children: [
+      {
+        path: 'portal/opening-guide',
+        name: 'HrmPortalOpeningGuide',
+        meta: {
+          title: '员工端开通引导',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/portal/home'
+        },
+        component: () => import('@/views/hrm/portal/opening-guide/index.vue')
+      },
+      {
+        path: 'recruit/post/detail/:id',
+        name: 'HrmRecruitPostDetail',
+        meta: {
+          title: '招聘职位详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/recruit/post'
+        },
+        component: () => import('@/views/hrm/recruit/post/detail/index.vue')
+      },
+      {
+        path: 'recruit/candidate/detail/:id',
+        name: 'HrmRecruitCandidateDetail',
+        meta: {
+          title: '招聘候选人详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/recruit/candidate'
+        },
+        component: () => import('@/views/hrm/recruit/candidate/detail/index.vue')
+      },
+      {
+        path: 'employee/detail/:id',
+        name: 'HrmEmployeeDetail',
+        meta: {
+          title: '员工档案详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/employee/list'
+        },
+        component: () => import('@/views/hrm/employee/detail/index.vue')
+      },
+      {
+        path: 'dept/detail/:id',
+        name: 'HrmDeptDetail',
+        meta: {
+          title: '组织详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/dept'
+        },
+        component: () => import('@/views/hrm/dept/detail/index.vue')
+      },
+      {
+        path: 'attendance/month/detail/:employeeId',
+        name: 'HrmAttendanceMonthDetail',
+        meta: {
+          title: '月度考勤详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/attendance/month'
+        },
+        component: () => import('@/views/hrm/attendance/month/detail/index.vue')
+      },
+      {
+        path: 'performance/plan/detail/:id',
+        name: 'HrmPerformancePlanDetail',
+        meta: {
+          title: '绩效计划详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/performance/plan'
+        },
+        component: () => import('@/views/hrm/performance/plan/detail/index.vue')
+      },
+      {
+        path: 'performance/plan/form',
+        name: 'HrmPerformancePlanForm',
+        meta: {
+          title: 'KPI 考核配置',
+          noCache: true,
+          hidden: true,
+          canTo: true,
+          activeMenu: '/hrm/performance/plan'
+        },
+        component: () => import('@/views/hrm/performance/plan/form/index.vue')
+      },
+      {
+        path: 'performance/assessment/employee/:employeeId',
+        name: 'HrmPerformanceAssessmentEmployee',
+        meta: {
+          title: '员工绩效档案',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/performance/assessment'
+        },
+        component: () => import('@/views/hrm/performance/assessment/employee/index.vue')
+      },
+      {
+        path: 'performance/assessment/detail/:id',
+        name: 'HrmPerformanceAssessmentDetail',
+        meta: {
+          title: '员工考核详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/performance/assessment'
+        },
+        component: () => import('@/views/hrm/performance/assessment/detail/index.vue')
+      },
+      {
+        path: 'insurance/month-record/detail/:id',
+        name: 'HrmInsuranceMonthRecordDetail',
+        meta: {
+          title: '月度社保详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/insurance/month-record'
+        },
+        component: () => import('@/views/hrm/insurance/month-record/detail/index.vue')
+      },
+      {
+        path: 'salary/employee-info/detail/:id',
+        name: 'HrmSalaryEmployeeInfoDetail',
+        meta: {
+          title: '薪资档案详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/salary/employee-info'
+        },
+        component: () => import('@/views/hrm/salary/employee-info/detail/index.vue')
+      },
+      {
+        path: 'salary/history/detail/:id',
+        name: 'HrmSalaryHistoryDetail',
+        meta: {
+          title: '历史工资详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/salary/history'
+        },
+        component: () => import('@/views/hrm/salary/month-record/detail/index.vue')
+      },
+      {
+        path: 'salary/slip/detail/:id',
+        name: 'HrmSalarySlipSendRecordDetail',
+        meta: {
+          title: '工资条发放详情',
+          noCache: true,
+          hidden: true,
+          activeMenu: '/hrm/salary/slip'
+        },
+        component: () => import('@/views/hrm/salary/slip/send-record/detail/index.vue')
       }
     ]
   },

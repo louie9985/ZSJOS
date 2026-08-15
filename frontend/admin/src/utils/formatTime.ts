@@ -74,13 +74,13 @@ export function formatDate(date: dayjs.ConfigType, format?: string): string {
 /**
  * 格式化可为空的时间日期
  *
- * @param date 当前时间，new Date() 格式或者字符串时间格式
+ * @param date 当前时间，支持 new Date()、字符串或者时间戳格式
  * @param format 需要转换的时间格式字符串
  * @param emptyText 空值展示文案
  * @returns 返回格式化后的时间字符串
  */
 export function formatNullableDate(
-  date?: Date | string | null,
+  date?: Date | string | number | null,
   format = 'YYYY-MM-DD HH:mm:ss',
   emptyText = '-'
 ): string {
@@ -361,4 +361,43 @@ export function getDateRange(
     dayjs(beginDate).startOf('d').format('YYYY-MM-DD HH:mm:ss'),
     dayjs(endDate).endOf('d').format('YYYY-MM-DD HH:mm:ss')
   ]
+}
+
+/**
+ * 将日期选择器的起止数组转换为左右闭合的日期时间范围
+ *
+ * @param dateRange 开始日期、结束日期
+ * @returns 开始日期零点至结束日期最后一秒；范围无效时返回 undefined
+ */
+export function getDateRangeFromArray(
+  dateRange?: dayjs.ConfigType[]
+): [string, string] | undefined {
+  if (dateRange?.length !== 2) {
+    return undefined
+  }
+  const [beginDate, endDate] = dateRange
+  if (
+    beginDate === undefined ||
+    beginDate === null ||
+    beginDate === '' ||
+    endDate === undefined ||
+    endDate === null ||
+    endDate === '' ||
+    !dayjs(beginDate).isValid() ||
+    !dayjs(endDate).isValid()
+  ) {
+    return undefined
+  }
+  return getDateRange(beginDate, endDate)
+}
+
+/**
+ * 获取指定月份的开始时间、截止时间
+ *
+ * @param month 月份
+ * @return 月初零点至月末最后一秒的闭区间
+ */
+export function getMonthRange(month: dayjs.ConfigType): [string, string] {
+  const monthDate = dayjs(month)
+  return getDateRange(monthDate.startOf('M'), monthDate.endOf('M'))
 }

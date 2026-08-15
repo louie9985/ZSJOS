@@ -89,14 +89,18 @@ SELECT 'order_command_ledger_v043' AS check_name,
           'PASS','FAIL') AS result;
 SELECT 'sales_order_supervisor_confirmation_v055' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V055')
+          AND EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V061')
           AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order_supervisor_confirmation')
           AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order_approval_round' AND column_name='supervisor_confirmation_enabled')
           AND EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
                      AND table_name='zsjos_order_supervisor_confirmation' AND index_name='uk_tenant_round_task')
-          AND EXISTS(SELECT 1 FROM system_menu WHERE id=6850
+          AND EXISTS(SELECT 1 FROM system_menu WHERE id=6856
                      AND permission='zsjos:sales-order:supervisor-confirm' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'sales_order_supervisor_menu_unassigned_v061' AS check_name,
+       IF(NOT EXISTS(SELECT 1 FROM system_role_menu WHERE menu_id=6856 AND deleted=b'0'),
           'PASS','FAIL') AS result;
 SELECT 'crm_lifecycle_confirmed_rules_v056' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V056')

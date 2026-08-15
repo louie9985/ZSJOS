@@ -136,6 +136,20 @@
 <!--            <version>${revision}</version>-->
 <!--        </dependency>-->
 
+        <!-- HRM 模块 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-hrm</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
+        <!-- FMS模块 -->
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-fms</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <!-- 中世健员工工作平台 -->
         <dependency>
             <groupId>cn.iocoder.boot</groupId>
