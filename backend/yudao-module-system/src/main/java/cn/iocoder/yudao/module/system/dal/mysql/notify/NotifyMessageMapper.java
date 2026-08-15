@@ -4,10 +4,13 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.QueryWrapperX;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessagePageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Delete;
+import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -15,6 +18,10 @@ import java.util.List;
 
 @Mapper
 public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
+
+    @TenantIgnore
+    @Delete("DELETE FROM system_notify_message WHERE create_time < #{before}")
+    int deleteCreatedBefore(@Param("before") LocalDateTime before);
 
     default PageResult<NotifyMessageDO> selectPage(NotifyMessagePageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<NotifyMessageDO>()

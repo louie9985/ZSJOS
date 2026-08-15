@@ -43,10 +43,10 @@ export type LeadCreateRequest = {
   name: string; mobile?: string; wechatId?: string; provinceCode: string; cityCode: string
   intendedProducts: Array<{ spuRef?: string; skuRef?: string; spuUnknown: boolean; skuUnknown: boolean; primary: boolean }>; sourceChannel: string; leadCategory: string
   remark?: string; attachments: Array<{ infraFileId: number }>; dispatchMode: 'auto' | 'specified'
-  specifiedSalesUserId?: number; idempotencyKey: string
+  specifiedSalesUserId?: number; newMediaProviderUserId?: number; idempotencyKey: string
 }
 export type LeadCreateResult = {
-  leadId?: number; leadNo?: string; reviewId?: number; outcome: 'created' | 'activated' | 'review_pending' | 'duplicate_rejected'
+  leadId?: number; leadNo?: string; reviewId?: number; outcome: 'created' | 'activated' | 'review_pending' | 'duplicate_rejected' | 'duplicate_auto_closed'
   assignmentStatus?: string; pendingAssigneeUserId?: number; existingLeadStatus?: string
   existingQualificationStatus?: string; existingOperationalStatus?: string
 }
@@ -113,9 +113,9 @@ export type LeadQualificationException = {
   recycleSourceOwnerUserId?: number; recycleSourceOwnerUserName?: string
   qualificationDeadlineAt?: Timestamp; suspendedAt?: Timestamp
 }
-export type LeadInboxFilterOption = { key: string; label: string; count: number }
+export type LeadInboxFilterOption = { key: string; label: string }
 export type LeadInboxFilterSection = { key: string; label: string; options: LeadInboxFilterOption[] }
-export type LeadInboxFilterGroup = { key: string; label: string; count: number; sections: LeadInboxFilterSection[] }
+export type LeadInboxFilterGroup = { key: string; label: string; sections: LeadInboxFilterSection[] }
 export type LeadInboxFilterProfile = { groups: LeadInboxFilterGroup[] }
 export type ManagedLeadPageParams = {
   pageNo: number
@@ -262,7 +262,7 @@ export type WorkPlanTemplateField = { id?: number; fieldKey?: string; label: str
 export type WorkPlanTemplateTask = { title: string; description?: string; deliverableRequirement?: string; dueOffsetDays?: number; dueOffsetBasis?: string; confirmationRequired?: boolean; sort?: number }
 export type WorkPlanTemplate = { id: number; typeId: number; code: string; name: string; description?: string; status: string; currentVersionNo: number; versionId?: number; versionStatus?: string; periodMode?: WorkPlan['periodType']; fields?: WorkPlanTemplateField[]; applicableDeptIds?: number[]; includeChildDepartments?: boolean; presetItems?: WorkPlanTemplateTask[] }
 export type LeadAssignmentRule = { id: number; code: string; name: string; strategyType: 'global_round_robin'; acceptTimeoutSeconds: number; maxAttempts: number; dailyClaimLimit: number; status: number }
-export type LeadFollowUpRule = { id: number; code: string; name: string; firstFollowUpTimeoutMinutes: number; qualificationTimeoutMinutes: number; agingPoolTimeoutDays: number; noProgressWarningDays: number; noProgressGraceDays: number; status: number; version: number }
+export type LeadFollowUpRule = { id: number; code: string; name: string; firstFollowUpTimeoutMinutes: number; qualificationTimeoutMinutes: number; agingPoolTimeoutDays: number; noProgressWarningDays: number; noProgressGraceDays: number; notificationPopupDurationMinutes: number; duplicateAutoResolutionEnabled: boolean; status: number; version: number }
 export type LeadFilterAudience = 'submitter' | 'owner' | 'reviewer'
 export type LeadFilterCondition = { field: string; values: string[] }
 export type LeadFilterOptionConfig = { key: string; label: string; sort: number; enabled: boolean; conditions: LeadFilterCondition[] }
@@ -323,7 +323,11 @@ export type NotifyMessagePageParams = {
 }
 
 const http = axios.create({ baseURL: APP_CONFIG.API_BASE_URL, timeout: 30000 })
-let refreshing: Promise<string | null> | null = null
+type RefreshResult =
+  | { status: 'refreshed'; accessToken: string }
+  | { status: 'failed'; expectedRefreshToken: string | null }
+  | { status: 'stale' }
+let refreshing: Promise<RefreshResult> | null = null
 
 export class AuthenticationError extends Error {
   readonly code = 401
@@ -341,10 +345,23 @@ export class ApiError extends Error {
 }
 
 export const clearAuthStorage = () => {
+  refreshing = null
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN)
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN)
   localStorage.removeItem(STORAGE_KEYS.CLIENT_ID)
   localStorage.removeItem(STORAGE_KEYS.EXPIRES_TIME)
+}
+
+export const AUTH_EXPIRED_EVENT = 'zsjos-auth-expired'
+let authExpiredDispatched = false
+export const isCurrentRefreshSession = (expectedRefreshToken: string | null, currentRefreshToken: string | null) =>
+  expectedRefreshToken === currentRefreshToken
+const expireAuthentication = (expectedRefreshToken: string | null) => {
+  if (!isCurrentRefreshSession(expectedRefreshToken, localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN))) return
+  clearAuthStorage()
+  if (authExpiredDispatched) return
+  authExpiredDispatched = true
+  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT))
 }
 
 http.interceptors.request.use(config => {
@@ -361,13 +378,18 @@ const retryAfterRefresh = async (config: AxiosRequestConfig, originalError: unkn
   const request = config as AxiosRequestConfig & { _retry?: boolean }
   if (request._retry || isAuthEndpoint(request.url)) return Promise.reject(originalError)
   request._retry = true
-  refreshing ??= refreshToken().finally(() => { refreshing = null })
-  const token = await refreshing
-  if (!token) {
-    clearAuthStorage()
+  if (!refreshing) {
+    const task = refreshToken()
+    refreshing = task
+    void task.finally(() => { if (refreshing === task) refreshing = null })
+  }
+  const result = await refreshing
+  if (result.status === 'stale') return Promise.reject(originalError)
+  if (result.status === 'failed') {
+    expireAuthentication(result.expectedRefreshToken)
     return Promise.reject(new AuthenticationError())
   }
-  request.headers = { ...request.headers, Authorization: `Bearer ${token}` }
+  request.headers = { ...request.headers, Authorization: `Bearer ${result.accessToken}` }
   return http(request)
 }
 
@@ -390,19 +412,26 @@ export const unwrap = <T,>(response: { data: any }): T => {
   return payload as T
 }
 
-async function refreshToken(): Promise<string | null> {
+async function refreshToken(): Promise<RefreshResult> {
   const refresh = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
-  if (!refresh) return null
+  if (!refresh) return { status: 'failed', expectedRefreshToken: null }
   try {
     const clientId = localStorage.getItem(STORAGE_KEYS.CLIENT_ID)
     const clientIdParam = clientId ? `&clientId=${encodeURIComponent(clientId)}` : ''
     const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`, undefined, { headers: { 'tenant-id': APP_CONFIG.DEFAULT_TENANT_ID }, timeout: 30000 })
     const result = unwrap<{ accessToken: string; refreshToken: string; clientId?: string }>(response)
+    if (!isCurrentRefreshSession(refresh, localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN))) {
+      return { status: 'stale' }
+    }
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken)
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
     if (result.clientId) localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId)
-    return result.accessToken
-  } catch { return null }
+    return { status: 'refreshed', accessToken: result.accessToken }
+  } catch {
+    return isCurrentRefreshSession(refresh, localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN))
+      ? { status: 'failed', expectedRefreshToken: refresh }
+      : { status: 'stale' }
+  }
 }
 
 const isUrl = (path: string) => /^https?:\/\//i.test(path)
@@ -437,6 +466,8 @@ export const api = {
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
     localStorage.setItem(STORAGE_KEYS.EXPIRES_TIME, result.expiresTime)
     localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId || (platform === 'MOBILE' ? 'zsjos-mobile' : 'zsjos-pc'))
+    refreshing = null
+    authExpiredDispatched = false
     return result
   },
   logout: async () => {
@@ -468,6 +499,7 @@ export const api = {
   },
   createLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/create', data)),
   createSelfSourcedLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/self-sourced/create', data)),
+  newMediaProviders: async () => unwrap<SalesUser[]>(await http.get('/zsjos/lead/self-sourced/new-media-providers')),
   duplicateReviewPage: async (status: 'pending' | 'completed') =>
     unwrap<PageResult<LeadDuplicateReview>>(await http.get('/zsjos/lead-duplicate-review/page', { params: { status, pageNo: 1, pageSize: 100 } })),
   duplicateReviewSalesCandidates: async () =>
@@ -649,7 +681,8 @@ export const api = {
   leadAssignmentRule: async () => unwrap<LeadAssignmentRule>(await http.get('/zsjos/lead/assignment-rule/get')),
   updateLeadAssignmentRule: async (data: Pick<LeadAssignmentRule, 'acceptTimeoutSeconds' | 'maxAttempts' | 'dailyClaimLimit'>) => unwrap<boolean>(await http.put('/zsjos/lead/assignment-rule/update', data)),
   leadFollowUpRule: async () => unwrap<LeadFollowUpRule>(await http.get('/zsjos/lead-follow-up-rule/get')),
-  updateLeadFollowUpRule: async (data: Pick<LeadFollowUpRule, 'firstFollowUpTimeoutMinutes' | 'qualificationTimeoutMinutes' | 'agingPoolTimeoutDays' | 'noProgressWarningDays' | 'noProgressGraceDays'>) => unwrap<boolean>(await http.put('/zsjos/lead-follow-up-rule/update', data)),
+  leadRuntimeSetting: async () => unwrap<{ notificationPopupDurationMinutes: number }>(await http.get('/zsjos/lead-follow-up-rule/runtime-setting')),
+  updateLeadFollowUpRule: async (data: Pick<LeadFollowUpRule, 'version' | 'firstFollowUpTimeoutMinutes' | 'qualificationTimeoutMinutes' | 'agingPoolTimeoutDays' | 'noProgressWarningDays' | 'noProgressGraceDays' | 'notificationPopupDurationMinutes' | 'duplicateAutoResolutionEnabled'>) => unwrap<boolean>(await http.put('/zsjos/lead-follow-up-rule/update', data)),
   leadFilterConfig: async (audience: LeadFilterAudience) => unwrap<LeadFilterAdmin>(await http.get('/zsjos/lead/inbox-filter/get', { params: { audience } })),
   leadFilterVersions: async (audience: LeadFilterAudience) => unwrap<LeadFilterVersion[]>(await http.get('/zsjos/lead/inbox-filter/versions', { params: { audience } })),
   publishLeadFilter: async (audience: LeadFilterAudience) => unwrap<number>(await http.post('/zsjos/lead/inbox-filter/publish', undefined, { params: { audience } })),

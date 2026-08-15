@@ -42,7 +42,8 @@ public class SalesOrderObjectPermissionService {
             case "read-own" -> Objects.equals(order.getSubmitterUserId(), userId);
             case "revise" -> canRevise(order, userId);
             case "continue-revise" -> canContinue(order, userId);
-            case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId);
+            case "terminate" -> Objects.equals(order.getSubmitterUserId(), userId)
+                    || Objects.equals(order.getFormalSalesUserId(), userId);
             case "review" -> isApprovalPoolMember(userId);
             default -> false;
         };

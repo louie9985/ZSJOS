@@ -21,6 +21,7 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [popupDurationSeconds, setPopupDurationSeconds] = useState(300)
 
   const refreshUnreadCount = useCallback(async () => {
     setLoading(true)
@@ -35,6 +36,16 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
   }, [])
 
   useEffect(() => { void refreshUnreadCount() }, [refreshUnreadCount])
+  useEffect(() => {
+    let active = true
+    void api.leadRuntimeSetting().then(setting => {
+      const minutes = Number(setting.notificationPopupDurationMinutes)
+      if (active && Number.isFinite(minutes) && minutes >= 1 && minutes <= 30) {
+        setPopupDurationSeconds(minutes * 60)
+      }
+    }).catch(() => undefined)
+    return () => { active = false }
+  }, [])
   const openAction = useCallback(async (detail: NotifyMessage) => {
     if (!detail.readStatus) await api.markNotifyMessagesRead([detail.id])
     await refreshUnreadCount()
@@ -98,7 +109,7 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
         message: detail.templateTitle || detail.templateNickname,
         description: detail.templateSummary,
         placement: 'bottomRight',
-        duration: 8,
+        duration: popupDurationSeconds,
         onClick: () => {
           notification.destroy(`notify-message-${detail.id}`)
           void openAction(detail)

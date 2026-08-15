@@ -25,6 +25,7 @@ import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_PENDING_APPROVAL;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
@@ -39,6 +40,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private LeadDispatchService dispatchService;
     @Resource private cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper orderMapper;
+    @Resource private LeadNotifyEventPublisher notifyEventPublisher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -60,6 +62,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         LeadTransferRequestDO record = new LeadTransferRequestDO();
         record.setLeadId(leadId); record.setFromOwnerUserId(lead.getOwnerUserId());
         record.setRequestedOwnerUserId(requesterUserId); record.setOwnerDeptIdSnapshot(owner.getDeptId());
+        record.setTransferReviewerUserId(dept.getLeaderUserId());
         record.setReason(request.getReason().trim()); record.setStatus("pending");
         record.setIdempotencyKey(request.getIdempotencyKey()); record.setSubmittedAt(LocalDateTime.now());
         requestMapper.insert(record);
@@ -77,6 +80,11 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
             throw exception(LEAD_TRANSFER_PROCESS_UNAVAILABLE);
         }
         requestMapper.updateById(record);
+        notifyEventPublisher.publish(TRANSFER_REQUESTED, leadId, "lead-transfer-requested:" + record.getId(),
+                requesterUserId, record.getSubmittedAt(), Map.of(
+                        "transferReviewerUserId", record.getTransferReviewerUserId(),
+                        "requesterUserId", requesterUserId, "ownerUserId", record.getFromOwnerUserId(),
+                        "transfer.reason", record.getReason()));
         return record.getId();
     }
 
@@ -89,14 +97,39 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         if (request == null || !"pending".equals(request.getStatus())) return;
         LocalDateTime now = LocalDateTime.now();
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
-            dispatchService.adminTransfer(request.getLeadId(), request.getRequestedOwnerUserId(),
-                    request.getRequestedOwnerUserId(), "同团队销售转派申请审批通过：" + request.getReason());
-            request.setStatus("approved");
+            LeadDispatchService.TransferAttemptResult transferResult = orderMapper.selectActiveByLeadId(
+                    request.getLeadId(), List.of(STATUS_PENDING_APPROVAL)) == null
+                    ? dispatchService.tryAdminTransfer(request.getLeadId(), request.getFromOwnerUserId(),
+                    request.getRequestedOwnerUserId(), request.getRequestedOwnerUserId(),
+                    "同团队销售转派申请审批通过：" + request.getReason())
+                    : LeadDispatchService.TransferAttemptResult.invalidated("客资已有活动订单");
+            if (transferResult.transferred()) {
+                request.setStatus("approved");
+            } else {
+                request.setStatus("invalidated");
+                request.setResolvedAt(now); request.setResolutionReason(transferResult.reason());
+                requestMapper.updateById(request);
+                notifyEventPublisher.publish(TRANSFER_REQUEST_INVALIDATED, request.getLeadId(),
+                        "lead-transfer-invalidated:" + request.getId(), request.getRequestedOwnerUserId(), now,
+                        Map.of("requesterUserId", request.getRequestedOwnerUserId(),
+                                "transfer.reason", request.getReason(), "transfer.resolutionReason", request.getResolutionReason()));
+                return;
+            }
         } else {
             request.setStatus(BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)
                     ? "rejected" : "cancelled");
         }
         request.setResolvedAt(now); request.setResolutionReason(reason);
         requestMapper.updateById(request);
+        String scene = "approved".equals(request.getStatus()) ? TRANSFER_REQUEST_APPROVED
+                : "rejected".equals(request.getStatus()) ? TRANSFER_REQUEST_REJECTED : TRANSFER_REQUEST_INVALIDATED;
+        Map<String, Object> payload = new java.util.LinkedHashMap<>();
+        payload.put("requesterUserId", request.getRequestedOwnerUserId());
+        payload.put("previousOwnerUserId", request.getFromOwnerUserId());
+        payload.put("newOwnerUserId", request.getRequestedOwnerUserId());
+        payload.put("transfer.reason", request.getReason());
+        payload.put("transfer.resolutionReason", request.getResolutionReason());
+        notifyEventPublisher.publish(scene, request.getLeadId(), "lead-transfer-result:" + request.getId(),
+                request.getRequestedOwnerUserId(), now, payload);
     }
 }

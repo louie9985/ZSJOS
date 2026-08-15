@@ -204,8 +204,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={12}><Form.Item name="remark" label="订单备注"><Input.TextArea rows={3} maxLength={1000} showCount/></Form.Item></Col>
           <Col xs={24} md={12}><Form.Item name="specialRequirements" label="学生特殊要求"><Input.TextArea rows={3} maxLength={1000} showCount/></Form.Item></Col>
           <Col xs={24}><Form.Item name="materialDeliveryContact" label="教材邮递联系"><Input.TextArea rows={3} maxLength={1000} showCount placeholder="收件人、联系电话和邮寄地址"/></Form.Item></Col>
-          <Col xs={24}><Form.Item label={`缴费凭证${vouchers.some(file => file.status === 'uploading') ? '（上传中）' : ''}`} required={total > 0} extra="确认提交后上传；订单金额大于 0 时至少上传一份；最多 9 个 JPG、PNG、WebP 或 PDF，单个不超过 10MB">
-            <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false}/>
+          <Col xs={24}><Form.Item label={`缴费凭证${vouchers.some(file => file.status === 'uploading') ? '（上传中）' : ''}`} required extra="确认提交后上传；所有订单至少一份，最多 6 个 JPG、PNG、WebP 或 PDF，单个不超过 10MB">
+            <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false} maxCount={6}/>
           </Form.Item></Col>
         </Row>
         <Space><IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」会签` : `提交「${lead.submittedName}」的成交订单会签`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交会签' : '提交会签'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>

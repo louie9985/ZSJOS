@@ -161,6 +161,10 @@ public class AdminUserServiceImpl implements AdminUserService {
         // 2.1 更新用户
         AdminUserDO updateObj = BeanUtils.toBean(updateReqVO, AdminUserDO.class);
         userMapper.updateById(updateObj);
+        if (!Objects.equals(oldUser.getUsername(), updateReqVO.getUsername())
+                || !Objects.equals(oldUser.getMobile(), updateReqVO.getMobile())) {
+            oauth2TokenService.removeAccessToken(oldUser.getId(), UserTypeEnum.ADMIN.getValue());
+        }
         // 2.2 更新岗位
         updateUserPost(updateReqVO, updateObj);
         // 2.3 昵称 / 头像变化时，发送消息供下游订阅（如 IM 模块推 FRIEND_INFO_UPDATED）
@@ -194,6 +198,7 @@ public class AdminUserServiceImpl implements AdminUserService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateUserProfile(Long id, UserProfileUpdateReqVO reqVO) {
         // 1. 校验正确性
         AdminUserDO oldUser = validateUserExists(id);
@@ -203,6 +208,9 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         // 2. 执行更新
         userMapper.updateById(BeanUtils.toBean(reqVO, AdminUserDO.class).setId(id));
+        if (!Objects.equals(oldUser.getMobile(), reqVO.getMobile())) {
+            oauth2TokenService.removeAccessToken(id, UserTypeEnum.ADMIN.getValue());
+        }
 
         // 3. 昵称 / 头像变化时，发送消息供下游订阅（如 IM 模块推 FRIEND_INFO_UPDATED）
         publishUserProfileUpdatedIfChanged(oldUser, reqVO.getNickname(), reqVO.getAvatar());

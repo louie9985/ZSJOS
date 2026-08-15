@@ -74,6 +74,12 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
                 scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_OWNER, ROLE_DIRECT_LEADER),
+                scene(DUPLICATE_REACTIVATED, "重复客资重新激活", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER),
+                scene(DUPLICATE_OWNER_REMINDER, "重复客资提醒所属销售", ROLE_OWNER),
+                scene(TRANSFER_REQUESTED, "公海转派申请待审批", ROLE_TRANSFER_REVIEWER),
+                scene(TRANSFER_REQUEST_APPROVED, "公海转派申请已同意", ROLE_REQUESTER, ROLE_PREVIOUS_OWNER),
+                scene(TRANSFER_REQUEST_REJECTED, "公海转派申请已拒绝", ROLE_REQUESTER),
+                scene(TRANSFER_REQUEST_INVALIDATED, "公海转派申请已失效", ROLE_REQUESTER),
                 timedScene(FIRST_FOLLOW_UP_REMINDER, "首次跟进时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(NEXT_FOLLOW_UP_REMINDER, "下次跟进提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
@@ -128,6 +134,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 case ROLE_NEW_OWNER -> longValue(payload.get("newOwnerUserId"));
                 case ROLE_COLLABORATOR -> longValue(payload.get("collaboratorUserId"));
                 case ROLE_PREVIOUS_COLLABORATOR -> longValue(payload.get("previousCollaboratorUserId"));
+                case ROLE_TRANSFER_REVIEWER -> longValue(payload.get("transferReviewerUserId"));
+                case ROLE_REQUESTER -> longValue(payload.get("requesterUserId"));
                 default -> null;
             };
             if (id != null && id > 0) users.add(id);

@@ -55,4 +55,10 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
                 .eq(CashbackDO::getVersion, version).eq(CashbackDO::getStatus, from)
                 .set(CashbackDO::getStatus, to).set(CashbackDO::getVersion, version + 1));
     }
+    default int cancel(Long id, Integer version, String from, LocalDateTime now, String reason) {
+        return update(null, new LambdaUpdateWrapper<CashbackDO>().eq(CashbackDO::getId, id)
+                .eq(CashbackDO::getVersion, version).eq(CashbackDO::getStatus, from)
+                .set(CashbackDO::getStatus, "cancelled").set(CashbackDO::getCancelledAt, now)
+                .set(CashbackDO::getCancelReason, reason).set(CashbackDO::getVersion, version + 1));
+    }
 }

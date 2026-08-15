@@ -31,6 +31,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.*;
@@ -75,7 +76,7 @@ public class CashbackServiceImpl implements CashbackService {
     @Transactional(rollbackFor = Exception.class)
     public Long ensureDealCashback(DealCashbackCommand command) {
         if (command == null || command.orderId() == null || command.orderItemId() == null
-                || command.actualAmount() == null || command.actualAmount().signum() <= 0
+                || command.actualAmount() == null || command.actualAmount().signum() < 0
                 || command.rateSnapshot() == null || command.rateSnapshot().signum() < 0
                 || command.rateSnapshot().compareTo(BigDecimal.ONE) > 0) throw exception(CASHBACK_SOURCE_INVALID);
         String key = "deal:" + command.orderItemId();
@@ -126,11 +127,48 @@ public class CashbackServiceImpl implements CashbackService {
         return BeanUtils.toBean(mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
     }
 
+    @Override
+    public boolean isEligibleDealLead(Long leadId) {
+        return eligibleLead(leadId) != null;
+    }
+
+    @Override
+    public BigDecimal resolveDealRate(String productRef) {
+        return resolveRule(productRef).dealRate();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelDealCashbacks(Long orderId, String reason) {
+        if (orderId == null) throw exception(CASHBACK_SOURCE_INVALID);
+        LocalDateTime now = LocalDateTime.now();
+        for (CashbackDO cashback : mapper.selectByOrderIdForUpdate(orderId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())) {
+            if (!TYPE_DEAL.equals(cashback.getType()) || STATUS_CANCELLED.equals(cashback.getStatus())) continue;
+            if (STATUS_WITHDRAWING.equals(cashback.getStatus()) || STATUS_WITHDRAWN.equals(cashback.getStatus())) {
+                throw exception(CASHBACK_ORDER_REJECTION_LOCKED);
+            }
+            if (Set.of(STATUS_PENDING, STATUS_AVAILABLE).contains(cashback.getStatus())) {
+                mapper.cancel(cashback.getId(), cashback.getVersion(), cashback.getStatus(), now, reason);
+            }
+        }
+    }
+
+    @Override
+    public BigDecimal getOrderCashbackTotal(Long orderId, Long beneficiaryUserId) {
+        if (orderId == null || beneficiaryUserId == null) return BigDecimal.ZERO.setScale(2);
+        return mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CashbackDO>()
+                        .eq(CashbackDO::getOrderId, orderId).eq(CashbackDO::getType, TYPE_DEAL)
+                        .eq(CashbackDO::getBeneficiaryUserId, beneficiaryUserId)
+                        .ne(CashbackDO::getStatus, STATUS_CANCELLED))
+                .stream().map(CashbackDO::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+    }
+
     private Long reuseOrRestore(CashbackDO existing) {
         if (!STATUS_CANCELLED.equals(existing.getStatus())) return existing.getId();
-        LocalDateTime now = LocalDateTime.now();
-        if (mapper.restoreValid(existing.getId(), existing.getVersion(), now,
-                now.plusDays(existing.getObservationDaysSnapshot())) != 1) throw exception(CASHBACK_STATE_INVALID);
+        if (mapper.restoreValid(existing.getId(), existing.getVersion(), existing.getGeneratedAt(),
+                existing.getAvailableAt()) != 1) throw exception(CASHBACK_STATE_INVALID);
         return existing.getId();
     }
 
@@ -164,7 +202,8 @@ public class CashbackServiceImpl implements CashbackService {
         if (partner == null || !Objects.equals(partner.getBoundSystemUserId(), lead.getSourceUserId())) {
             throw exception(CASHBACK_SOURCE_INVALID);
         }
-        if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())) return null;
+        if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())
+                || partner.getEnabledAt() == null || partner.getDisabledAt() != null) return null;
         return lead;
     }
 

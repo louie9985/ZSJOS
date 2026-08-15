@@ -34,6 +34,11 @@ export const createLead = (data: Record<string, unknown>, selfSourced = false) =
   })
 export const createExternalRepurchase = (data: Record<string, unknown>) =>
   request.post({ url: '/zsjos/sales-order/external-repurchase', data })
+export const uploadSalesOrderVoucher = (file: File) => {
+  const data = new FormData()
+  data.append('file', file)
+  return request.upload({ url: '/zsjos/sales-order/voucher/upload', data })
+}
 export const decideDuplicateReview = (id: number, data: Record<string, unknown>) =>
   request.post({ url: `/zsjos/lead-duplicate-review/${id}/decision`, data })
 export const decideComplaint = (id: number, data: Record<string, unknown>) =>

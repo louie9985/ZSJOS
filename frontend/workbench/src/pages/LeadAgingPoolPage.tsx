@@ -248,7 +248,7 @@ export default function LeadAgingPoolPage() {
                     setInboxStage(option.key);
                   }}
                 >
-                  {option.label} {option.count}
+                  {option.label}
                 </Button>
               );
             })}

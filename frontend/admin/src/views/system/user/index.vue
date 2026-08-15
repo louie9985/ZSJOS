@@ -113,7 +113,11 @@
           <el-table-column label="头像" align="center" width="110">
             <template #default="scope">
               <div class="flex flex-col items-center gap-1">
-                <el-avatar :src="scope.row.avatar || defaultAvatar">
+                <el-avatar
+                  :src="getAvatarSource(scope.row)"
+                  :style="getAvatarSource(scope.row) ? { backgroundColor: 'transparent' } : undefined"
+                  @error="markAvatarFailed(scope.row.id)"
+                >
                   {{ scope.row.nickname?.slice(0, 1) || '员' }}
                 </el-avatar>
                 <span v-if="!scope.row.avatar" class="text-11px text-gray-400">
@@ -248,6 +252,7 @@ const loading = ref(true) // 列表的加载中
 const total = ref(0) // 列表的总页数
 const list = ref([]) // 列表的数
 const defaultAvatar = ref('')
+const failedAvatarUserIds = ref<Set<number>>(new Set())
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -266,6 +271,7 @@ const getList = async () => {
     const data = await UserApi.getUserPage(queryParams)
     list.value = data.list
     total.value = data.total
+    failedAvatarUserIds.value = new Set()
   } finally {
     loading.value = false
   }
@@ -280,6 +286,14 @@ const defaultAvatarFormRef = ref()
 const openDefaultAvatarForm = () => defaultAvatarFormRef.value.open()
 const handleDefaultAvatarUpdated = (avatar: string) => {
   defaultAvatar.value = avatar || ''
+  failedAvatarUserIds.value = new Set()
+}
+
+const getAvatarSource = (row: UserApi.UserVO) =>
+  failedAvatarUserIds.value.has(row.id) ? '' : row.avatar || defaultAvatar.value
+
+const markAvatarFailed = (userId: number) => {
+  failedAvatarUserIds.value = new Set(failedAvatarUserIds.value).add(userId)
 }
 
 /** 搜索按钮操作 */

@@ -53,6 +53,18 @@
         <el-input-number v-model="formData.noProgressGraceDays" :min="1" :max="30" :step="1" />
         <span class="unit">自然日</span>
       </el-form-item>
+      <el-form-item label="消息浮窗时长" prop="notificationPopupDurationMinutes">
+        <el-input-number
+          v-model="formData.notificationPopupDurationMinutes"
+          :min="1"
+          :max="30"
+          :step="1"
+        />
+        <span class="unit">分钟</span>
+      </el-form-item>
+      <el-form-item label="自动判重">
+        <el-switch v-model="formData.duplicateAutoResolutionEnabled" />
+      </el-form-item>
       <el-form-item>
         <ZsjosPopconfirm
           action="保存客资跟进规则"
@@ -87,11 +99,14 @@ const confirmVisible = ref(false)
 const error = ref('')
 const formRef = ref<FormInstance>()
 const formData = reactive<FollowUpRuleApi.LeadFollowUpRuleUpdateReqVO>({
+  version: 0,
   firstFollowUpTimeoutMinutes: 1440,
   qualificationTimeoutMinutes: 4320,
   agingPoolTimeoutDays: 90,
   noProgressWarningDays: 7,
-  noProgressGraceDays: 2
+  noProgressGraceDays: 2,
+  notificationPopupDurationMinutes: 5,
+  duplicateAutoResolutionEnabled: false
 })
 const rules: FormRules = {
   firstFollowUpTimeoutMinutes: [
@@ -113,6 +128,10 @@ const rules: FormRules = {
   noProgressGraceDays: [
     { required: true, message: '请输入预警宽限期', trigger: 'blur' },
     { type: 'number', min: 1, max: 30, message: '范围为 1–30 个自然日', trigger: 'change' }
+  ],
+  notificationPopupDurationMinutes: [
+    { required: true, message: '请输入消息浮窗时长', trigger: 'blur' },
+    { type: 'number', min: 1, max: 30, message: '范围为 1–30 分钟', trigger: 'change' }
   ]
 }
 
@@ -121,11 +140,14 @@ const loadRule = async () => {
   error.value = ''
   try {
     const rule = await FollowUpRuleApi.getRule()
+    formData.version = rule.version
     formData.firstFollowUpTimeoutMinutes = rule.firstFollowUpTimeoutMinutes
     formData.qualificationTimeoutMinutes = rule.qualificationTimeoutMinutes
     formData.agingPoolTimeoutDays = rule.agingPoolTimeoutDays
     formData.noProgressWarningDays = rule.noProgressWarningDays
     formData.noProgressGraceDays = rule.noProgressGraceDays
+    formData.notificationPopupDurationMinutes = rule.notificationPopupDurationMinutes
+    formData.duplicateAutoResolutionEnabled = rule.duplicateAutoResolutionEnabled
   } catch (loadError: any) {
     error.value = loadError?.msg || loadError?.message || '跟进规则加载失败'
   } finally {

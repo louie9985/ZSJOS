@@ -28,7 +28,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { api, AuthenticationError, buildMenuTree, clearAuthStorage, type PermissionInfo } from './services/api'
+import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, type PermissionInfo } from './services/api'
 import {
   buildTwoLevelNavigation,
   filterRenderableMenus,
@@ -416,6 +416,16 @@ function Root() {
   const [info, setInfo] = useState<PermissionInfo>()
   const [error, setError] = useState('')
   const [permissionAttempt, setPermissionAttempt] = useState(0)
+
+  useEffect(() => {
+    const onAuthExpired = () => {
+      setInfo(undefined)
+      setError('')
+      setLogged(false)
+    }
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired)
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired)
+  }, [])
 
   useEffect(() => {
     if (!logged) return

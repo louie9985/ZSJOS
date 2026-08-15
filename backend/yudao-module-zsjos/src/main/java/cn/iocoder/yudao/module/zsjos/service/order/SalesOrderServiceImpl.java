@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
@@ -43,15 +44,16 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterQuery;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
+import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -90,6 +92,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private SalesOrderCommandService commandService;
     @Resource private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
+    @Resource private SalesOrderNumberService orderNumberService;
+    @Resource private CashbackService cashbackService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -107,15 +111,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
-        order.setOrderNo(generateOrderNo());
         order.setLeadId(leadId); order.setOpportunityId(opportunity.getId()); order.setPersonId(lead.getPersonId());
         order.setOrderType(ORDER_TYPE_FIRST_PURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(lead.getOwnerUserId());
         order.setSubmitterCenterType(SUBMITTER_CENTER_SALES);
         applySubmission(order, reqVO, validated, now);
         order.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); order.setVersion(0);
-        orderMapper.insert(order);
-        insertItems(order.getId(), validated.items());
+        insertOrderWithNumber(order);
+        List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
+        createDealCashbacks(leadId, order.getId(), createdItems, validated.items());
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
         agingPoolService.markDealPending(leadId, userId, now);
         return order.getId();
@@ -126,7 +130,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "enter-deal")
     public Long createSystemRepurchase(Long leadId, Long userId, SalesOrderRepurchaseReqVO reqVO) {
         LeadDO lead = requireRepurchaseLead(leadId, userId);
-        return createRepurchase(lead.getPersonId(), lead.getOwnerUserId(), userId,
+        return createRepurchase(lead.getPersonId(), null, lead.getOwnerUserId(), userId,
                 reqVO.getRepurchaseReason(), reqVO.getOrder(), true);
     }
 
@@ -144,10 +148,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 || leadMapper.selectLatestByPersonId(person.getId()) != null) {
             throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         }
-        return createRepurchase(person.getId(), userId, userId, reqVO.getRepurchaseReason(), reqVO.getOrder(), false);
+        return createRepurchase(person.getId(), null, userId, userId, reqVO.getRepurchaseReason(), reqVO.getOrder(), false);
     }
 
-    private Long createRepurchase(Long personId, Long formalSalesUserId, Long userId, String reason,
+    private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
                                   SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder) {
         Long duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey());
         if (duplicateId != null) return duplicateId;
@@ -160,13 +164,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         ValidatedSubmission validated = validateSubmission(submission, userId);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
-        order.setOrderNo(generateOrderNo()); order.setPersonId(personId);
+        order.setPersonId(personId); order.setLeadId(null); order.setOpportunityId(null);
         order.setOrderType(ORDER_TYPE_REPURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(formalSalesUserId);
         order.setSubmitterCenterType(SUBMITTER_CENTER_SALES); order.setRepurchaseReason(reason.trim());
         applySubmission(order, submission, validated, now);
         order.setSubmissionIdempotencyKey(submission.getIdempotencyKey()); order.setVersion(0);
-        orderMapper.insert(order); insertItems(order.getId(), validated.items());
+        insertOrderWithNumber(order);
+        List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
+        createDealCashbacks(sourceLeadId, order.getId(), createdItems, validated.items());
         startRound(order, null, userId, submission.getIdempotencyKey(), validated, 1, now);
         return order.getId();
     }
@@ -197,7 +203,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             throw exception(SALES_ORDER_IDEMPOTENCY_CONFLICT);
         }
         SalesOrderDO order = requireOrderForUpdate(orderId);
-        if (!STATUS_REVISION_REQUIRED.equals(order.getStatus())) throw exception(SALES_ORDER_STATE_INVALID);
+        if (!Set.of(STATUS_REVISION_REQUIRED, STATUS_TERMINATED).contains(order.getStatus())) {
+            throw exception(SALES_ORDER_STATE_INVALID);
+        }
         LeadDO lead = null;
         OpportunityDO opportunity = null;
         if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
@@ -206,12 +214,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
         LocalDateTime now = LocalDateTime.now();
+        cashbackService.cancelDealCashbacks(orderId, "订单修改重提");
         order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setTerminationReason(null); order.setTerminatedAt(null);
         applySubmission(order, reqVO, validated, now);
         order.setEffectiveAt(null);
         orderMapper.updateById(order);
         itemMapper.deleteByOrderId(orderId);
-        insertItems(orderId, validated.items());
+        List<SalesOrderItemDO> createdItems = insertItems(orderId, validated.items());
+        createDealCashbacks(order.getLeadId(), orderId, createdItems, validated.items());
         SalesOrderApprovalRoundDO latest = roundMapper.selectLatestByOrderId(orderId);
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated,
                 latest == null ? 1 : latest.getRoundNo() + 1, now);
@@ -462,6 +473,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderCommandService.Command command = new SalesOrderCommandService.Command(orderId, round.getId(),
                 round.getProcessInstanceId(), commandType, task.getTaskDefinitionKey(), reqVO.getTaskId(), userId,
                 fingerprint);
+        if (!approve) cashbackService.assertOrderRejectable(orderId);
         commandService.register(reqVO.getIdempotencyKey(), command);
         if (TASK_REGISTRATION.equals(task.getTaskDefinitionKey())) {
             if (round.getRegistrationDecisionIdempotencyKey() != null) throw exception(SALES_ORDER_ALREADY_HANDLED);
@@ -483,7 +495,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderDO order = requireOrderForUpdate(orderId);
         SalesOrderApprovalRoundDO round = roundMapper.selectByIdForUpdate(reqVO.getApprovalRoundId(),
                 TenantContextHolder.getRequiredTenantId());
-        if (!Objects.equals(order.getSubmitterUserId(), userId)
+        if (!(Objects.equals(order.getSubmitterUserId(), userId) || Objects.equals(order.getFormalSalesUserId(), userId))
                 || round == null || !Objects.equals(round.getOrderId(), orderId)
                 || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) {
             throw exception(SALES_ORDER_TERMINATE_FORBIDDEN);
@@ -497,6 +509,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (!Objects.equals(order.getVersion(), reqVO.getOrderVersion())
                 || !Objects.equals(round.getVersion(), reqVO.getRoundVersion())) throw exception(SALES_ORDER_VERSION_CONFLICT);
         commandService.register(reqVO.getIdempotencyKey(), command);
+        cashbackService.assertOrderRejectable(orderId);
         LocalDateTime now = LocalDateTime.now();
         supervisorConfirmationService.cancelPending(round.getId(), now);
         order.setStatus(STATUS_TERMINATED); order.setTerminationReason(reqVO.getReason().trim()); order.setTerminatedAt(now);
@@ -504,7 +517,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         round.setStatus(ROUND_TERMINATED); round.setDecisionReason(reqVO.getReason().trim()); round.setCompletedAt(now);
         round.setTerminationIdempotencyKey(reqVO.getIdempotencyKey()); round.setVersion(round.getVersion() + 1);
         orderMapper.updateById(order); roundMapper.updateById(round);
-        processInstanceApi.cancelProcessInstanceByStartUser(userId, round.getProcessInstanceId(), reqVO.getReason().trim());
+        cashbackService.cancelDealCashbacks(orderId, "订单主动终止");
+        processInstanceApi.terminateProcessInstanceByBusiness(userId, round.getProcessInstanceId(),
+                "zsjos.sales-order.terminate", reqVO.getReason().trim());
         if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
             OpportunityDO opportunity = opportunityMapper.selectById(order.getOpportunityId());
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
@@ -536,10 +551,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Transactional(rollbackFor = Exception.class)
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
-        SalesOrderApprovalRoundDO round = roundMapper.selectByProcessInstanceId(processInstanceId);
-        if (round == null || !ROUND_PENDING.equals(round.getStatus())) return;
-        SalesOrderDO order = requireOrderForUpdate(round.getOrderId());
-        if (!STATUS_PENDING_APPROVAL.equals(order.getStatus()) || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) return;
+        SalesOrderApprovalRoundDO locatedRound = roundMapper.selectByProcessInstanceId(processInstanceId);
+        if (locatedRound == null) return;
+        SalesOrderDO order = requireOrderForUpdate(locatedRound.getOrderId());
+        SalesOrderApprovalRoundDO round = roundMapper.selectByIdForUpdate(locatedRound.getId(),
+                TenantContextHolder.getRequiredTenantId());
+        if (round == null || !Objects.equals(processInstanceId, round.getProcessInstanceId())
+                || !ROUND_PENDING.equals(round.getStatus()) || !STATUS_PENDING_APPROVAL.equals(order.getStatus())
+                || !Objects.equals(order.getCurrentApprovalRoundId(), round.getId())) return;
         LocalDateTime now = LocalDateTime.now();
         supervisorConfirmationService.cancelPending(round.getId(), now);
         OpportunityDO opportunity = order.getOpportunityId() == null ? null : opportunityMapper.selectById(order.getOpportunityId());
@@ -550,7 +569,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 opportunity.setNextFollowUpAt(null); opportunityMapper.updateById(opportunity);
             }
             LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
-            if (lead != null) {
+            if (lead != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
                 lead.setStatus(STATUS_WON);
                 lead.setNextFollowUpAt(null);
                 leadMapper.updateById(lead);
@@ -563,16 +582,35 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
             round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
-            if (order.getLeadId() != null) agingPoolService.handleOrderRejected(order.getLeadId(), now);
+            cashbackService.cancelDealCashbacks(order.getId(), "订单审批驳回");
+            if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) agingPoolService.handleOrderRejected(order.getLeadId(), now);
         } else {
             round.setStatus(ROUND_REJECTED); round.setDecisionReason(StrUtil.trim(reason)); order.setStatus(STATUS_REVISION_REQUIRED);
             if (opportunity != null) { opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING); opportunityMapper.updateById(opportunity); }
-            if (order.getLeadId() != null) agingPoolService.handleOrderRejected(order.getLeadId(), now);
+            cashbackService.cancelDealCashbacks(order.getId(), "订单审批异常终止");
+            if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) agingPoolService.handleOrderRejected(order.getLeadId(), now);
         }
         round.setCompletedAt(now); roundMapper.updateById(round); orderMapper.updateById(order);
-        publishOrderNotification(BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)
-                        ? EFFECTIVE : BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus) ? REJECTED : CANCELLED,
-                order, "sales-order-result:" + round.getId(), List.of(), reason, now);
+        LeadDO notificationLead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
+        Long leadSubmitterUserId = notificationLead == null ? null : notificationLead.getSourceUserId();
+        if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
+            List<Long> resultUserIds = java.util.stream.Stream.of(
+                            order.getFormalSalesUserId(), round.getSubmittedByUserId())
+                    .filter(Objects::nonNull).distinct().toList();
+            publishOrderNotification(EFFECTIVE, order, "sales-order-effective:" + round.getId(),
+                    List.of(), resultUserIds, leadSubmitterUserId, reason, now);
+            if (leadSubmitterUserId != null) {
+                publishOrderNotification(SUBMITTER_EFFECTIVE, order,
+                        "sales-order-submitter-effective:" + round.getId(), List.of(), List.of(),
+                        leadSubmitterUserId, reason, now);
+            }
+        } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
+            List<Long> resultUserIds = java.util.stream.Stream.of(
+                            order.getFormalSalesUserId(), round.getSubmittedByUserId())
+                    .filter(Objects::nonNull).distinct().toList();
+            publishOrderNotification(REJECTED, order, "sales-order-rejected:" + round.getId(),
+                    List.of(), resultUserIds, leadSubmitterUserId, reason, now);
+        }
     }
 
     private void startRound(SalesOrderDO order, OpportunityDO opportunity, Long userId, String idempotencyKey,
@@ -606,13 +644,22 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (opportunity != null) {
             opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL); opportunityMapper.updateById(opportunity);
         }
+        List<Long> reviewerUserIds = java.util.stream.Stream.concat(
+                registrationUsers.stream(), financeUsers.stream()).distinct().toList();
+        LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
+        Long leadSubmitterUserId = lead == null ? null : lead.getSourceUserId();
         publishOrderNotification(SUBMITTED, order, "sales-order-submitted:" + round.getId(),
-                java.util.stream.Stream.concat(registrationUsers.stream(), financeUsers.stream()).distinct().toList(),
-                null, now);
+                reviewerUserIds, List.of(), leadSubmitterUserId, null, now);
+        if (leadSubmitterUserId != null) {
+            publishOrderNotification(SUBMITTER_PENDING, order,
+                    "sales-order-submitter-pending:" + round.getId(), List.of(), List.of(),
+                    leadSubmitterUserId, null, now);
+        }
     }
 
     private void publishOrderNotification(String sceneCode, SalesOrderDO order, String sourceEventKey,
-                                          List<Long> reviewers, String reason, LocalDateTime occurredAt) {
+                                          List<Long> reviewers, List<Long> resultUserIds,
+                                          Long leadSubmitterUserId, String reason, LocalDateTime occurredAt) {
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         List<String> departments = config == null ? List.of() : java.util.stream.Stream.of(
                         config.getRegistrationDeptId(), config.getFinanceDeptId())
@@ -620,6 +667,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 .filter(Objects::nonNull).map(item -> item.getName()).filter(Objects::nonNull).toList();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("reviewerUserIds", reviewers); payload.put("submitterUserId", order.getSubmitterUserId());
+        payload.put("resultUserIds", resultUserIds); payload.put("leadSubmitterUserId", leadSubmitterUserId);
         payload.put("approvalDepartments", String.join("、", departments));
         payload.put("decisionReason", StrUtil.blankToDefault(reason, ""));
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
@@ -683,6 +731,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private ValidatedSubmission validateSubmission(SalesOrderSubmitReqVO req, Long userId) {
         if (StrUtil.isBlank(req.getStudentMobile()) && StrUtil.isBlank(req.getStudentWechatId())) throw exception(SALES_ORDER_CONTACT_REQUIRED);
+        if (StrUtil.isNotBlank(req.getStudentMobile()) && !ValidationUtils.isMobile(req.getStudentMobile().trim())) {
+            throw exception(LEAD_MOBILE_INVALID);
+        }
         RegionSnapshot region = validateRegion(req.getProvinceCode(), req.getCityCode());
         req.setProvinceName(region.provinceName()); req.setCityName(region.cityName());
         dictDataApi.validateDictDataList(DICT_STUDENT_NATURE, List.of(req.getStudentNature()));
@@ -700,7 +751,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             total = total.add(amount); items.add(new ValidatedItem(snapshot, amount));
         }
         List<VoucherRef> vouchers = validateVouchers(req.getPaymentVouchers(), userId);
-        if (total.signum() > 0 && vouchers.isEmpty()) throw exception(SALES_ORDER_VOUCHER_REQUIRED);
+        if (vouchers.isEmpty()) throw exception(SALES_ORDER_VOUCHER_REQUIRED);
         return new ValidatedSubmission(items, vouchers, total.setScale(2));
     }
 
@@ -774,14 +825,56 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setPaymentVoucherRefs(JsonUtils.toJsonString(validated.vouchers())); order.setSubmittedAt(now);
     }
 
-    private void insertItems(Long orderId, List<ValidatedItem> items) {
+    private List<SalesOrderItemDO> insertItems(Long orderId, List<ValidatedItem> items) {
+        List<SalesOrderItemDO> created = new ArrayList<>();
         for (ValidatedItem validated : items) {
             SalesOrderItemDO item = new SalesOrderItemDO(); item.setOrderId(orderId);
             item.setProductRef(validated.snapshot().productRef()); item.setSkuRef(validated.snapshot().skuRef());
             item.setQuantity(BigDecimal.ONE); item.setUnitPrice(validated.snapshot().price());
             item.setDiscountAmount(BigDecimal.ZERO); item.setPayableAmount(validated.actualAmount());
             item.setProductSnapshot(JsonUtils.toJsonString(validated.snapshot())); itemMapper.insert(item);
+            created.add(item);
         }
+        return created;
+    }
+
+    private void createDealCashbacks(Long sourceLeadId, Long orderId, List<SalesOrderItemDO> orderItems,
+                                     List<ValidatedItem> validatedItems) {
+        if (sourceLeadId == null || !cashbackService.isEligibleDealLead(sourceLeadId)) return;
+        for (int i = 0; i < orderItems.size(); i++) {
+            SalesOrderItemDO item = orderItems.get(i);
+            ValidatedItem validated = validatedItems.get(i);
+            BigDecimal rate = cashbackService.resolveDealRate(validated.snapshot().productRef());
+            cashbackService.ensureDealCashback(new CashbackService.DealCashbackCommand(sourceLeadId, orderId,
+                    item.getId(), validated.snapshot().productRef(), validated.snapshot().name(),
+                    validated.actualAmount(), rate));
+        }
+    }
+
+    private void insertOrderWithNumber(SalesOrderDO order) {
+        for (int attempt = 1; attempt <= 20; attempt++) {
+            order.setOrderNo(orderNumberService.next());
+            try {
+                orderMapper.insert(order);
+                return;
+            } catch (DuplicateKeyException exception) {
+                if (!isOrderNumberConflict(exception) || attempt == 20) {
+                    throw exception;
+                }
+                order.setId(null);
+            }
+        }
+    }
+
+    private boolean isOrderNumberConflict(DuplicateKeyException exception) {
+        Throwable cause = exception;
+        while (cause != null) {
+            if (cause.getMessage() != null && cause.getMessage().contains("uk_tenant_order_no")) {
+                return true;
+            }
+            cause = cause.getCause();
+        }
+        return false;
     }
 
     private String buildOrderSnapshot(SalesOrderDO order, ValidatedSubmission validated) {
@@ -828,8 +921,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             result.setFinanceSupervisorConfirmation(convertSupervisorConfirmation(confirmations.get(TASK_FINANCE)));
         }
         if (task != null) { result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus()); result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime()); }
-        result.setCanRevise(STATUS_REVISION_REQUIRED.equals(order.getStatus()) && permissionService.canRevise(order, userId));
-        result.setCanTerminate(STATUS_PENDING_APPROVAL.equals(order.getStatus()) && Objects.equals(order.getSubmitterUserId(), userId));
+        result.setCanRevise(Set.of(STATUS_REVISION_REQUIRED, STATUS_TERMINATED).contains(order.getStatus())
+                && permissionService.canRevise(order, userId));
+        result.setCanTerminate(STATUS_PENDING_APPROVAL.equals(order.getStatus())
+                && (Objects.equals(order.getSubmitterUserId(), userId) || Objects.equals(order.getFormalSalesUserId(), userId)));
         return result;
     }
 
@@ -905,11 +1000,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return refs.stream().map(ref -> { SalesOrderRespVO.AttachmentVO vo = new SalesOrderRespVO.AttachmentVO();
             vo.setInfraFileId(ref.infraFileId()); vo.setFileUrl(urls.getOrDefault(ref.infraFileId(), ref.fileUrl()));
             vo.setOriginalName(ref.originalName()); vo.setContentType(ref.contentType()); vo.setFileSize(ref.fileSize()); return vo; }).toList();
-    }
-
-    private String generateOrderNo() {
-        return "SO" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
-                + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase(Locale.ROOT);
     }
 
     private Long parseOrderId(String businessKey) {

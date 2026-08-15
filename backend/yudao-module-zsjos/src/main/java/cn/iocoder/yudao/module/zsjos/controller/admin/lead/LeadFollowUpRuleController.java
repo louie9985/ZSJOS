@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.followup.LeadFollowUpRuleRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.followup.LeadFollowUpRuleUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.followup.LeadRuntimeSettingRespVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadFollowUpRuleService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +29,12 @@ public class LeadFollowUpRuleController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead-follow-up-rule:query')")
     public CommonResult<LeadFollowUpRuleRespVO> getRule() {
         return success(ruleService.getRule());
+    }
+
+    @GetMapping("/runtime-setting")
+    @Operation(summary = "获得工作台客资运行设置")
+    public CommonResult<LeadRuntimeSettingRespVO> getRuntimeSetting() {
+        return success(ruleService.getRuntimeSetting());
     }
 
     @PutMapping("/update")

@@ -23,7 +23,33 @@ export function LeadFollowUpRuleConfigPage({ permissions }: { permissions: strin
   const load = useCallback(async () => { setLoading(true); setError(''); try { setItem(await api.leadFollowUpRule()) } catch (e) { setError(e instanceof Error ? e.message : '跟进规则加载失败') } finally { setLoading(false) } }, [])
   useEffect(() => { void load() }, [load]); const edit = () => { form.setFieldsValue(item); setOpen(true) }
   const save = async () => { const v = await form.validateFields(); setSaving(true); try { await api.updateLeadFollowUpRule(v); message.success('跟进规则已更新'); setOpen(false); await load() } catch (e) { message.error(e instanceof Error ? e.message : '保存失败') } finally { setSaving(false) } }
-  return <section className="workspace-page"><Header title="客资跟进规则" reload={load}/><PageState loading={loading} error={error} retry={() => void load()}><Table rowKey="id" dataSource={item ? [item] : []} pagination={false} columns={[{ title: '规则', dataIndex: 'name' }, { title: '首次跟进', dataIndex: 'firstFollowUpTimeoutMinutes', render: v => `${v} 分钟` }, { title: '判定时限', dataIndex: 'qualificationTimeoutMinutes', render: v => `${v} 分钟` }, { title: '公海期限', dataIndex: 'agingPoolTimeoutDays', render: v => `${v} 天` }, { title: '无进展预警/宽限', render: (_, r) => `${r.noProgressWarningDays} / ${r.noProgressGraceDays} 天` }, { title: '操作', render: () => permissions.includes('zsjos:lead-follow-up-rule:update') ? <Button type="link" onClick={edit}>编辑</Button> : '-' }]}/></PageState><Modal title="编辑跟进规则" open={open} confirmLoading={saving} onCancel={() => setOpen(false)} onOk={() => void save()}><Form form={form} layout="vertical"><NumberField name="firstFollowUpTimeoutMinutes" label="首次跟进时限（分钟）" min={5} max={10080}/><NumberField name="qualificationTimeoutMinutes" label="有效性判定时限（分钟）" min={5} max={43200}/><NumberField name="agingPoolTimeoutDays" label="商机公海期限（天）" min={1} max={3650}/><NumberField name="noProgressWarningDays" label="无进展预警（天）" min={1} max={365}/><NumberField name="noProgressGraceDays" label="预警宽限期（天）" min={1} max={30}/></Form></Modal></section>
+  return <section className="workspace-page">
+    <Header title="客资跟进规则" reload={load}/>
+    <PageState loading={loading} error={error} retry={() => void load()}>
+      <Table rowKey="id" dataSource={item ? [item] : []} pagination={false} scroll={{ x: 1120 }} columns={[
+        { title: '规则', dataIndex: 'name', width: 160 },
+        { title: '首次跟进', dataIndex: 'firstFollowUpTimeoutMinutes', width: 120, render: v => `${v} 分钟` },
+        { title: '判定时限', dataIndex: 'qualificationTimeoutMinutes', width: 120, render: v => `${v} 分钟` },
+        { title: '商机公海', dataIndex: 'agingPoolTimeoutDays', width: 120, render: v => `${v} 天` },
+        { title: '预警 / 宽限', width: 150, render: (_, row) => `${row.noProgressWarningDays} / ${row.noProgressGraceDays} 天` },
+        { title: '通知浮窗', dataIndex: 'notificationPopupDurationMinutes', width: 120, render: v => `${v} 分钟` },
+        { title: '自动判重', dataIndex: 'duplicateAutoResolutionEnabled', width: 100, render: v => <Tag color={v ? 'success' : 'default'}>{v ? '开启' : '关闭'}</Tag> },
+        { title: '操作', width: 80, render: () => permissions.includes('zsjos:lead-follow-up-rule:update') ? <Button type="link" onClick={edit}>编辑</Button> : '-' }
+      ]}/>
+    </PageState>
+    <Modal title="编辑跟进与运行设置" open={open} confirmLoading={saving} onCancel={() => setOpen(false)} onOk={() => void save()}>
+      <Form form={form} layout="vertical">
+        <Form.Item name="version" hidden><InputNumber /></Form.Item>
+        <NumberField name="firstFollowUpTimeoutMinutes" label="首次跟进时限（分钟）" min={5} max={10080}/>
+        <NumberField name="qualificationTimeoutMinutes" label="有效性判定时限（分钟）" min={5} max={43200}/>
+        <NumberField name="agingPoolTimeoutDays" label="商机公海期限（天）" min={1} max={3650}/>
+        <NumberField name="noProgressWarningDays" label="无进展预警（天）" min={1} max={365}/>
+        <NumberField name="noProgressGraceDays" label="预警宽限期（天）" min={1} max={30}/>
+        <NumberField name="notificationPopupDurationMinutes" label="消息通知浮窗时长（分钟）" min={1} max={30}/>
+        <Form.Item name="duplicateAutoResolutionEnabled" label="重复客资自动判重" valuePropName="checked"><Switch/></Form.Item>
+      </Form>
+    </Modal>
+  </section>
 }
 
 export function LeadFilterConfigPage({ permissions }: { permissions: string[] }) {

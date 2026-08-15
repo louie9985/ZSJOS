@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.Collection;
@@ -14,7 +15,8 @@ import java.util.List;
 public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
 
     default AdminUserDO selectByUsername(String username) {
-        return selectOne(AdminUserDO::getUsername, username);
+        // Login names are case-sensitive even when the tenant database uses a case-insensitive collation.
+        return selectOne(new QueryWrapper<AdminUserDO>().apply("BINARY username = {0}", username));
     }
 
     default AdminUserDO selectByEmail(String email) {

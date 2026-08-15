@@ -34,4 +34,18 @@ public class BpmProcessInstanceApiImpl implements BpmProcessInstanceApi {
         processInstanceService.cancelProcessInstanceByStartUser(userId, request);
     }
 
+    @Override
+    public void terminateProcessInstanceByBusiness(Long operatorUserId, String processInstanceId,
+                                                   String authorizationType, String reason) {
+        if (operatorUserId == null || processInstanceId == null || processInstanceId.isBlank()
+                || authorizationType == null || authorizationType.isBlank()
+                || reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Business process termination parameters must not be blank");
+        }
+        BpmProcessInstanceCancelReqVO request = new BpmProcessInstanceCancelReqVO();
+        request.setId(processInstanceId);
+        request.setReason("业务授权[" + authorizationType.trim() + "]：" + reason.trim());
+        processInstanceService.cancelProcessInstanceByAdmin(operatorUserId, request);
+    }
+
 }

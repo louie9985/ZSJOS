@@ -19,6 +19,7 @@ public class LeadTransferRequestDO extends TenantBaseDO {
     private Long fromOwnerUserId;
     private Long requestedOwnerUserId;
     private Long ownerDeptIdSnapshot;
+    private Long transferReviewerUserId;
     private String reason;
     private String status;
     private String processInstanceId;

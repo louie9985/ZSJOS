@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -33,6 +34,7 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
+import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -83,12 +85,19 @@ class SalesOrderServiceImplTest {
     @Mock private SalesOrderCommandService commandService;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
+    @Mock private SalesOrderNumberService orderNumberService;
+    @Mock private CashbackService cashbackService;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
         lenient().when(advancedFilterService.matchOrderIds(any())).thenReturn(null);
         lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
         lenient().when(commandService.fingerprint(any())).thenReturn("fingerprint");
+        lenient().when(orderNumberService.next()).thenReturn("OD202608141200000001");
+        lenient().when(cashbackService.isEligibleDealLead(anyLong())).thenReturn(false);
+        lenient().when(fileApi.getFileInfo(1L)).thenReturn(new FileInfoRespDTO(
+                1L, 1L, "voucher.pdf", "zsjos/sales-order-voucher/voucher.pdf",
+                "https://example.test/voucher.pdf", "application/pdf", 100L, "20"));
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
@@ -123,12 +132,14 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void createRejectsNonZeroAmountWithoutVoucher() {
+    void createRejectsAnyAmountWithoutVoucher() {
         mockEligibleLeadAndOpportunity();
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+        SalesOrderSubmitReqVO request = request(new BigDecimal("10.00"), "13800138000", null);
+        request.setPaymentVouchers(List.of());
 
         ServiceException error = assertThrows(ServiceException.class,
-                () -> service.createAndSubmit(1L, 20L, request(new BigDecimal("10.00"), "13800138000", null)));
+                () -> service.createAndSubmit(1L, 20L, request));
 
         assertEquals(SALES_ORDER_VOUCHER_REQUIRED.getCode(), error.getCode());
         verify(orderMapper, never()).insert(any(SalesOrderDO.class));
@@ -189,12 +200,13 @@ class SalesOrderServiceImplTest {
     @Test
     void approvedProcessMakesOrderEffectiveAndLeadAndOpportunityWon() {
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
-        round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING);
+        round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING); round.setProcessInstanceId("process-1");
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
         OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setStatus(STATUS_VALID);
         when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
+        when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         when(opportunityMapper.selectById(30L)).thenReturn(opportunity);
         when(leadMapper.selectById(1L)).thenReturn(lead);
@@ -212,11 +224,12 @@ class SalesOrderServiceImplTest {
     @Test
     void rejectedProcessReturnsOriginalOrderForRevision() {
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
-        round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING);
+        round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING); round.setProcessInstanceId("process-1");
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
         OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
         when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
+        when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         when(opportunityMapper.selectById(30L)).thenReturn(opportunity);
 
@@ -409,7 +422,8 @@ class SalesOrderServiceImplTest {
 
         assertEquals(STATUS_TERMINATED, order.getStatus()); assertEquals(ROUND_TERMINATED, round.getStatus());
         assertEquals(4, order.getVersion()); assertEquals(5, round.getVersion());
-        verify(processInstanceApi).cancelProcessInstanceByStartUser(20L, "process-1", "客户取消");
+        verify(processInstanceApi).terminateProcessInstanceByBusiness(
+                20L, "process-1", "zsjos.sales-order.terminate", "客户取消");
         verifyNoInteractions(opportunityMapper, agingPoolService);
     }
 
@@ -429,7 +443,9 @@ class SalesOrderServiceImplTest {
         req.setStudentName("测试学员"); req.setStudentNature("new_student"); req.setStudentMobile(mobile); req.setStudentWechatId(wechat);
         req.setProvinceCode("120000"); req.setProvinceName("天津市"); req.setCityCode("OTHER"); req.setCityName("");
         req.setServicePeriod("one_year"); req.setStudentSource("direct_enrollment"); req.setCustomerPaidAt(LocalDateTime.now());
-        req.setFeeMode("retail"); req.setPaymentMethod("company_qr"); req.setIdempotencyKey("key-1"); req.setPaymentVouchers(List.of());
+        req.setFeeMode("retail"); req.setPaymentMethod("company_qr"); req.setIdempotencyKey("key-1");
+        SalesOrderSubmitReqVO.Attachment voucher = new SalesOrderSubmitReqVO.Attachment(); voucher.setInfraFileId(1L);
+        req.setPaymentVouchers(List.of(voucher));
         SalesOrderSubmitReqVO.Item item = new SalesOrderSubmitReqVO.Item(); item.setSpuRef("spu-1"); item.setSkuRef("sku-1"); item.setActualAmount(amount);
         req.setItems(List.of(item)); return req;
     }

@@ -43,7 +43,7 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
         <Typography.Text type="secondary">{order.orderNo} · 第 {order.approvalRoundNo || 1} 轮</Typography.Text>
       </div>
       <Space wrap className="sales-order-detail-actions">
-        {mode === 'mine' && order.status === 'revision_required' && order.canRevise && onRevise && <Button type="primary" icon={<EditOutlined/>} onClick={onRevise}>补正并重新提交</Button>}
+        {mode === 'mine' && (order.status === 'revision_required' || order.status === 'terminated') && order.canRevise && onRevise && <Button type="primary" icon={<EditOutlined/>} onClick={onRevise}>修改并重新提交</Button>}
         {mode === 'mine' && order.canTerminate && onTerminate && <Button danger icon={<StopOutlined/>} onClick={onTerminate}>终止审批</Button>}
         {mode === 'approval-todo' && canReview && !supervisorPending && <><Button type="primary" icon={<CheckOutlined/>} onClick={onApprove}>通过</Button><Button danger icon={<CloseOutlined/>} onClick={onReject}>驳回</Button>{onRequestSupervisor && order.canRequestSupervisorConfirmation && <Button icon={<UserSwitchOutlined/>} onClick={onRequestSupervisor}>申请主管确认</Button>}</>}
       </Space>

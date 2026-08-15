@@ -387,7 +387,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     else { setCategories([]); setCategoryError(true) }
     if (results[2].status === 'fulfilled') setChannels(results[2].value)
     else { setChannels([]); setChannelError(true) }
-    if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和状态统计。')
+    if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和筛选配置。')
     setFilterLoading(false)
   }, [audience])
 
@@ -568,7 +568,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
               onChange={changeInboxGroup}
               items={filterProfile.groups.map(group => ({
                 key: group.key,
-                label: <span>{group.label}<small>{group.count}</small></span>
+                label: group.label
               }))}
             />
             {activeGroup?.sections.length ? <div className="lead-inbox-filter-sections">
@@ -581,7 +581,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
                     className={inboxStage === option.key ? 'active' : ''}
                     aria-pressed={inboxStage === option.key}
                     onClick={() => setInboxStage(option.key)}
-                  >{option.label}<small>{option.count}</small></button>)}
+                  >{option.label}</button>)}
                 </div>
               </div>)}
             </div> : null}

@@ -219,8 +219,6 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 leadId, userId, history.getId(), acceptedAt, EVENT_LEAD_ACCEPTED, ASSIGNMENT_PENDING));
         leadMapper.updateById(lead);
         notifySales(userId, leadId, "accepted");
-        notifyEventPublisher.publish(ACCEPTED, leadId, "lead-accepted:" + history.getId(), userId,
-                acceptedAt, eventContext(lead, userId, userId, null));
         releaseReservation(leadId, userId);
     }
 
@@ -276,8 +274,6 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                 leadId, userId, history.getId(), claimedAt, EVENT_LEAD_CLAIMED, ASSIGNMENT_PUBLIC_POOL));
         leadMapper.updateById(lead);
-        notifyEventPublisher.publish(CLAIMED, leadId, "lead-claimed:" + history.getId(), userId,
-                claimedAt, eventContext(lead, null, userId, null));
     }
 
     @Override
@@ -318,6 +314,31 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
+        doAdminTransfer(lead, salesUserId, operatorUserId, reason);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TransferAttemptResult tryAdminTransfer(Long leadId, Long expectedOwnerUserId, Long salesUserId,
+                                                  Long operatorUserId, String reason) {
+        if (assignmentService.getEligibleSalesUsers().stream().noneMatch(user -> salesUserId.equals(user.getId()))) {
+            return TransferAttemptResult.invalidated("目标销售已不再有效");
+        }
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        if (lead == null) {
+            return TransferAttemptResult.invalidated("客资已不存在");
+        }
+        if (STATUS_SUSPENDED.equals(lead.getStatus())
+                || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                || !Objects.equals(lead.getOwnerUserId(), expectedOwnerUserId)) {
+            return TransferAttemptResult.invalidated("客资状态或归属已变化");
+        }
+        doAdminTransfer(lead, salesUserId, operatorUserId, reason);
+        return TransferAttemptResult.success();
+    }
+
+    private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason) {
+        Long leadId = lead.getId();
         LocalDateTime transferredAt = LocalDateTime.now();
         agingPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
         Long from = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getPendingAssigneeUserId();
@@ -545,6 +566,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
 
     private void publishDispatchEvent(String scene, LeadDO lead, Long salesUserId, Long operatorUserId,
                                       LeadAssignmentHistoryDO history, String reason) {
+        if (ASSIGNED.equals(scene) || REASSIGNED.equals(scene)) return;
         Map<String, Object> context = eventContext(lead, salesUserId, lead.getOwnerUserId(), reason);
         context.put("assignment.attempt", history.getAttemptNo());
         notifyEventPublisher.publish(scene, lead.getId(), "lead-dispatch:" + history.getId(), operatorUserId,

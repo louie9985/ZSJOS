@@ -201,10 +201,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     public LeadInboxFilterProfileRespVO getInboxFilterProfile(Long userId, String audience) {
         validateInboxAudiencePermission(audience);
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(audience);
-        List<Map<String, Object>> rows = leadMapper.selectManagementInboxStateCounts(userId, audience);
         List<LeadInboxFilterProfileRespVO.GroupVO> groups = config.getGroups().stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
-                .map(group -> toProfileGroup(config, group, rows))
+                .map(this::toProfileGroup)
                 .toList();
         return new LeadInboxFilterProfileRespVO(groups);
     }
@@ -221,31 +220,15 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         }
     }
 
-    private LeadInboxFilterProfileRespVO.GroupVO toProfileGroup(
-            LeadInboxFilterConfigVO config, LeadInboxFilterConfigVO.GroupVO group, List<Map<String, Object>> rows) {
-        LeadInboxFilterQuery groupQuery = inboxFilterConfigService.resolveQuery(config, group.getKey(), "all");
-        long groupCount = countRows(rows, groupQuery);
+    private LeadInboxFilterProfileRespVO.GroupVO toProfileGroup(LeadInboxFilterConfigVO.GroupVO group) {
         List<LeadInboxFilterProfileRespVO.SectionVO> sections = group.getOptions().isEmpty() ? List.of() : List.of(
                 new LeadInboxFilterProfileRespVO.SectionVO("current_stage",
                         group.getSectionLabel() == null || group.getSectionLabel().isBlank()
                                 ? "当前环节" : group.getSectionLabel(),
                         group.getOptions().stream().filter(option -> Boolean.TRUE.equals(option.getEnabled()))
-                                .map(option -> new LeadInboxFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel(),
-                                        countRows(rows, inboxFilterConfigService.resolveQuery(
-                                                config, group.getKey(), option.getKey()))))
+                                .map(option -> new LeadInboxFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel()))
                                 .toList()));
-        return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), groupCount, sections);
-    }
-
-    private static long countRows(List<Map<String, Object>> rows, LeadInboxFilterQuery query) {
-        return rows.stream().filter(row -> query.matches(stringValue(row.get("status")),
-                        stringValue(row.get("assignment_status")), stringValue(row.get("handling_stage"))))
-                .mapToLong(row -> row.get("total") instanceof Number number ? number.longValue() : 0L)
-                .sum();
-    }
-
-    private static String stringValue(Object value) {
-        return value == null ? null : value.toString();
+        return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), sections);
     }
 
     private LeadManagementRespVO convert(LeadDO lead, Long currentUserId,

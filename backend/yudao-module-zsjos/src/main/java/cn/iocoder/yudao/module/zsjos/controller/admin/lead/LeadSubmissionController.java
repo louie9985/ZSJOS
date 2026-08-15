@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
@@ -63,5 +64,12 @@ public class LeadSubmissionController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
     public CommonResult<LeadCreateRespVO> createSelfSourced(@Valid @RequestBody LeadCreateReqVO reqVO) {
         return success(submissionService.createSelfSourced(reqVO, getLoginUserId()));
+    }
+
+    @GetMapping("/self-sourced/new-media-providers")
+    @Operation(summary = "获得销售自拓可选的新媒体提供方")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:self-sourced:create')")
+    public CommonResult<List<LeadAssignmentUserRespVO>> getNewMediaProviders() {
+        return success(submissionService.getNewMediaProviders());
     }
 }

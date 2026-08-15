@@ -20,6 +20,8 @@ public class LeadFollowUpRuleDO extends TenantBaseDO {
     private Integer agingPoolTimeoutDays;
     private Integer noProgressWarningDays;
     private Integer noProgressGraceDays;
+    private Integer notificationPopupDurationMinutes;
+    private Boolean duplicateAutoResolutionEnabled;
     private Integer status;
     private Integer version;
 }

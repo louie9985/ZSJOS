@@ -21,6 +21,11 @@ public interface BpmProcessInstanceApi {
 
     void cancelProcessInstanceByStartUser(Long userId, String processInstanceId, String reason);
 
-
+    /**
+     * Terminates a process after the calling business domain has authorized the operator.
+     * The BPM history records the real operator and the supplied authorization type.
+     */
+    void terminateProcessInstanceByBusiness(Long operatorUserId, String processInstanceId,
+                                            String authorizationType, String reason);
 
 }

@@ -16,6 +16,7 @@ type Option = { label: string; value: string }
 type FormValues = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
   sourceChannel: string; leadCategory: string; remark?: string; dispatchMode: 'auto' | 'specified'; specifiedSalesUserId?: number
+  newMediaProviderUserId?: number
 }
 type RemoteState = { loading: boolean; error?: string }
 
@@ -38,6 +39,8 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
   const [salesState, setSalesState] = useState<RemoteState>({ loading: false })
   const salesLoaded = useRef(false)
   const assignmentMode = Form.useWatch('dispatchMode', form)
+  const [providers, setProviders] = useState<SalesUser[]>([])
+  const [providerState, setProviderState] = useState<RemoteState>({ loading: false })
   const [intentions, setIntentions] = useState<IntendedProductSelection[]>([])
   const [primaryKey, setPrimaryKey] = useState<string>()
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -76,6 +79,13 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
   }, [])
   useEffect(() => { if (assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && !salesLoaded.current) void loadSales() }, [assignmentMode, loadSales])
 
+  const loadProviders = useCallback(async () => {
+    setProviderState({ loading: true })
+    try { setProviders(await api.newMediaProviders()); setProviderState({ loading: false }) }
+    catch (error) { setProviders([]); setProviderState({ loading: false, error: error instanceof Error ? error.message : '新媒体提供方加载失败' }) }
+  }, [])
+  useEffect(() => { if (selfSourced) void loadProviders() }, [selfSourced, loadProviders])
+
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
 
 
@@ -112,7 +122,8 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
         attachments: uploadResult.items.filter(file => file.uploaded)
           .map(file => ({ infraFileId: file.uploaded!.infraFileId })),
         dispatchMode: selfSourced ? 'auto' : values.dispatchMode,
-        specifiedSalesUserId: selfSourced ? undefined : values.specifiedSalesUserId, idempotencyKey
+        specifiedSalesUserId: selfSourced ? undefined : values.specifiedSalesUserId,
+        newMediaProviderUserId: selfSourced ? values.newMediaProviderUserId : undefined, idempotencyKey
       })
       if (result.outcome === 'created') message.success(`客资 ${result.leadNo || ''} 提交成功`)
       else if (result.outcome === 'review_pending') message.info(`疑似重复，已进入复核队列 #${result.reviewId}`)
@@ -147,6 +158,7 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
         </Row>
         {!selfSourced && <><Divider /><Title level={5}>派单方式</Title><Form.Item name="dispatchMode" label="派单模式" rules={[{ required: true }]}><Radio.Group options={LEAD_ASSIGNMENT_OPTIONS} /></Form.Item>
         {assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && <Form.Item name="specifiedSalesUserId" label="指定销售" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}><EmployeeSelect users={sales} loading={salesState.loading} showSearch optionFilterProp="label" notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} /></Form.Item>}</>}
+        {selfSourced && <><Divider /><Title level={5}>客资提供方</Title><Form.Item name="newMediaProviderUserId" label="新媒体提供方" preserve={false} extra="选填；提交后不可补选或更改"><EmployeeSelect users={providers} loading={providerState.loading} showSearch optionFilterProp="label" allowClear notFoundContent={providerState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadProviders()}>重新加载</Button> : '暂无可选新媒体人员'} /></Form.Item></>}
         <div className="lead-form-actions"><Space><Button onClick={() => { form.resetFields(); setFiles([]); setIntentions([]); setPrimaryKey(undefined) }}>重置</Button><IrreversiblePopconfirm action={`提交客资「${pendingValues?.name?.trim() || '当前客户'}」`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" icon={<SendOutlined />} loading={submitting} disabled={unavailable || hasUploading} onClick={() => void prepareSubmit()}>提交客资</Button></IrreversiblePopconfirm></Space></div>
       </Form>
     </Spin></Card>

@@ -7,4 +7,5 @@ public interface PersonnelStateService {
     PersonnelStateRespVO get(Long userId);
     void update(Long userId, PersonnelStateUpdateReqVO reqVO, Long operatorUserId);
     boolean isEnabled(Long userId);
+    java.util.Set<Long> getDisabledUserIds(java.util.Collection<Long> userIds);
 }

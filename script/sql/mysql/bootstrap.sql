@@ -40,6 +40,9 @@ SOURCE script/sql/mysql/migrations/V051__cashback_domain.sql;
 SOURCE script/sql/mysql/migrations/V052__withdrawal_and_offline_payout.sql;
 SOURCE script/sql/mysql/migrations/V053__withdrawal_finance_query_permission.sql;
 SOURCE script/sql/mysql/migrations/V054__lead_business_number.sql;
+SOURCE script/sql/mysql/migrations/V055__sales_order_supervisor_confirmation.sql;
+SOURCE script/sql/mysql/migrations/V056__crm_lifecycle_confirmed_rules.sql;
+SOURCE script/sql/mysql/migrations/V057__lead_runtime_settings.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 
