@@ -1,7 +1,7 @@
 # Workstream Handoff: crm-lifecycle-gap-implementation
 
 - Workstream ID: `crm-lifecycle-gap-implementation`
-- Status: `active`
+- Status: `merged`
 - Goal: Implement the confirmed CRM lead-to-deal lifecycle gaps and the approved realtime notification, duplicate-resolution, authentication, lead-filter, and employee-avatar repairs without changing unrelated existing behavior.
 - Non-goals: Cashback withdrawal or payment, export, maintenance mode, WeCom, email, customer merge, standalone customer management, full opportunity management, refund, void, or cancellation workflows; unrelated notification scenes, report statistics, pagination totals, external service control, and unresolved business rules explicitly deferred to a later discussion.
 - Branch: `codex/crm-lifecycle-gap-implementation`
@@ -67,3 +67,16 @@
 - Verification evidence: ZSJOS focused backend suite passed 57/57; `yudao-server` full dependency graph `compile` passed. Workbench passed 32 test files/168 tests, typecheck and production build. Admin focused ESLint and production build passed. Admin full `pnpm ts:check` retains the same 14 pre-existing errors and no new error in the follow-up-rule or user-list files. `zsjos-db.ps1 check` passed. Desktop 1440x900 and mobile 390x844 browser checks passed for the available login surface with no overlap or horizontal overflow. `git diff --check` passed with line-ending warnings only. Open Code Review connectivity passed, but the workspace review exceeded the 10-minute command limit and produced no review result, so it is not counted as a successful review.
 - Dependency/integration impact: No Maven/npm dependency was added. V057 remains additive and repeatable; no real migration was executed. The full server `package` reached Spring Boot repackaging but could not rename the currently locked `yudao-server.jar`; the non-mutating full dependency compile passed instead, and no running Java service was stopped.
 - Remaining work: Authenticated browser checks for the settings table/modal, profile save, Admin avatar fallback, live logout/auth-expiry generation, and WebSocket popup duration/deduplication require a compatible test account and live backend. Real MySQL V057 fresh/double execution and end-to-end assignment/duplicate/transfer requests remain unverified. Full server packaging should be rerun after the process holding `backend/yudao-server/target/yudao-server.jar` is intentionally stopped by an authorized operator.
+
+### 2026-08-15 10:57 Asia/Shanghai
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `518fc88fd75ed72aa26e9106c121025b6ad747a6` (integration merge; this delivery entry is committed immediately afterward)
+- User goal: Merge all repository branches into local `main` after separately confirming the exact branch, commit, fetch, switch, and merge operations.
+- Key decisions: Preserved all 101 pre-existing worktree changes in one feature commit before fetching. Integrated `origin/main` into the feature branch with a regular merge, regenerated the conflicted tracked TypeScript build-info cache through the production build, then used an explicit non-fast-forward merge into local `main`. No history rewrite, push, branch deletion, service control, database execution, or dependency change was performed.
+- Execution result: Committed the CRM lifecycle work as `4074ab7ce6`, merged remote `main` into the feature branch as `c9305a39f4`, and merged `codex/crm-lifecycle-gap-implementation` into local `main` as `518fc88fd7`. Both the local feature branch and `origin/main` are ancestors of local `main`; the working tree was clean before this required handoff update.
+- Changed files: The integration includes the 101-file CRM lifecycle commit, the 11-file remote Workbench presentation update, their generated `frontend/workbench/tsconfig.tsbuildinfo` conflict resolution, and this handoff file. No unrelated content was reverted or discarded.
+- Verification evidence: Backend focused System/ZSJOS suite passed 81/81 with the complete 20-module Maven reactor successful. Workbench passed 32 test files and 171 tests, `npm run typecheck`, and production build. Admin `pnpm run build:prod` passed with existing environment/CSS warnings. `./zsjos-db.ps1 check` passed. `git diff --check` passed. Branch ancestry and merged-branch checks passed.
+- Dependency/integration impact: No dependency change. Local `main` contains all discovered local and remote branch commits and is ahead of `origin/main`; nothing was pushed. SQL migrations V056 and V057 remain additive and were statically verified but were not executed against a real database.
+- Remaining work: Push local `main` only after separate explicit confirmation. Branch deletion, live database migration/repeatability execution, authenticated browser/API/WebSocket verification, and shared-service control remain outside this merge task.
