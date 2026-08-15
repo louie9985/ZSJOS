@@ -117,28 +117,45 @@
   flex: 1;
   overflow-y: auto;
   flex-direction: column;
-  padding-right: 8px;
+  /* 内容与常驻滚动条之间的呼吸位；滚动条本身已实际占宽，见 base.css */
+  padding-right: var(--crm-sp-1);
 }
 
 .lead-inbox-item {
+  position: relative;
   width: 100%;
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-lg);
   background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .lead-inbox-item:hover {
   border-color: var(--crm-color-primary-hover);
+  box-shadow: var(--crm-shadow-card);
 }
 
 .lead-inbox-item.active {
-  padding: 11px;
-  border: 2px solid var(--crm-color-primary);
+  border-color: var(--crm-color-primary-border);
+  background: var(--crm-color-primary-bg);
+}
+
+.lead-inbox-item.active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--crm-color-primary);
 }
 
 /**
@@ -146,7 +163,6 @@
  * 底色 + 起始边一条竖条，在整列白底卡片里可以扫视识别；点进去后类名撤掉。
  */
 .lead-inbox-item.unseen {
-  position: relative;
   border-color: color-mix(in srgb, var(--crm-color-error) 35%, var(--crm-border));
   background: color-mix(in srgb, var(--crm-color-error) 6%, var(--crm-bg-container));
 }
@@ -221,14 +237,18 @@
   margin: 0;
 }
 
+.lead-inbox-item-title .ant-space {
+  flex: none;
+}
+
 .lead-inbox-item-meta {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 8px;
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid var(--crm-border);
+  padding-top: 6px;
+  margin-top: 6px;
+  border-top: 1px dashed color-mix(in srgb, var(--crm-border) 60%, transparent);
 }
 
 .lead-inbox-detail-pane {
@@ -428,7 +448,7 @@
   border-width: 3px;
   border-radius: 12px;
   box-shadow: 4px 4px 0 var(--crm-border);
-  transition: box-shadow 0.15s ease, transform 0.15s ease;
+  transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
 }
 
 [data-crm-preset="illustration"] .lead-inbox-item:hover {
@@ -438,7 +458,9 @@
 
 [data-crm-preset="illustration"] .lead-inbox-item.active {
   border-width: 3px;
-  padding: 12px;
+  border-color: var(--crm-color-primary);
+  padding: 10px 12px;
+  background: var(--crm-color-primary-bg);
   box-shadow: 4px 4px 0 var(--crm-color-primary);
 }
 
