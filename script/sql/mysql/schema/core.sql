@@ -3432,6 +3432,8 @@ CREATE TABLE IF NOT EXISTS `system_users` (
   `post_ids` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '岗位编号数组',
   `email` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '用户邮箱',
   `mobile` varchar(11) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '手机号码',
+  `unique_username` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin GENERATED ALWAYS AS (`username`) STORED COMMENT '租户内大小写敏感用户名唯一值',
+  `unique_mobile` varchar(11) GENERATED ALWAYS AS (NULLIF(`mobile`,'')) STORED COMMENT '租户内非空手机号唯一值',
   `wecom_user_id` varchar(64) DEFAULT NULL COMMENT '企业微信 userid',
   `sex` tinyint DEFAULT '0' COMMENT '用户性别',
   `avatar` varchar(512) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '头像地址',
@@ -3445,6 +3447,8 @@ CREATE TABLE IF NOT EXISTS `system_users` (
   `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
   PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_tenant_username_binary` (`tenant_id`,`unique_username`),
+  UNIQUE KEY `uk_tenant_mobile_active` (`tenant_id`,`unique_mobile`),
   KEY `idx_username` (`username`) USING BTREE,
   KEY `idx_mobile` (`mobile`) USING BTREE,
   KEY `idx_email` (`email`) USING BTREE,
@@ -4141,6 +4145,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_rule` (
   `first_follow_up_timeout_minutes` int NOT NULL COMMENT '接单后首次跟进时限（分钟）',
   `qualification_timeout_minutes` int NOT NULL DEFAULT '4320' COMMENT '首次跟进后有效性判定时限（分钟）',
   `aging_pool_timeout_days` int NOT NULL DEFAULT '90' COMMENT '超期协同公海期限（自然日）',
+  `notification_popup_duration_minutes` int NOT NULL DEFAULT '5' COMMENT '消息通知浮窗时长（分钟）',
+  `duplicate_auto_resolution_enabled` bit(1) NOT NULL DEFAULT b'0' COMMENT '重复客资自动判重开关',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0 启用，1 停用',
   `version` int NOT NULL DEFAULT '0' COMMENT '乐观锁版本',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '',
@@ -5225,4 +5231,47 @@ CREATE TABLE IF NOT EXISTS `zsjos_withdrawal` (
 CREATE TABLE IF NOT EXISTS `zsjos_withdrawal_item` (
  `id` bigint NOT NULL AUTO_INCREMENT, `withdrawal_id` bigint NOT NULL, `cashback_id` bigint NOT NULL, `amount_snapshot` decimal(12,2) NOT NULL, `active_flag` bit(1) NOT NULL DEFAULT b'1', `active_cashback_id` bigint GENERATED ALWAYS AS (IF(`active_flag`=b'1',`cashback_id`,NULL)) STORED, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`), UNIQUE KEY `uk_withdrawal_cashback` (`tenant_id`,`withdrawal_id`,`cashback_id`), UNIQUE KEY `uk_active_cashback` (`tenant_id`,`active_cashback_id`), KEY `idx_withdrawal` (`tenant_id`,`withdrawal_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 提现返现关联';
+-- zsjos_lead_claim_daily_counter
+CREATE TABLE IF NOT EXISTS `zsjos_lead_claim_daily_counter` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `sales_user_id` bigint NOT NULL, `claim_date` date NOT NULL,
+ `claim_count` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+ UNIQUE KEY `uk_tenant_sales_claim_date` (`tenant_id`,`sales_user_id`,`claim_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 销售每日主动抢单计数';
+
+-- zsjos_lead_transfer_request
+CREATE TABLE IF NOT EXISTS `zsjos_lead_transfer_request` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `from_owner_user_id` bigint NOT NULL,
+ `requested_owner_user_id` bigint NOT NULL, `owner_dept_id_snapshot` bigint NOT NULL,
+ `transfer_reviewer_user_id` bigint DEFAULT NULL COMMENT '提交时主管快照', `reason` varchar(500) NOT NULL,
+ `status` varchar(32) NOT NULL, `process_instance_id` varchar(64) DEFAULT NULL, `idempotency_key` varchar(64) NOT NULL,
+ `submitted_at` datetime NOT NULL, `resolved_at` datetime DEFAULT NULL, `resolution_reason` varchar(500) DEFAULT NULL,
+ `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+ UNIQUE KEY `uk_tenant_transfer_idempotency` (`tenant_id`,`idempotency_key`),
+ UNIQUE KEY `uk_tenant_transfer_process` (`tenant_id`,`process_instance_id`),
+ KEY `idx_tenant_lead_transfer_status` (`tenant_id`,`lead_id`,`status`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资正式转派申请';
+
+-- V056 baseline additions
+CREATE TABLE IF NOT EXISTS `zsjos_order_no_daily_counter` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `sequence_date` date NOT NULL, `current_value` int NOT NULL DEFAULT 0,
+ `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+ PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_order_no_sequence_date` (`tenant_id`,`sequence_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单号每日流水';
+CREATE TABLE IF NOT EXISTS `system_notify_business_outbox` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL, `scene_code` varchar(64) NOT NULL,
+ `source_event_key` varchar(128) NOT NULL, `target_rule_id` bigint DEFAULT NULL, `biz_type` varchar(64) DEFAULT NULL, `biz_id` bigint DEFAULT NULL,
+ `operator_user_id` bigint DEFAULT NULL, `occurred_at` datetime NOT NULL, `payload` json DEFAULT NULL,
+ `status` varchar(16) NOT NULL DEFAULT 'pending', `attempt_count` int NOT NULL DEFAULT 0, `next_attempt_at` datetime NOT NULL,
+ `lease_until` datetime DEFAULT NULL, `claim_token` varchar(64) DEFAULT NULL, `last_error` varchar(1000) DEFAULT NULL, `succeeded_at` datetime DEFAULT NULL,
+ `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+ `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0',
+ PRIMARY KEY (`id`), UNIQUE KEY `uk_notify_outbox_event_rule` (`tenant_id`,`source_event_key`,`target_rule_id`),
+ KEY `idx_notify_outbox_due` (`status`,`next_attempt_at`,`lease_until`), KEY `idx_notify_outbox_retention` (`status`,`succeeded_at`,`update_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务通知持久化 Outbox';
 SET FOREIGN_KEY_CHECKS=1;

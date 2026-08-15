@@ -24,6 +24,7 @@ public class LeadCreateReqVO {
     @Valid @Size(max = 9) private List<LeadAttachmentReqVO> attachments = new ArrayList<>();
     @NotBlank private String dispatchMode;
     private Long specifiedSalesUserId;
+    private Long newMediaProviderUserId;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 
     public List<LeadProductReqVO> getEffectiveProducts() {

@@ -8,6 +8,10 @@ import java.math.BigDecimal;
 public interface CashbackService {
     Long ensureValidCashback(Long leadId);
     Long ensureDealCashback(DealCashbackCommand command);
+    boolean isEligibleDealLead(Long leadId);
+    BigDecimal resolveDealRate(String productRef);
+    void cancelDealCashbacks(Long orderId, String reason);
+    BigDecimal getOrderCashbackTotal(Long orderId, Long beneficiaryUserId);
     int settleMatured();
     void assertOrderRejectable(Long orderId);
     PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId);

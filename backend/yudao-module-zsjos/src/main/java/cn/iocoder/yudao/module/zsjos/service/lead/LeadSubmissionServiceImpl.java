@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
+import cn.hutool.core.util.DesensitizedUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -7,22 +8,28 @@ import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.*;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
@@ -36,6 +43,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     @Resource private PersonMapper personMapper;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private DeptApi deptApi;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadActivationMapper activationMapper;
     @Resource private LeadDuplicateReviewMapper duplicateReviewMapper;
@@ -49,6 +57,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private LeadDuplicateMatcher duplicateMatcher;
     @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private LeadFollowUpRuleService followUpRuleService;
+    @Lazy @Resource private LeadDuplicateReviewService duplicateReviewService;
     @Resource private LeadNumberService leadNumberService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
 
@@ -57,20 +67,42 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     public LeadCreateRespVO create(LeadCreateReqVO reqVO, Long submitterUserId) {
         LeadSubmissionIdentityService.Resolution identity = identityService.requireOrdinarySubmitter(submitterUserId);
         validateOrdinaryDispatch(reqVO, submitterUserId, identity.identity());
-        return create(reqVO, submitterUserId, identity, false);
+        return create(reqVO, submitterUserId, submitterUserId, identity, false);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO createSelfSourced(LeadCreateReqVO reqVO, Long salesUserId) {
         identityService.requireSales(salesUserId);
+        if (reqVO.getNewMediaProviderUserId() != null) {
+            identityService.requireNewMediaProvider(reqVO.getNewMediaProviderUserId());
+        }
         reqVO.setDispatchMode(DISPATCH_SELF);
         reqVO.setSpecifiedSalesUserId(salesUserId);
-        return create(reqVO, salesUserId,
+        return create(reqVO, salesUserId, selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), salesUserId),
                 new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.SALES, null), true);
     }
 
-    private LeadCreateRespVO create(LeadCreateReqVO reqVO, Long submitterUserId,
+    @Override
+    public List<LeadAssignmentUserRespVO> getNewMediaProviders() {
+        List<AdminUserRespDTO> users = identityService.getEnabledNewMediaProviders();
+        Set<Long> deptIds = users.stream().map(AdminUserRespDTO::getDeptId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, DeptRespDTO> departments = (deptIds.isEmpty() ? List.<DeptRespDTO>of()
+                : deptApi.getDeptList(deptIds)).stream()
+                .collect(Collectors.toMap(DeptRespDTO::getId, Function.identity()));
+        return users.stream().map(user -> {
+            LeadAssignmentUserRespVO result = new LeadAssignmentUserRespVO();
+            result.setId(user.getId()); result.setNickname(user.getNickname());
+            result.setMaskedMobile(user.getMobile() == null ? null : DesensitizedUtil.mobilePhone(user.getMobile()));
+            result.setDeptId(user.getDeptId()); result.setAvatar(user.getAvatar()); result.setStatus(user.getStatus());
+            DeptRespDTO dept = departments.get(user.getDeptId());
+            result.setDeptName(dept == null ? null : dept.getName());
+            return result;
+        }).toList();
+    }
+
+    private LeadCreateRespVO create(LeadCreateReqVO reqVO, Long actorUserId, Long sourceUserId,
                                     LeadSubmissionIdentityService.Resolution identity, boolean selfSourced) {
         LeadCreateRespVO idempotent = findIdempotent(reqVO.getIdempotencyKey());
         if (idempotent != null) return idempotent;
@@ -83,21 +115,16 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(reqVO.getLeadCategory()));
         List<LeadProductSnapshot> products = validateProducts(reqVO.getEffectiveProducts());
         Map<Long, FileInfoRespDTO> attachments = attachmentService.validateReferences(
-                reqVO.getAttachments(), submitterUserId);
+                reqVO.getAttachments(), actorUserId);
         validateDispatch(reqVO, selfSourced);
 
         LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
-        if (existingReview != null) return LeadCreateRespVO.reviewPending(existingReview.getId());
+        if (existingReview != null) return duplicateReviewResponse(existingReview);
         LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
-        if (match.strongActiveMatch() != null) {
-            LeadDO existingLead = leadMapper.selectById(match.strongActiveMatch().leadId());
-            return LeadCreateRespVO.duplicateRejected(existingLead.getId(), existingLead.getLeadNo(), existingLead.getStatus(),
-                    LeadStateProjection.qualification(existingLead), LeadStateProjection.operational(existingLead));
-        }
         if (match.hasMatches()) {
             LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
             review.setStatus("pending");
-            review.setSubmitterUserId(submitterUserId);
+            review.setSubmitterUserId(actorUserId);
             review.setSubmissionSourceType(sourceType(identity));
             review.setSubmissionPartnerId(identity.partnerId());
             review.setSubmissionSnapshot(JsonUtils.toJsonString(reqVO));
@@ -107,10 +134,16 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             review.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey());
             review.setVersion(0);
             duplicateReviewMapper.insert(review);
+            if (Boolean.TRUE.equals(followUpRuleService.requireEnabledRule().getDuplicateAutoResolutionEnabled())) {
+                Long matchedLeadId = newestMatchedLeadId(match.candidates());
+                if (matchedLeadId != null) {
+                    return duplicateReviewService.resolveAutomatically(review.getId(), matchedLeadId, actorUserId);
+                }
+            }
             return LeadCreateRespVO.reviewPending(review.getId());
         }
 
-        return createApproved(reqVO, submitterUserId, null, products, region, attachments, identity);
+        return createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -137,10 +170,34 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             validateOrdinaryDispatch(reqVO, submitterUserId, identity.identity());
         }
         validateDispatch(reqVO, selfSourced);
-        return createApproved(reqVO, submitterUserId, reusePersonId, products, region, attachments, identity);
+        Long sourceUserId = selfSourced
+                ? selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), submitterUserId)
+                : submitterUserId;
+        return createApproved(reqVO, submitterUserId, sourceUserId, reusePersonId, products, region, attachments, identity);
     }
 
-    private LeadCreateRespVO createApproved(LeadCreateReqVO reqVO, Long submitterUserId, Long reusePersonId,
+    private LeadCreateRespVO duplicateReviewResponse(LeadDuplicateReviewDO review) {
+        if (!"completed".equals(review.getStatus()) || review.getMatchedLeadId() == null) {
+            return LeadCreateRespVO.reviewPending(review.getId());
+        }
+        LeadDO lead = leadMapper.selectById(review.getMatchedLeadId());
+        if (lead == null) return LeadCreateRespVO.reviewPending(review.getId());
+        return "reactivate_lead".equals(review.getResultType())
+                ? LeadCreateRespVO.activated(lead.getId(), lead.getLeadNo(), lead.getAssignmentStatus())
+                : LeadCreateRespVO.duplicateAutoClosed(lead.getId(), lead.getLeadNo(), lead.getStatus());
+    }
+
+    private Long newestMatchedLeadId(List<LeadDuplicateMatcher.Candidate> candidates) {
+        List<Long> leadIds = candidates.stream().map(LeadDuplicateMatcher.Candidate::leadId)
+                .filter(Objects::nonNull).distinct().toList();
+        if (leadIds.isEmpty()) return null;
+        return leadMapper.selectBatchIds(leadIds).stream()
+                .max(Comparator.comparing(LeadDO::getSubmittedAt, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(LeadDO::getId))
+                .map(LeadDO::getId).orElse(null);
+    }
+
+    private LeadCreateRespVO createApproved(LeadCreateReqVO reqVO, Long actorUserId, Long sourceUserId, Long reusePersonId,
                                             List<LeadProductSnapshot> products, RegionSnapshot region,
                                             Map<Long, FileInfoRespDTO> attachments,
                                             LeadSubmissionIdentityService.Resolution identity) {
@@ -154,12 +211,12 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
         LocalDateTime submittedAt = LocalDateTime.now(BEIJING);
-        LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, submitterUserId, identity, submittedAt);
+        LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, sourceUserId, identity, submittedAt);
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);
-        notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), submitterUserId,
-                lead.getSubmittedAt(), eventContext(lead, submitterUserId));
-        dispatchService.start(lead, reqVO.getSpecifiedSalesUserId(), submitterUserId);
+        notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), actorUserId,
+                lead.getSubmittedAt(), eventContext(lead));
+        dispatchService.start(lead, reqVO.getSpecifiedSalesUserId(), actorUserId);
         return response(leadMapper.selectById(lead.getId()), "created");
     }
 
@@ -241,6 +298,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         if (!(selfSourced ? Set.of(DISPATCH_SELF) : Set.of(DISPATCH_AUTO, DISPATCH_SPECIFIED)).contains(reqVO.getDispatchMode())) {
             throw exception(LEAD_DISPATCH_MODE_INVALID);
         }
+        if (!selfSourced && reqVO.getNewMediaProviderUserId() != null) {
+            throw exception(LEAD_DISPATCH_MODE_INVALID);
+        }
         if (DISPATCH_SPECIFIED.equals(reqVO.getDispatchMode()) && reqVO.getSpecifiedSalesUserId() == null) {
             throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
         }
@@ -258,15 +318,15 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     }
 
     private LeadDO createLead(PersonDO person, LeadCreateReqVO reqVO, String mobile, String wechatId,
-                              RegionSnapshot region, Long submitterUserId,
+                              RegionSnapshot region, Long sourceUserId,
                               LeadSubmissionIdentityService.Resolution identity, LocalDateTime submittedAt) {
         LeadDO lead = new LeadDO();
         lead.setLeadNo(leadNumberService.next(submittedAt));
         lead.setPersonId(person.getId()); lead.setSubmittedName(reqVO.getName().trim());
         lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechatId);
         lead.setSourceType(sourceType(identity));
-        lead.setSourceUserId(submitterUserId); lead.setPartnerId(identity.partnerId());
-        AdminUserRespDTO submitter = adminUserApi.getUser(submitterUserId);
+        lead.setSourceUserId(sourceUserId); lead.setPartnerId(identity.partnerId());
+        AdminUserRespDTO submitter = sourceUserId == null ? null : adminUserApi.getUser(sourceUserId);
         lead.setSourceDeptId(submitter == null ? null : submitter.getDeptId());
         lead.setSourceChannelId(reqVO.getSourceChannel());
         applyRegion(lead, region); lead.setLeadCategory(reqVO.getLeadCategory()); lead.setRemark(reqVO.getRemark());
@@ -281,6 +341,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         return identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER ? SOURCE_PARTNER
                 : identity.identity() == LeadSubmissionIdentityService.Identity.SALES ? SOURCE_SALES_SELF
                 : SOURCE_INTERNAL_NEW_MEDIA;
+    }
+
+    static Long selfSourcedSourceUserId(Long providerUserId, Long salesUserId) {
+        return Objects.requireNonNullElse(providerUserId, salesUserId);
     }
 
     private LeadActivationDO createActivation(LeadDO lead, PersonDO person, LeadCreateReqVO reqVO,
@@ -318,9 +382,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         return activation;
     }
 
-    private Map<String, Object> eventContext(LeadDO lead, Long submitterUserId) {
+    private Map<String, Object> eventContext(LeadDO lead) {
         Map<String, Object> context = new LinkedHashMap<>();
-        context.put("submitterUserId", submitterUserId);
+        context.put("submitterUserId", lead.getSourceUserId());
         context.put("ownerUserId", lead.getOwnerUserId());
         context.put("pendingSalesUserId", lead.getPendingAssigneeUserId());
         return context;

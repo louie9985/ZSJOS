@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Alert,
-  Avatar,
   Badge,
   Button,
   Empty,
@@ -17,7 +16,7 @@ import {
   Typography
 } from 'antd'
 import { message } from 'antd'
-import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
+import { BellOutlined, CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, ReloadOutlined, WarningOutlined } from '@ant-design/icons'
 import { useLocation } from 'react-router-dom'
 import { api, type AdvancedFilterGroup, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
 import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
@@ -26,10 +25,8 @@ import {
   applyInvalidRemarkTemplate,
   defaultInboxStage,
   dictionaryDisplayLabel,
-  invalidReasonSnapshotLabel,
   hasNextLeadInboxPage,
   isLeadInboxUnauthorized,
-  leadPendingTaskAlert,
   mergeUniqueLeads,
   protocolDisplayLabel,
   tryStartLeadPageRequest
@@ -68,7 +65,7 @@ function productText(lead: ManagedLead) {
 }
 
 function LeadStateTags({ lead }: { lead: ManagedLead }) {
-  return <Space size={4} wrap>
+  return <Space size={4}>
     <Tag color={lead.qualificationStatus === 'invalid' ? 'red' : lead.qualificationStatus === 'valid' ? 'green' : 'gold'}>
       {protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, lead.qualificationStatus, '未知有效状态')}
     </Tag>
@@ -87,7 +84,6 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
 }) {
-  const pendingTaskAlert = leadPendingTaskAlert(lead)
   const [activeTab, setActiveTab] = useState<LeadDetailTab>(defaultLeadDetailTab(autoExpandFollowUp))
   const [followUpTotal, setFollowUpTotal] = useState(0)
   const [invalidOpen, setInvalidOpen] = useState(false)
@@ -122,21 +118,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
   const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
-  const [nextFollowUpAt, setNextFollowUpAt] = useState<number | undefined>(lead.opportunity?.nextFollowUpAt)
   const actions = new Map((lead.availableActions || []).map(item => [item.code, item]))
   useEffect(() => { onDirtyChange(followUpFormDirty || basicInfoDirty) },
     [basicInfoDirty, followUpFormDirty, onDirtyChange])
-
-  // 拿最新跟进记录的下次应跟进时间（兜底 opportunity 上没有的情况）
-  useEffect(() => {
-    if (lead.opportunity?.nextFollowUpAt) {
-      setNextFollowUpAt(lead.opportunity.nextFollowUpAt)
-      return
-    }
-    api.leadFollowUpPage(lead.id, { pageNo: 1, pageSize: 1 })
-      .then(page => setNextFollowUpAt(page.list[0]?.nextFollowUpAt))
-      .catch(() => setNextFollowUpAt(undefined))
-  }, [lead.id, lead.opportunity?.nextFollowUpAt])
 
   const judgeValid = async () => {
     setValidConfirmOpen(false)
@@ -237,28 +221,8 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
 
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
-      <Avatar size={48}>{lead.submittedName.slice(0, 1)}</Avatar>
-      <div className="lead-detail-title">
-        <Space wrap>
-          <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
-          <LeadStateTags lead={lead}/>
-        </Space>
-        <Typography.Text type="secondary">
-          {lead.submittedMobile || '无手机号'} · {lead.submittedWechatId || '无微信号'} · {lead.leadNo}
-        </Typography.Text>
-      </div>
-      {nextFollowUpAt && (
-        <div className="lead-hero-next-followup">
-          <ClockCircleOutlined />
-          <span className="lead-hero-next-label">下次应跟进</span>
-          <span className="lead-hero-next-time">{formatTimestamp(nextFollowUpAt)}</span>
-        </div>
-      )}
+      <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
     </div>
-    {lead.operationalStatus === 'suspended' && <Alert type="warning" showIcon message="客资已挂起" description="销售当前只能查看，需由销售主管恢复、转派、回收或释放。"/>}
-    {lead.status === 'invalid' && <Alert type="error" showIcon message="客资已判无效" description={[lead.invalidReason ? invalidReasonSnapshotLabel(lead.invalidReasonLabelSnapshot) : undefined, lead.invalidDescription].filter(Boolean).join('：')}/>}
-    {pendingTaskAlert && <Alert type="info" showIcon message={pendingTaskAlert.message}
-      description={`截止时间：${formatTimestamp(pendingTaskAlert.deadline)}`}/>}
     <Tabs
       className="lead-detail-tabs"
       activeKey={activeTab}
@@ -387,7 +351,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
     else { setCategories([]); setCategoryError(true) }
     if (results[2].status === 'fulfilled') setChannels(results[2].value)
     else { setChannels([]); setChannelError(true) }
-    if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和状态统计。')
+    if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和筛选配置。')
     setFilterLoading(false)
   }, [audience])
 
@@ -568,7 +532,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
               onChange={changeInboxGroup}
               items={filterProfile.groups.map(group => ({
                 key: group.key,
-                label: <span>{group.label}<small>{group.count}</small></span>
+                label: group.label
               }))}
             />
             {activeGroup?.sections.length ? <div className="lead-inbox-filter-sections">
@@ -581,7 +545,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
                     className={inboxStage === option.key ? 'active' : ''}
                     aria-pressed={inboxStage === option.key}
                     onClick={() => setInboxStage(option.key)}
-                  >{option.label}<small>{option.count}</small></button>)}
+                  >{option.label}</button>)}
                 </div>
               </div>)}
             </div> : null}

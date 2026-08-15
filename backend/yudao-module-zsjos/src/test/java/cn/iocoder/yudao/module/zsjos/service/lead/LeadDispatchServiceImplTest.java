@@ -35,8 +35,6 @@ import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_CATEGORY;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_SOURCE_CHANNEL;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ACCEPTED;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ASSIGNED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_QUALIFICATION_DISPOSITION_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_CLAIM_DAILY_LIMIT_REACHED;
@@ -114,8 +112,7 @@ class LeadDispatchServiceImplTest {
         verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(10L), eq(88L), any(),
                 eq("lead_assignment_accepted"), eq("pending_acceptance"));
         verify(applicationEventPublisher).publishEvent(any(LeadAssignmentRealtimeEvent.class));
-        verify(notifyEventPublisher).publish(eq(ACCEPTED), eq(1L), eq("lead-accepted:88"), eq(10L),
-                any(), any());
+        verify(notifyEventPublisher, never()).publish(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -207,6 +204,29 @@ class LeadDispatchServiceImplTest {
     }
 
     @Test
+    void claimCreatesFollowUpTaskWithoutBusinessNotification() {
+        LeadDO lead = lead();
+        lead.setAssignmentStatus("public_pool");
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
+        when(ruleMapper.selectByCode("default")).thenReturn(rule());
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadMapper.updatePublicPoolToOwned(1L, 10L)).thenReturn(1);
+        when(claimDailyCounterMapper.reserve(eq(1L), eq(10L), any(), eq(5))).thenReturn(1);
+        doAnswer(invocation -> {
+            var history = invocation.getArgument(0,
+                    cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class);
+            history.setId(88L);
+            return 1;
+        }).when(historyMapper).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+
+        service.claim(1L, 10L);
+
+        verify(lifecycleTaskService).createFirstFollowUpTask(eq(1L), eq(10L), eq(88L), any(),
+                eq("lead_claimed"), eq("public_pool"));
+        verify(notifyEventPublisher, never()).publish(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     void retryAssignsOnlyOnlineAcceptingSalesAndReservesAtomically() {
         LeadDO lead = retryableLead();
         when(leadMapper.selectRetryableUnassignedAuto()).thenReturn(List.of(lead));
@@ -230,8 +250,7 @@ class LeadDispatchServiceImplTest {
         verify(dispatchRedisRepository).tryReserve(1L, 10L, 120);
         verify(lifecycleTaskService).createAssignmentTask(eq(1L), eq(10L), eq(88L), any(), eq("auto"));
         verify(applicationEventPublisher).publishEvent(any(LeadAssignmentRealtimeEvent.class));
-        verify(notifyEventPublisher).publish(eq(ASSIGNED), eq(1L), eq("lead-dispatch:88"), eq(0L),
-                any(), any());
+        verify(notifyEventPublisher, never()).publish(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -290,6 +309,40 @@ class LeadDispatchServiceImplTest {
         assertEquals(20L, lead.getOwnerUserId());
         assertEquals(20L, opportunity.getOwnerUserId());
         verify(opportunityMapper).updateById(opportunity);
+    }
+
+    @Test
+    void approvedTransferInvalidatesWhenOriginalOwnerChanged() {
+        LeadDO lead = lead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(11L);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+
+        LeadDispatchService.TransferAttemptResult result = service.tryAdminTransfer(1L, 10L, 20L, 20L, "审批通过");
+
+        assertEquals(false, result.transferred());
+        assertEquals("客资状态或归属已变化", result.reason());
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
+    }
+
+    @Test
+    void approvedTransferSucceedsWhenOriginalOwnerStillMatches() {
+        LeadDO lead = lead();
+        lead.setStatus("valid"); lead.setAssignmentStatus("owned"); lead.setOwnerUserId(10L);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(20L)));
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        doAnswer(invocation -> {
+            var history = invocation.getArgument(0,
+                    cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class);
+            history.setId(88L);
+            return 1;
+        }).when(historyMapper).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+
+        LeadDispatchService.TransferAttemptResult result = service.tryAdminTransfer(1L, 10L, 20L, 20L, "审批通过");
+
+        assertTrue(result.transferred());
+        assertEquals(20L, lead.getOwnerUserId());
+        verify(leadMapper, times(2)).updateById(lead);
     }
 
     private static LeadClaimPoolPageReqVO request() {

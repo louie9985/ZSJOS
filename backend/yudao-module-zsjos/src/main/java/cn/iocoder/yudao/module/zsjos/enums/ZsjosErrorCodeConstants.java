@@ -57,6 +57,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_INBOX_FILTER_VERSION_NOT_EXISTS = new ErrorCode(1_900_003_021, "客资筛选方案版本不存在");
     ErrorCode LEAD_FOLLOW_UP_RULE_NOT_EXISTS = new ErrorCode(1_900_003_022, "客资跟进规则不存在");
     ErrorCode LEAD_FOLLOW_UP_RULE_INVALID = new ErrorCode(1_900_003_023, "客资跟进规则参数无效");
+    ErrorCode LEAD_FOLLOW_UP_RULE_VERSION_CONFLICT = new ErrorCode(1_900_003_079, "客资跟进规则已被其他人修改，请刷新后重试");
     ErrorCode LEAD_FOLLOW_UP_STATE_INVALID = new ErrorCode(1_900_003_024, "当前客资状态不允许填写跟进记录");
     ErrorCode LEAD_FOLLOW_UP_DICT_INVALID = new ErrorCode(1_900_003_025, "跟进方式、跟进结果或客资分类无效");
     ErrorCode LEAD_FOLLOW_UP_TIME_INVALID = new ErrorCode(1_900_003_026, "下次跟进时间必须晚于当前时间");

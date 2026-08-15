@@ -19,7 +19,6 @@ public class LeadInboxFilterProfileRespVO {
     public static class GroupVO {
         private String key;
         private String label;
-        private Long count;
         private List<SectionVO> sections;
     }
 
@@ -38,6 +37,5 @@ public class LeadInboxFilterProfileRespVO {
     public static class OptionVO {
         private String key;
         private String label;
-        private Long count;
     }
 }

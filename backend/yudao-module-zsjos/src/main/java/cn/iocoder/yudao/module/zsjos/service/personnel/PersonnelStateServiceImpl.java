@@ -12,7 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.*;
@@ -59,5 +61,13 @@ public class PersonnelStateServiceImpl implements PersonnelStateService {
     public boolean isEnabled(Long userId) {
         PersonnelStateDO state = mapper.selectByUserId(userId);
         return state == null || STATE_ENABLED.equals(state.getBusinessState());
+    }
+
+    @Override
+    public Set<Long> getDisabledUserIds(Collection<Long> userIds) {
+        return mapper.selectByUserIds(userIds).stream()
+                .filter(state -> !STATE_ENABLED.equals(state.getBusinessState()))
+                .map(PersonnelStateDO::getSystemUserId)
+                .collect(Collectors.toSet());
     }
 }

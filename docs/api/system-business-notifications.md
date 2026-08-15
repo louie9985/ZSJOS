@@ -18,6 +18,15 @@ scene. Templates do not send messages by themselves: each tenant must still crea
 own notification rules. V016 inserts only a missing active template code and never overwrites an
 administrator-created or modified template.
 
+`in_app` rules use `system_notify_business_outbox` and join the publishing business transaction.
+The unique boundary is tenant + source event key + target rule. Workers claim rows with a unique
+`claim_token`; completion and failure updates must still own that token, so an expired worker cannot
+overwrite a newer claim. Retryable failures use 1, 5, and 30 second delays; permanent failures stop
+immediately. Successful rows are retained for 30 days, failed rows for 90 days, and rendered in-app
+messages for three years. WebSocket delivery remains an after-commit invalidation emitted from the
+persisted in-app message. Other configured channels remain after-commit best effort and are not
+covered by the durable delivery guarantee.
+
 ## HTTP APIs
 
 All paths below are under the administration API prefix and use the standard response envelope.
@@ -55,6 +64,12 @@ Clients treat this as an invalidation hint, fetch `/system/notify-message/my-get
 message ID, and display title plus summary at the bottom right. Clicking marks the message read and
 refreshes the bell. A lead action verifies the real business API first; absent menu or object access
 falls back to message details with a `Message` explanation.
+
+The bottom-right popup duration is tenant-configured through the lead follow-up rule and defaults
+to five minutes; the accepted range is 1 to 30 minutes. This does not control the pending-assignment
+modal. Assignment, reassignment, acceptance, and claim completion do not publish business-message
+events. Their historical scene catalog entries remain for configuration and existing-message
+compatibility, while `zsjos_lead_assignment` alone refreshes the functional assignment modal.
 
 The separate `zsjos_lead_assignment` event remains a lightweight prompt-refresh channel for the
 pending-assignment modal. Clients reload pending assignments and retain polling as the disconnect

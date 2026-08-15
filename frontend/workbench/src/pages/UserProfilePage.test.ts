@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseWecomCallback } from './UserProfilePage'
+import { isLatestAvatarUpload, parseWecomCallback } from './UserProfilePage'
 
 describe('WeCom OAuth callback parsing', () => {
   it('accepts only WeCom callbacks with code and state', () => {
@@ -14,5 +14,12 @@ describe('WeCom OAuth callback parsing', () => {
 
   it('rejects callbacks for other social types', () => {
     expect(parseWecomCallback('?type=20&code=abc&state=xyz').hasValidSocialCallback).toBe(false)
+  })
+})
+
+describe('avatar upload sequencing', () => {
+  it('accepts only the latest upload result', () => {
+    expect(isLatestAvatarUpload(2, 2)).toBe(true)
+    expect(isLatestAvatarUpload(1, 2)).toBe(false)
   })
 })

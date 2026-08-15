@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_DISABLED;
+import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_ENABLED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMITTER_IDENTITY_INVALID;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -49,6 +51,8 @@ class LeadSubmissionIdentityServiceTest {
         allowEnabledPersonnel(1L);
         AdminUserRespDTO user = user(1L, 10L, Set.of(100L));
         when(adminUserApi.getUser(1L)).thenReturn(user);
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
+        when(deptApi.getDept(10L)).thenReturn(dept);
         when(postApi.getPostByCode("new_media_operator")).thenReturn(post(100L));
 
         assertEquals(LeadSubmissionIdentityService.Identity.NEW_MEDIA,
@@ -61,7 +65,9 @@ class LeadSubmissionIdentityServiceTest {
         AdminUserRespDTO manager = user(2L, 20L, Set.of(200L));
         AdminUserRespDTO operator = user(3L, 20L, Set.of(100L));
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(20L); dept.setLeaderUserId(2L);
+        dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
         when(adminUserApi.getUser(2L)).thenReturn(manager);
+        when(deptApi.getDept(20L)).thenReturn(dept);
         when(postApi.getPostByCode("new_media_operator")).thenReturn(post(100L));
         when(postApi.getPostByCode("dept_manager")).thenReturn(post(200L));
         when(deptApi.getDeptListByLeaderUserId(2L)).thenReturn(List.of(dept));
@@ -84,11 +90,11 @@ class LeadSubmissionIdentityServiceTest {
         allowEnabledPersonnel(5L);
         when(adminUserApi.getUser(5L)).thenReturn(user(5L, null, Set.of()));
         PartnerDO partner = new PartnerDO(); partner.setId(50L); partner.setBoundSystemUserId(5L);
-        partner.setEnabledAt(LocalDateTime.now());
+        partner.setStatus(PARTNER_STATUS_ENABLED); partner.setEnabledAt(LocalDateTime.now());
         when(partnerMapper.selectById(50L)).thenReturn(partner);
         assertDoesNotThrow(() -> service.resolveHistoricalSubmission(5L, SOURCE_PARTNER, 50L));
 
-        partner.setBoundSystemUserId(9L);
+        partner.setStatus(PARTNER_STATUS_DISABLED);
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.resolveHistoricalSubmission(5L, SOURCE_PARTNER, 50L));
         assertEquals(LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());

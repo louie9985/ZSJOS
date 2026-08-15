@@ -75,6 +75,15 @@
   --crm-control-h: 32px;
   --crm-control-h-sm: 24px;
 
+  /* ---- 滚动条 ----
+   * 颜色全部引自既有语义变量，深色预设下随 ThemeVars 自动反色，无需深色分支。
+   * 取 border-strong 而非 fill-secondary：后者亮色下只有 6% 黑，8px 细条几乎看不见。
+   * 粗细不随密度档变，故不进 data-crm-density 分档。 */
+  --crm-scrollbar-size: 8px;
+  --crm-scrollbar-thumb: var(--crm-border-strong);
+  --crm-scrollbar-thumb-hover: var(--crm-text-tertiary);
+  --crm-scrollbar-thumb-active: var(--crm-text-secondary);
+
   /* ==================== Tier 2 尺度 ==================== */
   /* 间距阶梯。当前值对齐 styles.css 现行实际渲染（偏紧），Step 3 起随密度档切换。 */
   --crm-sp-1: 4px;

@@ -98,6 +98,44 @@ SELECT 'sales_order_supervisor_confirmation_v055' AS check_name,
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6850
                      AND permission='zsjos:sales-order:supervisor-confirm' AND deleted=b'0'),
           'PASS','FAIL') AS result;
+SELECT 'crm_lifecycle_confirmed_rules_v056' AS check_name,
+       IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V056')
+          AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+                     AND table_name='zsjos_order_no_daily_counter')
+          AND EXISTS(SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+                     AND table_name='system_notify_business_outbox')
+          AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                     AND table_name='system_notify_business_outbox' AND column_name='claim_token'),
+          'PASS','FAIL') AS result;
+SELECT 'lead_runtime_settings_v057' AS check_name,
+       IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V057')
+          AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                     AND table_name='zsjos_lead_follow_up_rule'
+                     AND column_name='notification_popup_duration_minutes' AND column_default='5')
+          AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                     AND table_name='zsjos_lead_follow_up_rule'
+                     AND column_name='duplicate_auto_resolution_enabled'
+                     AND column_default IN ('b''0''','0')),
+          'PASS','FAIL') AS result;
+SELECT 'account_unique_generated_columns_v056' AS check_name,
+       IF((SELECT CONCAT(MAX(non_unique), ':', GROUP_CONCAT(column_name ORDER BY seq_in_index))
+             FROM information_schema.statistics WHERE table_schema=DATABASE()
+              AND table_name='system_users' AND index_name='uk_tenant_username_binary')
+              = '0:tenant_id,unique_username'
+          AND (SELECT collation_name FROM information_schema.columns WHERE table_schema=DATABASE()
+                AND table_name='system_users' AND column_name='unique_username')='utf8mb4_bin'
+          AND (SELECT CONCAT(MAX(non_unique), ':', GROUP_CONCAT(column_name ORDER BY seq_in_index))
+             FROM information_schema.statistics WHERE table_schema=DATABASE()
+              AND table_name='system_users' AND index_name='uk_tenant_mobile_active')
+              = '0:tenant_id,unique_mobile',
+          'PASS','FAIL') AS result;
+SELECT 'account_uniqueness_conflicts_v056' AS check_name,
+       IF(NOT EXISTS (SELECT 1 FROM system_users GROUP BY tenant_id,BINARY username HAVING COUNT(*)>1)
+          AND NOT EXISTS (SELECT 1 FROM system_users WHERE mobile<>'' GROUP BY tenant_id,mobile HAVING COUNT(*)>1)
+          AND NOT EXISTS (SELECT 1 FROM system_users username_user JOIN system_users mobile_user
+               ON mobile_user.tenant_id=username_user.tenant_id AND mobile_user.id<>username_user.id
+              AND mobile_user.mobile<>'' AND BINARY mobile_user.mobile=BINARY username_user.username),
+          'PASS','FAIL') AS result;
 SELECT 'person_contact_claim_completeness_v043' AS check_name,
        IF(NOT EXISTS (
             SELECT 1 FROM (
@@ -446,6 +484,8 @@ FROM (
   UNION ALL SELECT 'zsjos_work_field_value' UNION ALL SELECT 'zsjos_work_change'
   UNION ALL SELECT 'zsjos_module_schema_version'
   UNION ALL SELECT 'zsjos_cashback'
+  UNION ALL SELECT 'zsjos_order_no_daily_counter'
+  UNION ALL SELECT 'system_notify_business_outbox'
 ) expected
 LEFT JOIN information_schema.tables actual
   ON actual.table_schema=DATABASE() AND actual.table_name=expected.table_name;

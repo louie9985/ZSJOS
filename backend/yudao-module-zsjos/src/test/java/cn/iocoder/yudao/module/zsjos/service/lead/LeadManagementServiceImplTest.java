@@ -41,6 +41,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -312,30 +314,16 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
-    void inboxFilterProfileUsesScopedRealStateCounts() {
+    void inboxFilterProfileDoesNotQueryCounts() {
         LeadInboxFilterConfigVO config = filterConfig();
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
         when(inboxFilterConfigService.getPublishedConfig("submitter")).thenReturn(config);
-        when(inboxFilterConfigService.resolveQuery(config, "all", "all"))
-                .thenReturn(new LeadInboxFilterQuery(java.util.Set.of(), java.util.Set.of(), false));
-        when(inboxFilterConfigService.resolveQuery(config, "pending", "all"))
-                .thenReturn(new LeadInboxFilterQuery(java.util.Set.of("submitted"), java.util.Set.of(), false));
-        when(inboxFilterConfigService.resolveQuery(config, "pending", "owned"))
-                .thenReturn(new LeadInboxFilterQuery(java.util.Set.of("submitted"), java.util.Set.of("owned"), false));
-        when(leadMapper.selectManagementInboxStateCounts(10L, "submitter")).thenReturn(List.of(
-                Map.of("status", "submitted", "assignment_status", "pending_acceptance", "total", 2L),
-                Map.of("status", "submitted", "assignment_status", "owned", "total", 3L),
-                Map.of("status", "valid", "assignment_status", "owned", "total", 4L),
-                Map.of("status", "won", "assignment_status", "owned", "total", 1L)));
-
         LeadInboxFilterProfileRespVO result = service.getInboxFilterProfile(10L, "submitter");
 
-        assertEquals(10L, result.getGroups().getFirst().getCount());
         LeadInboxFilterProfileRespVO.GroupVO pending = result.getGroups().get(1);
         assertEquals("pending", pending.getKey());
-        assertEquals(5L, pending.getCount());
-        assertEquals(3L, pending.getSections().getFirst().getOptions().getFirst().getCount());
-        verify(leadMapper).selectManagementInboxStateCounts(10L, "submitter");
+        assertEquals("owned", pending.getSections().getFirst().getOptions().getFirst().getKey());
+        verify(leadMapper, never()).selectManagementInboxStateCounts(any(), any());
     }
 
     @Test
@@ -348,26 +336,12 @@ class LeadManagementServiceImplTest {
         config.getGroups().get(1).setOptions(List.of(config.getGroups().get(1).getOptions().getFirst(), qualification));
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
         when(inboxFilterConfigService.getPublishedConfig("submitter")).thenReturn(config);
-        when(inboxFilterConfigService.resolveQuery(config, "all", "all"))
-                .thenReturn(new LeadInboxFilterQuery(Set.of(), Set.of(), false));
-        when(inboxFilterConfigService.resolveQuery(config, "pending", "all"))
-                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false));
-        when(inboxFilterConfigService.resolveQuery(config, "pending", "first_follow_pending"))
-                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
-                        Set.of("first_follow_pending"), false, Map.of()));
-        when(inboxFilterConfigService.resolveQuery(config, "pending", "qualification_pending"))
-                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
-                        Set.of("qualification_pending"), false, Map.of()));
-        when(leadMapper.selectManagementInboxStateCounts(10L, "submitter")).thenReturn(List.of(
-                Map.of("status", "submitted", "assignment_status", "owned",
-                        "handling_stage", "first_follow_pending", "total", 2L),
-                Map.of("status", "submitted", "assignment_status", "owned",
-                        "handling_stage", "qualification_pending", "total", 3L)));
-
         LeadInboxFilterProfileRespVO result = service.getInboxFilterProfile(10L, "submitter");
 
-        assertEquals(2L, result.getGroups().get(1).getSections().getFirst().getOptions().getFirst().getCount());
-        assertEquals(3L, result.getGroups().get(1).getSections().getFirst().getOptions().get(1).getCount());
+        assertEquals(List.of("first_follow_pending", "qualification_pending"),
+                result.getGroups().get(1).getSections().getFirst().getOptions().stream()
+                        .map(LeadInboxFilterProfileRespVO.OptionVO::getKey).toList());
+        verify(leadMapper, never()).selectManagementInboxStateCounts(any(), any());
     }
 
     @Test

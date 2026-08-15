@@ -67,7 +67,8 @@
   overflow-y: auto;
   flex-direction: column;
   gap: 7px;
-  padding-right: 6px;
+  /* 内容与常驻滚动条之间的呼吸位；滚动条本身已实际占宽，见 base.css */
+  padding-right: var(--crm-sp-1);
 }
 
 .sales-order-list-scroll>.ant-empty {

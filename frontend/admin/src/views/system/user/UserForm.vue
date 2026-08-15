@@ -51,7 +51,7 @@
       </el-row>
       <el-row>
         <el-col :span="12">
-          <el-form-item v-if="formData.id === undefined" label="用户名称" prop="username">
+          <el-form-item label="用户名称" prop="username">
             <el-input v-model="formData.username" placeholder="请输入用户名称" />
           </el-form-item>
         </el-col>

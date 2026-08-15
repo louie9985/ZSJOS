@@ -48,7 +48,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 派单、接单、拒单和超时同时维护 `lead_assignment_accept` 业务任务。接单、抢单和管理员转派在归属事务内创建 `lead_first_follow_up` 任务，截止时间由接单时启用的独立跟进规则计算。
 
-提交接口先执行统一查重。活动客资手机号或微信号同字段强命中时返回 `outcome=duplicate_rejected`、已有 `leadId`、`leadNo`、主状态、判定状态和运营状态，不创建复核任务。手机号/微信交叉、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中返回 `outcome=review_pending + reviewId`，此时不分配 `leadNo`。完全无命中返回 `created + leadId + leadNo`。旧 `activated` 只用于读取历史 `LeadActivation` 幂等结果，新提交不再直接激活。
+提交接口先执行统一查重。自动判重关闭时，强弱规则的所有重复命中都创建审计记录并返回 `outcome=review_pending + reviewId`，此时不分配 `leadNo`。自动判重开启时，系统按历史 Lead 的 `submittedAt` 倒序、再按 ID 倒序选取最近候选：无效或关闭客资返回 `activated` 并重新激活历史 Lead；原负责人仍是启用销售时保留归属，否则进入抢单池；活动或已成交客资保持不变，关闭本次提交审计并返回 `duplicate_auto_closed`，存在有效负责人时发送重复客资提醒。只有 Person、没有历史 Lead 的命中仍进入人工复核。完全无命中返回 `created + leadId + leadNo`。
+
+自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。
 
 管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
@@ -65,6 +67,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `POST /zsjos/lead/{id}/admin-transfer` | `zsjos:lead:transfer` + 客资对象检查 |
 | `GET /zsjos/lead-follow-up-rule/get` | `zsjos:lead-follow-up-rule:query` |
 | `PUT /zsjos/lead-follow-up-rule/update` | `zsjos:lead-follow-up-rule:update` |
+| `GET /zsjos/lead-follow-up-rule/runtime-setting` | 已登录用户；只返回当前租户消息浮窗时长 |
 | `GET /zsjos/lead/qualification-exception/page` | `zsjos:lead:qualification:query` + 部门范围或全租户处置权限 |
 | `POST /zsjos/lead/qualification-exception/search-page` | 同异常客资固定范围，组合关键词与高级条件 |
 | `POST /zsjos/lead/search-page` | 通用客资管理范围内组合关键词与高级条件 |
@@ -80,7 +83,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 自动派单候选来自租户隔离的 Redis 轮询池。工作台每 30 秒刷新页面心跳，心跳键 90 秒过期；接单偏好持久化在 `zsjos_sales_dispatch_preference`，首次默认暂停。每次派单最多旋转初始池长度的三倍，跳过离线、暂停、已有待接客资以及当前客资已经尝试过的销售。Redis 原子预留 `lead:lock` 与 `sale:pending` 后，数据库条件更新才确认 `pending_acceptance`；Redis 不是客资状态或归属的事实源。
 
 拒单立即释放预留并重新派发，不对销售实施冷却。自动派单超时继续由数据库 `pending_expires_at` 扫描处理，不能通过扫描已经过期消失的 Redis 键恢复客资。Redis 暂不可用时客资保持 `unassigned`，租户定时任务恢复后重试；三圈确实无人可接或达到最大实际尝试次数时进入抢单池。指定派单不进入在线轮询。
-首次跟进时限独立配置，范围为 5–10080 分钟，默认 1440 分钟；有效性判定时限范围为 5–43200 分钟，默认 4320 分钟。首次跟进截止时间从当前归属开始计算；有效性判定截止时间从当前归属周期首次跟进成功时计算。两者均在对应任务创建时固化规则版本和截止时间，修改不追溯已有任务。首次跟进完成前，客资仍属于待判定大类但处理阶段为待首跟，不返回有效性判定截止时间。
+首次跟进时限独立配置，范围为 5–10080 分钟，默认 1440 分钟；有效性判定时限范围为 5–43200 分钟，默认 4320 分钟。相同租户规则还维护 `notificationPopupDurationMinutes`（1–30 分钟，默认 5）和 `duplicateAutoResolutionEnabled`（默认 `false`）。运行时接口只暴露浮窗时长，管理读取和更新接口返回全部字段；更新请求必须携带读取时的 `version`，版本冲突返回 `1_900_003_079`。首次跟进截止时间从当前归属开始计算；有效性判定截止时间从当前归属周期首次跟进成功时计算。两者均在对应任务创建时固化规则版本和截止时间，修改不追溯已有任务。首次跟进完成前，客资仍属于待判定大类但处理阶段为待首跟，不返回有效性判定截止时间。
+
+提交人、负责人和商机公海筛选配置接口只返回筛选结构与标签，不返回分组或选项数量，也不执行状态统计 SQL。列表分页总数及独立统计接口保持原契约。
 
 ## 判定前跟进与今日待办
 

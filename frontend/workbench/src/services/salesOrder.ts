@@ -7,7 +7,8 @@ export function validateSalesOrderSubmission(
   voucherCount: number
 ) {
   if (!mobile?.trim() && !wechatId?.trim()) return '请填写手机号或微信号'
-  if (totalAmount > 0 && voucherCount === 0) return '已付款的非零订单必须上传缴费凭证'
+  if (voucherCount === 0) return '所有订单必须上传至少一份缴费凭证'
+  if (voucherCount > 6) return '缴费凭证最多上传 6 份'
   return undefined
 }
 

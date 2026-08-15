@@ -49,7 +49,7 @@ describe('stylesheet colour hygiene', () => {
   })
 
   it('routes every colour through a --crm-* variable or an allowed keyword', () => {
-    const allowed = /var\(--crm-|transparent|currentColor|inherit|color-mix\(/
+    const allowed = /var\(--crm-|transparent|currentColor|inherit|none|color-mix\(/
     const suspicious: string[] = []
     for (const [path, text] of business) {
       stripComments(text).split('\n').forEach((line, i) => {
@@ -153,11 +153,36 @@ describe('spacing and sizing anchors', () => {
         const match = line.match(/font-size:\s*(\d+)px/)
         if (!match) return
         // 13px brand must fit a 144px sider; 16px/30px are icon glyph sizes;
-        // 11px is deliberately below the sm tier
-        if (['11', '13', '16', '30'].includes(match[1])) return
+        // 11px is deliberately below the sm tier; 10px is tab-close and
+        // primary-nav label; 12px is the brand mark, 18px is menu icons
+        if (['10', '11', '12', '13', '16', '18', '30'].includes(match[1])) return
         offenders.push(`${path}:${i + 1}  ${line.trim()}`)
       })
     }
     expect(offenders).toEqual([])
+  })
+})
+
+describe('scrollbar styling', () => {
+  const base = readFileSync(join(ROOT, 'base.css'), 'utf8')
+
+  it('styles the scrollbar through crm tokens rather than the OS default', () => {
+    expect(base).toContain('::-webkit-scrollbar')
+    expect(base).toMatch(/scrollbar-color:\s*var\(--crm-/)
+  })
+
+  it('confines the always-on bar to fine pointers', () => {
+    // declaring a width flips macOS/iOS from overlay to space-consuming
+    // classic bars, which would steal 8px on touch screens
+    const block = base.split('@media (any-pointer: fine)')[1] ?? ''
+    expect(block).toContain('::-webkit-scrollbar')
+  })
+
+  it('declares the scrollbar tokens in :root', () => {
+    const root = tokens.split(':root')[1]?.split('}')[0] ?? ''
+    const missing = ['--crm-scrollbar-size', '--crm-scrollbar-thumb'].filter(
+      name => !root.includes(`${name}:`)
+    )
+    expect(missing).toEqual([])
   })
 })

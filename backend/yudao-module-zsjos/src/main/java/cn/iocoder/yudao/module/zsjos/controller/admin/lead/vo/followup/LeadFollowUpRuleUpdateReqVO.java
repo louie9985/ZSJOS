@@ -7,6 +7,9 @@ import lombok.Data;
 
 @Data
 public class LeadFollowUpRuleUpdateReqVO {
+    @NotNull @Min(0)
+    private Integer version;
+
     @NotNull @Min(5) @Max(10080)
     private Integer firstFollowUpTimeoutMinutes;
 
@@ -21,4 +24,10 @@ public class LeadFollowUpRuleUpdateReqVO {
 
     @NotNull @Min(1) @Max(30)
     private Integer noProgressGraceDays;
+
+    @NotNull @Min(1) @Max(30)
+    private Integer notificationPopupDurationMinutes;
+
+    @NotNull
+    private Boolean duplicateAutoResolutionEnabled;
 }

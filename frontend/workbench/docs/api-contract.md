@@ -26,11 +26,15 @@
 
 所有 HTTP 路径、租户头、Token 刷新和响应解包集中在 `src/services`。组件不得直接调用 Axios。
 
-认证失败既可能使用 HTTP 401，也可能使用 HTTP 200 包裹业务码 `401`。工作台对两种响应执行同一套单次刷新与请求回放；刷新失败进入未登录状态。HTTP 403 保留当前会话并显示无权限，网络错误和服务端错误保留独立的重试状态。
+认证失败既可能使用 HTTP 401，也可能使用 HTTP 200 包裹业务码 `401`。工作台对两种响应执行同一套单次刷新与请求回放；刷新失败通过全局事件立即卸载工作台并进入登录页。HTTP 403 保留当前会话并显示无权限，网络错误和服务端错误保留独立的重试状态。
 
 `/messages/all` 调用 `my-page` 获取当前用户全部消息；`/messages/unread` 固定传递 `readStatus=false`。两个页面均由权限接口中的服务端菜单决定是否可见，前端不自行制造入口权限。
 
 WebSocket 使用 `/infra/ws?token=...`，不带 `/admin-api` 前缀。当前消费 `notify-message-new` 和 `zsjos_lead_assignment`；事件只触发对应 HTTP 数据刷新，不替代站内信或客资业务记录。
+
+`GET /admin-api/zsjos/lead-follow-up-rule/runtime-setting` 返回当前租户右下角消息浮窗时长，工作台按分钟换算为秒，非法值或请求失败使用 5 分钟默认值。该配置不影响待接单功能弹窗。
+
+`PUT /admin-api/zsjos/lead-follow-up-rule/update` 必须回传最近一次读取到的 `version`。服务端只在版本仍一致时更新并递增版本；并发管理员已先保存时返回稳定冲突错误 `1_900_003_079`，客户端应提示刷新后重试，不得用旧表单覆盖新配置。
 
 具备 `zsjos:lead:accept` 的工作台调用 `/zsjos/lead/dispatch-status/my`、`heartbeat`、`mode` 和 `offline` 维护销售页面在线与接单偏好。前端权限只决定是否发起请求和展示控件，后端仍通过销售专员岗位资格决定 `eligible`。WebSocket 断开时工作台停止发送在线心跳并尽力调用 offline；Redis TTL 负责异常关页兜底。
 

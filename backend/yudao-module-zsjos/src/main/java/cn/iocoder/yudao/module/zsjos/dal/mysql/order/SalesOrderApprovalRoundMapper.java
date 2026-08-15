@@ -19,6 +19,9 @@ public interface SalesOrderApprovalRoundMapper extends BaseMapperX<SalesOrderApp
     default SalesOrderApprovalRoundDO selectByProcessInstanceId(String processInstanceId) {
         return selectOne(SalesOrderApprovalRoundDO::getProcessInstanceId, processInstanceId);
     }
+    @Select("SELECT * FROM zsjos_order_approval_round WHERE process_instance_id = #{processInstanceId} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
+    SalesOrderApprovalRoundDO selectByProcessInstanceIdForUpdate(@Param("processInstanceId") String processInstanceId,
+                                                                  @Param("tenantId") Long tenantId);
     default SalesOrderApprovalRoundDO selectByIdempotencyKey(String key) {
         return selectOne(SalesOrderApprovalRoundDO::getSubmissionIdempotencyKey, key);
     }

@@ -23,7 +23,8 @@ import java.util.*;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ACTIVATED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.DUPLICATE_OWNER_REMINDER;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.DUPLICATE_REACTIVATED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
@@ -81,6 +82,9 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         }
         LeadCreateReqVO submission = JsonUtils.parseObject(review.getSubmissionSnapshot(), LeadCreateReqVO.class);
         requireSelectedCandidate(review, request);
+        if ("reactivate_lead".equals(request.getResultType()) && request.getSelectedSalesUserId() == null) {
+            throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
+        }
         LocalDateTime now = LocalDateTime.now();
         Map<String, Object> before = new LinkedHashMap<>();
         Map<String, Object> after = new LinkedHashMap<>();
@@ -122,6 +126,57 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         reviewMapper.updateById(review);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public LeadCreateRespVO resolveAutomatically(Long id, Long matchedLeadId, Long actorUserId) {
+        LeadDuplicateReviewDO review = reviewMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
+        if (review == null) throw exception(LEAD_DUPLICATE_REVIEW_NOT_EXISTS);
+        if ("completed".equals(review.getStatus())) {
+            LeadDO completedLead = leadMapper.selectById(review.getMatchedLeadId());
+            if (completedLead == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
+            return "reactivate_lead".equals(review.getResultType())
+                    ? LeadCreateRespVO.activated(completedLead.getId(), completedLead.getLeadNo(), completedLead.getAssignmentStatus())
+                    : LeadCreateRespVO.duplicateAutoClosed(completedLead.getId(), completedLead.getLeadNo(), completedLead.getStatus());
+        }
+        LeadDO matchedLead = leadMapper.selectByIdForUpdate(matchedLeadId,
+                TenantContextHolder.getRequiredTenantId());
+        if (matchedLead == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
+        LeadDuplicateReviewDecisionReqVO request = new LeadDuplicateReviewDecisionReqVO();
+        boolean reactivatable = Set.of(STATUS_INVALID, STATUS_CLOSED).contains(matchedLead.getStatus());
+        request.setResultType(reactivatable ? "reactivate_lead" : "notify_owner");
+        request.setMatchedPersonId(matchedLead.getPersonId());
+        request.setMatchedLeadId(matchedLeadId);
+        request.setOpinion("系统自动判重：选择最近提交的历史客资");
+        request.setIdempotencyKey("auto-duplicate:" + review.getSubmissionIdempotencyKey());
+        LeadCreateReqVO submission = JsonUtils.parseObject(review.getSubmissionSnapshot(), LeadCreateReqVO.class);
+        Map<String, Object> before = new LinkedHashMap<>();
+        Map<String, Object> after = new LinkedHashMap<>();
+        LocalDateTime now = LocalDateTime.now();
+        if (reactivatable) {
+            reactivateLocked(request, submission, review.getSubmitterUserId(), actorUserId, now,
+                    before, after, matchedLead);
+        } else {
+            notifyOwnerLocked(request, actorUserId, now, before, after, matchedLead);
+        }
+        review.setStatus("completed");
+        review.setResultType(request.getResultType());
+        review.setMatchedPersonId(matchedLead.getPersonId());
+        review.setMatchedLeadId(matchedLeadId);
+        review.setReviewOpinion(request.getOpinion());
+        review.setReviewAttachments("[]");
+        review.setReviewerUserId(actorUserId);
+        review.setReviewedAt(now);
+        review.setBeforeSnapshot(JsonUtils.toJsonString(before));
+        review.setAfterSnapshot(JsonUtils.toJsonString(after));
+        review.setDecisionIdempotencyKey(request.getIdempotencyKey());
+        review.setVersion(review.getVersion() + 1);
+        reviewMapper.updateById(review);
+        LeadDO resolved = leadMapper.selectById(matchedLeadId);
+        return reactivatable
+                ? LeadCreateRespVO.activated(resolved.getId(), resolved.getLeadNo(), resolved.getAssignmentStatus())
+                : LeadCreateRespVO.duplicateAutoClosed(resolved.getId(), resolved.getLeadNo(), resolved.getStatus());
+    }
+
     @SuppressWarnings("rawtypes")
     private void requireSelectedCandidate(LeadDuplicateReviewDO review, LeadDuplicateReviewDecisionReqVO request) {
         if ("new_person".equals(request.getResultType())) return;
@@ -153,29 +208,42 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     private void reactivate(LeadDuplicateReviewDecisionReqVO request, LeadCreateReqVO submission,
                             Long submitterUserId, Long reviewerUserId, LocalDateTime now, Map<String, Object> before,
                             Map<String, Object> after) {
-        if (request.getMatchedLeadId() == null || request.getSelectedSalesUserId() == null) {
+        if (request.getMatchedLeadId() == null) {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
-        if (getSalesCandidates(reviewerUserId).stream()
+        if (request.getSelectedSalesUserId() != null && getSalesCandidates(reviewerUserId).stream()
                 .noneMatch(user -> Objects.equals(user.getId(), request.getSelectedSalesUserId()))) {
             throw exception(LEAD_DUPLICATE_REVIEW_SALES_INVALID);
         }
         LeadDO lead = leadMapper.selectByIdForUpdate(request.getMatchedLeadId(), TenantContextHolder.getRequiredTenantId());
+        reactivateLocked(request, submission, submitterUserId, reviewerUserId, now, before, after, lead);
+    }
+
+    private void reactivateLocked(LeadDuplicateReviewDecisionReqVO request, LeadCreateReqVO submission,
+                                  Long submitterUserId, Long reviewerUserId, LocalDateTime now,
+                                  Map<String, Object> before, Map<String, Object> after, LeadDO lead) {
         if (lead == null || !Set.of(STATUS_INVALID, STATUS_CLOSED).contains(lead.getStatus())) {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
+        Long previousOwnerUserId = lead.getOwnerUserId();
+        boolean previousOwnerValid = previousOwnerUserId != null && assignmentService.getEligibleSalesUsers().stream()
+                .anyMatch(user -> Objects.equals(user.getId(), previousOwnerUserId));
+        Long targetOwnerUserId = request.getSelectedSalesUserId() == null
+                ? (previousOwnerValid ? previousOwnerUserId : null) : request.getSelectedSalesUserId();
         PersonDO person = personMapper.selectById(lead.getPersonId());
         String previousAssignmentStatus = lead.getAssignmentStatus();
-        before.put("person", person); before.put("lead", lead);
-        before.put("products", productMapper.selectListByLeadId(lead.getId()));
-        before.put("attachments", attachmentMapper.selectListByLeadId(lead.getId()));
+        before.put("person", deepSnapshot(person)); before.put("lead", deepSnapshot(lead));
+        before.put("products", deepSnapshot(productMapper.selectListByLeadId(lead.getId())));
+        before.put("attachments", deepSnapshot(attachmentMapper.selectListByLeadId(lead.getId())));
         personIdentityWriteService.update(person.getId(), submission.getName().trim(),
                 submission.getMobile(), submission.getWechatId());
         lead.setSubmittedName(submission.getName().trim()); lead.setSubmittedMobile(submission.getMobile());
         lead.setSubmittedWechatId(submission.getWechatId()); lead.setProvinceCode(submission.getProvinceCode());
         lead.setCityCode(submission.getCityCode()); lead.setLeadCategory(submission.getLeadCategory());
-        lead.setRemark(submission.getRemark()); lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_OWNED);
-        lead.setOwnerUserId(request.getSelectedSalesUserId()); lead.setOwnershipStartedAt(now);
+        lead.setRemark(submission.getRemark()); lead.setStatus(STATUS_SUBMITTED);
+        lead.setAssignmentStatus(targetOwnerUserId == null ? ASSIGNMENT_PUBLIC_POOL : ASSIGNMENT_OWNED);
+        lead.setOwnerUserId(targetOwnerUserId); lead.setOwnershipStartedAt(targetOwnerUserId == null ? null : now);
+        lead.setPublicPoolAt(targetOwnerUserId == null ? now : null);
         lead.setQualifiedByUserId(null); lead.setQualifiedAt(null); lead.setValidDescription(null);
         lead.setInvalidReason(null); lead.setInvalidReasonLabelSnapshot(null); lead.setInvalidDescription(null);
         lead.setInvalidEvidenceRefs(null); lead.setClosedAt(null); lead.setCloseReason(null); lead.setSuspendedAt(null);
@@ -186,35 +254,62 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         publicSeaRecordMapper.deleteByLeadId(lead.getId());
         LeadAssignmentHistoryDO assignment = new LeadAssignmentHistoryDO();
         assignment.setLeadId(lead.getId()); assignment.setActionType("duplicate_review_reactivate");
-        assignment.setFromOwnerUserId(beforeOwner(before)); assignment.setToOwnerUserId(request.getSelectedSalesUserId());
+        assignment.setFromOwnerUserId(previousOwnerUserId); assignment.setToOwnerUserId(targetOwnerUserId);
         assignment.setOperatorUserId(reviewerUserId); assignment.setReason(request.getOpinion().trim()); assignment.setOccurredAt(now);
         assignmentHistoryMapper.insert(assignment);
         lead.setCurrentAssignmentHistoryId(assignment.getId());
-        LocalDateTime firstDue = lifecycleTaskService.createFirstFollowUpTask(lead.getId(), request.getSelectedSalesUserId(),
-                assignment.getId(), now, EVENT_LEAD_RESTORED, previousAssignmentStatus);
-        lead.setCurrentAssignmentFirstFollowUpDeadlineAt(firstDue);
+        lifecycleTaskService.cancelFirstFollowUpTasks(lead.getId(), now, "重复客资重新激活");
+        lifecycleTaskService.cancelFollowUpReminders(lead.getId(), now, "重复客资重新激活");
+        if (targetOwnerUserId != null) {
+            LocalDateTime firstDue = lifecycleTaskService.createFirstFollowUpTask(lead.getId(), targetOwnerUserId,
+                    assignment.getId(), now, EVENT_LEAD_RESTORED, previousAssignmentStatus);
+            lead.setCurrentAssignmentFirstFollowUpDeadlineAt(firstDue);
+        } else {
+            lead.setCurrentAssignmentFirstFollowUpDeadlineAt(null);
+        }
         leadMapper.updateById(lead);
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
         if (opportunity != null && !OPPORTUNITY_STATUS_LOST.equals(opportunity.getStatus())) {
             opportunity.setStatus(OPPORTUNITY_STATUS_LOST); opportunity.setLostAt(now);
             opportunity.setLostReason("重复客资复核重新激活，等待重新判有效"); opportunityMapper.updateById(opportunity);
         }
+        Map<String, Object> notification = new LinkedHashMap<>();
+        if (targetOwnerUserId != null) notification.put("ownerUserId", targetOwnerUserId);
+        if (previousOwnerValid) notification.put("previousOwnerUserId", previousOwnerUserId);
+        if (targetOwnerUserId != null) notification.put("newOwnerUserId", targetOwnerUserId);
+        notification.put("submitterUserId", lead.getSourceUserId());
+        notification.put("assignment.reason", request.getOpinion().trim());
+        notifyEventPublisher.publish(DUPLICATE_REACTIVATED, lead.getId(),
+                "duplicate-review-reactivated:" + lead.getId() + ":" + now, reviewerUserId, now, notification);
         after.put("person", personMapper.selectById(person.getId())); after.put("lead", leadMapper.selectById(lead.getId()));
     }
 
-    private Long beforeOwner(Map<String, Object> before) {
-        Object value = before.get("lead");
-        return value instanceof LeadDO lead ? lead.getOwnerUserId() : null;
+    private Object deepSnapshot(Object value) {
+        return JsonUtils.parseObject(JsonUtils.toJsonString(value), Object.class);
     }
 
     private void notifyOwner(LeadDuplicateReviewDecisionReqVO request, Long reviewerUserId, LocalDateTime now,
                              Map<String, Object> before, Map<String, Object> after) {
         if (request.getMatchedLeadId() == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
-        LeadDO lead = leadMapper.selectById(request.getMatchedLeadId());
-        if (lead == null || lead.getOwnerUserId() == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
+        LeadDO lead = leadMapper.selectByIdForUpdate(request.getMatchedLeadId(),
+                TenantContextHolder.getRequiredTenantId());
+        notifyOwnerLocked(request, reviewerUserId, now, before, after, lead);
+    }
+
+    private void notifyOwnerLocked(LeadDuplicateReviewDecisionReqVO request, Long reviewerUserId,
+                                   LocalDateTime now, Map<String, Object> before,
+                                   Map<String, Object> after, LeadDO lead) {
+        if (lead == null) throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         before.put("lead", lead); after.put("unchanged", true);
-        notifyEventPublisher.publish(ACTIVATED, lead.getId(), "duplicate-review-notify:" + UUID.randomUUID(),
-                reviewerUserId, now, Map.of("ownerUserId", lead.getOwnerUserId(), "submitterUserId", lead.getSourceUserId()));
+        boolean ownerValid = lead.getOwnerUserId() != null && assignmentService.getEligibleSalesUsers().stream()
+                .anyMatch(user -> Objects.equals(user.getId(), lead.getOwnerUserId()));
+        if (!ownerValid) {
+            after.put("notification", "no_valid_recipient");
+            return;
+        }
+        notifyEventPublisher.publish(DUPLICATE_OWNER_REMINDER, lead.getId(),
+                "duplicate-review-notify:" + UUID.randomUUID(), reviewerUserId, now,
+                Map.of("ownerUserId", lead.getOwnerUserId()));
     }
 
     private void insertProductsAndAttachments(Long leadId, LeadCreateReqVO submission, Long reviewerUserId) {

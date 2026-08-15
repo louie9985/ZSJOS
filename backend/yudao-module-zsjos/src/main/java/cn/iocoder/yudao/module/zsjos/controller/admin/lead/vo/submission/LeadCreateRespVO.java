@@ -36,4 +36,17 @@ public class LeadCreateRespVO {
         response.setExistingOperationalStatus(operationalStatus);
         return response;
     }
+
+    public static LeadCreateRespVO activated(Long leadId, String leadNo, String assignmentStatus) {
+        LeadCreateRespVO response = new LeadCreateRespVO(leadId, "activated", assignmentStatus, null);
+        response.setLeadNo(leadNo);
+        return response;
+    }
+
+    public static LeadCreateRespVO duplicateAutoClosed(Long leadId, String leadNo, String status) {
+        LeadCreateRespVO response = new LeadCreateRespVO(leadId, "duplicate_auto_closed", null, null);
+        response.setLeadNo(leadNo);
+        response.setExistingLeadStatus(status);
+        return response;
+    }
 }

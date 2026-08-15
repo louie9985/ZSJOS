@@ -96,31 +96,19 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Override
     public LeadInboxFilterProfileRespVO getFilterProfile(Long userId) {
         LeadInboxFilterConfigVO config = inboxFilterConfigService.getPublishedConfig(INBOX_AUDIENCE_AGING_POOL);
-        Map<String, Long> counts = getCounts(userId);
         List<LeadInboxFilterProfileRespVO.GroupVO> groups = config.getGroups().stream()
                 .filter(group -> Boolean.TRUE.equals(group.getEnabled()))
                 .map(group -> {
-                    LeadInboxFilterQuery groupQuery = inboxFilterConfigService.resolveQuery(config, group.getKey(), "all");
-                    long groupCount = countPoolStatuses(counts, groupQuery.values(INBOX_FILTER_FIELD_POOL_STATUS));
                     List<LeadInboxFilterProfileRespVO.OptionVO> options = group.getOptions().stream()
                             .filter(option -> Boolean.TRUE.equals(option.getEnabled()))
-                            .map(option -> {
-                                LeadInboxFilterQuery query = inboxFilterConfigService.resolveQuery(
-                                        config, group.getKey(), option.getKey());
-                                return new LeadInboxFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel(),
-                                        countPoolStatuses(counts, query.values(INBOX_FILTER_FIELD_POOL_STATUS)));
-                            }).toList();
+                            .map(option -> new LeadInboxFilterProfileRespVO.OptionVO(option.getKey(), option.getLabel()))
+                            .toList();
                     List<LeadInboxFilterProfileRespVO.SectionVO> sections = options.isEmpty() ? List.of() : List.of(
                             new LeadInboxFilterProfileRespVO.SectionVO("pool_status",
                                     group.getSectionLabel() == null ? "公海状态" : group.getSectionLabel(), options));
-                    return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), groupCount, sections);
+                    return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), sections);
                 }).toList();
         return new LeadInboxFilterProfileRespVO(groups);
-    }
-
-    private static long countPoolStatuses(Map<String, Long> counts, Set<String> statuses) {
-        if (statuses.isEmpty()) return counts.getOrDefault("all", 0L);
-        return statuses.stream().mapToLong(status -> counts.getOrDefault(status, 0L)).sum();
     }
 
     @Override
