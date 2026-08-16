@@ -200,9 +200,9 @@ const loginData = reactive({
   captchaEnable: import.meta.env.VITE_APP_CAPTCHA_ENABLE !== 'false',
   tenantEnable: import.meta.env.VITE_APP_TENANT_ENABLE !== 'false',
   loginForm: {
-    tenantName: '中世健',
+    tenantName: '中世健教育',
     username: 'admin',
-    password: 'admin123',
+    password: 'Test@123456',
     captchaVerification: '',
     rememberMe: false
   }
