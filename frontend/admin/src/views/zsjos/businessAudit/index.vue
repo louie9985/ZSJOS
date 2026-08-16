@@ -1,7 +1,14 @@
 <template>
   <ContentWrap>
-    <el-tabs v-model="tab" @tab-change="reload">
-      <el-tab-pane label="业务审计" name="business">
+    <el-alert
+      v-if="!availableTabs.length"
+      title="无权查看业务审计"
+      type="warning"
+      show-icon
+      :closable="false"
+    />
+    <el-tabs v-else v-model="tab" @tab-change="reload">
+      <el-tab-pane v-if="canViewBusiness" label="业务审计" name="business">
         <el-form :model="businessQuery" inline @submit.prevent>
           <el-form-item label="动作编码"
             ><el-input v-model="businessQuery.actionCode" clearable class="!w-220px"
@@ -33,7 +40,7 @@
           @pagination="loadBusiness"
         />
       </el-tab-pane>
-      <el-tab-pane label="借视图请求审计" name="impersonation">
+      <el-tab-pane v-if="canViewImpersonation" label="借视图请求审计" name="impersonation">
         <el-form :model="impersonationQuery" inline @submit.prevent>
           <el-form-item label="会话编号"
             ><el-input-number
@@ -69,11 +76,20 @@
 </template>
 
 <script lang="ts" setup>
-import type { TabsPaneContext } from 'element-plus'
 import * as AuditApi from '@/api/zsjos/businessAudit'
+import { useUserStore } from '@/store/modules/user'
 
 defineOptions({ name: 'ZsjosBusinessAudit' })
-const tab = ref('business')
+const userStore = useUserStore()
+const hasPermission = (permission: string) =>
+  userStore.getPermissions.has('*:*:*') || userStore.getPermissions.has(permission)
+const canViewBusiness = computed(() => hasPermission('zsjos:audit:query'))
+const canViewImpersonation = computed(() => hasPermission('zsjos:audit:query-impersonation'))
+const availableTabs = computed<Array<'business' | 'impersonation'>>(() => [
+  ...(canViewBusiness.value ? ['business' as const] : []),
+  ...(canViewImpersonation.value ? ['impersonation' as const] : [])
+])
+const tab = ref<'business' | 'impersonation'>(availableTabs.value[0] || 'business')
 const loading = ref(false)
 const error = ref('')
 const businessList = ref<AuditApi.BusinessAuditVO[]>([])
@@ -118,7 +134,15 @@ const loadImpersonation = async () => {
     loading.value = false
   }
 }
-const reload = (_?: string | number | TabsPaneContext) =>
-  tab.value === 'business' ? loadBusiness() : loadImpersonation()
-onMounted(loadBusiness)
+const reload = () => (tab.value === 'business' ? loadBusiness() : loadImpersonation())
+watch(
+  availableTabs,
+  (tabs, previousTabs) => {
+    if (!tabs.length) return
+    const tabChanged = !tabs.includes(tab.value)
+    if (tabChanged) tab.value = tabs[0]
+    if (!previousTabs?.length || tabChanged) reload()
+  },
+  { immediate: true }
+)
 </script>

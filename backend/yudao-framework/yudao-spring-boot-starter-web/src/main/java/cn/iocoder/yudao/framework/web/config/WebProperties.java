@@ -11,6 +11,9 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @ConfigurationProperties(prefix = "yudao.web")
 @Validated
 @Data
@@ -18,6 +21,11 @@ public class WebProperties {
 
     @NotNull(message = "APP API 不能为空")
     private Api appApi = new Api("/app-api", "**.controller.app.**");
+    /**
+     * App API subpaths backed by System admin identities rather than members.
+     * This is intentionally opt-in because ordinary app-api requests remain member-scoped.
+     */
+    private List<String> appApiAdminPrefixes = new ArrayList<>();
     @NotNull(message = "Admin API 不能为空")
     private Api adminApi = new Api("/admin-api", "**.controller.admin.**");
 

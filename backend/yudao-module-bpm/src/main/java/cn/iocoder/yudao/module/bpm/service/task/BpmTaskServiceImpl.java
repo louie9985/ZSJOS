@@ -369,7 +369,9 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (CollUtil.isEmpty(processInstanceIds)) {
             return Collections.emptyList();
         }
-        return taskService.createTaskQuery().processInstanceIdIn(processInstanceIds).list();
+        return taskService.createTaskQuery()
+                .taskTenantId(FlowableUtils.getTenantId())
+                .processInstanceIdIn(processInstanceIds).list();
     }
 
     @Override
@@ -383,6 +385,18 @@ public class BpmTaskServiceImpl implements BpmTaskService {
             query.orderByHistoricTaskInstanceStartTime().desc();
         }
         return query.list();
+    }
+
+    @Override
+    public List<HistoricTaskInstance> getTaskListByProcessInstanceIds(Collection<String> processInstanceIds) {
+        if (CollUtil.isEmpty(processInstanceIds)) {
+            return Collections.emptyList();
+        }
+        return historyService.createHistoricTaskInstanceQuery()
+                .includeTaskLocalVariables()
+                .taskTenantId(FlowableUtils.getTenantId())
+                .processInstanceIdIn(processInstanceIds)
+                .list();
     }
 
     @Override

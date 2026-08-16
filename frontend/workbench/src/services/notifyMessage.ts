@@ -1,4 +1,4 @@
-import type { NotifyMessage, NotifyMessagePageParams } from './api'
+import type { NotifyMessage, NotifyMessagePageParams, NotifyMessageCursorParams } from './api'
 
 export type NotifyMessageView = 'all' | 'unread'
 
@@ -24,3 +24,9 @@ export const applyReadStatus = (
     : item)
   return view === 'unread' ? updated.filter(item => !selectedIds.has(item.id)) : updated
 }
+
+export const buildNotifyMessageCursorParams = (view: NotifyMessageView, cursor?: string, limit = 20): NotifyMessageCursorParams => ({
+  cursor,
+  limit,
+  ...(view === 'unread' ? { readStatus: false } : {})
+})

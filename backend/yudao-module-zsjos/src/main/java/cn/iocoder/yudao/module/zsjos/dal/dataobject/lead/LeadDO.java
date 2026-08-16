@@ -63,6 +63,7 @@ public class LeadDO extends TenantBaseDO {
     private LocalDateTime publicPoolAt;
     private String submissionIdempotencyKey;
     private LocalDateTime submittedAt;
+    private LocalDateTime lastActivityAt;
     private LocalDateTime convertedAt;
     private String invalidReason;
     private LocalDateTime appealDeadlineAt;

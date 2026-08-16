@@ -10,12 +10,15 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
+import java.math.BigDecimal;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryService {
     private static final int MAX_DEPTH = 10;
+    private static final BigDecimal DEFAULT_VALID_CASHBACK_AMOUNT = new BigDecimal("10.00");
+    private static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private ZsjosProductMapper productMapper;
 
@@ -27,6 +30,7 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         validateName(parentId, reqVO.getName(), null);
         ZsjosProductCategoryDO category = BeanUtils.toBean(reqVO, ZsjosProductCategoryDO.class);
         category.setParentId(parentId); category.setLevel(level);
+        applyRootCashbackDefaults(category);
         categoryMapper.insert(category); return category.getId();
     }
 
@@ -48,6 +52,7 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         validateName(parentId, reqVO.getName(), current.getId());
         ZsjosProductCategoryDO update = BeanUtils.toBean(reqVO, ZsjosProductCategoryDO.class);
         update.setParentId(parentId); update.setLevel(newLevel);
+        applyRootCashbackDefaults(update);
         categoryMapper.updateById(update);
         if (newLevel != current.getLevel()) {
             int delta = newLevel - current.getLevel();
@@ -105,6 +110,15 @@ public class ZsjosProductCategoryServiceImpl implements ZsjosProductCategoryServ
         ZsjosProductCategoryDO item = categoryMapper.selectById(id);
         if (item == null) throw exception(PRODUCT_CATEGORY_NOT_EXISTS);
         return item;
+    }
+    private void applyRootCashbackDefaults(ZsjosProductCategoryDO category) {
+        if (!Objects.equals(category.getParentId(), 0L)) return;
+        if (category.getDefaultValidCashbackAmount() == null) {
+            category.setDefaultValidCashbackAmount(DEFAULT_VALID_CASHBACK_AMOUNT);
+        }
+        if (category.getDefaultDealCashbackRate() == null) {
+            category.setDefaultDealCashbackRate(DEFAULT_DEAL_CASHBACK_RATE);
+        }
     }
     private void validateCashbackRule(ZsjosProductCategorySaveReqVO request) {
         if ((request.getDefaultValidCashbackAmount() != null && request.getDefaultValidCashbackAmount().signum() < 0)

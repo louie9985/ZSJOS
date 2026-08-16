@@ -40,6 +40,7 @@ public class LeadManagementRespVO {
     private Integer assignmentAttemptCount;
     private LocalDateTime publicPoolAt;
     private LocalDateTime submittedAt;
+    private LocalDateTime lastActivityAt;
     private LocalDateTime currentAssignmentFirstFollowUpAt;
     private LocalDateTime currentAssignmentFirstFollowUpDeadlineAt;
     private LocalDateTime qualificationStartedAt;

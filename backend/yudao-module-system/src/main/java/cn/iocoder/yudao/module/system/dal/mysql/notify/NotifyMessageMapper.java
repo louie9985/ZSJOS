@@ -42,6 +42,23 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                 .orderByDesc(NotifyMessageDO::getId));
     }
 
+    default List<NotifyMessageDO> selectCursorList(Long userId, Integer userType, Boolean readStatus,
+                                                    LocalDateTime[] createTime, LocalDateTime cursorCreateTime,
+                                                    Long cursorId, int limit) {
+        LambdaQueryWrapperX<NotifyMessageDO> query = new LambdaQueryWrapperX<NotifyMessageDO>()
+                .eqIfPresent(NotifyMessageDO::getReadStatus, readStatus)
+                .betweenIfPresent(NotifyMessageDO::getCreateTime, createTime)
+                .eq(NotifyMessageDO::getUserId, userId)
+                .eq(NotifyMessageDO::getUserType, userType);
+        if (cursorCreateTime != null && cursorId != null) {
+            query.and(wrapper -> wrapper.lt(NotifyMessageDO::getCreateTime, cursorCreateTime)
+                    .or(nested -> nested.eq(NotifyMessageDO::getCreateTime, cursorCreateTime)
+                            .lt(NotifyMessageDO::getId, cursorId)));
+        }
+        return selectList(query.orderByDesc(NotifyMessageDO::getCreateTime)
+                .orderByDesc(NotifyMessageDO::getId).last("LIMIT " + limit));
+    }
+
     default int updateListRead(Collection<Long> ids, Long userId, Integer userType) {
         return update(new NotifyMessageDO().setReadStatus(true).setReadTime(LocalDateTime.now()),
                 new LambdaQueryWrapperX<NotifyMessageDO>()

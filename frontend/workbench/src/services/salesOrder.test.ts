@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { canReviewSalesOrderTask, mergeSalesOrderListItems, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
-import type { SalesOrderApprovalStatus, SalesOrderListItem } from './api'
+import { canReviewSalesOrderTask, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
+import type { SalesOrder, SalesOrderApprovalStatus, SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
   it('requires mobile or WeChat', () => {
@@ -31,6 +31,16 @@ describe('sales-order inbox helpers', () => {
 
   it('merges personal orders by order id', () => {
     expect(mergeSalesOrderListItems([item(1)], [item(1), item(2)]).map(value => value.id)).toEqual([1, 2])
+  })
+
+  it('builds a pinned navigation item from an exact order detail', () => {
+    const detail = {
+      id: 25, orderNo: 'SO-25', personId: 2, orderType: 'repurchase', status: 'revision_required',
+      studentName: '学员25', totalAmount: 800, approvalRoundNo: 2, submittedAt: 25
+    } as SalesOrder
+    expect(salesOrderDetailToListItem(detail)).toMatchObject({
+      id: 25, orderNo: 'SO-25', orderType: 'repurchase', status: 'revision_required', approvalRoundNo: 2
+    })
   })
 
   it('keeps two approval-center tasks for the same order', () => {

@@ -46,12 +46,14 @@ export const STORAGE_KEYS = {
   CLIENT_ID: 'zsjos_client_id',
   EXPIRES_TIME: 'zsjos_expires_time',
   LOGIN_FORM: 'zsjos_login_form',
+  IMPERSONATION: 'zsjos.impersonation.session',
   THEME: 'crm-theme'
 } as const
 
 export const APP_ROUTES = {
   USER_PROFILE: '/user/profile',
   LEAD_SUBMISSION: '/zsjos/leads/submit',
+  LEAD_MANAGEMENT: '/zsjos/leads/manage',
   LEAD_SELF_SOURCED: '/zsjos/leads/self-sourced',
   LEAD_COMPLAINTS: '/zsjos/leads/complaints',
   SUBMITTED_LEADS: '/zsjos/leads/submitted',
@@ -70,17 +72,28 @@ export const APP_ROUTES = {
   WORK_PLANS: '/zsjos/work-plans',
   BPM_TODO: '/bpm/task/todo',
   QUALIFICATION_EXCEPTIONS: '/zsjos/leads/qualification-exceptions',
-  LEAD_APPEALS: '/zsjos/leads/appeals',
+  LEAD_APPEALS: '/zsjos/appeals',
   MY_SALES_ORDERS: '/zsjos/sales-orders/my',
   SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
   SALES_ORDER_SUPERVISOR_CONFIRMATIONS: '/zsjos/sales-order-supervisor-confirmations',
   EXTERNAL_REPURCHASE: '/zsjos/orders/external-repurchase',
+  EXPORT_TASKS: '/zsjos/export-task',
+  PERSONNEL: '/zsjos/personnel',
+  PARTNER: '/zsjos/partner',
+  IMPERSONATION: '/zsjos/impersonation',
+  BUSINESS_AUDIT: '/zsjos/business-audit',
+  CASHBACK: '/zsjos/cashback',
+  WITHDRAWAL: '/zsjos/withdrawal',
+  USER_RELATION: '/system/user-relation',
+  MAINTENANCE: '/system/maintenance',
+  NOTIFY_RULE: '/messages/notify/notify-rule',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.LEAD_SUBMISSION,
+  APP_ROUTES.LEAD_MANAGEMENT,
   APP_ROUTES.LEAD_SELF_SOURCED,
   APP_ROUTES.LEAD_COMPLAINTS,
   APP_ROUTES.SUBMITTED_LEADS,
@@ -103,6 +116,16 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.SALES_ORDER_APPROVALS,
   APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS,
   APP_ROUTES.EXTERNAL_REPURCHASE,
+  APP_ROUTES.EXPORT_TASKS,
+  APP_ROUTES.PERSONNEL,
+  APP_ROUTES.PARTNER,
+  APP_ROUTES.IMPERSONATION,
+  APP_ROUTES.BUSINESS_AUDIT,
+  APP_ROUTES.CASHBACK,
+  APP_ROUTES.WITHDRAWAL,
+  APP_ROUTES.USER_RELATION,
+  APP_ROUTES.MAINTENANCE,
+  APP_ROUTES.NOTIFY_RULE,
   APP_ROUTES.ALL_MESSAGES,
   APP_ROUTES.UNREAD_MESSAGES
 ])

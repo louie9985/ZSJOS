@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
@@ -44,6 +45,11 @@ public class LeadAppealController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
     public CommonResult<PageResult<LeadAppealRespVO>> getInboxPage(@Valid LeadAppealPageReqVO reqVO) {
         return success(appealService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+    @GetMapping("/inbox-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
+    public CommonResult<CursorPageResult<LeadAppealRespVO>> getInboxCursor(@Valid LeadAppealPageReqVO reqVO) {
+        return success(appealService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 
     @PutMapping("/{id}/overturn")

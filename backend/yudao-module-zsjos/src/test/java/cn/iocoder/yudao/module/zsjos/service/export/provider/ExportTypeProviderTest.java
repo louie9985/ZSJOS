@@ -4,12 +4,14 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderListItemRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.FinanceOrderExportRowRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.WithdrawalRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.export.ExportTaskDO;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import cn.iocoder.yudao.module.zsjos.service.export.ExportTypeProvider;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderService;
+import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalService;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -28,9 +30,9 @@ import static org.mockito.Mockito.*;
 class ExportTypeProviderTest {
 
     @Test
-    void springRegistersAllFourProviders() {
+    void springRegistersAllFiveProviders() {
         try (var context = providerContext()) {
-            assertEquals(List.of("cashback", "lead", "order", "withdrawal"), context
+            assertEquals(List.of("cashback", "finance_order", "lead", "order", "withdrawal"), context
                     .getBeansOfType(ExportTypeProvider.class).values().stream()
                     .map(ExportTypeProvider::getType).sorted().toList());
         }
@@ -71,6 +73,10 @@ class ExportTypeProviderTest {
             order.setOrderNo("SO001");
             when(context.getBean(SalesOrderService.class).getMyPage(any(), eq(7L)))
                     .thenReturn(new PageResult<>(List.of(order), 1L));
+            FinanceOrderExportRowRespVO financeOrder = new FinanceOrderExportRowRespVO();
+            financeOrder.setOrderNo("FSO001");
+            when(context.getBean(SalesOrderService.class).getFinanceExportPage(any(), eq(7L)))
+                    .thenReturn(new PageResult<>(List.of(financeOrder), 1L));
             CashbackRespVO cashback = new CashbackRespVO();
             cashback.setId(31L);
             cashback.setCashbackNo("CB001");
@@ -86,6 +92,7 @@ class ExportTypeProviderTest {
                     .thenReturn(new PageResult<>(List.of(withdrawal), 1L));
 
             assertWorkbook(context.getBean(SalesOrderExportTypeProvider.class).generate(task("order")), "订单", "SO001");
+            assertWorkbook(context.getBean(FinanceOrderExportTypeProvider.class).generate(task("finance_order")), "财务订单台账", "FSO001");
             assertWorkbook(context.getBean(CashbackExportTypeProvider.class).generate(task("cashback")), "返现", "CB001");
             ExportTypeProvider.ExportResult withdrawalResult = context.getBean(WithdrawalExportTypeProvider.class)
                     .generate(task("withdrawal"));
@@ -128,9 +135,10 @@ class ExportTypeProviderTest {
         context.registerBean(Validator.class, () -> Validation.buildDefaultValidatorFactory().getValidator());
         context.registerBean(LeadManagementService.class, () -> mock(LeadManagementService.class));
         context.registerBean(SalesOrderService.class, () -> mock(SalesOrderService.class));
+        context.getBeanFactory().registerSingleton("permissionService", mock(SalesOrderObjectPermissionService.class));
         context.registerBean(CashbackService.class, () -> mock(CashbackService.class));
         context.registerBean(WithdrawalService.class, () -> mock(WithdrawalService.class));
-        context.register(LeadExportTypeProvider.class, SalesOrderExportTypeProvider.class,
+        context.register(LeadExportTypeProvider.class, SalesOrderExportTypeProvider.class, FinanceOrderExportTypeProvider.class,
                 CashbackExportTypeProvider.class, WithdrawalExportTypeProvider.class);
         context.refresh();
         return context;

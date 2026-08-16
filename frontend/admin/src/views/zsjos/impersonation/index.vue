@@ -24,13 +24,16 @@
         <template #default><el-button link @click="loadUsers">重试</el-button></template>
       </el-alert>
       <el-form-item label="目标账号" required>
-        <el-select v-model="targetUserId" filterable placeholder="请选择启用账号" class="!w-320px">
-          <el-option
-            v-for="user in users"
-            :key="user.id"
-            :label="`${user.nickname} (${user.username})`"
-            :value="user.id"
-          />
+        <el-select
+          v-model="targetUserId"
+          filterable
+          :loading="usersLoading"
+          loading-text="正在加载启用账号"
+          no-data-text="暂无启用账号"
+          placeholder="请选择启用账号"
+          class="!w-320px"
+        >
+          <el-option v-for="user in users" :key="user.id" :label="user.nickname" :value="user.id" />
         </el-select>
       </el-form-item>
       <el-form-item label="借用原因" required>
@@ -54,24 +57,29 @@
 <script lang="ts" setup>
 import * as UserApi from '@/api/system/user'
 import * as ImpersonationApi from '@/api/zsjos/impersonation'
+import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from '@/utils/impersonation'
 
 defineOptions({ name: 'ZsjosImpersonation' })
 
 const message = useMessage()
 const active = ref(ImpersonationApi.getStoredImpersonation())
-const users = ref<UserApi.UserVO[]>([])
+const users = ref<UserApi.UserSimpleVO[]>([])
 const targetUserId = ref<number>()
 const reason = ref('')
 const loading = ref(false)
+const usersLoading = ref(false)
 const error = ref('')
 
 const loadUsers = async () => {
+  usersLoading.value = true
   error.value = ''
   try {
-    users.value = (await UserApi.getSimpleUserList()).filter((user) => user.status === 0)
+    users.value = await UserApi.getSimpleUserOptions()
   } catch (e: any) {
     users.value = []
     error.value = e?.msg || e?.message || '账号列表加载失败'
+  } finally {
+    usersLoading.value = false
   }
 }
 
@@ -99,13 +107,19 @@ const end = async () => {
     ImpersonationApi.storeImpersonation()
     active.value = undefined
     message.success('借视图已结束')
-    await loadUsers()
   } finally {
     loading.value = false
   }
 }
 
+const syncActive = () => {
+  active.value = getStoredImpersonation()
+  if (!active.value) loadUsers()
+}
+
 onMounted(() => {
+  window.addEventListener(IMPERSONATION_CHANGE_EVENT, syncActive)
   if (!active.value) loadUsers()
 })
+onBeforeUnmount(() => window.removeEventListener(IMPERSONATION_CHANGE_EVENT, syncActive))
 </script>

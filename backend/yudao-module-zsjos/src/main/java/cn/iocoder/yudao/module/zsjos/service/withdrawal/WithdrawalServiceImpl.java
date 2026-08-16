@@ -18,6 +18,8 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.*;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.BankCardSaveReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.WithdrawalSummaryRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.withdrawal.*;
@@ -74,7 +76,13 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     public Long apply(Long userId, WithdrawalApplyReqVO request) {
         PartnerDO partner = partnerMapper.selectEnabledByUserId(userId);
         if (partner == null || !PARTNER_STATUS_ENABLED.equals(partner.getStatus())) throw exception(WITHDRAWAL_PARTNER_INVALID);
-        String cardNumber = normalizeCard(request.getCardNumber());
+        PartnerBankCardDO selectedCard = request.getBankCardId() == null ? null
+                : cardMapper.selectByIdAndOwner(request.getBankCardId(), userId);
+        if (request.getBankCardId() != null && (selectedCard == null
+                || !Objects.equals(selectedCard.getPartnerId(), partner.getId()))) {
+            throw exception(WITHDRAWAL_BANK_CARD_INVALID);
+        }
+        String cardNumber = normalizeCard(selectedCard == null ? request.getCardNumber() : selectedCard.getCardNumber());
         List<Long> ids = request.getCashbackIds().stream().filter(Objects::nonNull).distinct().sorted().toList();
         if (ids.isEmpty() || ids.size() != request.getCashbackIds().size()) throw exception(WITHDRAWAL_CASHBACK_INVALID);
         BigDecimal availableBalance = cashbackMapper.selectAvailableByBeneficiary(userId).stream()
@@ -97,9 +105,14 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         WithdrawalDO record = new WithdrawalDO().setWithdrawalNo(number()).setPartnerId(partner.getId())
                 .setApplicantUserId(userId).setStatus(STATUS_PENDING).setVerificationStatus(VERIFY_NORMAL)
                 .setApplicationAmount(amount).setAvailableBalanceSnapshot(availableBalance)
-                .setAccountNameSnapshot(request.getAccountName().trim()).setCardNumberSnapshot(cardNumber)
-                .setBankNameSnapshot(request.getBankName().trim())
-                .setBranchNameSnapshot(StrUtil.trim(request.getBranchName())).setSubmittedAt(now).setVersion(0);
+                .setAccountNameSnapshot(StrUtil.trim(selectedCard == null ? request.getAccountName() : selectedCard.getAccountName()))
+                .setCardNumberSnapshot(cardNumber)
+                .setBankNameSnapshot(StrUtil.trim(selectedCard == null ? request.getBankName() : selectedCard.getBankName()))
+                .setBranchNameSnapshot(StrUtil.trim(selectedCard == null ? request.getBranchName() : selectedCard.getBranchName()))
+                .setSubmittedAt(now).setVersion(0);
+        if (StrUtil.isBlank(record.getAccountNameSnapshot()) || StrUtil.isBlank(record.getBankNameSnapshot())) {
+            throw exception(WITHDRAWAL_BANK_CARD_INVALID);
+        }
         withdrawalMapper.insert(record);
         try {
             for (CashbackDO cashback : selected) {
@@ -112,7 +125,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         } catch (DuplicateKeyException duplicate) {
             throw exception(WITHDRAWAL_CASHBACK_INVALID);
         }
-        if (Boolean.TRUE.equals(request.getSaveCard())) saveCard(record);
+        if (Boolean.TRUE.equals(request.getSaveCard()) && selectedCard == null) saveCard(record);
         BpmProcessInstanceCreateReqDTO process = new BpmProcessInstanceCreateReqDTO();
         process.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); process.setBusinessKey("withdrawal:" + record.getId());
         process.setVariables(Map.of("withdrawalId", record.getId(), "applicationAmount", amount));
@@ -251,6 +264,67 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         return cardMapper.selectByOwner(userId).stream().map(card -> new BankCardRespVO().setId(card.getId())
                 .setAccountName(card.getAccountName()).setMaskedCardNumber(mask(card.getCardNumber()))
                 .setBankName(card.getBankName()).setBranchName(card.getBranchName()).setDefaultCard(card.getDefaultCard())).toList();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long saveMyCard(Long userId, BankCardSaveReqVO request) {
+        requireEnabledPartner(userId);
+        String cardNumber = normalizeCard(request.getCardNumber());
+        boolean first = cardMapper.selectByOwner(userId).isEmpty();
+        PartnerBankCardDO card = new PartnerBankCardDO().setPartnerId(partnerMapper.selectEnabledByUserId(userId).getId())
+                .setOwnerUserId(userId).setAccountName(request.getAccountName().trim())
+                .setCardNumber(cardNumber).setBankName(request.getBankName().trim())
+                .setBranchName(StrUtil.trimToNull(request.getBranchName())).setDefaultCard(first).setVersion(0);
+        cardMapper.insert(card);
+        return card.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteMyCard(Long userId, Long cardId) {
+        requireEnabledPartner(userId);
+        PartnerBankCardDO card = cardMapper.selectByIdAndOwner(cardId, userId);
+        if (card == null) throw exception(WITHDRAWAL_BANK_CARD_INVALID);
+        boolean wasDefault = Boolean.TRUE.equals(card.getDefaultCard());
+        cardMapper.deleteById(cardId);
+        if (wasDefault) {
+            List<PartnerBankCardDO> remaining = cardMapper.selectByOwner(userId);
+            if (!remaining.isEmpty()) setDefaultCardInternal(userId, remaining.get(0));
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void setDefaultCard(Long userId, Long cardId) {
+        requireEnabledPartner(userId);
+        PartnerBankCardDO card = cardMapper.selectByIdAndOwner(cardId, userId);
+        if (card == null) throw exception(WITHDRAWAL_BANK_CARD_INVALID);
+        setDefaultCardInternal(userId, card);
+    }
+
+    @Override
+    public WithdrawalSummaryRespVO getMySummary(Long userId) {
+        requireEnabledPartner(userId);
+        List<CashbackDO> available = cashbackMapper.selectAvailableByBeneficiary(userId);
+        BigDecimal amount = available.stream().map(CashbackDO::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, java.math.RoundingMode.HALF_UP);
+        WithdrawalSummaryRespVO result = new WithdrawalSummaryRespVO();
+        result.setAvailableAmount(amount); result.setSelectableCount((long) available.size());
+        BigDecimal minimum = minimumAmount(); result.setMinimumAmount(minimum);
+        result.setCanApply(amount.compareTo(minimum) >= 0);
+        return result;
+    }
+
+    private void setDefaultCardInternal(Long userId, PartnerBankCardDO card) {
+        cardMapper.clearDefaultByOwner(userId);
+        card.setDefaultCard(true); cardMapper.updateById(card);
+    }
+
+    private PartnerDO requireEnabledPartner(Long userId) {
+        PartnerDO partner = partnerMapper.selectEnabledByUserId(userId);
+        if (partner == null) throw exception(WITHDRAWAL_PARTNER_INVALID);
+        return partner;
     }
 
     @Override

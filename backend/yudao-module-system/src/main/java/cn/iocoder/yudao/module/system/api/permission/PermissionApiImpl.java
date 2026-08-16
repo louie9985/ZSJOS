@@ -25,6 +25,20 @@ public class PermissionApiImpl implements PermissionApi {
     }
 
     @Override
+    public void addUserRole(Long userId, Long roleId) {
+        Set<Long> roleIds = permissionService.getUserRoleIdListByUserId(userId);
+        roleIds.add(roleId);
+        permissionService.assignUserRole(userId, roleIds);
+    }
+
+    @Override
+    public void removeUserRole(Long userId, Long roleId) {
+        Set<Long> roleIds = permissionService.getUserRoleIdListByUserId(userId);
+        roleIds.remove(roleId);
+        permissionService.assignUserRole(userId, roleIds);
+    }
+
+    @Override
     public boolean hasAnyPermissions(Long userId, String... permissions) {
         return permissionService.hasAnyPermissions(userId, permissions);
     }

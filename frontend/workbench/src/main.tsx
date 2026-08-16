@@ -32,6 +32,7 @@ import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthS
 import {
   buildTwoLevelNavigation,
   filterRenderableMenus,
+  findMenuByPath,
   findPageByPath,
   findPrimaryByPath,
   getInaccessiblePathFallback,
@@ -59,6 +60,7 @@ import RouteHost from './layouts/RouteHost'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
+import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from './services/impersonation'
 // 聚合样式表；内部 @import 顺序即层叠优先级，tokens.css 在最前
 import './styles/index.css'
 
@@ -117,6 +119,18 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0)
   const [openAssignmentRequest, setOpenAssignmentRequest] = useState(0)
+  const [impersonation, setImpersonation] = useState<ReturnType<typeof getStoredImpersonation>>()
+
+  useEffect(() => {
+    const sync = () => setImpersonation(getStoredImpersonation())
+    sync()
+    window.addEventListener('storage', sync)
+    window.addEventListener(IMPERSONATION_CHANGE_EVENT, sync)
+    return () => {
+      window.removeEventListener('storage', sync)
+      window.removeEventListener(IMPERSONATION_CHANGE_EVENT, sync)
+    }
+  }, [])
 
   // 移动端同步：CSS 用 !important 把一级栏压到 56px，必须让 React 状态也收起，
   // 否则 antd Menu 仍渲染完整文字标签在 56px 容器里溢出。
@@ -137,16 +151,16 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const inaccessiblePathFallback = useMemo(
-    () => getInaccessiblePathFallback(navigation, location.pathname),
-    [navigation, location.pathname]
+    () => getInaccessiblePathFallback(navigation, location.pathname, menus),
+    [navigation, location.pathname, menus]
   )
   const activePrimary = useMemo(
     () => findPrimaryByPath(navigation, location.pathname),
     [navigation, location.pathname]
   )
   const currentMenu = useMemo(
-    () => findPageByPath(navigation, location.pathname),
-    [navigation, location.pathname]
+    () => findMenuByPath(menus, location.pathname),
+    [menus, location.pathname]
   )
 
   useEffect(() => {
@@ -388,13 +402,20 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
           </Dropdown>
         </Space>
       </Header>
+      {impersonation && <Alert
+        className="impersonation-global-alert"
+        type="warning"
+        showIcon
+        banner
+        message={`只读借视图：当前以 ${impersonation.targetNameSnapshot} 的数据权限查看，所有 ZSJOS 写操作均会被服务端拒绝。`}
+      />}
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle}/>}
       <Layout className="content-layout">
         <Content>
           <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path="/" element={initialTarget ? <Navigate to={initialTarget} replace/> : <NoAccessibleMenu hasMenus={navigation.length > 0}/>}/>
-            <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
+            <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
           </Routes>
         </Content>
         {aiOpen && <Sider width={320} className="ai-sider"><Typography.Title level={5}><RobotOutlined/> AI 助手</Typography.Title><Result status="info" title="AI 助手暂未接入"/></Sider>}

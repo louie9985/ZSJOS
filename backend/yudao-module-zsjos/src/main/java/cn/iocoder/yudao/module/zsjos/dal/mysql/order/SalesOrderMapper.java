@@ -4,13 +4,19 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.FinanceOrderExportReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterQuery;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.SelectProvider;
 
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDateTime;
 
 import static cn.hutool.core.util.StrUtil.isNotBlank;
 
@@ -69,6 +75,52 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
         return selectMyPage(userId, reqVO, null);
+    }
+    default List<SalesOrderDO> selectMyCursor(Long userId, String status, String keyword, List<Long> matchedOrderIds,
+                                               LocalDateTime cursorTime, Long cursorId, int limit) {
+        LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
+                .eq(SalesOrderDO::getSubmitterUserId, userId).eqIfPresent(SalesOrderDO::getStatus, status);
+        if (isNotBlank(keyword)) {
+            String value = keyword.trim();
+            query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
+                    .or().like(SalesOrderDO::getStudentName, value)
+                    .or().like(SalesOrderDO::getStudentMobile, value));
+        }
+        if (matchedOrderIds != null) {
+            if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
+        }
+        if (cursorTime != null && cursorId != null) {
+            query.and(wrapper -> wrapper.lt(SalesOrderDO::getSubmittedAt, cursorTime)
+                    .or(nested -> nested.eq(SalesOrderDO::getSubmittedAt, cursorTime).lt(SalesOrderDO::getId, cursorId)));
+        }
+        return selectList(query.orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId)
+                .last("LIMIT " + limit));
+    }
+    default PageResult<SalesOrderDO> selectFinanceExportPage(FinanceOrderExportReqVO reqVO,
+                                                               AdvancedFilterQuery advancedFilter) {
+        Page<SalesOrderDO> page = new Page<>(reqVO.getPageNo(), reqVO.getPageSize());
+        List<SalesOrderDO> rows = selectFinanceExportRows(page, reqVO, advancedFilter,
+                TenantContextHolder.getRequiredTenantId());
+        return new PageResult<>(rows, page.getTotal());
+    }
+
+    @SelectProvider(type = SqlProvider.class, method = "financeExportSql")
+    List<SalesOrderDO> selectFinanceExportRows(Page<?> page, @Param("request") FinanceOrderExportReqVO request,
+                                                @Param("query") AdvancedFilterQuery query,
+                                                @Param("tenantId") Long tenantId);
+
+    final class SqlProvider {
+        public static String financeExportSql() {
+            return "<script>SELECT o.* FROM zsjos_order o WHERE o.deleted=b'0' "
+                    + "AND o.tenant_id=#{tenantId} "
+                    + "<if test='request.status != null and request.status != \"\"'>AND o.status=#{request.status} </if>"
+                    + "<if test='request.keyword != null and request.keyword != \"\"'>"
+                    + "AND (o.order_no LIKE CONCAT('%',#{request.keyword},'%') "
+                    + "OR o.student_name LIKE CONCAT('%',#{request.keyword},'%') "
+                    + "OR o.student_mobile LIKE CONCAT('%',#{request.keyword},'%')) </if>"
+                    + "<if test='query != null'>AND (${query.whereSql}) </if>"
+                    + "ORDER BY o.submitted_at DESC, o.id DESC</script>";
+        }
     }
     default long selectMyCount(Long userId, String status) {
         return selectCount(new LambdaQueryWrapperX<SalesOrderDO>()

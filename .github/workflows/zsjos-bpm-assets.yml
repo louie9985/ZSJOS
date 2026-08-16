@@ -1,0 +1,48 @@
+name: ZSJOS BPM assets
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "script/bpm/**"
+      - ".github/workflows/zsjos-bpm-assets.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "script/bpm/**"
+      - ".github/workflows/zsjos-bpm-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11.7"
+      - name: Validate BPM asset manifest and immutability
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BASE_SHA: ${{ github.event.before }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            base_ref="$PR_BASE_SHA"
+          elif [[ "$EVENT_NAME" == "push" && "$PUSH_BASE_SHA" != "0000000000000000000000000000000000000000" ]]; then
+            base_ref="$PUSH_BASE_SHA"
+          else
+            base_ref=""
+          fi
+          if [[ -n "$base_ref" ]]; then
+            python script/bpm/validate_manifest.py --base-ref "$base_ref"
+          else
+            python script/bpm/validate_manifest.py
+          fi

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Space, Spin, Table, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Avatar, Button, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AssignmentUser, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
 import { formatTimestamp } from '../services/time'
@@ -14,6 +14,7 @@ const labels: Record<ResultType, string> = {
   new_person: '非重复，创建新客户', reuse_person: '复用客户并创建主客资',
   reactivate_lead: '激活无效或关闭客资', notify_owner: '提醒所属销售'
 }
+const resultLabel = (value?: string) => value && value in labels ? labels[value as ResultType] : value
 
 export default function LeadDuplicateReviewPage({ permissions }: { permissions: string[] }) {
   const [status, setStatus] = useState<'pending' | 'completed'>('pending')
@@ -21,6 +22,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<LeadDuplicateReview>()
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const [processing, setProcessing] = useState<LeadDuplicateReview>()
   const [saving, setSaving] = useState(false)
   const [sales, setSales] = useState<AssignmentUser[]>([])
@@ -30,8 +32,12 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
-    try { setItems((await api.duplicateReviewPage(status)).list) }
-    catch (cause) { setItems([]); setError(cause instanceof Error ? cause.message : '复核队列加载失败') }
+    try {
+      const next = (await api.duplicateReviewPage(status)).list
+      setItems(next)
+      setSelected(current => next.find(item => item.id === current?.id) ?? next[0])
+    }
+    catch (cause) { setItems([]); setSelected(undefined); setError(cause instanceof Error ? cause.message : '复核队列加载失败') }
     finally { setLoading(false) }
   }, [status])
   useEffect(() => { void load() }, [load])
@@ -67,27 +73,66 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
     finally { setSaving(false) }
   }
 
-  return <section className="workspace-page">
-    <div className="workspace-page-heading">
-      <div><Typography.Title level={3}>重复客资复核</Typography.Title><Typography.Text type="secondary">公共队列按提交时间处理，结论提交后不可覆盖</Typography.Text></div>
+  const selectReview = (item: LeadDuplicateReview) => {
+    setSelected(item)
+    if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+  }
+
+  const detail = !selected ? <Empty description="从左侧选择一条复核任务"/>
+    : !parsed ? <Alert type="error" message="任务快照无法解析"/>
+      : <article className="message-inbox-detail duplicate-review-detail">
+        <header className="message-detail-hero">
+          <Avatar size={42}>复</Avatar>
+          <div className="message-detail-heading">
+            <Typography.Title level={4}>复核任务 #{selected.id}</Typography.Title>
+            <Space wrap>
+              <Tag color={selected.status === 'pending' ? 'processing' : 'success'}>{selected.status === 'pending' ? '待处理' : '已处理'}</Tag>
+              {selected.resultType && <Tag>{resultLabel(selected.resultType)}</Tag>}
+            </Space>
+          </div>
+          {selected.status === 'pending' && canProcess && <Button type="primary" onClick={() => void openProcess(selected)}>处理</Button>}
+        </header>
+        <section className="message-detail-section">
+          <Typography.Title level={5}>提交快照</Typography.Title>
+          <Descriptions bordered column={1} size="small" items={Object.entries(parsed.submission).map(([key, value]) => ({ key, label: key, children: typeof value === 'object' ? JSON.stringify(value) : String(value ?? '-') }))}/>
+        </section>
+        <section className="message-detail-section">
+          <Typography.Title level={5}>候选对象</Typography.Title>
+          <pre className="duplicate-review-snapshot">{JSON.stringify(parsed.candidates, null, 2)}</pre>
+        </section>
+      </article>
+
+  return <section className="workspace-page message-inbox-page duplicate-review-page">
+    <header className="message-inbox-header">
+      <div><Typography.Title level={4}>重复客资复核</Typography.Title><Typography.Text type="secondary">公共队列按提交时间处理，结论提交后不可覆盖</Typography.Text></div>
+      <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
       <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
-    </div>
-    <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
+    </header>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
-    <Spin spinning={loading}><Table rowKey="id" dataSource={items} pagination={false} locale={{ emptyText: <Empty description="暂无复核任务"/> }} scroll={{ x: 920 }} columns={[
-      { title: '任务', dataIndex: 'id', width: 90, render: id => `#${id}` },
-      { title: '命中规则', dataIndex: 'matchRules', render: value => { try { return <Space wrap>{JSON.parse(value).map((rule: string) => <Tag key={rule}>{rule}</Tag>)}</Space> } catch { return '规则快照异常' } } },
-      { title: '提交时间', dataIndex: 'createTime', width: 180, render: value => formatTimestamp(value) },
-      { title: '状态', dataIndex: 'status', width: 100, render: value => <Tag color={value === 'pending' ? 'processing' : 'success'}>{value === 'pending' ? '待处理' : '已处理'}</Tag> },
-      { title: '结论', dataIndex: 'resultType', width: 200, render: value => value ? labels[value as ResultType] : '-' },
-      { title: '操作', key: 'actions', fixed: 'right', width: 170, render: (_, row) => <Space><Button size="small" onClick={() => setSelected(row)}>详情</Button>{row.status === 'pending' && canProcess && <Button size="small" type="primary" onClick={() => void openProcess(row)}>处理</Button>}</Space> }
-    ]}/></Spin>
-    <Drawer open={Boolean(selected)} title="复核任务详情" width={640} onClose={() => setSelected(undefined)}>
-      {!parsed ? <Alert type="error" message="任务快照无法解析"/> : <Space direction="vertical" size="large" style={{ width: '100%' }}>
-        <Descriptions bordered column={1} size="small" items={Object.entries(parsed.submission).map(([key, value]) => ({ key, label: key, children: typeof value === 'object' ? JSON.stringify(value) : String(value ?? '-') }))}/>
-        <div><Typography.Title level={5}>候选对象</Typography.Title><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{JSON.stringify(parsed.candidates, null, 2)}</pre></div>
-      </Space>}
-    </Drawer>
+    <div className="message-inbox-layout">
+      <aside className="message-inbox-list-pane">
+        <div className="message-inbox-list" aria-label="重复客资复核列表">
+          {loading ? <div className="message-inbox-skeleton"><Skeleton active paragraph={{ rows: 8 }}/></div>
+            : items.length ? items.map(item => {
+              let rules: string[] = []
+              try { rules = JSON.parse(item.matchRules) as string[] } catch { rules = ['规则快照异常'] }
+              return <button key={item.id} type="button" className={`message-inbox-item${selected?.id === item.id ? ' active' : ''}`} onClick={() => selectReview(item)}>
+                <div className="message-inbox-item-main">
+                  <Avatar>{String(item.id).slice(-2)}</Avatar>
+                  <div className="message-inbox-item-copy">
+                    <div className="message-inbox-item-title"><strong>复核任务 #{item.id}</strong><Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag></div>
+                    <span>{rules.join('、')}</span>
+                    {item.resultType && <span>{resultLabel(item.resultType)}</span>}
+                  </div>
+                </div>
+                <div className="message-inbox-item-meta"><span>{formatTimestamp(item.createTime)}</span></div>
+              </button>
+            }) : !error && <Empty description="暂无复核任务"/>}
+        </div>
+      </aside>
+      <main className="message-inbox-detail-pane">{detail}</main>
+    </div>
+    <Drawer className="message-inbox-mobile-drawer" open={drawerOpen} title="复核任务详情" placement="right" width="100%" onClose={() => setDrawerOpen(false)}>{detail}</Drawer>
     <Modal open={Boolean(processing)} title={`处理复核任务 #${processing?.id}`} okText="提交结论" confirmLoading={saving} onOk={() => void submit()} onCancel={() => setProcessing(undefined)} destroyOnHidden>
       <Form form={form} layout="vertical">
         <Form.Item name="resultType" label="复核结论" rules={[{ required: true }]}><Select options={Object.entries(labels).map(([value, label]) => ({ value, label }))}/></Form.Item>

@@ -422,9 +422,13 @@ SELECT 'readonly_impersonation_permissions' AS check_name,
              ((id=6870 AND permission='zsjos:impersonation:query')
                OR (id=6871 AND permission='zsjos:impersonation:start')))=2, 'PASS', 'FAIL') AS result;
 SELECT 'async_export_permissions' AS check_name,
-       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6872,6873,6874,6875,6876)
-             AND permission IN ('zsjos:export:query','zsjos:export:lead','zsjos:export:order',
-                                'zsjos:export:cashback','zsjos:export:withdrawal'))=5,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
+             ((id=6872 AND permission='zsjos:export:query')
+               OR (id=6873 AND permission='zsjos:export:lead')
+               OR (id=6874 AND permission='zsjos:export:order')
+               OR (id=6875 AND permission='zsjos:export:cashback')
+               OR (id=6876 AND permission='zsjos:export:withdrawal')
+               OR (id=6879 AND permission='zsjos:export:finance-order')))=6,
           'PASS', 'FAIL') AS result;
 SELECT 'business_audit_permissions' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND
@@ -550,3 +554,20 @@ SELECT 'V054 Lead business number counters' AS check_name,
           AND counter_row.sequence_date=allocated.sequence_date
          WHERE counter_row.id IS NULL
        ), 'PASS','FAIL') AS result;
+SELECT 'V063 partner role' AS check_name,
+       IF((SELECT COUNT(*) FROM system_role WHERE code='part_time_partner' AND deleted=b'0')>0,'PASS','FAIL') AS result;
+SELECT 'V063 partner permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE id BETWEEN 6901 AND 6912 AND deleted=b'0')=12,'PASS','FAIL') AS result;
+SELECT 'V063 cashback defaults' AS check_name,
+       IF((SELECT COUNT(*) FROM zsjos_product_category WHERE parent_id=0 AND deleted=b'0'
+             AND (default_valid_cashback_amount IS NULL OR default_deal_cashback_rate IS NULL))=0,'PASS','FAIL') AS result;
+SELECT 'V064 BPM model import permission' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu
+           WHERE id=6913 AND permission='bpm:model:import'
+             AND parent_id=1193 AND type=3 AND deleted=b'0')=1,'PASS','FAIL') AS result;
+SELECT 'V065 lead activity cursor ordering' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND table_name='zsjos_lead' AND column_name='last_activity_at')=1
+          AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
+             AND table_name='zsjos_lead' AND index_name='idx_tenant_last_activity')>0,
+          'PASS','FAIL') AS result;

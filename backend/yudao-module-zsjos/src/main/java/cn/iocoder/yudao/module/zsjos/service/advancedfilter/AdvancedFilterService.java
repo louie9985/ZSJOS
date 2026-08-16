@@ -45,7 +45,12 @@ public class AdvancedFilterService {
     }
 
     public List<Long> matchOrderIds(AdvancedFilterGroupReqVO group) {
-        return validateAndHasConditions(group) ? mapper.selectOrderIds(build(group, "order")) : null;
+        AdvancedFilterQuery query = buildOrderQuery(group);
+        return query == null ? null : mapper.selectOrderIds(query);
+    }
+
+    public AdvancedFilterQuery buildOrderQuery(AdvancedFilterGroupReqVO group) {
+        return validateAndHasConditions(group) ? build(group, "order") : null;
     }
 
     private AdvancedFilterQuery build(AdvancedFilterGroupReqVO group, String scene) {

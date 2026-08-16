@@ -24,6 +24,10 @@ import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSupervisorCursorReqVO;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
@@ -116,6 +120,36 @@ public class SalesOrderSupervisorConfirmationService {
         List<SalesOrderSupervisorConfirmationRespVO> list = page.getList().stream().map(row -> convert(row, users)).toList();
         return new PageResult<>(list, page.getTotal());
     }
+
+    public CursorPageResult<SalesOrderSupervisorConfirmationRespVO> getInboxCursor(SalesOrderSupervisorCursorReqVO reqVO, Long userId) {
+        List<Long> orderIds = orderMapper.selectIdsByKeyword(reqVO.getKeyword());
+        Cursor cursor = decodeCursor(reqVO.getCursor(), userId, reqVO.getHandled(), reqVO.getKeyword());
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        List<SalesOrderSupervisorConfirmationDO> rows = confirmationMapper.selectCursorBySupervisor(userId, reqVO.getHandled(), orderIds,
+                cursor == null ? null : cursor.time(), cursor == null ? null : cursor.id(), limit + 1);
+        boolean more = rows.size() > limit;
+        List<SalesOrderSupervisorConfirmationDO> page = more ? rows.subList(0, limit) : rows;
+        Set<Long> requesterIds = page.stream().map(SalesOrderSupervisorConfirmationDO::getRequesterUserId).collect(java.util.stream.Collectors.toSet());
+        Map<Long, AdminUserRespDTO> users = requesterIds.isEmpty() ? Map.of() : adminUserApi.getUserMap(requesterIds);
+        List<SalesOrderSupervisorConfirmationRespVO> list = page.stream().map(row -> convert(row, users)).toList();
+        SalesOrderSupervisorConfirmationDO last = page.isEmpty() ? null : page.get(page.size() - 1);
+        String next = more ? encodeCursor(last, userId, reqVO.getHandled(), reqVO.getKeyword()) : null;
+        return new CursorPageResult<>(list, next, more);
+    }
+
+    private String encodeCursor(SalesOrderSupervisorConfirmationDO row, Long userId, Boolean handled, String keyword) {
+        String raw = row.getRequestedAt() + "|" + row.getId() + "|" + userId + "|" + handled + "|" + String.valueOf(keyword);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+    private Cursor decodeCursor(String value, Long userId, Boolean handled, String keyword) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            String[] p = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8).split("\\|", -1);
+            if (p.length != 5 || !p[2].equals(String.valueOf(userId)) || !p[3].equals(String.valueOf(handled)) || !p[4].equals(String.valueOf(keyword))) throw new IllegalArgumentException();
+            return new Cursor(java.time.LocalDateTime.parse(p[0]), Long.valueOf(p[1]));
+        } catch (RuntimeException ex) { throw new IllegalArgumentException("Invalid supervisor cursor", ex); }
+    }
+    private record Cursor(java.time.LocalDateTime time, Long id) {}
 
     public SalesOrderSupervisorConfirmationDO getPending(Long roundId, String taskKey) {
         SalesOrderSupervisorConfirmationDO row = confirmationMapper.selectByRoundAndTaskKey(roundId, taskKey);

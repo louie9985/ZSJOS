@@ -6,7 +6,7 @@ import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter
 import SalesOrderDetailCards, { SALES_ORDER_STATUS_COLORS, SALES_ORDER_STATUS_LABELS } from '../components/SalesOrderDetailCards'
 import SalesOrderEntryModal, { type SalesOrderEntryLead } from '../components/SalesOrderEntryModal'
 import { formatTimestamp } from '../services/time'
-import { mergeSalesOrderListItems } from '../services/salesOrder'
+import { mergeSalesOrderListItems, salesOrderDetailToListItem } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 
 const PAGE_SIZE = 20
@@ -14,12 +14,13 @@ type StatusTab = 'all' | SalesOrder['status']
 const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0 }
 
 export default function MySalesOrderPage() {
+  const requestedOrderId = useRef(Number(new URLSearchParams(location.search).get('orderId')) || undefined)
   const [status, setStatus] = useState<StatusTab>('all')
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<SalesOrderListItem[]>([])
-  const [total, setTotal] = useState(0)
-  const [pageNo, setPageNo] = useState(1)
+  const [cursor, setCursor] = useState<string>()
+  const [hasMore, setHasMore] = useState(true)
   const [selectedId, setSelectedId] = useState<number>()
   const [detail, setDetail] = useState<SalesOrder>()
   const [counts, setCounts] = useState(emptyCounts)
@@ -43,15 +44,28 @@ export default function MySalesOrderPage() {
     catch (loadError) { setCountsError(loadError instanceof Error ? loadError.message : '订单数量加载失败') }
   }, [])
 
-  const loadPage = useCallback(async (targetPage: number, replace: boolean, version: number) => {
-    const key = `${version}:${targetPage}`
+  const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean, version: number) => {
+    const key = `${version}:${targetCursor || 'first'}`
     if (activePages.current.has(key)) return
     activePages.current.add(key); setLoading(true); setError('')
     try {
-      const result = await api.mySalesOrderPage({ pageNo: targetPage, pageSize: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+      const result = await api.mySalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
       if (version !== listVersion.current) return
-      setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list)); setTotal(result.total); setPageNo(targetPage)
-      if (replace) setSelectedId(current => current && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
+      let nextItems = result.list
+      const requestedId = replace ? requestedOrderId.current : undefined
+      if (requestedId && !result.list.some(item => item.id === requestedId)) {
+        const requestedOrder = await api.mySalesOrder(requestedId)
+        if (version !== listVersion.current) return
+        nextItems = [salesOrderDetailToListItem(requestedOrder), ...result.list]
+      }
+      setItems(current => replace ? nextItems : mergeSalesOrderListItems(current, nextItems)); setCursor(result.nextCursor); setHasMore(result.hasMore)
+      if (replace) {
+        setSelectedId(current => requestedId || (current && nextItems.some(item => item.id === current) ? current : nextItems[0]?.id))
+        if (requestedId) {
+          requestedOrderId.current = undefined
+          window.history.replaceState({}, '', `${window.location.pathname}${window.location.hash}`)
+        }
+      }
     } catch (loadError) {
       if (version === listVersion.current) setError(loadError instanceof Error ? loadError.message : '我的订单加载失败')
     } finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
@@ -59,8 +73,8 @@ export default function MySalesOrderPage() {
 
   const reload = useCallback(() => {
     const version = ++listVersion.current
-    setPageNo(1)
-    void Promise.all([loadPage(1, true, version), loadCounts()])
+    setCursor(undefined); setHasMore(true)
+    void Promise.all([loadPage(undefined, true, version), loadCounts()])
   }, [loadCounts, loadPage])
 
   useEffect(() => { reload() }, [reload])
@@ -80,7 +94,6 @@ export default function MySalesOrderPage() {
       : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)}
         onTerminate={() => { resetTerminationIntent(); setTerminateOpen(true) }}/>
         : <Empty description="从左侧选择一条订单"/>
-  const hasMore = items.length < total
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
     id: detail.leadId || 0, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,
     provinceCode: detail.provinceCode, provinceName: detail.provinceName, cityCode: detail.cityCode, cityName: detail.cityName,
@@ -107,13 +120,13 @@ export default function MySalesOrderPage() {
           className="sales-order-inbox-error" type="error" showIcon message={error}
           action={<Button size="small" onClick={reload}>重试</Button>}/>
         }
-        <div className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(pageNo + 1, false, listVersion.current) }}>
+        <div className="sales-order-list-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false, listVersion.current) }}>
           {!loading && !items.length && !error ? <Empty description="暂无订单"/> : items.map(item => <button key={item.id} type="button" className={`sales-order-list-item${item.id === selectedId ? ' active' : ''}`} onClick={() => { setSelectedId(item.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
             <div className="sales-order-list-main"><Avatar>{item.studentName.slice(0, 1)}</Avatar><div className="sales-order-list-copy"><div><strong>{item.studentName}</strong><Tag color={SALES_ORDER_STATUS_COLORS[item.status]}>{SALES_ORDER_STATUS_LABELS[item.status]}</Tag></div><span>{item.orderNo}</span><span>¥{Number(item.totalAmount).toFixed(2)} · 第 {item.approvalRoundNo || 1} 轮</span></div></div>
             <div className="sales-order-list-meta">{formatTimestamp(item.submittedAt)}</div>
           </button>)}
           {loading && <div className="sales-order-list-loading"><Spin size="small"/> 加载中</div>}
-          {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="sales-order-list-end">已加载全部 {total} 条订单</Typography.Text>}
+          {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="sales-order-list-end">已加载全部订单</Typography.Text>}
         </div>
       </aside>
       <main className="sales-order-detail-pane">{detailContent}</main>

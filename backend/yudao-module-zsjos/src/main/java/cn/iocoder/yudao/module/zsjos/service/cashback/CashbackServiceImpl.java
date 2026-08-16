@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.CashbackSummaryRespVO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.cashback.CashbackStatusSummaryRow;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
@@ -32,6 +34,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.Set;
+import java.util.HashMap;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.*;
@@ -125,6 +128,28 @@ public class CashbackServiceImpl implements CashbackService {
     @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
         return BeanUtils.toBean(mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
+    }
+
+    @Override
+    public CashbackSummaryRespVO getMySummary(Long userId) {
+        CashbackSummaryRespVO result = new CashbackSummaryRespVO();
+        Map<String, Long> counts = new HashMap<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (CashbackStatusSummaryRow row : mapper.selectStatusSummary(userId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())) {
+            BigDecimal amount = row.getAmount() == null ? BigDecimal.ZERO : row.getAmount();
+            counts.put(row.getStatus(), row.getCount()); total = total.add(amount);
+            switch (row.getStatus()) {
+                case STATUS_PENDING -> result.setPendingAmount(amount);
+                case STATUS_AVAILABLE -> result.setAvailableAmount(amount);
+                case STATUS_WITHDRAWING -> result.setWithdrawingAmount(amount);
+                case STATUS_WITHDRAWN -> result.setWithdrawnAmount(amount);
+                default -> { }
+            }
+        }
+        result.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
+        result.setCounts(counts);
+        return result;
     }
 
     @Override

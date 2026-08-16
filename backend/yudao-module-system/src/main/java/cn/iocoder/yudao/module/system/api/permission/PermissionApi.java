@@ -20,4 +20,10 @@ public interface PermissionApi extends PermissionCommonApi {
      */
     Set<Long> getUserRoleIdListByRoleIds(Collection<Long> roleIds);
 
+    /** Adds one role while preserving the user's existing role assignments. */
+    void addUserRole(Long userId, Long roleId);
+
+    /** Removes one role while preserving the user's other role assignments. */
+    void removeUserRole(Long userId, Long roleId);
+
 }

@@ -32,6 +32,10 @@ public class DefaultDBFieldHandler implements MetaObjectHandler {
             if (Objects.isNull(baseDO.getUpdateTime())) {
                 baseDO.setUpdateTime(current);
             }
+            // ZSJOS LeadDO uses this optional field as the server-owned inbox activity anchor.
+            if (metaObject.hasSetter("lastActivityAt") && Objects.isNull(getFieldValByName("lastActivityAt", metaObject))) {
+                setFieldValByName("lastActivityAt", current, metaObject);
+            }
 
             Long userId = SecurityFrameworkUtils.getLoginUserId();
             // 当前登录用户不为空，创建人为空，则当前登录用户为创建人
@@ -51,6 +55,9 @@ public class DefaultDBFieldHandler implements MetaObjectHandler {
         Object modifyTime = getFieldValByName("updateTime", metaObject);
         if (Objects.isNull(modifyTime)) {
             setFieldValByName("updateTime", LocalDateTime.now(), metaObject);
+        }
+        if (metaObject.hasSetter("lastActivityAt") && Objects.isNull(getFieldValByName("lastActivityAt", metaObject))) {
+            setFieldValByName("lastActivityAt", LocalDateTime.now(), metaObject);
         }
 
         // 当前登录用户不为空，更新人为空，则当前登录用户为更新人

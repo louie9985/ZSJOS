@@ -85,6 +85,14 @@ global administrator workflow and the React workbench owns the department-scoped
 manager workflow. Both consume the same ZSJOS relationship APIs; neither frontend owns
 or reconstructs relationship truth from roles, post names, or static user lists.
 
+The confirmed dual-frontend menu-completeness requirement is a scoped exception to the
+default administrator-page split: every active ZSJOS-facing page menu also has a React
+renderer, including personnel, partner, impersonation, audit, cashback, withdrawal,
+user-relation, maintenance, and notification-rule administration. These React pages
+reuse the same System or ZSJOS APIs and permission strings as Vue; they do not move
+backend ownership, duplicate administrator-maintained data, or infer access from role
+names. The route-to-renderer inventory is `docs/frontend/zsjos-menu-coverage.md`.
+
 ## Documentation boundaries
 
 - `AGENTS.md` contains durable agent behavior, commands, risk rules, and verification expectations.

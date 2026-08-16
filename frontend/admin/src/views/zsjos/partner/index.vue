@@ -14,6 +14,7 @@
         <template #default="scope">
           <el-button
             v-if="scope.row.status === 'enabled'"
+            v-hasPermi="['zsjos:partner:update-state']"
             link
             type="warning"
             @click="changeState(scope.row, false)"
@@ -21,6 +22,7 @@
           >
           <el-button
             v-if="scope.row.status === 'disabled'"
+            v-hasPermi="['zsjos:partner:update-state']"
             link
             type="success"
             @click="changeState(scope.row, true)"
@@ -28,6 +30,7 @@
           >
           <el-button
             v-if="scope.row.status === 'enabled'"
+            v-hasPermi="['zsjos:partner:convert']"
             link
             type="primary"
             @click="openConvert(scope.row)"

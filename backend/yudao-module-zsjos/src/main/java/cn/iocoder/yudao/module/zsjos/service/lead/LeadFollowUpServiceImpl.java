@@ -157,6 +157,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                 FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         lead.setLastFollowUpAt(occurredAt);
+        lead.setLastActivityAt(occurredAt);
         lead.setLastFollowUpRecordId(record.getId());
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
@@ -239,7 +240,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             image.setOriginalName(file.getName()); image.setContentType(file.getType());
             image.setFileSize(file.getSize()); image.setSort(i); opportunityImageMapper.insert(image);
         }
-        lead.setLeadCategory(categoryAfter); lead.setLastFollowUpAt(occurredAt);
+        lead.setLeadCategory(categoryAfter); lead.setLastFollowUpAt(occurredAt); lead.setLastActivityAt(occurredAt);
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
         leadMapper.updateById(lead);

@@ -53,16 +53,26 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     @Override
     public List<BpmProcessNodeStatusRespDTO> getProcessNodeStatuses(String processInstanceId, Set<String> taskDefinitionKeys) {
-        if (processInstanceId == null || taskDefinitionKeys == null || taskDefinitionKeys.isEmpty()) return List.of();
-        Map<String, BpmProcessNodeStatusRespDTO> result = new HashMap<>();
-        for (Task task : bpmTaskService.getRunningTaskListByProcessInstanceId(processInstanceId, null, null)) {
+        if (processInstanceId == null) return List.of();
+        return getProcessNodeStatuses(Set.of(processInstanceId), taskDefinitionKeys)
+                .getOrDefault(processInstanceId, List.of());
+    }
+
+    @Override
+    public Map<String, List<BpmProcessNodeStatusRespDTO>> getProcessNodeStatuses(
+            Set<String> processInstanceIds, Set<String> taskDefinitionKeys) {
+        if (processInstanceIds == null || processInstanceIds.isEmpty()
+                || taskDefinitionKeys == null || taskDefinitionKeys.isEmpty()) return Map.of();
+        Map<String, Map<String, BpmProcessNodeStatusRespDTO>> grouped = new HashMap<>();
+        for (String processInstanceId : processInstanceIds) grouped.put(processInstanceId, new HashMap<>());
+        for (Task task : bpmTaskService.getTasksByProcessInstanceIds(List.copyOf(processInstanceIds))) {
             if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getParentTaskId() != null) continue;
             BpmProcessNodeStatusRespDTO status = new BpmProcessNodeStatusRespDTO();
             status.setTaskDefinitionKey(task.getTaskDefinitionKey()); status.setStatus("pending");
             status.setCreateTime(toLocalDateTime(task.getCreateTime()));
-            result.put(task.getTaskDefinitionKey(), status);
+            grouped.get(task.getProcessInstanceId()).put(task.getTaskDefinitionKey(), status);
         }
-        for (HistoricTaskInstance task : bpmTaskService.getTaskListByProcessInstanceId(processInstanceId, true)) {
+        for (HistoricTaskInstance task : bpmTaskService.getTaskListByProcessInstanceIds(processInstanceIds)) {
             if (!taskDefinitionKeys.contains(task.getTaskDefinitionKey()) || task.getParentTaskId() != null
                     || task.getEndTime() == null) continue;
             Integer rawStatus = task.getTaskLocalVariables() == null ? null
@@ -73,6 +83,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
                 case 4 -> "cancelled";
                 default -> "pending";
             };
+            Map<String, BpmProcessNodeStatusRespDTO> result = grouped.get(task.getProcessInstanceId());
             BpmProcessNodeStatusRespDTO current = result.get(task.getTaskDefinitionKey());
             LocalDateTime taskEndTime = toLocalDateTime(task.getEndTime());
             if (current == null || statusRank(status) > statusRank(current.getStatus())
@@ -85,16 +96,20 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
                 result.put(task.getTaskDefinitionKey(), value);
             }
         }
-        Set<Long> reviewerUserIds = result.values().stream().map(BpmProcessNodeStatusRespDTO::getReviewerUserId)
+        Set<Long> reviewerUserIds = grouped.values().stream().flatMap(item -> item.values().stream())
+                .map(BpmProcessNodeStatusRespDTO::getReviewerUserId)
                 .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
         if (!reviewerUserIds.isEmpty()) {
             Map<Long, AdminUserRespDTO> reviewerUsers = adminUserApi.getUserMap(reviewerUserIds);
-            result.values().forEach(item -> {
+            grouped.values().stream().flatMap(item -> item.values().stream()).forEach(item -> {
                 AdminUserRespDTO reviewer = reviewerUsers.get(item.getReviewerUserId());
                 item.setReviewerUserName(reviewer == null ? null : reviewer.getNickname());
             });
         }
-        return result.values().stream().sorted(Comparator.comparing(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey)).toList();
+        Map<String, List<BpmProcessNodeStatusRespDTO>> response = new HashMap<>();
+        grouped.forEach((processInstanceId, result) -> response.put(processInstanceId, result.values().stream()
+                .sorted(Comparator.comparing(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey)).toList()));
+        return response;
     }
 
     private int statusRank(String status) {

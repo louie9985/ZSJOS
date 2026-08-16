@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
@@ -210,6 +211,43 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         }
         return new PageResult<>(result, taskPage.getTotal());
     }
+
+    @Override
+    public CursorPageResult<LeadAppealRespVO> getInboxCursor(LeadAppealPageReqVO reqVO, Long userId) {
+        AppealCursor cursor = decodeInboxCursor(reqVO.getCursor(), userId, reqVO.getHandled());
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        List<LeadAppealRespVO> all = new ArrayList<>();
+        int pageNo = 1; long total;
+        do {
+            LeadAppealPageReqVO pageReq = new LeadAppealPageReqVO();
+            pageReq.setHandled(reqVO.getHandled()); pageReq.setPageNo(pageNo++); pageReq.setPageSize(100);
+            PageResult<LeadAppealRespVO> page = getInboxPage(pageReq, userId);
+            all.addAll(page.getList()); total = page.getTotal();
+        } while (all.size() < total);
+        all.sort(Comparator.comparing(LeadAppealRespVO::getSubmittedAt, Comparator.reverseOrder())
+                .thenComparing(LeadAppealRespVO::getId, Comparator.reverseOrder()));
+        List<LeadAppealRespVO> eligible = cursor == null ? all : all.stream().filter(item ->
+                item.getSubmittedAt().isBefore(cursor.time())
+                        || item.getSubmittedAt().equals(cursor.time()) && item.getId() < cursor.id()).toList();
+        boolean more = eligible.size() > limit;
+        List<LeadAppealRespVO> list = more ? eligible.subList(0, limit) : eligible;
+        LeadAppealRespVO last = list.isEmpty() ? null : list.get(list.size() - 1);
+        return new CursorPageResult<>(list, more ? encodeInboxCursor(last, userId, reqVO.getHandled()) : null, more);
+    }
+
+    private String encodeInboxCursor(LeadAppealRespVO item, Long userId, Boolean handled) {
+        String raw = item.getSubmittedAt() + "|" + item.getId() + "|" + userId + "|" + handled;
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+    private AppealCursor decodeInboxCursor(String value, Long userId, Boolean handled) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            String[] p = new String(Base64.getUrlDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8).split("\\|", -1);
+            if (p.length != 4 || !p[2].equals(String.valueOf(userId)) || !p[3].equals(String.valueOf(handled))) throw new IllegalArgumentException();
+            return new AppealCursor(LocalDateTime.parse(p[0]), Long.parseLong(p[1]));
+        } catch (RuntimeException ex) { throw new IllegalArgumentException("Invalid appeal cursor", ex); }
+    }
+    private record AppealCursor(LocalDateTime time, long id) {}
 
     @Override
     @Transactional(rollbackFor = Exception.class)

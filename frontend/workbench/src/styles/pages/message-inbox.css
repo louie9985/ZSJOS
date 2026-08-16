@@ -369,3 +369,33 @@
   padding: 11px;
   border: 2px solid var(--crm-color-primary);
 }
+
+.message-inbox-load-more {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--crm-text-secondary);
+  font-size: 13px;
+}
+
+.duplicate-review-detail .message-detail-hero > .ant-btn {
+  margin-left: auto;
+}
+
+.duplicate-review-snapshot {
+  margin: 0;
+  padding: var(--crm-sp-3);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+@media (max-width: 768px) {
+  .duplicate-review-detail .message-detail-hero > .ant-btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}

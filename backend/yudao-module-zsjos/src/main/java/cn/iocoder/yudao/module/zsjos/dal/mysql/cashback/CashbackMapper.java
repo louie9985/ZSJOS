@@ -35,6 +35,12 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
                 .eq(CashbackDO::getBeneficiaryUserId, userId).eq(CashbackDO::getStatus, "available")
                 .orderByAsc(CashbackDO::getId));
     }
+
+    @Select("SELECT status, COALESCE(SUM(amount), 0) amount, COUNT(*) count "
+            + "FROM zsjos_cashback WHERE beneficiary_user_id=#{userId} AND tenant_id=#{tenantId} "
+            + "AND deleted=0 GROUP BY status")
+    List<CashbackStatusSummaryRow> selectStatusSummary(@Param("userId") Long userId,
+                                                        @Param("tenantId") Long tenantId);
     default int transition(Long id, Integer version, String from, String to, LocalDateTime settledAt) {
         return update(null, new LambdaUpdateWrapper<CashbackDO>().eq(CashbackDO::getId, id)
                 .eq(CashbackDO::getVersion, version).eq(CashbackDO::getStatus, from)

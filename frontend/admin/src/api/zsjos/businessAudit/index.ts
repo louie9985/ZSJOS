@@ -26,10 +26,10 @@ export interface ImpersonationAuditVO {
 
 export const getBusinessAuditPage = (
   params: PageParam & { actionCode?: string; targetType?: string }
-) => request.get<PageResult<BusinessAuditVO>>({ url: '/zsjos/business-audit/page', params })
+) => request.get<PageResult<BusinessAuditVO[]>>({ url: '/zsjos/business-audit/page', params })
 
 export const getImpersonationAuditPage = (params: PageParam & { sessionId?: number }) =>
-  request.get<PageResult<ImpersonationAuditVO>>({
+  request.get<PageResult<ImpersonationAuditVO[]>>({
     url: '/zsjos/business-audit/impersonation-page',
     params
   })

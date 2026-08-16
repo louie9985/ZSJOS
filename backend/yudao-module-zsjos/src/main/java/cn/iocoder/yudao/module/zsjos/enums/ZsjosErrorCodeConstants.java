@@ -11,6 +11,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_ACCOUNT_CONFLICT = new ErrorCode(1_900_000_005, "该账号已持有员工业务岗位，不能同时作为启用兼职");
     ErrorCode PARTNER_BOUND_USER_DUPLICATE = new ErrorCode(1_900_000_006, "该账号已绑定其他兼职主体");
     ErrorCode PARTNER_CONVERSION_POST_INVALID = new ErrorCode(1_900_000_007, "兼职仅可转为新媒体员工或新媒体主管");
+    ErrorCode PARTNER_ROLE_NOT_CONFIGURED = new ErrorCode(1_900_000_008, "兼职端角色未配置，请先执行 V063 迁移");
 
     ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
     ErrorCode LEAD_ASSIGNMENT_TARGET_INVALID = new ErrorCode(1_900_001_002, "所选销售不存在、已停用或不属于销售专员岗位");

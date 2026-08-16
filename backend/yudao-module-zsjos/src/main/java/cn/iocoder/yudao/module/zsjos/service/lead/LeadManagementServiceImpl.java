@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
@@ -42,6 +43,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.Base64;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_NOT_EXISTS;
@@ -118,6 +122,48 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 .toList();
         return new PageResult<>(result, page.getTotal());
     }
+
+    @Override
+    public CursorPageResult<LeadManagementRespVO> getLeadCursor(LeadManagementPageReqVO reqVO, Long userId) {
+        LeadCursor cursor = decodeCursor(reqVO.getCursor(), reqVO, userId);
+        reqVO.setCursorActivityAt(cursor == null ? null : cursor.time());
+        reqVO.setCursorId(cursor == null ? null : cursor.id());
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        reqVO.setPageNo(1);
+        reqVO.setPageSize(limit + 1);
+        PageResult<LeadManagementRespVO> page = getLeadPage(reqVO, userId);
+        boolean hasMore = page.getList().size() > limit;
+        List<LeadManagementRespVO> list = hasMore ? page.getList().subList(0, limit) : page.getList();
+        String next = hasMore && !list.isEmpty() ? encodeCursor(list.get(list.size() - 1), reqVO, userId) : null;
+        return new CursorPageResult<>(list, next, hasMore);
+    }
+
+    private String encodeCursor(LeadManagementRespVO item, LeadManagementPageReqVO reqVO, Long userId) {
+        String raw = item.getLastActivityAt() + "|" + item.getId() + "|" + userId + "|"
+                + cursorContext(reqVO);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private LeadCursor decodeCursor(String value, LeadManagementPageReqVO reqVO, Long userId) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            String[] parts = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8).split("\\|", 4);
+            if (parts.length != 4 || !parts[2].equals(String.valueOf(userId)) || !parts[3].equals(cursorContext(reqVO))) {
+                throw new IllegalArgumentException("cursor context mismatch");
+            }
+            return new LeadCursor(LocalDateTime.parse(parts[0]), Long.valueOf(parts[1]));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid lead cursor", ex);
+        }
+    }
+
+    private String cursorContext(LeadManagementPageReqVO reqVO) {
+        return Integer.toHexString(Objects.hash(reqVO.getAudience(), reqVO.getInboxGroup(), reqVO.getInboxStage(),
+                reqVO.getKeyword(), reqVO.getStatus(), reqVO.getAssignmentStatus(), reqVO.getSourceChannel(),
+                reqVO.getLeadCategory(), reqVO.getSourceUserId(), reqVO.getOwnerUserId(), reqVO.getAdvancedFilter()));
+    }
+
+    private record LeadCursor(LocalDateTime time, Long id) {}
 
     @Override
     public PageResult<LeadManagementRespVO> getManagedOwnerLeadPage(LeadManagementPageReqVO reqVO,

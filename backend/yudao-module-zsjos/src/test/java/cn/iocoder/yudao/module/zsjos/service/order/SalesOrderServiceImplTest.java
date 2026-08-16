@@ -37,6 +37,8 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -53,6 +56,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.APPROVE;
+import static cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.CANCEL;
 import static cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.REJECT;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
@@ -90,6 +94,7 @@ class SalesOrderServiceImplTest {
     @Mock private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
     @Mock private SalesOrderNumberService orderNumberService;
     @Mock private CashbackService cashbackService;
+    @Mock private BusinessTaskCommandService businessTaskCommandService;
 
     @BeforeEach void setUp() {
         TenantContextHolder.setTenantId(1L);
@@ -103,6 +108,18 @@ class SalesOrderServiceImplTest {
                 "https://example.test/voucher.pdf", "application/pdf", 100L, "20"));
     }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
+
+    @Test
+    void financeCourseSummaryFallsBackWhenHistoricalSnapshotIsMalformed() {
+        SalesOrderItemDO item = new SalesOrderItemDO();
+        item.setProductSnapshot("{malformed");
+        item.setProductRef("course-legacy");
+        item.setSkuRef("sku-legacy");
+
+        String summary = ReflectionTestUtils.invokeMethod(service, "courseSummary", item);
+
+        assertEquals("course-legacy / sku-legacy", summary);
+    }
 
     @Test
     void createZeroAmountOrderStartsDualApprovalAndDefaultsBuyer() {
@@ -228,8 +245,10 @@ class SalesOrderServiceImplTest {
     void rejectedProcessReturnsOriginalOrderForRevision() {
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
         round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING); round.setProcessInstanceId("process-1");
+        round.setSubmittedByUserId(20L);
         SalesOrderDO order = new SalesOrderDO();
-        order.setId(100L); order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setId(100L); order.setOrderNo("SO-100"); order.setStudentName("测试学员");
+        order.setOpportunityId(30L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
         OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setStatus(OPPORTUNITY_STATUS_DEAL_PENDING_APPROVAL);
         when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
         when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
@@ -242,6 +261,30 @@ class SalesOrderServiceImplTest {
         assertEquals(ROUND_REJECTED, round.getStatus());
         assertEquals("资料需补正", round.getDecisionReason());
         assertEquals(OPPORTUNITY_STATUS_FOLLOWING, opportunity.getStatus());
+        ArgumentCaptor<BusinessTaskCreateCommand> task = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(businessTaskCommandService).create(task.capture());
+        assertEquals(TASK_TYPE_REVISION, task.getValue().taskType());
+        assertEquals(20L, task.getValue().assigneeId());
+        assertNull(task.getValue().dueAt());
+        assertEquals(TASK_ACTION_REVISION, task.getValue().actionCode());
+        assertEquals(TASK_REVISION_KEY_PREFIX + 200L, task.getValue().idempotencyKey());
+    }
+
+    @Test
+    void cancelledProcessDoesNotCreateRevisionTask() {
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING); round.setProcessInstanceId("process-1");
+        round.setSubmittedByUserId(20L);
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setCurrentApprovalRoundId(200L); order.setStatus(STATUS_PENDING_APPROVAL);
+        when(roundMapper.selectByProcessInstanceId("process-1")).thenReturn(round);
+        when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+
+        service.handleProcessResult("process-1", CANCEL.getStatus(), "流程异常取消");
+
+        assertEquals(STATUS_REVISION_REQUIRED, order.getStatus());
+        verify(businessTaskCommandService, never()).create(any());
     }
 
     @Test
@@ -363,7 +406,7 @@ class SalesOrderServiceImplTest {
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_REVISION_REQUIRED);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
         mockEligibleLeadAndOpportunity();
-        SalesOrderApprovalRoundDO previous = new SalesOrderApprovalRoundDO(); previous.setRoundNo(1);
+        SalesOrderApprovalRoundDO previous = new SalesOrderApprovalRoundDO(); previous.setId(200L); previous.setRoundNo(1);
         when(roundMapper.selectLatestByOrderId(100L)).thenReturn(previous);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
@@ -383,6 +426,21 @@ class SalesOrderServiceImplTest {
         verify(roundMapper).insert(org.mockito.Mockito.<SalesOrderApprovalRoundDO>argThat(round -> round.getOrderId().equals(100L)
                 && round.getRoundNo() == 2 && "process-2".equals(round.getProcessInstanceId())
                 && round.getOrderSnapshot() != null));
+        verify(businessTaskCommandService).completeByKey(eq(TASK_REVISION_KEY_PREFIX + 200L), any());
+    }
+
+    @Test
+    void customerOrderDetailRequiresSamePerson() {
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L);
+        SalesOrderDO order = new SalesOrderDO(); order.setId(100L); order.setPersonId(11L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.getCustomerOrder(1L, 100L, 20L));
+
+        assertEquals(SALES_ORDER_PERMISSION_DENIED.getCode(), error.getCode());
+        verifyNoInteractions(itemMapper, processTaskApi);
     }
 
     @Test

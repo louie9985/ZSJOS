@@ -1,5 +1,6 @@
 import axios, { type AxiosRequestConfig } from 'axios'
 import { APP_CONFIG, STORAGE_KEYS } from '../constants'
+import { handleImpersonationInvalid, resolveImpersonationSessionHeader } from './impersonation'
 import type { Timestamp } from './time'
 
 export type User = { id: number; nickname: string; avatar?: string; username?: string }
@@ -18,6 +19,7 @@ export type AssignmentUser = SalesUser & { deptId?: number; status: number }
 export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]; validSalesCount: number; invalidSalesCount: number; updateTime?: Timestamp }
 export type AssignmentLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
 export type PageResult<T> = { list: T[]; total: number }
+export type CursorPageResult<T> = { list: T[]; nextCursor?: string; hasMore: boolean }
 export type AdvancedFilterCondition = { fieldKey: string; operator: string; value?: unknown; valueFrom?: unknown; valueTo?: unknown }
 export type AdvancedFilterGroup = { logic: 'AND' | 'OR'; conditions: AdvancedFilterCondition[]; groups: AdvancedFilterGroup[] }
 export type AdvancedFilterField = { fieldKey: string; group: string; label: string; valueType: 'text' | 'select' | 'number' | 'date'; operators: string[]; optionSource?: string; options: Array<{ value: string | number; label: string }>; optionsLoading?: boolean; optionsError?: boolean; retryOptions?: () => void }
@@ -96,7 +98,7 @@ export type ManagedLead = {
   invalidEvidence?: LeadAppealEvidence[]
   recycleSourceOwnerUserId?: number; recycleSourceOwnerUserName?: string
   appealDeadlineAt?: Timestamp; closedAt?: Timestamp; closeReason?: string
-  createTime: Timestamp; updateTime: Timestamp; relationTypes: Array<'submitter' | 'owner'>
+  createTime: Timestamp; updateTime: Timestamp; lastActivityAt?: Timestamp; relationTypes: Array<'submitter' | 'owner'>
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
@@ -214,14 +216,20 @@ export type BusinessTask = {
   id: number; taskType: string; bizType: string; bizId: number; title: string; summary?: string
   status: 'pending' | 'completed' | 'cancelled'; dueAt?: Timestamp; remindAt?: Timestamp
   completedAt?: Timestamp; cancelledAt?: Timestamp; createTime: Timestamp; overdue: boolean
-  actionCode?: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP' | 'OPEN_WORK_PLAN_ITEM' | 'REVIEW_WORK_PLAN_ITEM'
+  actionCode?: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP' | 'OPEN_WORK_PLAN_ITEM' | 'REVIEW_WORK_PLAN_ITEM' | 'OPEN_SALES_ORDER_REVISION'
   actionable: boolean
 }
 export type BpmTask = {
   id: string; name: string; createTime: Timestamp; endTime?: Timestamp; status: number; reason?: string
   processInstanceId: string; processInstance?: { id: string; name: string; createTime: Timestamp; startUser?: { id: number; nickname: string } }
 }
-export type SimpleUser = { id: number; nickname: string; avatar?: string; deptId?: number; deptName?: string }
+export type ExportTask = {
+  id: number; taskNo: string; exportType: 'lead' | 'order' | 'finance_order' | 'cashback' | 'withdrawal'
+  status: 'queued' | 'prechecking' | 'generating' | 'ready' | 'failed' | 'cancelled' | 'expired'
+  attemptCount: number; resultFileName?: string; resultFileSize?: number; readyAt?: Timestamp; expiresAt?: Timestamp
+  failureCode?: string; failureMessage?: string; createTime: Timestamp
+}
+export type SimpleUser = { id: number; nickname: string; username?: string; status?: number; avatar?: string; deptId?: number; deptName?: string }
 export type SimpleDept = { id: number; name: string; parentId?: number }
 export type WorkPlanAttachmentUpload = { infraFileId: number; originalName: string; contentType?: string; fileSize?: number }
 export type WorkPlanChange = { id: number; subjectType: string; subjectId: number; changeType: string; beforeSnapshot?: string; afterSnapshot?: string; reason: string; operatorUserId: number; changedAt: Timestamp }
@@ -322,7 +330,7 @@ export type NotifyMessagePageParams = {
   readStatus?: boolean
 }
 
-const http = axios.create({ baseURL: APP_CONFIG.API_BASE_URL, timeout: 30000 })
+export const http = axios.create({ baseURL: APP_CONFIG.API_BASE_URL, timeout: 30000 })
 type RefreshResult =
   | { status: 'refreshed'; accessToken: string }
   | { status: 'failed'; expectedRefreshToken: string | null }
@@ -350,6 +358,7 @@ export const clearAuthStorage = () => {
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN)
   localStorage.removeItem(STORAGE_KEYS.CLIENT_ID)
   localStorage.removeItem(STORAGE_KEYS.EXPIRES_TIME)
+  localStorage.removeItem(STORAGE_KEYS.IMPERSONATION)
 }
 
 export const AUTH_EXPIRED_EVENT = 'zsjos-auth-expired'
@@ -365,11 +374,29 @@ const expireAuthentication = (expectedRefreshToken: string | null) => {
 }
 
 http.interceptors.request.use(config => {
+  const expectedOrigin = new URL(config.baseURL || APP_CONFIG.API_BASE_URL, window.location.origin).origin
+  if (/^[a-z][a-z\d+.-]*:\/\//i.test(config.url || '') && new URL(config.url!).origin !== expectedOrigin) {
+    config.headers.delete('tenant-id')
+    config.headers.delete('Authorization')
+    config.headers.delete('X-ZSJOS-Impersonation-Session')
+    return config
+  }
   config.headers['tenant-id'] = APP_CONFIG.DEFAULT_TENANT_ID
   const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
   if (token) config.headers.Authorization = `Bearer ${token}`
+  const impersonation = localStorage.getItem(STORAGE_KEYS.IMPERSONATION)
+  const impersonationId = resolveImpersonationSessionHeader(config.url, impersonation, expectedOrigin)
+  const request = config as typeof config & { _zsjosImpersonationSessionId?: number }
+  delete request._zsjosImpersonationSessionId
+  config.headers.delete('X-ZSJOS-Impersonation-Session')
+  if (impersonationId != null) {
+    config.headers['X-ZSJOS-Impersonation-Session'] = impersonationId
+    request._zsjosImpersonationSessionId = impersonationId
+  }
   return config
 })
+
+export type NotifyMessageCursorParams = { cursor?: string; limit?: number; readStatus?: boolean }
 
 const isAuthEndpoint = (url?: string) => ['/system/auth/login', '/system/auth/logout', '/system/auth/refresh-token']
   .some(path => url?.includes(path))
@@ -393,11 +420,17 @@ const retryAfterRefresh = async (config: AxiosRequestConfig, originalError: unkn
   return http(request)
 }
 
+const clearRejectedImpersonation = (code: unknown, config?: AxiosRequestConfig & { _zsjosImpersonationSessionId?: number }) => {
+  if (typeof code === 'number') handleImpersonationInvalid(code, config?._zsjosImpersonationSessionId)
+}
+
 http.interceptors.response.use(async response => {
+  clearRejectedImpersonation(response.data?.code, response.config)
   if (response.data?.code === 401) return retryAfterRefresh(response.config, new AuthenticationError(response.data.msg))
   return response
 }, async error => {
   const original = error.config as AxiosRequestConfig & { _retry?: boolean } | undefined
+  clearRejectedImpersonation(error.response?.data?.code, original)
   if (error.response?.status !== 401 || !original) return Promise.reject(error)
   return retryAfterRefresh(original, error)
 })
@@ -526,7 +559,16 @@ export const api = {
   managedLeadInboxPage: async (audience: 'submitter' | 'owner', params: ManagedLeadPageParams) =>
     params.advancedFilter ? unwrap<PageResult<ManagedLead>>(await http.post(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/search-page`, params))
       : unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/page`, { params })),
+  managedLeadInboxCursor: async (audience: 'submitter' | 'owner', params: Omit<ManagedLeadPageParams, 'pageNo' | 'pageSize'> & { cursor?: string; limit?: number }) =>
+    params.advancedFilter ? unwrap<CursorPageResult<ManagedLead>>(await http.post(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/search-cursor`, params))
+      : unwrap<CursorPageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/cursor`, { params })),
   managedLead: async (id: number) => unwrap<ManagedLead>(await http.get('/zsjos/lead/get', { params: { id } })),
+  allLeadPage: async (params: ManagedLeadPageParams) =>
+    params.advancedFilter ? unwrap<PageResult<ManagedLead>>(await http.post('/zsjos/lead/search-page', params))
+      : unwrap<PageResult<ManagedLead>>(await http.get('/zsjos/lead/page', { params })),
+  allLeadCursor: async (params: Omit<ManagedLeadPageParams, 'pageNo' | 'pageSize'> & { cursor?: string; limit?: number }) =>
+    params.advancedFilter ? unwrap<CursorPageResult<ManagedLead>>(await http.post('/zsjos/lead/search-cursor', params))
+      : unwrap<CursorPageResult<ManagedLead>>(await http.get('/zsjos/lead/cursor', { params })),
   agingPoolPage: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: LeadAgingPoolStatus; inboxGroup?: string; inboxStage?: string; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<PageResult<LeadAgingPoolItem>>(await http.post('/zsjos/lead/aging-pool/search-page', params))
       : unwrap<PageResult<LeadAgingPoolItem>>(await http.get('/zsjos/lead/aging-pool/page', { params })),
@@ -595,6 +637,8 @@ export const api = {
     unwrap<number>(await http.post(`/zsjos/lead/appeal/lead/${leadId}/submit`, data)),
   leadAppealInboxPage: async (handled: boolean, params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<LeadAppeal>>(await http.get('/zsjos/lead/appeal/inbox-page', { params: { handled, ...params } })),
+  leadAppealInboxCursor: async (handled: boolean, params: { cursor?: string; limit?: number }) =>
+    unwrap<CursorPageResult<LeadAppeal>>(await http.get('/zsjos/lead/appeal/inbox-cursor', { params: { handled, ...params } })),
   decideLeadAppeal: async (appealId: number, decision: 'overturn' | 'uphold', data: { taskId: string; reason: string; attachments: Array<{ infraFileId: number }>; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/lead/appeal/${appealId}/${decision}`, data)),
   uploadLeadAppealImage: async (file: File) => {
@@ -609,6 +653,8 @@ export const api = {
   submitExternalRepurchase: async (data: { customerName: string; customerMobile?: string; customerWechatId?: string; repurchaseReason: string; order: SalesOrderSubmitRequest }) =>
     unwrap<number>(await http.post('/zsjos/sales-order/external-repurchase', data)),
   customerSalesOrders: async (leadId: number) => unwrap<SalesOrderListItem[]>(await http.get(`/zsjos/sales-order/lead/${leadId}/customer-orders`)),
+  customerSalesOrder: async (leadId: number, orderId: number) =>
+    unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/lead/${leadId}/customer-orders/${orderId}`)),
   resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
   salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
@@ -616,12 +662,18 @@ export const api = {
   mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<PageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/my-search-page', params))
       : unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-page', { params })),
+  mySalesOrderCursor: async (params: { cursor?: string; limit?: number; status?: SalesOrder['status']; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<CursorPageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/my-search-cursor', params))
+      : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-cursor', { params })),
   mySalesOrderStatusCounts: async () =>
     unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
   salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
   salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<PageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/approval/search-page', params))
       : unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
+  salesOrderApprovalCursor: async (params: { cursor?: string; limit?: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<CursorPageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/approval/search-cursor', params))
+      : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-cursor', { params })),
   advancedFilterCatalog: async (scene: 'lead' | 'order') =>
     unwrap<AdvancedFilterCatalog>(await http.get('/zsjos/advanced-filter/catalog', { params: { scene } })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
@@ -630,6 +682,8 @@ export const api = {
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/supervisor-confirmation/request`, data)),
   salesOrderSupervisorInbox: async (params: { pageNo: number; pageSize: number; handled: boolean; keyword?: string }) =>
     unwrap<PageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-page', { params })),
+  salesOrderSupervisorCursor: async (params: { cursor?: string; limit?: number; handled: boolean; keyword?: string }) =>
+    unwrap<CursorPageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-cursor', { params })),
   decideSalesOrderSupervisor: async (orderId: number, decision: 'confirm' | 'reject', data: { confirmationId: number; taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; confirmationVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/supervisor-confirmation/${decision}`, data)),
   terminateSalesOrder: async (orderId: number, data: { reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
@@ -643,6 +697,12 @@ export const api = {
     unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-page', { params: { bucket, ...params } })),
   businessTaskList: async (params: { status: 'pending' | 'done'; bucket?: BusinessTaskBucket; pageNo: number; pageSize: number }) =>
     unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-task-page', { params })),
+  createExportTask: async (exportType: ExportTask['exportType'], filter: unknown) =>
+    unwrap<number>(await http.post('/zsjos/export-task', { exportType, filterJson: JSON.stringify(filter || {}) })),
+  exportTaskPage: async (params: { pageNo: number; pageSize: number; exportType?: ExportTask['exportType'] }) =>
+    unwrap<PageResult<ExportTask>>(await http.get('/zsjos/export-task/page', { params })),
+  cancelExportTask: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/export-task/${id}/cancel`)),
+  exportDownloadUrl: async (id: number) => unwrap<string>(await http.get(`/zsjos/export-task/${id}/download-url`)),
   bpmTaskPage: async (view: 'todo' | 'done', params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<BpmTask>>(await http.get(`/bpm/task/${view}-page`, { params })),
   simpleUsers: async () => unwrap<SimpleUser[]>(await http.get('/system/user/simple-list')),
@@ -729,6 +789,8 @@ export const api = {
   unreadNotifyMessages: async () => unwrap<NotifyMessage[]>(await http.get('/system/notify-message/get-unread-list')),
   myNotifyMessagePage: async (params: NotifyMessagePageParams) =>
     unwrap<PageResult<NotifyMessage>>(await http.get('/system/notify-message/my-page', { params })),
+  myNotifyMessageCursor: async (params: NotifyMessageCursorParams) =>
+    unwrap<CursorPageResult<NotifyMessage>>(await http.get('/system/notify-message/my-cursor', { params })),
   myNotifyMessage: async (id: number) =>
     unwrap<NotifyMessage>(await http.get('/system/notify-message/my-get', { params: { id } })),
   markNotifyMessagesRead: async (ids: number[]) => {

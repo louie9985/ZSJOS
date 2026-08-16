@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NotifyMessage } from './api'
-import { applyReadStatus, buildNotifyMessagePageParams } from './notifyMessage'
+import { applyReadStatus, buildNotifyMessageCursorParams, buildNotifyMessagePageParams } from './notifyMessage'
 
 const messages: NotifyMessage[] = [
   {
@@ -38,5 +38,10 @@ describe('notify message inbox state', () => {
       messages[1]
     ])
     expect(applyReadStatus(messages, [1], 'unread', readTime)).toEqual([messages[1]])
+  })
+
+  it('builds cursor requests without client-side ordering or page offsets', () => {
+    expect(buildNotifyMessageCursorParams('all')).toEqual({ cursor: undefined, limit: 20 })
+    expect(buildNotifyMessageCursorParams('unread', 'opaque', 10)).toEqual({ cursor: 'opaque', limit: 10, readStatus: false })
   })
 })

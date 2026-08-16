@@ -14,11 +14,12 @@
           <el-option v-for="item in statuses" :key="item.value" v-bind="item" />
         </el-select>
       </el-form-item>
-      <el-form-item
-        ><el-button :loading="loading" @click="load"
-          ><Icon icon="ep:search" />查询</el-button
-        ></el-form-item
-      >
+      <el-form-item>
+        <el-button :loading="loading" @click="load"><Icon icon="ep:search" />查询</el-button>
+        <el-button v-if="canExport" :loading="exporting" @click="exportCurrent">
+          <Icon icon="ep:download" />导出
+        </el-button>
+      </el-form-item>
     </el-form>
     <el-alert v-if="error" :title="error" type="error" show-icon
       ><el-button link @click="load">重试</el-button></el-alert
@@ -86,9 +87,7 @@
         >¥{{ money(detail.applicationAmount) }}</el-descriptions-item
       >
       <el-descriptions-item label="开户名">{{ detail.accountNameSnapshot }}</el-descriptions-item>
-      <el-descriptions-item label="银行卡">{{
-        detail.cardNumber || detail.maskedCardNumber
-      }}</el-descriptions-item>
+      <el-descriptions-item label="银行卡">{{ detail.maskedCardNumber }}</el-descriptions-item>
       <el-descriptions-item label="开户行"
         >{{ detail.bankNameSnapshot }} {{ detail.branchNameSnapshot }}</el-descriptions-item
       >
@@ -143,7 +142,15 @@
     >
   </Dialog>
   <Dialog v-model="rejectVisible" title="驳回待打款提现" width="480px">
-    <el-form label-position="top"><el-form-item label="驳回原因" required><el-input v-model="rejectReason" type="textarea" :rows="4" maxlength="500" show-word-limit /></el-form-item></el-form>
+    <el-form label-position="top"
+      ><el-form-item label="驳回原因" required
+        ><el-input
+          v-model="rejectReason"
+          type="textarea"
+          :rows="4"
+          maxlength="500"
+          show-word-limit /></el-form-item
+    ></el-form>
     <template #footer
       ><el-button @click="rejectVisible = false">取消</el-button
       ><el-button type="danger" :loading="saving" @click="submitReject"
@@ -176,12 +183,15 @@
 <script setup lang="ts">
 import * as Api from '@/api/zsjos/withdrawal'
 import * as CashbackApi from '@/api/zsjos/cashback'
+import * as ExportTaskApi from '@/api/zsjos/exportTask'
 import { useUserStore } from '@/store/modules/user'
 import { withdrawalDataScope } from '@/utils/zsjosDataScope'
 defineOptions({ name: 'ZsjosWithdrawal' })
 const userStore = useUserStore()
+const router = useRouter()
 const loading = ref(false),
   saving = ref(false),
+  exporting = ref(false),
   error = ref(''),
   total = ref(0)
 const list = ref<Api.WithdrawalVO[]>([]),
@@ -202,6 +212,37 @@ const applyForm = reactive({
   saveCard: false
 })
 const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined })
+const canExport = computed(
+  () =>
+    (userStore.getPermissions.has('*:*:*') ||
+      userStore.getPermissions.has('zsjos:export:withdrawal')) &&
+    withdrawalDataScope(userStore.getPermissions) === 'all'
+)
+const exportCurrent = async () => {
+  try {
+    await ElMessageBox.confirm('将导出符合当前状态条件的全部记录。', '导出提现记录', {
+      confirmButtonText: '加入导出队列',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+  } catch (action) {
+    if (action === 'cancel' || action === 'close') return
+    throw action
+  }
+  exporting.value = true
+  try {
+    await ExportTaskApi.createExportTask('withdrawal', JSON.stringify({ status: query.status }))
+    ElMessageBox.confirm('已加入导出队列', '导出任务', {
+      confirmButtonText: '查看导出任务',
+      cancelButtonText: '关闭',
+      type: 'success'
+    })
+      .then(() => router.push('/zsjos/export-task'))
+      .catch(() => undefined)
+  } finally {
+    exporting.value = false
+  }
+}
 const payoutForm = reactive({
   bankTransactionNo: '',
   proofFileId: undefined as number | undefined,

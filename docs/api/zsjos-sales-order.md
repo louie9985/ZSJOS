@@ -15,6 +15,7 @@
 - `POST /zsjos/sales-order/lead/{leadId}/repurchase`：从系统客户客资详情创建复购；客资只用于发起与权限上下文，订单持久化仅关联客户。
 - `POST /zsjos/sales-order/external-repurchase`：录入系统外历史客户复购。唯一命中无主客资客户时复用客户，无命中时创建客户主档；多客户命中、身份冲突或已有主客资时拒绝。
 - `GET /zsjos/sales-order/lead/{leadId}/customer-orders`：按客户聚合首购与复购订单。
+- `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：从“我负责的”客资详情读取同一客户的完整订单详情。服务端先校验客资读取权限，再校验订单与客资 `personId` 一致，不扩大通用订单详情权限。
 - `PUT /zsjos/sales-order/{id}/resubmit`：原地修改 `revision_required` 或 `terminated` 订单并创建新审批轮次，保留订单 ID 和订单号。若同一客资已存在另一张活动首购订单，或同一客户已存在另一张活动复购订单，则拒绝重提；复购创建与重提通过客户主档行锁串行化。
 - `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情；`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/姓名及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
 - `GET /zsjos/sales-order/my-page`：本人提交订单的轻量分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。
@@ -52,3 +53,5 @@
 `orderType` 由服务端判定并在创建后不可修改：首购为 `first_purchase`，复购为 `repurchase`。首购持久化 `personId + leadId + opportunityId`；系统客户和系统外复购都只持久化 `personId`，固定 `leadId=null`、`opportunityId=null`。复购不通知原客资提交人、不继承原兼职返现，生效时只新增客户的一张有效订单，不覆盖客资、商机或首次成交时间；同一客户最多一张活动复购订单。
 
 审批轮次保存最终非通过原因快照。补正重提创建新的空原因轮次，不覆盖上一轮审计记录。
+
+明确业务驳回（报名履约、财务或主管不确认）会为本轮提交人创建无截止的 `sales_order_revision` 业务任务，幂等键为 `sales-order-revision:{approvalRoundId}`，动作码为 `OPEN_SALES_ORDER_REVISION`。正式负责人可代为补正；新轮次启动成功后完成该任务。BPM 异常取消或异常终止不创建补正任务，历史订单不回填任务，既有驳回通知不因任务创建重复发送。

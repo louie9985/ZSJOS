@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.LoginUser;
@@ -27,6 +28,7 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
@@ -52,6 +54,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     public Long create(Long userId, String exportType, String filterJson) {
         ExportTypeProvider provider = requireProvider(exportType);
         if (!securityService.hasPermission(provider.getCreatePermission())) throw exception(EXPORT_PERMISSION_DENIED);
+        provider.checkCreator(userId);
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) {
             throw exception(EXPORT_PERMISSION_DENIED);
@@ -102,6 +105,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
         ExportTaskDO task = requireOwned(taskId, userId);
         ExportTypeProvider provider = requireProvider(task.getExportType());
         if (!securityService.hasPermission(provider.getCreatePermission())) throw exception(EXPORT_PERMISSION_DENIED);
+        provider.checkCreator(userId);
         if (!READY.equals(task.getStatus()) || task.getResultFileId() == null
                 || task.getExpiresAt() == null || !task.getExpiresAt().isAfter(LocalDateTime.now())) {
             throw exception(EXPORT_STATE_INVALID);
@@ -247,6 +251,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
             if (!securityService.hasPermission(provider.getCreatePermission())) {
                 throw new ExportPermissionRevokedException("导出权限已被撤销");
             }
+            checkCreatorScope(provider, task.getCreatorUserId());
             return provider.generate(task);
         } finally {
             SecurityContextHolder.setContext(previousContext);
@@ -256,6 +261,17 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     private static final class ExportPermissionRevokedException extends RuntimeException {
         private ExportPermissionRevokedException(String message) {
             super(message);
+        }
+    }
+
+    private void checkCreatorScope(ExportTypeProvider provider, Long userId) {
+        try {
+            provider.checkCreator(userId);
+        } catch (ServiceException error) {
+            if (Objects.equals(error.getCode(), EXPORT_PERMISSION_DENIED.getCode())) {
+                throw new ExportPermissionRevokedException("导出数据范围已被撤销");
+            }
+            throw error;
         }
     }
 

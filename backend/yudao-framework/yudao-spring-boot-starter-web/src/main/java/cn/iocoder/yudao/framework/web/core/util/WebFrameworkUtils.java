@@ -112,6 +112,10 @@ public class WebFrameworkUtils {
             return UserTypeEnum.ADMIN.getValue();
         }
         if (request.getServletPath().startsWith(properties.getAppApi().getPrefix())) {
+            String appPath = request.getServletPath().substring(properties.getAppApi().getPrefix().length());
+            if (properties.getAppApiAdminPrefixes().stream().anyMatch(appPath::startsWith)) {
+                return UserTypeEnum.ADMIN.getValue();
+            }
             return UserTypeEnum.MEMBER.getValue();
         }
         return null;

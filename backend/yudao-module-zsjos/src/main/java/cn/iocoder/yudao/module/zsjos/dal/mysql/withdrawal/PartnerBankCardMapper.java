@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.withdrawal.PartnerBankCardDO;
 import org.apache.ibatis.annotations.Mapper;
 import java.util.List;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 @Mapper
 public interface PartnerBankCardMapper extends BaseMapperX<PartnerBankCardDO> {
@@ -12,5 +13,17 @@ public interface PartnerBankCardMapper extends BaseMapperX<PartnerBankCardDO> {
         return selectList(new LambdaQueryWrapperX<PartnerBankCardDO>()
                 .eq(PartnerBankCardDO::getOwnerUserId, userId)
                 .orderByDesc(PartnerBankCardDO::getDefaultCard).orderByDesc(PartnerBankCardDO::getId));
+    }
+
+    default PartnerBankCardDO selectByIdAndOwner(Long id, Long userId) {
+        return selectOne(new LambdaQueryWrapperX<PartnerBankCardDO>()
+                .eq(PartnerBankCardDO::getId, id).eq(PartnerBankCardDO::getOwnerUserId, userId));
+    }
+
+    default void clearDefaultByOwner(Long userId) {
+        update(null, new LambdaUpdateWrapper<PartnerBankCardDO>()
+                .eq(PartnerBankCardDO::getOwnerUserId, userId)
+                .eq(PartnerBankCardDO::getDefaultCard, true)
+                .set(PartnerBankCardDO::getDefaultCard, false));
     }
 }

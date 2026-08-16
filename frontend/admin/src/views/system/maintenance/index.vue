@@ -21,10 +21,14 @@
           <el-switch
             :model-value="state"
             :loading="updating"
+            :disabled="!canUpdate"
             active-text="开启"
             inactive-text="关闭"
             @change="changeState"
           />
+          <span v-if="!canUpdate" class="ml-12px text-[var(--el-text-color-secondary)]">
+            仅超级管理员可切换维护模式
+          </span>
         </el-descriptions-item>
       </el-descriptions>
     </div>
@@ -33,10 +37,13 @@
 
 <script lang="ts" setup>
 import * as MaintenanceApi from '@/api/system/maintenance'
+import { useUserStore } from '@/store/modules/user'
 
 defineOptions({ name: 'SystemMaintenance' })
 
 const message = useMessage()
+const userStore = useUserStore()
+const canUpdate = computed(() => userStore.getRoles.includes('super_admin'))
 const loading = ref(false)
 const updating = ref(false)
 const state = ref<boolean>()
@@ -56,6 +63,7 @@ const load = async () => {
 }
 
 const changeState = async (enabled: boolean | string | number) => {
+  if (!canUpdate.value) return
   const next = Boolean(enabled)
   try {
     await message.confirm(

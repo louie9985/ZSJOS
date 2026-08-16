@@ -20,11 +20,18 @@ const isExternalPath = (path: string) => /^https?:\/\//i.test(path)
 
 export function filterRenderableMenus(menus: WorkbenchMenu[], renderablePaths: ReadonlySet<string>): WorkbenchMenu[] {
   return menus.flatMap(menu => {
-    if (menu.hidden) return []
     const children = filterRenderableMenus(menu.children, renderablePaths)
     if (children.length === 0 && !renderablePaths.has(menu.path)) return []
     return [{ ...menu, children }]
   })
+}
+
+export function findMenuByPath(menus: WorkbenchMenu[], path: string): WorkbenchMenu | undefined {
+  for (const menu of menus) {
+    if (menu.path === path) return menu
+    const child = findMenuByPath(menu.children, path)
+    if (child) return child
+  }
 }
 
 function collectVisibleLeaves(menus: WorkbenchMenu[]): SecondaryNavigationItem[] {
@@ -76,7 +83,8 @@ export function getInitialTarget(items: PrimaryNavigationItem[]) {
   }
 }
 
-export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path: string) {
-  if (path === '/' || path === APP_ROUTES.USER_PROFILE || findPageByPath(items, path)) return
+export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path: string, authorizedMenus?: WorkbenchMenu[]) {
+  if (path === '/' || path === APP_ROUTES.USER_PROFILE || findPageByPath(items, path)
+    || (authorizedMenus && findMenuByPath(authorizedMenus, path))) return
   return getInitialTarget(items)
 }

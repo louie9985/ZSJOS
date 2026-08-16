@@ -85,8 +85,8 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     void getProcessNodeStatusesKeepsApprovedDecisionWhenSiblingWasCancelledLater() {
         HistoricTaskInstance approved = historicTask("registrationReview", 2, 1000L, "233");
         HistoricTaskInstance cancelled = historicTask("registrationReview", 4, 2000L);
-        when(bpmTaskService.getRunningTaskListByProcessInstanceId("process-1", null, null)).thenReturn(List.of());
-        when(bpmTaskService.getTaskListByProcessInstanceId("process-1", true)).thenReturn(List.of(approved, cancelled));
+        when(bpmTaskService.getTasksByProcessInstanceIds(List.of("process-1"))).thenReturn(List.of());
+        when(bpmTaskService.getTaskListByProcessInstanceIds(Set.of("process-1"))).thenReturn(List.of(approved, cancelled));
         AdminUserRespDTO reviewer = new AdminUserRespDTO();
         reviewer.setId(233L); reviewer.setNickname("审核员甲");
         when(adminUserApi.getUserMap(Set.of(233L))).thenReturn(Map.of(233L, reviewer));
@@ -103,10 +103,11 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     @Test
     void getProcessNodeStatusesReportsRunningNodeAsPending() {
         Task running = mock(Task.class);
+        when(running.getProcessInstanceId()).thenReturn("process-1");
         when(running.getTaskDefinitionKey()).thenReturn("financeReview");
         when(running.getCreateTime()).thenReturn(new Date(1000L));
-        when(bpmTaskService.getRunningTaskListByProcessInstanceId("process-1", null, null)).thenReturn(List.of(running));
-        when(bpmTaskService.getTaskListByProcessInstanceId("process-1", true)).thenReturn(List.of());
+        when(bpmTaskService.getTasksByProcessInstanceIds(List.of("process-1"))).thenReturn(List.of(running));
+        when(bpmTaskService.getTaskListByProcessInstanceIds(Set.of("process-1"))).thenReturn(List.of());
 
         List<BpmProcessNodeStatusRespDTO> result = processTaskApi.getProcessNodeStatuses(
                 "process-1", Set.of("registrationReview", "financeReview"));
@@ -122,9 +123,9 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
         HistoricTaskInstance historicSupervisorTask = mock(HistoricTaskInstance.class);
         when(historicSupervisorTask.getTaskDefinitionKey()).thenReturn("financeReview");
         when(historicSupervisorTask.getParentTaskId()).thenReturn("historic-parent");
-        when(bpmTaskService.getRunningTaskListByProcessInstanceId("process-1", null, null))
+        when(bpmTaskService.getTasksByProcessInstanceIds(List.of("process-1")))
                 .thenReturn(List.of(supervisorTask));
-        when(bpmTaskService.getTaskListByProcessInstanceId("process-1", true))
+        when(bpmTaskService.getTaskListByProcessInstanceIds(Set.of("process-1")))
                 .thenReturn(List.of(historicSupervisorTask));
 
         List<BpmProcessNodeStatusRespDTO> result = processTaskApi.getProcessNodeStatuses(
@@ -149,12 +150,32 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
                         && "需要主管确认".equals(value.getReason())));
     }
 
+    @Test
+    void getProcessNodeStatusesGroupsMultipleInstancesInOneBatch() {
+        Task first = mock(Task.class); when(first.getProcessInstanceId()).thenReturn("process-1");
+        when(first.getTaskDefinitionKey()).thenReturn("registrationReview");
+        Task second = mock(Task.class); when(second.getProcessInstanceId()).thenReturn("process-2");
+        when(second.getTaskDefinitionKey()).thenReturn("financeReview");
+        when(bpmTaskService.getTasksByProcessInstanceIds(org.mockito.ArgumentMatchers.anyList()))
+                .thenReturn(List.of(first, second));
+        when(bpmTaskService.getTaskListByProcessInstanceIds(Set.of("process-1", "process-2"))).thenReturn(List.of());
+
+        Map<String, List<BpmProcessNodeStatusRespDTO>> result = processTaskApi.getProcessNodeStatuses(
+                Set.of("process-1", "process-2"), Set.of("registrationReview", "financeReview"));
+
+        assertEquals("registrationReview", result.get("process-1").getFirst().getTaskDefinitionKey());
+        assertEquals("financeReview", result.get("process-2").getFirst().getTaskDefinitionKey());
+        verify(bpmTaskService).getTasksByProcessInstanceIds(org.mockito.ArgumentMatchers.anyList());
+        verify(bpmTaskService).getTaskListByProcessInstanceIds(Set.of("process-1", "process-2"));
+    }
+
     private HistoricTaskInstance historicTask(String taskKey, int status, long endTime) {
         return historicTask(taskKey, status, endTime, null);
     }
 
     private HistoricTaskInstance historicTask(String taskKey, int status, long endTime, String assignee) {
         HistoricTaskInstance task = mock(HistoricTaskInstance.class);
+        when(task.getProcessInstanceId()).thenReturn("process-1");
         when(task.getTaskDefinitionKey()).thenReturn(taskKey);
         org.mockito.Mockito.lenient().when(task.getAssignee()).thenReturn(assignee);
         org.mockito.Mockito.lenient().when(task.getCreateTime()).thenReturn(new Date(500L));

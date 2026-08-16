@@ -17,24 +17,24 @@
     </div>
 
     <div v-for="(condition, index) in modelValue.conditions" :key="`${condition.fieldKey}-${index}`" class="filter-condition">
-      <el-select :model-value="condition.fieldKey" filterable @change="(value) => setField(index, value)">
+      <el-select :model-value="condition.fieldKey" filterable fit-input-width popper-class="advanced-filter-select-popper" @change="(value) => setField(index, value)">
         <el-option v-for="field in fields" :key="field.fieldKey" :label="`${field.group} · ${field.label}`" :value="field.fieldKey" />
       </el-select>
-      <el-select :model-value="condition.operator" @change="(value) => setOperator(index, value)">
+      <el-select :model-value="condition.operator" fit-input-width popper-class="advanced-filter-select-popper" @change="(value) => setOperator(index, value)">
         <el-option v-for="operator in fieldOf(condition)?.operators || []" :key="operator" :label="operatorLabels[operator] || operator" :value="operator" />
       </el-select>
       <div class="filter-condition__value">
         <template v-if="!isEmptyOperator(condition.operator)">
           <template v-if="condition.operator === 'between'">
-            <el-date-picker v-if="fieldOf(condition)?.valueType === 'date'" :model-value="[condition.valueFrom, condition.valueTo]" type="datetimerange" value-format="x" start-placeholder="开始时间" end-placeholder="结束时间" @update:model-value="(value) => setRange(index, value)" />
+            <el-date-picker v-if="fieldOf(condition)?.valueType === 'date'" :model-value="dateRangeValue(condition.valueFrom, condition.valueTo)" type="datetimerange" value-format="x" start-placeholder="开始时间" end-placeholder="结束时间" @update:model-value="(value) => setRange(index, value)" />
             <div v-else class="number-range"><el-input-number :model-value="condition.valueFrom as number" @update:model-value="(value) => setValue(index, 'valueFrom', value)" /><span>至</span><el-input-number :model-value="condition.valueTo as number" @update:model-value="(value) => setValue(index, 'valueTo', value)" /></div>
           </template>
-          <el-select v-else-if="fieldOf(condition)?.valueType === 'select'" :model-value="selectValue(condition)" multiple filterable :loading="fieldOf(condition)?.optionsLoading" @change="(value) => setValue(index, 'value', value, true)">
+          <el-select v-else-if="fieldOf(condition)?.valueType === 'select'" :model-value="selectValue(condition)" multiple filterable fit-input-width popper-class="advanced-filter-select-popper" :loading="fieldOf(condition)?.optionsLoading" @change="(value) => setValue(index, 'value', value, true)">
             <el-option v-for="option in fieldOf(condition)?.options || []" :key="String(option.value)" :label="option.label" :value="option.value" />
             <template #empty><div class="filter-empty"><template v-if="fieldOf(condition)?.optionsError">选项加载失败 <el-button link type="primary" @click="emit('retryOptions', condition.fieldKey)">重试</el-button></template><template v-else>暂无可选项</template></div></template>
           </el-select>
           <el-input-number v-else-if="fieldOf(condition)?.valueType === 'number'" :model-value="numberValue(condition.value)" @update:model-value="(value) => setValue(index, 'value', value)" />
-          <el-date-picker v-else-if="fieldOf(condition)?.valueType === 'date'" :model-value="condition.value" type="datetime" value-format="x" placeholder="选择时间" @update:model-value="(value) => setValue(index, 'value', value)" />
+          <el-date-picker v-else-if="fieldOf(condition)?.valueType === 'date'" :model-value="dateInputValue(condition.value)" type="datetime" value-format="x" placeholder="选择时间" @update:model-value="(value) => setValue(index, 'value', value)" />
           <el-input v-else :model-value="textValue(condition.value)" clearable @update:model-value="(value) => setValue(index, 'value', value)" />
         </template>
       </div>
@@ -57,6 +57,8 @@ const isEmptyOperator = (operator: string) => operator === 'is_empty' || operato
 const selectValue = (condition: AdvancedFilterCondition) => Array.isArray(condition.value) ? condition.value as Array<string | number> : []
 const numberValue = (value: unknown) => typeof value === 'number' ? value : undefined
 const textValue = (value: unknown) => typeof value === 'string' ? value : ''
+const dateInputValue = (value: unknown): Date | undefined => value instanceof Date ? value : typeof value === 'string' || typeof value === 'number' ? new Date(Number(value)) : undefined
+const dateRangeValue = (from: unknown, to: unknown): [Date, Date] | undefined => { const start = dateInputValue(from), end = dateInputValue(to); return start && end ? [start, end] : undefined }
 const update = (next: AdvancedFilterGroup, immediate = false) => emit('update:modelValue', next, immediate)
 const setLogic = (logic: 'AND' | 'OR') => update({ ...props.modelValue, logic }, true)
 const addCondition = () => { const field = props.fields[0]; if (field && props.total < 20) update({ ...props.modelValue, conditions: [...props.modelValue.conditions, { fieldKey: field.fieldKey, operator: field.operators[0] }] }, true) }
@@ -71,5 +73,5 @@ const removeGroup = (index: number) => update({ ...props.modelValue, groups: pro
 </script>
 
 <style scoped>
-.filter-group{display:flex;flex-direction:column;gap:12px;padding:14px;border:1px solid var(--el-border-color-light);border-radius:8px;background:var(--el-fill-color-extra-light)}.filter-group.depth-1{margin-top:4px;background:var(--el-fill-color-light)}.filter-group__head,.filter-group__actions,.filter-condition,.number-range{display:flex;align-items:center;gap:8px}.filter-group__head{justify-content:space-between}.filter-condition> .el-select{width:170px}.filter-condition__value{min-width:0;flex:1}.filter-condition__value :deep(.el-select),.filter-condition__value :deep(.el-date-editor),.filter-condition__value :deep(.el-input-number){width:100%}.number-range span{flex:none;color:var(--el-text-color-secondary)}.filter-empty{padding:8px;text-align:center;color:var(--el-text-color-secondary)}@media(max-width:768px){.filter-group__head,.filter-condition{align-items:stretch;flex-direction:column}.filter-group__actions{flex-wrap:wrap}.filter-condition> .el-select{width:100%}.filter-condition>button{align-self:flex-end}.filter-group.depth-1{margin-left:0}}
+.filter-group{display:flex;flex-direction:column;gap:12px;padding:14px;border:1px solid var(--el-border-color-light);border-radius:8px;background:var(--el-fill-color-extra-light)}.filter-group.depth-1{margin-top:4px;background:var(--el-fill-color-light)}.filter-group__head,.filter-group__actions,.filter-condition,.number-range{display:flex;align-items:center;gap:8px}.filter-group__head{justify-content:space-between}.filter-condition{min-width:0}.filter-condition> .el-select{flex:0 0 170px;width:170px;min-width:170px}.filter-condition__value{min-width:130px;flex:1 1 auto}.filter-condition__value :deep(.el-select),.filter-condition__value :deep(.el-date-editor),.filter-condition__value :deep(.el-input-number){width:100%}.filter-condition__value :deep(.el-select__selected-item),.filter-condition> .el-select :deep(.el-select__selected-item){overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.number-range span{flex:none;color:var(--el-text-color-secondary)}.filter-empty{padding:8px;text-align:center;color:var(--el-text-color-secondary)}:global(.advanced-filter-select-popper){min-width:170px!important;max-width:min(560px,calc(100vw - 24px))}:global(.advanced-filter-select-popper .el-select-dropdown__item){height:auto;min-height:34px;white-space:normal;overflow-wrap:anywhere;line-height:20px;padding-top:7px;padding-bottom:7px}@media(max-width:768px){.filter-group__head,.filter-condition{align-items:stretch;flex-direction:column}.filter-group__actions{flex-wrap:wrap}.filter-condition> .el-select,.filter-condition__value{width:100%;min-width:0}.filter-condition>button{align-self:flex-end}.filter-group.depth-1{margin-left:0}}
 </style>

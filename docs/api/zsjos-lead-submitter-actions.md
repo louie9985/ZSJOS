@@ -2,16 +2,16 @@
 
 ## Submission channels
 
-- `POST /admin-api/zsjos/lead/create` requires `zsjos:lead:submit` and accepts only a server-resolved new-media employee, new-media department manager, or enabled ordinary partner.
+- The independent partner frontend uses `/app-api/zsjos/**`. `POST /app-api/zsjos/lead/create` requires `zsjos:lead:submit` and accepts an enabled ordinary partner; admin/workbench calls remain under `/admin-api/zsjos/**`.
 - Partners may use automatic dispatch only. New-media employees may specify only configured assignment candidates. New-media managers may specify any enabled eligible sales user.
 - `POST /admin-api/zsjos/lead/self-sourced/create` requires `zsjos:lead:self-sourced:create`. The server forces direct self-ownership and never places the Lead in automatic dispatch or the claim pool.
 - Duplicate review snapshots the original source type and partner subject. A weak-match review therefore preserves self-sourced direct ownership and historical submitter rights when it later creates the Lead.
 
 ## Submitter actions
 
-- `PUT /admin-api/zsjos/lead/{id}/submitter-supplement` updates region, category, intended products, and remark only. It cannot change name, mobile, or WeChat.
-- `POST /admin-api/zsjos/lead/{id}/urge` records at most one urge per Lead, submitter, and Beijing date and notifies the current owner.
-- `POST /admin-api/zsjos/lead-complaint/lead/{leadId}` creates an independent complaint with optional validated image evidence.
+- `PUT /app-api/zsjos/lead/{id}/submitter-supplement` updates region, category, intended products, and remark only. It cannot change name, mobile, or WeChat.
+- `POST /app-api/zsjos/lead/{id}/urge` records at most one urge per Lead, submitter, and Beijing date and notifies the current owner.
+- `POST /app-api/zsjos/lead-complaint/lead/{leadId}` creates an independent complaint with optional validated image evidence; `GET /app-api/zsjos/lead-complaint/my-page` returns the current partner's complaint history.
 - Historical rights use the immutable `sourceUserId`. The system account must remain enabled; partner submissions additionally require the same partner subject to remain enabled.
 - Invalid, closed, and won Leads reject supplement, urge, and complaint commands.
 

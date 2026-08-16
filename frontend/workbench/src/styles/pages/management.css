@@ -1,0 +1,88 @@
+.management-page {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-gap);
+  padding: var(--crm-page-pad);
+}
+
+.management-page .page-heading {
+  flex: none;
+}
+
+.management-page .page-heading > div:first-child {
+  min-width: 0;
+}
+
+.management-page .page-heading .ant-typography {
+  margin-bottom: 0;
+}
+
+.management-panel {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow);
+}
+
+.management-actions,
+.management-filters {
+  margin-block: var(--crm-sp-2);
+}
+
+.management-filters .ant-input,
+.management-filters .ant-select,
+.management-filters .ant-input-number {
+  width: 220px;
+}
+
+.management-wide-control {
+  width: min(360px, 100%);
+}
+
+.management-form {
+  width: min(720px, 100%);
+}
+
+.management-loading {
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+}
+
+.management-maintenance {
+  width: min(760px, 100%);
+}
+
+.management-relation-form {
+  margin-top: var(--crm-sp-4);
+  padding: var(--crm-card-pad);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.impersonation-global-alert {
+  flex: none;
+  border-radius: 0;
+}
+
+@media (max-width: 768px) {
+  .management-page .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .management-filters,
+  .management-filters .ant-space-item,
+  .management-filters .ant-input,
+  .management-filters .ant-select,
+  .management-filters .ant-input-number {
+    width: 100%;
+  }
+}

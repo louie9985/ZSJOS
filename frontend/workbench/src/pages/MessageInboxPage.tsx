@@ -7,7 +7,6 @@ import {
   Drawer,
   Empty,
   Grid,
-  Pagination,
   Skeleton,
   Space,
   Tag,
@@ -21,12 +20,12 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, AuthenticationError, type NotifyMessage } from '../services/api'
-import { applyReadStatus, buildNotifyMessagePageParams, type NotifyMessageView } from '../services/notifyMessage'
+import { applyReadStatus, buildNotifyMessageCursorParams, type NotifyMessageView } from '../services/notifyMessage'
 import { formatTimestamp } from '../services/time'
 import { useNotifyMessages } from '../components/NotifyMessageProvider'
 import { useRealtime, useRealtimeEvent } from '../components/RealtimeProvider'
 
-const DEFAULT_PAGE_SIZE = 20
+const CURSOR_LIMIT = 20
 
 const senderName = (item: NotifyMessage) => item.templateNickname?.trim() || '系统消息'
 
@@ -68,24 +67,27 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const requestSequence = useRef(0)
   const [messages, setMessages] = useState<NotifyMessage[]>([])
   const [selected, setSelected] = useState<NotifyMessage>()
-  const [pageNo, setPageNo] = useState(1)
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [total, setTotal] = useState(0)
+  const [cursor, setCursor] = useState<string>()
+  const [hasMore, setHasMore] = useState(true)
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
   const [unauthorized, setUnauthorized] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [markingAll, setMarkingAll] = useState(false)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (append = false) => {
     const requestId = ++requestSequence.current
-    setLoading(true)
+    if (append) setLoadingMore(true)
+    else { setLoading(true); setCursor(undefined); setHasMore(true) }
     try {
-      const data = await api.myNotifyMessagePage(buildNotifyMessagePageParams(view, pageNo, pageSize))
+      const data = await api.myNotifyMessageCursor(buildNotifyMessageCursorParams(view, append ? cursor : undefined, CURSOR_LIMIT))
       if (requestId !== requestSequence.current) return
-      setMessages(data.list)
-      setTotal(data.total)
-      setSelected(current => data.list.find(item => item.id === current?.id) ?? current ?? data.list[0])
+      setMessages(current => append ? [...current, ...data.list.filter(item => !current.some(existing => existing.id === item.id))] : data.list)
+      setCursor(data.nextCursor)
+      setHasMore(data.hasMore)
+      setSelected(current => append ? current : data.list.find(item => item.id === current?.id) ?? current ?? data.list[0])
       setError('')
       setUnauthorized(false)
     } catch (loadError) {
@@ -93,17 +95,26 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       setUnauthorized(loadError instanceof AuthenticationError)
       setError(loadError instanceof Error ? loadError.message : '消息加载失败')
     } finally {
-      if (requestId === requestSequence.current) setLoading(false)
+      if (requestId === requestSequence.current) { setLoading(false); setLoadingMore(false) }
     }
-  }, [pageNo, pageSize, view])
+  }, [cursor, view])
 
-  useEffect(() => { void load() }, [load])
+  useEffect(() => { void load() }, [view])
+  useEffect(() => {
+    const node = loadMoreRef.current
+    if (!node || !hasMore || loading || loadingMore) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0]?.isIntersecting) void load(true)
+    }, { root: node.parentElement, rootMargin: '160px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, load, loading, loadingMore])
   useEffect(() => {
     const messageId = Number(searchParams.get('messageId'))
     if (!Number.isFinite(messageId) || messageId <= 0) return
     void api.myNotifyMessage(messageId).then(item => {
       setSelected(item)
-      if (!screens.md) setDrawerOpen(true)
+      if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
       void markRead(item)
     }).catch(() => toast.warning('消息不存在或当前账号无权查看'))
   // The URL-selected message is independent of the current page result.
@@ -123,8 +134,6 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       setSelected(current => current?.id === item.id
         ? { ...current, readStatus: true, readTime }
         : current)
-      setTotal(current => view === 'unread' ? Math.max(0, current - 1) : current)
-      if (view === 'unread' && messages.length === 1 && pageNo > 1) setPageNo(pageNo - 1)
       await refreshUnreadCount()
     } catch (markError) {
       toast.error(markError instanceof Error ? markError.message : '标记已读失败')
@@ -133,7 +142,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
 
   const selectMessage = (item: NotifyMessage) => {
     setSelected(item)
-    if (!screens.md) setDrawerOpen(true)
+    if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
     void markRead(item)
   }
 
@@ -144,7 +153,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       const readTime = Date.now()
       setMessages(current => applyReadStatus(current, current.map(item => item.id), view, readTime))
       setSelected(current => current ? { ...current, readStatus: true, readTime } : current)
-      if (view === 'unread') setTotal(0)
+      if (view === 'unread') { setCursor(undefined); setHasMore(false) }
       await refreshUnreadCount()
       toast.success('全部消息已标记为已读')
     } catch (markError) {
@@ -152,12 +161,6 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
     } finally {
       setMarkingAll(false)
     }
-  }
-
-  const changePage = (page: number, size: number) => {
-    setSelected(undefined)
-    setPageNo(page)
-    setPageSize(size)
   }
 
   const emptyText = view === 'unread' ? '暂无未读消息' : '暂无消息'
@@ -215,19 +218,10 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
               </div>
             </button>
           }) : !error && <Empty description={emptyText}/>} 
+          {!loading && messages.length > 0 && <div ref={loadMoreRef} className="message-inbox-load-more">
+            {loadingMore ? '加载中…' : hasMore ? '继续下滑加载' : '已加载全部消息'}
+          </div>}
         </div>
-        {total > 0 && <div className="message-inbox-pagination">
-          <Pagination
-            current={pageNo}
-            pageSize={pageSize}
-            total={total}
-            size="small"
-            showSizeChanger
-            showLessItems
-            pageSizeOptions={[10, 20, 50]}
-            onChange={changePage}
-          />
-        </div>}
       </aside>
       <main className="message-inbox-detail-pane"><MessageDetail message={selected}/></main>
     </div>

@@ -38,6 +38,9 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
     if (task.actionCode === 'OPEN_LEAD_FOLLOW_UP') {
       navigate(APP_ROUTES.OWNED_LEADS, { state: { leadId: task.bizId, openFollowUp: true } }); return
     }
+    if (task.actionCode === 'OPEN_SALES_ORDER_REVISION') {
+      navigate(`${APP_ROUTES.MY_SALES_ORDERS}?orderId=${task.bizId}`); return
+    }
     if (task.actionCode === 'OPEN_WORK_PLAN_ITEM' || task.actionCode === 'REVIEW_WORK_PLAN_ITEM') {
       navigate(`${APP_ROUTES.WORK_PLANS}?itemId=${task.bizId}`)
     }

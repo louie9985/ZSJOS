@@ -4,6 +4,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
@@ -45,11 +46,14 @@ import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.dao.DuplicateKeyException;
+import tools.jackson.core.JacksonException;
 
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -94,6 +98,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private SalesOrderSupervisorConfirmationService supervisorConfirmationService;
     @Resource private SalesOrderNumberService orderNumberService;
     @Resource private CashbackService cashbackService;
+    @Resource private BusinessTaskCommandService businessTaskCommandService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -237,6 +242,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderApprovalRoundDO latest = roundMapper.selectLatestByOrderId(orderId);
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated,
                 latest == null ? 1 : latest.getRoundNo() + 1, now);
+        if (latest != null) {
+            businessTaskCommandService.completeByKey(TASK_REVISION_KEY_PREFIX + latest.getId(), now);
+        }
         if (lead != null) agingPoolService.markDealPending(lead.getId(), userId, now);
     }
 
@@ -265,6 +273,47 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
         return new PageResult<>(page.getList().stream()
                 .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList(), page.getTotal());
+    }
+
+    @Override
+    public CursorPageResult<SalesOrderListItemRespVO> getMyCursorPage(SalesOrderMyCursorReqVO reqVO, Long userId) {
+        List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
+        String keyword = StrUtil.blankToDefault(reqVO.getKeyword(), null);
+        SalesOrderCursorCodec.Cursor cursor = SalesOrderCursorCodec.decode(reqVO.getCursor(), userId, reqVO.getStatus(), keyword);
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        List<SalesOrderDO> rows = orderMapper.selectMyCursor(userId, reqVO.getStatus(), keyword, matchedOrderIds,
+                cursor == null ? null : cursor.time(), cursor == null ? null : cursor.id(), limit + 1);
+        boolean hasMore = rows.size() > limit;
+        List<SalesOrderDO> list = hasMore ? rows.subList(0, limit) : rows;
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(list);
+        List<SalesOrderListItemRespVO> result = list.stream()
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList();
+        String next = hasMore && !list.isEmpty()
+                ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getSubmittedAt(), list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
+        return new CursorPageResult<>(result, next, hasMore);
+    }
+
+    @Override
+    public PageResult<FinanceOrderExportRowRespVO> getFinanceExportPage(FinanceOrderExportReqVO reqVO, Long userId) {
+        if (!permissionService.isFinanceCenterMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
+        PageResult<SalesOrderDO> page = orderMapper.selectFinanceExportPage(reqVO,
+                advancedFilterService.buildOrderQuery(reqVO.getAdvancedFilter()));
+        if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
+        Set<String> processIds = rounds.values().stream().map(SalesOrderApprovalRoundDO::getProcessInstanceId)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        Map<String, List<BpmProcessNodeStatusRespDTO>> statuses = processTaskApi.getProcessNodeStatuses(
+                processIds, Set.of(TASK_REGISTRATION, TASK_FINANCE));
+        List<Long> orderIds = page.getList().stream().map(SalesOrderDO::getId).toList();
+        Map<Long, List<SalesOrderItemDO>> items = itemMapper.selectListByOrderIds(orderIds).stream()
+                .collect(java.util.stream.Collectors.groupingBy(SalesOrderItemDO::getOrderId));
+        Set<Long> userIds = page.getList().stream().flatMap(order -> java.util.stream.Stream.of(
+                        order.getFormalSalesUserId(), order.getSubmitterUserId())).filter(Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users = adminUserApi.getUserMap(userIds);
+        return new PageResult<>(page.getList().stream().map(order -> convertFinanceExportRow(order,
+                rounds.get(order.getCurrentApprovalRoundId()), items.getOrDefault(order.getId(), List.of()), statuses, users))
+                .toList(), page.getTotal());
     }
 
     @Override
@@ -317,6 +366,50 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         long total = countApprovalTasks(userId, filter, processIds);
         return new PageResult<>(result, total);
     }
+
+    @Override
+    public CursorPageResult<SalesOrderListItemRespVO> getInboxCursor(SalesOrderPageReqVO reqVO, Long userId) {
+        ApprovalCursor cursor = decodeApprovalCursor(reqVO.getCursor(), reqVO, userId);
+        reqVO.setCursorTaskTime(cursor == null ? null : cursor.time());
+        reqVO.setCursorTaskId(cursor == null ? null : cursor.id());
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        reqVO.setPageNo(1); reqVO.setPageSize(limit + 1);
+        PageResult<SalesOrderListItemRespVO> page = getInboxPage(reqVO, userId);
+        boolean more = page.getList().size() > limit;
+        List<SalesOrderListItemRespVO> list = more ? page.getList().subList(0, limit) : page.getList();
+        SalesOrderListItemRespVO last = list.isEmpty() ? null : list.get(list.size() - 1);
+        return new CursorPageResult<>(list, more ? encodeApprovalCursor(last, reqVO, userId) : null, more);
+    }
+
+    private String encodeApprovalCursor(SalesOrderListItemRespVO item, SalesOrderPageReqVO reqVO, Long userId) {
+        LocalDateTime time = isDoneApproval(reqVO) ? item.getTaskEndTime() : item.getTaskCreateTime();
+        String raw = time + "|" + item.getTaskId() + "|" + userId + "|" + approvalCursorContext(reqVO);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private ApprovalCursor decodeApprovalCursor(String value, SalesOrderPageReqVO reqVO, Long userId) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            String[] parts = new String(Base64.getUrlDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8).split("\\|", 4);
+            if (parts.length != 4 || !parts[2].equals(String.valueOf(userId)) || !parts[3].equals(approvalCursorContext(reqVO))) {
+                throw new IllegalArgumentException("cursor context mismatch");
+            }
+            return new ApprovalCursor(LocalDateTime.parse(parts[0]), parts[1]);
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid approval cursor", ex);
+        }
+    }
+
+    private String approvalCursorContext(SalesOrderPageReqVO reqVO) {
+        return Integer.toHexString(Objects.hash(reqVO.getCenter(), reqVO.getHandled(), reqVO.getGroupKey(),
+                reqVO.getOptionKey(), reqVO.getKeyword(), reqVO.getAdvancedFilter()));
+    }
+
+    private boolean isDoneApproval(SalesOrderPageReqVO reqVO) {
+        return Boolean.TRUE.equals(reqVO.getHandled()) || "done".equals(reqVO.getGroupKey());
+    }
+
+    private record ApprovalCursor(LocalDateTime time, String id) {}
 
     @Override
     public SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId) {
@@ -378,14 +471,25 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<String> handledValues = handled.isEmpty() ? List.of("todo", "done") : new ArrayList<>(handled);
         List<String> taskValues = taskKeys.isEmpty() ? Collections.singletonList(null) : new ArrayList<>(taskKeys);
         List<BpmTaskRespDTO> tasks = new ArrayList<>();
-        int requiredOrdinaryTasks = reqVO.getPageNo() * reqVO.getPageSize();
+        int requiredOrdinaryTasks = reqVO.getCursorTaskTime() == null
+                ? reqVO.getPageNo() * reqVO.getPageSize() : Integer.MAX_VALUE;
         for (String handledValue : handledValues) {
             for (String taskKey : taskValues) {
                 tasks.addAll(loadOrdinaryApprovalTasks(userId, handledValue, taskKey, processIds,
-                        requiredOrdinaryTasks));
+                        requiredOrdinaryTasks == Integer.MAX_VALUE ? null : requiredOrdinaryTasks));
             }
         }
-        tasks.sort(Comparator.comparing(BpmTaskRespDTO::getCreateTime, Comparator.nullsLast(Comparator.reverseOrder())));
+        boolean done = isDoneApproval(reqVO);
+        java.util.function.Function<BpmTaskRespDTO, LocalDateTime> taskTime = task -> done ? task.getEndTime() : task.getCreateTime();
+        tasks.sort(Comparator.comparing(taskTime, Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparing(BpmTaskRespDTO::getId, Comparator.nullsLast(Comparator.reverseOrder())));
+        if (reqVO.getCursorTaskTime() != null && reqVO.getCursorTaskId() != null) {
+            tasks = tasks.stream().filter(task -> {
+                LocalDateTime time = taskTime.apply(task);
+                return time != null && (time.isBefore(reqVO.getCursorTaskTime())
+                        || time.equals(reqVO.getCursorTaskTime()) && task.getId().compareTo(reqVO.getCursorTaskId()) < 0);
+            }).toList();
+        }
         int from = Math.min((reqVO.getPageNo() - 1) * reqVO.getPageSize(), tasks.size());
         int to = Math.min(from + reqVO.getPageSize(), tasks.size());
         return tasks.subList(from, to);
@@ -549,6 +653,19 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "read")
+    public SalesOrderRespVO getCustomerOrder(Long leadId, Long orderId, Long userId) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        SalesOrderDO order = orderMapper.selectById(orderId);
+        if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
+        if (!Objects.equals(lead.getPersonId(), order.getPersonId())) {
+            throw exception(SALES_ORDER_PERMISSION_DENIED);
+        }
+        return convert(order, roundMapper.selectLatestByOrderId(orderId), null, userId);
+    }
+
+    @Override
     public LeadAttachmentUploadRespVO uploadVoucher(Long userId, MultipartFile file) throws IOException {
         if (file.isEmpty() || file.getSize() > MAX_VOUCHER_SIZE) throw exception(SALES_ORDER_ATTACHMENT_INVALID);
         byte[] content = file.getBytes();
@@ -602,6 +719,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (order.getLeadId() != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) agingPoolService.handleOrderRejected(order.getLeadId(), now);
         }
         round.setCompletedAt(now); roundMapper.updateById(round); orderMapper.updateById(order);
+        if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
+            createRevisionTask(order, round, reason);
+        }
         LeadDO notificationLead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         Long leadSubmitterUserId = notificationLead == null ? null : notificationLead.getSourceUserId();
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
@@ -740,6 +860,41 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 : orderMapper.selectOtherActiveByPersonId(personId, orderId, ACTIVE_ORDER_STATUSES);
         if (active != null) {
             throw exception(SALES_ORDER_ACTIVE_DUPLICATE);
+        }
+    }
+
+    private void createRevisionTask(SalesOrderDO order, SalesOrderApprovalRoundDO round, String reason) {
+        if (round.getSubmittedByUserId() == null) return;
+        String center = resolveRejectedCenter(round);
+        String centerLabel = TASK_REGISTRATION.equals(center) ? "报名履约中心"
+                : TASK_FINANCE.equals(center) ? "财务中心" : "成交审批";
+        String normalizedReason = StrUtil.blankToDefault(StrUtil.trim(reason), "未填写驳回原因");
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("orderId", order.getId());
+        payload.put("approvalRoundId", round.getId());
+        payload.put("orderNo", order.getOrderNo());
+        payload.put("studentName", order.getStudentName());
+        payload.put("rejectedCenter", center);
+        payload.put("decisionReason", normalizedReason);
+        businessTaskCommandService.create(new BusinessTaskCreateCommand(
+                TASK_TYPE_REVISION, BIZ_TYPE_SALES_ORDER, order.getId(), round.getSubmittedByUserId(),
+                "补正成交订单：" + order.getOrderNo(),
+                "学员：" + StrUtil.blankToDefault(order.getStudentName(), "-") + "；" + centerLabel
+                        + "驳回：" + normalizedReason,
+                TASK_ACTION_REVISION, null, null, JsonUtils.toJsonString(payload),
+                TASK_REVISION_KEY_PREFIX + round.getId()));
+    }
+
+    private String resolveRejectedCenter(SalesOrderApprovalRoundDO round) {
+        SalesOrderSupervisorConfirmationDO rejectedConfirmation = supervisorConfirmationService.getByRound(round.getId())
+                .stream().filter(item -> SUPERVISOR_REJECTED.equals(item.getStatus())).findFirst().orElse(null);
+        if (rejectedConfirmation != null) return rejectedConfirmation.getTaskDefinitionKey();
+        try {
+            return processTaskApi.getProcessNodeStatuses(round.getProcessInstanceId(), Set.of(TASK_REGISTRATION, TASK_FINANCE))
+                    .stream().filter(item -> "rejected".equals(item.getStatus()))
+                    .map(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey).findFirst().orElse(null);
+        } catch (RuntimeException ignored) {
+            return null;
         }
     }
 
@@ -999,6 +1154,64 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             }
         }
         return result;
+    }
+
+    private FinanceOrderExportRowRespVO convertFinanceExportRow(SalesOrderDO order, SalesOrderApprovalRoundDO round,
+            List<SalesOrderItemDO> items, Map<String, List<BpmProcessNodeStatusRespDTO>> statuses,
+            Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users) {
+        FinanceOrderExportRowRespVO row = new FinanceOrderExportRowRespVO();
+        row.setOrderNo(order.getOrderNo()); row.setOrderType(order.getOrderType()); row.setStatus(order.getStatus());
+        row.setBuyerName(order.getBuyerName()); row.setStudentName(order.getStudentName());
+        row.setStudentMobile(order.getStudentMobile()); row.setStudentWechatId(order.getStudentWechatId());
+        row.setRegion(java.util.stream.Stream.of(order.getProvinceName(), order.getCityName())
+                .filter(StrUtil::isNotBlank).distinct().collect(java.util.stream.Collectors.joining(" / ")));
+        row.setCourseSummary(items.stream().map(this::courseSummary).collect(java.util.stream.Collectors.joining("；")));
+        row.setTotalAmount(order.getTotalAmount()); row.setCustomerPaidAt(order.getCustomerPaidAt());
+        row.setPaymentMethod(order.getPaymentMethod());
+        row.setFormalSalesName(userName(users, order.getFormalSalesUserId()));
+        row.setSubmitterName(userName(users, order.getSubmitterUserId()));
+        row.setSubmittedAt(order.getSubmittedAt()); row.setEffectiveAt(order.getEffectiveAt());
+        if (round != null) {
+            row.setApprovalRoundNo(round.getRoundNo());
+            Map<String, BpmProcessNodeStatusRespDTO> nodes = statuses.getOrDefault(round.getProcessInstanceId(), List.of())
+                    .stream().collect(java.util.stream.Collectors.toMap(BpmProcessNodeStatusRespDTO::getTaskDefinitionKey,
+                            item -> item, (left, right) -> right));
+            applyFinanceNode(row, nodes.get(TASK_REGISTRATION), true);
+            applyFinanceNode(row, nodes.get(TASK_FINANCE), false);
+            row.setFinalReason(round.getDecisionReason());
+        }
+        if (StrUtil.isBlank(row.getFinalReason())) row.setFinalReason(order.getTerminationReason());
+        return row;
+    }
+
+    private void applyFinanceNode(FinanceOrderExportRowRespVO row, BpmProcessNodeStatusRespDTO node, boolean registration) {
+        if (node == null) return;
+        if (registration) {
+            row.setRegistrationStatus(node.getStatus()); row.setRegistrationReviewer(node.getReviewerUserName());
+            row.setRegistrationReviewedAt(node.getEndTime());
+        } else {
+            row.setFinanceStatus(node.getStatus()); row.setFinanceReviewer(node.getReviewerUserName());
+            row.setFinanceReviewedAt(node.getEndTime());
+        }
+    }
+
+    private String courseSummary(SalesOrderItemDO item) {
+        LeadProductSnapshot snapshot = null;
+        try {
+            if (StrUtil.isNotBlank(item.getProductSnapshot())) {
+                snapshot = JsonUtils.getObjectMapper().readValue(item.getProductSnapshot(), LeadProductSnapshot.class);
+            }
+        } catch (JacksonException ignored) {
+            // Historical snapshots are not allowed to make an otherwise valid finance export fail.
+        }
+        String name = snapshot == null ? item.getProductRef() : snapshot.name();
+        String sku = snapshot == null ? item.getSkuRef() : snapshot.skuName();
+        return StrUtil.blankToDefault(name, "-") + (StrUtil.isBlank(sku) ? "" : " / " + sku);
+    }
+
+    private String userName(Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users, Long userId) {
+        var user = users.get(userId);
+        return user == null ? null : user.getNickname();
     }
 
     @SuppressWarnings("unchecked")

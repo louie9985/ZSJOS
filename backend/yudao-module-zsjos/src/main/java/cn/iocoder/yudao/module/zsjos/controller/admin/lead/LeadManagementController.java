@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
@@ -57,17 +58,37 @@ public class LeadManagementController {
     public CommonResult<PageResult<LeadManagementRespVO>> searchLeadPage(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
+    @GetMapping("/cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<CursorPageResult<LeadManagementRespVO>> getLeadCursor(@Valid LeadManagementPageReqVO reqVO) {
+        return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+    }
+    @PostMapping("/search-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<CursorPageResult<LeadManagementRespVO>> searchLeadCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
+        return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+    }
 
     @PostMapping("/inbox/submitted/search-page")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchSubmitted(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
+    @PostMapping("/inbox/submitted/search-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
+    public CommonResult<CursorPageResult<LeadManagementRespVO>> searchSubmittedCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
+        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+    }
 
     @PostMapping("/inbox/owned/search-page")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchOwned(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
+    }
+    @PostMapping("/inbox/owned/search-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
+    public CommonResult<CursorPageResult<LeadManagementRespVO>> searchOwnedCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
+        reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/inbox/submitted/page")
@@ -78,6 +99,11 @@ public class LeadManagementController {
         reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER);
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
+    @GetMapping("/inbox/submitted/cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
+    public CommonResult<CursorPageResult<LeadManagementRespVO>> getSubmittedLeadCursor(@Valid LeadManagementPageReqVO reqVO) {
+        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+    }
 
     @GetMapping("/inbox/owned/page")
     @Operation(summary = "获得我负责的客资分页")
@@ -86,6 +112,11 @@ public class LeadManagementController {
             @Valid LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
+    }
+    @GetMapping("/inbox/owned/cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
+    public CommonResult<CursorPageResult<LeadManagementRespVO>> getOwnedLeadCursor(@Valid LeadManagementPageReqVO reqVO) {
+        reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/get")

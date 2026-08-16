@@ -31,6 +31,89 @@
 
 ## Entries
 
+### Workstream registration: 2026-08-16 15:59:09 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Correct the dual-frontend management-page review findings: impersonation expiry and account loading, audit/partner/maintenance permissions, user-relation isolation and pagination, and withdrawal detail scope.
+- Non-goals: Backend API, schema, menu, role, or real-account permission changes; dependency additions; unrelated refactors; branch, commit, push, publication, or service reconfiguration.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/{main.tsx,layouts/RouteHost.tsx,pages/ManagementPages.tsx,services/api.ts,services/managementApi.ts,services/apiImpersonation.test.ts}` plus focused new management logic/tests if required; `frontend/admin/src/{api/system/user/index.ts,config/axios/service.ts,utils/impersonation.ts,views/zsjos/impersonation/index.vue,views/zsjos/businessAudit/index.vue,views/zsjos/partner/index.vue,views/system/maintenance/index.vue}`; directly affected impersonation/permission documentation; this handoff file. Existing overlapping edits are preserved as the baseline.
+- Owner: Codex `/root`
+- Dependencies: Existing System simple-user API, ZSJOS impersonation/audit/relation/withdrawal APIs, server-issued permissions and roles; no new package dependency.
+- Integration order: Register scope, add testable client/session and permission logic, update React pages, update Vue pages/client, synchronize documentation, run focused/full checks and browser verification, then append the delivery entry.
+- Verification plan: Workbench focused/full Vitest, typecheck, production build and style guard; Admin targeted ESLint/Prettier, typecheck and local build; `git diff --check`; authenticated desktop/mobile browser checks when a suitable existing session is available.
+
+### Workstream scope expansion: 2026-08-16 16:18:28 +08:00
+
+- Reason: Open Code Review found that the Vue business-audit page's corrected permission lifecycle exposes an existing incorrect pagination generic in its adjacent API client, and that changing the shared simple-user method's return type would break legacy callers.
+- Added ownership scope: `frontend/admin/src/api/zsjos/businessAudit/index.ts` for the directly affected page contract. The simple-user correction remains within the already owned `frontend/admin/src/api/system/user/index.ts` and will preserve the legacy method while adding an accurately typed method for the impersonation selector.
+- Dependencies and integration order: No dependency change; repair the API types before rerunning Admin typecheck/build and targeted lint/format checks.
+- Verification plan: Admin full typecheck with new-versus-pre-existing error classification, targeted ESLint/Prettier, local production build, and affected diff inspection.
+
+### 2026-08-16 16:38:35 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Complete the confirmed React Workbench and Vue Admin repair plan for impersonation lifecycle/account selection, permission-split management pages, relation-log isolation/pagination, and withdrawal detail scope, including the requested Open Code Review findings.
+- Key decisions: Preserve the existing shared Vue `getSimpleUserList` type for un migrated callers and add `getSimpleUserOptions` for the backend's exact enabled-user contract; handle impersonation invalidation in the Axios response layer without replay and only clear the session that issued the failed request; keep the backend, menus, database, roles, and permissions unchanged; mask withdrawal card numbers in React detail views.
+- Execution or analysis result: Implemented strict active-session validation and unified change events in both clients; fixed Vue account-list filtering and independent loading/error/retry states; aligned audit, partner, maintenance, and withdrawal permission behavior; separated relation/target/log states with lazy authorized logging and real pagination plus scene/request race guards; hardened React cross-origin credential handling, render-time storage initialization, stale payout proof IDs, and full-card-number disclosure; corrected Vue audit pagination response generics and asynchronous permission first-load behavior; synchronized impersonation API and permission-flow documentation.
+- Changed files: React impersonation/API/session/permission helpers and tests, `main.tsx`, `ManagementPages.tsx`; Vue system-user and business-audit API contracts, Axios service, impersonation utility, impersonation/audit/partner/maintenance views; readonly-impersonation and data/permission-flow documentation; this handoff record. Existing unrelated worktree changes were preserved.
+- Verification evidence: React `npm test` passed 35 files / 189 tests; `npm run typecheck` passed; `npm run build` passed after 5,094 modules with only the existing chunk-size warning. Vue targeted ESLint and Prettier checks passed; `pnpm build:local` passed after 8,784 modules with only the existing Lightning CSS `*zoom` warning. Full Vue `pnpm ts:check` now reports only 8 pre-existing errors (PostSimpleVO consumers, CRM funnel, ZSJOS export task, and My Sales Order), with no errors in the newly changed contracts/views. `git diff --check` passed with existing line-ending warnings. `ocr llm test` succeeded; Open Code Review completed partial coverage because its aggregate token budget stopped two large helper files, and its actionable findings in covered files were reviewed and fixed. Browser checks reached both local login boundaries without console errors or horizontal overflow at 1280px and 390px; authenticated business interactions were unavailable because no existing signed-in session was present.
+- Dependency or integration impact: No new dependency, backend API/schema/menu/permission/role change, database execution, service restart, branch/worktree operation, commit, push, or publication. No external account state was changed.
+- Remaining work: OCR did not fully cover `managementAccess.ts` and `managementApi.ts` due to its token budget. Lower-priority or pre-existing page findings remain outside this batch, including notification-rule metadata error UX and withdrawal cashback selection beyond 100 rows. Run authenticated desktop/mobile acceptance for account options, invalid-session recovery, permission combinations, relation/log pagination and 403 isolation, and finance-detail scope when a suitable session is available. Resolve the eight existing Admin type errors separately.
+
+### 2026-08-16 16:40:41 +08:00
+
+- Correction to prior delivery entry: After the recorded OCR pass, added request-generation guards for React personnel-state and audit-page loaders so late responses cannot overwrite a newer selection/tab/page. Re-ran Workbench `npm test` (35 files, 189 tests), `npm run typecheck`, and `npm run build`; all passed. No new dependencies or external-state changes.
+
+### 2026-08-16 16:41:22 +08:00
+
+- Correction to prior delivery entry: Vue withdrawal detail now displays only the backend-provided masked card number, matching the React sensitive-data fix without changing query scope or operation permissions. Targeted Vue ESLint and Prettier checks passed; no backend or external-state change.
+
+### 2026-08-16 15:09:14 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: 修复管理端高级筛选下拉框在窄布局下文字显示不完整的问题。
+- Key decisions: 保持现有筛选接口和业务选项不变；为字段、操作和值控件设置不可压缩的桌面最小宽度，窄屏改为纵向布局；已选文本使用省略号；下拉弹层设置最小/最大宽度并允许长选项换行；日期模型值增加本地类型收窄。
+- Execution or analysis result: 修改 `ZsjosAdvancedFilterGroup.vue` 的三个 `el-select` 及 scoped 样式，避免 flex shrink 将值选择框压缩到几十像素，并改善长文本展示。
+- Changed files: `frontend/admin/src/views/zsjos/components/ZsjosAdvancedFilterGroup.vue`。
+- Verification evidence: `pnpm build:local` 成功（Vite build completed）；`git diff --check` 通过（仅有既有换行符提示）；组件相关的 vue-tsc 类型错误已消除。全量 `pnpm ts:check` 仍因仓库已有的岗位 DTO、CRM funnel、业务审计、导出任务和订单页面类型错误失败。
+- Dependency or integration impact: None; no dependencies, APIs, database, permissions, or runtime configuration changed.
+- Remaining work: 在真实登录环境用桌面和移动宽度打开高级筛选，验证长字段、长选项和多选值的视觉效果；清理全量管理端既有类型错误。
+
+## Current Task Registration: 2026-08-16 ZSJOS dual-frontend menu coverage
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Make every server-defined ZSJOS page menu render a complete React Workbench and Vue Admin interface, using the official server paths and the Workbench UI guidelines.
+- Non-goals: Backend API or schema changes; database execution; role or permission mutation; service reconfiguration; dependency additions; branch, commit, push, or publication operations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: Existing Workbench menu, route, request, page, style, and focused test files; new focused Workbench management pages/services/styles/tests; Vue supervisor-confirmation API/view; directly affected menu/permission/API documentation; this handoff file. Existing overlapping user changes remain part of the baseline and must be preserved.
+- Owner: Current main workstream
+- Dependencies: Existing System, ZSJOS, BPM, Infra APIs and server-issued permission menus. No new package dependency.
+- Integration order: Serialize all edits in the current worktree; establish route coverage first, then typed services and React pages, Vue supervisor confirmation, documentation, and verification.
+- Verification plan: Workbench focused/full tests, typecheck, production build, style guards, Admin typecheck/scoped lint/build, `git diff --check`, read-only menu-contract verification, and authenticated desktop/mobile browser checks when suitable existing accounts and data are available.
+
+### 2026-08-16 13:26:05 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `61e6232837de2fdc77800de2311589a8bbdec1b7` (pre-change)
+- User goal: Restore the missing BPM model import permission control so the local Admin can import the partner withdrawal BPM model.
+- Key decisions: Add one repeatable `bpm:model:import` button menu under standard BPM model menu `1193`, using reserved menu ID `6913`; do not grant the permission to any role automatically; include the migration in fresh bootstrap and verification SQL.
+- Execution or analysis result: Added V064 migration and synchronized bootstrap, migration documentation, and bootstrap verification. Existing models, roles, account permissions, BPM assets, and business data were not changed.
+- Changed files: `script/sql/mysql/migrations/V064__bpm_model_import_permission.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `script/sql/mysql/verify-bootstrap.sql`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Reviewed parent menu ID and permission mapping against `01-bootstrap-system-seed.sql` and `BpmModelController`; SQL text and idempotent upserts require execution against the local MySQL database for runtime confirmation. No database execution, backend restart, role grant, or BPM deployment was performed in this turn.
+- Dependency or integration impact: Existing environments must apply V064 before the import button appears; an administrator must manually grant `bpm:model:import` to the publishing role and refresh the Admin session. No new dependency or service configuration.
+- Remaining work: Apply V064 locally, assign `bpm:model:import` to the intended Admin role, re-login, then import and deploy `zsjos_partner_withdrawal`.
+
 ### 2026-08-12 12:35:43 +08:00
 
 - Branch: `main`
@@ -1137,3 +1220,199 @@
 - Verification evidence: Merge preview and actual merge both identified only the Workbench build-info conflict; after resolution, the unmerged-path list was empty; staged and remote file sets matched at 16 files; the conflict file's staged blob `0a1ed0f85cd8aa600e337a83407d54fb39eece76` exactly matched `origin/main`; the handoff and all pre-existing worktree changes were absent from the merge index; the merge commit has parents `d3e4ac8851162ebfdf78c37607fd873abd659b8c` and `a6b5aa8dfa135b96a4c4ec2efd1231ba8afb7c96`; `origin/main` is an ancestor of HEAD; no merge state or index lock remains. Staged `git diff --check` reported only one trailing-whitespace line already present in the remote UI guideline document. Frontend tests/build/browser checks were not rerun because this turn synchronizes an existing remote commit and a build could rewrite the tracked `tsconfig.tsbuildinfo` that was explicitly required to match remote.
 - Dependency or integration impact: Local history gained one merge commit and the latest remote frontend changes. No dependency, database, permission, runtime service, branch/worktree switch, rebase, push, or publication occurred. Existing unstaged and untracked work remains in place.
 - Remaining work: The merge commit is not pushed. Existing unrelated dirty-worktree changes remain uncommitted. Local functional verification of the remotely authored UI change remains pending if acceptance testing is required.
+
+### Workstream registration: 2026-08-16 10:43:31 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Implement the confirmed ZSJOS completion plan for sales-order correction tasks, finance-order and withdrawal direct asynchronous exports, versioned BPM business assets, and complete customer order history in the owned-lead detail.
+- Non-goals: No database migration execution, BPM publication, role or permission assignment, service restart, dependency addition, branch/worktree operation, commit, push, historical correction-task backfill, or unrelated refactor.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: ZSJOS sales-order, business-task and export production/test code; the additive BPM public batch node-status API and focused tests; V062 plus directly affected fresh-schema/menu metadata; versioned files under `script/bpm`; React workbench order/task/export pages, services, routing, styles and tests; Vue Admin withdrawal/export entry files; directly affected order/export/BPM/navigation documentation; and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing ZSJOS BusinessTask, asynchronous export, sales-order, withdrawal and object-permission facilities; Yudao BPM public APIs; System user/department public APIs; existing React and Vue frontend stacks. No new dependency.
+- Integration order: Implement correction-task lifecycle and customer-order detail authorization; add BPM batch status support and finance export provider/permission metadata; version all four BPM definitions and add validation; add React/Vue UI surfaces; synchronize documentation; run focused and aggregate verification.
+- Verification plan: Run focused BPM and ZSJOS unit tests, migration/static SQL checks, BPM asset validator, React tests/typecheck/build, Vue targeted lint/typecheck/build, desktop/mobile browser checks when local services are available, and `git diff --check`; report runtime checks that require migration, BPM publication, permission grants or service restart as unverified.
+
+### 2026-08-16 11:20:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Complete four confirmed ZSJOS gaps: sales-order rejection correction tasks, finance-order and withdrawal asynchronous direct exports with a React export-task center, versioned BPM assets for four workflows, and complete customer order history in the owned-lead detail.
+- Key decisions: Create one no-deadline correction task per rejected approval round for the round submitter and complete it after a successful resubmission; retain existing notifications and exclude abnormal BPM cancellation; enforce finance export through both the dedicated permission and configured finance department tree without role-name inference; obtain BPM node summaries through a new public batch API; keep BPM publication manual and immutable by repository semantic asset version; aggregate owned-lead order history by `Person` while authorizing both the Lead and order-to-Person relationship. The repository has no production `superseded` transition, so correction-task cancellation is documented for the future real transition instead of inventing unreachable state behavior.
+- Execution or analysis result: Explicit registration/finance rejection and supervisor rejection now create idempotent `sales_order_revision` tasks with action `OPEN_SALES_ORDER_REVISION`; successful resubmission completes the prior task and routes the workbench to the requested order even outside the first list page. Finance approval can enqueue complete filtered finance ledgers, Admin withdrawal can enqueue the current status result, and the React workbench has a server-menu-driven export task page with loading, empty, error/retry, cancel and download behavior. Four BPM definitions are stored under immutable `1.0.0` directories with a checksum manifest, read-only validator, CI validation and controlled-publication documentation. Owned-lead details now lazily load a read-only `订单记录（数量）` tab with desktop master-detail, mobile selection, per-order detail caching, request race protection, and complete order/approval detail.
+- Changed files: `.github/workflows/maven.yml`; BPM public API/service and focused test files under `backend/yudao-module-bpm`; sales-order controllers, VOs, mappers, constants, services, export providers and focused tests under `backend/yudao-module-zsjos`; `frontend/workbench/src/components/LeadCustomerOrders.tsx`; `frontend/workbench/src/pages/ExportTaskPage.tsx`; affected Workbench route, task, approval, order, lead-detail, API and style files; `frontend/admin/src/api/zsjos/exportTask/index.ts`; `frontend/admin/src/views/zsjos/withdrawal/index.vue`; `script/bpm/manifest.json`, validator and four versioned process directories; `script/sql/mysql/migrations/V062__finance_order_export_permission.sql`, bootstrap/verifier/migration documentation; directly affected API, state-machine and BPM operations documentation; this handoff record. The two former unversioned BPM files are removed after relocation.
+- Verification evidence: Backend dependency-reactor compilation passed; focused BPM and ZSJOS suites passed 39/39, including 22 sales-order, 10 export-service, 6 export-provider/wiring and 1 finance object-permission tests; React Vitest passed 175/175, direct TypeScript check passed, and the Vite production build passed after 5,090 modules; Vue targeted ESLint passed and `build:local` passed after 8,780 modules with only the existing Lightning CSS `*zoom` warning; `python script/bpm/validate_manifest.py` validated all four assets; V062, bootstrap and verification metadata were statically reviewed; `git diff --check` passed with line-ending warnings only; no tracked build output appeared in Git status. Full Admin `pnpm ts:check` remains blocked by 14 pre-existing errors in BPM designer, CRM, MES, System user, business audit, advanced filter, export-task and my-order files, with no error in the changed withdrawal or export API files.
+- Dependency or integration impact: Adds one finance-export permission metadata row when V062 is later applied, one export type, one task action/type, one Lead-scoped order-detail API and one additive BPM batch-status API. No new dependency, migration execution, BPM publication, role/permission grant, business-data mutation, service start/stop/restart, branch/worktree operation, commit, push or artifact publication occurred.
+- Remaining work: Apply V062, grant `zsjos:export:finance-order`, publish the four BPM assets through the controlled BPM administration process, and rebuild/restart the relevant runtime only under separately authorized operational changes. Authenticated real-request and desktop/mobile browser verification remain pending because the running services were intentionally not changed. When a real production `superseded` transition is introduced, cancel the superseded round's open correction task in that transaction. The changes remain uncommitted on local `main`.
+
+### Scope update: 2026-08-16 11:45:00 +08:00
+
+- Added review-remediation ownership for Flowable tenant-scoped batch task queries, BPM candidate/signature metadata and immutable-asset CI validation; finance export authorization at download time and structured advanced-filter pagination; V062 conflict/atomicity checks; React export-task and order deep-link race/error handling; Vue wildcard permission and confirmation handling; and the associated focused regression tests and documentation updates.
+- Decision: Existing ZSJOS approval flows have no signature field or UI, so the sales-order BPM assets will explicitly disable signature requirements rather than introduce a new approval-signature feature.
+
+### Workstream registration: 2026-08-16 11:40:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Expose the confirmed ZSJOS partner portal through `/app-api/zsjos`, complete partner self-service profile, cashback summary, bank-card management, complaint history, and role/permission migration V063.
+- Non-goals: No frontend application implementation, no `/app-api` member-user behavior change outside `/app-api/zsjos`, no production/test database execution, no remote BPM publication, no finance-user assignment, no Git commit/push/branch operation, and no invented business dictionary options.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: ZSJOS partner portal controllers/services/VOs/mappers/tests, System app authentication/profile facade and app-api user-type routing configuration, V063 migration/bootstrap verification metadata, BPM local publication documentation, and directly affected API/architecture documentation.
+- Owner: Codex `/root`
+- Dependencies: Existing System admin authentication and permission APIs, ZSJOS partner/cashback/withdrawal/complaint services, V062 and versioned BPM assets already present in the worktree. No new dependency.
+- Integration order: Add app-api admin-user partition and auth facade; add self-service contracts and permission backfill; add financial/card/complaint tests; update SQL/docs; run focused backend, schema, BPM and build verification.
+- Verification plan: Focused controller/service authorization and tenant tests, ZSJOS module compile/test, server dependency package, `zsjos-db check`, BPM manifest validation, and `git diff --check`; report database execution and authenticated HTTP/BPM publication as environment-dependent.
+
+### 2026-08-16 12:12:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Move all independent partner frontend contracts to `/app-api`, complete partner self-service gaps, use V063, configure local BPM readiness, and document the frontend contract.
+- Key decisions: Keep partner identities as System ADMIN users behind the narrow `/app-api/zsjos/**` ADMIN partition; require `part_time_partner` on partner login/refresh; create the tenant-scoped role and permissions in V063 while leaving finance review assignment manual; reuse system dictionaries for lead source/category; default first-level category cashback to 10.00 and 0.1000.
+- Execution or analysis result: Added app-api auth/profile/portal/finance facades, role lifecycle API wiring, V063 migration/bootstrap verification, partner API contract documentation, architecture boundary documentation, and category default enforcement. Local BPM service is listening on port 48080 and the four versioned assets validate, but no authenticated admin browser session was available for publication.
+- Changed files: App-api routing/configuration, System permission API and partner auth/profile controllers, ZSJOS partner portal/finance controllers and self-service services/VOs/mappers, partner/category tests, V063 migration plus bootstrap/verifier/README, partner API and architecture documentation, and this handoff record. Existing unrelated dirty files were preserved.
+- Verification evidence: ZSJOS dependency compile passed; focused partner/cashback/category/withdrawal tests passed 19/19; app-api ADMIN/MEMBER routing test passed 1/1; server dependency build with `-Dspring-boot.repackage.skip=true` passed; BPM manifest validator passed 4 assets; `zsjos_db.py check` passed; `git diff --check` reported only existing line-ending normalization warnings. Full reactor tests remain blocked by pre-existing `CodegenEngineUniappTest.testExecute_treeSearch`; normal server repackage is blocked by the running service locking `yudao-server.jar`.
+- Dependency or integration impact: Adds no dependency. V063 creates role/menu grants and updates only missing root-category defaults; it does not seed dictionary options or assign finance reviewers. Database migration and BPM publication were not executed because the local DB password file and authenticated administrative session are unavailable.
+- Remaining work: Set `ZSJOS_DB_PASSWORD_FILE` and run the reviewed local V063 migration, then publish `zsjos_partner_withdrawal` locally and manually grant `zsjos:withdrawal:review` to the selected tenant finance user. Run authenticated HTTP contract checks after restart. No commit, push, branch, or service restart was performed.
+
+### 2026-08-16 12:14:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Finalize the app-api-only partner boundary before frontend handoff.
+- Key decisions: Require `part_time_partner` at both partner controller classes, in addition to feature permissions and service ownership checks.
+- Execution or analysis result: Ordinary admin tokens with copied partner permissions cannot use the partner app facade; existing admin APIs remain unchanged.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppPortalController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/PartnerAppFinanceController.java`.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed after the hardening.
+- Dependency or integration impact: None.
+- Remaining work: None beyond the environment-dependent V063 execution, local BPM publication, finance-user grant, and authenticated HTTP checks recorded above.
+
+### 2026-08-16 14:05:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Execute the confirmed code-review remediation for the four ZSJOS completion features without changing external state.
+- Key decisions: Keep sales-order approval signatures disabled (`signEnable=false`); enforce Flowable tenant filters and finance-export scope at create/generate/download boundaries; keep V062 ungranted by design; execute finance advanced filters as tenant-scoped paginated SQL; treat a missing baseline BPM manifest as the first asset rollout while freezing every version field except `recommended`; pin a task-linked order outside the first My Orders page without changing the user's filters. OCR findings for partner portal/V063/V064 were classified as a separate workstream and not modified.
+- Execution or analysis result: Hardened export authorization/retry behavior, BPM asset metadata/validation/CI and tenant isolation, V062 conflict-safe repeatability, frontend error/race/deep-link behavior, and directly affected documentation. Final OCR reviewed 70 files and identified the off-page order locator, malformed historical course snapshot, initial BPM baseline, asset-path/immutability and CI-permission gaps; all five in-scope findings were fixed. Malformed historical course snapshots now fall back without logging their payload. The My Orders task link inserts and highlights an exact authorized order even when absent from page one, while subsequent pages remain reachable.
+- Changed files: In-scope review remediation in `.github/workflows/maven.yml`, `.github/workflows/zsjos-bpm-assets.yml`; Flowable task service/API files and tests; ZSJOS advanced-filter, sales-order mapper/service, export service/provider and tests; `FinanceOrderExportReqVO`; V062/bootstrap/verifier/migration README; four BPM versioned assets, `manifest.json`, validator and validator tests; React export/task/order pages, API/helpers/tests/styles; Vue withdrawal export page/API; directly affected export/order/BPM documentation; and this handoff record. Existing partner portal/V063/V064 and unrelated dirty-worktree files were preserved.
+- Verification evidence: Final focused backend reactor suite passed 47/47; the additional sales-order suite passed 23/23 after the no-log fallback; ZSJOS dependency-reactor compile passed; React Vitest passed 176/176, direct TypeScript check passed, and Vite production build passed after 5,090 modules; Vue withdrawal ESLint passed and Admin `build:local` passed after 8,780 modules with only the existing Lightning CSS `*zoom` warning; BPM validator passed for four assets both normally and with `--base-ref HEAD`; three validator boundary unit tests passed; `zsjos_db.py check` passed; `git diff --check` passed with line-ending warnings only. OCR completed against 70 files. Admin full `ts:check` remains blocked by the previously recorded 14 unrelated errors. Authenticated HTTP and desktop/mobile browser checks were not run because no service start/restart or external-state change was authorized.
+- Dependency or integration impact: No dependency was added. No database migration, BPM publication, permission/role grant, service start/stop/restart, branch/worktree operation, commit, push or artifact publication occurred. V062 remains an ungranted permission migration by confirmed design.
+- Remaining work: Before runtime acceptance, separately authorize and apply V062, assign `zsjos:export:finance-order`, publish the reviewed BPM assets, deploy/restart, and run authenticated desktop/mobile requests. Do not execute current V063/V064 until their independently reported menu-ID collision and grant-scope risks are reviewed and repaired. The custom MyBatis finance export provider has compile/service coverage but no live-MySQL execution evidence in this turn.
+
+### 2026-08-16 14:35:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Complete the confirmed audit and repair of all 36 ZSJOS page menus so React Workbench and Vue Admin both have matching functional routes and interfaces, with React UI following `frontend/workbench/docs/ui-guidelines.md`.
+- Key decisions: Preserve only server-owned official paths; `/zsjos/appeals` and `/zsjos/lead-aging-pool` are canonical and obsolete aliases remain unsupported. Keep authorized hidden `/zsjos/leads/manage` directly routable without navigation exposure. Explicitly provide React administrator workflow pages as the confirmed dual-frontend exception, while retaining server permissions and APIs as the source of truth. Add Vue supervisor-confirmation API/page without backend or schema changes.
+- Execution or analysis result: Added React route constants, hidden-menu resolution, all-leads management data branch, typed management API, global read-only impersonation banner/header handling, nine functional management pages, CRM-token styles, route/header regression tests, and the 36-menu coverage matrix. Added Vue `salesOrderSupervisorConfirmation` API and page with pending/done tabs, detail loading, confirmation/rejection decisions, version fields and idempotency key. Synchronized permission/data-flow and ownership architecture documentation.
+- Changed files: `frontend/workbench/src/constants.ts`, `src/layouts/RouteHost.tsx`, `src/main.tsx`, `src/pages/LeadManagementPage.tsx`, `src/pages/ManagementPages.tsx`, `src/services/api.ts`, `src/services/managementApi.ts`, `src/services/apiImpersonation.test.ts`, `src/services/menu.ts`, `src/services/menu.test.ts`, `src/styles/index.css`, `src/styles/pages/management.css`; `frontend/admin/src/api/zsjos/salesOrderSupervisorConfirmation/index.ts`; `frontend/admin/src/views/zsjos/salesOrderSupervisorConfirmation/index.vue`; `docs/frontend/zsjos-menu-coverage.md`; directly affected architecture docs; this handoff record. Existing unrelated dirty files were preserved.
+- Verification evidence: React `npm test` passed 181/181; `npm run typecheck` passed; `npm run build` passed after 5,092 modules with only the existing large-chunk warning. Vue targeted ESLint for the new API/page passed; prior `pnpm build:local` passed after 8,784 modules with the existing Lightning CSS `*zoom` warning. Static coverage check found all 36 Vue component files present; official-route and obsolete-alias tests passed; impersonation header tests passed; browser desktop unauthenticated shell had no console errors or horizontal overflow. Full Vue `pnpm ts:check` remains blocked by the previously existing 14 errors outside the new page. Browser business-page interaction could not be authenticated; the in-app viewport override returned inconsistent dimensions, so mobile business-page visual verification remains unverified.
+- Dependency or integration impact: No dependency, backend, database, permission assignment, role change, service restart, branch/worktree operation, commit, push or publication. The local Workbench dev server was started at `http://127.0.0.1:5174/` for browser verification and remains an ordinary local process. Management mutations continue to be rejected or authorized by backend permissions; no real mutation was submitted.
+- Remaining work: Run authenticated desktop/mobile acceptance against the deployed backend, especially each new management page and the Vue supervisor decision flow. Resolve the pre-existing Admin `ts:check` errors separately. Stop or retain the local dev server according to the developer's environment policy; no runtime deployment was performed in this turn.
+
+## Active workstream registration: inbox-cursor-lazy-loading
+
+- Goal: Replace Workbench employee inbox pagination with cursor-based lazy loading and establish server-authoritative ordering for messages, leads, orders, approvals, appeals, and supervisor confirmations.
+- Non-goals: Do not alter unrelated dirty-worktree changes, ordinary administration/report/configuration tables, permissions, roles, external services, or execute database migrations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: System notify cursor API; ZSJOS lead activity ordering and inbox APIs; ZSJOS order/appeal inbox cursor APIs; Workbench inbox service/page clients and focused tests; additive SQL migration and directly affected documentation.
+- Owner: `/root`
+- Dependencies: Existing System and BPM public APIs; existing ZSJOS tenant and permission boundaries.
+- Integration order: Backend contracts and tests -> frontend typed clients/pages and tests -> SQL/documentation synchronization -> focused verification.
+- Verification plan: Focused Maven module tests/compile, Workbench test/typecheck/build, SQL static checks, and `git diff --check`; live database/browser acceptance remains separate unless an environment is already available.
+
+### 2026-08-16 15:41:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Implement unified cursor-based lazy loading and server-authoritative inbox ordering for Workbench messages, leads, orders, approvals, appeals, and supervisor confirmations.
+- Key decisions: Additive `CursorPageResult` contracts preserve legacy `PageResult` endpoints. Messages use `create_time,id`; orders use `submitted_at,id`; supervisor confirmations use `requested_at,id`; approvals use BPM task create/end time plus task ID; leads use the new tenant-scoped `last_activity_at,id` projection. Cursor context is checked against user/filter state. BPM remains the task source of truth; appeal cursor behavior scans BPM-backed pages before applying the business cursor.
+- Execution or analysis result: Added System notify cursor query and Workbench message lazy loading; added ZSJOS cursor APIs and Workbench lazy loading for lead, my-order, approval, supervisor-confirmation, and appeal inboxes; added lead activity projection, automatic MyBatis activity fill for partial Lead updates, follow-up/accept activity updates, V065 backfill/index migration, fresh-schema/bootstrap/verification synchronization, and architecture documentation.
+- Changed files: Framework cursor result and lead activity fill; System notification controller/service/mapper/VO; ZSJOS lead/order cursor controllers, VOs, mappers, services, LeadDO/response types; Workbench API/types/pages/message helper/tests/styles; V065 SQL/bootstrap/core/verification/docs; this handoff record. Existing unrelated dirty files were preserved.
+- Verification evidence: Workbench `npm test -- --run` passed 182/182; `npm run typecheck` passed; `npm run build` passed after 5,092 modules with only the existing large-chunk warning; SQL static inspection and `git diff --check` passed with normal line-ending warnings. Backend Maven compile was attempted online and offline but remained blocked before project compilation because Netty 4.2.15 and Spring Boot 4.1.0 BOMs are absent and Maven mirror access is denied.
+- Dependency or integration impact: No new npm/Maven dependency. No migration execution, database write, service restart, role/permission change, branch/worktree operation, commit, push, or publication occurred. V065 must be applied before deploying cursor clients. Browser/authenticated API acceptance was not run.
+- Remaining work: Run backend compile/tests once the required Maven BOMs are available; apply V065 in a controlled environment and verify repeatability/backfill/indexes; run authenticated desktop/mobile browser checks. Optimize appeal cursor retrieval with a BPM-native keyset API if deep historical appeal volumes require it.
+
+## Active workstream registration: desktop-inbox-details
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Ensure every employee Workbench detail view uses an in-page inbox master-detail layout on desktop while retaining the existing detail drawers on mobile.
+- Non-goals: Removing mobile detail drawers; changing action modals, filters, settings, navigation, APIs, permissions, routes, backend behavior, dependencies, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/{MessageInboxPage,LeadAppealPage,MySalesOrderPage,SalesOrderApprovalPage,SalesOrderSupervisorConfirmationPage,LeadDuplicateReviewPage}.tsx`; directly affected Workbench page styles and focused tests; `frontend/workbench/docs/architecture.md` only if behavior documentation changes; this handoff record. Existing overlapping edits are preserved as the baseline.
+- Owner: Codex `/root`
+- Dependencies: Existing Ant Design breakpoint behavior, Workbench inbox layout styles, and current typed service APIs; no new dependency.
+- Integration order: Audit desktop/mobile triggers -> repair desktop-only behavior -> add focused regression coverage -> run Workbench verification and browser checks -> append delivery evidence.
+- Verification plan: Focused/full Workbench tests, typecheck, production build, `git diff --check`, and real-browser desktop/mobile checks for list selection, detail rendering, loading, empty, error, and URL-selected WebSocket notification behavior.
+
+### 2026-08-16 17:10:12 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: Make every employee Workbench detail view use an inbox-style left-list/right-detail layout on the desktop Web surface while retaining detail drawers on mobile.
+- Key decisions: Preserve the existing mobile drawers and action modals; treat only `max-width: 768px` as mobile; keep the four order-related pages whose click handlers were already mobile-gated; repair message and appeal desktop drawer triggers; convert duplicate-review desktop presentation from a table-plus-drawer to the standard inbox master-detail layout without changing its APIs, permissions, or processing modal.
+- Execution or analysis result: WebSocket-selected and manually selected messages no longer interpret Ant Design's initially undefined desktop breakpoint as mobile; appeal selection no longer opens a desktop drawer; duplicate-review now selects and renders the current task in an in-page detail pane on desktop and opens the same detail in a full-width right drawer on mobile. Added a source guard covering all six employee detail pages so future drawer openings must remain mobile-gated.
+- Changed files: `frontend/workbench/src/pages/MessageInboxPage.tsx`; `frontend/workbench/src/pages/LeadAppealPage.tsx`; `frontend/workbench/src/pages/LeadDuplicateReviewPage.tsx`; `frontend/workbench/src/pages/desktop-detail-drawer.guard.test.ts`; `frontend/workbench/src/styles/pages/message-inbox.css`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Focused drawer/style guards passed 21/21; full Workbench `npm test` passed 36 files / 195 tests; `npm run typecheck` passed; `npm run build` passed after 5,094 modules with only the existing large-chunk warning; targeted `git diff --check` passed with only normal line-ending warnings. In-app browser checks at 1440x900 and 390x844 found exact-width layout, zero visible drawers on the login surface, and no console warnings/errors. Authenticated list selection, real-data detail loading, and WebSocket notification navigation remain unverified because the available local browser session was not signed in.
+- Dependency or integration impact: None; no dependency, API, backend, database, permission, role, route, architecture-document, service, branch/worktree, commit, push, or publication change. Existing overlapping dirty-worktree changes were preserved.
+- Remaining work: Run authenticated desktop/mobile acceptance for the six employee detail pages, including a WebSocket notification fallback to message detail, when a suitable signed-in local session is available.
+
+### 2026-08-16 17:12:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: 保留录入成交表单当前课程的 SKU 属性选择；新增课程由“添加成交课程”按钮创建独立空白行。
+- Key decisions: 不修改 `Form.List`、提交接口或新增课程行为；课程选择器收到已选 `spuRef::skuRef` 时从目录中的 SKU 回显 `attrValues`，不再无条件清空当前行属性。
+- Execution or analysis result: 导出 `selectedSkuAttrValues` 作为选择器同步逻辑，并增加空值/未知 SKU 与完整属性回显测试。现有课程行的 Form 回写不会清空属性，用户可继续通过添加按钮增加其他课程。
+- Changed files: `frontend/workbench/src/components/SalesOrderCoursePicker.tsx`; `frontend/workbench/src/components/SalesOrderCoursePicker.test.ts`; `handoff/20260810-main-existing.md`。
+- Verification evidence: 定向 Vitest 2/2 通过；`npm run typecheck` 通过；`npm run build` 通过（5094 modules，保留既有大 chunk warning）；`git diff --check` 通过，仅报告工作区既有换行符转换提示。真实登录页面交互未复测，当前浏览器会话无该路由权限并被重定向。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、服务或外部状态变更；未提交、推送或切换分支。
+- Remaining work: 在具备成交权限的登录会话中，重新打开录入成交弹窗验证最后一个属性选择、提交和新增第二课程的完整交互。
+
+### Workstream registration: 2026-08-16 17:17:03 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Pull and fast-forward local `main` to the latest `origin/main`, taking the remote version for every overlapping frontend path and stopping for confirmation on any non-frontend conflict.
+- Non-goals: No push, commit, rebase, branch/worktree operation, service operation, dependency decision, cleanup of remotely committed artifacts, or modification of unrelated local work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- Target branch: `main`
+- Ownership scope: Remote commit `da80424aca`; local overlap paths `frontend/workbench/src/pages/LeadManagementPage.tsx` and `frontend/workbench/tsconfig.tsbuildinfo`; this handoff record. All other dirty paths remain owned by their existing tasks.
+- Owner: Codex `/root`
+- Dependencies: `origin/main` at `da80424aca`; current dirty main worktree.
+- Integration order: Temporarily isolate only the two confirmed frontend overlaps, fast-forward to `origin/main`, discard the isolated overlap snapshot after the remote versions are installed, then verify all unrelated dirty paths remain.
+- Verification plan: Confirm fast-forward ancestry and branch counts; compare the two overlap blobs with `origin/main`; verify no merge/rebase state, no staged changes, and no loss of unrelated dirty paths; do not run builds because the task is repository synchronization and the remote commit includes tracked generated/dependency artifacts.
+
+### 2026-08-16 17:18:01 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `da80424acabbd524e390f1a1de691bbfbdcc88f1`
+- User goal: Pull the latest remote repository code, use the remote version for frontend conflicts, and request confirmation for any other conflict.
+- Key decisions: Fast-forwarded because local committed history was an ancestor of `origin/main`; after explicit confirmation, discarded local uncommitted versions only for `frontend/workbench/src/pages/LeadManagementPage.tsx` and `frontend/workbench/tsconfig.tsbuildinfo`; preserved every non-overlapping dirty path; did not clean or alter the remotely committed H5 dependency tree.
+- Execution or analysis result: Local `main` now exactly matches `origin/main` at `da80424aca`. No non-frontend overlap or conflict occurred. The two overlapping frontend files now use the complete remote blobs.
+- Changed files: The 5,798 paths contained in remote commit `da80424aca` (primarily the new `frontend/h5` application, its remotely committed dependency files, and Workbench updates); `handoff/20260810-main-existing.md` for this task record. No other local file content was authored or normalized by this task.
+- Verification evidence: Before updating, remote and local dirty paths overlapped only in the two confirmed frontend files. Their final worktree blobs match `origin/main` exactly: `LeadManagementPage.tsx` is `2c98ddb28c1b3a678a92d41d0e748c90016cfcb5`; `tsconfig.tsbuildinfo` is `7f37585afedc1ec89d0e54ad6052bb8d122592e1`. The unrelated dirty-path set remained 160 paths with identical pre/post SHA-256 `b55d012f9d28ab54abbb8cfc0e2429e54b657ccc14778342190fb439dfaf71e4`. HEAD and `origin/main` match, ahead/behind is `0/0`, the index is empty, and no merge or rebase state remains. Tests/build/browser checks were not run because this was a repository synchronization task and running the new H5/Workbench build could rewrite tracked generated or dependency artifacts.
+- Dependency or integration impact: The worktree now contains the remote H5 frontend and its committed `node_modules`; no local dependency installation, commit, push, service operation, database action, branch/worktree change, rebase, or merge commit occurred. The two confirmed local frontend versions were intentionally discarded; all other local work remains.
+- Remaining work: Existing unrelated local modifications and untracked files remain uncommitted. The pulled H5 and Workbench behavior has not been locally acceptance-tested in this turn.

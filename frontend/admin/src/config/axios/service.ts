@@ -17,7 +17,7 @@ import errorCode from './errorCode'
 import { resetRouter } from '@/router'
 import { deleteUserCache } from '@/hooks/web/useCache'
 import { ApiEncrypt } from '@/utils/encrypt'
-import { getStoredImpersonation, IMPERSONATION_STORAGE_KEY } from '@/utils/impersonation'
+import { getStoredImpersonation, handleImpersonationInvalid } from '@/utils/impersonation'
 
 const tenantEnable = import.meta.env.VITE_APP_TENANT_ENABLE
 const { result_code, base_url, request_timeout } = config
@@ -105,9 +105,6 @@ service.interceptors.request.use(
     return config
   },
   (error: AxiosError) => {
-    if (error.response?.data && (error.response.data as any).code === 1_900_007_002) {
-      sessionStorage.removeItem(IMPERSONATION_STORAGE_KEY)
-    }
     // Do something with request error
     console.log(error) // for debug
     return Promise.reject(error)
@@ -153,6 +150,7 @@ service.interceptors.response.use(
       data = await new Response(response.data).json()
     }
     const code = data.code ?? result_code
+    handleImpersonationInvalid(code)
     // 获取错误信息
     const msg = data.msg || errorCode[code] || errorCode['default']
     if (ignoreMsgs.indexOf(msg) !== -1) {
@@ -232,6 +230,7 @@ service.interceptors.response.use(
     }
   },
   (error: AxiosError) => {
+    handleImpersonationInvalid(Number((error.response?.data as any)?.code))
     console.log('err' + error) // for debug
     let { message } = error
     const { t } = useI18n()

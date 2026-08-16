@@ -86,6 +86,10 @@ public class SalesOrderObjectPermissionService {
         return result;
     }
 
+    public boolean isFinanceCenterMember(Long userId) {
+        return approvalTaskKeys(userId).contains(TASK_FINANCE);
+    }
+
     public Set<Long> enabledUsers(Long rootDeptId) {
         if (rootDeptId == null) return Set.of();
         Set<Long> deptIds = new LinkedHashSet<>();

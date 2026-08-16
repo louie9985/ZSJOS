@@ -6,7 +6,10 @@ import cn.iocoder.yudao.module.system.api.dept.PostApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.*;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.permission.RoleApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.*;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerMeRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
@@ -28,6 +31,8 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private PostApi postApi;
     @Resource private LeadMapper leadMapper;
+    @Resource private PermissionApi permissionApi;
+    @Resource private RoleApi roleApi;
 
     @Override @Transactional(rollbackFor = Exception.class)
     public Long create(PartnerCreateReqVO reqVO) {
@@ -36,6 +41,7 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         account.setUsername(reqVO.getUsername()); account.setPassword(reqVO.getPassword());
         account.setNickname(reqVO.getName()); account.setMobile(reqVO.getMobile()); account.setPostIds(Set.of());
         Long userId = adminUserApi.createUser(account);
+        assignPartnerRole(userId);
         PartnerDO partner = BeanUtils.toBean(reqVO, PartnerDO.class);
         partner.setBoundSystemUserId(userId); partner.setStatus(PARTNER_STATUS_ENABLED);
         partner.setEnabledAt(LocalDateTime.now()); partner.setVersion(0); mapper.insert(partner);
@@ -43,6 +49,12 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
     }
 
     @Override public List<PartnerRespVO> list() { return BeanUtils.toBean(mapper.selectList(), PartnerRespVO.class); }
+
+    @Override public PartnerMeRespVO getMe(Long userId) {
+        PartnerDO partner = mapper.selectByBoundUserId(userId);
+        if (partner == null) throw exception(PARTNER_NOT_EXISTS);
+        return BeanUtils.toBean(partner, PartnerMeRespVO.class);
+    }
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void disable(Long id, PartnerStateReqVO reqVO) {
@@ -61,6 +73,7 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         partner.setStatus(PARTNER_STATUS_ENABLED); partner.setEnabledAt(LocalDateTime.now()); partner.setDisabledAt(null);
         mapper.updateById(partner);
         adminUserApi.updateUserStatus(partner.getBoundSystemUserId(), CommonStatusEnum.ENABLE.getStatus(), reqVO.getReason());
+        assignPartnerRole(partner.getBoundSystemUserId());
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -77,11 +90,23 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         AdminUserOrganizationUpdateReqDTO update = new AdminUserOrganizationUpdateReqDTO();
         update.setUserId(partner.getBoundSystemUserId()); update.setDeptId(reqVO.getDeptId()); update.setPostIds(posts);
         adminUserApi.updateUserOrganization(update);
+        removePartnerRole(partner.getBoundSystemUserId());
         partner.setStatus(PARTNER_STATUS_CONVERTED); partner.setDisabledAt(LocalDateTime.now()); mapper.updateById(partner);
         if (reqVO.isMigrateHistoricalOrganization()) leadMapper.updateSourceDeptByPartnerId(id, reqVO.getDeptId());
     }
 
     private PartnerDO require(Long id) {
         PartnerDO partner = mapper.selectById(id); if (partner == null) throw exception(PARTNER_NOT_EXISTS); return partner;
+    }
+
+    private void assignPartnerRole(Long userId) {
+        var role = roleApi.getRoleByCode("part_time_partner");
+        if (role == null) throw exception(PARTNER_ROLE_NOT_CONFIGURED);
+        permissionApi.addUserRole(userId, role.getId());
+    }
+
+    private void removePartnerRole(Long userId) {
+        var role = roleApi.getRoleByCode("part_time_partner");
+        if (role != null) permissionApi.removeUserRole(userId, role.getId());
     }
 }

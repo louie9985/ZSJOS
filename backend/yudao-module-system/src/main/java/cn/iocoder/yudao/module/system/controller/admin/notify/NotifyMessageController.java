@@ -4,8 +4,10 @@ import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyPageReqVO;
+import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyCursorReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessagePageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
@@ -68,6 +70,16 @@ public class NotifyMessageController {
         PageResult<NotifyMessageDO> pageResult = notifyMessageService.getMyMyNotifyMessagePage(pageVO,
                 getLoginUserId(), UserTypeEnum.ADMIN.getValue());
         return success(BeanUtils.toBean(pageResult, NotifyMessageRespVO.class));
+    }
+
+    @GetMapping("/my-cursor")
+    @Operation(summary = "使用游标获得我的站内信")
+    public CommonResult<CursorPageResult<NotifyMessageRespVO>> getMyNotifyMessageCursor(
+            @Valid NotifyMessageMyCursorReqVO reqVO) {
+        CursorPageResult<NotifyMessageDO> result = notifyMessageService.getMyNotifyMessageCursor(reqVO,
+                getLoginUserId(), UserTypeEnum.ADMIN.getValue());
+        return success(new CursorPageResult<>(BeanUtils.toBean(result.getList(), NotifyMessageRespVO.class),
+                result.getNextCursor(), result.isHasMore()));
     }
 
     @PutMapping("/update-read")

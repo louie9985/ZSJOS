@@ -11,8 +11,10 @@ import cn.iocoder.yudao.module.zsjos.service.export.provider.CashbackExportTypeP
 import cn.iocoder.yudao.module.zsjos.service.export.provider.LeadExportTypeProvider;
 import cn.iocoder.yudao.module.zsjos.service.export.provider.SalesOrderExportTypeProvider;
 import cn.iocoder.yudao.module.zsjos.service.export.provider.WithdrawalExportTypeProvider;
+import cn.iocoder.yudao.module.zsjos.service.export.provider.FinanceOrderExportTypeProvider;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderService;
+import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import cn.iocoder.yudao.module.zsjos.service.withdrawal.WithdrawalService;
 import jakarta.validation.Validation;
 import jakarta.validation.Validator;
@@ -36,10 +38,11 @@ class ExportTaskWiringTest {
             context.registerBean(BusinessAuditService.class, () -> mock(BusinessAuditService.class));
             context.registerBean(LeadManagementService.class, () -> mock(LeadManagementService.class));
             context.registerBean(SalesOrderService.class, () -> mock(SalesOrderService.class));
+            context.getBeanFactory().registerSingleton("permissionService", mock(SalesOrderObjectPermissionService.class));
             context.registerBean(CashbackService.class, () -> mock(CashbackService.class));
             context.registerBean(WithdrawalService.class, () -> mock(WithdrawalService.class));
             context.register(LeadExportTypeProvider.class, SalesOrderExportTypeProvider.class,
-                    CashbackExportTypeProvider.class, WithdrawalExportTypeProvider.class,
+                    FinanceOrderExportTypeProvider.class, CashbackExportTypeProvider.class, WithdrawalExportTypeProvider.class,
                     ExportTaskServiceImpl.class, ExportTaskController.class);
 
             context.refresh();

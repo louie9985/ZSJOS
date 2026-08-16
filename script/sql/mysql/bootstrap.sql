@@ -43,6 +43,10 @@ SOURCE script/sql/mysql/migrations/V054__lead_business_number.sql;
 SOURCE script/sql/mysql/migrations/V055__sales_order_supervisor_confirmation.sql;
 SOURCE script/sql/mysql/migrations/V056__crm_lifecycle_confirmed_rules.sql;
 SOURCE script/sql/mysql/migrations/V057__lead_runtime_settings.sql;
+SOURCE script/sql/mysql/migrations/V062__finance_order_export_permission.sql;
+SOURCE script/sql/mysql/migrations/V063__partner_portal_app_api_role.sql;
+SOURCE script/sql/mysql/migrations/V064__bpm_model_import_permission.sql;
+SOURCE script/sql/mysql/migrations/V065__inbox_cursor_activity_ordering.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

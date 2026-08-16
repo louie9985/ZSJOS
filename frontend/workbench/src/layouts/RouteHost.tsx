@@ -19,6 +19,18 @@ import SalesOrderSupervisorConfirmationPage from '../pages/SalesOrderSupervisorC
 import MySalesOrderPage from '../pages/MySalesOrderPage'
 import SubordinateSalesPage from '../pages/SubordinateSalesPage'
 import ExternalRepurchasePage from '../pages/ExternalRepurchasePage'
+import ExportTaskPage from '../pages/ExportTaskPage'
+import {
+  BusinessAuditPage,
+  CashbackPage,
+  ImpersonationPage,
+  MaintenancePage,
+  NotifyRulePage,
+  PartnerPage,
+  PersonnelPage,
+  UserRelationPage,
+  WithdrawalPage
+} from '../pages/ManagementPages'
 import {
   LeadFilterConfigPage,
   LeadFollowUpRuleConfigPage,
@@ -30,6 +42,7 @@ import {
 interface RouteHostProps {
   menu?: WorkbenchMenu
   permissions: string[]
+  roles: string[]
   onOpenAssignment: () => void
 }
 
@@ -37,9 +50,10 @@ interface RouteHostProps {
  * 根据当前菜单路径/组件名渲染对应业务页面。
  * 未迁移的菜单显示占位提示。
  */
-export default function RouteHost({ menu, permissions, onOpenAssignment }: RouteHostProps) {
+export default function RouteHost({ menu, permissions, roles, onOpenAssignment }: RouteHostProps) {
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage audience="all"/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage selfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_COMPLAINTS) return <LeadComplaintPage/>
@@ -57,9 +71,19 @@ export default function RouteHost({ menu, permissions, onOpenAssignment }: Route
   if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
-  if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage/>
+  if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS) return <SalesOrderSupervisorConfirmationPage/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
+  if (menu?.path === APP_ROUTES.EXPORT_TASKS) return <ExportTaskPage/>
+  if (menu?.path === APP_ROUTES.PERSONNEL) return <PersonnelPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.PARTNER) return <PartnerPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.IMPERSONATION) return <ImpersonationPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.BUSINESS_AUDIT) return <BusinessAuditPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.CASHBACK) return <CashbackPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.WITHDRAWAL) return <WithdrawalPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.USER_RELATION) return <UserRelationPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MAINTENANCE) return <MaintenancePage roles={roles}/>
+  if (menu?.path === APP_ROUTES.NOTIFY_RULE) return <NotifyRulePage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_RULE) return <LeadRuleConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_FILTER) return <LeadFilterConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_FOLLOW_UP_RULE) return <LeadFollowUpRuleConfigPage permissions={permissions}/>

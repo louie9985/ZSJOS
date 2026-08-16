@@ -19,8 +19,22 @@ export interface UserVO {
   createTime: Date
 }
 
-// 获取用户精简信息列表
+export interface UserSimpleVO {
+  id: number
+  nickname: string
+  avatar?: string
+  sex?: number
+  deptId?: number
+  deptName?: string
+}
+
+// 保留旧返回类型，避免扩大影响尚未迁移的上游管理页面。
 export const getSimpleUserList = (): Promise<UserVO[]> => {
+  return request.get({ url: '/system/user/simple-list' })
+}
+
+// 精简用户接口的真实返回契约
+export const getSimpleUserOptions = (): Promise<UserSimpleVO[]> => {
   return request.get({ url: '/system/user/simple-list' })
 }
 

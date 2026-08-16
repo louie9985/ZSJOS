@@ -8,6 +8,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.time.LocalDateTime;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSupervisorPageReqVO;
 
@@ -42,6 +43,25 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
         }
         query.orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt);
         return selectPage(reqVO, query);
+    }
+    default List<SalesOrderSupervisorConfirmationDO> selectCursorBySupervisor(Long userId, Boolean handled,
+                                                                                List<Long> orderIds, LocalDateTime cursorTime,
+                                                                                Long cursorId, int limit) {
+        LambdaQueryWrapperX<SalesOrderSupervisorConfirmationDO> query = new LambdaQueryWrapperX<>();
+        query.eq(SalesOrderSupervisorConfirmationDO::getSupervisorUserId, userId)
+                .eq(Boolean.FALSE.equals(handled), SalesOrderSupervisorConfirmationDO::getStatus, "pending")
+                .ne(Boolean.TRUE.equals(handled), SalesOrderSupervisorConfirmationDO::getStatus, "pending");
+        if (orderIds != null) {
+            if (orderIds.isEmpty()) query.eq(SalesOrderSupervisorConfirmationDO::getOrderId, -1L);
+            else query.in(SalesOrderSupervisorConfirmationDO::getOrderId, orderIds);
+        }
+        if (cursorTime != null && cursorId != null) {
+            query.and(wrapper -> wrapper.lt(SalesOrderSupervisorConfirmationDO::getRequestedAt, cursorTime)
+                    .or(nested -> nested.eq(SalesOrderSupervisorConfirmationDO::getRequestedAt, cursorTime)
+                            .lt(SalesOrderSupervisorConfirmationDO::getId, cursorId)));
+        }
+        return selectList(query.orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getId).last("LIMIT " + limit));
     }
 
     @Select("SELECT * FROM zsjos_order_supervisor_confirmation WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")

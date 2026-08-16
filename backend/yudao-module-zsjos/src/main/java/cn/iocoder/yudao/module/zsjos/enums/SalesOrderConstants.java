@@ -11,6 +11,11 @@ public interface SalesOrderConstants {
     String CENTER_REGISTRATION = "registration";
     String CENTER_FINANCE = "finance";
 
+    String BIZ_TYPE_SALES_ORDER = "sales-order";
+    String TASK_TYPE_REVISION = "sales_order_revision";
+    String TASK_ACTION_REVISION = "OPEN_SALES_ORDER_REVISION";
+    String TASK_REVISION_KEY_PREFIX = "sales-order-revision:";
+
     String STATUS_PENDING_APPROVAL = "pending_approval";
     String STATUS_REVISION_REQUIRED = "revision_required";
     String STATUS_EFFECTIVE = "effective";

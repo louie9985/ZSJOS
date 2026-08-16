@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { APP_ROUTES } from '../constants'
+import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
 import { AuthenticationError, buildMenuTree, type RawMenu, unwrap } from './api'
 import {
   buildTwoLevelNavigation,
   filterRenderableMenus,
+  findMenuByPath,
   findPageByPath,
   findPrimaryByPath,
   getInaccessiblePathFallback,
@@ -109,6 +110,28 @@ describe('workbench menu conversion', () => {
     expect(filtered).toHaveLength(1)
     expect(filtered[0].name).toBe('Workbench')
     expect(filtered[0].children.map(child => child.name)).toEqual(['Work plans'])
+  })
+
+  it('covers all 36 server-owned page routes and excludes obsolete aliases', () => {
+    expect(RENDERABLE_APP_ROUTES.size).toBe(36)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/appeals')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-aging-pool')).toBe(true)
+    expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
+    expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/opportunity-public-sea')
+  })
+
+  it('keeps an authorized hidden page routable without adding it to navigation', () => {
+    const routes = filterRenderableMenus(buildMenuTree([menu({
+      id: 1,
+      name: 'Workbench',
+      path: '/zsjos',
+      children: [menu({ id: 2, parentId: 1, name: 'Lead management', path: 'leads/manage', visible: false })]
+    })]), RENDERABLE_APP_ROUTES)
+    const navigation = buildTwoLevelNavigation(routes)
+
+    expect(findMenuByPath(routes, APP_ROUTES.LEAD_MANAGEMENT)?.name).toBe('Lead management')
+    expect(navigation[0]?.pages).toEqual([])
+    expect(getInaccessiblePathFallback(navigation, APP_ROUTES.LEAD_MANAGEMENT, routes)).toBeUndefined()
   })
 
   it('supports a root that is itself a page', () => {

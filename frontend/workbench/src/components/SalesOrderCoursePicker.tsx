@@ -2,6 +2,11 @@ import { Cascader, Col, Row, Select, Typography } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import type { LeadCatalog, LeadCategoryNode } from '../services/api'
 
+export function selectedSkuAttrValues(catalog: LeadCatalog, value?: string): Record<string, string> {
+  const [spuRef, skuRef] = value?.split('::') || []
+  return catalog.skus.find(item => item.spuRef === spuRef && item.skuRef === skuRef)?.attrValues || {}
+}
+
 function categoryOptions(items: LeadCategoryNode[]): any[] {
   return items.map(item => ({ label: item.name, value: item.id, children: item.children?.length ? categoryOptions(item.children) : undefined }))
 }
@@ -19,7 +24,8 @@ export default function SalesOrderCoursePicker({ catalog, value, onChange, disab
   useEffect(() => {
     const [nextSpu, nextSku] = value?.split('::') || []
     const spu = catalog.spus.find(item => item.spuRef === nextSpu)
-    setSpuRef(nextSpu || undefined); setSkuRef(nextSku || undefined); setAttrValues({})
+    setSpuRef(nextSpu || undefined); setSkuRef(nextSku || undefined)
+    setAttrValues(selectedSkuAttrValues(catalog, value))
     setCategoryPath(spu?.categoryPath.map(item => item.id) || [])
   }, [catalog, value])
   const selectedSpu = catalog.spus.find(item => item.spuRef === spuRef)

@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.order;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductCatalogRespVO;
@@ -62,6 +63,14 @@ public class SalesOrderController {
         return success(orderService.getCustomerOrders(leadId, WebFrameworkUtils.getLoginUserId()));
     }
 
+    @GetMapping("/lead/{leadId}/customer-orders/{orderId}")
+    @Operation(summary = "获得客资客户的完整订单详情")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    public CommonResult<SalesOrderRespVO> getCustomerOrder(@PathVariable Long leadId,
+                                                            @PathVariable Long orderId) {
+        return success(orderService.getCustomerOrder(leadId, orderId, WebFrameworkUtils.getLoginUserId()));
+    }
+
     @PutMapping("/{id}/resubmit")
     @Operation(summary = "补正并重新提交成交订单")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
@@ -81,6 +90,19 @@ public class SalesOrderController {
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> getMyPage(@Valid SalesOrderMyPageReqVO reqVO) {
         return success(orderService.getMyPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+    @GetMapping("/my-cursor")
+    @Operation(summary = "使用游标获得本人提交的成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> getMyCursorPage(@Valid SalesOrderMyCursorReqVO reqVO) {
+        return success(orderService.getMyCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+    @PostMapping("/my-search-cursor")
+    @Operation(summary = "高级筛选本人订单游标列表")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchMyCursorPage(
+            @Valid @RequestBody SalesOrderMyCursorReqVO reqVO) {
+        return success(orderService.getMyCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/my-search-page")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
@@ -108,10 +130,20 @@ public class SalesOrderController {
     public CommonResult<PageResult<SalesOrderListItemRespVO>> getInboxPage(@Valid SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
+    @GetMapping("/approval/inbox-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> getInboxCursor(@Valid SalesOrderPageReqVO reqVO) {
+        return success(orderService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
     @PostMapping("/approval/search-page")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> searchInboxPage(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+    @PostMapping("/approval/search-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchInboxCursor(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
+        return success(orderService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 
     @GetMapping("/approval/filter-profile")
@@ -150,6 +182,12 @@ public class SalesOrderController {
     public CommonResult<PageResult<SalesOrderSupervisorConfirmationRespVO>> getSupervisorConfirmationInbox(
             @Valid SalesOrderSupervisorPageReqVO reqVO) {
         return success(supervisorConfirmationService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+    @GetMapping("/supervisor-confirmation/inbox-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
+    public CommonResult<CursorPageResult<SalesOrderSupervisorConfirmationRespVO>> getSupervisorConfirmationCursor(
+            @Valid SalesOrderSupervisorCursorReqVO reqVO) {
+        return success(supervisorConfirmationService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/supervisor-confirmation/search-page")

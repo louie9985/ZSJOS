@@ -119,6 +119,8 @@ public interface BpmTaskService {
      */
     List<HistoricTaskInstance> getTaskListByProcessInstanceId(String processInstanceId, Boolean asc);
 
+    List<HistoricTaskInstance> getTaskListByProcessInstanceIds(Collection<String> processInstanceIds);
+
     /**
      * 校验任务是否存在，并且是否是分配给自己的任务
      *

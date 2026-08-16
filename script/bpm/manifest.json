@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "assets": [
+    {
+      "processKey": "zsjos_sales_order_dual_approval",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["registrationReview", "financeReview"],
+      "businessVariables": ["orderId", "leadId", "personId", "roundNo"],
+      "assigneeVariables": ["registrationUsers", "financeUsers", "registrationAssignee", "financeAssignee"],
+      "runtimeOnlyVariables": ["orderId", "leadId", "personId", "roundNo"],
+      "businessKeyFormat": "sales-order:{orderId}",
+      "minimumMigration": "V023",
+      "path": "zsjos_sales_order_dual_approval/1.0.0/process.bpmn20.xml",
+      "sha256": "a4b553db2664f64e7ea48ee25167d8f43384dff7e011635eb3bcf2f216069278"
+    },
+    {
+      "processKey": "zsjos_lead_appeal_review",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["appealReview"],
+      "businessVariables": ["appealId", "leadId", "roundNo", "reviewStage"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["appealId", "leadId", "roundNo", "reviewStage"],
+      "businessKeyFormat": "lead-appeal:{appealId}",
+      "minimumMigration": "V024",
+      "path": "zsjos_lead_appeal_review/1.0.0/process.bpmn20.xml",
+      "sha256": "47934b196416db1183878282280a5cc0b129bccdbc3984c70797a1f40508d8e2"
+    },
+    {
+      "processKey": "zsjos_lead_transfer_request",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["ownerManagerReview"],
+      "businessVariables": ["requestId", "leadId", "fromOwnerUserId", "requestedOwnerUserId"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["requestId", "leadId", "fromOwnerUserId", "requestedOwnerUserId"],
+      "businessKeyFormat": "lead-transfer:{requestId}",
+      "minimumMigration": "V034",
+      "path": "zsjos_lead_transfer_request/1.0.0/process.bpmn20.xml",
+      "sha256": "993bbd97760566e587fddc0f4445b307f15eaaa39e25f4785d006ad41dc64cb6"
+    },
+    {
+      "processKey": "zsjos_partner_withdrawal",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["financeReview"],
+      "businessVariables": ["withdrawalId", "applicationAmount"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["withdrawalId", "applicationAmount"],
+      "businessKeyFormat": "withdrawal:{withdrawalId}",
+      "minimumMigration": "V052",
+      "path": "zsjos_partner_withdrawal/1.0.0/process.bpmn20.xml",
+      "sha256": "ef4d0834672dcddc727b56935e31dfbc801ed0d2f8460de56241fb828029d5bc"
+    }
+  ]
+}

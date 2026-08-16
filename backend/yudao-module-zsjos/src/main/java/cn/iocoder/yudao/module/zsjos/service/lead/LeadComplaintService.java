@@ -76,6 +76,15 @@ public class LeadComplaintService {
                 page.getTotal());
     }
 
+    public PageResult<LeadComplaintRespVO> myPage(LeadComplaintPageReqVO req, Long userId) {
+        PageResult<LeadComplaintDO> page = complaintMapper.selectMyPage(req, userId);
+        Set<Long> leadIds = page.getList().stream().map(LeadComplaintDO::getLeadId).collect(Collectors.toSet());
+        Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
+        return new PageResult<>(page.getList().stream().map(row -> toResp(row, leads.get(row.getLeadId()))).toList(),
+                page.getTotal());
+    }
+
     @Transactional(rollbackFor = Exception.class)
     public void decide(Long id, Long handler, LeadComplaintDecisionReqVO req) {
         LeadComplaintDO replay = complaintMapper.selectByDecisionKey(req.getIdempotencyKey());

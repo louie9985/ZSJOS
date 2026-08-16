@@ -207,6 +207,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setOwnerUserId(userId);
         lead.setOwnershipStartedAt(acceptedAt);
+        lead.setLastActivityAt(acceptedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPendingAssigneeUserId(null);
         lead.setPendingExpiresAt(null);

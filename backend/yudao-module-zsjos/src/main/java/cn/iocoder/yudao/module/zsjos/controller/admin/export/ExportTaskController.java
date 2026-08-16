@@ -23,7 +23,7 @@ public class ExportTaskController {
     @Resource private ExportTaskService service;
 
     @PostMapping
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:export:lead','zsjos:export:order','zsjos:export:cashback','zsjos:export:withdrawal')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:export:lead','zsjos:export:order','zsjos:export:cashback','zsjos:export:withdrawal','zsjos:export:finance-order')")
     @Operation(summary = "创建异步导出任务")
     public CommonResult<Long> create(@Valid @RequestBody ExportTaskCreateReqVO request) {
         return success(service.create(WebFrameworkUtils.getLoginUserId(), request.getExportType(), request.getFilterJson()));

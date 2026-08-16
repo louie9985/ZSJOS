@@ -18,6 +18,9 @@ public interface BpmProcessTaskApi {
     java.util.List<BpmProcessNodeStatusRespDTO> getProcessNodeStatuses(String processInstanceId,
                                                                          java.util.Set<String> taskDefinitionKeys);
 
+    java.util.Map<String, java.util.List<BpmProcessNodeStatusRespDTO>> getProcessNodeStatuses(
+            java.util.Set<String> processInstanceIds, java.util.Set<String> taskDefinitionKeys);
+
     /**
      * 触发流程任务的执行
      *

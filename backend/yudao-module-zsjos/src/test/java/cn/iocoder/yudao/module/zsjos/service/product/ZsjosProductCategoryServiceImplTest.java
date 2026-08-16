@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.math.BigDecimal;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PRODUCT_CATEGORY_LEVEL_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -33,6 +34,8 @@ class ZsjosProductCategoryServiceImplTest {
         ArgumentCaptor<ZsjosProductCategoryDO> captor = ArgumentCaptor.forClass(ZsjosProductCategoryDO.class);
         verify(categoryMapper).insert(captor.capture());
         assertEquals(1, captor.getValue().getLevel());
+        assertEquals(new BigDecimal("10.00"), captor.getValue().getDefaultValidCashbackAmount());
+        assertEquals(new BigDecimal("0.1000"), captor.getValue().getDefaultDealCashbackRate());
     }
 
     @Test

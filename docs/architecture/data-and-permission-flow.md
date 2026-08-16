@@ -59,6 +59,10 @@ store opaque tokens and must not persist the account password for this behavior.
 Tenant values come from environment configuration. A current local default is not a
 license to hard-code tenant assumptions into business components.
 
+### Independent partner frontend
+
+The partner frontend uses `/app-api/zsjos/**`, but partner identities remain tenant-scoped System ADMIN users. `yudao.web.app-api-admin-prefixes` contains only `/zsjos/`, so this narrow app-api partition resolves ADMIN tokens while every other `/app-api/**` route retains the standard MEMBER identity. Partner login and refresh additionally require the stable `part_time_partner` role; feature permissions and service-level ownership checks remain cumulative. Admin and workbench routes under `/admin-api/**` are unchanged.
+
 Account-password login accepts either the tenant-scoped username or mobile number. New usernames
 are 4-32 letters, digits, or underscores; newly set passwords are 8-20 characters and contain both
 letters and digits. Login validation deliberately remains compatible with historical password hashes.
@@ -98,12 +102,19 @@ Rules:
 - Deep leaves may be flattened for the approved two-column workbench presentation, without changing their permission or original route identity.
 - Role names are not used to manufacture menus or grant access.
 - Backend component names are metadata only. React renders an explicitly registered local page or a safe placeholder.
+- The 36 active ZSJOS-facing page menus have matching React Workbench and Vue Admin renderers; the auditable mapping is maintained in `docs/frontend/zsjos-menu-coverage.md`. Both clients preserve the server path and permission identity instead of maintaining aliases or a duplicate menu tree.
+- Authorized hidden pages remain in the React renderable menu tree for direct routing but are removed from visible navigation. Therefore `/zsjos/leads/manage` can be opened only when returned by the permission response, while it remains absent from the side or top menu.
+- The canonical appeal and opportunity-public-sea routes are `/zsjos/appeals` and `/zsjos/lead-aging-pool`. The clients intentionally do not redirect the obsolete `/zsjos/leads/appeals` or `/zsjos/opportunity-public-sea` paths.
+- A valid active read-only impersonation session is injected by the shared clients as `X-ZSJOS-Impersonation-Session` only on ZSJOS requests and excluded from impersonation lifecycle requests. The clients clear malformed, inactive, or server-rejected sessions and synchronize their visible state. A request rejected with `IMPERSONATION_SESSION_INVALID` remains failed and is not replayed under the administrator identity. Storage is also cleared with authentication state; server-side authorization and write rejection remain authoritative.
 - Direct URL access must still resolve against the authorized menu set; hiding a menu item alone is not authorization.
 
 The administration message center keeps personal station-message navigation server-owned. The
 “全部消息” and “未读消息” routes are children of the existing message-center menu and inherit only
 its established role grants. Both routes remain scoped to the authenticated user's messages through
 the existing `/system/notify-message/my-page` contract; the unread route fixes `readStatus=false`.
+Workbench lazy loading uses the additive `/system/notify-message/my-cursor` contract. It returns
+`list`, `nextCursor`, and `hasMore`, with server ordering `create_time DESC, id DESC`; the legacy
+page contract remains for compatibility.
 WebSocket events are refresh hints, while the persisted message page remains authoritative.
 
 Business notification templates are global system configuration, while notification rules and
@@ -300,7 +311,7 @@ otherwise
   detail request cannot bypass row visibility. A leader of a peer department receives
   no access, while a leader of a parent department may access owners in child departments.
 - 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案：后端根据审批配置根部门及子部门解析用户可用中心，报名履约用户固定查询 `registrationReview`，财务用户固定查询 `financeReview`，同时属于两个范围的用户才可切换中心。`inbox-page` 必须将请求中心、已发布筛选条件和用户可用 BPM 节点取交集，页面隐藏另一中心不能代替授权。
-- 提交人和负责人客资收件箱固定按服务端分页每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一页；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取第一页。下一页失败必须保留已加载客资并提供局部重试，不得把增量失败渲染成空列表或扩大服务端筛选范围。
+- 提交人和负责人客资收件箱使用服务端游标每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一批；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取首批。游标排序固定为 `last_activity_at DESC, id DESC`，下一批失败必须保留已加载客资并提供局部重试。旧分页接口继续保留给兼容调用方。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询只消费已发布版本；筛选标签不返回数量且不执行额外统计查询。保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。

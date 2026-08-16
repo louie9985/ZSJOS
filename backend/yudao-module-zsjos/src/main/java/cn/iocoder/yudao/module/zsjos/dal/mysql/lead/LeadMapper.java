@@ -162,8 +162,18 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                         .or().eq(LeadDO::getOwnerUserId, visibleUserId));
             }
         }
-        query.orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId);
+        if (reqVO.getCursorActivityAt() != null && reqVO.getCursorId() != null) {
+            query.and(wrapper -> wrapper.lt(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
+                    .or(nested -> nested.eq(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
+                            .lt(LeadDO::getId, reqVO.getCursorId())));
+        }
+        query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
         return selectPage(reqVO, query);
+    }
+
+    default void touchActivity(Long leadId, java.time.LocalDateTime occurredAt) {
+        update(new LeadDO().setLastActivityAt(occurredAt),
+                new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getId, leadId));
     }
 
     default Map<String, Long> selectManagementStatusCounts(Long visibleUserId, List<Long> managedOwnerUserIds) {

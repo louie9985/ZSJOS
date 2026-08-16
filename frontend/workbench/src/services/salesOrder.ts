@@ -36,3 +36,20 @@ export function mergeSalesOrderListItems(
   next.forEach(item => values.set(keyOf(item), item))
   return [...values.values()]
 }
+
+export function salesOrderDetailToListItem(order: SalesOrder): SalesOrderListItem {
+  return {
+    id: order.id,
+    orderNo: order.orderNo,
+    leadId: order.leadId,
+    personId: order.personId,
+    orderType: order.orderType,
+    status: order.status,
+    studentName: order.studentName,
+    studentMobile: order.studentMobile,
+    totalAmount: order.totalAmount,
+    approvalRoundNo: order.approvalRoundNo,
+    submittedAt: order.submittedAt,
+    effectiveAt: order.effectiveAt
+  }
+}

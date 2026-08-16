@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.system.service.notify;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
+import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyCursorReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessageMyPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.notify.vo.message.NotifyMessagePageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyMessageDO;
@@ -14,6 +16,11 @@ import jakarta.annotation.Resource;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Objects;
 
 /**
  * 站内信 Service 实现类
@@ -75,6 +82,44 @@ public class NotifyMessageServiceImpl implements NotifyMessageService {
     public PageResult<NotifyMessageDO> getMyMyNotifyMessagePage(NotifyMessageMyPageReqVO pageReqVO, Long userId, Integer userType) {
         return notifyMessageMapper.selectPage(pageReqVO, userId, userType);
     }
+
+    @Override
+    public CursorPageResult<NotifyMessageDO> getMyNotifyMessageCursor(NotifyMessageMyCursorReqVO reqVO,
+                                                                      Long userId, Integer userType) {
+        NotifyCursor cursor = decodeCursor(reqVO.getCursor(), userId, userType, reqVO.getReadStatus());
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        List<NotifyMessageDO> rows = notifyMessageMapper.selectCursorList(userId, userType, reqVO.getReadStatus(),
+                reqVO.getCreateTime(), cursor == null ? null : cursor.createTime(),
+                cursor == null ? null : cursor.id(), limit + 1);
+        boolean hasMore = rows.size() > limit;
+        List<NotifyMessageDO> list = hasMore ? new ArrayList<>(rows.subList(0, limit)) : rows;
+        String nextCursor = hasMore && !list.isEmpty()
+                ? encodeCursor(list.get(list.size() - 1), userId, userType, reqVO.getReadStatus()) : null;
+        return new CursorPageResult<>(list, nextCursor, hasMore);
+    }
+
+    private String encodeCursor(NotifyMessageDO message, Long userId, Integer userType, Boolean readStatus) {
+        String value = message.getCreateTime() + "|" + message.getId() + "|" + userId + "|" + userType
+                + "|" + Objects.toString(readStatus, "null");
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private NotifyCursor decodeCursor(String value, Long userId, Integer userType, Boolean readStatus) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            String[] parts = new String(Base64.getUrlDecoder().decode(value), StandardCharsets.UTF_8).split("\\|", -1);
+            if (parts.length != 5 || !Objects.equals(Long.valueOf(parts[2]), userId)
+                    || !Objects.equals(Integer.valueOf(parts[3]), userType)
+                    || !Objects.equals(parts[4], Objects.toString(readStatus, "null"))) {
+                throw new IllegalArgumentException("cursor context mismatch");
+            }
+            return new NotifyCursor(LocalDateTime.parse(parts[0]), Long.valueOf(parts[1]));
+        } catch (RuntimeException ex) {
+            throw new IllegalArgumentException("Invalid notify message cursor", ex);
+        }
+    }
+
+    private record NotifyCursor(LocalDateTime createTime, Long id) {}
 
     @Override
     public NotifyMessageDO getNotifyMessage(Long id) {

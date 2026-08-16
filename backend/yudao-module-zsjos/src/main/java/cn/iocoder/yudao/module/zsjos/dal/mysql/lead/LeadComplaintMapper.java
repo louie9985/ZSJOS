@@ -10,6 +10,9 @@ import org.apache.ibatis.annotations.*;
     default LeadComplaintDO selectByDecisionKey(String key) { return selectOne(LeadComplaintDO::getDecisionIdempotencyKey, key); }
     default PageResult<LeadComplaintDO> selectPage(LeadComplaintPageReqVO req) { return selectPage(req,
             new LambdaQueryWrapperX<LeadComplaintDO>().eqIfPresent(LeadComplaintDO::getStatus, req.getStatus()).orderByAsc(LeadComplaintDO::getId)); }
+    default PageResult<LeadComplaintDO> selectMyPage(LeadComplaintPageReqVO req, Long userId) { return selectPage(req,
+            new LambdaQueryWrapperX<LeadComplaintDO>().eq(LeadComplaintDO::getComplainantUserId, userId)
+                    .eqIfPresent(LeadComplaintDO::getStatus, req.getStatus()).orderByDesc(LeadComplaintDO::getId)); }
     @Select("SELECT * FROM zsjos_lead_complaint WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     LeadComplaintDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
 }

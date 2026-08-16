@@ -4,6 +4,9 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.system.api.dept.PostApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.permission.RoleApi;
+import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCreateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserOrganizationUpdateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
@@ -14,6 +17,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -34,6 +38,14 @@ class PartnerManagementServiceImplTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private PostApi postApi;
     @Mock private LeadMapper leadMapper;
+    @Mock private PermissionApi permissionApi;
+    @Mock private RoleApi roleApi;
+
+    @BeforeEach
+    void setUpRole() {
+        lenient().when(roleApi.getRoleByCode("part_time_partner"))
+                .thenReturn(new RoleRespDTO().setId(99L).setCode("part_time_partner"));
+    }
 
     @Test
     void createUsesAccountWithoutPostsAndBindsPartner() {
@@ -49,6 +61,7 @@ class PartnerManagementServiceImplTest {
         assertEquals(Set.of(), accountCaptor.getValue().getPostIds());
         verify(mapper).insert(argThat((PartnerDO partner) -> partner.getBoundSystemUserId().equals(88L)
                 && PARTNER_STATUS_ENABLED.equals(partner.getStatus())));
+        verify(permissionApi).addUserRole(88L, 99L);
     }
 
     @Test
@@ -92,6 +105,7 @@ class PartnerManagementServiceImplTest {
         assertEquals(Set.of(101L, 102L), updateCaptor.getValue().getPostIds());
         verify(mapper).updateById(argThat((PartnerDO partner) -> PARTNER_STATUS_CONVERTED.equals(partner.getStatus())));
         verify(leadMapper).updateSourceDeptByPartnerId(10L, 20L);
+        verify(permissionApi).removeUserRole(88L, 99L);
     }
 
     @Test

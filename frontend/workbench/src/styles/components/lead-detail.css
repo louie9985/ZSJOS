@@ -85,6 +85,19 @@
   padding: 9px 2px;
 }
 
+.lead-customer-orders { display: grid; min-height: 520px; grid-template-columns: 240px minmax(0,1fr); gap: var(--crm-gap); }
+.lead-customer-orders-list { display: flex; flex-direction: column; gap: var(--crm-sp-2); max-height: 520px; overflow-y: auto; }
+.lead-customer-orders-list button { display: flex; flex-direction: column; gap: var(--crm-sp-2); padding: var(--crm-sp-3); border: 1px solid var(--crm-border); border-radius: var(--crm-radius-md); background: var(--crm-bg-container); color: inherit; text-align: left; cursor: pointer; }
+.lead-customer-orders-list button.active { border-color: var(--crm-color-primary); }
+.lead-customer-orders-list small { color: var(--crm-text-secondary); }
+.lead-customer-orders-mobile { display: none; }
+@media (max-width: 768px) {
+  .lead-customer-orders { display: block; min-height: 0; }
+  .lead-customer-orders-list { display: none; }
+  .lead-customer-orders-mobile { display: block; margin-bottom: var(--crm-sp-4); }
+  .lead-customer-orders-mobile .ant-select { width: 100%; }
+}
+
 .lead-detail-tab-content {
   padding: 10px 0 0;
 }
