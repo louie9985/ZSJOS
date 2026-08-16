@@ -117,6 +117,12 @@ public class BpmTaskServiceImpl implements BpmTaskService {
 
     @Override
     public PageResult<Task> getTaskTodoPage(Long userId, BpmTaskPageReqVO pageVO) {
+        return getTaskTodoPage(userId, pageVO, null, null);
+    }
+
+    @Override
+    public PageResult<Task> getTaskTodoPage(Long userId, BpmTaskPageReqVO pageVO,
+                                            String processVariableName, List<String> processVariableValues) {
         TaskQuery taskQuery = taskService.createTaskQuery()
                 .taskAssignee(String.valueOf(userId)) // 分配给自己
                 .active()
@@ -137,6 +143,9 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         }
         if (CollUtil.isNotEmpty(pageVO.getProcessInstanceIds())) {
             taskQuery.processInstanceIdIn(pageVO.getProcessInstanceIds());
+        }
+        if (!applyProcessVariableFilter(taskQuery, processVariableName, processVariableValues)) {
+            return PageResult.empty();
         }
         if (ArrayUtil.isNotEmpty(pageVO.getCreateTime())) {
             taskQuery.taskCreatedAfter(DateUtils.of(pageVO.getCreateTime()[0]));
@@ -233,10 +242,18 @@ public class BpmTaskServiceImpl implements BpmTaskService {
 
     @Override
     public PageResult<HistoricTaskInstance> getTaskDonePage(Long userId, BpmTaskPageReqVO pageVO) {
+        return getTaskDonePage(userId, pageVO, null, null);
+    }
+
+    @Override
+    public PageResult<HistoricTaskInstance> getTaskDonePage(Long userId, BpmTaskPageReqVO pageVO,
+                                                            String processVariableName,
+                                                            List<String> processVariableValues) {
         HistoricTaskInstanceQuery taskQuery = historyService.createHistoricTaskInstanceQuery()
                 .finished() // 已完成
                 .taskAssignee(String.valueOf(userId)) // 分配给自己
                 .includeTaskLocalVariables()
+                .taskTenantId(FlowableUtils.getTenantId())
                 .orderByHistoricTaskInstanceEndTime().desc(); // 审批时间倒序
         if (StrUtil.isNotBlank(pageVO.getName())) {
             taskQuery.taskNameLike("%" + pageVO.getName() + "%");
@@ -249,6 +266,9 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         }
         if (CollUtil.isNotEmpty(pageVO.getProcessInstanceIds())) {
             taskQuery.processInstanceIdIn(pageVO.getProcessInstanceIds());
+        }
+        if (!applyProcessVariableFilter(taskQuery, processVariableName, processVariableValues)) {
+            return PageResult.empty();
         }
         if (pageVO.getStatus() != null) {
             taskQuery.taskVariableValueEquals(BpmnVariableConstants.TASK_VARIABLE_STATUS, pageVO.getStatus());
@@ -274,6 +294,43 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                     || task.getCreateTime().after(DateUtils.of(pageVO.getCreateTime()[1])));
         }
         return new PageResult<>(tasks, count);
+    }
+
+    private boolean applyProcessVariableFilter(TaskQuery query, String variableName, List<String> values) {
+        if (variableName == null && values == null) {
+            return true;
+        }
+        if (StrUtil.isBlank(variableName) || CollUtil.isEmpty(values)
+                || values.stream().anyMatch(StrUtil::isBlank)) {
+            return false;
+        }
+        if (values.size() == 1) {
+            query.processVariableValueEquals(variableName, values.getFirst());
+            return true;
+        }
+        query.or();
+        values.forEach(value -> query.processVariableValueEquals(variableName, value));
+        query.endOr();
+        return true;
+    }
+
+    private boolean applyProcessVariableFilter(HistoricTaskInstanceQuery query, String variableName,
+                                               List<String> values) {
+        if (variableName == null && values == null) {
+            return true;
+        }
+        if (StrUtil.isBlank(variableName) || CollUtil.isEmpty(values)
+                || values.stream().anyMatch(StrUtil::isBlank)) {
+            return false;
+        }
+        if (values.size() == 1) {
+            query.processVariableValueEquals(variableName, values.getFirst());
+            return true;
+        }
+        query.or();
+        values.forEach(value -> query.processVariableValueEquals(variableName, value));
+        query.endOr();
+        return true;
     }
 
     @Override

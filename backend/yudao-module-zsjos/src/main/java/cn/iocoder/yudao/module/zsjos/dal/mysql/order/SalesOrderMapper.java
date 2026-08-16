@@ -25,6 +25,18 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
                 .eq(SalesOrderDO::getOrderType, "repurchase").in(SalesOrderDO::getStatus, statuses)
                 .orderByDesc(SalesOrderDO::getId).last("LIMIT 1"));
     }
+    default SalesOrderDO selectOtherActiveByLeadId(Long leadId, Long excludedOrderId,
+                                                    Collection<String> statuses) {
+        return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
+                .ne(SalesOrderDO::getId, excludedOrderId).in(SalesOrderDO::getStatus, statuses)
+                .orderByDesc(SalesOrderDO::getId).last("LIMIT 1"));
+    }
+    default SalesOrderDO selectOtherActiveByPersonId(Long personId, Long excludedOrderId,
+                                                      Collection<String> statuses) {
+        return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getPersonId, personId)
+                .ne(SalesOrderDO::getId, excludedOrderId).in(SalesOrderDO::getStatus, statuses)
+                .orderByDesc(SalesOrderDO::getId).last("LIMIT 1"));
+    }
     default boolean hasEffectiveOrder(Long personId) {
         return selectCount(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getPersonId, personId)
                 .eq(SalesOrderDO::getStatus, "effective")) > 0;

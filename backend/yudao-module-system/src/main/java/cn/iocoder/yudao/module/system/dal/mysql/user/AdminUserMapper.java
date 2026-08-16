@@ -15,8 +15,8 @@ import java.util.List;
 public interface AdminUserMapper extends BaseMapperX<AdminUserDO> {
 
     default AdminUserDO selectByUsername(String username) {
-        // Login names are case-sensitive even when the tenant database uses a case-insensitive collation.
-        return selectOne(new QueryWrapper<AdminUserDO>().apply("BINARY username = {0}", username));
+        // V056 keeps login names case-sensitive without using MySQL syntax that the tenant SQL parser cannot parse.
+        return selectOne(new QueryWrapper<AdminUserDO>().eq("unique_username", username));
     }
 
     default AdminUserDO selectByEmail(String email) {

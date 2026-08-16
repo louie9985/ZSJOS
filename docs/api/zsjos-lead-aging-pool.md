@@ -31,6 +31,12 @@ provide BPM process definition `zsjos_lead_transfer_request` with task key `owne
 the endpoint is enabled. An unavailable process returns a stable business error and rolls back the
 request row.
 
+Transfer-request creation locks the cycle and then its Lead, matching the exit workflow's lock order,
+and revalidates the Lead relationship and caller visibility. An idempotent replay is returned only
+after those authorization checks and must match both the locked Lead and requesting user; it remains
+replayable after the original request changes the cycle status. A new request still requires an active
+cycle. Guessing another tenant user's or an out-of-scope cycle ID never bypasses object authorization.
+
 Active statuses are `waiting_assignment`, `assigned`, and `deal_pending`. Entry is timed from the
 latest Opportunity follow-up, or Opportunity creation when no follow-up exists. Responses include full
 contact fields only after server-side object authorization and include `availableActions`; clients

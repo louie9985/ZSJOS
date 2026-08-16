@@ -62,7 +62,6 @@ public class LeadAgingPoolController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead-aging-pool:transfer-request')")
     public CommonResult<Long> requestTransfer(@PathVariable Long id,
             @Valid @RequestBody LeadTransferRequestCreateReqVO reqVO) {
-        LeadAgingPoolRespVO cycle = service.get(id, getLoginUserId());
-        return success(transferRequestService.create(cycle.getLeadId(), getLoginUserId(), reqVO));
+        return success(transferRequestService.create(id, getLoginUserId(), reqVO));
     }
 }

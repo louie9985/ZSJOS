@@ -938,3 +938,202 @@
 - Verification evidence: `codex/crm-lifecycle-gap-implementation` is an ancestor of `main` and contributes no unmerged commit; `gitee/master` has no merge base and was not merged. `zsjos-db check` passed; `git diff --check` passed with line-ending warnings only; Admin `pnpm build:local` completed successfully after transforming 8,780 modules, with the existing Lightning CSS `*zoom` warning. Admin `pnpm ts:check` reported 16 errors: two FMS formula-rule narrowing errors and 14 existing BPM/CRM/MES/System/ZSJOS baseline errors. Admin `pnpm lint` reported zero ESLint errors, one generated declaration warning, and 76 Stylelint errors spanning both existing baseline and eight imported HRM/FMS property-order findings. Backend aggregate Maven compilation is blocked during model loading because FMS declares Aviator without a managed version; isolated HRM compilation reached 577 Java sources but failed on upstream/current-framework compatibility gaps including missing date, collection and money helpers plus generated accessor/type mismatches. Backend tests could not run because compilation failed.
 - Dependency or integration impact: Local `main` now records HRM/FMS as enabled Maven modules and Admin surfaces, plus the reconciled V058-V061 SQL chain. FMS introduces an unresolved `com.googlecode.aviator:aviator` declaration that requires a separately reviewed version/maintenance/security decision before backend compilation can pass. No unrelated-history merge, database mutation, service restart, branch deletion, push, publication, or force operation occurred in this consolidation turn.
 - Remaining work: Repair the imported HRM/FMS compatibility gaps against the current Yudao framework; explicitly review and pin or centrally manage Aviator; fix the two FMS TypeScript errors and imported Stylelint findings; rerun backend compile/tests, Admin typecheck/lint/build, and authenticated desktop/mobile HRM/FMS checks before release. Push remains pending explicit user request.
+
+### Workstream registration: 2026-08-15 15:21:44 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Repair the confirmed HRM/FMS backend compatibility and directly related Admin type/style failures introduced by the integrated upstream modules.
+- Non-goals: Do not change HRM/FMS business behavior, fix unrelated baseline errors, mutate database state, start or stop services, create or switch branches, commit, or push.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- Target branch: `main`
+- Ownership scope: `backend/yudao-dependencies/pom.xml`; the exact HRM-required APIs and focused tests in `backend/yudao-framework/yudao-common`; necessary HRM/FMS compile compatibility fixes; the two FMS report formula type fixes; imported HRM/FMS Stylelint property-order fixes; and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: User-confirmed Aviator `5.4.3`; current upstream Yudao utility contracts; existing integrated HRM/FMS source; no database or runtime service changes.
+- Integration order: Manage Aviator centrally; add only utility APIs referenced by HRM with focused tests; compile HRM/FMS/Server and resolve genuine compatibility failures; apply scoped Admin type/style fixes; run backend, Admin, dependency, database read-only, and diff verification.
+- Verification plan: Run focused `yudao-common` tests; compile `yudao-module-hrm`, `yudao-module-fms`, and `yudao-server` with dependencies; inspect the Aviator dependency tree; run Admin typecheck, scoped ESLint/Stylelint, and production-local build; run `zsjos-db check` and `git diff --check`; report unrelated baseline failures separately.
+
+### Scope update: 2026-08-15 15:45:20 +08:00
+
+- Added ownership for the five HRM test-only timestamp precision corrections required to make imported database tests deterministic at MySQL/H2 microsecond precision. No production behavior or database state is changed.
+- Added ownership for the FMS H2 test-schema idempotency correction: the generated-column addition now tolerates repeated test-script initialization. No production SQL or database state is changed.
+- Added ownership for imported FMS test fixtures covering current service dependencies, database timestamp precision, and order-independent collection assertions. Production query and service behavior remains unchanged.
+
+### 2026-08-15 15:57:20 +08:00
+
+- Branch: `main`
+- Worktree: `D:\\ZSJ-OS`
+- HEAD commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- User goal: Complete the confirmed HRM/FMS backend compatibility repair and directly related Admin type/style repair after the upstream modules were integrated.
+- Key decisions: Centrally managed Aviator at the user-confirmed `5.4.3`; added only public Yudao framework/system contracts referenced by HRM/FMS; preserved production query ordering and business behavior; repaired imported HRM/FMS test fixtures for current dependencies, H2 idempotency, and database-supported timestamp precision; left unrelated Admin baseline type errors unchanged.
+- Execution or analysis result: HRM/FMS and `yudao-server` now compile in the aggregate reactor. Common collection/date/money/number/page/servlet, Excel, and MyBatis compatibility APIs are present; department and administrator-user public APIs satisfy HRM integration; the two FMS formula TypeScript failures and eight imported HRM/FMS Stylelint failures are removed. Imported HRM and FMS test suites now pass completely.
+- Changed files: `backend/yudao-dependencies/pom.xml`; focused common utility implementations and tests under `backend/yudao-framework/yudao-common/**`; Excel compatibility classes under `backend/yudao-framework/yudao-spring-boot-starter-excel/**`; MyBatis compatibility methods under `backend/yudao-framework/yudao-spring-boot-starter-mybatis/**`; system department/user public API and service files; three HRM test files; four FMS test files and `backend/yudao-module-fms/src/test/resources/sql/create_tables.sql`; eight HRM/FMS Admin Vue files; and this handoff record.
+- Verification evidence: `mvn.cmd -pl yudao-module-hrm,yudao-module-fms,yudao-server -am -DskipTests compile` passed all 27 reactor modules; focused common utility tests passed; HRM passed 567/567 tests and FMS passed 265/265 tests; dependency tree resolves only `com.googlecode.aviator:aviator:5.4.3`; Admin scoped ESLint and Stylelint passed; `pnpm build:local` passed after 8,780 modules with the existing Lightning CSS `*zoom` warning; `pnpm ts:check` contains only 14 pre-existing BPM/CRM/MES/System/ZSJOS errors and no HRM/FMS errors; `.\\zsjos-db.ps1 check` passed; `git diff --check` passed with line-ending warnings only. A broad `-am test` attempt remains blocked by the unrelated existing `CodegenEngineUniappTest.testExecute_treeSearch` assertion in `yudao-module-infra`, while the two requested module suites pass independently with reactor dependencies.
+- Dependency or integration impact: FMS now consumes centrally managed Aviator `5.4.3`; shared framework/system APIs expand compatibly for HRM/FMS callers. Test-only changes do not alter production database or runtime behavior. No database mutation, migration execution, service start/stop, branch operation, commit, push, or publication occurred.
+- Remaining work: The 14 unrelated Admin TypeScript baseline errors and the unrelated Infra UniApp generator test remain outside this task. The verified changes are uncommitted on local `main`; commit and push require separate explicit confirmation.
+
+### Workstream registration: 2026-08-15 16:41:39 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Fix the impersonation idle-session scheduler so it executes once per active tenant with tenant context and isolates failures between tenants.
+- Non-goals: Do not change the cron schedule, idle timeout, session states, mapper queries, database schema, dependencies, maintenance-mode behavior, runtime services, branch state, commit state, or unrelated existing changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- Target branch: `main`
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/impersonation/ImpersonationSessionScheduler.java`; its focused scheduler test under the matching test package; and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing `TenantFrameworkService` and `TenantUtils` framework contracts; current System maintenance-mode public API; existing impersonation service boundary.
+- Integration order: Add tenant enumeration and scoped execution to the scheduler; add focused tests for multi-tenant execution, failure isolation, maintenance mode, and tenant-context restoration; run focused tests and module compile/test checks; append delivery evidence.
+- Verification plan: Run the focused impersonation scheduler and service tests, compile the ZSJOS module with reactor dependencies, run `git diff --check` for owned files, and report any unrelated aggregate-suite blocker separately.
+
+### 2026-08-15 16:45:45 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- User goal: Fix the impersonation idle-session scheduler failure caused by a missing tenant context.
+- Key decisions: Reused the established `TenantFrameworkService` and `TenantUtils.execute` framework pattern; retained the maintenance-mode check and one-minute cron; executed the existing transactional service once per tenant; isolated runtime failures so one tenant cannot block later tenants; did not bypass tenant isolation with `@TenantIgnore`.
+- Execution or analysis result: The scheduler now supplies the required tenant context before querying impersonation sessions, restores the previous context after each tenant, skips all tenant work during maintenance, and logs tenant-specific failures while continuing the scan.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/impersonation/ImpersonationSessionScheduler.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/impersonation/ImpersonationSessionSchedulerTest.java`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Focused reactor test command passed `ImpersonationSessionSchedulerTest` and `ImpersonationServiceImplTest`, 6 tests with 0 failures/errors, and compiled all 20 dependency modules including 479 ZSJOS production sources and 58 test sources. Scheduler coverage verifies two-tenant execution, context restoration, tenant-failure isolation, and maintenance-mode skipping. The complete `yudao-module-zsjos -am test` run was blocked before ZSJOS by the existing unrelated `yudao-module-infra` failure `CodegenEngineUniappTest.testExecute_treeSearch` (205 tests, 1 failure, 10 skipped). A standalone ZSJOS run was not valid against the dirty reactor because Maven resolved stale installed System snapshot classes and reported missing public APIs such as `MaintenanceModeApi`, followed by cascading Mockito errors. Focused `git diff --check` passed with line-ending warnings only.
+- Dependency or integration impact: No new dependency, API, schema, migration, data, permission, configuration, cron, timeout, service-state, branch, commit, push, or publication change. The existing architecture documentation already specifies maintenance checking before tenant enumeration and required no synchronization.
+- Remaining work: Rebuild or restart the backend in an authorized runtime and observe at least one scheduled execution to confirm the prior `TenantContextHolder` error no longer appears and idle sessions expire per tenant. The unrelated Infra generator test and stale standalone-module dependency snapshot remain outside this task.
+
+### Workstream registration: 2026-08-15 17:20:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Implement the confirmed ZSJOS full-review remediation plan while preserving unrelated local changes.
+- Non-goals: No branch/worktree operation, commit, push, database execution, service restart, dependency addition, or unrelated module refactor.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- Target branch: `main`
+- Ownership scope: ZSJOS order, lead transfer/appeal/duplicate-review, withdrawal, work-plan, product SKU, advanced-filter and follow-up pagination production/test files; directly affected ZSJOS documentation; and this handoff entry.
+- Owner: Codex `/root`
+- Dependencies: Existing System/BPM public APIs and current local uncommitted work; no new dependency.
+- Integration order: Apply transaction/permission fixes, then work-plan/SKU/filter/input fixes, then test and build verification; preserve all pre-existing files outside ownership scope.
+- Verification plan: Run focused ZSJOS tests for every changed behavior, module compile/test, server dependency build, `git diff --check`, and report the unrelated Infra and existing baseline failures separately.
+
+### 2026-08-15 20:11:44 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- User goal: Complete the confirmed full review remediation for `backend/yudao-module-zsjos`, including a complete repair implementation and final verification.
+- Key decisions: Preserved tenant-level central duplicate-review candidate selection and intersection semantics for advanced filters; kept terminated-order revision in place and rejected it when another active order exists; treated only active tasks as work-plan blockers; defaulted created/generated SKUs to enabled, prohibited ordinary status/SPU changes, and capped generation at 500; hid finance-only withdrawal fields from ordinary users; made transfer replay tenant/Lead/requester-bound and authorization-first; modeled each appeal round as an independent row and BPM process; used BPM-native `reviewStage` filtering with tenant/task/process constraints and fail-closed input validation; kept legacy null reviewer snapshots compatible only when stage permission, enabled BPM assignee, and all other correlations pass; preserved protocol error code `1_900_003_021`.
+- Execution or analysis result: Repaired order lifecycle concurrency guards, transfer replay authorization/idempotency, work-plan completion checks, withdrawal field exposure, SKU parent/state validation, duplicate-review and advanced-filter behavior, appeal authorization/correlation/pagination, follow-up pagination validation, and removed production test controllers. Extended the BPM internal task-page boundary so authorized process-variable filters are not HTTP-bindable, added tenant isolation to historic done-task queries, rejected incomplete/blank filter values, required canonical appeal business keys, and failed the whole appeal page on inconsistent BPM/database relations. Synchronized directly affected API documentation.
+- Changed files: ZSJOS production and focused test files for sales orders, lead transfer/appeal/duplicate review/management/follow-up/aging pool, withdrawals, work plans, product SKUs, advanced filters, error codes, test-controller removal, and associated mappers/controllers/VOs; BPM task API DTO/implementation, task service interface/implementation, and focused tests; `docs/api/withdrawal-and-offline-payout.md`, `docs/api/zsjos-lead-aging-pool.md`, `docs/api/zsjos-lead-appeal.md`, `docs/api/zsjos-lead-submission-dispatch.md`, `docs/api/zsjos-product-configuration.md`, `docs/api/zsjos-sales-order.md`, `docs/api/zsjos-workbench-foundation.md`; this handoff record. Pre-existing unrelated framework, System, HRM/FMS, Admin, and impersonation changes were preserved.
+- Verification evidence: Final focused reactor tests passed BPM 11/11 and appeal 12/12 after the last fail-closed filter change. The preceding final aggregate selection passed all BPM tests 64 total with 6 existing skips and all ZSJOS tests 298/298 with zero failures/errors; earlier SKU-focused coverage passed 9/9. `git diff --check` exited 0 with line-ending warnings only. Open Code Review sessions included full/iterative review evidence `f8bfa32c-357b-46ae-ba10-9e275c967613`, `4086a16a-b120-4bee-83d2-468cd57f812c`, `00d6fa2e-708d-4281-a97c-65da69e614cb`, `2c446cd7-6ab6-49ab-bc90-d6b8df01eca3`, `6d91a60d-1caa-4e5b-a0bd-cbec6342dd9d`, and `70dca9d8-014b-4550-94dc-4d7aa3b88615`; final focused session `1e382dff-1673-44d9-af37-1b18c6ee18f5` reviewed the last Flowable filter change with zero findings. Java PID `26732` remained running throughout.
+- Dependency or integration impact: The BPM public Java API is extended additively for internal callers; existing Controller-facing two-argument task-page methods retain their prior behavior, while process-variable filter fields are absent from the HTTP request VO. No dependency, schema, migration, database data, permission, runtime service, branch/worktree, commit, push, or publication operation occurred. The running server JAR was not repackaged or replaced because PID `26732` owns it.
+- Remaining work: Real BPM/Flowable execution, database transaction rollback, concurrent request behavior, and authenticated endpoint behavior remain unverified in a runtime environment. Rebuild/restart and runtime validation require separate authorization because the current Java service must not be stopped. A broader unfiltered `-am test` remains blocked by the unrelated existing `CodegenEngineUniappTest.testExecute_treeSearch`; the scoped BPM and ZSJOS suites pass. The verified changes remain uncommitted on local `main`.
+
+### Scope update: 2026-08-15 20:43:00 +08:00
+
+- Added ownership for `frontend/admin/src/api/system/dict/dict.data.ts` to replace its nonexistent dictionary-by-type route with the existing System simple-list contract and client-side type filtering. No System backend, dictionary data, permission, component behavior, dependency, or runtime service change is included.
+
+### 2026-08-15 20:46:51 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- User goal: Fix the Admin advanced-filter dictionary request that returned 404 for `/admin-api/system/dict-data/type`.
+- Key decisions: Reused the existing System `GET /system/dict-data/simple-list` contract and filtered enabled results by `dictType` in the shared frontend helper; did not add a duplicate backend endpoint or create static business options.
+- Execution or analysis result: `getDictDataByType` now returns a typed `Promise<DictDataVO[]>` from the authoritative simple-list response. Existing advanced-filter callers require no change, and the nonexistent `/system/dict-data/type` route is no longer referenced in Admin source or build output.
+- Changed files: `frontend/admin/src/api/system/dict/dict.data.ts`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Focused ESLint passed; `pnpm build:local` succeeded after transforming 8,780 modules with only the existing Lightning CSS `*zoom` warning; port 80's live Vite module contained `/system/dict-data/simple-list` and `item.dictType === dictType` and did not contain `/system/dict-data/type`; source and `dist` contained zero old-route references; `git diff --check` exited 0. Full `pnpm ts:check` remained blocked by the same 14 pre-existing BPM/CRM/MES/System/ZSJOS errors and reported no error in the changed helper. Browser validation reached the local Admin login page, but no authenticated in-app or Chrome session was available, so the protected advanced-filter UI itself was not exercised.
+- Dependency or integration impact: No dependency, System backend, dictionary data, permission, database, runtime service, branch/worktree, commit, push, or publication change. Admin port 80 and backend port 48080 remained listening.
+- Remaining work: Authenticated interaction with the advanced-filter drawer remains unverified until an existing signed-in browser session is available. The unrelated 14 Admin TypeScript baseline errors remain outside this repair.
+
+### Scope update: 2026-08-15 21:02:32 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Implement the confirmed frontend/backend API contract repairs for work-plan export and mail-log export, and remove eight verified-unused stale API declarations.
+- Non-goals: No database or permission-data change, disabled-module cleanup, dependency addition, service restart, branch/worktree operation, commit, push, or unrelated refactor.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- Target branch: `main`
+- Ownership scope: `frontend/admin/src/config/axios/index.ts`; the Admin work-plan API/view; the Admin mail-log API/view only if required; stale declarations in the identified BPM and Pay API modules; the System mail-log Controller/service/export VO and focused tests; directly affected API documentation if present; and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing Yudao Axios, Excel, System mail-log, and ZSJOS work-plan facilities; no new dependency.
+- Integration order: Add the shared POST-download path, repair work-plan download consumption, restore the System mail-log export contract, remove only declarations with zero call sites, then run focused and aggregate verification.
+- Verification plan: Run focused System mail-log tests, affected backend module tests/build as feasible, Admin lint/type/build checks, runtime OpenAPI and HTTP contract checks without restarting services, `git diff --check`, and report any baseline or runtime limitation separately.
+
+### Scope update: 2026-08-15 21:06:00 +08:00
+
+- Added ownership for `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/enums/DictTypeConstants.java` because the new mail-log Excel VO must reference the existing `system_mail_send_status` dictionary through the module-owned constant rather than duplicate its code as a string literal.
+
+### 2026-08-15 21:16:26 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- User goal: Execute the confirmed frontend/backend API contract repair plan after comprehensively reconciling Admin callers with available backend routes.
+- Key decisions: Added a shared POST Blob download method because work-plan export is server-owned as POST; made the work-plan page consume and save the returned Blob with an explicit loading state; restored the missing System mail-log Excel endpoint using the existing service, Excel framework, permission convention, and send-status dictionary; deliberately excluded mail body, template parameters, CC, and BCC fields from the export; removed only eight declarations proven to have zero Admin call sites and no matching backend route; preserved all unrelated dirty-worktree changes and did not reformat the existing compressed work-plan files.
+- Execution or analysis result: Work-plan export now calls `POST /zsjos/work-plan/export-excel` and downloads `计划任务明细.xlsx`; System now provides `GET /system/mail-log/export-excel` guarded by `system:mail-log:export`; obsolete BPM/Pay declarations for process-expression export, form-field permission, my-todo task, channel page/export, and refund create/update/delete are removed. No directly affected API documentation required synchronization because these are existing contracts or removal of unused invalid declarations.
+- Changed files: `frontend/admin/src/config/axios/index.ts`; `frontend/admin/src/api/zsjos/workPlan/index.ts`; `frontend/admin/src/views/zsjos/workPlan/index.vue`; `frontend/admin/src/api/bpm/processExpression/index.ts`; `frontend/admin/src/api/bpm/processInstance/index.ts`; `frontend/admin/src/api/bpm/task/index.ts`; `frontend/admin/src/api/pay/channel/index.ts`; `frontend/admin/src/api/pay/refund/index.ts`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/mail/MailLogController.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/mail/vo/log/MailLogExcelVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/enums/DictTypeConstants.java`; `backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/controller/admin/mail/MailLogControllerTest.java`; this handoff record.
+- Verification evidence: Focused System mail-log tests passed 6/6 with zero failures/errors and the 18-module reactor built successfully; Admin targeted ESLint passed; `pnpm build:local` passed after transforming 8,780 modules with only the existing Lightning CSS `*zoom` warning; source scanning found zero remaining references to all eight stale symbols; `git diff --check` exited 0 with line-ending warnings only. Full `pnpm ts:check` still reports exactly 14 pre-existing errors in BPM, CRM, MES, System user, and unrelated ZSJOS views, with no error in this task's files. Running OpenAPI confirms the work-plan POST route; port 80's live Vite modules contain `postDownload` and `计划任务明细.xlsx`. The new mail-log route is compile/test verified but is not present in the already-running backend because port 48080 was intentionally not restarted.
+- Dependency or integration impact: The Axios request facade gains one additive POST-download helper and System gains one permission-protected export endpoint; no new dependency, schema, migration, dictionary data, role/permission grant, database mutation, service start/stop, branch/worktree operation, commit, push, or publication occurred. Listening project ports remain limited to 80, 5174, and 48080.
+- Remaining work: Rebuild/restart the backend through a separately authorized operational action before runtime OpenAPI and authenticated HTTP validation of the new mail-log route. Authenticated browser download checks remain pending. The 14 unrelated Admin TypeScript errors and the work-plan page's pre-existing compressed Stylelint baseline remain outside this repair. The verified changes remain uncommitted on local `main`.
+
+### Workstream registration: 2026-08-16 09:50:48 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Fix Admin login failure caused by JSqlParser rejecting the MySQL-specific `BINARY username` predicate after V056.
+- Non-goals: No schema or migration change, tenant-filter change, dependency addition, credential or account mutation, service restart, branch/worktree operation, commit, push, or unrelated refactor.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- Target branch: `main`
+- Ownership scope: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/user/AdminUserMapper.java`; focused System user Mapper/service tests required for the username lookup regression; and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: V056's `system_users.unique_username` generated column and existing MyBatis-Plus tenant interceptor; no new dependency.
+- Integration order: Replace the parser-incompatible predicate, add regression coverage for case-sensitive lookup and tenant SQL parsing, then run focused tests, module compilation, and diff checks.
+- Verification plan: Run focused System username lookup tests with the tenant interceptor active, verify exact and case-mismatched usernames, compile/package the affected module as feasible, run `git diff --check`, and report live login as pending because restarting the running backend requires separate authorization.
+
+### Scope update: 2026-08-16 09:52:00 +08:00
+
+- Added ownership for `backend/yudao-module-system/src/test/resources/sql/create_tables.sql` because the System H2 test baseline must expose V056's generated `unique_username` column for the focused Mapper/service regression test. Production schema and migration artifacts remain unchanged.
+
+### 2026-08-16 09:53:24 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- User goal: Fix Admin login after V056 and recompilation still failed because the tenant SQL interceptor could not parse `BINARY username = ?`.
+- Key decisions: Query V056's generated `unique_username` column through a standard MyBatis-Plus equality predicate; preserve case-sensitive usernames, tenant interception, the production schema, and the existing V056 migration; align the System H2 test table with the generated-column contract.
+- Execution or analysis result: `AdminUserMapper.selectByUsername` no longer emits parser-incompatible MySQL `BINARY` syntax. Exact username lookup succeeds, a case-only mismatch returns no user, and existing user create/import/uniqueness paths continue to pass.
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/user/AdminUserMapper.java`; `backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/service/user/AdminUserServiceImplTest.java`; `backend/yudao-module-system/src/test/resources/sql/create_tables.sql`; `handoff/20260810-main-existing.md`.
+- Verification evidence: Focused exact/case-sensitive username tests passed 2/2 with the 18-module dependency reactor compiling successfully; the complete `AdminUserServiceImplTest` passed 39/39 with zero failures/errors; the standard MyBatis-Plus query executed without the prior JSqlParser exception; task-scoped `git diff --check` passed with line-ending warnings only; source scanning confirms application code no longer contains `BINARY username` and both V056 and the fresh baseline contain `unique_username`.
+- Dependency or integration impact: No dependency, API, schema, migration, tenant-filter, database data, credential, permission, runtime service, branch/worktree, commit, push, or publication change. Runtime now requires V056's generated column, which the user confirmed is applied.
+- Remaining work: Rebuild and restart the backend, then retry an authenticated login request with the correct `tenant-id`. Live HTTP verification remains pending because stopping/restarting the running service requires separate explicit confirmation.
+
+### Workstream registration: 2026-08-16 10:32:51 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Pull and merge the latest `origin/main` commit into local `main`, resolving all frontend conflicts with the remote version and stopping for confirmation on any non-frontend conflict.
+- Non-goals: No push, branch/worktree switch, rebase, service operation, dependency change, or modification/staging of existing unrelated uncommitted work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d3e4ac8851162ebfdf78c37607fd873abd659b8c`
+- Target branch: `main`
+- Ownership scope: The merge state and files changed by remote commit `a6b5aa8dfa135b96a4c4ec2efd1231ba8afb7c96`; the frontend conflict `frontend/workbench/tsconfig.tsbuildinfo`; this handoff record. Existing uncommitted files remain owned by their current tasks and must not be staged into the merge commit.
+- Owner: Codex `/root`
+- Dependencies: `origin/main` at `a6b5aa8dfa135b96a4c4ec2efd1231ba8afb7c96`; current local five-commit history; existing dirty worktree.
+- Integration order: Record scope, merge with automatic commit disabled, resolve frontend conflicts from the remote side, stop if any non-frontend conflict exists, verify the merge index excludes unrelated work, then create the user-confirmed merge commit.
+- Verification plan: Inspect unmerged paths, compare staged merge changes with the remote commit, confirm unrelated unstaged/untracked changes remain outside the index, run `git diff --check` on the staged merge, create the merge commit, and verify branch ancestry/status without pushing.
+
+### 2026-08-16 10:34:51 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `2fbda10f8e476650f086d29c9e00fea5491a3436`
+- User goal: Pull the latest remote repository code; resolve frontend conflicts entirely with the remote version and request confirmation for any other conflict.
+- Key decisions: Fetched `origin/main` first and previewed the three-way merge; disabled merge autostash to avoid moving or replaying the dirty worktree; removed only the verified stale `.git/index.lock`; resolved the sole conflict, `frontend/workbench/tsconfig.tsbuildinfo`, from `origin/main`; preserved all unrelated unstaged and untracked work; created the separately confirmed merge commit without pushing.
+- Execution or analysis result: Remote commit `a6b5aa8dfa135b96a4c4ec2efd1231ba8afb7c96` is now the second parent of local merge commit `2fbda10f8e476650f086d29c9e00fea5491a3436`. No non-frontend conflict occurred. Local `main` is ahead of `origin/main` by 6 commits and behind by 0.
+- Changed files: Remote commit's 16 files: `.claude/skills/new-page.md`; `.gitignore`; `frontend/admin/src/views/Login/SocialLogin.vue`; `frontend/workbench/AGENTS.md`; `frontend/workbench/docs/ui-guidelines.md`; `frontend/workbench/src/components/FollowUpTimeline.tsx`; `frontend/workbench/src/components/LeadFollowUpPanel.tsx`; `frontend/workbench/src/pages/LeadManagementPage.tsx`; `frontend/workbench/src/services/leadFollowUp.test.ts`; `frontend/workbench/src/services/leadFollowUp.ts`; `frontend/workbench/src/styles/antd-overrides.css`; `frontend/workbench/src/styles/components/follow-up.css`; `frontend/workbench/src/styles/components/lead-detail.css`; `frontend/workbench/src/styles/components/snake-timeline.css`; `frontend/workbench/src/styles/index.css`; `frontend/workbench/tsconfig.tsbuildinfo`; plus this handoff record.
+- Verification evidence: Merge preview and actual merge both identified only the Workbench build-info conflict; after resolution, the unmerged-path list was empty; staged and remote file sets matched at 16 files; the conflict file's staged blob `0a1ed0f85cd8aa600e337a83407d54fb39eece76` exactly matched `origin/main`; the handoff and all pre-existing worktree changes were absent from the merge index; the merge commit has parents `d3e4ac8851162ebfdf78c37607fd873abd659b8c` and `a6b5aa8dfa135b96a4c4ec2efd1231ba8afb7c96`; `origin/main` is an ancestor of HEAD; no merge state or index lock remains. Staged `git diff --check` reported only one trailing-whitespace line already present in the remote UI guideline document. Frontend tests/build/browser checks were not rerun because this turn synchronizes an existing remote commit and a build could rewrite the tracked `tsconfig.tsbuildinfo` that was explicitly required to match remote.
+- Dependency or integration impact: Local history gained one merge commit and the latest remote frontend changes. No dependency, database, permission, runtime service, branch/worktree switch, rebase, push, or publication occurred. Existing unstaged and untracked work remains in place.
+- Remaining work: The merge commit is not pushed. Existing unrelated dirty-worktree changes remain uncommitted. Local functional verification of the remotely authored UI change remains pending if acceptance testing is required.

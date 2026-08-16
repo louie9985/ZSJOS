@@ -17,4 +17,8 @@ public class BpmTaskPageReqDTO extends PageParam {
     private String taskDefinitionKey;
 
     private List<String> processInstanceIds;
+
+    private String processVariableName;
+
+    private List<String> processVariableValues;
 }

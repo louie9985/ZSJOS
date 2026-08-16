@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.AdvancedFilterGroupReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
@@ -380,6 +381,27 @@ class LeadManagementServiceImplTest {
 
         verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
                 List.of("first_follow_pending"), false, null);
+    }
+
+    @Test
+    void advancedFilterKeepsInboxConstraintsAndAddsMatchedIds() {
+        LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
+        reqVO.setAudience("owner"); reqVO.setInboxGroup("pending");
+        reqVO.setAdvancedFilter(new AdvancedFilterGroupReqVO());
+        LeadInboxFilterConfigVO config = filterConfig();
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
+        when(inboxFilterConfigService.resolveQuery(config, "pending", null))
+                .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false));
+        when(advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter())).thenReturn(List.of(7L, 8L));
+        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
+                false, List.of(7L, 8L))).thenReturn(PageResult.empty());
+
+        service.getLeadPage(reqVO, 10L);
+
+        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
+                false, List.of(7L, 8L));
     }
 
     @Test

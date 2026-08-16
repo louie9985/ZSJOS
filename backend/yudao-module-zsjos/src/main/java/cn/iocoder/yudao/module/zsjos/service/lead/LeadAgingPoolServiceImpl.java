@@ -402,6 +402,10 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Override public boolean canRead(Long leadId, Long userId) {
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadId(leadId);
         if (cycle == null) return false;
+        return canRead(cycle, userId);
+    }
+
+    @Override public boolean canRead(LeadAgingPoolCycleDO cycle, Long userId) {
         AdminUserRespDTO user = adminUserApi.getUser(userId);
         Long ownerDeptId = currentOwnerDeptId(cycle);
         return hasManageAll() || user != null && Objects.equals(user.getDeptId(), ownerDeptId) && isEligibleSales(userId)

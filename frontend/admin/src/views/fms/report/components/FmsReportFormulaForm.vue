@@ -128,19 +128,21 @@ const formulaList = ref<FmsReportFormulaVO[]>([]) // 编辑中的公式项列表
 const subjectId = ref<number>() // 待添加的科目编号
 const rules = ref<number>(FMS_FORMULA_RULE.BALANCE) // 待添加的取数规则
 const operator = ref<'+' | '-'>('+') // 待添加的运算符
+const balanceFormulaRules: number[] = [
+  FMS_FORMULA_RULE.BALANCE,
+  FMS_FORMULA_RULE.DEBIT_BALANCE,
+  FMS_FORMULA_RULE.CREDIT_BALANCE
+]
+const incomeFormulaRules: number[] = [
+  FMS_FORMULA_RULE.DEBIT_AMOUNT,
+  FMS_FORMULA_RULE.CREDIT_AMOUNT,
+  FMS_FORMULA_RULE.PROFIT_LOSS_AMOUNT
+]
 const balanceFormulaRuleOptions = getIntDictOptions(DICT_TYPE.FMS_FORMULA_RULE).filter((item) =>
-  [
-    FMS_FORMULA_RULE.BALANCE,
-    FMS_FORMULA_RULE.DEBIT_BALANCE,
-    FMS_FORMULA_RULE.CREDIT_BALANCE
-  ].includes(item.value)
+  balanceFormulaRules.includes(item.value)
 )
 const incomeFormulaRuleOptions = getIntDictOptions(DICT_TYPE.FMS_FORMULA_RULE).filter((item) =>
-  [
-    FMS_FORMULA_RULE.DEBIT_AMOUNT,
-    FMS_FORMULA_RULE.CREDIT_AMOUNT,
-    FMS_FORMULA_RULE.PROFIT_LOSS_AMOUNT
-  ].includes(item.value)
+  incomeFormulaRules.includes(item.value)
 )
 
 /** 启用状态的科目 */

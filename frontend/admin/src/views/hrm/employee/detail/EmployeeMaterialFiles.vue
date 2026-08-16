@@ -114,8 +114,8 @@ onMounted(() => {
   align-items: center;
   width: 100%;
   min-height: 72px;
-  margin-bottom: 12px;
   padding: 14px 16px;
+  margin-bottom: 12px;
   color: var(--el-text-color-regular);
   text-align: left;
   cursor: pointer;

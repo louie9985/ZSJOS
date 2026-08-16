@@ -14,4 +14,4 @@ export const getWorkPlan = (id: number) => request.get<WorkPlanVO>({ url: '/zsjo
 export const cancelWorkPlan = (id: number, version: number, reason: string) => request.post({ url: `/zsjos/work-plan/${id}/cancel`, data: { version, reason } })
 export const cancelWorkTask = (id: number, version: number, reason: string, cascadeChildren = false) => request.post({ url: `/zsjos/work-plan/task/${id}/cancel`, data: { version, reason, cascadeChildren } })
 export const adjustWorkTask = (task: WorkTaskVO, assigneeUserId: number, reason: string) => request.put({ url: `/zsjos/work-plan/task/${task.id}`, data: { title: task.title, description: task.description, deliverableRequirement: task.deliverableRequirement, assigneeUserId, dueAt: task.dueAt, confirmationRequired: task.confirmationRequired, confirmerUserId: task.confirmerUserId, taskFields: task.taskFields, version: task.version, reason } })
-export const exportWorkPlans = (data: WorkPlanSearchReqVO) => request.download({ url: '/zsjos/work-plan/export-excel', data })
+export const exportWorkPlans = (data: WorkPlanSearchReqVO) => request.postDownload<Blob>({ url: '/zsjos/work-plan/export-excel', data })

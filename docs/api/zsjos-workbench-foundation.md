@@ -43,6 +43,8 @@ Templates provide four dynamic-field sections: `plan`, `task`, `report`, and `su
 
 In role management, the `工作计划` node is only the page route. Read access is granted by its separate child permission `查看工作计划` (`zsjos:work-plan:query`), independently from create, update, publish, assignment, review, cancellation, summary, and export permissions.
 
+Work-plan summary submission is serialized with task creation on the plan row and is rejected while any task remains active; an empty task set keeps the existing summary behavior. Plan details return task change logs only for task IDs visible to the caller, while plan-level changes remain visible with the plan.
+
 Plan states are `draft -> active -> completed/cancelled`. Drafts and published plans may contain no tasks. Completing every effective task makes `summaryReady=true` for reminder purposes, but the plan owner may submit a final summary while tasks remain unfinished and record the outstanding work in that summary.
 
 Task states are `draft -> pending -> awaiting_confirmation -> completed`, with a return moving `awaiting_confirmation -> pending`. A task without confirmation completes immediately after its report. A parent task may report while children remain unfinished; child progress remains visible as management context. Cancelling a task affects only that task by default. Clients must explicitly submit `cascadeChildren=true` to cancel its unfinished descendants as well.

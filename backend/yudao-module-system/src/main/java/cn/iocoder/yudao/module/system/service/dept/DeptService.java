@@ -97,6 +97,11 @@ public interface DeptService {
     List<DeptDO> getChildDeptList(Collection<Long> ids);
 
     /**
+     * 获得指定部门的所有父部门，按直属父部门到根部门的顺序返回。
+     */
+    List<DeptDO> getParentDeptList(Long id);
+
+    /**
      * 获得指定领导者的部门列表
      *
      * @param id 领导者编号

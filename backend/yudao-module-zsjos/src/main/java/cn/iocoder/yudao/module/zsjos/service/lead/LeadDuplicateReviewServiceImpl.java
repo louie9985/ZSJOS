@@ -39,7 +39,6 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     @Resource private LeadAssignmentHistoryMapper assignmentHistoryMapper;
     @Resource private LeadSubmissionServiceImpl submissionService;
     @Resource private LeadAssignmentService assignmentService;
-    @Resource private LeadObjectPermissionService permissionService;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
@@ -63,10 +62,11 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
 
     @Override
     public List<LeadAssignmentUserRespVO> getSalesCandidates(Long reviewerUserId) {
-        boolean all = securityFrameworkService.hasPermission("zsjos:lead-duplicate-review:manage-all");
-        Set<Long> managed = all ? Set.of() : permissionService.getManagedUserIds(reviewerUserId);
+        if (!securityFrameworkService.hasPermission("zsjos:lead-duplicate-review:process")) {
+            throw exception(LEAD_DUPLICATE_REVIEW_PERMISSION_DENIED);
+        }
         return assignmentService.getEligibleSalesUsers().stream()
-                .filter(user -> all || managed.contains(user.getId())).toList();
+                .toList();
     }
 
     @Override

@@ -2,10 +2,12 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
@@ -14,6 +16,8 @@ import cn.iocoder.yudao.module.system.api.permission.RoleApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.LeadAppealSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.LeadAppealPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.appeal.LeadAppealDecisionReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -65,6 +69,90 @@ class LeadAppealServiceImplTest {
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
+    }
+
+    @Test
+    void reviewPermissionIsBoundToAppealStage() {
+        LeadAppealDO sales = new LeadAppealDO(); sales.setRoundNo(1); sales.setReviewStage(LeadConstants.APPEAL_STAGE_SALES_MANAGER);
+        LeadAppealDO quality = new LeadAppealDO(); quality.setRoundNo(2); quality.setReviewStage(LeadConstants.APPEAL_STAGE_QUALITY);
+        LeadAppealDO chairman = new LeadAppealDO(); chairman.setRoundNo(3); chairman.setReviewStage(LeadConstants.APPEAL_STAGE_CHAIRMAN);
+
+        assertEquals(LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER,
+                ReflectionTestUtils.invokeMethod(service, "requiredReviewPermission", sales));
+        assertEquals(LeadConstants.PERMISSION_APPEAL_REVIEW_QUALITY,
+                ReflectionTestUtils.invokeMethod(service, "requiredReviewPermission", quality));
+        assertEquals(LeadConstants.PERMISSION_APPEAL_REVIEW_CHAIRMAN,
+                ReflectionTestUtils.invokeMethod(service, "requiredReviewPermission", chairman));
+
+        sales.setReviewStage(LeadConstants.APPEAL_STAGE_QUALITY);
+        assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "requiredReviewPermission", sales));
+        sales.setReviewStage(null);
+        assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "requiredReviewPermission", sales));
+    }
+
+    @Test
+    void inboxFiltersAppealsByStagePermissionAndReturnsFilteredTotal() {
+        LeadAppealPageReqVO request = new LeadAppealPageReqVO(); request.setPageNo(1); request.setPageSize(10);
+        BpmTaskRespDTO salesTask = new BpmTaskRespDTO(); salesTask.setId("task-1");
+        salesTask.setBusinessKey("lead-appeal:1"); salesTask.setProcessInstanceId("process-1");
+        BpmTaskRespDTO qualityTask = new BpmTaskRespDTO(); qualityTask.setId("task-2");
+        qualityTask.setBusinessKey("lead-appeal:2"); qualityTask.setProcessInstanceId("process-2");
+        when(permissionApi.hasAnyPermissions(eq(40L), anyString())).thenAnswer(invocation ->
+                LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER.equals(invocation.getArgument(1)));
+        when(processTaskApi.getTodoTaskPage(eq(40L), any())).thenReturn(new PageResult<>(List.of(salesTask), 1L));
+        LeadAppealDO salesAppeal = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
+        LeadAppealDO qualityAppeal = appeal(2L, 9L, 2, LeadConstants.APPEAL_STAGE_QUALITY, "[40]");
+        salesAppeal.setProcessInstanceId("process-1"); qualityAppeal.setProcessInstanceId("process-2");
+        salesAppeal.setApplicantUserId(11L); salesAppeal.setReviewerUserId(12L);
+        when(appealMapper.selectBatchIds(anyCollection())).thenReturn(List.of(salesAppeal, qualityAppeal));
+        when(leadMapper.selectBatchIds(anyCollection())).thenReturn(List.of(new LeadDO().setId(8L)));
+        when(adminUserApi.getUser(40L)).thenReturn(user(40L, 10L));
+        AdminUserRespDTO applicant = user(11L, 10L); applicant.setNickname("申请人");
+        AdminUserRespDTO reviewer = user(12L, 10L); reviewer.setNickname("审批人");
+        when(adminUserApi.getUserList(anyCollection())).thenReturn(List.of(applicant, reviewer));
+
+        var page = service.getInboxPage(request, 40L);
+
+        assertEquals(1L, page.getTotal());
+        assertEquals(1, page.getList().size());
+        assertEquals("task-1", page.getList().get(0).getTaskId());
+        assertEquals("申请人", page.getList().get(0).getApplicantUserName());
+        assertEquals("审批人", page.getList().get(0).getReviewerUserName());
+        verify(appealMapper).selectBatchIds(anyCollection());
+        verify(leadMapper).selectBatchIds(anyCollection());
+        verify(adminUserApi, times(1)).getUser(40L);
+        verify(adminUserApi).getUserList(anyCollection());
+        ArgumentCaptor<cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO> taskRequest =
+                ArgumentCaptor.forClass(cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO.class);
+        verify(processTaskApi).getTodoTaskPage(eq(40L), taskRequest.capture());
+        assertEquals("reviewStage", taskRequest.getValue().getProcessVariableName());
+        assertEquals(List.of(LeadConstants.APPEAL_STAGE_SALES_MANAGER),
+                taskRequest.getValue().getProcessVariableValues());
+        assertEquals(LeadConstants.APPEAL_TASK_DEFINITION_KEY, taskRequest.getValue().getTaskDefinitionKey());
+        verify(appealMapper, never()).selectById(anyLong());
+        verify(leadMapper, never()).selectById(anyLong());
+    }
+
+    @Test
+    void inboxRejectsNonCanonicalAppealBusinessKey() {
+        LeadAppealPageReqVO request = new LeadAppealPageReqVO(); request.setPageNo(1); request.setPageSize(10);
+        BpmTaskRespDTO task = new BpmTaskRespDTO(); task.setId("task-1");
+        task.setBusinessKey("lead-appeal:01"); task.setProcessInstanceId("process-1");
+        when(permissionApi.hasAnyPermissions(eq(40L), anyString())).thenAnswer(invocation ->
+                LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER.equals(invocation.getArgument(1)));
+        when(adminUserApi.getUser(40L)).thenReturn(user(40L, 10L));
+        when(processTaskApi.getTodoTaskPage(eq(40L), any())).thenReturn(new PageResult<>(List.of(task), 1L));
+        LeadAppealDO appeal = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
+        appeal.setProcessInstanceId("process-1");
+        when(appealMapper.selectBatchIds(anyCollection())).thenReturn(List.of(appeal));
+        when(leadMapper.selectBatchIds(anyCollection())).thenReturn(List.of(new LeadDO().setId(8L)));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.getInboxPage(request, 40L));
+
+        assertEquals(1_900_003_043, error.getCode());
     }
 
     @AfterEach
@@ -251,6 +339,22 @@ class LeadAppealServiceImplTest {
         assertFalse(invokeCanReview(legacyAppeal, 50L));
     }
 
+    @Test
+    void decisionRejectsStatusThatDoesNotMatchAppealRound() {
+        LeadAppealDO appeal = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
+        appeal.setStatus(LeadConstants.APPEAL_STATUS_QUALITY_REVIEWING);
+        when(appealMapper.selectByIdForUpdate(1L, 1L)).thenReturn(appeal);
+        LeadAppealDecisionReqVO request = new LeadAppealDecisionReqVO();
+        request.setTaskId("task-1"); request.setReason("审批意见"); request.setIdempotencyKey("decision-1");
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.overturn(1L, 40L, request));
+
+        assertEquals(1_900_003_041, error.getCode());
+        verifyNoInteractions(processTaskApi);
+        verify(leadMapper, never()).selectByIdForUpdate(anyLong(), anyLong());
+    }
+
     private void prepareFirstRoundSubmit(LeadDO lead, String idempotencyKey) {
         when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(lead);
         when(appealMapper.selectBySubmissionIdempotencyKey(idempotencyKey)).thenReturn(null);
@@ -279,6 +383,13 @@ class LeadAppealServiceImplTest {
         lead.setSourceUserId(7L);
         lead.setOwnerUserId(ownerUserId);
         return lead;
+    }
+
+    private LeadAppealDO appeal(Long id, Long leadId, int round, String stage, String reviewers) {
+        LeadAppealDO appeal = new LeadAppealDO();
+        appeal.setId(id); appeal.setLeadId(leadId); appeal.setRoundNo(round);
+        appeal.setReviewStage(stage); appeal.setReviewerUserIdsSnapshot(reviewers);
+        return appeal;
     }
 
     private AdminUserRespDTO user(Long id, Long deptId) {

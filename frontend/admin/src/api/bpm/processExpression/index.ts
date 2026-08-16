@@ -33,10 +33,5 @@ export const ProcessExpressionApi = {
   // 删除BPM 流程表达式
   deleteProcessExpression: async (id: number) => {
     return await request.delete({ url: `/bpm/process-expression/delete?id=` + id })
-  },
-
-  // 导出BPM 流程表达式 Excel
-  exportProcessExpression: async (params) => {
-    return await request.download({ url: `/bpm/process-expression/export-excel`, params })
   }
 }

@@ -155,6 +155,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                                   SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder) {
         Long duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey());
         if (duplicateId != null) return duplicateId;
+        if (personMapper.selectByIdForUpdate(personId, TenantContextHolder.getRequiredTenantId()) == null) {
+            throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
+        }
+        duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey());
+        if (duplicateId != null) return duplicateId;
         if (requireEffectiveOrder && !orderMapper.hasEffectiveOrder(personId)) {
             throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         }
@@ -211,6 +216,12 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
             lead = requireRevisionLead(order.getLeadId());
             opportunity = requireEligibleOpportunity(lead);
+            requireNoOtherActiveOrder(order.getId(), lead.getId(), null);
+        } else {
+            if (personMapper.selectByIdForUpdate(order.getPersonId(), TenantContextHolder.getRequiredTenantId()) == null) {
+                throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
+            }
+            requireNoOtherActiveOrder(order.getId(), null, order.getPersonId());
         }
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
         LocalDateTime now = LocalDateTime.now();
@@ -721,6 +732,15 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             throw exception(SALES_ORDER_ENTRY_FORBIDDEN);
         }
         return opportunity;
+    }
+
+    private void requireNoOtherActiveOrder(Long orderId, Long leadId, Long personId) {
+        SalesOrderDO active = leadId != null
+                ? orderMapper.selectOtherActiveByLeadId(leadId, orderId, ACTIVE_ORDER_STATUSES)
+                : orderMapper.selectOtherActiveByPersonId(personId, orderId, ACTIVE_ORDER_STATUSES);
+        if (active != null) {
+            throw exception(SALES_ORDER_ACTIVE_DUPLICATE);
+        }
     }
 
     private SalesOrderDO requireOrderForUpdate(Long orderId) {

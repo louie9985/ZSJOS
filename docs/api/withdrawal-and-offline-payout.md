@@ -17,10 +17,12 @@ Only an enabled ordinary partner may apply. The server locks selected `available
 |---|---|---|
 | `POST /zsjos/withdrawal/apply` | `zsjos:withdrawal:apply` | Enabled ordinary partner, own available cashback only |
 | `PUT /{id}/cancel` | `zsjos:withdrawal:apply` | Applicant and `pending_review` only |
-| `GET /my-page`, `GET /my/{id}` | `zsjos:withdrawal:my-query` | Applicant rows, masked card |
-| `GET /page`, `GET /{id}` | finance/admin query | All rows, masked card |
+| `GET /my-page`, `GET /my/{id}` | `zsjos:withdrawal:my-query` | Applicant rows; masked card; no transaction number, proof, payout remark, payout operator or payout time |
+| `GET /page`, `GET /{id}` | finance/admin query | All rows; masked card; payout finance fields redacted |
 | `GET /{id}/finance-detail` | `zsjos:withdrawal:finance-query` | Full card; every read writes business audit without card data |
 | `PUT /{id}/reject-approved` | `zsjos:withdrawal:review` | Finance rejection after BPM approval and before payout |
 | `POST /proof/upload`, `PUT /{id}/payout` | `zsjos:withdrawal:payout` | Private proof and immutable offline payout |
 
 Feature permissions, list scope and `withdrawal` object checks are cumulative. The weekly reminder defaults to Thursday 10:30, uses the configured overdue-day threshold (default 7), resolves recipients from the review permission, and skips while maintenance mode is active. V052 does not deploy BPM or grant roles; deployment must publish the exact process and task keys before applications are enabled.
+
+Only `GET /{id}/finance-detail` returns the full card and payout finance fields, including bank transaction number, proof, payout remark, payout operator and payout time. Ordinary list/detail projections never generate proof pre-signed URLs.

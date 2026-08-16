@@ -9,12 +9,15 @@ import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadTransferRequestDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadTransferRequestMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,9 +25,11 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_PENDING_APPROVAL;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -34,7 +39,9 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
     public static final String PROCESS_DEFINITION_KEY = "zsjos_lead_transfer_request";
     private static final String TASK_DEFINITION_KEY = "ownerManagerReview";
     @Resource private LeadTransferRequestMapper requestMapper;
+    @Resource private LeadAgingPoolCycleMapper cycleMapper;
     @Resource private LeadMapper leadMapper;
+    @Resource private LeadAgingPoolService agingPoolService;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private BpmProcessInstanceApi processInstanceApi;
@@ -44,11 +51,32 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public Long create(Long leadId, Long requesterUserId, LeadTransferRequestCreateReqVO request) {
-        LeadTransferRequestDO replay = requestMapper.selectByIdempotencyKey(request.getIdempotencyKey());
-        if (replay != null) return replay.getId();
+    public Long create(Long cycleId, Long requesterUserId, LeadTransferRequestCreateReqVO request) {
+        LeadAgingPoolCycleDO cycleSnapshot = cycleMapper.selectById(cycleId);
+        if (cycleSnapshot == null) {
+            throw exception(LEAD_AGING_POOL_STATE_INVALID);
+        }
+        LeadAgingPoolCycleDO cycle = cycleMapper.selectByIdForUpdate(cycleId,
+                TenantContextHolder.getRequiredTenantId());
+        if (cycle == null || !Objects.equals(cycle.getLeadId(), cycleSnapshot.getLeadId())) {
+            throw exception(LEAD_AGING_POOL_STATE_INVALID);
+        }
+        Long leadId = cycle.getLeadId();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (!agingPoolService.canRead(cycle, requesterUserId)) throw exception(LEAD_PERMISSION_DENIED);
+        LeadTransferRequestDO replay = requestMapper.selectByIdempotencyKey(request.getIdempotencyKey());
+        if (replay != null) {
+            if (!Objects.equals(replay.getLeadId(), leadId)
+                    || !Objects.equals(replay.getRequestedOwnerUserId(), requesterUserId)) {
+                throw exception(LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT);
+            }
+            return replay.getId();
+        }
+        if (!Set.of(AGING_POOL_WAITING_ASSIGNMENT, AGING_POOL_ASSIGNED,
+                AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())) {
+            throw exception(LEAD_AGING_POOL_STATE_INVALID);
+        }
         if (Objects.equals(lead.getOwnerUserId(), requesterUserId)) throw exception(LEAD_AGING_POOL_STATE_INVALID);
         if (orderMapper.selectActiveByLeadId(leadId, List.of(STATUS_PENDING_APPROVAL)) != null
                 || requestMapper.selectActiveByLeadId(leadId) != null) throw exception(LEAD_AGING_POOL_STATE_INVALID);
@@ -65,7 +93,18 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         record.setTransferReviewerUserId(dept.getLeaderUserId());
         record.setReason(request.getReason().trim()); record.setStatus("pending");
         record.setIdempotencyKey(request.getIdempotencyKey()); record.setSubmittedAt(LocalDateTime.now());
-        requestMapper.insert(record);
+        try {
+            requestMapper.insert(record);
+        } catch (DuplicateKeyException duplicate) {
+            LeadTransferRequestDO concurrentReplay = requestMapper.selectByIdempotencyKeyForUpdate(
+                    request.getIdempotencyKey(), TenantContextHolder.getRequiredTenantId());
+            if (concurrentReplay == null) throw duplicate;
+            if (!Objects.equals(concurrentReplay.getLeadId(), leadId)
+                    || !Objects.equals(concurrentReplay.getRequestedOwnerUserId(), requesterUserId)) {
+                throw exception(LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT);
+            }
+            return concurrentReplay.getId();
+        }
         BpmProcessInstanceCreateReqDTO process = new BpmProcessInstanceCreateReqDTO();
         process.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
         process.setBusinessKey("lead-transfer:" + record.getId());

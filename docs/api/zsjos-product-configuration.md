@@ -10,10 +10,10 @@
 - `/admin-api/zsjos/product/category`：通用分类树管理；父分类为空或 `0` 表示根分类，移动分类时服务端原子更新整棵子树深度。
 - `/admin-api/zsjos/product/sku/attrs?spuId=`：查询或保存 SPU 销售属性。
 - `/admin-api/zsjos/product/sku/list?spuId=`：查询 SPU 下的 SKU。
-- `/admin-api/zsjos/product/sku/create|update|delete|update-status`：SKU 管理。
-- `/admin-api/zsjos/product/sku/generate?spuId=`：根据属性笛卡尔积生成缺失 SKU；新生成 SKU 默认停用、价格为 0，管理员设置价格后启用。
+- `/admin-api/zsjos/product/sku/create|update|delete|update-status`：SKU 管理。所属 SPU 及完整分类链启用时，手工创建默认启用；普通更新不修改状态，后续启停只通过 `update-status` 完成；SKU 创建后不可更换所属 SPU。
+- `/admin-api/zsjos/product/sku/generate?spuId=`：根据属性笛卡尔积生成缺失 SKU；所属 SPU 及完整分类链启用时，新生成 SKU 默认启用、价格为 0。服务端在分配组合列表前校验笛卡尔积数量，配置 `zsjos.product.sku.max-generated-combinations` 默认限制为 500，非正配置和超限均返回稳定业务错误。
 
-SPU 只能挂在叶子分类；已挂 SPU 的分类不能新增子分类，有子分类的分类不能挂 SPU。同一 SPU 下属性组合唯一。SPU 或任一祖先分类停用后，其 SKU 不进入员工端目录；被 Lead 引用的 SPU/SKU 禁止删除，应改为停用。
+SPU 只能挂在叶子分类；已挂 SPU 的分类不能新增子分类，有子分类的分类不能挂 SPU。同一 SPU 下属性组合唯一。属性保存、SKU 手工创建、组合生成和普通更新都在事务内锁定所属 SPU，避免并发请求写入重复组合。SPU 或任一祖先分类停用后，其 SKU 不进入员工端目录；被 Lead 引用的 SPU/SKU 禁止删除，应改为停用。
 
 ## 客资端
 

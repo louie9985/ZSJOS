@@ -93,11 +93,10 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<Long> managedOwnerUserIds = reqVO.getAudience() == null && !queryAll
                 ? sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId)) : List.of();
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
-        boolean advanced = matchedLeadIds != null;
-        List<String> statuses = advanced ? List.of() : List.copyOf(inboxQuery.statuses());
-        List<String> assignmentStatuses = advanced ? List.of() : List.copyOf(inboxQuery.assignmentStatuses());
-        List<String> handlingStages = advanced ? List.of() : List.copyOf(inboxQuery.handlingStages());
-        boolean matchNone = !advanced && inboxQuery.matchNone();
+        List<String> statuses = List.copyOf(inboxQuery.statuses());
+        List<String> assignmentStatuses = List.copyOf(inboxQuery.assignmentStatuses());
+        List<String> handlingStages = List.copyOf(inboxQuery.handlingStages());
+        boolean matchNone = inboxQuery.matchNone();
         PageResult<LeadDO> page;
         if (handlingStages.isEmpty()) {
             page = leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,

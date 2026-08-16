@@ -6,12 +6,17 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductPageReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.util.Collection;
 import java.util.List;
 
 @Mapper
 public interface ZsjosProductMapper extends BaseMapperX<ZsjosProductDO> {
+    @Select("SELECT * FROM zsjos_product WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
+    ZsjosProductDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     default PageResult<ZsjosProductDO> selectPage(ZsjosProductPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<ZsjosProductDO>()
                 .likeIfPresent(ZsjosProductDO::getName, reqVO.getName())

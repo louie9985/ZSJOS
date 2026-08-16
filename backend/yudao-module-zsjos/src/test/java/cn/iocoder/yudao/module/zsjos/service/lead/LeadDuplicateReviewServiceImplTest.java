@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCreateRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO;
@@ -43,7 +44,7 @@ class LeadDuplicateReviewServiceImplTest {
     @Mock private LeadAssignmentHistoryMapper assignmentHistoryMapper;
     @Mock private LeadSubmissionServiceImpl submissionService;
     @Mock private LeadAssignmentService assignmentService;
-    @Mock private LeadObjectPermissionService permissionService;
+    @Mock private SecurityFrameworkService securityFrameworkService;
     @Mock private LeadAttachmentService attachmentService;
     @Mock private ZsjosProductSkuService productSkuService;
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
@@ -122,6 +123,15 @@ class LeadDuplicateReviewServiceImplTest {
         assertEquals("duplicate_auto_closed", result.getOutcome());
         assertEquals("notify_owner", review.getResultType());
         verify(notifyEventPublisher, never()).publish(eq(DUPLICATE_OWNER_REMINDER), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void centralReviewerCanChooseEveryEligibleSalesUser() {
+        when(securityFrameworkService.hasPermission("zsjos:lead-duplicate-review:process")).thenReturn(true);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(sales(10L), sales(20L)));
+
+        assertEquals(List.of(10L, 20L), service.getSalesCandidates(99L).stream()
+                .map(LeadAssignmentUserRespVO::getId).toList());
     }
 
     private static LeadDuplicateReviewDO review(Long id) {

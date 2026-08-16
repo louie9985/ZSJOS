@@ -66,6 +66,8 @@ public class FmsAccountSetServiceImplTest extends BaseDbUnitTest {
     @MockitoBean
     private FmsClosingSchemeService closingSchemeService;
     @MockitoBean
+    private FmsFinanceIndicatorService financeIndicatorService;
+    @MockitoBean
     private FmsClosingTemplateService closingTemplateService;
 
     @Test

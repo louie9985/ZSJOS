@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -174,7 +175,7 @@ public class WorkPlanServiceImpl implements WorkPlanService {
     @Transactional
     @ZsjosPermission(bizType = BIZ_TYPE_WORK_PLAN, bizId = "#id", action = "cancel")
     public void cancel(Long id, WorkPlanCancelReqVO reqVO, Long userId) {
-        WorkPlanDO plan = requirePlan(id); requireVersion(reqVO.getVersion(), plan.getVersion());
+        WorkPlanDO plan = requirePlanForUpdate(id); requireVersion(reqVO.getVersion(), plan.getVersion());
         requireState(Set.of(PLAN_DRAFT, PLAN_ACTIVE).contains(plan.getStatus()), true);
         LocalDateTime now = LocalDateTime.now();
         List<WorkTaskDO> tasks = taskMapper.selectListByPlanId(id);
@@ -191,7 +192,7 @@ public class WorkPlanServiceImpl implements WorkPlanService {
     @Override
     @Transactional
     public Long addTask(Long planId, WorkTaskSaveReqVO reqVO, Long userId) {
-        WorkPlanDO plan = requirePlan(planId); requireState(PLAN_ACTIVE.equals(plan.getStatus()), true); requireReason(reqVO.getReason());
+        WorkPlanDO plan = requirePlanForUpdate(planId); requireState(PLAN_ACTIVE.equals(plan.getStatus()), true); requireReason(reqVO.getReason());
         if (reqVO.getParentTaskId() == null) {
             permissionProvider.check(planId, "assign", userId);
         } else {
@@ -311,9 +312,10 @@ public class WorkPlanServiceImpl implements WorkPlanService {
     @Transactional
     @ZsjosPermission(bizType = BIZ_TYPE_WORK_PLAN, bizId = "#planId", action = "close")
     public void submitSummary(Long planId, WorkPlanSummaryReqVO reqVO, Long userId) {
-        WorkPlanDO plan = requirePlan(planId); requireVersion(reqVO.getVersion(), plan.getVersion());
+        WorkPlanDO plan = requirePlanForUpdate(planId); requireVersion(reqVO.getVersion(), plan.getVersion());
         requireState(PLAN_ACTIVE.equals(plan.getStatus()), true);
         if (summaryMapper.selectByPlanId(planId) != null) throw exception(WORK_PLAN_STATE_INVALID);
+        if (taskMapper.countActiveByPlanId(planId) > 0) throw exception(WORK_PLAN_STATE_INVALID);
         List<Long> fileIds = normalizeFileIds(reqVO.getInfraFileIds(), userId);
         LocalDateTime now = LocalDateTime.now();
         WorkPlanSummaryDO summary = new WorkPlanSummaryDO().setPlanId(planId).setSummary(reqVO.getSummary())
@@ -661,7 +663,7 @@ public class WorkPlanServiceImpl implements WorkPlanService {
             Set<Long> visibleIds = visibleTaskIds(plan, allTasks, userId);
             result.setTasks(allTasks.stream().filter(task -> visibleIds.contains(task.getId())).map(task -> convertTask(task, allTasks, userId)).toList());
             result.setSummary(convertSummary(plan));
-            result.setChanges(changeMapper.selectListByPlan(plan.getId(), allTasks.stream().map(WorkTaskDO::getId).toList()).stream()
+            result.setChanges(changeMapper.selectListByPlan(plan.getId(), visibleIds.stream().toList()).stream()
                     .map(this::convertChange).toList());
         }
         return result;
@@ -839,6 +841,7 @@ public class WorkPlanServiceImpl implements WorkPlanService {
     }
 
     private WorkPlanDO requirePlan(Long id) { WorkPlanDO plan = planMapper.selectById(id); if (plan == null) throw exception(WORK_PLAN_NOT_EXISTS); return plan; }
+    private WorkPlanDO requirePlanForUpdate(Long id) { WorkPlanDO plan = planMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId()); if (plan == null) throw exception(WORK_PLAN_NOT_EXISTS); return plan; }
     private WorkTaskDO requireTask(Long id) { WorkTaskDO task = taskMapper.selectById(id); if (task == null) throw exception(WORK_TASK_NOT_EXISTS); return task; }
     private WorkPlanTemplateDO requireTemplate(Long id) { WorkPlanTemplateDO template = templateMapper.selectById(id); if (template == null) throw exception(WORK_PLAN_FIELD_INVALID); return template; }
     private void requireVersion(Integer expected, Integer actual) { if (!Objects.equals(expected, actual)) conflict(); }

@@ -38,6 +38,18 @@ public interface BpmTaskService {
     PageResult<Task> getTaskTodoPage(Long userId, BpmTaskPageReqVO pageReqVO);
 
     /**
+     * 获得待办的流程任务分页，并按内部调用方授权的流程变量值过滤。
+     *
+     * @param userId 用户编号
+     * @param pageReqVO 分页请求
+     * @param processVariableName 流程变量名
+     * @param processVariableValues 允许的流程变量值
+     * @return 流程任务分页
+     */
+    PageResult<Task> getTaskTodoPage(Long userId, BpmTaskPageReqVO pageReqVO,
+                                     String processVariableName, List<String> processVariableValues);
+
+    /**
      * 获得用户（待办）的任务：
      * 1. 根据 taskId 查询待办任务
      * 2. 如果任务不存在（或者已审核），获取指定流程下，首个需要处理任务
@@ -57,6 +69,18 @@ public interface BpmTaskService {
      * @return 流程任务分页
      */
     PageResult<HistoricTaskInstance> getTaskDonePage(Long userId, BpmTaskPageReqVO pageReqVO);
+
+    /**
+     * 获得已办的流程任务分页，并按内部调用方授权的流程变量值过滤。
+     *
+     * @param userId 用户编号
+     * @param pageReqVO 分页请求
+     * @param processVariableName 流程变量名
+     * @param processVariableValues 允许的流程变量值
+     * @return 流程任务分页
+     */
+    PageResult<HistoricTaskInstance> getTaskDonePage(Long userId, BpmTaskPageReqVO pageReqVO,
+                                                      String processVariableName, List<String> processVariableValues);
 
     /**
      * 获得全部的流程任务分页

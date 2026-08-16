@@ -640,9 +640,9 @@ function createDefaultDeductRule(): AttendanceGroupApi.HrmAttendanceDeductRule {
   display: flex;
   align-items: center;
   margin: 8px 0 20px;
-  color: var(--el-text-color-primary);
   font-size: 16px;
   font-weight: 600;
+  color: var(--el-text-color-primary);
 }
 
 .section-title::before {

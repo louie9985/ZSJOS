@@ -89,6 +89,7 @@ class CashbackServiceImplTest {
 
     private void eligibleLead() {
         when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L).setSourceType("partner").setSourceUserId(7L).setPartnerId(8L));
-        when(partnerMapper.selectById(8L)).thenReturn(new PartnerDO().setId(8L).setBoundSystemUserId(7L).setStatus("enabled"));
+        when(partnerMapper.selectById(8L)).thenReturn(new PartnerDO().setId(8L).setBoundSystemUserId(7L)
+                .setStatus("enabled").setEnabledAt(LocalDateTime.now()));
     }
 }

@@ -283,7 +283,14 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         response.setCardNumber(fullCard ? record.getCardNumberSnapshot() : null);
         response.setItems(itemMapper.selectByWithdrawalId(record.getId()).stream().map(item ->
                 new WithdrawalRespVO.Item().setCashbackId(item.getCashbackId()).setAmount(item.getAmountSnapshot())).toList());
-        if (record.getProofFileId() != null) {
+        if (!fullCard) {
+            response.setBankTransactionNo(null);
+            response.setProofFileId(null);
+            response.setProofUrl(null);
+            response.setPayoutRemark(null);
+            response.setPaidByUserId(null);
+            response.setPaidAt(null);
+        } else if (record.getProofFileId() != null) {
             try { response.setProofUrl(fileApi.presignGetUrl(record.getProofFileId(), 600)); }
             catch (ServiceException ignored) { response.setProofUrl(null); }
         }

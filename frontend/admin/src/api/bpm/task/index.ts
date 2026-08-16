@@ -111,11 +111,6 @@ export const withdrawTask = async (taskId: string) => {
   return await request.put({ url: '/bpm/task/withdraw', params: { taskId } })
 }
 
-// 获取我的待办任务
-export const myTodoTask = async (processInstanceId: string) => {
-  return await request.get({ url: '/bpm/task/my-todo?processInstanceId=' + processInstanceId })
-}
-
 // 获取减签任务列表
 export const getChildrenTaskList = async (id: string) => {
   return await request.get({ url: '/bpm/task/list-by-parent-task-id?parentTaskId=' + id })

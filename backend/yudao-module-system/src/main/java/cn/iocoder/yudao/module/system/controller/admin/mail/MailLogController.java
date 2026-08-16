@@ -1,8 +1,12 @@
 package cn.iocoder.yudao.module.system.controller.admin.mail;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
+import cn.iocoder.yudao.module.system.controller.admin.mail.vo.log.MailLogExcelVO;
 import cn.iocoder.yudao.module.system.controller.admin.mail.vo.log.MailLogPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.mail.vo.log.MailLogRespVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.mail.MailLogDO;
@@ -17,8 +21,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 
+import java.io.IOException;
+import java.util.List;
+
+import static cn.iocoder.yudao.framework.apilog.core.enums.OperateTypeEnum.EXPORT;
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
 @Tag(name = "管理后台 - 邮件日志")
@@ -44,6 +53,18 @@ public class MailLogController {
     public CommonResult<MailLogRespVO> getMailTemplate(@RequestParam("id") Long id) {
         MailLogDO log = mailLogService.getMailLog(id);
         return success(BeanUtils.toBean(log, MailLogRespVO.class));
+    }
+
+    @GetMapping("/export-excel")
+    @Operation(summary = "导出邮件日志 Excel")
+    @PreAuthorize("@ss.hasPermission('system:mail-log:export')")
+    @ApiAccessLog(operateType = EXPORT)
+    public void exportMailLogExcel(@Valid MailLogPageReqVO exportReqVO,
+                                   HttpServletResponse response) throws IOException {
+        exportReqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
+        List<MailLogDO> list = mailLogService.getMailLogPage(exportReqVO).getList();
+        ExcelUtils.write(response, "邮件日志.xls", "数据", MailLogExcelVO.class,
+                BeanUtils.toBean(list, MailLogExcelVO.class));
     }
 
 }

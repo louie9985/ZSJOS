@@ -23,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import static cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.APPROVE;
 import static cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum.REJECT;
@@ -94,6 +95,37 @@ class WithdrawalServiceImplTest {
         when(cashbackMapper.transitionStatus(1L,0,"withdrawing","withdrawn")).thenReturn(1);when(userApi.getUserListByStatus(0)).thenReturn(List.of());
         WithdrawalPayoutReqVO req=new WithdrawalPayoutReqVO();req.setBankTransactionNo("TX1");req.setProofFileId(90L);
         service.recordPayout(50L,30L,req);assertEquals("paid",row.getStatus());assertEquals(30L,row.getPaidByUserId());verify(auditService).record(any(),any(),any(),any(),any(),any());
+    }
+
+    @Test void ordinaryDetailRedactsFinanceFieldsAndDoesNotCreateProofUrl() {
+        WithdrawalDO row = withdrawal(50L, "paid");
+        row.setBankTransactionNo("TX1"); row.setProofFileId(90L); row.setPayoutRemark("已打款");
+        row.setPaidByUserId(30L); row.setPaidAt(LocalDateTime.of(2026, 8, 15, 10, 0));
+        when(withdrawalMapper.selectById(50L)).thenReturn(row);
+        when(itemMapper.selectByWithdrawalId(50L)).thenReturn(List.of());
+
+        WithdrawalRespVO response = service.getDetail(50L, 20L, false);
+
+        assertNull(response.getBankTransactionNo()); assertNull(response.getProofFileId());
+        assertNull(response.getProofUrl()); assertNull(response.getPayoutRemark());
+        assertNull(response.getPaidByUserId()); assertNull(response.getPaidAt());
+        verify(fileApi, never()).presignGetUrl(anyLong(), anyInt());
+    }
+
+    @Test void financeDetailReturnsFinanceFieldsAndAuditsAccess() {
+        WithdrawalDO row = withdrawal(50L, "paid");
+        row.setCardNumberSnapshot("622200001234"); row.setBankTransactionNo("TX1"); row.setProofFileId(90L);
+        when(withdrawalMapper.selectById(50L)).thenReturn(row);
+        when(permissionApi.hasAnyPermissions(30L, "zsjos:withdrawal:finance-query")).thenReturn(true);
+        when(itemMapper.selectByWithdrawalId(50L)).thenReturn(List.of());
+        when(fileApi.presignGetUrl(90L, 600)).thenReturn("https://signed.test/proof");
+
+        WithdrawalRespVO response = service.getDetail(50L, 30L, true);
+
+        assertEquals("TX1", response.getBankTransactionNo());
+        assertEquals("https://signed.test/proof", response.getProofUrl());
+        assertEquals("622200001234", response.getCardNumber());
+        verify(auditService).record(any(), any(), any(), eq("50"), eq("finance"), any());
     }
 
     private WithdrawalDO invocationWithdrawal(org.mockito.invocation.InvocationOnMock inv){return inv.getArgument(0);}

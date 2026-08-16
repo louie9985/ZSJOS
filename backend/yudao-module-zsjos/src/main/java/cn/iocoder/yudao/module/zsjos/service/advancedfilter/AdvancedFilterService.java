@@ -36,19 +36,19 @@ public class AdvancedFilterService {
     }
 
     public boolean hasConditions(AdvancedFilterGroupReqVO group) {
-        return group != null && ((!group.getConditions().isEmpty()) || group.getGroups().stream().anyMatch(this::hasConditions));
+        return group != null && ((group.getConditions() != null && !group.getConditions().isEmpty())
+                || (group.getGroups() != null && group.getGroups().stream().anyMatch(this::hasConditions)));
     }
 
     public List<Long> matchLeadIds(AdvancedFilterGroupReqVO group) {
-        return hasConditions(group) ? mapper.selectLeadIds(build(group, "lead")) : null;
+        return validateAndHasConditions(group) ? mapper.selectLeadIds(build(group, "lead")) : null;
     }
 
     public List<Long> matchOrderIds(AdvancedFilterGroupReqVO group) {
-        return hasConditions(group) ? mapper.selectOrderIds(build(group, "order")) : null;
+        return validateAndHasConditions(group) ? mapper.selectOrderIds(build(group, "order")) : null;
     }
 
     private AdvancedFilterQuery build(AdvancedFilterGroupReqVO group, String scene) {
-        validateShape(group, 0, new int[]{0});
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("tenantId", TenantContextHolder.getTenantId());
         String sql = groupSql(group, scene, params);
@@ -56,8 +56,17 @@ public class AdvancedFilterService {
         return new AdvancedFilterQuery(sql, params);
     }
 
+    private boolean validateAndHasConditions(AdvancedFilterGroupReqVO group) {
+        if (group == null) return false;
+        validateShape(group, 0, new int[]{0});
+        return hasConditions(group);
+    }
+
     private void validateShape(AdvancedFilterGroupReqVO group, int depth, int[] count) {
-        if (group == null || depth > 1 || group.getGroups().size() > 5) throw exception(ADVANCED_FILTER_INVALID);
+        if (group == null || group.getConditions() == null || group.getGroups() == null
+                || group.getConditions().stream().anyMatch(Objects::isNull)
+                || group.getGroups().stream().anyMatch(Objects::isNull)
+                || depth > 1 || group.getGroups().size() > 5) throw exception(ADVANCED_FILTER_INVALID);
         count[0] += group.getConditions().size();
         if (count[0] > 20 || (depth == 1 && !group.getGroups().isEmpty())) throw exception(ADVANCED_FILTER_INVALID);
         group.getGroups().forEach(child -> validateShape(child, depth + 1, count));

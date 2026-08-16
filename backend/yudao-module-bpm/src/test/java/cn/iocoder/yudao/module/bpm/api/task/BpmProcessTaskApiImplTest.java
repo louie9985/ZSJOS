@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskSignCreateReqVO;
+import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskPageReqVO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
 import cn.iocoder.yudao.module.bpm.service.task.BpmTaskService;
@@ -13,6 +14,7 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.flowable.task.api.Task;
 import org.flowable.task.api.history.HistoricTaskInstance;
@@ -48,20 +50,28 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     @Test
     void getTodoTaskPageReturnsEmptyPageWithoutQueryingProcessInstances() {
         BpmTaskPageReqDTO reqDTO = pageReq();
-        when(bpmTaskService.getTaskTodoPage(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+        reqDTO.setProcessVariableName("reviewStage");
+        reqDTO.setProcessVariableValues(List.of("sales_manager", "quality"));
+        when(bpmTaskService.getTaskTodoPage(eq(USER_ID), org.mockito.ArgumentMatchers.any(),
+                eq("reviewStage"), eq(List.of("sales_manager", "quality"))))
                 .thenReturn(PageResult.empty());
 
         PageResult<BpmTaskRespDTO> result = processTaskApi.getTodoTaskPage(USER_ID, reqDTO);
 
         assertEquals(0L, result.getTotal());
         assertTrue(result.getList().isEmpty());
+        ArgumentCaptor<BpmTaskPageReqVO> request = ArgumentCaptor.forClass(BpmTaskPageReqVO.class);
+        verify(bpmTaskService).getTaskTodoPage(eq(USER_ID), request.capture(),
+                eq("reviewStage"), eq(List.of("sales_manager", "quality")));
+        assertEquals("zsjos_lead_appeal_review", request.getValue().getProcessDefinitionKey());
         verifyNoInteractions(processInstanceService);
     }
 
     @Test
     void getDoneTaskPageReturnsEmptyPageWithoutQueryingProcessInstances() {
         BpmTaskPageReqDTO reqDTO = pageReq();
-        when(bpmTaskService.getTaskDonePage(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+        when(bpmTaskService.getTaskDonePage(eq(USER_ID), org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.isNull()))
                 .thenReturn(PageResult.empty());
 
         PageResult<BpmTaskRespDTO> result = processTaskApi.getDoneTaskPage(USER_ID, reqDTO);

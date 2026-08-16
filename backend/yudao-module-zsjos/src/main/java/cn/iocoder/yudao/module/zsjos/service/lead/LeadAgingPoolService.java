@@ -30,4 +30,5 @@ public interface LeadAgingPoolService {
     void completeConversion(Long leadId, Long salesUserId, LocalDateTime now);
     void terminateForOwnerTransfer(Long leadId, Long newOwnerUserId, Long operatorUserId, LocalDateTime now);
     boolean canRead(Long leadId, Long userId);
+    boolean canRead(LeadAgingPoolCycleDO cycle, Long userId);
 }

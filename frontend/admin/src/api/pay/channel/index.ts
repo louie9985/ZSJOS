@@ -11,11 +11,6 @@ export interface ChannelVO {
   createTime: Date
 }
 
-// 查询列表支付渠道
-export const getChannelPage = (params: PageParam) => {
-  return request.get({ url: '/pay/channel/page', params })
-}
-
 // 查询详情支付渠道
 export const getChannel = (appId: string, code: string) => {
   const params = {
@@ -38,9 +33,4 @@ export const updateChannel = (data: ChannelVO) => {
 // 删除支付渠道
 export const deleteChannel = (id: number) => {
   return request.delete({ url: '/pay/channel/delete?id=' + id })
-}
-
-// 导出支付渠道
-export const exportChannel = (params) => {
-  return request.download({ url: '/pay/channel/export-excel', params })
 }

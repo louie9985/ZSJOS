@@ -30,6 +30,11 @@ public interface AdminUserApi {
     AdminUserRespDTO getUser(Long id);
 
     /**
+     * 通过手机号查询用户。
+     */
+    AdminUserRespDTO getUserByMobile(String mobile);
+
+    /**
      * 通过用户 ID 查询用户下属
      *
      * @param id 用户编号

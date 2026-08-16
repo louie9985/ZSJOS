@@ -69,6 +69,24 @@ class AdvancedFilterServiceTest {
         assertThrows(ServiceException.class, () -> service.matchLeadIds(six));
     }
 
+    @Test void rejectsNullCollectionsAndElementsDefensively() {
+        AdvancedFilterGroupReqVO nullConditions = group("AND");
+        nullConditions.setConditions(null);
+        assertThrows(ServiceException.class, () -> service.matchLeadIds(nullConditions));
+
+        AdvancedFilterGroupReqVO nullGroups = group("AND");
+        nullGroups.setGroups(null);
+        assertThrows(ServiceException.class, () -> service.matchLeadIds(nullGroups));
+
+        AdvancedFilterGroupReqVO nullCondition = group("AND");
+        nullCondition.getConditions().add(null);
+        assertThrows(ServiceException.class, () -> service.matchLeadIds(nullCondition));
+
+        AdvancedFilterGroupReqVO nullGroup = group("AND");
+        nullGroup.getGroups().add(null);
+        assertThrows(ServiceException.class, () -> service.matchLeadIds(nullGroup));
+    }
+
     @Test void catalogContainsControlledOptionsAndRejectsUnknownScene() {
         var catalog = service.catalog("lead");
         assertTrue(catalog.fields().stream().allMatch(field -> field.fieldKey().contains(".")));

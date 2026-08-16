@@ -10,7 +10,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Excel 工具类
@@ -44,12 +46,39 @@ public class ExcelUtils {
         response.setContentType("application/vnd.ms-excel;charset=UTF-8");
     }
 
+    public static void write(HttpServletResponse response, String filename, String sheetName,
+                             List<List<String>> head, List<List<Object>> data) throws IOException {
+        FastExcelFactory.write(response.getOutputStream())
+                .autoCloseStream(false)
+                .registerWriteHandler(new ColumnWidthMatchStyleStrategy())
+                .registerConverter(new LongStringConverter())
+                .head(head).sheet(sheetName).doWrite(data);
+        response.addHeader("Content-Disposition", "attachment;filename=" + HttpUtils.encodeUtf8(filename));
+        response.setContentType("application/vnd.ms-excel;charset=UTF-8");
+    }
+
     public static <T> List<T> read(MultipartFile file, Class<T> head) throws IOException {
+        if (file == null || file.isEmpty()) {
+            return Collections.emptyList();
+        }
         // 参考 https://t.zsxq.com/zM77F 帖子，增加 try 处理，兼容 windows 场景
         try (InputStream inputStream = file.getInputStream()) {
             return FastExcelFactory.read(inputStream, head, null)
                     .autoCloseStream(false) // 不要自动关闭，交给 Servlet 自己处理
                     .doReadAllSync();
+        }
+    }
+
+    public static List<Map<Integer, String>> read(MultipartFile file) throws IOException {
+        if (file == null || file.isEmpty()) {
+            return Collections.emptyList();
+        }
+        try (InputStream inputStream = file.getInputStream()) {
+            return FastExcelFactory.read(inputStream)
+                    .autoCloseStream(false)
+                    .headRowNumber(1)
+                    .sheet()
+                    .doReadSync();
         }
     }
 

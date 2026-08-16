@@ -17,7 +17,8 @@ public class ZsjosProductSkuSaveReqVO {
     @NotBlank @Size(max = 200) private String skuName;
     @NotNull private Map<String, String> attrValues = new LinkedHashMap<>();
     @NotNull @DecimalMin("0") private BigDecimal price;
-    @NotNull private Integer status;
+    /** Deprecated compatibility field. Status is controlled by the dedicated status endpoint. */
+    private Integer status;
     @NotNull private Integer sort;
     @Size(max = 1000) private String remark;
 }

@@ -40,7 +40,8 @@ public class FmsAuxiliaryCombinationServiceImplTest extends BaseDbUnitTest {
         // 断言
         assertNull(auxiliaryCombinationMapper.selectById(deletedCombination.getId()));
         assertPojoEquals(retainedCombination,
-                auxiliaryCombinationMapper.selectById(retainedCombination.getId()), "deleted");
+                auxiliaryCombinationMapper.selectById(retainedCombination.getId()),
+                "createTime", "updateTime", "deleted");
     }
 
 }

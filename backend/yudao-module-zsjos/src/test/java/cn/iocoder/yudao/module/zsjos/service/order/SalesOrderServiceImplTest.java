@@ -22,10 +22,12 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
@@ -69,6 +71,7 @@ class SalesOrderServiceImplTest {
     @Mock private LeadMapper leadMapper;
     @Mock private LeadAppealMapper leadAppealMapper;
     @Mock private OpportunityMapper opportunityMapper;
+    @Mock private PersonMapper personMapper;
     @Mock private ZsjosProductSkuService skuService;
     @Mock private SalesOrderObjectPermissionService permissionService;
     @Mock private FileApi fileApi;
@@ -383,9 +386,45 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void terminatedOrderCannotBeResubmittedWhenReplacementOrderIsActive() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_TERMINATED);
+        SalesOrderDO replacement = new SalesOrderDO(); replacement.setId(101L); replacement.setStatus(STATUS_PENDING_APPROVAL);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        mockEligibleLeadAndOpportunity();
+        when(orderMapper.selectOtherActiveByLeadId(1L, 100L, ACTIVE_ORDER_STATUSES)).thenReturn(replacement);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+
+        assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
+        assertEquals(STATUS_TERMINATED, order.getStatus());
+        verifyNoInteractions(skuService, processInstanceApi);
+    }
+
+    @Test
+    void terminatedRepurchaseCannotBeResubmittedWhenAnyCustomerOrderIsActive() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setPersonId(10L); order.setOrderType(ORDER_TYPE_REPURCHASE);
+        order.setStatus(STATUS_TERMINATED);
+        SalesOrderDO replacement = new SalesOrderDO(); replacement.setId(101L); replacement.setStatus(STATUS_PENDING_APPROVAL);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(new PersonDO().setId(10L));
+        when(orderMapper.selectOtherActiveByPersonId(10L, 100L, ACTIVE_ORDER_STATUSES)).thenReturn(replacement);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+
+        assertEquals(SALES_ORDER_ACTIVE_DUPLICATE.getCode(), error.getCode());
+        assertEquals(STATUS_TERMINATED, order.getStatus());
+        verifyNoInteractions(skuService, processInstanceApi);
+    }
+
+    @Test
     void systemRepurchasePersistsCustomerOnlyAndStartsDualApproval() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus(STATUS_WON);
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(personMapper.selectByIdForUpdate(10L, 1L)).thenReturn(new PersonDO().setId(10L));
         when(orderMapper.hasEffectiveOrder(10L)).thenReturn(true);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);

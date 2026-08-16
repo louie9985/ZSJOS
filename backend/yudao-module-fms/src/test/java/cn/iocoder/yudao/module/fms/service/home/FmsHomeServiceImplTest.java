@@ -8,8 +8,13 @@ import cn.iocoder.yudao.module.fms.controller.admin.report.vo.FmsReportListReqVO
 import cn.iocoder.yudao.module.fms.dal.dataobject.config.FmsAccountSetDO;
 import cn.iocoder.yudao.module.fms.service.closing.FmsClosingPeriodService;
 import cn.iocoder.yudao.module.fms.service.config.FmsAccountSetService;
+import cn.iocoder.yudao.module.fms.service.config.FmsFinanceIndicatorService;
+import cn.iocoder.yudao.module.fms.service.config.FmsSubjectService;
+import cn.iocoder.yudao.module.fms.service.report.FmsBalanceSheetService;
 import cn.iocoder.yudao.module.fms.service.report.FmsIncomeStatementService;
+import cn.iocoder.yudao.module.fms.service.report.FmsReportCommonService;
 import jakarta.annotation.Resource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -42,6 +47,19 @@ public class FmsHomeServiceImplTest extends BaseDbUnitTest {
     private FmsClosingPeriodService closingPeriodService;
     @MockitoBean
     private FmsIncomeStatementService incomeStatementService;
+    @MockitoBean
+    private FmsBalanceSheetService balanceSheetService;
+    @MockitoBean
+    private FmsReportCommonService reportCommonService;
+    @MockitoBean
+    private FmsSubjectService subjectService;
+    @MockitoBean
+    private FmsFinanceIndicatorService financeIndicatorService;
+
+    @BeforeEach
+    public void setUp() {
+        when(reportCommonService.isLineFormula(any())).thenReturn(true);
+    }
 
     @Test
     public void testGetHome_success() {
@@ -99,7 +117,7 @@ public class FmsHomeServiceImplTest extends BaseDbUnitTest {
         assertEquals(new BigDecimal("80.00"), result.getStructure().get(0).getAmount());
         assertEquals("5051", result.getStructure().get(1).getSubjectCode());
         assertEquals(new BigDecimal("20.00"), result.getStructure().get(1).getAmount());
-        verify(incomeStatementService, times(8)).getIncomeStatement(any(FmsReportListReqVO.class), eq(10L));
+        verify(incomeStatementService, times(9)).getIncomeStatement(any(FmsReportListReqVO.class), eq(10L));
     }
 
     @Test

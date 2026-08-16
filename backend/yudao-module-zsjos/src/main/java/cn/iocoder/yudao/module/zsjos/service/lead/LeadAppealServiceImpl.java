@@ -42,6 +42,7 @@ import jakarta.annotation.Resource;
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
@@ -50,6 +51,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 @Slf4j
 public class LeadAppealServiceImpl implements LeadAppealService {
+
+    private static final String APPEAL_REVIEW_STAGE_VARIABLE = "reviewStage";
 
     @Resource private LeadAppealMapper appealMapper;
     @Resource private LeadMapper leadMapper;
@@ -147,22 +150,65 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Override
     public PageResult<LeadAppealRespVO> getInboxPage(LeadAppealPageReqVO reqVO, Long userId) {
-        BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
-        taskReq.setPageNo(reqVO.getPageNo());
-        taskReq.setPageSize(reqVO.getPageSize());
-        taskReq.setProcessDefinitionKey(APPEAL_PROCESS_DEFINITION_KEY);
-        PageResult<BpmTaskRespDTO> tasks = Boolean.TRUE.equals(reqVO.getHandled())
-                ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
-        List<LeadAppealRespVO> result = new ArrayList<>();
-        for (BpmTaskRespDTO task : tasks.getList()) {
-            Long appealId = parseAppealId(task.getBusinessKey());
-            LeadAppealDO appeal = appealId == null ? null : appealMapper.selectById(appealId);
-            if (appeal == null) continue;
-            LeadDO lead = leadMapper.selectById(appeal.getLeadId());
-            if (lead == null || !canReview(appeal, userId)) continue;
-            result.add(convert(appeal, lead, task.getId()));
+        Set<String> reviewPermissions = Set.of(PERMISSION_APPEAL_REVIEW_SALES_MANAGER,
+                        PERMISSION_APPEAL_REVIEW_QUALITY, PERMISSION_APPEAL_REVIEW_CHAIRMAN).stream()
+                .filter(permission -> permissionApi.hasAnyPermissions(userId, permission))
+                .collect(Collectors.toSet());
+        if (reviewPermissions.isEmpty()) return PageResult.empty();
+        AdminUserRespDTO reviewer = adminUserApi.getUser(userId);
+        if (reviewer == null || !CommonStatusEnum.ENABLE.getStatus().equals(reviewer.getStatus())) {
+            return PageResult.empty();
         }
-        return new PageResult<>(result, tasks.getTotal());
+        BpmTaskPageReqDTO taskReq = new BpmTaskPageReqDTO();
+        taskReq.setPageNo(reqVO.getPageNo()); taskReq.setPageSize(reqVO.getPageSize());
+        taskReq.setProcessDefinitionKey(APPEAL_PROCESS_DEFINITION_KEY);
+        taskReq.setTaskDefinitionKey(APPEAL_TASK_DEFINITION_KEY);
+        taskReq.setProcessVariableName(APPEAL_REVIEW_STAGE_VARIABLE);
+        taskReq.setProcessVariableValues(new ArrayList<>(reviewStages(reviewPermissions)));
+        PageResult<BpmTaskRespDTO> taskPage = Boolean.TRUE.equals(reqVO.getHandled())
+                ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+        Set<Long> appealIds = taskPage.getList().stream().map(BpmTaskRespDTO::getBusinessKey)
+                .map(this::parseAppealId).filter(Objects::nonNull)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        Map<Long, LeadAppealDO> appeals = appealIds.isEmpty() ? Map.of() : appealMapper.selectBatchIds(appealIds).stream()
+                .collect(Collectors.toMap(LeadAppealDO::getId, appeal -> appeal, (left, right) -> left));
+        Set<Long> leadIds = appeals.values().stream().map(LeadAppealDO::getLeadId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(Collectors.toMap(LeadDO::getId, lead -> lead, (left, right) -> left));
+        List<BpmTaskRespDTO> selectedTasks = new ArrayList<>();
+        List<LeadAppealDO> selectedAppeals = new ArrayList<>();
+        List<LeadDO> selectedLeads = new ArrayList<>();
+        for (BpmTaskRespDTO task : taskPage.getList()) {
+            Long appealId = parseAppealId(task.getBusinessKey());
+            LeadAppealDO appeal = appealId == null ? null : appeals.get(appealId);
+            if (appeal == null || !canReviewStage(appeal, reviewPermissions) || !canReview(appeal, userId, reviewer)
+                    || !Objects.equals(task.getBusinessKey(), APPEAL_BUSINESS_KEY_PREFIX + appealId)
+                    || !Objects.equals(task.getProcessInstanceId(), appeal.getProcessInstanceId())) {
+                log.error("[getInboxPage][userId({}) taskId({}) processInstanceId({}) appealId({}) task correlation invalid]",
+                        userId, task.getId(), task.getProcessInstanceId(), appealId);
+                throw exception(LEAD_APPEAL_PROCESS_UNAVAILABLE);
+            }
+            LeadDO lead = leads.get(appeal.getLeadId());
+            if (lead == null) {
+                log.error("[getInboxPage][userId({}) taskId({}) appealId({}) leadId({}) lead missing]",
+                        userId, task.getId(), appealId, appeal.getLeadId());
+                throw exception(LEAD_APPEAL_PROCESS_UNAVAILABLE);
+            }
+            selectedTasks.add(task); selectedAppeals.add(appeal); selectedLeads.add(lead);
+        }
+        Set<Long> displayUserIds = selectedAppeals.stream()
+                .flatMap(appeal -> java.util.stream.Stream.of(appeal.getApplicantUserId(), appeal.getReviewerUserId()))
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, String> userNames = displayUserIds.isEmpty() ? Map.of() : adminUserApi.getUserList(displayUserIds).stream()
+                .filter(user -> user.getId() != null && user.getNickname() != null)
+                .collect(Collectors.toMap(AdminUserRespDTO::getId, AdminUserRespDTO::getNickname,
+                        (left, right) -> left));
+        List<LeadAppealRespVO> result = new ArrayList<>();
+        for (int i = 0; i < selectedAppeals.size(); i++) {
+            result.add(convert(selectedAppeals.get(i), selectedLeads.get(i), selectedTasks.get(i).getId(), userNames));
+        }
+        return new PageResult<>(result, taskPage.getTotal());
     }
 
     @Override
@@ -186,7 +232,14 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             throw exception(LEAD_APPEAL_IDEMPOTENCY_CONFLICT);
         }
         if (!isReviewing(appeal.getStatus())) throw exception(LEAD_APPEAL_ALREADY_HANDLED);
+        String reviewPermission = requiredReviewPermission(appeal);
+        if (!Objects.equals(appeal.getStatus(), reviewingStatus(appeal.getRoundNo()))) {
+            throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        }
         LeadDO lead = requireLeadForUpdate(appeal.getLeadId());
+        if (!permissionApi.hasAnyPermissions(userId, reviewPermission)) {
+            throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        }
         if (!canReview(appeal, userId)) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         BpmTaskRespDTO task;
         try {
@@ -317,7 +370,10 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     }
 
     private boolean canReview(LeadAppealDO appeal, Long userId) {
-        AdminUserRespDTO user = adminUserApi.getUser(userId);
+        return canReview(appeal, userId, adminUserApi.getUser(userId));
+    }
+
+    private boolean canReview(LeadAppealDO appeal, Long userId, AdminUserRespDTO user) {
         if (user == null || !CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus())) return false;
         // Legacy rows predate reviewer snapshots. The BPM task API already scopes the task to its assignee.
         String snapshot = appeal.getReviewerUserIdsSnapshot();
@@ -330,6 +386,19 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             log.warn("[canReview][appealId({}) reviewer snapshot is invalid]", appeal.getId());
             return false;
         }
+    }
+
+    private boolean canReviewStage(LeadAppealDO appeal, Set<String> permissions) {
+        String permission = reviewPermission(appeal);
+        return permission != null && permissions.contains(permission);
+    }
+
+    private Set<String> reviewStages(Set<String> permissions) {
+        Set<String> stages = new LinkedHashSet<>();
+        if (permissions.contains(PERMISSION_APPEAL_REVIEW_SALES_MANAGER)) stages.add(APPEAL_STAGE_SALES_MANAGER);
+        if (permissions.contains(PERMISSION_APPEAL_REVIEW_QUALITY)) stages.add(APPEAL_STAGE_QUALITY);
+        if (permissions.contains(PERMISSION_APPEAL_REVIEW_CHAIRMAN)) stages.add(APPEAL_STAGE_CHAIRMAN);
+        return stages;
     }
 
     private String buildEvidenceJson(List<LeadAttachmentReqVO> attachments, Long userId) {
@@ -345,17 +414,25 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     }
 
     private LeadAppealRespVO convert(LeadAppealDO source, LeadDO lead, String taskId) {
+        return convert(source, lead, taskId, null);
+    }
+
+    private LeadAppealRespVO convert(LeadAppealDO source, LeadDO lead, String taskId, Map<Long, String> userNames) {
         LeadAppealRespVO result = new LeadAppealRespVO();
         result.setId(source.getId()); result.setLeadId(source.getLeadId()); result.setLeadNo(lead.getLeadNo());
         result.setLeadName(lead.getSubmittedName());
         result.setRoundNo(source.getRoundNo()); result.setReviewStage(source.getReviewStage()); result.setStatus(source.getStatus());
-        result.setApplicantUserId(source.getApplicantUserId()); result.setApplicantUserName(userName(source.getApplicantUserId()));
+        result.setApplicantUserId(source.getApplicantUserId());
+        result.setApplicantUserName(userNames == null ? userName(source.getApplicantUserId())
+                : userNames.get(source.getApplicantUserId()));
         result.setReason(source.getReason()); result.setEvidence(toEvidenceVO(source.getEvidenceRefs()));
         result.setInvalidReasonSnapshot(source.getInvalidReasonSnapshot());
         result.setInvalidDescriptionSnapshot(source.getInvalidDescriptionSnapshot());
         result.setInvalidEvidenceSnapshot(toEvidenceVO(source.getInvalidEvidenceRefsSnapshot()));
         result.setProcessInstanceId(source.getProcessInstanceId()); result.setTaskId(taskId);
-        result.setReviewerUserId(source.getReviewerUserId()); result.setReviewerUserName(userName(source.getReviewerUserId()));
+        result.setReviewerUserId(source.getReviewerUserId());
+        result.setReviewerUserName(userNames == null ? userName(source.getReviewerUserId())
+                : userNames.get(source.getReviewerUserId()));
         result.setDecisionReason(source.getDecisionReason()); result.setDecisionEvidence(toEvidenceVO(source.getDecisionEvidenceRefs()));
         result.setSubmittedAt(source.getSubmittedAt()); result.setDecidedAt(source.getDecidedAt());
         result.setCanSubmitNextRound(APPEAL_STATUS_UPHELD.equals(source.getStatus()) && source.getRoundNo() < 3);
@@ -435,6 +512,26 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     }
 
     private String stage(int round) { return round == 1 ? APPEAL_STAGE_SALES_MANAGER : round == 2 ? APPEAL_STAGE_QUALITY : APPEAL_STAGE_CHAIRMAN; }
+    private String requiredReviewPermission(LeadAppealDO appeal) {
+        String permission = reviewPermission(appeal);
+        if (permission == null) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        return permission;
+    }
+    private String reviewPermission(LeadAppealDO appeal) {
+        if (appeal.getRoundNo() == null || appeal.getRoundNo() < 1 || appeal.getRoundNo() > 3) {
+            return null;
+        }
+        String expectedStage = stage(appeal.getRoundNo());
+        if (!Objects.equals(appeal.getReviewStage(), expectedStage)) {
+            return null;
+        }
+        return switch (expectedStage) {
+            case APPEAL_STAGE_SALES_MANAGER -> PERMISSION_APPEAL_REVIEW_SALES_MANAGER;
+            case APPEAL_STAGE_QUALITY -> PERMISSION_APPEAL_REVIEW_QUALITY;
+            case APPEAL_STAGE_CHAIRMAN -> PERMISSION_APPEAL_REVIEW_CHAIRMAN;
+            default -> null;
+        };
+    }
     private String reviewingStatus(int round) { return round == 1 ? APPEAL_STATUS_SALES_MANAGER_REVIEWING : round == 2 ? APPEAL_STATUS_QUALITY_REVIEWING : APPEAL_STATUS_CHAIRMAN_REVIEWING; }
     private boolean isReviewing(String status) { return Set.of(APPEAL_STATUS_SALES_MANAGER_REVIEWING, APPEAL_STATUS_QUALITY_REVIEWING, APPEAL_STATUS_CHAIRMAN_REVIEWING).contains(status); }
 

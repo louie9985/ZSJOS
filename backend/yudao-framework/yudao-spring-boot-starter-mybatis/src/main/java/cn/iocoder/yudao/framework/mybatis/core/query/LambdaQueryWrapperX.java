@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 
 /**
@@ -105,6 +106,15 @@ public class LambdaQueryWrapperX<T> extends LambdaQueryWrapper<T> {
         Object val1 = ArrayUtils.get(values, 0);
         Object val2 = ArrayUtils.get(values, 1);
         return betweenIfPresent(column, val1, val2);
+    }
+
+    /**
+     * 拼接记录闭区间与查询闭区间重叠的条件。
+     */
+    public LambdaQueryWrapperX<T> betweenIfPresent(
+            SFunction<T, ?> beginColumn, SFunction<T, ?> endColumn, LocalDateTime[] times) {
+        return leIfPresent(beginColumn, ArrayUtils.get(times, 1))
+                .geIfPresent(endColumn, ArrayUtils.get(times, 0));
     }
 
     // ========== 重写父类方法，方便链式调用 ==========

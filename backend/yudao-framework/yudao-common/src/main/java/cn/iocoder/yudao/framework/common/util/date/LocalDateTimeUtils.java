@@ -6,6 +6,9 @@ import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.enums.DateIntervalEnum;
+import cn.iocoder.yudao.framework.common.util.collection.ArrayUtils;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import java.sql.Timestamp;
 import java.time.*;
@@ -14,8 +17,11 @@ import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.TimeZone;
+import java.util.stream.Collectors;
 
 import static cn.hutool.core.date.DatePattern.*;
 
@@ -54,6 +60,10 @@ public class LocalDateTimeUtils {
         }
     }
 
+    public static YearMonth parseYearMonth(String month) {
+        return YearMonth.parse(month, NORM_MONTH_FORMATTER);
+    }
+
     public static LocalDateTime addTime(Duration duration) {
         return LocalDateTime.now().plus(duration);
     }
@@ -68,6 +78,173 @@ public class LocalDateTimeUtils {
 
     public static boolean afterNow(LocalDateTime date) {
         return date.isAfter(LocalDateTime.now());
+    }
+
+    public static boolean isJanuary(LocalDateTime time) {
+        return time.getMonthValue() == 1;
+    }
+
+    public static boolean beforeOrEqualNow(LocalDateTime time) {
+        LocalDateTime now = LocalDateTime.now();
+        return time.isBefore(now) || time.isEqual(now);
+    }
+
+    public static boolean beforeOrEqualNow(LocalDate date) {
+        LocalDate today = LocalDate.now();
+        return date.isBefore(today) || date.isEqual(today);
+    }
+
+    public static boolean afterNow(LocalDate date) {
+        return date.isAfter(LocalDate.now());
+    }
+
+    public static boolean isBeforeOrEqual(LocalDate firstDate, LocalDate secondDate) {
+        return firstDate.isBefore(secondDate) || firstDate.isEqual(secondDate);
+    }
+
+    public static boolean isAfterOrEqual(LocalDate firstDate, LocalDate secondDate) {
+        return firstDate.isAfter(secondDate) || firstDate.isEqual(secondDate);
+    }
+
+    public static boolean isBeforeOrEqual(LocalDateTime firstTime, LocalDateTime secondTime) {
+        return firstTime.isBefore(secondTime) || firstTime.isEqual(secondTime);
+    }
+
+    public static boolean isAfterOrEqual(LocalDateTime firstTime, LocalDateTime secondTime) {
+        return firstTime.isAfter(secondTime) || firstTime.isEqual(secondTime);
+    }
+
+    public static boolean isTimeRangeValid(LocalDateTime beginTime, LocalDateTime endTime) {
+        return beginTime != null && endTime != null && endTime.isAfter(beginTime);
+    }
+
+    public static boolean isTimeRangePresent(LocalDateTime[] times) {
+        return ArrayUtils.get(times, 0) != null || ArrayUtils.get(times, 1) != null;
+    }
+
+    public static boolean isBetween(LocalDate beginDate, LocalDate endDate, LocalDate date) {
+        return beginDate != null && endDate != null && date != null
+                && isAfterOrEqual(date, beginDate) && isBeforeOrEqual(date, endDate);
+    }
+
+    public static boolean isNotBetween(LocalDate beginDate, LocalDate endDate, LocalDate date) {
+        return !isBetween(beginDate, endDate, date);
+    }
+
+    public static boolean isBetween(LocalDateTime beginTime, LocalDateTime endTime, LocalDateTime time) {
+        return beginTime != null && endTime != null && time != null
+                && isAfterOrEqual(time, beginTime) && isBeforeOrEqual(time, endTime);
+    }
+
+    public static boolean isNotBetween(LocalDateTime beginTime, LocalDateTime endTime, LocalDateTime time) {
+        return !isBetween(beginTime, endTime, time);
+    }
+
+    public static int getYearsBetween(LocalDate beginDate, LocalDate endDate) {
+        if (beginDate == null || endDate == null || beginDate.isAfter(endDate)) {
+            return 0;
+        }
+        return Period.between(beginDate, endDate).getYears();
+    }
+
+    public static List<TimeRange> subtractTimeRanges(List<TimeRange> sourceRanges, TimeRange excludedRange) {
+        List<TimeRange> result = new ArrayList<>();
+        for (TimeRange sourceRange : sourceRanges) {
+            TimeRange overlap = intersectTimeRange(sourceRange, excludedRange);
+            if (overlap == null) {
+                result.add(sourceRange);
+                continue;
+            }
+            if (sourceRange.getStartTime().isBefore(overlap.getStartTime())) {
+                result.add(new TimeRange(sourceRange.getStartTime(), overlap.getStartTime()));
+            }
+            if (overlap.getEndTime().isBefore(sourceRange.getEndTime())) {
+                result.add(new TimeRange(overlap.getEndTime(), sourceRange.getEndTime()));
+            }
+        }
+        return result;
+    }
+
+    public static List<TimeRange> mergeTimeRanges(List<TimeRange> timeRanges) {
+        if (CollUtil.isEmpty(timeRanges)) {
+            return Collections.emptyList();
+        }
+        List<TimeRange> sortedRanges = timeRanges.stream()
+                .sorted(Comparator.comparing(TimeRange::getStartTime))
+                .collect(Collectors.toList());
+        List<TimeRange> result = new ArrayList<>();
+        TimeRange currentRange = CollUtil.getFirst(sortedRanges);
+        for (int i = 1; i < sortedRanges.size(); i++) {
+            TimeRange nextRange = sortedRanges.get(i);
+            if (nextRange.getStartTime().isAfter(currentRange.getEndTime())) {
+                result.add(currentRange);
+                currentRange = nextRange;
+                continue;
+            }
+            LocalDateTime endTime = currentRange.getEndTime().isAfter(nextRange.getEndTime())
+                    ? currentRange.getEndTime() : nextRange.getEndTime();
+            currentRange = new TimeRange(currentRange.getStartTime(), endTime);
+        }
+        result.add(currentRange);
+        return result;
+    }
+
+    public static List<TimeRange> intersectTimeRanges(
+            List<TimeRange> firstRanges, List<TimeRange> secondRanges) {
+        List<TimeRange> result = new ArrayList<>();
+        for (TimeRange firstRange : firstRanges) {
+            for (TimeRange secondRange : secondRanges) {
+                TimeRange overlap = intersectTimeRange(firstRange, secondRange);
+                if (overlap != null) {
+                    result.add(overlap);
+                }
+            }
+        }
+        return mergeTimeRanges(result);
+    }
+
+    public static TimeRange intersectTimeRange(TimeRange firstRange, TimeRange secondRange) {
+        LocalDateTime startTime = firstRange.getStartTime().isAfter(secondRange.getStartTime())
+                ? firstRange.getStartTime() : secondRange.getStartTime();
+        LocalDateTime endTime = firstRange.getEndTime().isBefore(secondRange.getEndTime())
+                ? firstRange.getEndTime() : secondRange.getEndTime();
+        return endTime.isAfter(startTime) ? new TimeRange(startTime, endTime) : null;
+    }
+
+    public static int calculateDurationMinutes(List<TimeRange> timeRanges) {
+        return timeRanges.stream()
+                .mapToInt(range -> Math.toIntExact(Duration.between(
+                        range.getStartTime(), range.getEndTime()).toMinutes()))
+                .sum();
+    }
+
+    public static List<TimeRange> buildDailyTimeRanges(
+            LocalDate beginDate, LocalDate endDate, LocalTime beginTime, LocalTime endTime) {
+        if (beginDate == null || endDate == null || beginTime == null || endTime == null
+                || beginDate.isAfter(endDate)) {
+            return Collections.emptyList();
+        }
+        List<TimeRange> result = new ArrayList<>();
+        for (LocalDate date = beginDate; isBeforeOrEqual(date, endDate); date = date.plusDays(1)) {
+            LocalDateTime rangeBeginTime = date.atTime(beginTime);
+            LocalDateTime rangeEndTime = date.atTime(endTime);
+            if (rangeEndTime.isBefore(rangeBeginTime) || rangeEndTime.isEqual(rangeBeginTime)) {
+                rangeEndTime = rangeEndTime.plusDays(1);
+            }
+            result.add(new TimeRange(rangeBeginTime, rangeEndTime));
+        }
+        return result;
+    }
+
+    public static TimeRange findDailyTimeRange(
+            LocalDate date, LocalTime beginTime, LocalTime endTime, LocalDateTime time) {
+        if (date == null || time == null) {
+            return null;
+        }
+        List<TimeRange> timeRanges = buildDailyTimeRanges(
+                date.minusDays(1), date.plusDays(1), beginTime, endTime);
+        return CollUtil.findOne(timeRanges, timeRange -> isBetween(
+                timeRange.getStartTime(), timeRange.getEndTime(), time));
     }
 
     /**
@@ -184,6 +361,38 @@ public class LocalDateTimeUtils {
                 LocalDateTime.of(nowDate, startTime2), LocalDateTime.of(nowDate, endTime2));
     }
 
+    public static LocalDateTime getDayBeginTime(LocalDate date) {
+        return date == null ? null : date.atStartOfDay();
+    }
+
+    public static LocalDateTime getDayBeginTime(LocalDateTime time) {
+        return time == null ? null : getDayBeginTime(time.toLocalDate());
+    }
+
+    public static LocalDateTime getDayEndTime(LocalDate date) {
+        return date == null ? null : date.atTime(LocalTime.MAX);
+    }
+
+    public static LocalDateTime[] getDateTimeRange(LocalDate beginDate, LocalDate endDate) {
+        if (beginDate == null && endDate == null) {
+            return null;
+        }
+        return new LocalDateTime[]{getDayBeginTime(beginDate), getDayEndTime(endDate)};
+    }
+
+    public static LocalDateTime[] getMonthDateTimeRange(int year, int month) {
+        LocalDate monthBeginDate = LocalDate.of(year, month, 1);
+        return getDateTimeRange(monthBeginDate, monthBeginDate.with(TemporalAdjusters.lastDayOfMonth()));
+    }
+
+    public static boolean isClosedRangeOverlap(LocalDateTime beginTime1, LocalDateTime endTime1,
+                                               LocalDateTime beginTime2, LocalDateTime endTime2) {
+        if (beginTime1 == null || endTime1 == null || beginTime2 == null || endTime2 == null) {
+            return false;
+        }
+        return isBeforeOrEqual(beginTime1, endTime2) && isAfterOrEqual(endTime1, beginTime2);
+    }
+
     /**
      * 获取指定日期所在的月份的开始时间
      * 例如：2023-09-30 00:00:00,000
@@ -195,6 +404,10 @@ public class LocalDateTimeUtils {
         return date.with(TemporalAdjusters.firstDayOfMonth()).with(LocalTime.MIN);
     }
 
+    public static LocalDateTime beginOfDay(LocalDateTime date) {
+        return date.with(LocalTime.MIN);
+    }
+
     /**
      * 获取指定日期所在的月份的最后时间
      * 例如：2023-09-30 23:59:59,999
@@ -204,6 +417,22 @@ public class LocalDateTimeUtils {
      */
     public static LocalDateTime endOfMonth(LocalDateTime date) {
         return date.with(TemporalAdjusters.lastDayOfMonth()).with(LocalTime.MAX);
+    }
+
+    public static LocalDateTime getMonthBeginTime(int year, int month) {
+        return LocalDateTime.of(year, month, 1, 0, 0);
+    }
+
+    public static LocalDateTime getMonthBeginTime(YearMonth month) {
+        return getMonthBeginTime(month.getYear(), month.getMonthValue());
+    }
+
+    public static LocalDateTime getNextMonthBeginTime(int year, int month) {
+        return getMonthBeginTime(year, month).plusMonths(1);
+    }
+
+    public static LocalDateTime getNextMonthBeginTime(YearMonth month) {
+        return getMonthBeginTime(month).plusMonths(1);
     }
 
     /**
@@ -431,6 +660,16 @@ public class LocalDateTimeUtils {
      */
     public static Long toEpochSecond(LocalDateTime sourceDateTime, ZoneId zoneId) {
         return sourceDateTime.atZone(zoneId).toEpochSecond();
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @SuppressWarnings("ClassCanBeRecord")
+    public static class TimeRange {
+
+        private final LocalDateTime startTime;
+        private final LocalDateTime endTime;
+
     }
 
 }

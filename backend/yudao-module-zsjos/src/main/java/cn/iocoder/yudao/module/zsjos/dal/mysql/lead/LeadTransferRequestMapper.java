@@ -12,6 +12,10 @@ public interface LeadTransferRequestMapper extends BaseMapperX<LeadTransferReque
     default LeadTransferRequestDO selectByIdempotencyKey(String key) {
         return selectOne(LeadTransferRequestDO::getIdempotencyKey, key);
     }
+    @Select("SELECT * FROM zsjos_lead_transfer_request WHERE idempotency_key=#{key} " +
+            "AND tenant_id=#{tenantId} AND deleted=b'0' LIMIT 1 FOR UPDATE")
+    LeadTransferRequestDO selectByIdempotencyKeyForUpdate(@Param("key") String key,
+                                                           @Param("tenantId") Long tenantId);
     default LeadTransferRequestDO selectActiveByLeadId(Long leadId) {
         return selectOne(new LambdaQueryWrapperX<LeadTransferRequestDO>()
                 .eq(LeadTransferRequestDO::getLeadId, leadId)

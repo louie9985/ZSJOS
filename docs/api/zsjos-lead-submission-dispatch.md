@@ -22,7 +22,7 @@
 | `POST /zsjos/lead/self-sourced/create` | `zsjos:lead:self-sourced:create` |
 | `GET /zsjos/lead-duplicate-review/page` | `zsjos:lead-duplicate-review:query`；租户公共复核队列 |
 | `GET /zsjos/lead-duplicate-review/{id}` | `zsjos:lead-duplicate-review:query` + 独立复核对象权限 |
-| `GET /zsjos/lead-duplicate-review/sales-candidates` | `zsjos:lead-duplicate-review:process`；部门管理范围或 `manage-all` |
+| `GET /zsjos/lead-duplicate-review/sales-candidates` | `zsjos:lead-duplicate-review:process`；租户中央复核可选择全部符合条件的启用销售 |
 | `POST /zsjos/lead-duplicate-review/{id}/decision` | `zsjos:lead-duplicate-review:process` + 独立复核对象权限 |
 | `GET /zsjos/lead/assignment/my-pending` | `zsjos:lead:accept` |
 | `POST /zsjos/lead/{id}/accept` | `zsjos:lead:accept` + 当前候选对象权限 |
@@ -54,7 +54,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
-复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；决定事务对任务加行锁，第一位提交者成功。结论固定为 `new_person`、`reuse_person`、`reactivate_lead`、`notify_owner`，意见必填、附件可选。重新激活覆盖当前 Person/Lead 资料，选择范围内启用销售并回到待首次跟进；旧 Opportunity 保持 `lost`，重新判有效时恢复。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
+复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；这是租户级中央复核，不按复核人的组织范围裁剪候选销售。决定事务对任务加行锁，第一位提交者成功。结论固定为 `new_person`、`reuse_person`、`reactivate_lead`、`notify_owner`，意见必填、附件可选。重新激活覆盖当前 Person/Lead 资料，可选择租户内全部符合资格的启用销售并回到待首次跟进；旧 Opportunity 保持 `lost`，重新判有效时恢复。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
 
 ## 管理接口与权限
 

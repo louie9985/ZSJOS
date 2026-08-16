@@ -119,6 +119,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PRODUCT_SKU_IN_USE = new ErrorCode(1_900_004_015, "课程 SKU 已被客资引用，不能删除，请改为停用");
     ErrorCode PRODUCT_PRICE_INVALID = new ErrorCode(1_900_004_016, "课程 SKU 价格不能小于 0");
     ErrorCode PRODUCT_ATTR_INVALID = new ErrorCode(1_900_004_017, "课程销售属性或属性值无效");
+    ErrorCode PRODUCT_SKU_COMBINATION_LIMIT = new ErrorCode(1_900_004_018, "课程 SKU 属性组合数量超过上限");
+    ErrorCode PRODUCT_SKU_SPU_IMMUTABLE = new ErrorCode(1_900_004_019, "课程 SKU 不允许更换所属课程");
 
     ErrorCode WORK_PLAN_NOT_EXISTS = new ErrorCode(1_900_005_001, "工作计划不存在");
     ErrorCode WORK_TASK_NOT_EXISTS = new ErrorCode(1_900_005_002, "工作任务不存在");

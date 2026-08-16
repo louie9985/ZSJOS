@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.framework.common.util.servlet;
 
+import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -11,6 +12,9 @@ import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.io.IOException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 /**
@@ -29,6 +33,13 @@ public class ServletUtils {
     public static void writeJSON(HttpServletResponse response, Object object) {
         String content = JsonUtils.toJsonString(object);
         JakartaServletUtil.write(response, content, MediaType.APPLICATION_JSON_VALUE + ";charset=UTF-8");
+    }
+
+    public static void writeAttachment(HttpServletResponse response, String filename, byte[] content) throws IOException {
+        response.setHeader("Content-Disposition", "attachment;filename="
+                + URLEncoder.encode(filename, StandardCharsets.UTF_8));
+        response.setContentType(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+        IoUtil.write(response.getOutputStream(), false, content);
     }
 
     /**

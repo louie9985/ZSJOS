@@ -322,6 +322,15 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testGetUserByUsername_caseSensitive() {
+        userMapper.insert(randomAdminUserDO(o -> o.setUsername("Admin")));
+
+        AdminUserDO user = userService.getUserByUsername("admin");
+
+        assertNull(user);
+    }
+
+    @Test
     public void testGetUserByMobile() {
         // mock 数据
         AdminUserDO dbUser = randomAdminUserDO();

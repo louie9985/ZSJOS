@@ -8,12 +8,17 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.workplan.vo.WorkPlanSearch
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.workplan.WorkPlanDO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
 
 @Mapper
 public interface WorkPlanMapper extends BaseMapperX<WorkPlanDO> {
+    @Select("SELECT * FROM zsjos_work_plan WHERE id = #{id} AND tenant_id = #{tenantId} AND deleted = b'0' FOR UPDATE")
+    WorkPlanDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     default PageResult<WorkPlanDO> selectVisiblePage(WorkPlanPageReqVO reqVO, Long userId,
                                                      Collection<Long> visiblePlanIds, boolean all) {
         return selectPage(reqVO, visibleQuery(userId, visiblePlanIds, all)

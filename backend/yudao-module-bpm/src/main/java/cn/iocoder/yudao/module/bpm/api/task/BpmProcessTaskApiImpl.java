@@ -114,7 +114,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     @Override
     public PageResult<BpmTaskRespDTO> getTodoTaskPage(Long userId, BpmTaskPageReqDTO reqDTO) {
-        PageResult<Task> page = bpmTaskService.getTaskTodoPage(userId, toPageReq(reqDTO));
+        PageResult<Task> page = bpmTaskService.getTaskTodoPage(userId, toPageReq(reqDTO),
+                reqDTO.getProcessVariableName(), reqDTO.getProcessVariableValues());
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -134,7 +135,8 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
 
     @Override
     public PageResult<BpmTaskRespDTO> getDoneTaskPage(Long userId, BpmTaskPageReqDTO reqDTO) {
-        PageResult<HistoricTaskInstance> page = bpmTaskService.getTaskDonePage(userId, toPageReq(reqDTO));
+        PageResult<HistoricTaskInstance> page = bpmTaskService.getTaskDonePage(userId, toPageReq(reqDTO),
+                reqDTO.getProcessVariableName(), reqDTO.getProcessVariableValues());
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }

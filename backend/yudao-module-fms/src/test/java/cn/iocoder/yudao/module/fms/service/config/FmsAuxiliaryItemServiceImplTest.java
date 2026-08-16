@@ -24,6 +24,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomPojo;
@@ -170,8 +172,8 @@ public class FmsAuxiliaryItemServiceImplTest extends BaseDbUnitTest {
 
         // 断言
         assertEquals(2, result.size());
-        assertEquals("KH001", result.get(0).getCode());
-        assertEquals("KH002", result.get(1).getCode());
+        assertEquals(Set.of("KH001", "KH002"),
+                result.stream().map(FmsAuxiliaryItemDO::getCode).collect(Collectors.toSet()));
     }
 
     @Test

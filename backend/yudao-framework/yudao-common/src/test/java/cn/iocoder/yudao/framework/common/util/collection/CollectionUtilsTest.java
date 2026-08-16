@@ -7,7 +7,10 @@ import org.junit.jupiter.api.Test;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.BiFunction;
+import java.math.BigDecimal;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -59,6 +62,19 @@ public class CollectionUtilsTest {
         // 断言 delete
         assertEquals(result.get(2).size(), 1);
         assertEquals(result.get(2).get(0), new Dog(2, "旺财", "wc"));
+    }
+
+    @Test
+    public void testAggregateAndConvertSetBySupplier() {
+        List<Integer> values = Arrays.asList(1, 2, 2, null, 3);
+
+        assertEquals(8L, CollectionUtils.sum(values, value -> value == null ? 0 : value));
+        assertEquals(3L, CollectionUtils.count(values, value -> value != null && value >= 2));
+        assertEquals(3L, CollectionUtils.distinctCount(values, value -> value));
+        Set<Integer> result = CollectionUtils.convertSetBySupplier(values, value -> value, TreeSet::new);
+        assertEquals(new TreeSet<>(Arrays.asList(1, 2, 3)), result);
+        assertEquals(new BigDecimal("3.50"), CollectionUtils.sumBigDecimal(
+                Arrays.asList(new BigDecimal("1.25"), null, new BigDecimal("2.25")), value -> value));
     }
 
 }

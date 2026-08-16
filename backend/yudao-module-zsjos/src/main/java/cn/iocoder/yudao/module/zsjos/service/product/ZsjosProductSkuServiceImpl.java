@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.product;
 import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductCatalogRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.*;
@@ -10,6 +11,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.product.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import jakarta.annotation.Resource;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,8 +24,11 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
+    @Value("${zsjos.product.sku.max-generated-combinations:500}")
+    private int maxGeneratedCombinations;
     @Resource private ZsjosProductService productService;
     @Resource private ZsjosProductMapper productMapper;
+    @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private ZsjosProductAttrMapper attrMapper;
     @Resource private ZsjosProductAttrValueMapper attrValueMapper;
     @Resource private ZsjosProductSkuMapper skuMapper;
@@ -45,6 +50,7 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
     @Transactional(rollbackFor = Exception.class)
     public void saveAttrs(ZsjosProductAttrSaveReqVO reqVO) {
         productService.getProduct(reqVO.getSpuId());
+        lockProduct(reqVO.getSpuId());
         Set<String> names = new HashSet<>();
         Set<String> keys = new HashSet<>();
         for (ZsjosProductAttrSaveReqVO.Attr attr : reqVO.getAttrs()) {
@@ -79,12 +85,13 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public Long createSku(ZsjosProductSkuSaveReqVO reqVO) {
-        productService.getProduct(reqVO.getSpuId());
+        lockEnabledProduct(reqVO.getSpuId());
         validatePrice(reqVO.getPrice());
         String json = canonicalAttrs(reqVO.getSpuId(), reqVO.getAttrValues());
         String hash = DigestUtil.sha256Hex(json);
         if (skuMapper.selectBySpuIdAndHash(reqVO.getSpuId(), hash) != null) throw exception(PRODUCT_SKU_DUPLICATE);
         ZsjosProductSkuDO sku = toSku(reqVO, json, hash);
+        sku.setStatus(CommonStatusEnum.ENABLE.getStatus());
         sku.setSkuRef("sku_" + UUID.randomUUID().toString().replace("-", ""));
         skuMapper.insert(sku); return sku.getId();
     }
@@ -92,12 +99,24 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int generateSkus(Long spuId) {
-        ZsjosProductRespVO spu = productService.getProduct(spuId);
+        if (maxGeneratedCombinations <= 0) {
+            throw exception(PRODUCT_SKU_COMBINATION_LIMIT);
+        }
+        ZsjosProductDO spu = lockEnabledProduct(spuId);
         List<ZsjosProductAttrDO> attrs = attrMapper.selectListBySpuId(spuId);
         Map<Long, List<ZsjosProductAttrValueDO>> values = attrValueMapper
                 .selectListByAttrIds(attrs.stream().map(ZsjosProductAttrDO::getId).toList()).stream()
                 .filter(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()))
                 .collect(Collectors.groupingBy(ZsjosProductAttrValueDO::getAttrId, LinkedHashMap::new, Collectors.toList()));
+        long combinationsCount = 1;
+        for (ZsjosProductAttrDO attr : attrs) {
+            int valueCount = values.getOrDefault(attr.getId(), List.of()).size();
+            if (valueCount == 0) return 0;
+            if (combinationsCount > maxGeneratedCombinations / (long) valueCount) {
+                throw exception(PRODUCT_SKU_COMBINATION_LIMIT);
+            }
+            combinationsCount *= valueCount;
+        }
         List<Map<String, String>> combinations = new ArrayList<>(); combinations.add(new LinkedHashMap<>());
         for (ZsjosProductAttrDO attr : attrs) {
             List<Map<String, String>> next = new ArrayList<>();
@@ -114,7 +133,7 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
             sku.setSkuRef("sku_" + UUID.randomUUID().toString().replace("-", ""));
             sku.setSkuName(spu.getName() + (combination.isEmpty() ? "" : " - " + String.join(" / ", combination.values())));
             sku.setAttrValuesJson(json); sku.setAttrValuesHash(hash); sku.setPrice(BigDecimal.ZERO);
-            sku.setStatus(CommonStatusEnum.DISABLE.getStatus()); sku.setSort(created); skuMapper.insert(sku); created++;
+            sku.setStatus(CommonStatusEnum.ENABLE.getStatus()); sku.setSort(created); skuMapper.insert(sku); created++;
         }
         return created;
     }
@@ -122,11 +141,13 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
     @Override @Transactional(rollbackFor = Exception.class)
     public void updateSku(ZsjosProductSkuSaveReqVO reqVO) {
         ZsjosProductSkuDO existing = validateSkuExists(reqVO.getId());
-        productService.getProduct(reqVO.getSpuId()); validatePrice(reqVO.getPrice());
+        if (!Objects.equals(existing.getSpuId(), reqVO.getSpuId())) throw exception(PRODUCT_SKU_SPU_IMMUTABLE);
+        productService.getProduct(reqVO.getSpuId()); lockProduct(reqVO.getSpuId()); validatePrice(reqVO.getPrice());
         String json = canonicalAttrs(reqVO.getSpuId(), reqVO.getAttrValues()); String hash = DigestUtil.sha256Hex(json);
         ZsjosProductSkuDO same = skuMapper.selectBySpuIdAndHash(reqVO.getSpuId(), hash);
         if (same != null && !Objects.equals(same.getId(), reqVO.getId())) throw exception(PRODUCT_SKU_DUPLICATE);
-        ZsjosProductSkuDO update = toSku(reqVO, json, hash); update.setSkuRef(existing.getSkuRef()); skuMapper.updateById(update);
+        ZsjosProductSkuDO update = toSku(reqVO, json, hash); update.setSkuRef(existing.getSkuRef());
+        update.setStatus(null); skuMapper.updateById(update);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -236,6 +257,30 @@ public class ZsjosProductSkuServiceImpl implements ZsjosProductSkuService {
         return JsonUtils.toJsonString(new TreeMap<>(requested));
     }
     private void validatePrice(BigDecimal price) { if (price == null || price.signum() < 0) throw exception(PRODUCT_PRICE_INVALID); }
+    private ZsjosProductDO lockProduct(Long spuId) {
+        ZsjosProductDO product = productMapper.selectByIdForUpdate(spuId, TenantContextHolder.getRequiredTenantId());
+        if (product == null) {
+            throw exception(PRODUCT_NOT_EXISTS);
+        }
+        return product;
+    }
+    private ZsjosProductDO lockEnabledProduct(Long spuId) {
+        Long tenantId = TenantContextHolder.getRequiredTenantId();
+        ZsjosProductDO product = lockProduct(spuId);
+        if (!CommonStatusEnum.ENABLE.getStatus().equals(product.getStatus())) throw exception(PRODUCT_REFS_INVALID);
+        Set<Long> visited = new HashSet<>();
+        Long categoryId = product.getCategoryId();
+        int depth = 0;
+        while (categoryId != null && categoryId != 0L && depth++ < 10 && visited.add(categoryId)) {
+            ZsjosProductCategoryDO category = categoryMapper.selectByIdForUpdate(categoryId, tenantId);
+            if (category == null || !CommonStatusEnum.ENABLE.getStatus().equals(category.getStatus())) {
+                throw exception(PRODUCT_REFS_INVALID);
+            }
+            categoryId = category.getParentId();
+        }
+        if (depth == 0 || categoryId == null || categoryId != 0L) throw exception(PRODUCT_REFS_INVALID);
+        return product;
+    }
     private ZsjosProductSkuDO validateSkuExists(Long id) { ZsjosProductSkuDO sku = skuMapper.selectById(id); if (sku == null) throw exception(PRODUCT_SKU_NOT_EXISTS); return sku; }
     private ZsjosProductSkuDO toSku(ZsjosProductSkuSaveReqVO req, String json, String hash) {
         ZsjosProductSkuDO sku = new ZsjosProductSkuDO(); sku.setId(req.getId()); sku.setSpuId(req.getSpuId());

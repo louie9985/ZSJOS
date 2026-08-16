@@ -12,6 +12,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Min;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -24,6 +26,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @Tag(name = "管理后台 - 客资跟进")
 @RestController
 @RequestMapping("/zsjos/lead")
+@Validated
 public class LeadFollowUpController {
     @Resource private LeadFollowUpService followUpService;
     @Resource private LeadAttachmentService attachmentService;
@@ -34,8 +37,8 @@ public class LeadFollowUpController {
     @ZsjosPermission(bizType = "lead", bizId = "#id", action = "follow-up-read")
     public CommonResult<PageResult<LeadFollowUpRespVO>> getPage(
             @PathVariable("id") Long id,
-            @RequestParam(value = "pageNo", defaultValue = "1") int pageNo,
-            @RequestParam(value = "pageSize", defaultValue = "10") int pageSize) {
+            @RequestParam(value = "pageNo", defaultValue = "1") @Min(1) int pageNo,
+            @RequestParam(value = "pageSize", defaultValue = "10") @Min(1) int pageSize) {
         return success(followUpService.getPage(id, pageNo, pageSize));
     }
 

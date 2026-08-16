@@ -29,8 +29,9 @@ export const getDictData = (id: number) => {
 }
 
 // 根据字典类型查询字典数据
-export const getDictDataByType = (dictType: string) => {
-  return request.get({ url: '/system/dict-data/type?type=' + dictType })
+export const getDictDataByType = async (dictType: string): Promise<DictDataVO[]> => {
+  const list = await getSimpleDictDataList()
+  return list.filter((item: DictDataVO) => item.dictType === dictType)
 }
 
 // 新增字典数据

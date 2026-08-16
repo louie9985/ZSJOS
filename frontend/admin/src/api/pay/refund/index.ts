@@ -61,21 +61,6 @@ export const getRefund = (id: number) => {
   return request.get<RefundDetailVO>({ url: '/pay/refund/get?id=' + id })
 }
 
-// 新增退款订单
-export const createRefund = (data: RefundVO) => {
-  return request.post({ url: '/pay/refund/create', data })
-}
-
-// 修改退款订单
-export const updateRefund = (data: RefundVO) => {
-  return request.put({ url: '/pay/refund/update', data })
-}
-
-// 删除退款订单
-export const deleteRefund = (id: number) => {
-  return request.delete({ url: '/pay/refund/delete?id=' + id })
-}
-
 // 导出退款订单
 export const exportRefund = (params: any) => {
   return request.download({ url: '/pay/refund/export-excel', params })

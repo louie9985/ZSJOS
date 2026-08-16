@@ -97,6 +97,29 @@ public class MoneyUtils {
     }
 
     /**
+     * 格式化金额，默认进行四舍五入。金额为空时按 0 处理。
+     */
+    public static BigDecimal priceScale(BigDecimal price) {
+        return (price == null ? BigDecimal.ZERO : price).setScale(PRICE_SCALE, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * 金额相加，忽略空金额，没有有效金额时返回 0。
+     */
+    public static BigDecimal priceAdd(BigDecimal... prices) {
+        BigDecimal result = BigDecimal.ZERO;
+        if (prices == null) {
+            return priceScale(result);
+        }
+        for (BigDecimal price : prices) {
+            if (price != null) {
+                result = result.add(price);
+            }
+        }
+        return priceScale(result);
+    }
+
+    /**
      * 金额相乘，默认进行四舍五入
      *
      * 位数：{@link #PRICE_SCALE}
