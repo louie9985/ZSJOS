@@ -150,6 +150,12 @@
             <version>${revision}</version>
         </dependency>
 
+        <dependency>
+            <groupId>cn.iocoder.boot</groupId>
+            <artifactId>yudao-module-eam</artifactId>
+            <version>${revision}</version>
+        </dependency>
+
         <!-- 中世健员工工作平台 -->
         <dependency>
             <groupId>cn.iocoder.boot</groupId>

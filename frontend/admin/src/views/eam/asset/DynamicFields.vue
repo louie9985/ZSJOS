@@ -1,0 +1,110 @@
+<template>
+  <!-- 按分类的自定义字段定义动态渲染表单项；字段定义随分类切换而重新加载 -->
+  <template v-for="field in fields" :key="field.fieldKey">
+    <el-form-item
+      :label="field.fieldName"
+      :prop="`extFields.${field.fieldKey}`"
+      :rules="buildRule(field)"
+    >
+      <el-input
+        v-if="field.fieldType === FieldType.TEXT"
+        v-model="model[field.fieldKey]"
+        :placeholder="`请输入${field.fieldName}`"
+        clearable
+      />
+      <el-input
+        v-else-if="field.fieldType === FieldType.TEXTAREA"
+        v-model="model[field.fieldKey]"
+        type="textarea"
+        :rows="3"
+        :placeholder="`请输入${field.fieldName}`"
+      />
+      <el-input-number
+        v-else-if="field.fieldType === FieldType.NUMBER"
+        v-model="model[field.fieldKey]"
+        class="!w-full"
+        :controls="false"
+        :placeholder="`请输入${field.fieldName}`"
+      />
+      <el-date-picker
+        v-else-if="field.fieldType === FieldType.DATE"
+        v-model="model[field.fieldKey]"
+        type="date"
+        value-format="YYYY-MM-DD"
+        class="!w-full"
+        :placeholder="`请选择${field.fieldName}`"
+      />
+      <el-select
+        v-else-if="field.fieldType === FieldType.SELECT"
+        v-model="model[field.fieldKey]"
+        class="!w-full"
+        clearable
+        :placeholder="`请选择${field.fieldName}`"
+      >
+        <el-option v-for="opt in field.options || []" :key="opt" :label="opt" :value="opt" />
+      </el-select>
+    </el-form-item>
+  </template>
+
+  <el-empty
+    v-if="!loading && fields.length === 0 && categoryId"
+    description="该分类未配置自定义字段"
+    :image-size="60"
+  />
+</template>
+
+<script setup lang="ts">
+import * as CategoryFieldApi from '@/api/eam/categoryField'
+import { FieldType } from '@/api/eam/categoryField'
+
+defineOptions({ name: 'EamDynamicFields' })
+
+const props = defineProps<{
+  /** 当前分类，切换时重新拉取字段定义 */
+  categoryId?: number
+  /** 扩展字段值对象，双向绑定 */
+  modelValue: Record<string, any>
+}>()
+const emit = defineEmits<{ (e: 'update:modelValue', value: Record<string, any>): void }>()
+
+const fields = ref<CategoryFieldApi.CategoryFieldVO[]>([])
+const loading = ref(false)
+
+const model = computed({
+  get: () => props.modelValue || {},
+  set: (val) => emit('update:modelValue', val)
+})
+
+const buildRule = (field: CategoryFieldApi.CategoryFieldVO) => {
+  if (!field.required) {
+    return []
+  }
+  return [{ required: true, message: `${field.fieldName}不能为空`, trigger: 'blur' }]
+}
+
+/** 分类切换后，丢弃不再属于新分类的扩展字段值，避免提交时被后端拒绝 */
+const loadFields = async (categoryId?: number) => {
+  if (!categoryId) {
+    fields.value = []
+    return
+  }
+  loading.value = true
+  try {
+    fields.value = await CategoryFieldApi.getEffectiveFieldList(categoryId)
+    const allowed = new Set(fields.value.map((f) => f.fieldKey))
+    const next: Record<string, any> = {}
+    Object.entries(model.value).forEach(([key, value]) => {
+      if (allowed.has(key)) {
+        next[key] = value
+      }
+    })
+    emit('update:modelValue', next)
+  } finally {
+    loading.value = false
+  }
+}
+
+watch(() => props.categoryId, loadFields, { immediate: true })
+
+defineExpose({ reload: () => loadFields(props.categoryId) })
+</script>

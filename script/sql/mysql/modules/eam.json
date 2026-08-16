@@ -1,0 +1,14 @@
+{
+  "code": "eam",
+  "description": "Enterprise Asset Management module",
+  "dependsOn": ["core"],
+  "schema": "schema/eam.sql",
+  "baseline": null,
+  "migrations": "migrations/eam",
+  "verify": "verify/eam.sql",
+  "enabledJavaModules": [
+    "yudao-module-eam"
+  ],
+  "ignoredMappedTables": [],
+  "allowedExtraTables": []
+}

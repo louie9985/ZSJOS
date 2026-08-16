@@ -1,0 +1,10 @@
+DELETE FROM "eam_category";
+DELETE FROM "eam_category_field";
+DELETE FROM "eam_asset";
+DELETE FROM "eam_asset_change_log";
+DELETE FROM "eam_transfer";
+DELETE FROM "eam_inventory";
+DELETE FROM "eam_inventory_detail";
+DELETE FROM "eam_repair";
+DELETE FROM "eam_scrap";
+DELETE FROM "eam_code_rule";

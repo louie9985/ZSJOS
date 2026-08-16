@@ -31,6 +31,7 @@
         <module>yudao-module-hrm</module>
 <!-- 请参考 https://doc.iocoder.cn/ai/build/ 文档，完成 AI 模块的启动！！！ -->
         <module>yudao-module-ai</module>
+        <module>yudao-module-eam</module>
         <module>yudao-module-zsjos</module>
     </modules>
 
