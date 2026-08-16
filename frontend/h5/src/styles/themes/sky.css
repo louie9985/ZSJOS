@@ -1,0 +1,29 @@
+/* 天空蓝主题 */
+:root[data-theme="sky"] {
+  --h5-primary: #4A90D9;
+  --h5-primary-light: #F0F7FF;
+  --h5-primary-dark: #3578C0;
+  --h5-primary-opacity: rgba(74, 144, 217, 0.1);
+  --h5-gradient: linear-gradient(135deg, #4A90D9 0%, #6BAAEE 100%);
+  --h5-bg: #F5F9FD;
+  --h5-card-bg: #FFFFFF;
+  --h5-text-primary: #1A1A1A;
+  --h5-text-secondary: #666666;
+  --h5-text-placeholder: #BFBFBF;
+  --h5-border: #F0F0F0;
+  --h5-divider: #F5F5F5;
+  --h5-success: #52C41A;
+  --h5-warning: #FAAD14;
+  --h5-danger: #FF4D4F;
+  --h5-info: #1890FF;
+
+  --van-primary-color: #4A90D9;
+  --van-background: #F5F9FD;
+  --van-background-2: #FFFFFF;
+  --van-text-color: #1A1A1A;
+  --van-text-color-2: #666666;
+  --van-text-color-3: #BFBFBF;
+  --van-border-color: #F0F0F0;
+  --van-active-color: #F0F7FF;
+  --van-tabbar-item-active-color: #4A90D9;
+}

@@ -114,10 +114,12 @@ describe('spacing and sizing anchors', () => {
       /\.message-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.sales-order-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.claim-pool-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.subordinate-sales-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.sales-order-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
-      /\.work-plan-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
+      /\.work-plan-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
+      /\.subordinate-sales-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
     ]
     expect(anchors.filter(re => !re.test(joined)).map(re => re.source)).toEqual([])
   })
@@ -129,7 +131,8 @@ describe('spacing and sizing anchors', () => {
       'lead-inbox-layout',
       'message-inbox-layout',
       'sales-order-inbox-layout',
-      'work-plan-layout'
+      'work-plan-layout',
+      'subordinate-inbox-layout'
     ]
     const offenders = layouts.filter(name => {
       const body = joined.split(`.${name} {`)[1]?.split('}')[0] ?? ''

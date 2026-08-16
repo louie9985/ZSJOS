@@ -30,7 +30,7 @@
   border-radius: var(--crm-radius-lg)!important;
 }
 
-.lead-inbox-filter-shell,.lead-inbox-item,.lead-inbox-detail-pane,.lead-detail-hero,.lead-detail-card,.pending-reminder,.claim-pool-card,.claim-card-region,.claim-pool-state,.claim-pool-skeletons .ant-card,.assignment-subject,.assignment-picker {
+.lead-inbox-filter-shell,.lead-inbox-item,.lead-inbox-detail-pane,.lead-detail-hero,.lead-detail-card,.pending-reminder,.claim-pool-card,.claim-card-region,.claim-pool-state,.claim-pool-skeletons .ant-card,.assignment-subject,.assignment-picker,.subordinate-sales-item,.subordinate-sales-detail-pane,.subordinate-detail-hero,.subordinate-overview-card {
   border-radius: var(--crm-radius-lg)!important;
 }
 

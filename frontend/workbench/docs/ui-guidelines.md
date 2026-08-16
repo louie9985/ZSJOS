@@ -106,6 +106,40 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 
 注意 `--crm-glass-edge` 的 none 态是 `inset 0 0 0 0 transparent`（不是 `none`），可安全拼入 `box-shadow` 列表。
 
+### 2.4 详情区 12 列网格（overview grid）
+
+所有页面的详情区/概览区内容布局统一使用 12 列网格体系。至少遵守最外层的 **9:3** 主侧分栏比例；二级嵌套可按内容量选择是否细分。
+
+**最外层（必须）：**
+
+```css
+.<feature>-overview-grid {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--crm-gap);
+}
+
+.<feature>-overview-main { grid-column: span 9; min-width: 0; }
+.<feature>-overview-aside { grid-column: span 3; min-width: 0; }
+
+@container (max-width: 699px) {
+  .<feature>-overview-main,
+  .<feature>-overview-aside { grid-column: 1 / -1; }
+}
+```
+
+**二级嵌套（可选，按信息密度选择）：**
+
+| 场景 | 列定义 | 比例 |
+|------|--------|------|
+| 主区内左右分栏 | `8fr 4fr` | 66.7% / 33.3% |
+| 卡片等分行 | `repeat(2, minmax(0, 1fr))` | 50% / 50% |
+| 字段 2 列 | `repeat(2, minmax(0, 1fr))` | 50% / 50% |
+| 字段 3 列 | `repeat(3, minmax(0, 1fr))` | 三等分 |
+
+**参考实现：** `src/components/LeadDetailOverview.tsx` + `src/styles/components/lead-detail-v2.css`
+
 ---
 
 ## 3. 页面骨架

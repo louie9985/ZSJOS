@@ -1,0 +1,112 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { usePageList } from '@/composables/usePageList'
+import { getMyLeadPage, type LeadListItem } from '@/api/lead'
+
+defineOptions({ name: 'LeadList' })
+
+const router = useRouter()
+const activeTab = ref('all')
+
+const statusTabs = [
+  { key: 'all', label: '全部' },
+  { key: 'submitted', label: '已提交' },
+  { key: 'valid', label: '有效' },
+  { key: 'invalid', label: '无效' }
+]
+
+const filterParams = computed(() => {
+  const params: Record<string, unknown> = {}
+  if (activeTab.value !== 'all') {
+    params.status = activeTab.value
+  }
+  return params
+})
+
+const { list, loading, refreshing, finished, loadMore, refresh } = usePageList(
+  (params) => getMyLeadPage(params as Parameters<typeof getMyLeadPage>[0]),
+  filterParams
+)
+
+function onTabChange() {
+  refresh()
+}
+
+function goDetail(id: number) {
+  router.push(`/lead/${id}`)
+}
+
+function goSubmit() {
+  router.push('/lead/submit')
+}
+
+const statusMap: Record<string, { text: string; type: string }> = {
+  submitted: { text: '已提交', type: 'primary' },
+  valid: { text: '有效', type: 'success' },
+  invalid: { text: '无效', type: 'danger' },
+  suspended: { text: '已挂起', type: 'warning' },
+  converted: { text: '已转化', type: 'primary' },
+  closed: { text: '已关闭', type: 'default' }
+}
+</script>
+
+<template>
+  <div class="page-container">
+    <van-nav-bar title="我的客资" />
+
+    <van-tabs v-model:active="activeTab" @change="onTabChange" shrink sticky>
+      <van-tab v-for="tab in statusTabs" :key="tab.key" :name="tab.key" :title="tab.label" />
+    </van-tabs>
+
+    <van-pull-refresh v-model="refreshing" @refresh="refresh">
+      <van-list
+        v-model:loading="loading"
+        :finished="finished"
+        finished-text="没有更多了"
+        @load="loadMore"
+      >
+        <van-cell
+          v-for="item in list"
+          :key="item.id"
+          :title="item.submittedName"
+          :label="item.submittedAt?.slice(0, 16)"
+          is-link
+          @click="goDetail(item.id)"
+        >
+          <template #value>
+            <van-tag :type="(statusMap[item.status]?.type as any) || 'default'" plain>
+              {{ statusMap[item.status]?.text || item.status }}
+            </van-tag>
+          </template>
+        </van-cell>
+
+        <van-empty v-if="!loading && list.length === 0" description="暂无客资记录">
+          <van-button type="primary" round size="small" @click="goSubmit">去提交客资</van-button>
+        </van-empty>
+      </van-list>
+    </van-pull-refresh>
+
+    <!-- 悬浮提交按钮 -->
+    <div class="fab-btn" @click="goSubmit">
+      <van-icon name="plus" size="24" color="#fff" />
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.fab-btn {
+  position: fixed;
+  right: 20px;
+  bottom: 80px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--h5-gradient);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(255, 107, 129, 0.4);
+  z-index: 100;
+}
+</style>

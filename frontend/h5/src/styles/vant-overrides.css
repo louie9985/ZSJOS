@@ -1,0 +1,36 @@
+/* Vant 组件样式微调 */
+
+/* TabBar 圆角 + 阴影 */
+.van-tabbar {
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  border-top: none !important;
+}
+
+/* 按钮圆角加大 */
+.van-button--primary {
+  border-radius: 22px;
+}
+
+.van-button--large {
+  border-radius: 24px;
+}
+
+/* 输入框底部边框 */
+.van-field__body {
+  border-bottom: 1px solid var(--h5-border);
+  padding-bottom: 8px;
+}
+
+/* Steps 组件主题色 */
+.van-step--finish .van-step__circle {
+  background-color: var(--h5-primary);
+}
+
+.van-step--process .van-step__circle {
+  border-color: var(--h5-primary);
+}
+
+/* Cell 箭头颜色 */
+.van-cell__right-icon {
+  color: var(--h5-text-placeholder);
+}

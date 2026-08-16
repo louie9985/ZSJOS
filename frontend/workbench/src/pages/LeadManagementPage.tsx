@@ -56,6 +56,7 @@ import {
 } from '../services/leadInboxUnseen'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
+import FollowUpModal from '../components/FollowUpModal'
 
 const PAGE_SIZE = 20
 
@@ -98,6 +99,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidEvidence, setInvalidEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const { submitting: qualificationSaving, run: runQualification, resetIntent: resetQualificationIntent } = useSubmissionGuard()
   const [followUpOpen, setFollowUpOpen] = useState(true)
+  const [followUpModalOpen, setFollowUpModalOpen] = useState(false)
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
   const [basicInfoDirty, setBasicInfoDirty] = useState(false)
@@ -207,7 +209,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
 
   // 所有操作统一为按钮，宽度不足时自动溢出到「更多」下拉
   const toolbarActions: ToolbarAction[] = [
-    actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpOpen(true) },
+    actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpModalOpen(true) },
     actions.has('JUDGE_VALID') && { key: 'judge-valid', icon: <CheckOutlined/>, label: '判有效', onClick: () => void openValid() },
     actions.has('JUDGE_INVALID') && { key: 'judge-invalid', icon: <CloseOutlined/>, label: '判无效', danger: true, onClick: () => void openInvalid() },
     actions.has('ENTER_DEAL') && { key: 'enter-deal', icon: <FileAddOutlined/>, label: '录入成交', disabled: !actions.get('ENTER_DEAL')?.enabled, onClick: () => setSalesOrderOpen(true) },
@@ -298,6 +300,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
       onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
     <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)}
       onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
+    <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={onChanged}/>
   </div>
 }
 

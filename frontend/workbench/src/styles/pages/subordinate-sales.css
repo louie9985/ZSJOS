@@ -1,11 +1,12 @@
 /* Subordinate sales list, detail, and batch operations. */
 
 .subordinate-sales-page {
+  max-width: none;
   display: flex;
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  padding: 12px;
+  padding: var(--crm-page-pad);
 }
 
 .subordinate-toolbar,.subordinate-batch-bar {
@@ -13,21 +14,21 @@
   flex: none;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--crm-gap);
+  margin-bottom: var(--crm-gap-sm);
 }
 
 .subordinate-page-error {
   flex: none;
-  margin-bottom: 10px;
+  margin-bottom: var(--crm-gap-sm);
 }
 
 .subordinate-inbox-layout {
   display: grid;
   min-height: 0;
   flex: 1;
-  grid-template-columns: 340px minmax(0,1fr);
-  gap: 12px;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0,1fr);
+  gap: var(--crm-gap);
 }
 
 .subordinate-sales-list-pane {
@@ -43,35 +44,51 @@
   flex: 1;
   overflow-y: auto;
   flex-direction: column;
-  gap: 7px;
-  padding-right: 6px;
+  gap: var(--crm-gap-sm);
+  padding-right: var(--crm-sp-1);
 }
 
 .subordinate-sales-list>.ant-empty {
   margin: auto;
 }
 
+/* ========== 列表卡片 ========== */
+
 .subordinate-sales-item {
+  position: relative;
   width: 100%;
-  padding: 12px;
+  padding: 10px 12px;
   border: 1px solid var(--crm-border);
-  border-radius: 8px;
+  border-radius: var(--crm-radius-lg);
   background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow);
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color .15s ease,background-color .15s ease;
+  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .subordinate-sales-item:hover {
   border-color: var(--crm-color-primary-hover);
+  box-shadow: var(--crm-shadow-card);
 }
 
 .subordinate-sales-item.active {
-  padding: 11px;
-  border: 2px solid var(--crm-color-primary);
-  background: color-mix(in srgb,var(--crm-bg-container) 94%,var(--crm-color-primary) 6%);
+  border-color: var(--crm-color-primary-border);
+  background: var(--crm-color-primary-bg);
+}
+
+.subordinate-sales-item.active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--crm-color-primary);
 }
 
 .subordinate-sales-item-title {
@@ -94,17 +111,6 @@
   margin: 0;
 }
 
-.subordinate-sales-avatar {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  flex: none;
-  place-items: center;
-  border-radius: 50%;
-  background: var(--crm-primary-soft);
-  color: var(--crm-color-primary);
-}
-
 .subordinate-sales-item-account {
   overflow: hidden;
   padding: 6px 0;
@@ -125,9 +131,9 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding-top: 7px;
-  margin-top: 7px;
-  border-top: 1px solid var(--crm-border);
+  padding-top: var(--crm-sp-2);
+  margin-top: var(--crm-sp-2);
+  border-top: 1px dashed color-mix(in srgb, var(--crm-border) 60%, transparent);
   color: var(--crm-text-secondary);
   font-size: var(--crm-font-sm);
 }
@@ -148,14 +154,16 @@
   padding-top: 8px;
 }
 
+/* ========== 详情面板 ========== */
+
 .subordinate-sales-detail-pane {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px 20px;
+  padding: var(--crm-pane-pad);
   border: 1px solid var(--crm-border);
-  border-radius: 8px;
-  background: var(--crm-bg-container);
+  border-radius: var(--crm-radius-lg);
+  background: color-mix(in srgb, var(--crm-bg-sunken) 50%, var(--crm-bg-container));
 }
 
 .subordinate-sales-detail-pane>.ant-empty {
@@ -168,12 +176,32 @@
   min-width: 0;
 }
 
+/* ========== Hero 毛玻璃卡片 ========== */
+
+.subordinate-detail-hero {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-4);
+  border-radius: var(--crm-radius-md);
+  background: color-mix(in srgb, var(--crm-bg-container) 65%, transparent);
+  backdrop-filter: blur(var(--crm-glass-blur-strong));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur-strong));
+  border: 1px solid color-mix(in srgb, var(--crm-border) 50%, transparent);
+  box-shadow:
+    var(--crm-glass-edge),
+    var(--crm-shadow),
+    inset 0 1px 0 0 color-mix(in srgb, var(--crm-bg-elevated) 40%, transparent);
+}
+
 .subordinate-detail-heading {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 14px;
-  padding-bottom: 14px;
+  gap: var(--crm-sp-4);
+  padding-bottom: var(--crm-sp-4);
   border-bottom: 1px solid var(--crm-border);
 }
 
@@ -195,28 +223,145 @@
   display: none;
 }
 
-.subordinate-batch-bar {
-  padding: 10px 12px;
+/* ========== Overview 网格（12列 9:3 体系） ========== */
+
+.subordinate-overview-grid {
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--crm-gap);
+}
+
+.subordinate-overview-main {
+  grid-column: span 9;
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-gap);
+  min-width: 0;
+}
+
+.subordinate-overview-aside {
+  grid-column: span 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-gap);
+  min-width: 0;
+}
+
+@container (max-width: 699px) {
+  .subordinate-overview-main,
+  .subordinate-overview-aside {
+    grid-column: 1 / -1;
+  }
+}
+
+.subordinate-overview-card {
+  min-width: 0;
+  overflow: hidden;
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.subordinate-overview-card:hover {
+  box-shadow: var(--crm-shadow-raised);
+  transform: translateY(-1px);
+}
+
+.subordinate-overview-card-head {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 var(--crm-sp-4);
+  background: var(--crm-fill-tertiary);
+  font-weight: 500;
+  font-size: var(--crm-font-base);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.subordinate-overview-card>.subordinate-metrics {
+  padding: var(--crm-card-pad);
+  margin-top: 0;
+}
+
+/* ========== 自绘字段行（sunken field-row） ========== */
+
+.subordinate-profile-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  padding: var(--crm-card-pad);
+}
+
+.subordinate-profile-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 8px;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.subordinate-field-label {
+  flex: none;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}
+
+.subordinate-field-value {
+  font-size: var(--crm-font-base);
+  font-weight: 500;
+  color: var(--crm-text);
+  text-align: right;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.subordinate-field-empty {
+  color: var(--crm-text-tertiary);
+  font-weight: 400;
+}
+
+/* ========== 批量操作栏 ========== */
+
+.subordinate-batch-bar {
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-fill-tertiary);
 }
 
+/* ========== 指标卡 ========== */
+
 .subordinate-metrics {
   display: grid;
-  grid-template-columns: repeat(4,minmax(120px,1fr));
-  gap: 16px;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fill,minmax(120px,1fr));
+  gap: var(--crm-gap-sm);
+  margin-top: var(--crm-sp-4);
+}
+
+.subordinate-metric-card {
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
 }
 
 .subordinate-sales-page .ant-table-cell {
   white-space: nowrap;
 }
 
+/* ========== 移动端响应式 ========== */
+
 @media(max-width:768px) {
   .subordinate-sales-page {
     height: 100%;
-    padding: 8px;
   }
 
   .subordinate-toolbar,.subordinate-batch-bar {
@@ -257,14 +402,14 @@
   }
 
   .subordinate-sales-detail-pane {
-    padding: 12px;
+    padding: var(--crm-card-pad);
   }
 
   .subordinate-mobile-back {
     display: inline-flex;
   }
 
-  .subordinate-detail-heading {
+  .subordinate-detail-hero {
     align-items: flex-start;
     flex-wrap: wrap;
   }
@@ -289,7 +434,20 @@
 
   .subordinate-metrics {
     grid-template-columns: repeat(2,minmax(0,1fr));
-    gap: 12px;
+    gap: var(--crm-sp-4);
+  }
+
+  .subordinate-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .subordinate-overview-main,
+  .subordinate-overview-aside {
+    grid-column: 1 / -1;
+  }
+
+  .subordinate-profile-fields {
+    grid-template-columns: 1fr;
   }
 
   .subordinate-sales-detail-pane .ant-tabs-nav-wrap {
@@ -299,4 +457,68 @@
   .subordinate-sales-detail-pane .ant-tabs-nav-list {
     min-width: max-content;
   }
+}
+
+/* ========== 插画风格适配 ========== */
+
+[data-crm-preset="illustration"] .subordinate-sales-item {
+  border-width: 3px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--crm-border);
+  transition: box-shadow 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+
+[data-crm-preset="illustration"] .subordinate-sales-item:hover {
+  box-shadow: 5px 5px 0 var(--crm-color-primary-hover);
+  transform: translate(-1px, -1px);
+}
+
+[data-crm-preset="illustration"] .subordinate-sales-item.active {
+  border-width: 3px;
+  border-color: var(--crm-color-primary);
+  padding: 10px 12px;
+  background: var(--crm-color-primary-bg);
+  box-shadow: 4px 4px 0 var(--crm-color-primary);
+}
+
+[data-crm-preset="illustration"] .subordinate-sales-item.active::before {
+  display: none;
+}
+
+[data-crm-preset="illustration"] .subordinate-sales-detail-pane {
+  border-width: 3px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--crm-border);
+}
+
+[data-crm-preset="illustration"] .subordinate-detail-hero {
+  border-width: 3px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--crm-border);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  background: var(--crm-bg-container);
+}
+
+[data-crm-preset="illustration"] .subordinate-overview-card {
+  border-width: 3px;
+  border-radius: 12px;
+  box-shadow: 4px 4px 0 var(--crm-border);
+}
+
+[data-crm-preset="illustration"] .subordinate-overview-card:hover {
+  box-shadow: 5px 5px 0 var(--crm-border);
+  transform: translate(-1px, -1px);
+}
+
+[data-crm-preset="illustration"] .subordinate-profile-row {
+  border: 3px solid var(--crm-border);
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 var(--crm-border);
+}
+
+[data-crm-preset="illustration"] .subordinate-metric-card {
+  border: 3px solid var(--crm-border);
+  border-radius: 8px;
+  box-shadow: 2px 2px 0 var(--crm-border);
 }

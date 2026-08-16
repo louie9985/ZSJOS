@@ -69,13 +69,17 @@ function Metrics({ sales }: { sales: SubordinateSales }) {
   return (
     <div className="subordinate-metrics">
       {metrics.map(([label, value]) => (
-        <Statistic key={label} title={label} value={value} />
+        <div key={label} className="subordinate-metric-card">
+          <Statistic title={label} value={value} />
+        </div>
       ))}
-      <Statistic
-        title="成交金额"
-        value={sales.effectiveOrderAmount}
-        formatter={() => formatCurrency(sales.effectiveOrderAmount)}
-      />
+      <div className="subordinate-metric-card">
+        <Statistic
+          title="成交金额"
+          value={sales.effectiveOrderAmount}
+          formatter={() => formatCurrency(sales.effectiveOrderAmount)}
+        />
+      </div>
     </div>
   );
 }
@@ -566,7 +570,7 @@ function SalesDetail({
     );
   return (
     <div className="subordinate-sales-detail">
-      <div className="subordinate-detail-heading">
+      <div className="subordinate-detail-hero">
         <Button
           className="subordinate-mobile-back"
           icon={<ArrowLeftOutlined />}
@@ -616,60 +620,57 @@ function SalesDetail({
             key: "overview",
             label: "概览",
             children: (
-              <>
-                <Descriptions
-                  bordered
-                  size="small"
-                  column={{ xs: 1, sm: 2, lg: 3 }}
-                  items={[
-                    {
-                      key: "mobile",
-                      label: "手机号",
-                      children: sales.mobile || "-",
-                    },
-                    {
-                      key: "account",
-                      label: "账号状态",
-                      children: (
-                        <Tag
-                          color={
-                            sales.accountStatus === 0 ? "success" : "default"
-                          }
-                        >
-                          {sales.accountStatus === 0 ? "启用" : "停用"}
-                        </Tag>
-                      ),
-                    },
-                    {
-                      key: "presence",
-                      label: "页面状态",
-                      children: sales.presence === "online" ? "在线" : "离线",
-                    },
-                    {
-                      key: "mode",
-                      label: "接单状态",
-                      children: sales.accepting ? "开启" : "关闭",
-                    },
-                    {
-                      key: "receive",
-                      label: "新客资",
-                      children: receiveStatusLabel(sales),
-                    },
-                    { key: "newcomer", label: "新手池", children: "暂未开放" },
-                    {
-                      key: "today",
-                      label: "今日跟进状态",
-                      children: todayStatusLabel(sales.todayFollowUpStatus),
-                    },
-                    {
-                      key: "categories",
-                      label: "客资分类",
-                      children: <CategoryCounts sales={sales} />,
-                    },
-                  ]}
-                />
-                <Metrics sales={sales} />
-              </>
+              <div className="subordinate-overview-grid">
+                <div className="subordinate-overview-main">
+                  <section className="subordinate-overview-card">
+                    <div className="subordinate-overview-card-head">基本信息</div>
+                    <div className="subordinate-profile-fields">
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">手机号</span>
+                        <span className={`subordinate-field-value${sales.mobile ? '' : ' subordinate-field-empty'}`}>{sales.mobile || '-'}</span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">账号状态</span>
+                        <span className="subordinate-field-value">
+                          <Tag color={sales.accountStatus === 0 ? 'success' : 'default'} style={{ margin: 0 }}>
+                            {sales.accountStatus === 0 ? '启用' : '停用'}
+                          </Tag>
+                        </span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">页面状态</span>
+                        <span className="subordinate-field-value">{sales.presence === 'online' ? '在线' : '离线'}</span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">接单状态</span>
+                        <span className="subordinate-field-value">{sales.accepting ? '开启' : '关闭'}</span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">新客资</span>
+                        <span className="subordinate-field-value">{receiveStatusLabel(sales)}</span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">新手池</span>
+                        <span className="subordinate-field-value subordinate-field-empty">暂未开放</span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">今日跟进状态</span>
+                        <span className="subordinate-field-value">{todayStatusLabel(sales.todayFollowUpStatus)}</span>
+                      </div>
+                      <div className="subordinate-profile-row">
+                        <span className="subordinate-field-label">客资分类</span>
+                        <span className="subordinate-field-value"><CategoryCounts sales={sales}/></span>
+                      </div>
+                    </div>
+                  </section>
+                </div>
+                <aside className="subordinate-overview-aside">
+                  <section className="subordinate-overview-card">
+                    <div className="subordinate-overview-card-head">业绩指标</div>
+                    <Metrics sales={sales} />
+                  </section>
+                </aside>
+              </div>
             ),
           },
           {
