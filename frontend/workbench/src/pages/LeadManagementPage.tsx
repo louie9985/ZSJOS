@@ -97,7 +97,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   const [invalidDescription, setInvalidDescription] = useState('')
   const [invalidEvidence, setInvalidEvidence] = useState<DeferredUploadItem<LeadAppealEvidence>[]>([])
   const { submitting: qualificationSaving, run: runQualification, resetIntent: resetQualificationIntent } = useSubmissionGuard()
-  const [followUpOpen, setFollowUpOpen] = useState(autoExpandFollowUp)
+  const [followUpOpen, setFollowUpOpen] = useState(true)
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
   const [basicInfoDirty, setBasicInfoDirty] = useState(false)
@@ -202,7 +202,7 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
   useEffect(() => {
     setActiveTab(defaultLeadDetailTab(autoExpandFollowUp))
     setFollowUpTotal(0)
-    setFollowUpOpen(autoExpandFollowUp)
+    setFollowUpOpen(true)
   }, [autoExpandFollowUp, lead.id])
 
   // 所有操作统一为按钮，宽度不足时自动溢出到「更多」下拉
@@ -241,7 +241,9 @@ function LeadDetail({ lead, categories, categoryLabel, channelLabel, audience, a
           label: `跟进记录 (${followUpTotal})`,
           forceRender: true,
           children: <div className="lead-detail-tab-content lead-detail-follow-up">
-            <LeadFollowUpPanel lead={lead} open={followUpOpen} onClose={() => setFollowUpOpen(false)}
+            <LeadFollowUpPanel lead={lead} open={followUpOpen}
+              onOpen={actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined}
+              onClose={() => setFollowUpOpen(false)}
               onDirtyChange={setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/>
           </div>
         },

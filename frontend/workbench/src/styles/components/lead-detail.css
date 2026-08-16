@@ -89,12 +89,6 @@
   padding: 10px 0 0;
 }
 
-.lead-detail-follow-up .lead-follow-up-panel {
-  padding-top: 0;
-  margin-top: 0;
-  border-top: 0;
-}
-
 @media(max-width:768px) {
   .lead-detail-tabs .ant-tabs-nav-wrap {
     overflow-x: auto;

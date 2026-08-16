@@ -1,0 +1,151 @@
+/* Vertical timeline for follow-up records (FollowUpTimeline component).
+ *
+ * Layout:
+ *   [dot]  08-15 14:32
+ *    │     ┌────────────────────────────┐
+ *    │     │ tags + remark + meta       │
+ *    │     └────────────────────────────┘
+ *   [dot]  08-14 09:10
+ *    │     ...
+ */
+
+/* ========== Timeline container ========== */
+
+.fu-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ========== Node ========== */
+
+.fu-node {
+  display: grid;
+  grid-template-columns: 24px 1fr;
+  gap: 0 var(--crm-sp-3);
+  min-width: 0;
+}
+
+/* ---- Marker column: dot + vertical line ---- */
+
+.fu-node-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+}
+
+.fu-node-marker::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: var(--crm-border-strong);
+}
+
+.fu-node:last-child .fu-node-marker::after {
+  display: none;
+}
+
+/* Dot */
+.fu-node-dot {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--crm-color-primary);
+  border: 2px solid var(--crm-bg-container);
+  box-shadow: 0 0 0 2px var(--crm-color-primary-border);
+  position: relative;
+  z-index: 1;
+}
+
+.fu-node--first .fu-node-dot {
+  background: var(--crm-color-success);
+  box-shadow: 0 0 0 2px var(--crm-color-success);
+}
+
+/* ---- Content column ---- */
+
+.fu-node-content {
+  padding-bottom: var(--crm-sp-5);
+  min-width: 0;
+}
+
+.fu-node:last-child .fu-node-content {
+  padding-bottom: 0;
+}
+
+/* Time label */
+.fu-node-time {
+  font-size: var(--crm-font-sm);
+  font-weight: 500;
+  color: var(--crm-text-secondary);
+  line-height: 18px;
+  margin-bottom: var(--crm-sp-2);
+}
+
+/* Content card */
+.fu-node-card {
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  transition: box-shadow 0.2s ease;
+}
+
+.fu-node-card:hover {
+  box-shadow: var(--crm-shadow-raised);
+}
+
+.fu-node--first .fu-node-card {
+  border-left: 3px solid var(--crm-color-success);
+}
+
+/* ---- Card content ---- */
+
+.fu-node-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-1);
+}
+
+.fu-node-tags .ant-tag {
+  margin: 0;
+}
+
+.fu-node-remark {
+  margin-bottom: 0 !important;
+  font-size: var(--crm-font-base);
+  color: var(--crm-text);
+}
+
+.fu-node-meta {
+  display: block;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}
+
+.fu-node-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+  margin-top: var(--crm-sp-1);
+}
+
+.fu-node-images .ant-image {
+  width: 56px;
+  height: 56px;
+}
+
+.fu-node-images img {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border-radius: var(--crm-radius-sm);
+}

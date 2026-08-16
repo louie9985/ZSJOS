@@ -16,7 +16,7 @@ target/
 ### STS ###
 .apt_generated
 .classpath
-.factorypath
+.factorypathz
 .project
 .settings
 .springBeans
@@ -61,4 +61,4 @@ application-my.yaml
 .DS_Store
 **/.DS_Store
 
-.codex
+.codex/

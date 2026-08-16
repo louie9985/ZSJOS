@@ -27,8 +27,8 @@ extend the repository root instructions.
 
 ## UI implementation
 
-- Before changing shared layout, themes, navigation, or component styling, **MUST** inspect both the current workbench and the relevant reference implementation under `../CRM-demo-Ant-design` when it is available.
-- A reference UI is evidence for dimensions, tokens, hierarchy, icons, and interaction. **MUST NOT** approximate it from memory.
+- Before changing shared layout, themes, navigation, or component styling, **MUST** read `docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions.
+- Visual decisions (dimensions, tokens, hierarchy, icons, interaction) **MUST** be grounded in the documented design system and existing page implementations. **MUST NOT** approximate from memory.
 - Prefer existing Ant Design, Pro Components, icon, and theme primitives over new custom controls.
 - Remote views **MUST** provide the applicable loading, empty, error, retry, and unauthorized states.
 - Fixed-format UI elements **SHOULD** use stable responsive dimensions so dynamic labels and states do not shift or overlap the layout.
