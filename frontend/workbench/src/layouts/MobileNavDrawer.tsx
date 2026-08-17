@@ -24,7 +24,7 @@ export default function MobileNavDrawer({ open, onClose, navigation, activePrima
     open={open}
     onClose={onClose}
     placement="left"
-    width={260}
+    size={260}
     title="导航菜单"
     styles={{ body: { padding: 0 } }}
   >

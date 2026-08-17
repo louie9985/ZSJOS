@@ -20,6 +20,9 @@ public interface PermissionApi extends PermissionCommonApi {
      */
     Set<Long> getUserRoleIdListByRoleIds(Collection<Long> roleIds);
 
+    /** Returns enabled users whose enabled roles grant the specified menu permission. */
+    Set<Long> getEnabledUserIdsByPermission(String permission);
+
     /** Adds one role while preserving the user's existing role assignments. */
     void addUserRole(Long userId, Long roleId);
 

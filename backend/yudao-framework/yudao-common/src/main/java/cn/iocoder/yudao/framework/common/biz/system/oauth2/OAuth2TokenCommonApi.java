@@ -38,6 +38,15 @@ public interface OAuth2TokenCommonApi {
     OAuth2AccessTokenRespDTO removeAccessToken(String accessToken);
 
     /**
+     * 按预期用户类型移除访问令牌。令牌不存在或类型不匹配时不执行删除。
+     *
+     * @param accessToken 访问令牌
+     * @param expectedUserType 预期用户类型
+     * @return 被移除的令牌信息
+     */
+    OAuth2AccessTokenRespDTO removeAccessToken(String accessToken, Integer expectedUserType);
+
+    /**
      * 移除用户的所有访问令牌
      * 注意：该流程中，会移除相关的刷新令牌
      *

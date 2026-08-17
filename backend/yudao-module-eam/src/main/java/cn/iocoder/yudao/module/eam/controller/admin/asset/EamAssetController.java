@@ -6,9 +6,9 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
+import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetChangeLogRespVO;
-import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportExcelVO;
-import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportRespVO;
+import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportPreviewRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetPageReqVO;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetSaveReqVO;
@@ -17,6 +17,7 @@ import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetChangeLogService;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
+import cn.iocoder.yudao.module.eam.service.asset.EamAssetLedgerImportService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.util.EamQrCodeUtil;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -32,6 +33,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -60,6 +62,8 @@ public class EamAssetController {
 
     @Resource
     private EamAssetService assetService;
+    @Resource
+    private EamAssetLedgerImportService ledgerImportService;
     @Resource
     private EamAssetChangeLogService changeLogService;
     @Resource
@@ -157,32 +161,37 @@ public class EamAssetController {
     }
 
     @GetMapping("/get-import-template")
-    @Operation(summary = "获得资产导入模板")
+    @Operation(summary = "获得中世健资产台账导入模板")
+    @PreAuthorize("@ss.hasPermission('eam:asset:import')")
     public void getImportTemplate(HttpServletResponse response) throws IOException {
-        // 模板给一行示例，说明分类用编码而不是名称填写
-        List<EamAssetImportExcelVO> sample = List.of(
-                EamAssetImportExcelVO.builder()
-                        .name("MacBook Pro 14")
-                        .categoryCode("IT")
-                        .brand("Apple M3 Pro")
-                        .specification("18G/512G")
-                        .sn("C02XY1234")
-                        .location("总部三楼研发区")
-                        .expectedLife(36)
-                        .build());
-        ExcelUtils.write(response, "资产导入模板.xlsx", "资产列表",
-                EamAssetImportExcelVO.class, sample);
+        ClassPathResource resource = new ClassPathResource("eam/eam-asset-ledger-template.xlsx");
+        response.addHeader("Content-Disposition", "attachment;filename="
+                + HttpUtils.encodeUtf8("中世健资产台账导入模板.xlsx"));
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        try (var input = resource.getInputStream()) {
+            input.transferTo(response.getOutputStream());
+        }
     }
 
-    @PostMapping("/import")
-    @Operation(summary = "导入资产 Excel", description = "逐行处理，单行失败不影响其他行")
+    @PostMapping("/import/preview")
+    @Operation(summary = "预检中世健资产台账", description = "只读取在岗资产初始申报表，不写入数据库")
     @PreAuthorize("@ss.hasPermission('eam:asset:import')")
-    @ApiAccessLog(operateName = "导入资产")
-    public CommonResult<EamAssetImportRespVO> importAssetExcel(
-            @RequestParam("file") MultipartFile file) throws IOException {
-        List<EamAssetImportExcelVO> list =
-                ExcelUtils.read(file, EamAssetImportExcelVO.class);
-        return success(assetService.importAssetList(list));
+    public CommonResult<EamAssetImportPreviewRespVO> previewLedgerImport(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "updateExisting", defaultValue = "false") boolean updateExisting)
+            throws IOException {
+        return success(ledgerImportService.preview(file.getBytes(), file.getOriginalFilename(), updateExisting));
+    }
+
+    @PostMapping("/import/commit")
+    @Operation(summary = "提交中世健资产台账导入", description = "按文件摘要和 Excel 行号幂等导入")
+    @PreAuthorize("@ss.hasPermission('eam:asset:import')")
+    @ApiAccessLog(operateName = "导入中世健资产台账")
+    public CommonResult<EamAssetImportPreviewRespVO> commitLedgerImport(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "updateExisting", defaultValue = "false") boolean updateExisting)
+            throws IOException {
+        return success(ledgerImportService.commit(file.getBytes(), file.getOriginalFilename(), updateExisting));
     }
 
     /**

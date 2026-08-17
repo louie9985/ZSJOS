@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.framework.web.config;
 
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -8,11 +9,12 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @ConfigurationProperties(prefix = "yudao.web")
 @Validated
@@ -22,15 +24,21 @@ public class WebProperties {
     @NotNull(message = "APP API 不能为空")
     private Api appApi = new Api("/app-api", "**.controller.app.**");
     /**
-     * App API subpaths backed by System admin identities rather than members.
-     * This is intentionally opt-in because ordinary app-api requests remain member-scoped.
+     * App API 子路径对应的用户类型。未配置的 App API 仍使用 MEMBER。
      */
-    private List<String> appApiAdminPrefixes = new ArrayList<>();
+    private Map<@NotEmpty String, @NotNull Integer> appApiUserTypePrefixes = new LinkedHashMap<>();
     @NotNull(message = "Admin API 不能为空")
     private Api adminApi = new Api("/admin-api", "**.controller.admin.**");
 
     @NotNull(message = "Admin UI 不能为空")
     private Ui adminUi;
+
+    @AssertTrue(message = "App API 用户类型子路径配置无效")
+    public boolean isAppApiUserTypePrefixesValid() {
+        return appApiUserTypePrefixes != null && appApiUserTypePrefixes.entrySet().stream().allMatch(entry ->
+                entry.getKey() != null && entry.getKey().startsWith("/") && entry.getKey().endsWith("/")
+                        && UserTypeEnum.valueOf(entry.getValue()) != null);
+    }
 
     @Data
     @AllArgsConstructor

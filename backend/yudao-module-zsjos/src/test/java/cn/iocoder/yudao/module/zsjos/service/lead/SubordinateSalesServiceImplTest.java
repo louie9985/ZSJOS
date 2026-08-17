@@ -2,12 +2,16 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.dept.PostApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchResultVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchTransferReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateTaskPageReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -24,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,6 +39,9 @@ class SubordinateSalesServiceImplTest {
     @Mock private SubordinateSalesCommandService commandService;
     @Mock private SalesDispatchStatusService dispatchStatusService;
     @Mock private LeadMapper leadMapper;
+    @Mock private BusinessTaskMapper taskMapper;
+    @Mock private AdminUserApi adminUserApi;
+    @Mock private PostApi postApi;
 
     @Test
     void subordinateSalesProjectsSystemAvatar() throws Exception {
@@ -89,6 +97,23 @@ class SubordinateSalesServiceImplTest {
         SubordinateBatchTransferReqVO request = new SubordinateBatchTransferReqVO();
         request.setLeadIds(List.of(1L)); request.setTargetUserId(30L); request.setReason("   ");
         assertThrows(ServiceException.class, () -> service.batchTransfer(request, 10L));
+    }
+
+    @Test
+    void emptyPendingTaskPageDoesNotQueryLeadsWithEmptyIds() {
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO salesPost =
+                new cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO();
+        salesPost.setId(5L);
+        AdminUserRespDTO subordinate = new AdminUserRespDTO();
+        subordinate.setId(20L); subordinate.setPostIds(Set.of(5L));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(salesPost);
+        when(adminUserApi.getUserList(Set.of(20L))).thenReturn(List.of(subordinate));
+        when(taskMapper.selectMyPending(20L)).thenReturn(List.of());
+        SubordinateTaskPageReqVO request = new SubordinateTaskPageReqVO();
+
+        assertEquals(0L, service.getTaskPage(20L, request, 10L).getTotal());
+        verify(leadMapper, never()).selectBatchIds(org.mockito.ArgumentMatchers.anyCollection());
     }
 
     private static LeadAssignmentUserRespVO sales(Long id) {

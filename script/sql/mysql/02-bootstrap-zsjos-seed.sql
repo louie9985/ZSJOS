@@ -258,9 +258,10 @@ SELECT seed.sort,seed.label,seed.value,seed.dict_type,0,'default','quick-init',N
 ) seed WHERE NOT EXISTS(SELECT 1 FROM `system_dict_data` d WHERE d.dict_type=seed.dict_type AND d.value=seed.value AND d.deleted=b'0');
 
 INSERT IGNORE INTO `system_menu` (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6810,'成交审批','zsjos:sales-order:review',2,17,6735,'sales-order-approvals','ep:finished','zsjos/salesOrderApproval/index','ZsjosSalesOrderApproval',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6810,'成交订单审批','',2,17,6735,'sales-order-approvals','ep:finished','zsjos/salesOrderApproval/index','ZsjosSalesOrderApproval',0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
 (6811,'录入成交','zsjos:sales-order:create',3,15,6770,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
-(6812,'查询成交订单','zsjos:sales-order:query',3,1,6810,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+(6812,'查询成交订单','zsjos:sales-order:query',3,1,6810,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(76000,'处理成交订单审批','zsjos:sales-order:review',3,1,6810,'','','',NULL,0,b'1',b'1',b'0','quick-init',NOW(),'quick-init',NOW(),b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V023', 'Add direct sales-order entry and dual-center approval', 'sales-order-dual-approval-v1');
@@ -367,7 +368,7 @@ INSERT IGNORE INTO `system_menu`
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6856,'主管确认','zsjos:sales-order:supervisor-confirm',2,18,6735,'sales-order-supervisor-confirmations','ep:stamp','zsjos/salesOrderSupervisorConfirmation/index','ZsjosSalesOrderSupervisorConfirmation',0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0');
+(6856,'主管确认','zsjos:sales-order:supervisor-confirm',3,2,6810,'','','',NULL,0,b'1',b'1',b'0','bootstrap',NOW(),'bootstrap',NOW(),b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V040', 'Submitter actions and sales complaint queue', 'submitter-actions-complaints-v1');

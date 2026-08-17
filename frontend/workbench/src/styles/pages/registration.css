@@ -1,0 +1,147 @@
+.registration-page,.registration-config-page {
+  display: flex;
+  max-width: none;
+  height: 100%;
+  min-height: 0;
+  padding: var(--crm-page-pad);
+  flex-direction: column;
+}
+
+.registration-filter-shell {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--crm-gap);
+}
+
+.registration-filter-shell h4,
+.registration-detail-hero h4 {
+  margin: 0;
+}
+
+.registration-detail {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  gap: var(--crm-sp-5);
+}
+
+.registration-detail-hero {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+}
+
+.registration-detail-hero > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.registration-block-alert {
+  flex: none;
+}
+
+.registration-checklist-card {
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow);
+}
+
+.registration-checklist-card h5 {
+  margin-top: 0;
+}
+
+.registration-checklist,
+.registration-service-list,
+.registration-config-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.registration-checklist-row,
+.registration-service-item {
+  display: flex;
+  min-width: 0;
+  min-height: var(--crm-control-h);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  padding: var(--crm-sp-2) 0;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.registration-checklist-row:last-child,
+.registration-service-item:last-child {
+  border-bottom: 0;
+}
+
+.registration-checklist-copy,
+.registration-service-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.registration-checklist-row > span,
+.registration-checklist-copy > span,
+.registration-service-copy > span {
+  color: var(--crm-text-secondary);
+}
+
+.registration-service-copy {
+  flex: 1;
+}
+
+.registration-service-copy strong,
+.registration-service-copy > span {
+  overflow-wrap: anywhere;
+}
+
+.registration-checklist-row .ant-select {
+  width: min(260px, 45%);
+}
+
+.registration-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: auto;
+}
+
+.registration-pagination {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  padding-top: var(--crm-sp-2);
+}
+
+.registration-config-item {
+  padding: var(--crm-sp-2) 0;
+}
+
+@media (max-width: 768px) {
+  .registration-page {
+    height: auto;
+    min-height: 100%;
+  }
+
+  .registration-filter-shell {
+    align-items: flex-start;
+  }
+
+  .registration-checklist-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .registration-checklist-row .ant-select {
+    width: 100%;
+  }
+}

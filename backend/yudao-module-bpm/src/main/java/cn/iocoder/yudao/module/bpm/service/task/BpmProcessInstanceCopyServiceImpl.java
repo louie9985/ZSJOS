@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.bpm.service.task;
 import cn.hutool.core.util.ObjectUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.instance.BpmProcessInstanceCopyPageReqVO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.task.BpmProcessInstanceCopyDO;
 import cn.iocoder.yudao.module.bpm.dal.mysql.task.BpmProcessInstanceCopyMapper;
 import cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants;
@@ -74,7 +75,8 @@ public class BpmProcessInstanceCopyServiceImpl implements BpmProcessInstanceCopy
 
         // 2. 创建抄送流程
         List<BpmProcessInstanceCopyDO> copyList = convertList(userIds, userId -> new BpmProcessInstanceCopyDO()
-                .setUserId(userId).setReason(reason).setStartUserId(Long.valueOf(processInstance.getStartUserId()))
+                .setUserId(userId).setReason(reason)
+                .setStartUserId(BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId()))
                 .setProcessInstanceId(processInstanceId).setProcessInstanceName(processInstance.getName())
                 .setCategory(processDefinition.getCategory()).setTaskId(taskId)
                 .setActivityId(activityId).setActivityName(activityName)

@@ -15,6 +15,11 @@ public class LeadComplaintController {
     public CommonResult<Long> create(@PathVariable Long leadId,@Valid @RequestBody LeadComplaintCreateReqVO req){return success(service.create(leadId,getLoginUserId(),req));}
     @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:lead-complaint:handle')")
     public CommonResult<PageResult<LeadComplaintRespVO>> page(@Valid LeadComplaintPageReqVO req){return success(service.page(req));}
+    @GetMapping("/lead/{leadId}/list")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-complaint:create','zsjos:lead-complaint:handle','zsjos:subordinate-sales:query')")
+    public CommonResult<java.util.List<LeadComplaintRespVO>> leadList(@PathVariable Long leadId) {
+        return success(service.getLeadComplaints(leadId, getLoginUserId()));
+    }
     @PostMapping("/{id}/decision") @PreAuthorize("@ss.hasPermission('zsjos:lead-complaint:handle')")
     public CommonResult<Boolean> decide(@PathVariable Long id,@Valid @RequestBody LeadComplaintDecisionReqVO req){service.decide(id,getLoginUserId(),req);return success(true);}
 }

@@ -30,6 +30,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -143,12 +144,33 @@ public class CashbackServiceImpl implements CashbackService {
     }
 
     @Override
+    public PageResult<CashbackRespVO> getPartnerPage(CashbackPageReqVO request, Long partnerId) {
+        PageResult<CashbackRespVO> result = BeanUtils.toBean(mapper.selectPartnerPage(request, partnerId), CashbackRespVO.class);
+        Set<Long> leadIds = result.getList().stream().map(CashbackRespVO::getLeadId)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        Map<Long, String> leadNumbers = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(java.util.stream.Collectors.toMap(LeadDO::getId, LeadDO::getLeadNo));
+        result.getList().forEach(item -> item.setLeadNo(leadNumbers.get(item.getLeadId())));
+        return result;
+    }
+
+    @Override
     public CashbackSummaryRespVO getMySummary(Long userId) {
+        return buildSummary(mapper.selectStatusSummary(userId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+    }
+
+    @Override
+    public CashbackSummaryRespVO getPartnerSummary(Long partnerId) {
+        return buildSummary(mapper.selectPartnerStatusSummary(partnerId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+    }
+
+    private CashbackSummaryRespVO buildSummary(List<CashbackStatusSummaryRow> rows) {
         CashbackSummaryRespVO result = new CashbackSummaryRespVO();
         Map<String, Long> counts = new HashMap<>();
         BigDecimal total = BigDecimal.ZERO;
-        for (CashbackStatusSummaryRow row : mapper.selectStatusSummary(userId,
-                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())) {
+        for (CashbackStatusSummaryRow row : rows) {
             BigDecimal amount = row.getAmount() == null ? BigDecimal.ZERO : row.getAmount();
             counts.put(row.getStatus(), row.getCount()); total = total.add(amount);
             switch (row.getStatus()) {
@@ -197,6 +219,17 @@ public class CashbackServiceImpl implements CashbackService {
         return mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CashbackDO>()
                         .eq(CashbackDO::getOrderId, orderId).eq(CashbackDO::getType, TYPE_DEAL)
                         .eq(CashbackDO::getBeneficiaryUserId, beneficiaryUserId)
+                        .ne(CashbackDO::getStatus, STATUS_CANCELLED))
+                .stream().map(CashbackDO::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    @Override
+    public BigDecimal getPartnerOrderCashbackTotal(Long orderId, Long partnerId) {
+        if (orderId == null || partnerId == null) return BigDecimal.ZERO.setScale(2);
+        return mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CashbackDO>()
+                        .eq(CashbackDO::getOrderId, orderId).eq(CashbackDO::getType, TYPE_DEAL)
+                        .eq(CashbackDO::getPartnerId, partnerId)
                         .ne(CashbackDO::getStatus, STATUS_CANCELLED))
                 .stream().map(CashbackDO::getAmount).filter(Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);

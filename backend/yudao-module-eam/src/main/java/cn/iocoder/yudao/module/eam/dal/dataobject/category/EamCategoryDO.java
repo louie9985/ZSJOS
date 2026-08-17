@@ -50,6 +50,14 @@ public class EamCategoryDO extends BaseDO {
      */
     private Integer status;
     /**
+     * 管理模式：1 单件，2 批量
+     */
+    private Integer managementMode;
+    /**
+     * 默认计量单位
+     */
+    private String unit;
+    /**
      * 备注
      */
     private String remark;

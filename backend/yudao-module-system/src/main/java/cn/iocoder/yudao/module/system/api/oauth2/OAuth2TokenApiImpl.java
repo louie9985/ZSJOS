@@ -24,8 +24,12 @@ public class OAuth2TokenApiImpl implements OAuth2TokenCommonApi {
 
     @Override
     public OAuth2AccessTokenRespDTO createAccessToken(OAuth2AccessTokenCreateReqDTO reqDTO) {
-        OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.createAccessToken(
-                reqDTO.getUserId(), reqDTO.getUserType(), reqDTO.getClientId(), reqDTO.getScopes());
+        OAuth2AccessTokenDO accessTokenDO = reqDTO.getMaxDevices() == null
+                ? oauth2TokenService.createAccessToken(reqDTO.getUserId(), reqDTO.getUserType(),
+                        reqDTO.getClientId(), reqDTO.getScopes(), reqDTO.getRefreshTokenValiditySeconds())
+                : oauth2TokenService.createAccessTokenWithLimit(reqDTO.getUserId(), reqDTO.getUserType(),
+                        reqDTO.getClientId(), reqDTO.getScopes(), reqDTO.getRefreshTokenValiditySeconds(),
+                        reqDTO.getMaxDevices());
         return BeanUtils.toBean(accessTokenDO, OAuth2AccessTokenRespDTO.class);
     }
 
@@ -38,6 +42,12 @@ public class OAuth2TokenApiImpl implements OAuth2TokenCommonApi {
     @Override
     public OAuth2AccessTokenRespDTO removeAccessToken(String accessToken) {
         OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.removeAccessToken(accessToken);
+        return BeanUtils.toBean(accessTokenDO, OAuth2AccessTokenRespDTO.class);
+    }
+
+    @Override
+    public OAuth2AccessTokenRespDTO removeAccessToken(String accessToken, Integer expectedUserType) {
+        OAuth2AccessTokenDO accessTokenDO = oauth2TokenService.removeAccessToken(accessToken, expectedUserType);
         return BeanUtils.toBean(accessTokenDO, OAuth2AccessTokenRespDTO.class);
     }
 

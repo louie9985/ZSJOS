@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { getCashbackSummary, type CashbackSummary } from '@/api/cashback'
 import { getMyLeadPage, type LeadListItem } from '@/api/lead'
 import { getPartnerMe, type PartnerInfo } from '@/api/profile'
-import { formatLeadNo } from '@/utils/format'
+import { formatDate, formatLeadNo } from '@/utils/format'
 
 defineOptions({ name: 'Home' })
 
@@ -143,7 +143,7 @@ const statusMap: Record<string, { text: string; color: string }> = {
             v-for="lead in recentLeads"
             :key="lead.id"
             :title="lead.submittedName"
-            :label="`${formatLeadNo(lead.leadNo)} · ${lead.submittedAt?.slice(0, 10) || '-'}`"
+            :label="`${formatLeadNo(lead.leadNo)} · ${formatDate(lead.submittedAt)}`"
             is-link
             @click="goLeadDetail(lead.id)"
           >

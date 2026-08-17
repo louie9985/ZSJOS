@@ -1,15 +1,18 @@
 package cn.iocoder.yudao.module.eam.service.category;
 
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategorySaveReqVO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
 import cn.iocoder.yudao.module.eam.dal.mysql.category.EamCategoryMapper;
+import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
@@ -37,6 +40,7 @@ public class EamCategoryServiceImpl implements EamCategoryService {
 
         // 3. 插入
         EamCategoryDO category = BeanUtils.toBean(reqVO, EamCategoryDO.class);
+        normalizeManagement(category);
         categoryMapper.insert(category);
         return category.getId();
     }
@@ -52,6 +56,7 @@ public class EamCategoryServiceImpl implements EamCategoryService {
 
         // 4. 更新
         EamCategoryDO updateObj = BeanUtils.toBean(reqVO, EamCategoryDO.class);
+        normalizeManagement(updateObj);
         categoryMapper.updateById(updateObj);
     }
 
@@ -138,6 +143,15 @@ public class EamCategoryServiceImpl implements EamCategoryService {
         EamCategoryDO existing = categoryMapper.selectByCode(code);
         if (existing != null && !Objects.equals(existing.getId(), excludeId)) {
             throw exception(CATEGORY_CODE_DUPLICATE);
+        }
+    }
+
+    private void normalizeManagement(EamCategoryDO category) {
+        if (!Arrays.asList(EamManagementModeEnum.ARRAYS).contains(category.getManagementMode())) {
+            category.setManagementMode(EamManagementModeEnum.SERIALIZED.getMode());
+        }
+        if (StrUtil.isBlank(category.getUnit())) {
+            category.setUnit("个");
         }
     }
 

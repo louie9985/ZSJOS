@@ -113,8 +113,14 @@ public class WebFrameworkUtils {
         }
         if (request.getServletPath().startsWith(properties.getAppApi().getPrefix())) {
             String appPath = request.getServletPath().substring(properties.getAppApi().getPrefix().length());
-            if (properties.getAppApiAdminPrefixes().stream().anyMatch(appPath::startsWith)) {
-                return UserTypeEnum.ADMIN.getValue();
+            for (var entry : properties.getAppApiUserTypePrefixes().entrySet()) {
+                if (appPath.startsWith(entry.getKey())) {
+                    Integer configuredUserType = entry.getValue();
+                    if (configuredUserType == null || UserTypeEnum.valueOf(configuredUserType) == null) {
+                        throw new IllegalStateException("Invalid App API user type mapping for prefix " + entry.getKey());
+                    }
+                    return configuredUserType;
+                }
             }
             return UserTypeEnum.MEMBER.getValue();
         }

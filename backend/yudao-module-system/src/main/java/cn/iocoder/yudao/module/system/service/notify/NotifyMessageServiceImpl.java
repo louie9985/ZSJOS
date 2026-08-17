@@ -133,8 +133,8 @@ public class NotifyMessageServiceImpl implements NotifyMessageService {
     }
 
     @Override
-    public boolean existsByRuleUserAndEvent(Long ruleId, Long userId, String sourceEventKey) {
-        return notifyMessageMapper.selectByRuleUserAndEvent(ruleId, userId, sourceEventKey) != null;
+    public boolean existsByRuleUserAndEvent(Long ruleId, Long userId, Integer userType, String sourceEventKey) {
+        return notifyMessageMapper.selectByRuleUserAndEvent(ruleId, userId, userType, sourceEventKey) != null;
     }
 
     @Override

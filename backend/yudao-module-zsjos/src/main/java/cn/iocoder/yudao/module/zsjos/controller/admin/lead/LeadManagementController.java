@@ -72,23 +72,27 @@ public class LeadManagementController {
     @PostMapping("/inbox/submitted/search-page")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchSubmitted(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
+        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); reqVO.setRelationScope("submitted");
+        return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/inbox/submitted/search-cursor")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> searchSubmittedCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); reqVO.setRelationScope("submitted");
+        return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @PostMapping("/inbox/owned/search-page")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchOwned(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
+        reqVO.setAudience(INBOX_AUDIENCE_OWNER); reqVO.setRelationScope("owned");
+        return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/inbox/owned/search-cursor")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> searchOwnedCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+        reqVO.setAudience(INBOX_AUDIENCE_OWNER); reqVO.setRelationScope("owned");
+        return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/inbox/submitted/page")
@@ -97,12 +101,14 @@ public class LeadManagementController {
     public CommonResult<PageResult<LeadManagementRespVO>> getSubmittedLeadPage(
             @Valid LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER);
+        reqVO.setRelationScope("submitted");
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
     @GetMapping("/inbox/submitted/cursor")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> getSubmittedLeadCursor(@Valid LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+        reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); reqVO.setRelationScope("submitted");
+        return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/inbox/owned/page")
@@ -111,18 +117,20 @@ public class LeadManagementController {
     public CommonResult<PageResult<LeadManagementRespVO>> getOwnedLeadPage(
             @Valid LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
+        reqVO.setRelationScope("owned");
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
     @GetMapping("/inbox/owned/cursor")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> getOwnedLeadCursor(@Valid LeadManagementPageReqVO reqVO) {
-        reqVO.setAudience(INBOX_AUDIENCE_OWNER); return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
+        reqVO.setAudience(INBOX_AUDIENCE_OWNER); reqVO.setRelationScope("owned");
+        return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/get")
     @Operation(summary = "获得客资详情")
     @Parameter(name = "id", description = "内部客资ID", required = true)
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query')")
     public CommonResult<LeadManagementRespVO> getLead(@RequestParam("id") Long id) {
         return success(leadManagementService.getLead(id, getLoginUserId()));
     }

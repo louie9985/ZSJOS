@@ -1,14 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePageList } from '@/composables/usePageList'
-import { getMessagePage, markRead, getUnreadCount, type MessageItem } from '@/api/message'
+import { getMessagePage, markRead, type MessageItem } from '@/api/message'
 import { formatDateTime } from '@/utils/format'
 
 defineOptions({ name: 'Messages' })
 
 const router = useRouter()
-const unreadCount = ref(0)
 
 const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
   (params) => getMessagePage(params),
@@ -16,30 +14,9 @@ const { list, loading, refreshing, finished, error, loadMore, refresh } = usePag
   { immediate: true }
 )
 
-onMounted(async () => {
-  try {
-    unreadCount.value = await getUnreadCount()
-  } catch {
-    unreadCount.value = 0
-  }
-})
-
 function goDetail(item: MessageItem) {
-  // 标记已读
-  if (!item.readStatus) {
-    markRead([item.id]).catch(() => {})
-    item.readStatus = true
-    if (unreadCount.value > 0) unreadCount.value--
-  }
-
-  // 根据 bizType 跳转到对应业务页
-  if (item.bizType === 'lead' && item.bizId) {
-    router.push(`/lead/${item.bizId}`)
-  } else if (item.bizType === 'cashback' && item.bizId) {
-    router.push('/earnings')
-  } else if (item.bizType === 'withdrawal' && item.bizId) {
-    router.push(`/withdrawal/${item.bizId}`)
-  }
+  if (!item.readStatus) markRead([item.id]).catch(() => {})
+  router.push(`/messages/${item.id}`)
 }
 
 const typeIcon: Record<string, string> = {

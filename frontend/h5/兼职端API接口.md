@@ -90,7 +90,9 @@ platform: PC 或 MOBILE，默认 PC
 POST /app-api/zsjos/auth/logout
 ```
 
-只需要携带 `Authorization`。
+只需要携带 `Authorization`。接口按 `PARTNER` 主体类型幂等撤销：token 已过期、已删除或重复调用均成功，ADMIN/MEMBER token 不会被删除。
+
+主动退出请求不刷新 token，也不展示“访问令牌已过期”。用户确认后，无论服务端成功、401、网络失败或其他异常，H5 都清空 access token、refresh token、clientId、用户资料和权限，并直接进入登录页且不携带回跳地址。用户取消确认时保持当前会话不变。
 
 ### 3. 刷新 Token
 
@@ -875,7 +877,7 @@ GET /app-api/zsjos/messages/unread-count
 
 已读请求体为 `{ "ids": [1, 2] }`。消息沿用 System 字段 `templateTitle`、`templateSummary`、`templateContent`、`templateType`、`readStatus`、`createTime`。四个接口要求 `part_time_partner` 角色，并按当前 ADMIN 用户校验消息所有权。
 
-HTTP 401 和业务 `code=401` 进入同一个单航班刷新流程。刷新请求不进入普通拦截器，原请求最多重放一次；刷新失败时全部等待请求结束、认证状态清空并统一返回登录页。
+普通业务请求的 HTTP 401 和业务 `code=401` 进入同一个单航班刷新流程。刷新请求不进入普通拦截器，原请求最多重放一次；刷新失败时全部等待请求结束、认证状态清空，并带原目标地址统一返回登录页。主动退出请求明确跳过刷新，清理后不保留回跳地址。
 
 ## 十三、前端需要处理的状态
 

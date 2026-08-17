@@ -65,7 +65,7 @@ public interface NotifyMessageService {
 
     NotifyMessageDO getMyNotifyMessage(Long id, Long userId, Integer userType);
 
-    boolean existsByRuleUserAndEvent(Long ruleId, Long userId, String sourceEventKey);
+    boolean existsByRuleUserAndEvent(Long ruleId, Long userId, Integer userType, String sourceEventKey);
 
     /**
      * 获得【我的】未读站内信列表

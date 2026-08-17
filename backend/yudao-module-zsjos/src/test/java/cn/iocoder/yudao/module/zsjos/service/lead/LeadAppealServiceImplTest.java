@@ -65,6 +65,7 @@ class LeadAppealServiceImplTest {
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private CashbackService cashbackService;
+    @Mock private LeadObjectPermissionService leadObjectPermissionService;
 
     @BeforeEach
     void setUp() {
@@ -90,6 +91,27 @@ class LeadAppealServiceImplTest {
         sales.setReviewStage(null);
         assertThrows(ServiceException.class,
                 () -> ReflectionTestUtils.invokeMethod(service, "requiredReviewPermission", sales));
+    }
+
+    @Test
+    void leadAppealsUseSharedLeadReadScopeForManager() {
+        LeadDO lead = new LeadDO().setId(8L);
+        lead.setLeadNo("KZ202608170001");
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        when(leadObjectPermissionService.canRead(lead, 40L)).thenReturn(true);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
+
+        assertTrue(service.getLeadAppeals(8L, 40L).isEmpty());
+    }
+
+    @Test
+    void leadAppealsRejectOutOfScopeUser() {
+        LeadDO lead = new LeadDO().setId(8L);
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        when(leadObjectPermissionService.canRead(lead, 50L)).thenReturn(false);
+
+        assertThrows(ServiceException.class, () -> service.getLeadAppeals(8L, 50L));
+        verify(appealMapper, never()).selectListByLeadId(anyLong());
     }
 
     @Test

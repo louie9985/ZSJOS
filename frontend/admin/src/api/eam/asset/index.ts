@@ -6,6 +6,9 @@ export interface AssetVO {
   name: string
   categoryId: number
   categoryName?: string
+  managementMode?: number
+  quantity?: number
+  unit?: string
   status?: number
   brand?: string
   specification?: string
@@ -97,14 +100,45 @@ export const importTemplate = async () => {
   return await request.download({ url: '/eam/asset/get-import-template' })
 }
 
-export interface AssetImportRespVO {
-  createAssetCodes: string[]
-  failures: { rowNum: number; name?: string; reason: string }[]
+export interface AssetImportRowVO {
+  rowNum: number
+  assetCode?: string
+  name: string
+  categoryName: string
+  managementMode: number
+  quantity: number
+  sourceUserName?: string
+  matchedUserName?: string
+  action: 'CREATE' | 'UPDATE' | 'SKIP_EXISTING' | 'SKIP_SAME_FILE'
+  sourceFields: Record<string, any>
+  defaultedFields: string[]
+  warnings: string[]
 }
 
-// 资产导入接口地址，供 el-upload 直接使用
-export const getImportUrl = () => {
-  return import.meta.env.VITE_BASE_URL + import.meta.env.VITE_API_URL + '/eam/asset/import'
+export interface AssetImportPreviewRespVO {
+  fileHash: string
+  totalRows: number
+  createCount: number
+  updateCount: number
+  skipCount: number
+  warningCount: number
+  batchId?: number
+  rows: AssetImportRowVO[]
+}
+
+const uploadLedger = async (url: string, file: File, updateExisting: boolean) => {
+  const data = new FormData()
+  data.append('file', file)
+  data.append('updateExisting', String(updateExisting))
+  return await request.upload<AssetImportPreviewRespVO>({ url, data })
+}
+
+export const previewLedgerImport = async (file: File, updateExisting = false) => {
+  return await uploadLedger('/eam/asset/import/preview', file, updateExisting)
+}
+
+export const commitLedgerImport = async (file: File, updateExisting = false) => {
+  return await uploadLedger('/eam/asset/import/commit', file, updateExisting)
 }
 
 // 资产二维码地址，直接用于 <img :src="...">

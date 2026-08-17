@@ -3,7 +3,10 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.LeadComplaintCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.LeadComplaintDecisionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.LeadComplaintPageReqVO;
@@ -13,7 +16,9 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadComplaintDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadComplaintMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
+import lombok.Data;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,6 +34,7 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_CLOSED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_WON;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ATTACHMENT_URL_EXPIRATION_SECONDS;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_FOUNDED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -40,23 +46,41 @@ public class LeadComplaintService {
     @Resource private LeadNotifyEventPublisher notifyPublisher;
     @Resource private LeadAttachmentService attachmentService;
     @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private AdminUserApi adminUserApi;
+    @Resource private FileApi fileApi;
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(Long leadId, Long userId, LeadComplaintCreateReqVO req) {
+        return createInternal(leadId, userId, null, userId, req);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public Long createForPartner(Long leadId, Long accountId, Long partnerId, LeadComplaintCreateReqVO req) {
+        return createInternal(leadId, null, partnerId, accountId, req);
+    }
+
+    private Long createInternal(Long leadId, Long userId, Long partnerId, Long attachmentOwnerId,
+                                LeadComplaintCreateReqVO req) {
         LeadComplaintDO replay = complaintMapper.selectByCreateKey(req.getIdempotencyKey());
         if (replay != null) return replay.getId();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!Objects.equals(lead.getSourceUserId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
-        identityService.requireHistoricalSubmitter(lead, userId);
+        if (partnerId != null) {
+            if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
+        } else {
+            if (!Objects.equals(lead.getSourceUserId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
+            identityService.requireHistoricalSubmitter(lead, userId);
+        }
         if (lead.getOwnerUserId() == null || Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {
             throw exception(LEAD_SUBMITTER_ACTION_STATE_INVALID);
         }
-        Map<Long, FileInfoRespDTO> evidence = attachmentService.validateReferences(
-                attachments(req.getEvidenceFileIds()), userId);
+        Map<Long, FileInfoRespDTO> evidence = partnerId == null
+                ? attachmentService.validateReferences(attachments(req.getEvidenceFileIds()), attachmentOwnerId)
+                : attachmentService.validatePartnerReferences(attachments(req.getEvidenceFileIds()), attachmentOwnerId);
         LeadComplaintDO row = new LeadComplaintDO();
         row.setLeadId(leadId);
         row.setComplainantUserId(userId);
+        row.setPartnerId(partnerId);
         row.setSalesUserId(lead.getOwnerUserId());
         row.setReason(req.getReason().trim());
         row.setEvidenceRefs(evidenceJson(evidence));
@@ -72,7 +96,9 @@ public class LeadComplaintService {
         Set<Long> leadIds = page.getList().stream().map(LeadComplaintDO::getLeadId).collect(Collectors.toSet());
         Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
-        return new PageResult<>(page.getList().stream().map(row -> toResp(row, leads.get(row.getLeadId()))).toList(),
+        Map<Long, String> userNames = userNames(page.getList());
+        return new PageResult<>(page.getList().stream()
+                .map(row -> toResp(row, leads.get(row.getLeadId()), userNames)).toList(),
                 page.getTotal());
     }
 
@@ -81,8 +107,30 @@ public class LeadComplaintService {
         Set<Long> leadIds = page.getList().stream().map(LeadComplaintDO::getLeadId).collect(Collectors.toSet());
         Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
-        return new PageResult<>(page.getList().stream().map(row -> toResp(row, leads.get(row.getLeadId()))).toList(),
+        Map<Long, String> userNames = userNames(page.getList());
+        return new PageResult<>(page.getList().stream()
+                .map(row -> toResp(row, leads.get(row.getLeadId()), userNames)).toList(),
                 page.getTotal());
+    }
+
+    public PageResult<LeadComplaintRespVO> partnerPage(LeadComplaintPageReqVO req, Long partnerId) {
+        PageResult<LeadComplaintDO> page = complaintMapper.selectPartnerPage(req, partnerId);
+        Set<Long> leadIds = page.getList().stream().map(LeadComplaintDO::getLeadId).collect(Collectors.toSet());
+        Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
+        Map<Long, String> userNames = userNames(page.getList());
+        return new PageResult<>(page.getList().stream()
+                .map(row -> toResp(row, leads.get(row.getLeadId()), userNames)).toList(),
+                page.getTotal());
+    }
+
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "read")
+    public List<LeadComplaintRespVO> getLeadComplaints(Long leadId, Long userId) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        List<LeadComplaintDO> rows = complaintMapper.selectListByLeadId(leadId);
+        Map<Long, String> userNames = userNames(rows);
+        return rows.stream().map(row -> toResp(row, lead, userNames)).toList();
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -126,22 +174,65 @@ public class LeadComplaintService {
         )).toList());
     }
 
-    private LeadComplaintRespVO toResp(LeadComplaintDO row, LeadDO lead) {
+    private LeadComplaintRespVO toResp(LeadComplaintDO row, LeadDO lead, Map<Long, String> userNames) {
         LeadComplaintRespVO result = new LeadComplaintRespVO();
         result.setId(row.getId());
         result.setLeadId(row.getLeadId());
         result.setLeadNo(lead == null ? null : lead.getLeadNo());
         result.setComplainantUserId(row.getComplainantUserId());
+        result.setComplainantUserName(nameOf(userNames, row.getComplainantUserId()));
         result.setSalesUserId(row.getSalesUserId());
+        result.setSalesUserName(nameOf(userNames, row.getSalesUserId()));
         result.setReason(row.getReason());
         result.setEvidenceRefs(row.getEvidenceRefs());
+        result.setEvidence(toEvidence(row.getEvidenceRefs()));
         result.setStatus(row.getStatus());
         result.setResult(row.getResult());
         result.setHandlerUserId(row.getHandlerUserId());
+        result.setHandlerUserName(nameOf(userNames, row.getHandlerUserId()));
         result.setHandlerOpinion(row.getHandlerOpinion());
         result.setHandlerEvidenceRefs(row.getHandlerEvidenceRefs());
+        result.setHandlerEvidence(toEvidence(row.getHandlerEvidenceRefs()));
         result.setHandledAt(row.getHandledAt());
         result.setCreateTime(row.getCreateTime());
         return result;
+    }
+
+    private Map<Long, String> userNames(List<LeadComplaintDO> rows) {
+        Set<Long> ids = rows.stream().flatMap(row -> java.util.stream.Stream.of(
+                        row.getComplainantUserId(), row.getSalesUserId(), row.getHandlerUserId()))
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        if (ids.isEmpty()) return Map.of();
+        return adminUserApi.getUserList(ids).stream().filter(user -> user.getNickname() != null)
+                .collect(Collectors.toMap(AdminUserRespDTO::getId, AdminUserRespDTO::getNickname,
+                        (left, right) -> left));
+    }
+
+    private String nameOf(Map<Long, String> userNames, Long userId) {
+        return userId == null ? null : userNames.get(userId);
+    }
+
+    private List<LeadComplaintRespVO.EvidenceVO> toEvidence(String json) {
+        List<EvidenceRef> refs = json == null ? List.of() : JsonUtils.parseArray(json, EvidenceRef.class);
+        List<Long> ids = refs.stream().map(EvidenceRef::getInfraFileId).filter(Objects::nonNull).toList();
+        Map<Long, String> urls = ids.isEmpty() ? Map.of()
+                : fileApi.presignGetUrls(ids, ATTACHMENT_URL_EXPIRATION_SECONDS);
+        return refs.stream().map(ref -> {
+            LeadComplaintRespVO.EvidenceVO result = new LeadComplaintRespVO.EvidenceVO();
+            result.setInfraFileId(ref.getInfraFileId());
+            result.setFileUrl(urls.get(ref.getInfraFileId()));
+            result.setOriginalName(ref.getName());
+            result.setContentType(ref.getType());
+            result.setFileSize(ref.getSize());
+            return result;
+        }).toList();
+    }
+
+    @Data
+    private static class EvidenceRef {
+        private Long infraFileId;
+        private String name;
+        private String type;
+        private Long size;
     }
 }

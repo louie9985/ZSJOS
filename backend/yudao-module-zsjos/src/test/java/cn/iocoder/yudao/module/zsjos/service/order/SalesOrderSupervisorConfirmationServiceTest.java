@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSupervisorDecisionReqVO;
@@ -41,6 +42,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
     private static final Long ORDER_ID = 100L;
     private static final Long ROUND_ID = 200L;
     private static final Long REQUESTER_ID = 20L;
+    private static final Long FORMAL_SALES_ID = 21L;
     private static final Long SUPERVISOR_ID = 30L;
 
     @InjectMocks private SalesOrderSupervisorConfirmationService service;
@@ -52,6 +54,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Mock private PermissionApi permissionApi;
 
     private SalesOrderDO order;
     private SalesOrderApprovalRoundDO round;
@@ -60,7 +63,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
     void setUp() {
         TenantContextHolder.setTenantId(1L);
         order = new SalesOrderDO();
-        order.setId(ORDER_ID); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setId(ORDER_ID); order.setStatus(STATUS_PENDING_APPROVAL); order.setFormalSalesUserId(FORMAL_SALES_ID);
         order.setCurrentApprovalRoundId(ROUND_ID); order.setVersion(3);
         round = new SalesOrderApprovalRoundDO();
         round.setId(ROUND_ID); round.setOrderId(ORDER_ID); round.setStatus(ROUND_PENDING);
@@ -114,19 +117,30 @@ class SalesOrderSupervisorConfirmationServiceTest {
     @Test
     void requestRejectsMissingDisabledAndSelfSupervisor() {
         mockOrdinaryTask();
-        AdminUserRespDTO requester = user(REQUESTER_ID, 10L, CommonStatusEnum.ENABLE.getStatus());
-        when(adminUserApi.getUser(REQUESTER_ID)).thenReturn(requester);
+        AdminUserRespDTO formalSales = user(FORMAL_SALES_ID, 10L, CommonStatusEnum.ENABLE.getStatus());
+        when(adminUserApi.getUser(FORMAL_SALES_ID)).thenReturn(formalSales);
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L);
         when(deptApi.getDept(10L)).thenReturn(dept);
 
         assertError(SALES_ORDER_SUPERVISOR_NOT_CONFIGURED.getCode());
 
-        dept.setLeaderUserId(REQUESTER_ID);
+        dept.setLeaderUserId(FORMAL_SALES_ID);
         assertError(SALES_ORDER_SUPERVISOR_SELF.getCode());
 
         dept.setLeaderUserId(SUPERVISOR_ID);
         when(adminUserApi.getUser(SUPERVISOR_ID)).thenReturn(user(SUPERVISOR_ID, 11L, CommonStatusEnum.DISABLE.getStatus()));
         assertError(SALES_ORDER_SUPERVISOR_DISABLED.getCode());
+        verify(processTaskApi, never()).createBeforeSignTask(anyLong(), any());
+    }
+
+    @Test
+    void requestRejectsSalesSupervisorWithoutConfirmationPermission() {
+        mockOrdinaryTask();
+        mockSupervisor(SUPERVISOR_ID, CommonStatusEnum.ENABLE.getStatus());
+        when(permissionApi.hasAnyPermissions(SUPERVISOR_ID, "zsjos:sales-order:supervisor-confirm")).thenReturn(false);
+
+        assertError(SALES_ORDER_SUPERVISOR_PERMISSION_NOT_GRANTED.getCode());
+
         verify(processTaskApi, never()).createBeforeSignTask(anyLong(), any());
     }
 
@@ -187,10 +201,11 @@ class SalesOrderSupervisorConfirmationServiceTest {
     }
 
     private void mockSupervisor(Long leaderId, Integer status) {
-        when(adminUserApi.getUser(REQUESTER_ID)).thenReturn(user(REQUESTER_ID, 10L, CommonStatusEnum.ENABLE.getStatus()));
+        when(adminUserApi.getUser(FORMAL_SALES_ID)).thenReturn(user(FORMAL_SALES_ID, 10L, CommonStatusEnum.ENABLE.getStatus()));
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setLeaderUserId(leaderId);
         when(deptApi.getDept(10L)).thenReturn(dept);
         when(adminUserApi.getUser(leaderId)).thenReturn(user(leaderId, 11L, status));
+        lenient().when(permissionApi.hasAnyPermissions(leaderId, "zsjos:sales-order:supervisor-confirm")).thenReturn(true);
     }
 
     private BpmTaskRespDTO ordinaryTask() {

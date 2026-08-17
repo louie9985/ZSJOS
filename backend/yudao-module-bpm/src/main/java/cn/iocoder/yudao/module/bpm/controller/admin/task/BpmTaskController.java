@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.number.NumberUtils;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.*;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.convert.task.BpmTaskConvert;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmFormDO;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmProcessDefinitionInfoDO;
@@ -76,7 +77,9 @@ public class BpmTaskController {
         Map<String, ProcessInstance> processInstanceMap = processInstanceService.getProcessInstanceMap(
                 convertSet(pageResult.getList(), Task::getProcessInstanceId));
         Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(
-                convertSet(processInstanceMap.values(), instance -> Long.valueOf(instance.getStartUserId())));
+                processInstanceMap.values().stream().map(ProcessInstance::getStartUserId)
+                        .map(BpmStartSubjectDTO::getAdminUserId).filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet()));
         Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
                 convertSet(pageResult.getList(), Task::getProcessDefinitionId));
         return success(BpmTaskConvert.INSTANCE.buildTodoTaskPage(pageResult, processInstanceMap, userMap, processDefinitionInfoMap));
@@ -95,7 +98,9 @@ public class BpmTaskController {
         Map<String, HistoricProcessInstance> processInstanceMap = processInstanceService.getHistoricProcessInstanceMap(
                 convertSet(pageResult.getList(), HistoricTaskInstance::getProcessInstanceId));
         Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(
-                convertSet(processInstanceMap.values(), instance -> Long.valueOf(instance.getStartUserId())));
+                processInstanceMap.values().stream().map(HistoricProcessInstance::getStartUserId)
+                        .map(BpmStartSubjectDTO::getAdminUserId).filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toSet()));
         Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
                 convertSet(pageResult.getList(), HistoricTaskInstance::getProcessDefinitionId));
         Map<String, List<Attachment>> taskAttachmentMap = getTaskAttachmentMap(pageResult.getList());
@@ -116,7 +121,9 @@ public class BpmTaskController {
         Map<String, HistoricProcessInstance> processInstanceMap = processInstanceService.getHistoricProcessInstanceMap(
                 convertSet(pageResult.getList(), HistoricTaskInstance::getProcessInstanceId));
         // 获得 User 和 Dept Map
-        Set<Long> userIds = convertSet(processInstanceMap.values(), instance -> Long.valueOf(instance.getStartUserId()));
+        Set<Long> userIds = processInstanceMap.values().stream().map(HistoricProcessInstance::getStartUserId)
+                .map(BpmStartSubjectDTO::getAdminUserId).filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
         userIds.addAll(convertSet(pageResult.getList(), task -> NumberUtils.parseLong(task.getAssignee())));
         Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(userIds);
         Map<Long, DeptRespDTO> deptMap = deptApi.getDeptMap(

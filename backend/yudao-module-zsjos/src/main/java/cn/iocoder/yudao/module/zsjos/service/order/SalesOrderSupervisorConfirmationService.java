@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
@@ -43,6 +44,7 @@ public class SalesOrderSupervisorConfirmationService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Resource private PermissionApi permissionApi;
 
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "sales-order", bizId = "#orderId", action = "review")
@@ -59,13 +61,22 @@ public class SalesOrderSupervisorConfirmationService {
         if (confirmationMapper.selectByRoundAndTaskKey(round.getId(), task.getTaskDefinitionKey()) != null) {
             throw exception(SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED);
         }
-        AdminUserRespDTO requester = adminUserApi.getUser(userId);
-        DeptRespDTO dept = requester == null || requester.getDeptId() == null ? null : deptApi.getDept(requester.getDeptId());
-        if (dept == null || dept.getLeaderUserId() == null) throw exception(SALES_ORDER_SUPERVISOR_NOT_CONFIGURED);
-        if (Objects.equals(dept.getLeaderUserId(), userId)) throw exception(SALES_ORDER_SUPERVISOR_SELF);
-        AdminUserRespDTO supervisor = adminUserApi.getUser(dept.getLeaderUserId());
+        AdminUserRespDTO formalSales = order.getFormalSalesUserId() == null
+                ? null : adminUserApi.getUser(order.getFormalSalesUserId());
+        DeptRespDTO salesDept = formalSales == null || formalSales.getDeptId() == null
+                ? null : deptApi.getDept(formalSales.getDeptId());
+        if (salesDept == null || salesDept.getLeaderUserId() == null) {
+            throw exception(SALES_ORDER_SUPERVISOR_NOT_CONFIGURED);
+        }
+        if (Objects.equals(salesDept.getLeaderUserId(), order.getFormalSalesUserId())) {
+            throw exception(SALES_ORDER_SUPERVISOR_SELF);
+        }
+        AdminUserRespDTO supervisor = adminUserApi.getUser(salesDept.getLeaderUserId());
         if (supervisor == null || !CommonStatusEnum.ENABLE.getStatus().equals(supervisor.getStatus())) {
             throw exception(SALES_ORDER_SUPERVISOR_DISABLED);
+        }
+        if (!permissionApi.hasAnyPermissions(supervisor.getId(), "zsjos:sales-order:supervisor-confirm")) {
+            throw exception(SALES_ORDER_SUPERVISOR_PERMISSION_NOT_GRANTED);
         }
         commandService.register(reqVO.getIdempotencyKey(), new SalesOrderCommandService.Command(orderId, round.getId(),
                 round.getProcessInstanceId(), "request_supervisor", task.getTaskDefinitionKey(), task.getId(), userId, fingerprint));

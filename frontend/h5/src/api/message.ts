@@ -1,4 +1,5 @@
 import request from './request'
+import type { ApiDateValue } from '@/utils/format'
 
 export interface MessageItem {
   id: number
@@ -6,10 +7,14 @@ export interface MessageItem {
   templateSummary?: string
   templateContent: string
   templateType: number
+  templateNickname?: string
+  sceneCode?: string
+  actionType?: 'none' | 'message_detail' | 'business_detail'
   bizType?: string
   bizId?: number
   readStatus: boolean
-  createTime: string
+  readTime?: ApiDateValue
+  createTime: ApiDateValue
 }
 
 /** 消息列表 */

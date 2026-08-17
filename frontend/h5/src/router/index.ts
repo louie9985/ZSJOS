@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useUserStore } from '@/stores/user'
+import { getPermissionInfo } from '@/api/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -23,60 +24,81 @@ const router = createRouter({
     {
       path: '/lead/submit',
       name: 'LeadSubmit',
-      component: () => import('@/pages/lead/submit.vue')
+      component: () => import('@/pages/lead/submit.vue'),
+      meta: { permission: 'zsjos:lead:submit' }
     },
     {
       path: '/lead/list',
       name: 'LeadList',
-      component: () => import('@/pages/lead/list.vue')
+      component: () => import('@/pages/lead/list.vue'),
+      meta: { permission: 'zsjos:lead:query-submitted' }
     },
     {
       path: '/lead/:id',
       name: 'LeadDetail',
-      component: () => import('@/pages/lead/detail.vue')
+      component: () => import('@/pages/lead/detail.vue'),
+      meta: { permission: 'zsjos:lead:query-submitted' }
     },
     {
       path: '/lead/:id/supplement',
       name: 'LeadSupplement',
-      component: () => import('@/pages/lead/supplement.vue')
+      component: () => import('@/pages/lead/supplement.vue'),
+      meta: { permission: 'zsjos:lead:submitter-supplement' }
     },
     {
       path: '/lead/:id/complaint',
       name: 'LeadComplaint',
-      component: () => import('@/pages/lead/complaint.vue')
+      component: () => import('@/pages/lead/complaint.vue'),
+      meta: { permission: 'zsjos:lead-complaint:create' }
+    },
+    {
+      path: '/complaints',
+      name: 'ComplaintHistory',
+      component: () => import('@/pages/lead/complaints.vue'),
+      meta: { permission: 'zsjos:lead-complaint:create' }
     },
     {
       path: '/lead/:id/appeal',
       name: 'LeadAppeal',
-      component: () => import('@/pages/lead/appeal.vue')
+      component: () => import('@/pages/lead/appeal.vue'),
+      meta: { permission: 'zsjos:lead:appeal:create' }
     },
     // --- 收益 ---
     {
       path: '/earnings',
       name: 'Earnings',
-      component: () => import('@/pages/earnings/index.vue')
+      component: () => import('@/pages/earnings/index.vue'),
+      meta: { permission: 'zsjos:cashback:my-query' }
     },
     // --- 提现 ---
     {
       path: '/withdrawal',
       name: 'Withdrawal',
-      component: () => import('@/pages/withdrawal/index.vue')
+      component: () => import('@/pages/withdrawal/index.vue'),
+      meta: { permission: 'zsjos:withdrawal:my-query' }
     },
     {
       path: '/withdrawal/apply',
       name: 'WithdrawalApply',
-      component: () => import('@/pages/withdrawal/apply.vue')
+      component: () => import('@/pages/withdrawal/apply.vue'),
+      meta: { permission: 'zsjos:withdrawal:apply' }
     },
     {
       path: '/withdrawal/:id',
       name: 'WithdrawalDetail',
-      component: () => import('@/pages/withdrawal/detail.vue')
+      component: () => import('@/pages/withdrawal/detail.vue'),
+      meta: { permission: 'zsjos:withdrawal:my-query' }
     },
     // --- 消息 ---
     {
       path: '/messages',
       name: 'Messages',
       component: () => import('@/pages/messages/index.vue')
+    },
+    {
+      path: '/messages/:id',
+      name: 'MessageDetail',
+      component: () => import('@/pages/messages/detail.vue')
     },
     // --- 个人 ---
     {
@@ -97,12 +119,18 @@ const router = createRouter({
     {
       path: '/profile/bank-cards',
       name: 'BankCards',
-      component: () => import('@/pages/profile/bank-cards.vue')
+      component: () => import('@/pages/profile/bank-cards.vue'),
+      meta: { permission: 'zsjos:withdrawal:apply' }
     },
     {
       path: '/profile/theme',
       name: 'ThemeSwitch',
       component: () => import('@/pages/profile/theme.vue')
+    },
+    {
+      path: '/unauthorized',
+      name: 'Unauthorized',
+      component: () => import('@/pages/unauthorized/index.vue')
     }
   ]
 })
@@ -115,6 +143,26 @@ router.beforeEach(async (to) => {
 
   if (!userStore.isLoggedIn) {
     return { name: 'Login', query: { redirect: to.fullPath } }
+  }
+
+  if (!userStore.userId) {
+    try {
+      const info = await getPermissionInfo()
+      userStore.setUserInfo({
+        userId: info.user.id,
+        nickname: info.user.nickname,
+        avatar: info.user.avatar,
+        permissions: info.permissions
+      })
+    } catch {
+      userStore.logout()
+      return { name: 'Login', query: { redirect: to.fullPath } }
+    }
+  }
+
+  const permission = to.meta.permission as string | undefined
+  if (permission && !userStore.hasPermission(permission)) {
+    return { name: 'Unauthorized', query: { from: to.fullPath } }
   }
 })
 

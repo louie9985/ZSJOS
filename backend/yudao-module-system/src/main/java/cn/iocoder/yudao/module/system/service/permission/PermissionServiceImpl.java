@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleMenuDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.UserRoleDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.permission.RoleMenuMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.permission.UserRoleMapper;
 import cn.iocoder.yudao.module.system.dal.redis.RedisKeyConstants;
@@ -84,6 +85,33 @@ public class PermissionServiceImpl implements PermissionService {
 
         // 情况二：如果是超管，也说明有权限
         return roleService.hasAnySuperAdmin(convertSet(roles, RoleDO::getId));
+    }
+
+    @Override
+    public Set<Long> getEnabledUserIdsByPermission(String permission) {
+        if (permission == null || permission.isBlank()) {
+            return Collections.emptySet();
+        }
+        Set<Long> roleIds = menuService.getMenuIdListByPermissionFromCache(permission).stream()
+                .flatMap(menuId -> getMenuRoleIdListByMenuIdFromCache(menuId).stream())
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+        roleService.getRoleListByStatus(Set.of(CommonStatusEnum.ENABLE.getStatus())).stream()
+                .filter(role -> SUPER_ADMIN.getCode().equals(role.getCode()))
+                .map(RoleDO::getId).forEach(roleIds::add);
+        if (roleIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<Long> enabledRoleIds = roleService.getRoleList(roleIds).stream()
+                .filter(role -> CommonStatusEnum.ENABLE.getStatus().equals(role.getStatus()))
+                .map(RoleDO::getId).collect(java.util.stream.Collectors.toSet());
+        Set<Long> userIds = getUserRoleIdListByRoleId(enabledRoleIds);
+        if (userIds.isEmpty()) {
+            return Collections.emptySet();
+        }
+        return userService.getUserList(userIds).stream()
+                .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
+                .map(AdminUserDO::getId)
+                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
     }
 
     /**

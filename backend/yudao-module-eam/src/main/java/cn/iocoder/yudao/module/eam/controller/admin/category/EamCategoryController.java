@@ -1,15 +1,19 @@
 package cn.iocoder.yudao.module.eam.controller.admin.category;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategoryRespVO;
+import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategoryImportRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategorySaveReqVO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
+import cn.iocoder.yudao.module.eam.service.category.EamCategoryImportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -21,7 +25,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.ClassPathResource;
 
+import java.io.IOException;
 import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
@@ -34,6 +41,8 @@ public class EamCategoryController {
 
     @Resource
     private EamCategoryService categoryService;
+    @Resource
+    private EamCategoryImportService categoryImportService;
 
     @PostMapping("/create")
     @Operation(summary = "创建资产分类")
@@ -74,6 +83,35 @@ public class EamCategoryController {
     public CommonResult<EamCategoryRespVO> getCategory(@RequestParam("id") Long id) {
         EamCategoryDO category = categoryService.getCategory(id);
         return success(BeanUtils.toBean(category, EamCategoryRespVO.class));
+    }
+
+    @GetMapping("/get-import-template")
+    @Operation(summary = "下载资产分类配置导入模板")
+    @PreAuthorize("@ss.hasPermission('eam:category:import')")
+    public void getImportTemplate(HttpServletResponse response) throws IOException {
+        ClassPathResource resource = new ClassPathResource("eam/eam-category-config-template.xlsx");
+        response.addHeader("Content-Disposition", "attachment;filename="
+                + HttpUtils.encodeUtf8("中世健EAM分类配置模板.xlsx"));
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        try (var input = resource.getInputStream()) {
+            input.transferTo(response.getOutputStream());
+        }
+    }
+
+    @PostMapping("/import/preview")
+    @Operation(summary = "预检资产分类配置")
+    @PreAuthorize("@ss.hasPermission('eam:category:import')")
+    public CommonResult<EamCategoryImportRespVO> previewImport(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        return success(categoryImportService.preview(file.getBytes()));
+    }
+
+    @PostMapping("/import/commit")
+    @Operation(summary = "提交资产分类配置导入")
+    @PreAuthorize("@ss.hasPermission('eam:category:import')")
+    public CommonResult<EamCategoryImportRespVO> commitImport(@RequestParam("file") MultipartFile file)
+            throws IOException {
+        return success(categoryImportService.commit(file.getBytes()));
     }
 
 }

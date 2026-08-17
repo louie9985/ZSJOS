@@ -96,9 +96,11 @@ class LeadManagementServiceImplTest {
     void pageRestrictsOrdinaryUserToRelatedLeads() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         LeadDO lead = lead(1L, 10L, 20L);
-        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
-        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of());
-        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of(), List.of(), false, null))
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(10L), List.of(10L), false,
+                List.of(), List.of(), List.of(), false, null))
                 .thenReturn(new PageResult<>(List.of(lead), 1L));
         when(intendedProductMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
@@ -108,18 +110,21 @@ class LeadManagementServiceImplTest {
         assertEquals(1L, result.getTotal());
         assertEquals(List.of("submitter"), result.getList().getFirst().getRelationTypes());
         assertEquals("13800138000", result.getList().getFirst().getSubmittedMobile());
-        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of(), List.of(), false, null);
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(10L), List.of(10L), false,
+                List.of(), List.of(), List.of(), false, null);
     }
 
     @Test
     void pageAllowsQueryAllPermissionWithoutRelationScope() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
-        when(leadMapper.selectManagementPage(reqVO, null, List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(), true,
+                List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
-        verify(leadMapper).selectManagementPage(reqVO, null, List.of(), List.of(), List.of(), false, null);
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(), true,
+                List.of(), List.of(), List.of(), false, null);
     }
 
     @Test
@@ -333,25 +338,27 @@ class LeadManagementServiceImplTest {
 
     @Test
     void statusCountsRestrictOrdinaryUserToRelatedLeads() {
-        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
-        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
-        when(leadMapper.selectManagementStatusCounts(10L, List.of(20L))).thenReturn(Map.of("valid", 2L));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L, 20L));
+        when(leadMapper.selectManagementStatusCountsByScope(List.of(10L, 20L), List.of(10L, 20L), false))
+                .thenReturn(Map.of("valid", 2L));
 
         Map<String, Long> result = service.getStatusCounts(10L);
 
         assertEquals(Map.of("valid", 2L), result);
-        verify(leadMapper).selectManagementStatusCounts(10L, List.of(20L));
+        verify(leadMapper).selectManagementStatusCountsByScope(List.of(10L, 20L), List.of(10L, 20L), false);
     }
 
     @Test
     void statusCountsAllowQueryAllWithoutRelationScope() {
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
-        when(leadMapper.selectManagementStatusCounts(null, List.of())).thenReturn(Map.of("valid", 3L));
+        when(leadMapper.selectManagementStatusCountsByScope(List.of(), List.of(), true)).thenReturn(Map.of("valid", 3L));
 
         Map<String, Long> result = service.getStatusCounts(99L);
 
         assertEquals(Map.of("valid", 3L), result);
-        verify(leadMapper).selectManagementStatusCounts(null, List.of());
+        verify(leadMapper).selectManagementStatusCountsByScope(List.of(), List.of(), true);
     }
 
     @Test
@@ -393,14 +400,17 @@ class LeadManagementServiceImplTest {
         LeadInboxFilterConfigVO config = filterConfig();
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(99L)).thenReturn(Set.of(99L));
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
         when(inboxFilterConfigService.resolveQuery(config, "all", null))
                 .thenReturn(new LeadInboxFilterQuery(java.util.Set.of(), java.util.Set.of(), false));
-        when(leadMapper.selectManagementPage(reqVO, 99L, List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(99L), false,
+                List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
-        verify(leadMapper).selectManagementPage(reqVO, 99L, List.of(), List.of(), List.of(), false, null);
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(99L), false,
+                List.of(), List.of(), List.of(), false, null);
     }
 
     @Test
@@ -409,18 +419,19 @@ class LeadManagementServiceImplTest {
         reqVO.setAudience("owner"); reqVO.setInboxGroup("pending"); reqVO.setInboxStage("first_follow_pending");
         LeadInboxFilterConfigVO config = filterConfig();
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
-        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
         when(inboxFilterConfigService.resolveQuery(config, "pending", "first_follow_pending"))
                 .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"),
                         Set.of("first_follow_pending"), false, Map.of()));
-        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
-                List.of("first_follow_pending"), false, null)).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
+                List.of("submitted"), List.of("owned"), List.of("first_follow_pending"), false, null))
+                .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
-        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
-                List.of("first_follow_pending"), false, null);
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
+                List.of("submitted"), List.of("owned"), List.of("first_follow_pending"), false, null);
     }
 
     @Test
@@ -430,18 +441,19 @@ class LeadManagementServiceImplTest {
         reqVO.setAdvancedFilter(new AdvancedFilterGroupReqVO());
         LeadInboxFilterConfigVO config = filterConfig();
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
-        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L));
         when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
         when(inboxFilterConfigService.resolveQuery(config, "pending", null))
                 .thenReturn(new LeadInboxFilterQuery(Set.of("submitted"), Set.of("owned"), false));
         when(advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter())).thenReturn(List.of(7L, 8L));
-        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
-                false, List.of(7L, 8L))).thenReturn(PageResult.empty());
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
+                List.of("submitted"), List.of("owned"), List.of(), false, List.of(7L, 8L)))
+                .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
-        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(), List.of("submitted"), List.of("owned"),
-                false, List.of(7L, 8L));
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(10L), false,
+                List.of("submitted"), List.of("owned"), List.of(), false, List.of(7L, 8L));
     }
 
     @Test
@@ -471,15 +483,17 @@ class LeadManagementServiceImplTest {
     @Test
     void pageIncludesManagedDepartmentOwnersForTeamView() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
-        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
-        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 21L));
-        when(leadMapper.selectManagementPage(reqVO, 10L, List.of(20L, 21L), List.of(), List.of(), false, null))
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(10L)).thenReturn(Set.of(10L, 20L, 21L));
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(10L, 20L, 21L),
+                List.of(10L, 20L, 21L), false, List.of(), List.of(), List.of(), false, null))
                 .thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 10L);
 
-        verify(leadMapper).selectManagementPage(reqVO, 10L, List.of(20L, 21L),
-                List.of(), List.of(), false, null);
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(10L, 20L, 21L),
+                List.of(10L, 20L, 21L), false, List.of(), List.of(), List.of(), false, null);
     }
 
     @Test

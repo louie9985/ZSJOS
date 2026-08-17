@@ -37,4 +37,10 @@ public class OAuth2AccessTokenCreateReqDTO implements Serializable {
      */
     private List<String> scopes;
 
+    /** 可选的刷新令牌有效期，单位秒。 */
+    private Integer refreshTokenValiditySeconds;
+
+    /** 可选的同客户端最大会话数。 */
+    private Integer maxDevices;
+
 }

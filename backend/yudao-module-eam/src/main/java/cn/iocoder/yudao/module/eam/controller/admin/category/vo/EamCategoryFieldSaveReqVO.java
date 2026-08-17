@@ -6,6 +6,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 @Schema(description = "管理后台 - EAM 分类自定义字段创建/更新 Request VO")
 @Data
@@ -37,6 +38,18 @@ public class EamCategoryFieldSaveReqVO {
     @Schema(description = "是否必填", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
     @NotNull(message = "是否必填不能为空")
     private Boolean required;
+
+    @Schema(description = "管理端是否显示", example = "true")
+    private Boolean adminVisible;
+
+    @Schema(description = "员工收集表是否显示", example = "true")
+    private Boolean collectionVisible;
+
+    @Schema(description = "员工收集表是否必填", example = "false")
+    private Boolean collectionRequired;
+
+    @Schema(description = "员工收集表条件规则")
+    private Map<String, Object> conditionRule;
 
     @Schema(description = "排序", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "排序不能为空")

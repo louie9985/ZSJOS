@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Button,
-  Descriptions,
   Empty,
   Form,
   Input,
@@ -34,15 +33,16 @@ import {
   type AssignmentUser,
   type AdvancedFilterGroup,
   type BusinessTaskBucket,
-  type LeadAppeal,
-  type LeadFollowUp,
+  type DictData,
   type ManagedLead,
   type SubordinateBatchResult,
   type SubordinateSales,
   type SubordinateTask,
 } from "../services/api";
 import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
-import { LEAD_STATUS_LABELS } from "../constants";
+import LeadDetail from "../components/LeadDetail";
+import { DICT_TYPE, LEAD_STATUS_LABELS } from "../constants";
+import { dictionaryDisplayLabel } from "../services/leadManagement";
 import { formatTimestamp } from "../services/time";
 import {
   formatCurrency,
@@ -145,219 +145,49 @@ function BatchResultModal({
   );
 }
 
-function ManagedLeadDetail({
-  leadId,
-  onBack,
-}: {
-  leadId: number;
-  onBack: () => void;
-}) {
-  const [lead, setLead] = useState<ManagedLead>();
-  const [followUps, setFollowUps] = useState<LeadFollowUp[]>([]);
-  const [appeals, setAppeals] = useState<LeadAppeal[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [followUpError, setFollowUpError] = useState("");
-  const [appealError, setAppealError] = useState("");
-  useEffect(() => {
-    if (!leadId) return;
-    setLoading(true);
-    setError("");
-    setFollowUpError("");
-    setAppealError("");
-    Promise.allSettled([
+function ManagedLeadDetail({ leadId, onBack }: { leadId: number; onBack: () => void }) {
+  const [lead, setLead] = useState<ManagedLead>()
+  const [categories, setCategories] = useState<DictData[]>([])
+  const [channels, setChannels] = useState<DictData[]>([])
+  const [categoryError, setCategoryError] = useState(false)
+  const [channelError, setChannelError] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(''); setCategoryError(false); setChannelError(false)
+    const results = await Promise.allSettled([
       api.managedLead(leadId),
-      api.leadFollowUpPage(leadId, { pageNo: 1, pageSize: 100 }),
-      api.leadAppeals(leadId),
+      api.dictDataByType(DICT_TYPE.LEAD_CATEGORY),
+      api.dictDataByType(DICT_TYPE.LEAD_SOURCE_CHANNEL)
     ])
-      .then(([detail, followUpPage, appealRows]) => {
-        if (detail.status === "fulfilled") setLead(detail.value);
-        else
-          setError(
-            detail.reason instanceof Error
-              ? detail.reason.message
-              : "客资详情加载失败",
-          );
-        if (followUpPage.status === "fulfilled")
-          setFollowUps(followUpPage.value.list);
-        else
-          setFollowUpError(
-            followUpPage.reason instanceof Error
-              ? followUpPage.reason.message
-              : "跟进记录加载失败",
-          );
-        if (appealRows.status === "fulfilled") setAppeals(appealRows.value);
-        else
-          setAppealError(
-            appealRows.reason instanceof Error
-              ? appealRows.reason.message
-              : "申诉记录加载失败",
-          );
-      })
-      .finally(() => setLoading(false));
-  }, [leadId]);
-  return (
-    <div className="subordinate-lead-detail">
-      <div className="subordinate-detail-heading">
-        <Button icon={<ArrowLeftOutlined />} onClick={onBack}>
-          返回销售详情
-        </Button>
-        <div>
-          <Typography.Title level={4}>
-            {lead?.submittedName || "客资详情"}
-          </Typography.Title>
-          <Typography.Text type="secondary">{lead?.leadNo}</Typography.Text>
-        </div>
-      </div>
-      {error && <Alert type="error" showIcon message={error} />}
-      {loading ? (
-        <Skeleton active />
-      ) : (
-        lead && (
-          <Tabs
-            items={[
-              {
-                key: "overview",
-                label: "概览",
-                children: (
-                  <Descriptions
-                    bordered
-                    size="small"
-                    column={{ xs: 1, sm: 2 }}
-                    items={[
-                      {
-                        key: "mobile",
-                        label: "手机号",
-                        children: lead.submittedMobile || "-",
-                      },
-                      {
-                        key: "wechat",
-                        label: "微信号",
-                        children: lead.submittedWechatId || "-",
-                      },
-                      {
-                        key: "status",
-                        label: "客资状态",
-                        children:
-                          LEAD_STATUS_LABELS[lead.status] || lead.status,
-                      },
-                      {
-                        key: "category",
-                        label: "客资分类",
-                        children: lead.leadCategory || "未配置",
-                      },
-                      {
-                        key: "owner",
-                        label: "归属销售",
-                        children:
-                          lead.ownerUserName || `用户 #${lead.ownerUserId}`,
-                      },
-                      {
-                        key: "submitted",
-                        label: "提交时间",
-                        children: formatTimestamp(lead.submittedAt),
-                      },
-                      {
-                        key: "region",
-                        label: "地区",
-                        children:
-                          [lead.provinceName, lead.cityName]
-                            .filter(Boolean)
-                            .join(" / ") || "-",
-                      },
-                      {
-                        key: "remark",
-                        label: "备注",
-                        children: lead.remark || "-",
-                        span: 2,
-                      },
-                    ]}
-                  />
-                ),
-              },
-              {
-                key: "followUps",
-                label: `跟进记录 ${followUps.length}`,
-                children: (
-                  <>
-                    {followUpError && (
-                      <Alert type="error" showIcon message={followUpError} />
-                    )}
-                    <List
-                      dataSource={followUps}
-                      locale={{
-                        emptyText: <Empty description="暂无跟进记录" />,
-                      }}
-                      renderItem={(item) => (
-                        <List.Item>
-                          <List.Item.Meta
-                            title={
-                              <Space>
-                                <span>
-                                  {item.operatorName ||
-                                    `用户 #${item.operatorUserId}`}
-                                </span>
-                                <Tag>{item.resultLabel || item.result}</Tag>
-                              </Space>
-                            }
-                            description={
-                              <>
-                                <div>{item.remark || "-"}</div>
-                                <Typography.Text type="secondary">
-                                  {formatTimestamp(item.occurredAt)}
-                                </Typography.Text>
-                              </>
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
-                  </>
-                ),
-              },
-              {
-                key: "appeals",
-                label: `申诉记录 ${appeals.length}`,
-                children: (
-                  <>
-                    {appealError && (
-                      <Alert type="error" showIcon message={appealError} />
-                    )}
-                    <List
-                      dataSource={appeals}
-                      locale={{
-                        emptyText: <Empty description="暂无申诉记录" />,
-                      }}
-                      renderItem={(item) => (
-                        <List.Item>
-                          <List.Item.Meta
-                            title={
-                              <Space>
-                                <span>第 {item.roundNo} 轮</span>
-                                <Tag>{item.status}</Tag>
-                              </Space>
-                            }
-                            description={
-                              <>
-                                <div>{item.reason}</div>
-                                <Typography.Text type="secondary">
-                                  {formatTimestamp(item.submittedAt)}
-                                </Typography.Text>
-                              </>
-                            }
-                          />
-                        </List.Item>
-                      )}
-                    />
-                  </>
-                ),
-              },
-            ]}
-          />
-        )
-      )}
+    if (results[0].status === 'fulfilled') setLead(results[0].value)
+    else {
+      setLead(undefined)
+      setError(results[0].reason instanceof Error ? results[0].reason.message : '客资详情加载失败')
+    }
+    if (results[1].status === 'fulfilled') setCategories(results[1].value)
+    else { setCategories([]); setCategoryError(true) }
+    if (results[2].status === 'fulfilled') setChannels(results[2].value)
+    else { setChannels([]); setChannelError(true) }
+    setLoading(false)
+  }, [leadId])
+  useEffect(() => { void load() }, [load])
+
+  return <div className="subordinate-lead-detail">
+    <div className="subordinate-detail-heading">
+      <Button icon={<ArrowLeftOutlined/>} onClick={onBack}>返回销售详情</Button>
+      <div><Typography.Title level={4}>{lead?.submittedName || '客资详情'}</Typography.Title><Typography.Text type="secondary">{lead?.leadNo}</Typography.Text></div>
     </div>
-  );
+    {loading ? <Skeleton active paragraph={{ rows: 10 }}/>
+      : error ? <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>
+        : lead ? <LeadDetail lead={lead} categories={categories}
+          categoryLabel={value => dictionaryDisplayLabel(categories, value, categoryError)}
+          channelLabel={value => dictionaryDisplayLabel(channels, value, channelError)}
+          mode="manager-readonly" autoExpandFollowUp={false} onDirtyChange={() => undefined}
+          onChanged={() => void load()}/>
+          : <Empty description="客资详情不可用"/>}
+  </div>
 }
 
 function SalesDetail({

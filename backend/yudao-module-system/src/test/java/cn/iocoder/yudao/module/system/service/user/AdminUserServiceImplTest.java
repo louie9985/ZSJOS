@@ -102,6 +102,7 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         UserSaveReqVO reqVO = randomPojo(UserSaveReqVO.class, o -> {
             o.setSex(RandomUtil.randomEle(SexEnum.values()).getSex());
             o.setMobile(randomString());
+            o.setWecomUserId("   ");
             o.setPostIds(asSet(1L, 2L));
         }).setId(null); // 避免 id 被赋值
         // mock 账户额度充足
@@ -130,9 +131,10 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         Long userId = userService.createUser(reqVO);
         // 断言
         AdminUserDO user = userMapper.selectById(userId);
-        assertPojoEquals(reqVO, user, "password", "id");
+        assertPojoEquals(reqVO, user, "password", "id", "wecomUserId");
         assertEquals("yudaoyuanma", user.getPassword());
         assertEquals(CommonStatusEnum.ENABLE.getStatus(), user.getStatus());
+        assertNull(user.getWecomUserId());
         // 断言关联岗位
         List<UserPostDO> userPosts = userPostMapper.selectListByUserId(user.getId());
         assertEquals(1L, userPosts.get(0).getPostId());
@@ -166,6 +168,7 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
             o.setId(dbUser.getId());
             o.setSex(RandomUtil.randomEle(SexEnum.values()).getSex());
             o.setMobile(randomString());
+            o.setWecomUserId("  wecom-user-1  ");
             o.setPostIds(asSet(2L, 3L));
         });
         // mock deptService 的方法
@@ -186,7 +189,8 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         userService.updateUser(reqVO);
         // 断言
         AdminUserDO user = userMapper.selectById(reqVO.getId());
-        assertPojoEquals(reqVO, user, "password");
+        assertPojoEquals(reqVO, user, "password", "wecomUserId");
+        assertEquals("wecom-user-1", user.getWecomUserId());
         // 断言关联岗位
         List<UserPostDO> userPosts = userPostMapper.selectListByUserId(user.getId());
         assertEquals(2L, userPosts.get(0).getPostId());

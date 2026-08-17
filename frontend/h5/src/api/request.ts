@@ -4,6 +4,12 @@ import { useUserStore } from '@/stores/user'
 import { getToken, getTenantId, getRefreshToken, getClientId } from '@/utils/storage'
 import router from '@/router'
 
+declare module 'axios' {
+  interface AxiosRequestConfig {
+    _skipAuthRefresh?: boolean
+  }
+}
+
 /** 统一响应结构 */
 export interface ApiResponse<T = unknown> {
   code: number
@@ -26,15 +32,22 @@ request.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
-type RetryableConfig = InternalAxiosRequestConfig & { _authRetried?: boolean }
+type RetryableConfig = InternalAxiosRequestConfig & {
+  _authRetried?: boolean
+  _skipAuthRefresh?: boolean
+}
 let refreshPromise: Promise<string> | null = null
 let redirectingToLogin = false
 
-function clearAuthentication() {
+function clearAuthentication(preserveRedirect = true) {
   useUserStore().logout()
   if (!redirectingToLogin) {
     redirectingToLogin = true
-    void router.replace({ name: 'Login' }).finally(() => { redirectingToLogin = false })
+    const currentRoute = router.currentRoute.value
+    const query = preserveRedirect && currentRoute.name !== 'Login'
+      ? { redirect: currentRoute.fullPath }
+      : undefined
+    void router.replace({ name: 'Login', query }).finally(() => { redirectingToLogin = false })
   }
 }
 
@@ -89,7 +102,12 @@ request.interceptors.response.use(
     }
 
     if (code === 401) {
-      return recoverAndReplay(response.config as RetryableConfig)
+      const config = response.config as RetryableConfig
+      if (config._skipAuthRefresh) {
+        clearAuthentication(false)
+        return Promise.reject(new Error('登录已失效'))
+      }
+      return recoverAndReplay(config)
     }
 
     // 业务错误
@@ -101,7 +119,12 @@ request.interceptors.response.use(
 
     // 401: Token 过期
     if (response?.status === 401 && config) {
-      return recoverAndReplay(config as RetryableConfig)
+      const retryableConfig = config as RetryableConfig
+      if (retryableConfig._skipAuthRefresh) {
+        clearAuthentication(false)
+        return Promise.reject(error)
+      }
+      return recoverAndReplay(retryableConfig)
     }
 
     // 403

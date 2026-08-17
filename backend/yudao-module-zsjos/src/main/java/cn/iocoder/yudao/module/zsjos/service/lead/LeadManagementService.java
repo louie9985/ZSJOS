@@ -13,9 +13,11 @@ import java.util.List;
 public interface LeadManagementService {
 
     PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId);
+    PageResult<LeadManagementRespVO> getPartnerLeadPage(LeadManagementPageReqVO reqVO, Long partnerId);
     CursorPageResult<LeadManagementRespVO> getLeadCursor(LeadManagementPageReqVO reqVO, Long userId);
 
     LeadManagementRespVO getLead(Long id, Long userId);
+    LeadManagementRespVO getPartnerLead(Long id, Long partnerId);
 
     void updateBasicInfo(Long id, Long userId, LeadBasicInfoUpdateReqVO reqVO);
 

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.bpm.api.task;
 
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import jakarta.validation.Valid;
 
 /**
@@ -19,6 +20,10 @@ public interface BpmProcessInstanceApi {
      */
     String createProcessInstance(Long userId, @Valid BpmProcessInstanceCreateReqDTO reqDTO);
 
+    String createProcessInstance(BpmStartSubjectDTO subject, @Valid BpmProcessInstanceCreateReqDTO reqDTO);
+
+    void cancelProcessInstanceByStartSubject(BpmStartSubjectDTO subject, String processInstanceId, String reason);
+
     void cancelProcessInstanceByStartUser(Long userId, String processInstanceId, String reason);
 
     /**
@@ -26,6 +31,9 @@ public interface BpmProcessInstanceApi {
      * The BPM history records the real operator and the supplied authorization type.
      */
     void terminateProcessInstanceByBusiness(Long operatorUserId, String processInstanceId,
+                                            String authorizationType, String reason);
+
+    void terminateProcessInstanceByBusiness(BpmStartSubjectDTO operator, String processInstanceId,
                                             String authorizationType, String reason);
 
 }

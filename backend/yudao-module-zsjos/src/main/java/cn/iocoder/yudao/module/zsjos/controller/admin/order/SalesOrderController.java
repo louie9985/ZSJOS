@@ -58,14 +58,14 @@ public class SalesOrderController {
 
     @GetMapping("/lead/{leadId}/customer-orders")
     @Operation(summary = "按客资客户聚合全部首购和复购订单")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query')")
     public CommonResult<java.util.List<SalesOrderListItemRespVO>> getCustomerOrders(@PathVariable Long leadId) {
         return success(orderService.getCustomerOrders(leadId, WebFrameworkUtils.getLoginUserId()));
     }
 
     @GetMapping("/lead/{leadId}/customer-orders/{orderId}")
     @Operation(summary = "获得客资客户的完整订单详情")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query')")
     public CommonResult<SalesOrderRespVO> getCustomerOrder(@PathVariable Long leadId,
                                                             @PathVariable Long orderId) {
         return success(orderService.getCustomerOrder(leadId, orderId, WebFrameworkUtils.getLoginUserId()));
@@ -168,7 +168,7 @@ public class SalesOrderController {
     }
 
     @PutMapping("/{id}/supervisor-confirmation/request")
-    @Operation(summary = "申请直属主管确认")
+    @Operation(summary = "申请订单销售主管确认")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<Boolean> requestSupervisorConfirmation(@PathVariable Long id,
                                                                 @Valid @RequestBody SalesOrderSupervisorRequestReqVO reqVO) {

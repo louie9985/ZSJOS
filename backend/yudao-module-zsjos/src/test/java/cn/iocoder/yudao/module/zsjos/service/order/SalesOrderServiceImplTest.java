@@ -39,6 +39,9 @@ import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterServic
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
+import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.registration.RegistrationChecklistConfigService;
+import cn.iocoder.yudao.module.zsjos.service.registration.RegistrationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +72,8 @@ import static org.mockito.Mockito.*;
 class SalesOrderServiceImplTest {
     @InjectMocks private SalesOrderServiceImpl service;
     @Mock private SalesOrderMapper orderMapper;
+    @Mock private RegistrationChecklistConfigService registrationChecklistConfigService;
+    @Mock private RegistrationService registrationService;
     @Mock private SalesOrderItemMapper itemMapper;
     @Mock private SalesOrderApprovalRoundMapper roundMapper;
     @Mock private SalesOrderApprovalConfigMapper configMapper;
@@ -127,8 +132,8 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledReviewers(1030L)).thenReturn(Set.of(301L, 302L));
-        when(permissionService.enabledReviewers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L, 302L));
+        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
         doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; }).when(orderMapper).insert(any(SalesOrderDO.class));
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(200L); return 1; }).when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
@@ -150,6 +155,25 @@ class SalesOrderServiceImplTest {
                 req.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
                         && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
                         && "KZ202608160000000001".equals(req.getVariables().get("leadNo"))));
+    }
+
+    @Test
+    void createRejectsWhenAnApprovalCenterHasNoEnabledUsers() {
+        mockEligibleLeadAndOpportunity();
+        SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
+        config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
+        when(configMapper.selectCurrent()).thenReturn(config);
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
+        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of());
+        when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+        doAnswer(invocation -> { ((SalesOrderDO) invocation.getArgument(0)).setId(100L); return 1; })
+                .when(orderMapper).insert(any(SalesOrderDO.class));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
+
+        assertEquals(SALES_ORDER_APPROVAL_CONFIG_INVALID.getCode(), error.getCode());
+        verify(processInstanceApi, never()).createProcessInstance(anyLong(), any());
     }
 
     @Test
@@ -412,8 +436,8 @@ class SalesOrderServiceImplTest {
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L);
         when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledReviewers(1030L)).thenReturn(Set.of(301L));
-        when(permissionService.enabledReviewers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L));
+        when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-2");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
@@ -442,6 +466,21 @@ class SalesOrderServiceImplTest {
 
         assertEquals(SALES_ORDER_PERMISSION_DENIED.getCode(), error.getCode());
         verifyNoInteractions(itemMapper, processTaskApi);
+    }
+
+    @Test
+    void customerOrderReadsRequireLeadOwnerPermission() throws NoSuchMethodException {
+        ZsjosPermission listPermission = SalesOrderServiceImpl.class
+                .getMethod("getCustomerOrders", Long.class, Long.class)
+                .getAnnotation(ZsjosPermission.class);
+        ZsjosPermission detailPermission = SalesOrderServiceImpl.class
+                .getMethod("getCustomerOrder", Long.class, Long.class, Long.class)
+                .getAnnotation(ZsjosPermission.class);
+
+        assertNotNull(listPermission);
+        assertNotNull(detailPermission);
+        assertEquals("owner-or-manager-read", listPermission.action());
+        assertEquals("owner-or-manager-read", detailPermission.action());
     }
 
     @Test
@@ -487,7 +526,7 @@ class SalesOrderServiceImplTest {
         when(orderMapper.hasEffectiveOrder(10L)).thenReturn(true);
         SalesOrderApprovalConfigDO config = new SalesOrderApprovalConfigDO();
         config.setRegistrationDeptId(1030L); config.setFinanceDeptId(1040L); when(configMapper.selectCurrent()).thenReturn(config);
-        when(permissionService.enabledReviewers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledReviewers(1040L)).thenReturn(Set.of(401L));
+        when(permissionService.enabledUsers(1030L)).thenReturn(Set.of(301L)); when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-repurchase");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
         AreaRespDTO province = new AreaRespDTO(); province.setId(120000); province.setName("天津市");

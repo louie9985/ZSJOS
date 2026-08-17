@@ -116,6 +116,44 @@ The migration independently checks every required V041 column and index, creates
 
 After applying V043, run `verify-bootstrap.sql` and confirm the V041 objects, command-ledger unique index, contact-claim completeness/no-orphan checks, and structured legacy-status check all return `PASS`. Rollback is application-only: retain the additive tables and columns because removing them would discard idempotency and ownership audit data.
 
+## V073 registration fulfillment
+
+V073 is additive and follows V072. It creates the versioned checklist, public-pool case, immutable checklist snapshot, completion facts, per-order-item service relationship and command-idempotency tables. It seeds exactly five confirmed items for active tenants, adds menu metadata, grants checklist configuration to `system_administrator`, and grants only My Students to `study_planner`. It does not backfill historical orders and does not grant public-pool handling to ordinary roles. Existing-environment execution still requires a separate approval and a preflight review of orders whose registration node already passed.
+
+Rollback is forward-only: retire the menus/permissions and preserve business facts. Verify all V073 checks in `verify-bootstrap.sql`; do not drop tables containing completion or audit records.
+
+## V074 registration task notifications
+
+V074 follows V073 and adds the Chinese station-message template and enabled default in-app rule for a newly created registration fulfillment task. Delivery recipients are resolved from `zsjos:registration:query-pool` at event processing time, and the existing in-app channel emits its post-commit WebSocket refresh hint. The migration is repeatable, changes no role grants or business rows, and must not be executed without the normal existing-environment approval. Rollback disables untouched V074 rules while preserving notification history.
+
+## V075 Lead-created default notification
+
+V075 follows V074 and inserts an enabled `zsjos.lead.created` in-app rule only for non-deleted tenants that have no existing rule for that scene. Its recipients are the Lead source user and the actual event operator, covering the selected new-media provider and submitting salesperson for a sales self-sourced Lead. It does not overwrite enabled or disabled administrator rules, does not create historical messages, and changes no Lead, account, role, permission, or template row. Reruns are idempotent. Rollback is forward-only: disable untouched V075 rules and preserve delivered message history.
+
+## V077 WeCom userid normalization
+
+V077 follows V076 and repairs the optional `system_users.wecom_user_id` contract. Its preflight
+groups configured values by tenant after trimming and blocks before mutation if any normalized
+value would collide. After a clean preflight, it trims configured values, converts blank values
+to SQL `NULL`, installs the generated `unique_wecom_user_id` column and tenant-scoped unique
+index, and removes the older raw V028 index. It deletes no users and does not change account
+status, roles, permissions, tokens, or notification history. Apply it before deploying application
+writes that normalize the field. Rollback is forward-only and retains the normalized values and
+unique index.
+
+## V078 unified Lead management scope
+
+V078 follows V077 and changes only Lead menu metadata and `system_role_menu`. Before applying it
+to an existing environment, export active grants for `zsjos:lead:query-all`,
+`zsjos:lead:query-submitted`, `zsjos:lead:query-owned`, `zsjos:lead:query`, and
+`zsjos:lead-follow-up:query`, grouped by tenant and stable role code. The migration preserves the
+two relation permissions, grants their holders the single `客资管理` page, logically retires
+`query-all` only for `sales_manager` and `sales_specialist`, and grants follow-up query to enabled
+sales managers. It changes no Lead, user, role, task, BPM, or history row. After controlled
+execution, require `unified_lead_management_scope_v078` in `verify-bootstrap.sql` to return `PASS`.
+Rollback is a reviewed forward migration based on the captured grant snapshot; do not broadly
+restore tenant-wide Lead access.
+
 ## Optional modules
 
 An approved optional module adds its own manifest under

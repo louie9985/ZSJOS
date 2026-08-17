@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.bpm.convert.task;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.core.map.MapUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.collection.MapUtils;
@@ -10,6 +11,7 @@ import cn.iocoder.yudao.framework.common.util.date.DateUtils;
 import cn.iocoder.yudao.framework.common.util.number.NumberUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEvent;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.base.user.UserSimpleBaseVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.BpmModelMetaInfoVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.simple.BpmSimpleModelNodeVO;
@@ -75,10 +77,14 @@ public interface BpmProcessInstanceConvert {
             respVO.setTasks(BeanUtils.toBean(taskMap.get(respVO.getId()), BpmProcessInstanceRespVO.Task.class));
             // user
             if (userMap != null) {
-                AdminUserRespDTO startUser = userMap.get(NumberUtils.parseLong(pageResult.getList().get(i).getStartUserId()));
+                Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(pageResult.getList().get(i).getStartUserId());
+                AdminUserRespDTO startUser = startAdminUserId == null ? null : userMap.get(startAdminUserId);
                 if (startUser != null) {
                     respVO.setStartUser(BeanUtils.toBean(startUser, UserSimpleBaseVO.class));
                     MapUtils.findAndThen(deptMap, startUser.getDeptId(), dept -> respVO.getStartUser().setDeptName(dept.getName()));
+                } else if (BpmStartSubjectDTO.fromFlowableId(pageResult.getList().get(i).getStartUserId()) != null) {
+                    respVO.setStartUser(new UserSimpleBaseVO().setNickname(
+                            MapUtil.getStr(pageResult.getList().get(i).getProcessVariables(), "externalStartUserName")));
                 }
                 if (CollUtil.isNotEmpty(respVO.getTasks())) {
                     respVO.getTasks().forEach(task -> {
@@ -116,6 +122,9 @@ public interface BpmProcessInstanceConvert {
             if (dept != null) {
                 respVO.getStartUser().setDeptName(dept.getName());
             }
+        } else if (BpmStartSubjectDTO.fromFlowableId(processInstance.getStartUserId()) != null) {
+            respVO.setStartUser(new UserSimpleBaseVO().setNickname(
+                    MapUtil.getStr(processInstance.getProcessVariables(), "externalStartUserName")));
         }
         return respVO;
     }
@@ -131,7 +140,7 @@ public interface BpmProcessInstanceConvert {
 
     default BpmMessageSendWhenProcessInstanceApproveReqDTO buildProcessInstanceApproveMessage(ProcessInstance instance) {
         return new BpmMessageSendWhenProcessInstanceApproveReqDTO()
-                .setStartUserId(NumberUtils.parseLong(instance.getStartUserId()))
+                .setStartSubject(BpmStartSubjectDTO.fromFlowableId(instance.getStartUserId()))
                 .setProcessInstanceId(instance.getId())
                 .setProcessInstanceName(instance.getName());
     }
@@ -141,7 +150,7 @@ public interface BpmProcessInstanceConvert {
                 .setProcessInstanceName(instance.getName())
                 .setProcessInstanceId(instance.getId())
                 .setReason(reason)
-                .setStartUserId(NumberUtils.parseLong(instance.getStartUserId()));
+                .setStartSubject(BpmStartSubjectDTO.fromFlowableId(instance.getStartUserId()));
     }
 
     default BpmProcessInstanceBpmnModelViewRespVO buildProcessInstanceBpmnModelView(HistoricProcessInstance processInstance,
@@ -158,7 +167,8 @@ public interface BpmProcessInstanceConvert {
         // 基本信息
         respVO.setProcessInstance(BeanUtils.toBean(processInstance, BpmProcessInstanceRespVO.class, o -> o
                         .setStatus(FlowableUtils.getProcessInstanceStatus(processInstance)))
-                        .setStartUser(buildUser(processInstance.getStartUserId(), userMap, deptMap)));
+                        .setStartUser(buildStartUser(processInstance.getStartUserId(),
+                                processInstance.getProcessVariables(), userMap, deptMap)));
         respVO.setTasks(convertList(taskInstances, task -> BeanUtils.toBean(task, BpmTaskRespVO.class)
                 .setStatus(FlowableUtils.getTaskStatus(task)).setReason(FlowableUtils.getTaskReason(task))
                 .setAssigneeUser(buildUser(task.getAssignee(), userMap, deptMap))
@@ -179,8 +189,21 @@ public interface BpmProcessInstanceConvert {
         if (StrUtil.isEmpty(userIdStr)) {
             return null;
         }
-        Long userId = NumberUtils.parseLong(userIdStr);
-        return buildUser(userId, userMap, deptMap);
+        return buildUser(BpmStartSubjectDTO.getAdminUserId(userIdStr), userMap, deptMap);
+    }
+
+    default UserSimpleBaseVO buildStartUser(String flowableUserId, Map<String, Object> variables,
+                                            Map<Long, AdminUserRespDTO> userMap,
+                                            Map<Long, DeptRespDTO> deptMap) {
+        BpmStartSubjectDTO subject = BpmStartSubjectDTO.fromFlowableId(flowableUserId);
+        if (subject == null) {
+            return null;
+        }
+        Long adminUserId = BpmStartSubjectDTO.getAdminUserId(flowableUserId);
+        if (adminUserId != null) {
+            return buildUser(adminUserId, userMap, deptMap);
+        }
+        return new UserSimpleBaseVO().setNickname(MapUtil.getStr(variables, "externalStartUserName"));
     }
 
     default UserSimpleBaseVO buildUser(Long userId,
@@ -216,7 +239,7 @@ public interface BpmProcessInstanceConvert {
                                    BpmTaskRespVO todoTask) {
         Set<Long> userIds = new HashSet<>();
         if (processInstance != null) {
-            userIds.add(NumberUtils.parseLong(processInstance.getStartUserId()));
+            CollUtil.addIfAbsent(userIds, BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId()));
         }
         for (BpmApprovalDetailRespVO.ActivityNode activityNode : activityNodes) {
             CollUtil.addAll(userIds, convertSet(activityNode.getTasks(), BpmApprovalDetailRespVO.ActivityNodeTask::getAssignee));
@@ -236,7 +259,8 @@ public interface BpmProcessInstanceConvert {
 
     default Set<Long> parseUserIds02(HistoricProcessInstance processInstance,
                                      List<HistoricTaskInstance> tasks) {
-        Set<Long> userIds = SetUtils.asSet(Long.valueOf(processInstance.getStartUserId()));
+        Set<Long> userIds = new HashSet<>();
+        CollUtil.addIfAbsent(userIds, BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId()));
         tasks.forEach(task -> {
             CollUtil.addIfAbsent(userIds, NumberUtils.parseLong((task.getAssignee())));
             CollUtil.addIfAbsent(userIds, NumberUtils.parseLong((task.getOwner())));
@@ -257,7 +281,8 @@ public interface BpmProcessInstanceConvert {
         // 1.1 流程实例
         BpmProcessInstanceRespVO processInstanceResp = null;
         if (processInstance != null) {
-            AdminUserRespDTO startUser = userMap.get(NumberUtils.parseLong(processInstance.getStartUserId()));
+            Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
+            AdminUserRespDTO startUser = startAdminUserId == null ? null : userMap.get(startAdminUserId);
             DeptRespDTO dept = startUser != null ? deptMap.get(startUser.getDeptId()) : null;
             processInstanceResp = buildProcessInstance(processInstance, null, null, startUser, dept);
         }

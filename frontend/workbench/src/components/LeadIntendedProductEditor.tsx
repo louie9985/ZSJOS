@@ -67,7 +67,7 @@ export default function LeadIntendedProductEditor({ catalog, value, primaryKey, 
         options={spuOptions} placeholder="请选择课程" onChange={next => { setSpuRef(next); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(false) }}/></div>
       <Button className="lead-product-add" type="primary" icon={<PlusOutlined/>} disabled={disabled || !canAdd} onClick={add}>添加意向课程</Button>
     </div>
-    <Checkbox disabled={disabled} checked={spuUnknown} onChange={event => { setSpuUnknown(event.target.checked); if (event.target.checked) { setCategoryPathIds([]); setSpuRef(undefined); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(true) } }}>未明确课程</Checkbox>
+    <Checkbox className="lead-product-checkbox-control" disabled={disabled} checked={spuUnknown} onChange={event => { setSpuUnknown(event.target.checked); if (event.target.checked) { setCategoryPathIds([]); setSpuRef(undefined); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(true) } }}>未明确课程</Checkbox>
     {selectedSpu && <div className="lead-product-secondary-grid">
       {selectedSpu.attrs.map(attr => {
         const selectedAttr = attr.values.find(item => item.value === attrValues[attr.attrKey])
@@ -77,7 +77,7 @@ export default function LeadIntendedProductEditor({ catalog, value, primaryKey, 
       })}
       {!selectedSpu.attrs.length && <div className="lead-product-field" title={selectedSku?.skuName}><Typography.Text type="secondary">具体班次/方案</Typography.Text><Select className="lead-product-control" popupClassName="lead-product-dropdown" popupMatchSelectWidth disabled={disabled || skuUnknown}
         placeholder="请选择具体班次/方案" value={skuRef} options={selectedSpuSkus.map(sku => ({ label: `${sku.skuName}（¥${sku.price}）`, value: sku.skuRef }))} onChange={setSkuRef}/></div>}
-      <div className="lead-product-checkbox"><Checkbox disabled={disabled} checked={skuUnknown} onChange={event => { setSkuUnknown(event.target.checked); if (event.target.checked) { setSkuRef(undefined); setAttrValues({}) } }}>未明确具体班次/方案</Checkbox></div>
+      <div className="lead-product-checkbox"><Checkbox className="lead-product-checkbox-control" disabled={disabled} checked={skuUnknown} onChange={event => { setSkuUnknown(event.target.checked); if (event.target.checked) { setSkuRef(undefined); setAttrValues({}) } }}>未明确具体班次/方案</Checkbox></div>
     </div>}
     {!value.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="请添加至少一条意向课程"/> :
       <Radio.Group value={primaryKey} onChange={event => onPrimaryChange(event.target.value)} className="w-full">

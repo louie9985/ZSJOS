@@ -14,15 +14,30 @@ public interface PartnerBankCardMapper extends BaseMapperX<PartnerBankCardDO> {
                 .eq(PartnerBankCardDO::getOwnerUserId, userId)
                 .orderByDesc(PartnerBankCardDO::getDefaultCard).orderByDesc(PartnerBankCardDO::getId));
     }
+    default List<PartnerBankCardDO> selectByPartner(Long partnerId) {
+        return selectList(new LambdaQueryWrapperX<PartnerBankCardDO>()
+                .eq(PartnerBankCardDO::getPartnerId, partnerId)
+                .orderByDesc(PartnerBankCardDO::getDefaultCard).orderByDesc(PartnerBankCardDO::getId));
+    }
 
     default PartnerBankCardDO selectByIdAndOwner(Long id, Long userId) {
         return selectOne(new LambdaQueryWrapperX<PartnerBankCardDO>()
                 .eq(PartnerBankCardDO::getId, id).eq(PartnerBankCardDO::getOwnerUserId, userId));
     }
+    default PartnerBankCardDO selectByIdAndPartner(Long id, Long partnerId) {
+        return selectOne(new LambdaQueryWrapperX<PartnerBankCardDO>()
+                .eq(PartnerBankCardDO::getId, id).eq(PartnerBankCardDO::getPartnerId, partnerId));
+    }
 
     default void clearDefaultByOwner(Long userId) {
         update(null, new LambdaUpdateWrapper<PartnerBankCardDO>()
                 .eq(PartnerBankCardDO::getOwnerUserId, userId)
+                .eq(PartnerBankCardDO::getDefaultCard, true)
+                .set(PartnerBankCardDO::getDefaultCard, false));
+    }
+    default void clearDefaultByPartner(Long partnerId) {
+        update(null, new LambdaUpdateWrapper<PartnerBankCardDO>()
+                .eq(PartnerBankCardDO::getPartnerId, partnerId)
                 .eq(PartnerBankCardDO::getDefaultCard, true)
                 .set(PartnerBankCardDO::getDefaultCard, false));
     }

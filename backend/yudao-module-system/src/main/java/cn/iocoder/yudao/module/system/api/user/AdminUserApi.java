@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.util.collection.CollectionUtils;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCreateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserOrganizationUpdateReqDTO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserPartnerConversionReqDTO;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -20,6 +21,8 @@ public interface AdminUserApi {
     Long createUser(AdminUserCreateReqDTO reqDTO);
 
     void updateUserOrganization(AdminUserOrganizationUpdateReqDTO reqDTO);
+
+    Long convertPartnerToEmployee(AdminUserPartnerConversionReqDTO reqDTO);
 
     /**
      * 通过用户 ID 查询用户

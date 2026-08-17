@@ -14,9 +14,13 @@ plus appeal submission, overturn, and uphold. The scene response is the source o
 available variables, recipient roles, sensitive markers, and actions.
 
 Fresh environments and migration V016 provide one enabled global template for every registered
-scene. Templates do not send messages by themselves: each tenant must still create and enable its
-own notification rules. V016 inserts only a missing active template code and never overwrites an
-administrator-created or modified template.
+scene. Templates do not send messages by themselves. Notification rules remain tenant-owned, with
+one system default exception: new tenants and V075 receive an enabled `zsjos.lead.created` in-app
+rule when that tenant has no rule for the scene. It notifies the Lead source user and the actual
+operator, which are respectively the selected new-media provider and submitting salesperson for a
+sales self-sourced Lead. V075 does not overwrite an existing enabled or disabled administrator rule
+and does not backfill historical messages. V016 inserts only a missing active template code and
+never overwrites an administrator-created or modified template.
 
 `in_app` rules use `system_notify_business_outbox` and join the publishing business transaction.
 The unique boundary is tenant + source event key + target rule. Workers claim rows with a unique
@@ -82,4 +86,5 @@ fallback.
 Development and production proxies must forward `/infra/ws` directly to the backend with HTTP/1.1
 WebSocket Upgrade and Connection headers. `/infra/ws` is not under `/admin-api`. A release check
 must confirm a `101 Switching Protocols` response and delivery across backend nodes when a shared
-sender is configured.
+sender is configured. Browser clients authenticate the handshake with the current OAuth access
+token in the `token` query parameter; refresh tokens are only used by the HTTP token-refresh flow.

@@ -17,6 +17,9 @@ public class EamAssetSaveReqVO {
     @Schema(description = "资产编号（更新时必填）", example = "1")
     private Long id;
 
+    @Schema(description = "资产业务编号；导入时可沿用已有资产标签", example = "ZSJ-001")
+    private String assetCode;
+
     @Schema(description = "资产名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "MacBook Pro 14")
     @NotBlank(message = "资产名称不能为空")
     private String name;
@@ -24,6 +27,9 @@ public class EamAssetSaveReqVO {
     @Schema(description = "分类编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "分类不能为空")
     private Long categoryId;
+
+    @Schema(description = "数量；单件资产固定为 1", example = "1")
+    private Integer quantity;
 
     @Schema(description = "品牌型号", example = "Apple M3 Pro")
     private String brand;

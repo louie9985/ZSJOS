@@ -102,18 +102,6 @@ public class SalesOrderObjectPermissionService {
         return users;
     }
 
-    public Set<Long> enabledReviewers(Long rootDeptId) {
-        if (rootDeptId == null) return Set.of();
-        Set<Long> reviewers = new LinkedHashSet<>(enabledUsers(rootDeptId));
-        Set<Long> deptIds = new LinkedHashSet<>();
-        deptIds.add(rootDeptId);
-        deptApi.getChildDeptList(rootDeptId).forEach(item -> deptIds.add(item.getId()));
-        deptIds.stream().map(deptApi::getDept).filter(Objects::nonNull)
-                .map(cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO::getLeaderUserId)
-                .filter(Objects::nonNull).forEach(reviewers::remove);
-        return reviewers;
-    }
-
     private boolean isCurrentSupervisor(SalesOrderDO order, Long userId) {
         if (order.getCurrentApprovalRoundId() == null) return false;
         return supervisorConfirmationMapper.selectByRoundId(order.getCurrentApprovalRoundId()).stream()

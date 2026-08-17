@@ -32,9 +32,9 @@ public class WorkPlanNotifySceneProvider implements NotifySceneProvider {
     }
 
     @Override
-    public Set<Long> resolveRecipients(NotifyBusinessEvent event, Set<String> roles) {
+    public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> roles) {
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
-        Set<Long> result = new LinkedHashSet<>();
+        Set<NotifyRecipientDTO> result = new LinkedHashSet<>();
         for (String role : roles) {
             Object raw = payload.get(switch (role) {
                 case ROLE_ASSIGNEE -> "assigneeUserId";
@@ -43,13 +43,13 @@ public class WorkPlanNotifySceneProvider implements NotifySceneProvider {
                 case ROLE_PLAN_OWNER -> "planOwnerUserId";
                 default -> "";
             });
-            if (raw instanceof Number number && number.longValue() > 0) result.add(number.longValue());
+            if (raw instanceof Number number && number.longValue() > 0) result.add(NotifyRecipientDTO.admin(number.longValue()));
         }
         return result;
     }
 
     @Override
-    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, Long recipientUserId) {
+    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         Map<String, Object> values = new LinkedHashMap<>();
         WorkTaskDO task = taskMapper.selectById(event.getBizId());
         if (task != null) {

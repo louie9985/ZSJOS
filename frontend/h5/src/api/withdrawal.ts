@@ -1,4 +1,5 @@
 import request from './request'
+import type { ApiDateValue } from '@/utils/format'
 
 export interface WithdrawalSummary {
   availableAmount: number
@@ -30,7 +31,7 @@ export interface WithdrawalItem {
   id: number
   status: 'pending_review' | 'approved' | 'rejected' | 'paid' | 'cancelled'
   applicationAmount: number
-  submittedAt: string
+  submittedAt: ApiDateValue
   bankNameSnapshot: string
   maskedCardNumber: string
 }

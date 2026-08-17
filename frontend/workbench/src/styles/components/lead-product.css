@@ -55,6 +55,11 @@
   align-items: center;
 }
 
+.lead-product-checkbox-control {
+  width: fit-content;
+  justify-self: start;
+}
+
 .lead-product-list,.lead-product-list>.ant-card,.lead-product-list>.ant-space-item,.lead-product-card {
   width: 100%;
   min-width: 0;

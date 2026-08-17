@@ -7,8 +7,26 @@ export interface CategoryVO {
   code: string
   sort: number
   status: number
+  managementMode: number
+  unit: string
   remark?: string
   createTime?: Date
+}
+
+export interface CategoryImportItemVO {
+  kind: 'CATEGORY' | 'FIELD'
+  code: string
+  name: string
+  action: 'CREATE' | 'UPDATE' | 'SKIP' | 'CONFLICT'
+  message?: string
+}
+
+export interface CategoryImportRespVO {
+  createCount: number
+  updateCount: number
+  skipCount: number
+  conflictCount: number
+  items: CategoryImportItemVO[]
 }
 
 // 查询资产分类列表
@@ -34,4 +52,22 @@ export const updateCategory = async (data: CategoryVO) => {
 // 删除资产分类
 export const deleteCategory = async (id: number) => {
   return await request.delete({ url: '/eam/category/delete?id=' + id })
+}
+
+export const importTemplate = async () => {
+  return await request.download({ url: '/eam/category/get-import-template' })
+}
+
+const uploadImport = async (url: string, file: File) => {
+  const data = new FormData()
+  data.append('file', file)
+  return await request.upload<CategoryImportRespVO>({ url, data })
+}
+
+export const previewImport = async (file: File) => {
+  return await uploadImport('/eam/category/import/preview', file)
+}
+
+export const commitImport = async (file: File) => {
+  return await uploadImport('/eam/category/import/commit', file)
 }

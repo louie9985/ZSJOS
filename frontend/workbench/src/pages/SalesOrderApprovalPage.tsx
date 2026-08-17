@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Badge, Button, Drawer, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Avatar, Badge, Button, Drawer, Empty, Form, Input, Modal, Result, Segmented, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
@@ -10,11 +10,15 @@ import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderTaskKey } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
+import SalesOrderSupervisorInbox from '../components/SalesOrderSupervisorInbox'
+import { resolveSalesOrderApprovalAccess, type SalesOrderApprovalWorkType } from '../services/salesOrderApprovalAccess'
 
 const PAGE_SIZE = 20
 
 export default function SalesOrderApprovalPage({ permissions }: { permissions: string[] }) {
   const navigate = useNavigate()
+  const { canReview, canConfirmSupervisor, defaultWorkType, showWorkTypeSwitch } = resolveSalesOrderApprovalAccess(permissions)
+  const [workType, setWorkType] = useState<SalesOrderApprovalWorkType>(defaultWorkType || 'approval')
   const [profile, setProfile] = useState<SalesOrderApprovalFilterProfile>({ groups: [], centers: [] })
   const [center, setCenter] = useState<'registration' | 'finance'>()
   const [groupKey, setGroupKey] = useState<string>()
@@ -42,6 +46,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const closeDecision = () => { setConfirmOpen(false); setDecision(undefined); resetIntent() }
 
   const loadProfile = useCallback(async () => {
+    if (!canReview) { setProfileLoading(false); return }
     setProfileLoading(true); setProfileError('')
     try {
       const next = await api.salesOrderApprovalFilterProfile()
@@ -50,7 +55,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       setGroupKey(current => current && next.groups.some(group => group.key === current) ? current : next.groups[0]?.key)
     } catch (loadError) { setProfileError(loadError instanceof Error ? loadError.message : '审批筛选方案加载失败') }
     finally { setProfileLoading(false) }
-  }, [])
+  }, [canReview])
 
   const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean) => {
     const version = ++requestVersion.current
@@ -66,6 +71,10 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   }, [advancedFilter, center, groupKey, keyword, optionKey])
 
   useEffect(() => { void loadProfile() }, [loadProfile])
+  useEffect(() => {
+    if (workType === 'approval' && !canReview && canConfirmSupervisor) setWorkType('supervisor')
+    if (workType === 'supervisor' && !canConfirmSupervisor && canReview) setWorkType('approval')
+  }, [canConfirmSupervisor, canReview, workType])
   useEffect(() => { if (!profileLoading && !profileError && groupKey && center) void loadPage(undefined, true) }, [center, groupKey, optionKey, keyword, profileLoading, profileError, loadPage])
 
   const selectedItem = useMemo(() => items.find(item => salesOrderTaskKey(item) === selectedKey), [items, selectedKey])
@@ -123,7 +132,16 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         onApprove={() => { resetIntent(); setDecision('approve') }} onReject={() => { resetIntent(); setDecision('reject') }}
         onRequestSupervisor={() => { resetIntent(); setReason(''); setSupervisorOpen(true) }}/>
         : <Empty description="从左侧选择一条订单"/>
+  const workTypeSwitch = showWorkTypeSwitch ? <Segmented
+    aria-label="成交审批任务类型"
+    value={workType}
+    onChange={value => setWorkType(value as SalesOrderApprovalWorkType)}
+    options={[{ label: '双中心审批', value: 'approval' }, { label: '主管确认', value: 'supervisor' }]}
+  /> : null
+  if (!canReview && !canConfirmSupervisor) return <Result status="403" title="无权访问成交订单审批"/>
+  if (workType === 'supervisor') return <div className="sales-order-unified-approval-page">{workTypeSwitch}<SalesOrderSupervisorInbox/></div>
   return <section className="workspace-page lead-management-page sales-order-approval-page">
+    {workTypeSwitch}
     {filterCount(advancedFilter) === 0 && <header className="lead-inbox-filter-shell">
       {profileError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={profileError} action={<Button type="link" size="small" onClick={() => void loadProfile()}>重试</Button>}/>}
       {profileLoading ? <Skeleton active title={false} paragraph={{ rows: 2 }}/> : profile.groups.length > 0 ? <>

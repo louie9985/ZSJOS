@@ -6,7 +6,7 @@
 - `zsjos:sales-order:query-own`：分页和读取当前用户作为实际提交人的历史订单。详情仍执行 `read-own` 对象校验，不随客资负责人变化。
 - `zsjos:sales-order:query`：读取具备对象关系的订单详情。
 - `zsjos:sales-order:review`：工作台成交审批菜单与直接详情查询权限。审批池、通过和驳回接口的业务授权以配置部门成员关系和本人 BPM 任务为准，不按角色名称推断。
-- `zsjos:sales-order:supervisor-confirm`：独立“主管确认”入口、待办/已办列表及确认决定权限。迁移不按角色名自动授权；管理员必须显式分配。主管命令还要求当前用户是申请时固化的直属部门负责人、持有本人 BPM 加签任务并通过订单对象校验。
+- `zsjos:sales-order:supervisor-confirm`：统一“成交订单审批”入口中的主管待办/已办列表及确认决定权限。V076 为启用的稳定 `sales_manager` 角色补齐该权限；主管命令还要求当前用户是申请时固化的订单销售直属主管、持有本人 BPM 加签任务并通过订单对象校验。
 
 ## 接口
 
@@ -14,8 +14,8 @@
 - `POST /zsjos/sales-order/lead/{leadId}/submit`：创建首购订单。服务端要求客户、主客资和商机属于同一客户，且客户尚无生效订单。
 - `POST /zsjos/sales-order/lead/{leadId}/repurchase`：从系统客户客资详情创建复购；客资只用于发起与权限上下文，订单持久化仅关联客户。
 - `POST /zsjos/sales-order/external-repurchase`：录入系统外历史客户复购。唯一命中无主客资客户时复用客户，无命中时创建客户主档；多客户命中、身份冲突或已有主客资时拒绝。
-- `GET /zsjos/sales-order/lead/{leadId}/customer-orders`：按客户聚合首购与复购订单。
-- `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：从“我负责的”客资详情读取同一客户的完整订单详情。服务端先校验客资读取权限，再校验订单与客资 `personId` 一致，不扩大通用订单详情权限。
+- `GET /zsjos/sales-order/lead/{leadId}/customer-orders`：从客资详情按客户聚合首购与复购订单，仅当前客资负责人、负责该销售部门的当前主管或具备 `zsjos:lead:query-all` 的用户可读；客资提交人关系本身不可见且不可直接调用。
+- `GET /zsjos/sales-order/lead/{leadId}/customer-orders/{orderId}`：读取同一客户的完整订单详情。服务端先执行上述负责人/主管对象校验，再校验订单与客资 `personId` 一致，不扩大通用订单详情权限。
 - `PUT /zsjos/sales-order/{id}/resubmit`：原地修改 `revision_required` 或 `terminated` 订单并创建新审批轮次，保留订单 ID 和订单号。若同一客资已存在另一张活动首购订单，或同一客户已存在另一张活动复购订单，则拒绝重提；复购创建与重提通过客户主档行锁串行化。
 - `GET /zsjos/sales-order/{id}`：订单、课程、凭证和当前审批轮次详情；`registrationApproval` 与 `financeApproval` 分别返回报名履约、财务节点的 `pending/approved/rejected/cancelled` 汇总状态、实际审核人用户 ID/姓名及节点时间。审核身份和结果只读自 BPM 当前任务和历史任务，不在订单域重复持久化；界面展示审核人姓名、结果和审核时间，不展示用户 ID。
 - `GET /zsjos/sales-order/my-page`：本人提交订单的轻量分页，支持 `status` 和订单号/学员姓名/手机号 `keyword`。
@@ -26,7 +26,7 @@
 - `GET /zsjos/sales-order/approval/inbox-page?center=registration|finance&groupKey=pending&optionKey=all&keyword=`：按当前用户审批任务、处理状态和中心分页查询轻量订单列表，支持订单号、学员姓名和手机号搜索；`handled` 仍可作为兼容参数。服务端将筛选条件与当前用户允许的 BPM 任务节点取交集，伪造无权中心返回权限错误，前端隐藏筛选项不是授权边界。
 - `POST /zsjos/sales-order/approval/search-page`：在当前用户 BPM 任务和中心权限固定范围内组合关键词与高级条件；高级条件非空时忽略可选处理分组，但不扩大允许的任务节点。
 - `PUT /zsjos/sales-order/{id}/approve`、`/reject`：处理当前 BPM 任务，必须提交 `taskId`、当前 `approvalRoundId`、订单/轮次版本、审批意见和幂等键。订单行与轮次行锁保证审批、驳回和终止只有首个命令成功。
-- `PUT /zsjos/sales-order/{id}/supervisor-confirmation/request`：当前报名履约或财务普通审批人申请直属主管确认。请求必须提交普通 `taskId`、轮次、订单/轮次版本、必填且不超过 1000 字的 `reason` 和幂等键。每轮每中心最多一条申请；待确认时锁定该中心全部普通任务，另一中心继续处理。
+- `PUT /zsjos/sales-order/{id}/supervisor-confirmation/request`：当前报名履约或财务普通审批人申请订单销售主管确认。请求必须提交普通 `taskId`、轮次、订单/轮次版本、必填且不超过 1000 字的 `reason` 和幂等键。每轮每中心最多一条申请；待确认时锁定该中心全部普通任务，另一中心继续处理。
 - `GET /zsjos/sales-order/supervisor-confirmation/inbox-page`、`POST /zsjos/sales-order/supervisor-confirmation/search-page`：只查询当前用户作为指定主管的待办或已办，`handled=false|true` 区分状态，支持订单关键词。
 - `PUT /zsjos/sales-order/{id}/supervisor-confirmation/confirm`、`/reject`：主管提交确认决定，必须携带 `confirmationId`、主管 BPM `taskId`、轮次、订单/轮次/确认记录版本、必填且不超过 1000 字的 `reason` 和幂等键。确认后恢复该中心普通任务；不确认使用 BPM 驳回整轮并退回销售补正。
 - `PUT /zsjos/sales-order/{id}/terminate`：未生效订单的原创建人或正式负责人可填写原因终止当前 BPM 流程，包括已进入财务节点的订单。订单域先校验权限、状态、版本和幂等键，再通过 BPM 业务授权终止接口记录真实操作人、授权类型与原因。
@@ -36,7 +36,7 @@
 外部复购和所有客户联系方式写入口共用 Person 身份写服务。手机号与微信号使用同一租户级占用空间，手机号命中微信号同样冲突；值仅去除首尾空格，微信号大小写敏感且最多 64 个字符。同一 Person 的手机号与微信号可填写相同值并只占用一次。并发创建相同联系方式时只允许创建一份客户主档，其他请求按已存在客户继续执行复购入口校验。
 
 审批详情仅在当前中心节点仍为 `pending` 且当前待办仍提供 `taskId` 时显示通过、驳回操作。任一审核人处理该中心节点后，同中心其他用户不再显示操作按钮；服务端仍以 BPM 待办状态校验并拒绝过期或重复处理。
-上线后创建的审批轮次返回 `supervisorConfirmationEnabled=true`。申请时服务端从申请人直属部门读取 `leaderUserId`；未配置、负责人停用或负责人就是申请人分别返回稳定错误。确认记录为 `pending/confirmed/rejected/cancelled`，并行中心驳回、销售终止或流程取消会把未完成记录置为 `cancelled`。上线前已存在轮次保持 `false`，继续旧流程且禁止发起主管确认。
+上线后创建的审批轮次返回 `supervisorConfirmationEnabled=true`。申请时服务端从订单 `formalSalesUserId` 对应销售的当前直属部门读取 `leaderUserId`；正式销售或部门负责人未配置、负责人停用、负责人就是正式销售或负责人缺少主管确认权限分别返回稳定错误。确认记录为 `pending/confirmed/rejected/cancelled`，并行中心驳回、销售终止或流程取消会把未完成记录置为 `cancelled`。历史确认记录继续使用申请时固化的 `supervisorUserId`；上线前已存在轮次保持 `false`，继续旧流程且禁止发起主管确认。
 - `POST /zsjos/sales-order/voucher/upload`：上传 JPG、PNG、WebP 或 PDF，最多 10 MB；服务端按文件内容识别真实类型。所有订单最终提交必须引用 1–6 个当前销售上传的凭证，包括零元订单和系统外复购。工作台延迟上传，管理端系统外复购选择后上传；两端都保留上传中、失败、重试、删除和预览状态。
 
 提交命令必须携带 `idempotencyKey`。同一次录单或补正意图的快速重复点击、凭证上传失败和请求重试必须复用该键，只有服务端确认成功后才轮换；首次录单在锁定客资行后会再次检查该键，使并发相同请求返回已创建订单，而不是重复创建或误报已有活动订单。订单总金额不由客户端提交，服务端以各课程 `actualAmount` 重新汇总。手机号和微信号至少一项；所有订单必须引用 1–6 份缴费凭证。省市名称由服务端根据省市级联编码生成快照，五类订单字典值由系统字典 API 校验。

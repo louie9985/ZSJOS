@@ -40,6 +40,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead/inbox/submitted/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-submitted` |
 | `GET /zsjos/lead/inbox/owned/page` | `zsjos:lead:query` + `zsjos:lead:query-owned` |
 | `GET /zsjos/lead/inbox/owned/filter-profile` | `zsjos:lead:query` + `zsjos:lead:query-owned` |
+| `GET /zsjos/lead/page?relationScope=all\|submitted\|owned` | 统一客资管理；按提交/负责权限返回本人及当前管理部门、子部门员工的关系并集 |
 | `POST /zsjos/lead/inbox/submitted/search-page` | 提交人固定范围内组合关键词与高级条件；忽略可选状态分组 |
 | `POST /zsjos/lead/inbox/owned/search-page` | 负责人固定范围内组合关键词与高级条件；忽略可选状态分组 |
 | `POST /zsjos/lead/{id}/judge-valid` | `zsjos:lead:qualify` + 当前负责人对象权限 |
@@ -50,7 +51,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 提交接口先执行统一查重。自动判重关闭时，强弱规则的所有重复命中都创建审计记录并返回 `outcome=review_pending + reviewId`，此时不分配 `leadNo`。自动判重开启时，系统按历史 Lead 的 `submittedAt` 倒序、再按 ID 倒序选取最近候选：无效或关闭客资返回 `activated` 并重新激活历史 Lead；原负责人仍是启用销售时保留归属，否则进入抢单池；活动或已成交客资保持不变，关闭本次提交审计并返回 `duplicate_auto_closed`，存在有效负责人时发送重复客资提醒。只有 Person、没有历史 Lead 的命中仍进入人工复核。完全无命中返回 `created + leadId + leadNo`。
 
-自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。
+自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。选择新媒体提供方后，默认“客资新建”站内信规则同时通知该提供方和实际提交销售；未选择时两个收件角色解析为同一销售并自动去重。管理员已有的启用或停用场景规则不由 V075 覆盖，历史客资不补发消息。
 
 管理、抢单池和判定异常列表的 `keyword` 规则一致：以 `KZ` 开头时按大写标准化后精确匹配 `leadNo`，纯数字精确匹配内部 Lead ID，其他值继续模糊匹配姓名、手机号和微信号。
 
@@ -89,7 +90,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 ## 判定前跟进与今日待办
 
-客资仍为 `submitted` 且分配状态为 `owned` 时，跟进记录归属于 Lead，不提前创建 Opportunity，也不改变 Lead 主状态。当前负责人通过 `POST /zsjos/lead/{id}/follow-ups` 追加记录；当前负责人、提交人、负责人部门及子部门主管和 `zsjos:lead:query-all` 账号可通过 `GET /zsjos/lead/{id}/follow-ups/page` 只读查询。记录时间由服务端生成，记录不提供修改或删除接口。
+客资仍为 `submitted` 且分配状态为 `owned` 时，跟进记录归属于 Lead，不提前创建 Opportunity，也不改变 Lead 主状态。当前负责人通过 `POST /zsjos/lead/{id}/follow-ups` 追加记录；只读查询与客资详情使用同一对象范围：持有对应关系查询权限的提交人、负责人及其当前部门层级主管，或 `zsjos:lead:query-all` 账号可读取。记录时间由服务端生成，记录不提供修改或删除接口。
 
 客资提交、跟进、有效性判定和异常处置中的 `idempotencyKey` 表示一次用户操作意图。前端在打开或重置为新操作时生成一次键，同一操作的快速重复点击、上传失败、网络失败和超时重试必须复用该键，只有服务端确认成功后才能轮换。前端提交状态必须使用同步互斥保护，按钮 loading 仅作为交互反馈，不能作为唯一防重手段。
 

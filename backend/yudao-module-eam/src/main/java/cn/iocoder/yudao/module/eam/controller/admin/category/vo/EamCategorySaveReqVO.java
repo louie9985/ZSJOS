@@ -32,6 +32,12 @@ public class EamCategorySaveReqVO {
     @NotNull(message = "状态不能为空")
     private Integer status;
 
+    @Schema(description = "管理模式：1 单件，2 批量", example = "1")
+    private Integer managementMode;
+
+    @Schema(description = "计量单位", example = "个")
+    private String unit;
+
     @Schema(description = "备注", example = "IT设备")
     private String remark;
 

@@ -47,6 +47,7 @@ public class LeadObjectPermissionService {
             case "pending-read", "accept", "reject" -> ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
                     && Objects.equals(userId, lead.getPendingAssigneeUserId());
             case "owner-read" -> Objects.equals(userId, lead.getOwnerUserId());
+            case "owner-or-manager-read" -> canReadAsOwnerOrManager(lead, userId);
             case "follow-up-create" -> Objects.equals(userId, effectiveSalesUserId(lead))
                     && (STATUS_INVALID.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
@@ -69,23 +70,37 @@ public class LeadObjectPermissionService {
     }
 
     public boolean canRead(LeadDO lead, Long userId) {
-        return Objects.equals(userId, lead.getSourceUserId())
-                || Objects.equals(userId, lead.getOwnerUserId())
-                || securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)
-                || managesOwnerDepartment(userId, lead.getOwnerUserId())
+        return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)
+                || securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
+                    && (Objects.equals(userId, lead.getSourceUserId())
+                    || managesUserDepartment(userId, lead.getSourceUserId()))
+                || securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)
+                    && (Objects.equals(userId, lead.getOwnerUserId())
+                    || managesUserDepartment(userId, lead.getOwnerUserId()))
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
-                    && managesOwnerDepartment(userId, lead.getRecycleSourceOwnerUserId());
+                    && managesUserDepartment(userId, lead.getRecycleSourceOwnerUserId());
     }
 
     public boolean hasQueryAll() {
         return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
     }
 
+    public boolean canReadAsOwnerOrManager(LeadDO lead, Long userId) {
+        return Objects.equals(userId, lead.getOwnerUserId())
+                || hasQueryAll()
+                || managesUserDepartment(userId, lead.getOwnerUserId());
+    }
+
     /**
      * 管理员及负责人部门主管可以查看提交人与负责人的完整员工身份信息。
      */
     public boolean canViewUnmaskedIdentity(Long userId, Long ownerUserId) {
-        return hasQueryAll() || managesOwnerDepartment(userId, ownerUserId);
+        return hasQueryAll() || managesUserDepartment(userId, ownerUserId);
+    }
+
+    public boolean canViewUnmaskedIdentity(Long userId, LeadDO lead) {
+        return hasQueryAll() || managesUserDepartment(userId, lead.getSourceUserId())
+                || managesUserDepartment(userId, lead.getOwnerUserId());
     }
 
     private Long effectiveSalesUserId(LeadDO lead) {
@@ -111,14 +126,14 @@ public class LeadObjectPermissionService {
         return dept != null && Objects.equals(dept.getLeaderUserId(), userId);
     }
 
-    private boolean managesOwnerDepartment(Long userId, Long ownerUserId) {
-        if (ownerUserId == null) return false;
-        AdminUserRespDTO owner = adminUserApi.getUser(ownerUserId);
-        if (owner == null || owner.getDeptId() == null) return false;
+    private boolean managesUserDepartment(Long userId, Long relatedUserId) {
+        if (relatedUserId == null) return false;
+        AdminUserRespDTO relatedUser = adminUserApi.getUser(relatedUserId);
+        if (relatedUser == null || relatedUser.getDeptId() == null) return false;
         for (DeptRespDTO managed : deptApi.getDeptListByLeaderUserId(userId)) {
-            if (Objects.equals(managed.getId(), owner.getDeptId())
+            if (Objects.equals(managed.getId(), relatedUser.getDeptId())
                     || deptApi.getChildDeptList(managed.getId()).stream()
-                    .anyMatch(child -> Objects.equals(child.getId(), owner.getDeptId()))) {
+                    .anyMatch(child -> Objects.equals(child.getId(), relatedUser.getDeptId()))) {
                 return true;
             }
         }
@@ -129,7 +144,7 @@ public class LeadObjectPermissionService {
         if (securityFrameworkService.hasPermission(QUALIFICATION_MANAGE_ALL_PERMISSION)) return true;
         Long scopedOwnerId = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
                 ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
-        return managesOwnerDepartment(userId, scopedOwnerId);
+        return managesUserDepartment(userId, scopedOwnerId);
     }
 
     public boolean hasQualificationManageAll() {

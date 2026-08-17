@@ -1,6 +1,6 @@
 /* Today tasks page and the task centre panels. */
 
-@media(max-width:768px) {
+@media (max-width: 768px) {
   .today-tasks-page {
     padding: 12px;
   }
@@ -12,7 +12,7 @@
 
 .task-center-grid {
   display: grid;
-  grid-template-columns: repeat(2,minmax(0,1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -36,7 +36,7 @@
 }
 
 .task-panel-header h4 {
-  margin: 0!important;
+  margin: 0 !important;
 }
 
 .task-bucket-control {
@@ -48,25 +48,49 @@
 }
 
 .task-panel-list {
+  display: flex;
   flex: 1;
+  min-height: 0;
+  flex-direction: column;
   margin-top: 8px;
 }
 
-.task-panel-list .ant-list-item {
+.task-panel-item {
+  display: flex;
   min-height: 68px;
+  align-items: center;
+  gap: var(--crm-gap);
+  padding: var(--crm-sp-2) 0;
+  border-bottom: 1px solid var(--crm-border);
 }
 
-.task-panel-list .ant-list-item-meta-title,.task-panel-list .ant-list-item-meta-description {
+.task-panel-item:last-child {
+  border-bottom: 0;
+}
+
+.task-panel-item-icon {
+  color: var(--crm-color-primary);
+}
+
+.task-panel-item-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.task-panel-item-copy > * {
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
-.task-center-panel>.ant-pagination {
+.task-center-panel > .ant-pagination {
   align-self: flex-end;
   margin-top: 10px;
 }
 
-@media(max-width:900px) {
+@media (max-width: 900px) {
   .task-center-grid {
     grid-template-columns: 1fr;
   }

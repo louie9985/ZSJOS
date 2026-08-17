@@ -107,10 +107,7 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
             Object raw = input.get(def.getFieldKey());
             boolean blank = raw == null || (raw instanceof CharSequence && StrUtil.isBlank((CharSequence) raw));
             if (blank) {
-                if (Boolean.TRUE.equals(def.getRequired())) {
-                    throw exception(FIELD_REQUIRED, def.getFieldName());
-                }
-                continue; // 非必填留空则不落库
+                continue; // 管理端字段全部选填；员工收集表规则由独立表单执行
             }
             normalized.put(def.getFieldKey(), convertValue(def, raw));
         }
@@ -155,6 +152,16 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
     private void normalizeOptions(EamCategoryFieldDO field) {
         if (!Objects.equals(field.getFieldType(), EamFieldTypeEnum.SELECT.getType())) {
             field.setOptions(null);
+        }
+        field.setRequired(false); // 兼容旧字段；管理端不执行必填校验
+        if (field.getAdminVisible() == null) {
+            field.setAdminVisible(true);
+        }
+        if (field.getCollectionVisible() == null) {
+            field.setCollectionVisible(true);
+        }
+        if (field.getCollectionRequired() == null) {
+            field.setCollectionRequired(false);
         }
     }
 

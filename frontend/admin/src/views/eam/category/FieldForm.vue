@@ -37,8 +37,23 @@
           </el-button>
         </div>
       </el-form-item>
-      <el-form-item label="是否必填" prop="required">
-        <el-switch v-model="formData.required" />
+      <el-form-item label="管理端显示" prop="adminVisible">
+        <el-switch v-model="formData.adminVisible" />
+        <span class="ml-2 text-xs text-gray-500">管理端显示时仍为选填</span>
+      </el-form-item>
+      <el-form-item label="员工表显示" prop="collectionVisible">
+        <el-switch v-model="formData.collectionVisible" />
+      </el-form-item>
+      <el-form-item label="员工表必填" prop="collectionRequired">
+        <el-switch v-model="formData.collectionRequired" :disabled="!formData.collectionVisible" />
+      </el-form-item>
+      <el-form-item label="条件规则" prop="conditionRule">
+        <el-input
+          v-model="conditionRuleText"
+          type="textarea"
+          :rows="3"
+          :placeholder="conditionRulePlaceholder"
+        />
       </el-form-item>
       <el-form-item label="排序" prop="sort">
         <el-input-number v-model="formData.sort" :min="0" class="!w-full" :controls="false" />
@@ -62,12 +77,14 @@ const emit = defineEmits(['success'])
 
 const { t } = useI18n()
 const message = useMessage()
+const conditionRulePlaceholder = '可选 JSON，例如 {"field":"ownership","equals":"公司资产"}'
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const formLoading = ref(false)
 const formType = ref('')
 const formData = ref<CategoryFieldApi.CategoryFieldVO>(buildEmptyForm())
+const conditionRuleText = ref('')
 const formRef = ref()
 
 const formRules = reactive({
@@ -92,6 +109,9 @@ function buildEmptyForm(): CategoryFieldApi.CategoryFieldVO {
     fieldType: FieldType.TEXT,
     options: [],
     required: false,
+    adminVisible: true,
+    collectionVisible: true,
+    collectionRequired: false,
     sort: 0
   }
 }
@@ -108,6 +128,7 @@ const open = async (type: string, id?: number) => {
   dialogTitle.value = t('action.' + type)
   formType.value = type
   formData.value = buildEmptyForm()
+  conditionRuleText.value = ''
   formRef.value?.resetFields()
   if (id) {
     formLoading.value = true
@@ -118,6 +139,9 @@ const open = async (type: string, id?: number) => {
       const target = list.find((item) => item.id === id)
       if (target) {
         formData.value = { ...target, options: target.options || [] }
+        conditionRuleText.value = target.conditionRule
+          ? JSON.stringify(target.conditionRule, null, 2)
+          : ''
       }
     } finally {
       formLoading.value = false
@@ -136,6 +160,25 @@ const submitForm = async () => {
       return
     }
     formData.value.options = options
+  }
+  if (conditionRuleText.value.trim()) {
+    try {
+      const rule = JSON.parse(conditionRuleText.value)
+      if (!rule || Array.isArray(rule) || typeof rule !== 'object') {
+        message.warning('条件规则必须是 JSON 对象')
+        return
+      }
+      formData.value.conditionRule = rule
+    } catch {
+      message.warning('条件规则不是有效的 JSON')
+      return
+    }
+  } else {
+    formData.value.conditionRule = undefined
+  }
+  formData.value.required = false
+  if (!formData.value.collectionVisible) {
+    formData.value.collectionRequired = false
   }
 
   formLoading.value = true

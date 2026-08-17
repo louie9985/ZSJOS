@@ -568,12 +568,13 @@ def static_check() -> None:
     for code, manifest in manifests.items():
         migrations = migrations_for(code, manifest)
         schema_path = resolve_sql_path(manifest["schema"])
-        baseline_path = resolve_sql_path(manifest["baseline"])
         verify_path = resolve_sql_path(manifest["verify"])
-        for path in (schema_path, baseline_path, verify_path):
+        baseline_value = manifest.get("baseline")
+        baseline_path = resolve_sql_path(baseline_value) if baseline_value else None
+        for path in (schema_path, verify_path, *([baseline_path] if baseline_path else [])):
             if not path.is_file():
                 fail(f"Missing {code} database file: {path}")
-        if schema_path.read_bytes() != baseline_path.read_bytes():
+        if baseline_path and schema_path.read_bytes() != baseline_path.read_bytes():
             fail(
                 f"Desired schema differs from the fresh baseline for {code}; run `zsjos-db make {code} <name>` "
                 "or synchronize the reviewed migration"

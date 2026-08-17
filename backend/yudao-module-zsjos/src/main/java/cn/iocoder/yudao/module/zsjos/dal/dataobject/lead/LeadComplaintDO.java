@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 
 @TableName("zsjos_lead_complaint") @KeySequence("zsjos_lead_complaint_seq") @Data @EqualsAndHashCode(callSuper = true)
 public class LeadComplaintDO extends TenantBaseDO {
-    @TableId private Long id; private Long leadId; private Long complainantUserId; private Long salesUserId;
+    @TableId private Long id; private Long leadId; private Long complainantUserId; private Long partnerId; private Long salesUserId;
     private String reason; private String evidenceRefs; private String status; private String result;
     private Long handlerUserId; private String handlerOpinion; private String handlerEvidenceRefs;
     private LocalDateTime handledAt; private String createIdempotencyKey; private String decisionIdempotencyKey; private Integer version;

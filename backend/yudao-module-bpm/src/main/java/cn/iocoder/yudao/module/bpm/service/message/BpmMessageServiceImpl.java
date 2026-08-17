@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.bpm.service.message;
 
 import cn.iocoder.yudao.framework.web.config.WebProperties;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenProcessInstanceApproveReqDTO;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenProcessInstanceRejectReqDTO;
 import cn.iocoder.yudao.module.bpm.service.message.dto.BpmMessageSendWhenTaskCreatedReqDTO;
@@ -36,7 +38,7 @@ public class BpmMessageServiceImpl implements BpmMessageService {
         Map<String, Object> templateParams = new HashMap<>();
         templateParams.put("processInstanceName", reqDTO.getProcessInstanceName());
         templateParams.put("detailUrl", getProcessInstanceDetailUrl(reqDTO.getProcessInstanceId()));
-        publish("bpm.process.approved", reqDTO.getProcessInstanceId(), reqDTO.getStartUserId(), templateParams);
+        publish("bpm.process.approved", reqDTO.getProcessInstanceId(), reqDTO.getStartSubject(), templateParams);
     }
 
     @Override
@@ -45,7 +47,7 @@ public class BpmMessageServiceImpl implements BpmMessageService {
         templateParams.put("processInstanceName", reqDTO.getProcessInstanceName());
         templateParams.put("reason", reqDTO.getReason());
         templateParams.put("detailUrl", getProcessInstanceDetailUrl(reqDTO.getProcessInstanceId()));
-        publish("bpm.process.rejected", reqDTO.getProcessInstanceId(), reqDTO.getStartUserId(), templateParams);
+        publish("bpm.process.rejected", reqDTO.getProcessInstanceId(), reqDTO.getStartSubject(), templateParams);
     }
 
     @Override
@@ -68,9 +70,14 @@ public class BpmMessageServiceImpl implements BpmMessageService {
     }
 
     private void publish(String sceneCode, String eventId, Long targetUserId, Map<String, Object> params) {
+        publish(sceneCode, eventId, new BpmStartSubjectDTO(UserTypeEnum.ADMIN.getValue(), targetUserId), params);
+    }
+
+    private void publish(String sceneCode, String eventId, BpmStartSubjectDTO target, Map<String, Object> params) {
         try {
             Map<String, Object> payload = new HashMap<>(params);
-            payload.put("targetUserId", targetUserId);
+            payload.put("targetUserId", target.getUserId());
+            payload.put("targetUserType", target.getUserType());
             notifyBusinessEventApi.publish(NotifyBusinessEvent.builder().sceneCode(sceneCode)
                     .sourceEventKey(sceneCode + ":" + eventId).bizType("bpm").payload(payload).build());
         } catch (Exception ex) {

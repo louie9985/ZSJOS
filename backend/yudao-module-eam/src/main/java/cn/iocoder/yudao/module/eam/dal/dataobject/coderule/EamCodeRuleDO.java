@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.eam.dal.dataobject.coderule;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
 import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.AllArgsConstructor;
@@ -49,6 +50,7 @@ public class EamCodeRuleDO extends BaseDO {
     /**
      * 分隔符，默认 -
      */
+    @TableField("`separator`")
     private String separator;
     /**
      * 当前流水号（该规则下已分配的最大流水号）

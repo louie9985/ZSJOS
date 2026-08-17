@@ -26,7 +26,6 @@ async function handleSave() {
     await updateProfile({
       nickname: form.value.nickname.trim(),
       email: form.value.email?.trim() || undefined,
-      mobile: form.value.mobile?.trim() || undefined,
       sex: form.value.sex
     })
     showSuccessToast('保存成功')
@@ -41,7 +40,7 @@ async function handleSave() {
     <van-skeleton :loading="loading" :row="4" style="padding: 16px;">
       <div class="card">
         <van-field v-model="form.nickname" label="昵称" placeholder="请输入昵称" required clearable />
-        <van-field v-model="form.mobile" label="手机号" type="tel" placeholder="请输入手机号" clearable />
+        <van-field v-model="form.mobile" label="手机号" type="tel" readonly />
         <van-field v-model="form.email" label="邮箱" type="email" placeholder="请输入邮箱" clearable />
       </div>
       <div style="padding: 24px 16px;">

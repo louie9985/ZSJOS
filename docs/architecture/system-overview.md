@@ -34,7 +34,8 @@ dependencies and Spring component scanning.
 
 - Authenticated browser clients connect to `/infra/ws`; this endpoint is not under the
   `/admin-api` HTTP prefix. Development and production proxies must enable WebSocket Upgrade
-  for this path.
+  for this path. The `token` query parameter carries the current OAuth access token, never the
+  refresh token.
 - Durable user notifications are written to `system_notify_message` first. After the database
   transaction commits, the backend sends a `notify-message-new` event containing only the
   message identifier. Clients then query the system notification APIs for authoritative data.

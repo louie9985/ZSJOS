@@ -35,12 +35,29 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
                 .eq(CashbackDO::getBeneficiaryUserId, userId).eq(CashbackDO::getStatus, "available")
                 .orderByAsc(CashbackDO::getId));
     }
+    default List<CashbackDO> selectAvailableByPartner(Long partnerId) {
+        return selectList(new LambdaQueryWrapperX<CashbackDO>()
+                .eq(CashbackDO::getPartnerId, partnerId).eq(CashbackDO::getStatus, "available")
+                .orderByAsc(CashbackDO::getId));
+    }
+    default PageResult<CashbackDO> selectPartnerPage(CashbackPageReqVO request, Long partnerId) {
+        return selectPage(request, new LambdaQueryWrapperX<CashbackDO>()
+                .eq(CashbackDO::getPartnerId, partnerId)
+                .eqIfPresent(CashbackDO::getType, request.getType())
+                .eqIfPresent(CashbackDO::getStatus, request.getStatus())
+                .orderByDesc(CashbackDO::getGeneratedAt).orderByDesc(CashbackDO::getId));
+    }
 
     @Select("SELECT status, COALESCE(SUM(amount), 0) amount, COUNT(*) count "
             + "FROM zsjos_cashback WHERE beneficiary_user_id=#{userId} AND tenant_id=#{tenantId} "
             + "AND deleted=0 GROUP BY status")
     List<CashbackStatusSummaryRow> selectStatusSummary(@Param("userId") Long userId,
                                                         @Param("tenantId") Long tenantId);
+    @Select("SELECT status, COALESCE(SUM(amount), 0) amount, COUNT(*) count "
+            + "FROM zsjos_cashback WHERE partner_id=#{partnerId} AND tenant_id=#{tenantId} "
+            + "AND deleted=0 GROUP BY status")
+    List<CashbackStatusSummaryRow> selectPartnerStatusSummary(@Param("partnerId") Long partnerId,
+                                                               @Param("tenantId") Long tenantId);
     default int transition(Long id, Integer version, String from, String to, LocalDateTime settledAt) {
         return update(null, new LambdaUpdateWrapper<CashbackDO>().eq(CashbackDO::getId, id)
                 .eq(CashbackDO::getVersion, version).eq(CashbackDO::getStatus, from)

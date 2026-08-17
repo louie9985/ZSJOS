@@ -115,6 +115,7 @@ describe('spacing and sizing anchors', () => {
       /\.sales-order-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.claim-pool-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.subordinate-sales-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.registration-page,.registration-config-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.sales-order-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
@@ -147,6 +148,10 @@ describe('spacing and sizing anchors', () => {
     expect(joined).toMatch(/\.dispatch-status-tag \{[^}]*height: var\(--crm-control-h\)/)
     expect(joined).toMatch(/\.dispatch-mode-button \{[^}]*height: var\(--crm-control-h\)/)
     expect(joined).toMatch(/\.lead-product-checkbox \{[^}]*min-height: var\(--crm-control-h\)/)
+  })
+
+  it('keeps intended-product checkbox hit areas on the control and label', () => {
+    expect(joined).toMatch(/\.lead-product-checkbox-control \{[^}]*width: fit-content;[^}]*justify-self: start/)
   })
 
   it('leaves only deliberate font-size literals', () => {

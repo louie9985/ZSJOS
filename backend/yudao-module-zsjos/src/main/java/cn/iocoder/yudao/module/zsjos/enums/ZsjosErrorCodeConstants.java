@@ -12,6 +12,13 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_BOUND_USER_DUPLICATE = new ErrorCode(1_900_000_006, "该账号已绑定其他兼职主体");
     ErrorCode PARTNER_CONVERSION_POST_INVALID = new ErrorCode(1_900_000_007, "兼职仅可转为新媒体员工或新媒体主管");
     ErrorCode PARTNER_ROLE_NOT_CONFIGURED = new ErrorCode(1_900_000_008, "兼职端角色未配置，请先执行 V063 迁移");
+    ErrorCode PARTNER_ACCOUNT_NOT_EXISTS = new ErrorCode(1_900_000_009, "兼职登录账号不存在");
+    ErrorCode PARTNER_ACCOUNT_DISABLED = new ErrorCode(1_900_000_010, "兼职登录账号或兼职主体已停用");
+    ErrorCode PARTNER_MOBILE_DUPLICATE = new ErrorCode(1_900_000_011, "该手机号已绑定其他兼职账号");
+    ErrorCode PARTNER_LOGIN_BAD_CREDENTIALS = new ErrorCode(1_900_000_012, "手机号或密码错误");
+    ErrorCode PARTNER_PASSWORD_MISMATCH = new ErrorCode(1_900_000_013, "当前密码错误");
+    ErrorCode PARTNER_TOKEN_TYPE_INVALID = new ErrorCode(1_900_000_014, "当前令牌不是兼职合作方身份");
+    ErrorCode PARTNER_ACCOUNT_CONCURRENT_MODIFICATION = new ErrorCode(1_900_000_015, "兼职账号已被并发修改，请重试");
 
     ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
     ErrorCode LEAD_ASSIGNMENT_TARGET_INVALID = new ErrorCode(1_900_001_002, "所选销售不存在、已停用或不属于销售专员岗位");
@@ -157,15 +164,16 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_REPURCHASE_CUSTOMER_INVALID = new ErrorCode(1_900_006_016, "复购客户身份冲突、存在主客资或未找到有效首购记录");
     ErrorCode SALES_ORDER_VERSION_CONFLICT = new ErrorCode(1_900_006_017, "订单或审批轮次已变化，请刷新后重试");
     ErrorCode SALES_ORDER_TERMINATE_FORBIDDEN = new ErrorCode(1_900_006_018, "当前订单状态或操作人不允许终止审批");
-    ErrorCode SALES_ORDER_SUPERVISOR_NOT_CONFIGURED = new ErrorCode(1_900_006_019, "当前审批人直属部门未配置负责人");
-    ErrorCode SALES_ORDER_SUPERVISOR_DISABLED = new ErrorCode(1_900_006_020, "当前审批人直属部门负责人已停用或不存在");
-    ErrorCode SALES_ORDER_SUPERVISOR_SELF = new ErrorCode(1_900_006_021, "直属部门负责人不能与申请人相同");
+    ErrorCode SALES_ORDER_SUPERVISOR_NOT_CONFIGURED = new ErrorCode(1_900_006_019, "订单正式销售或其直属部门负责人未配置");
+    ErrorCode SALES_ORDER_SUPERVISOR_DISABLED = new ErrorCode(1_900_006_020, "订单销售直属部门负责人已停用或不存在");
+    ErrorCode SALES_ORDER_SUPERVISOR_SELF = new ErrorCode(1_900_006_021, "订单正式销售不能同时作为自己的直属主管");
     ErrorCode SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED = new ErrorCode(1_900_006_022, "本轮当前中心已申请过主管确认");
     ErrorCode SALES_ORDER_SUPERVISOR_PENDING = new ErrorCode(1_900_006_023, "当前中心正在等待主管确认，暂不能审批");
     ErrorCode SALES_ORDER_SUPERVISOR_CONFIRMATION_NOT_EXISTS = new ErrorCode(1_900_006_024, "主管确认记录不存在");
     ErrorCode SALES_ORDER_SUPERVISOR_TASK_EXPIRED = new ErrorCode(1_900_006_025, "主管确认任务已处理或已失效");
-    ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_DENIED = new ErrorCode(1_900_006_026, "当前用户不是该申请指定的直属部门负责人");
+    ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_DENIED = new ErrorCode(1_900_006_026, "当前用户不是该申请指定的销售直属主管");
     ErrorCode SALES_ORDER_SUPERVISOR_LEGACY_ROUND = new ErrorCode(1_900_006_027, "该审批轮次创建于主管确认功能上线前，请沿用原流程完成");
+    ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_NOT_GRANTED = new ErrorCode(1_900_006_028, "订单销售直属主管未配置成交订单主管确认权限");
 
     ErrorCode IMPERSONATION_TARGET_INVALID = new ErrorCode(1_900_007_001, "借视图目标账号不存在、已停用或与当前账号相同");
     ErrorCode IMPERSONATION_SESSION_INVALID = new ErrorCode(1_900_007_002, "借视图会话不存在、已结束或已超时");
@@ -190,5 +198,22 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode WITHDRAWAL_TRANSACTION_DUPLICATE = new ErrorCode(1_900_009_008, "银行流水号已登记");
     ErrorCode WITHDRAWAL_PROOF_INVALID = new ErrorCode(1_900_009_009, "打款凭证不存在、无权使用或文件类型不支持");
     ErrorCode WITHDRAWAL_PERMISSION_DENIED = new ErrorCode(1_900_009_010, "无权查看或处理该提现单");
+
+    ErrorCode REGISTRATION_CASE_NOT_EXISTS = new ErrorCode(1_900_010_001, "报名履约任务不存在");
+    ErrorCode REGISTRATION_ITEM_NOT_EXISTS = new ErrorCode(1_900_010_002, "报名履约清单项不存在");
+    ErrorCode REGISTRATION_STATE_INVALID = new ErrorCode(1_900_010_003, "当前报名履约任务状态不允许该操作");
+    ErrorCode REGISTRATION_VERSION_CONFLICT = new ErrorCode(1_900_010_004, "报名履约内容已被其他人员修改，请刷新后重试");
+    ErrorCode REGISTRATION_PERMISSION_DENIED = new ErrorCode(1_900_010_005, "无权查看或处理该报名履约任务");
+    ErrorCode REGISTRATION_CHECKLIST_CONFIG_INVALID = new ErrorCode(1_900_010_006, "报名履约清单尚未正确配置并发布");
+    ErrorCode REGISTRATION_CHECKLIST_ITEM_FIXED = new ErrorCode(1_900_010_007, "学习规划师清单项必须通过规划师选择更新");
+    ErrorCode REGISTRATION_CHECKLIST_INCOMPLETE = new ErrorCode(1_900_010_008, "报名履约清单尚未全部完成");
+    ErrorCode REGISTRATION_STUDY_PLANNER_INVALID = new ErrorCode(1_900_010_009, "学习规划师不存在、已停用或未持有学习规划师角色");
+    ErrorCode REGISTRATION_ORDER_INVALID = new ErrorCode(1_900_010_010, "报名履约关联订单不存在");
+    ErrorCode REGISTRATION_ORDER_NOT_EFFECTIVE = new ErrorCode(1_900_010_011, "订单尚未生效，不能完成报名履约");
+    ErrorCode REGISTRATION_FINANCE_PENDING = new ErrorCode(1_900_010_012, "财务审核通过后才能完成报名履约");
+    ErrorCode REGISTRATION_FINANCE_REVISION_REQUIRED = new ErrorCode(1_900_010_013, "财务审核未通过，订单补正并重新审核通过后才能完成报名履约");
+    ErrorCode REGISTRATION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_010_014, "幂等键已用于其他报名履约操作");
+    ErrorCode STUDENT_NOT_EXISTS = new ErrorCode(1_900_010_012, "学员不存在或不属于当前学习规划师");
+    ErrorCode STUDENT_PERMISSION_DENIED = new ErrorCode(1_900_010_013, "无权查看该学员");
 
 }

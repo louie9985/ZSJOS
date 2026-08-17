@@ -18,7 +18,6 @@ import java.util.Map;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.FIELD_KEY_DUPLICATE;
-import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.FIELD_REQUIRED;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.FIELD_VALUE_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -112,27 +111,26 @@ public class EamCategoryFieldServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
-    public void testValidateExtFields_requiredMissing() {
+    public void testValidateExtFields_adminIgnoresLegacyRequiredWhenMissing() {
         Long categoryId = createCategory("数字资产", "DIGI", 0L);
         createField(categoryId, "account", "账号", EamFieldTypeEnum.TEXT.getType(), true, null);
 
-        assertServiceException(
-                () -> fieldService.validateAndNormalizeExtFields(categoryId, new HashMap<>()),
-                FIELD_REQUIRED, "账号");
+        Map<String, Object> result = fieldService.validateAndNormalizeExtFields(categoryId, new HashMap<>());
+
+        assertTrue(result.isEmpty());
     }
 
     @Test
-    public void testValidateExtFields_requiredBlankStringRejected() {
+    public void testValidateExtFields_adminIgnoresLegacyRequiredWhenBlank() {
         Long categoryId = createCategory("数字资产", "DIGI", 0L);
         createField(categoryId, "account", "账号", EamFieldTypeEnum.TEXT.getType(), true, null);
 
         Map<String, Object> input = new HashMap<>();
         input.put("account", "   ");
 
-        // 空白字符串等同于未填写，必填校验必须拦住
-        assertServiceException(
-                () -> fieldService.validateAndNormalizeExtFields(categoryId, input),
-                FIELD_REQUIRED, "账号");
+        Map<String, Object> result = fieldService.validateAndNormalizeExtFields(categoryId, input);
+
+        assertTrue(result.isEmpty());
     }
 
     @Test

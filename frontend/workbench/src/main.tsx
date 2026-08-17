@@ -414,6 +414,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         <Content>
           <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
+            <Route path={APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS} element={<Navigate to={APP_ROUTES.SALES_ORDER_APPROVALS} replace/>}/>
             <Route path="/" element={initialTarget ? <Navigate to={initialTarget} replace/> : <NoAccessibleMenu hasMenus={navigation.length > 0}/>}/>
             <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
           </Routes>

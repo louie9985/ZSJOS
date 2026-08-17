@@ -61,7 +61,11 @@ license to hard-code tenant assumptions into business components.
 
 ### Independent partner frontend
 
-The partner frontend uses `/app-api/zsjos/**`, but partner identities remain tenant-scoped System ADMIN users. `yudao.web.app-api-admin-prefixes` contains only `/zsjos/`, so this narrow app-api partition resolves ADMIN tokens while every other `/app-api/**` route retains the standard MEMBER identity. Partner login and refresh additionally require the stable `part_time_partner` role; feature permissions and service-level ownership checks remain cumulative. Admin and workbench routes under `/admin-api/**` are unchanged.
+The partner frontend uses `/app-api/zsjos/**` with the independent `PARTNER(3)` identity. `yudao.web.app-api-user-type-prefixes` maps `/zsjos/` to PARTNER while every other `/app-api/**` route retains MEMBER and `/admin-api/**` retains ADMIN. Prefix keys and user types are validated at startup; a matched null or unknown type is also rejected at request time instead of disabling token-type comparison. OAuth token `userId` is the tenant-scoped `zsjos_partner_account.id`; each business request resolves it to `partnerId`, verifies both account and Partner state, and authorizes the target object by `partnerId`. PARTNER does not depend on System roles, departments, posts, menus, or `member_user`.
+
+Partner account updates use the shared MyBatis-Plus optimistic-lock interceptor and the `zsjos_partner_account.version` column. Login audit, enable/disable, mobile, and password updates must affect exactly one row; a stale version returns the stable concurrent-modification error before token issuance, token revocation, or success reporting. This closes the race where a login could issue a token after the account was concurrently disabled.
+
+Partner logout is type-safe and idempotent. System reads the persisted access-token record without requiring it to remain unexpired and deletes the access token, linked refresh token, and their caches only when `user_type=PARTNER`; a missing token or a token of another subject type is left untouched. Login-log enrichment is best effort and cannot roll back logout. The H5 likewise treats confirmed local logout as authoritative: its logout request never starts refresh, and any server, network, or audit failure still clears all local authentication state and navigates directly to login without a return target. Other protected requests retain one refresh-and-replay attempt and preserve their return target only when recovery fails.
 
 The H5 System reference-data client is deliberately separate from the authenticated business client. It calls `GET /app-api/system/dict-data/type` and `GET /app-api/system/area/tree` with `tenant-id` only and removes `Authorization`; those public System endpoints therefore cannot misinterpret an ADMIN token as a MEMBER token. Reference-data failures are visible and retryable. The retained WeCom login entry is an unavailable product path only: it starts no OAuth flow and calls no backend login endpoint until a later approved integration.
 
@@ -123,7 +127,11 @@ Workbench lazy loading uses the additive `/system/notify-message/my-cursor` cont
 page contract remains for compatibility.
 WebSocket events are refresh hints, while the persisted message page remains authoritative.
 
-The partner H5 exposes the same persisted personal messages through `/app-api/zsjos/messages/**`. The Controller requires the `part_time_partner` role and supplies the authenticated ADMIN user ID/type to every page, detail, read, and unread-count service call. Message ownership is therefore checked per record; no per-role message menu permission is copied into the ZSJOS matrix.
+The partner H5 exposes persisted personal messages through `/app-api/zsjos/messages/**`. The Controller validates the Partner context and supplies the Partner Account ID with `user_type=PARTNER` to every page, detail, read, and unread-count service call. Notification idempotency includes `user_type`, so equal ADMIN and PARTNER numeric IDs cannot collide. External notification channels consume the same typed identity: System dispatches ADMIN and MEMBER through their established APIs, while a module-owned mobile Provider resolves PARTNER only after both account and subject state checks. The SMS log retains the original PARTNER type and never interprets a Partner Account ID as an ADMIN ID.
+
+Partner-created lead and appeal attachments use a typed storage directory containing the Partner Account ID. Reference validation checks both the Infra creator and this directory namespace; internal callers accept their historical `zsjos/lead/**` files but explicitly reject the Partner subtree. Tenant-global lead submission idempotency keys return a prior result only when its persisted `partner_id` matches the current Partner, otherwise the request fails without disclosing the existing record.
+
+New external BPM initiators remain encoded as `<userType>:<userId>`. Approval and rejection notifications carry this typed start subject into the notification recipient, and process/model/task views use the snapshotted `externalStartUserName` rather than parsing the typed identifier as a System user ID. Business termination validates the same audit fields for ADMIN and external subjects; approval candidates and tasks remain ADMIN-only.
 
 Business notification templates are global system configuration, while notification rules and
 specified recipients are tenant-scoped. A tenant rule may select only a registered business scene,
@@ -305,10 +313,10 @@ visibility is then applied by the ZSJOS service:
 zsjos:lead:query-all
   -> all non-deleted leads in the current tenant
 otherwise
-  -> lead.source_user_id = current user
-     OR lead.owner_user_id = current user
-     OR lead.owner_user_id belongs to a department currently led by the user,
-        including child departments
+  -> zsjos:lead:query-submitted
+       AND lead.source_user_id is the current user or a currently managed employee
+     OR zsjos:lead:query-owned
+       AND lead.owner_user_id is the current user or a currently managed employee
 ```
 
 - `source_user_id` is the original Lead submitter. A later `LeadActivation` submitter
@@ -316,13 +324,14 @@ otherwise
 - A user who is both submitter and owner receives the Lead once, with both relation
   types in the response.
 - Phase-four submitter commands continue to use immutable `source_user_id` after a post or department transfer, while requiring the system account and the original business subject to remain enabled. Ordinary creation identity is resolved from stable post, department-leader, and partner records rather than role or department display names. Sales self-sourced creation is a separate permission and direct-ownership path. Complaint handling is an independent shared business queue; it does not duplicate BPM tasks or modify sales assignment and performance state.
+- Managed employees come from current System department-leader relationships, including child departments. Historical Leads follow the employee's current department after transfer; `source_dept_id` is not an authorization source.
 - Page, status-count, and single-record queries apply the same team boundary. A direct
   detail request cannot bypass row visibility. A leader of a peer department receives
   no access, while a leader of a parent department may access owners in child departments.
-- 员工工作台使用固定接口：`GET /zsjos/lead/inbox/submitted/page` 与 `/filter-profile` 只消费提交人方案，要求 `zsjos:lead:query-submitted`；`GET /zsjos/lead/inbox/owned/page` 与 `/filter-profile` 只消费负责人方案，要求 `zsjos:lead:query-owned`。成交审批使用独立的 `reviewer` 方案：后端根据审批配置根部门及子部门解析用户可用中心，报名履约用户固定查询 `registrationReview`，财务用户固定查询 `financeReview`，同时属于两个范围的用户才可切换中心。`inbox-page` 必须将请求中心、已发布筛选条件和用户可用 BPM 节点取交集，页面隐藏另一中心不能代替授权。
+- 员工工作台统一从 `/zsjos/leads/manage` 进入，并通过 `relationScope=all|submitted|owned` 切换范围。`submitted` 要求 `zsjos:lead:query-submitted` 并消费提交人方案，`owned` 要求 `zsjos:lead:query-owned` 并消费负责人方案；旧 inbox API 与路由仅作兼容。成交审批继续使用独立的 `reviewer` 方案。
 - 提交人和负责人客资收件箱使用服务端游标每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一批；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取首批。游标排序固定为 `last_activity_at DESC, id DESC`，下一批失败必须保留已加载客资并提供局部重试。旧分页接口继续保留给兼容调用方。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
-- 一旦指定视角，`submitter` 必须限定 `lead.source_user_id = currentUserId`，`owner` 必须限定 `lead.owner_user_id = currentUserId`；`query-all` 不得把“我的”视角扩大成全租户数据。未指定视角的通用管理查询继续遵循原有 `query-all` 或提交人/负责人关系范围。
+- 指定 `submitted` 或 `owned` 时必须具备对应关系权限，并限制在本人及当前所管员工；即使同时持有 `query-all` 也不把关系页扩大为全租户。`all` 对两类已授权关系取去重并集，只有显式 `query-all` 才绕过关系范围。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询只消费已发布版本；筛选标签不返回数量且不执行额外统计查询。保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
 - 管理端只能从后端按视角返回的条件能力白名单选择字段和值，不得提交 SQL、列名或任意表达式。`submitter` 与 `owner` 只允许客资主状态和分配状态；`reviewer` 只允许处理状态和 BPM 任务节点。不同视角的字段不得混用。
 - 收件箱归类是对客资主状态和分配状态的只读投影，不是新的持久化状态。前端只能展示服务端返回的筛选项，不得自行补齐尚未实现的跟进、申诉、机会或订单状态。
@@ -339,7 +348,7 @@ otherwise
   user filters use `GET /zsjos/lead/visible-users`: `query-all` users receive all enabled
   users in the tenant; other users receive only themselves and enabled users in departments
   they currently lead, including child departments.
-- V007 通过既有菜单权限关系分配固定入口：提交权限映射到“我提交的”，抢单或接单权限映射到“我负责的”，`query-all` 映射到两者；不根据角色名或岗位名推断。
+- V078 将 V007 的两个固定入口收拢为单一“客资管理”页面，原权限节点保留为隐藏范围能力；不根据角色名、岗位名或前端标签推断数据范围。
 - V025 通过现有 `system_role_menu` 关系将“我的订单”复制给已经拥有“录入成交”的角色。订单列表固定使用 `submitter_user_id = 当前用户`，详情继续执行本人提交对象校验；客资转派不会改变历史订单提交人，也不会扩大成交审批池。
 
 ### Qualification exception authorization
@@ -402,15 +411,18 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
 - The workbench starts pending queries and WebSocket invalidation only when the permission response contains that permission. Authorized load failures remain visible and retryable.
 - A pending assignment is represented by Lead assignment fields plus a `lead_assignment_accept` business task. Accept, reject, timeout and administrative cancellation complete or cancel that task in the same business transaction.
 - Acquiring ownership creates a `lead_first_follow_up` task from the currently enabled tenant follow-up rule. The task payload freezes the rule ID, version, timeout and ownership start time.
-- Before qualification, append-only follow-up records belong to Lead. Only the current owner can create them; the submitter, current owner, leaders of the owner's department hierarchy, and `zsjos:lead:query-all` may read them. After qualification creates an Opportunity, subsequent sales follow-up belongs to Opportunity instead.
+- Before qualification, append-only follow-up records belong to Lead. Only the current owner can create them; readers must satisfy the same submitted/owned/query-all object visibility used by Lead details, including authorized leaders of the submitter or owner department hierarchy. After qualification creates an Opportunity, subsequent sales follow-up belongs to Opportunity instead.
 - `lead_first_follow_up` and `lead_follow_up_reminder` are completed or replaced only by the lead follow-up transaction. The employee today-task APIs are assignee-scoped and expose stable action codes rather than a generic completion endpoint.
 - 跟进备注和下次跟进时间均为必填，下次时间必须晚于当前时间。无效客资不再允许新增跟进；判无效及成交订单最终生效会取消未完成的首次跟进、下次跟进和适用的判定任务，并清空 Lead/Opportunity 当前下次跟进投影，历史跟进记录保持不变。
 - 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 内部阶段值。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中按内部阶段值做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。消息展示边界将三个阶段转换为“即将到期/已到期/已逾期”，系统默认规则分别使用阶段化中文标题、摘要和正文，不向用户暴露内部英文值；管理员自定义模板仍由 System 配置管理。直属主管只取销售当前部门负责人，不向上级部门递归。
+- “客资新建”是默认站内信场景。新租户初始化和 V075 只在租户不存在该场景规则时创建启用规则，收件角色为 Lead 来源人与实际操作人；销售自拓选择新媒体提供方时分别解析为提供方和提交销售，未选择时同一销售按收件人集合去重。管理员已有的启用或停用规则保持权威，迁移不覆盖，也不补发历史消息。
 - Business editing overlays have presentation priority over assignment prompts. An assignment may continue to expire on the server while the workbench defers its modal, so reconnect, focus refresh and polling always reload server truth.
 
 ### Subordinate-sales management
 
 The server-owned `下属销售` menu is available only with `zsjos:subordinate-sales:query`. Runtime scope is resolved from System department-leader relationships, including every child department, and then limited to users holding the stable `sales_specialist` post. Disabled accounts remain visible; no role name or department label creates access.
+
+The subordinate Lead detail reuses the owned-Lead presentation component in an explicit read-only mode. `zsjos:subordinate-sales:query` permits entry to the existing Lead, follow-up, appeal, complaint-history, and customer-order read endpoints, but it never replaces the Lead object check: the selected Lead owner must remain inside a department currently led by the caller. Appeal and complaint history use the general Lead read relationship; customer orders use the narrower owner-or-manager action so a submitter-only relationship cannot expose order data. Frontend tab visibility and the absence of write controls are defense in depth, not authorization.
 
 - Account and dispatch mutations use separate permissions. Account disable delegates to the System public user API so current login tokens are revoked without moving Lead ownership.
 - Every account, dispatch, transfer, and manual public-sea mutation requires a trimmed reason of at most 500 characters and writes operator, target, before/after values, reason, and occurrence time.
@@ -434,14 +446,21 @@ The server-owned `下属销售` menu is available only with `zsjos:subordinate-s
 
 - `zsjos:sales-order:create` exposes direct order entry only when the backend `availableActions` projection enables `ENTER_DEAL`; the Service rechecks current ownership, valid qualification, suspension, opportunity state, active-order uniqueness and enabled SKU state under a tenant-scoped row lock.
 - Sales-order field options come from System dictionaries and the enabled ZSJOS product/SKU catalog. The workbench does not keep static business options or infer product hierarchy from labels.
-- `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. New approval rounds snapshot enabled users in each root department and its children after excluding every included department's `leaderUserId`; department names, role names and frontend menus are not reviewer sources. If either center has no remaining ordinary reviewer, submission fails as invalid approval configuration.
+- `zsjos_order_approval_config` stores the tenant's registration-fulfillment and finance-settlement root department IDs. New approval rounds snapshot all enabled users in each root department and its children, including department leaders; department names, role names and frontend menus are not reviewer sources. Submission fails as invalid approval configuration only when either center has no enabled user.
 - 成交订单提交/补正只通知本轮两个配置部门解析出的实际审批人；最终通过、拒绝或取消只通知订单提交销售。通知显示配置根部门名称，内部任务键仍保持 `registrationReview` / `financeReview`。
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
 - 订单详情通过 BPM 公共 API 汇总当前轮次两个节点的 `pending/approved/rejected/cancelled` 状态并展示给已有订单读取权限的用户；汇总优先保留实际通过或驳回决定，不能让同组后续取消的会签任务覆盖结果。ZSJOS 不新增审批任务或节点状态表。
-- 上线后轮次允许普通审批人每轮每中心申请一次直属主管确认。直属主管只取申请人直属部门的 `leaderUserId`，必须启用且不能是申请人；BPM 通过向前加签拥有主管任务、评论和历史，ZSJOS 的 `zsjos_order_supervisor_confirmation` 只保存业务申请、决定、状态和 BPM 引用，不复制任务。`pending` 锁定同中心全部普通审批任务，另一中心继续；主管确认后解除锁并恢复父任务，主管不确认由 BPM 驳回整轮。并行驳回、销售终止或流程取消将未完成申请标记为 `cancelled`。
+- 上线后轮次允许普通审批人每轮每中心申请一次销售主管确认。主管只取订单正式销售当前直属部门的 `leaderUserId`，必须启用、不能是正式销售本人且必须持有 `zsjos:sales-order:supervisor-confirm`；BPM 通过向前加签拥有主管任务、评论和历史，ZSJOS 的 `zsjos_order_supervisor_confirmation` 只保存业务申请、决定、状态和 BPM 引用，不复制任务。`pending` 锁定同中心全部普通审批任务，另一中心继续；主管确认后解除锁并恢复父任务，主管不确认由 BPM 驳回整轮。并行驳回、销售终止或流程取消将未完成申请标记为 `cancelled`。普通审批与主管确认共用服务端“成交订单审批”页面，功能权限和本人 BPM 任务仍分别校验。
 - 成交普通审批累计要求 Controller 功能权限 `zsjos:sales-order:review`、配置部门范围及本人普通 BPM 任务；主管确认累计要求 `zsjos:sales-order:supervisor-confirm`、本人主管 BPM 子任务、申请记录指定主管和订单对象关系。菜单可见、部门成员、对象可读和 BPM 任务所有权互不替代。
 - 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化，复购生效不修改客资、商机或首次成交时间。
 - 报名履约和财务任务处理、驳回、创建人或正式负责人终止均按“订单→当前审批轮次”顺序加锁，并校验当前 BPM 任务、轮次、订单/轮次版本与节点幂等键。终止由 BPM 业务授权公共 API 执行并记录真实操作人、授权类型和原因；ZSJOS 保存订单业务状态、轮次和原因快照。
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`.
 - 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。筛选项稳定编码使用小写下划线格式 `registration_review` / `finance_review`，与保持 BPM 契约的驼峰条件值相互独立；读取历史配置时兼容旧筛选项编码，并在下一次保存或发布时规范化。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。
 - 工作台业务附件选择后先保留本地文件和预览地址，确认提交时才通过 Infra 文件 API 上传 COS；任一上传失败都不会发送业务命令，成功引用和失败项会保留以便重试。删除只移除当前表单引用，不物理删除已上传文件。
+
+### Registration fulfillment and students (V073)
+
+- `registrationReview` first approval creates one tenant/order-unique public-pool case. Finance pending or `revision_required` cases remain editable; completion additionally requires an `effective` order, every snapshotted item checked, and an enabled user returned by the System role-code API for `study_planner`.
+- Feature permissions (`query-pool`, `update`, `complete`) and registration object checks are cumulative. Public-pool access is never inferred from role or department. The planner candidate query uses System public APIs and never reads System tables.
+- Completion atomically records checklist facts, one service relation for each order item, and Person identity `student`. My Students is scoped by service-relation `owner_user_id`, grouped by Person, and exposes `leadNo` only as the user-visible Lead identifier.
+- Registration task creation publishes `zsjos.registration.task_created` through the System notification API. Recipients are resolved from enabled users with `zsjos:registration:query-pool`; the persisted in-app message and post-commit WebSocket hint are idempotent by the registration-case event key. User interfaces consume Chinese label fields while retaining protocol codes internally.

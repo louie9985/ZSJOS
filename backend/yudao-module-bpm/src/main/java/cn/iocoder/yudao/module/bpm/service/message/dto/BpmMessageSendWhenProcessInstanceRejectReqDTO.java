@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.bpm.service.message.dto;
 
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
+import jakarta.validation.Valid;
 import lombok.Data;
 
 import jakarta.validation.constraints.NotEmpty;
@@ -21,8 +23,9 @@ public class BpmMessageSendWhenProcessInstanceRejectReqDTO {
      */
     @NotEmpty(message = "流程实例的名字不能为空")
     private String processInstanceName;
-    @NotNull(message = "发起人的用户编号")
-    private Long startUserId;
+    @Valid
+    @NotNull(message = "发起主体不能为空")
+    private BpmStartSubjectDTO startSubject;
 
     /**
      * 不通过理由

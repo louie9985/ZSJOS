@@ -1,17 +1,17 @@
 # Main Workstream
 
 - Workstream ID: main
-- Goal: complete the partner H5 API contract repair, establish the audited all-role ZSJOS permission matrix through the forward-only V071 migration, and fix the H5 development server to port 10086, while preserving the prior main-workstream changes
-- Non-goals: rewrite applied migrations, apply V071 to a real database, change real accounts or business records, add dependencies, modify BPM definitions, change the H5 proxy target or preview port, or implement business domains that do not yet exist
+- Goal: fix partner optimistic-lock runtime failures and implement type-safe, idempotent partner logout with authoritative H5 local-session cleanup, while preserving the prior main-workstream changes
+- Non-goals: change database schema or data, rewrite V072 or any applied migration, change normal employee authentication behavior, add dependencies, modify unrelated business domains, or restart shared services
 - Branch: main
 - Worktree: D:\ZSJ-OS
 - Base commit: 69741138b4
 - Target branch: main
-- Ownership scope: frontend/h5 source and API documentation; the System partner message controller and focused tests; script/sql/mysql V071/bootstrap/verification files and the focused migration test runner; directly affected permission/API/menu documentation; this handoff file. Existing overlapping edits are preserved.
+- Ownership scope: common MyBatis interceptor configuration and focused test; System OAuth2 token public API/service and focused tests; ZSJOS partner account/auth services, error code and focused tests; H5 request/auth/profile logout flow; directly affected partner API and authentication-flow documentation; this handoff file. Existing overlapping edits are preserved.
 - Owner: Codex root
-- Dependencies: existing Yudao OAuth2, System notify-message service, ADMIN app-api routing, ZSJOS partner APIs, and stable role/permission codes; no new package dependency
-- Integration order: H5 request and DTO contracts; System partner-message boundary; V071 permission repair; bootstrap/verification/docs; focused and end-to-end verification
-- Verification plan: H5 typecheck/production build and browser checks, including strict development-server startup and HTTP response on port 10086; focused System/ZSJOS tests and Maven package; 38-endpoint contract audit; migration static/fresh/upgrade/guardrail/repeatability checks; read-only local database permission verification without applying V071
+- Dependencies: existing MyBatis-Plus 3.5.16, Yudao OAuth2 token persistence/cache APIs, ZSJOS PARTNER principal, and existing H5 Axios/Vue Router/Vant stack; no new package dependency
+- Integration order: optimistic-lock interceptor and checked account updates; typed OAuth2 revocation and partner logout; H5 refresh/logout routing; tests and documentation; focused and dependency-graph verification
+- Verification plan: focused MyBatis, OAuth2, partner account/auth tests; ZSJOS module tests; server dependency-graph package; H5 typecheck/build and browser checks where runtime credentials are available; scoped diff/whitespace validation
 
 ## Delivery 2026-08-16 18:00:49 +08:00
 
@@ -103,3 +103,16 @@
 - Verification evidence: H5 `npm run build` PASS; the retained Vite process listens on `[::1]:10086`; `http://localhost:10086/` returned HTTP 200 with the application root; a concurrent startup failed with `Port 10086 is already in use`, confirming strict-port behavior; scoped `git diff --check` PASS with a line-ending warning only
 - Dependency or integration impact: no dependency, API proxy, backend, database, account, permission, business data, branch, or external shared service changed
 - Remaining work: None
+
+## Delivery 2026-08-17 17:51:16 +08:00
+
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: 84474ae6083a64343f5b39b397e5143b233523ae
+- User goal: fix partner login/update optimistic-lock failures and make expired-token logout type-safe, idempotent, and locally authoritative in the partner H5
+- Key decisions: register the existing MyBatis-Plus optimistic-lock interceptor globally; require every versioned partner-account update to affect exactly one row before token side effects; add an OAuth2 revocation overload guarded by expected user type; treat logout audit as best effort; let normal H5 requests refresh once while logout requests never refresh and always clear local state after confirmation
+- Execution or analysis result: implemented stable concurrent-modification handling for partner login, enable/disable, mobile, and password updates; PARTNER logout now removes persisted expired access/refresh tokens and caches without touching ADMIN/MEMBER tokens, and missing tokens are idempotent success; H5 logout separates user cancellation from server failure, suppresses expired-token refresh/toast on logout, clears all authentication state in `finally`, and uses centralized login redirection with return targets only for passive session expiry; synchronized API and authentication-flow documentation
+- Changed files: backend/yudao-framework/yudao-common OAuth2TokenCommonApi; backend/yudao-framework/yudao-spring-boot-starter-mybatis YudaoMybatisAutoConfiguration and focused test; backend/yudao-module-system OAuth2TokenApiImpl, OAuth2TokenService, OAuth2TokenServiceImpl and focused test; backend/yudao-module-zsjos ZsjosErrorCodeConstants, PartnerAccountService/Impl, PartnerAuthServiceImpl and focused tests; frontend/h5/src/api/request.ts; frontend/h5/src/api/auth.ts; frontend/h5/src/pages/profile/index.vue; docs/api/partner-app-api.md; frontend/h5/兼职端API接口.md; docs/architecture/data-and-permission-flow.md; handoff/main.md
+- Verification evidence: MyBatis configuration test PASS 1/1; typed OAuth2 revocation tests PASS 3/3; partner account/auth tests PASS 11/11; H5 `npm run build` PASS; browser check on `localhost:10086` confirmed the login page renders without console errors and unauthenticated `/profile` preserves `/profile` as the return target; server dependency graph compiled all 28 modules and package PASS with `spring-boot.repackage.skip=true`; scoped `git diff --check` PASS. The complete `yudao-module-zsjos -am test` reactor remains blocked before System/BPM/ZSJOS by the unrelated existing `CodegenEngineUniappTest.testExecute_treeSearch` failure in Infra. Standard executable-JAR repackage compiled all modules but could not rename the currently running locked `yudao-server.jar`.
+- Dependency or integration impact: no dependency, database schema/data, migration, account permission, branch, or shared-service state changed; deployment requires replacing/restarting the backend before the new interceptor and revocation implementation are active
+- Remaining work: after an approved backend deployment/restart and with a non-sensitive partner test account, run real HTTP/mobile regressions for login version increment, valid/expired/repeated logout, wrong subject type, refresh success/failure, network failure, and active-logout no-return-target behavior; resolve the unrelated Infra codegen test baseline separately

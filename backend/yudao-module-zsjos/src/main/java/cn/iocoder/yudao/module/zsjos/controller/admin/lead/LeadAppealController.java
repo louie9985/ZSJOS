@@ -28,7 +28,7 @@ public class LeadAppealController {
 
     @GetMapping("/lead/{leadId}/list")
     @Operation(summary = "获得客资申诉记录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:appeal:create','zsjos:lead:appeal:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:appeal:create','zsjos:lead:appeal:query','zsjos:subordinate-sales:query')")
     public CommonResult<List<LeadAppealRespVO>> getList(@PathVariable Long leadId) {
         return success(appealService.getLeadAppeals(leadId, WebFrameworkUtils.getLoginUserId()));
     }

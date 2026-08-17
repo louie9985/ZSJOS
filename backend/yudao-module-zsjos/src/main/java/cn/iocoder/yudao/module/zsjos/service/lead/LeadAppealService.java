@@ -11,10 +11,13 @@ import java.util.List;
 
 public interface LeadAppealService {
     List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId);
+    List<LeadAppealRespVO> getPartnerLeadAppeals(Long leadId, Long partnerId);
     Long submit(Long leadId, Long userId, LeadAppealSubmitReqVO reqVO);
+    Long submitForPartner(Long leadId, Long accountId, Long partnerId, LeadAppealSubmitReqVO reqVO);
     PageResult<LeadAppealRespVO> getInboxPage(LeadAppealPageReqVO reqVO, Long userId);
     CursorPageResult<LeadAppealRespVO> getInboxCursor(LeadAppealPageReqVO reqVO, Long userId);
     void overturn(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO);
     void uphold(Long appealId, Long userId, LeadAppealDecisionReqVO reqVO);
     LeadAttachmentUploadRespVO upload(MultipartFile file) throws IOException;
+    LeadAttachmentUploadRespVO uploadForPartner(MultipartFile file, Long accountId) throws IOException;
 }

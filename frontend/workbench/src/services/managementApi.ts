@@ -6,7 +6,7 @@ export type { ImpersonationSession } from './impersonation'
 
 export type PersonnelState = { userId: number; state: 'enabled' | 'disabled' | 'departed'; reason?: string; changedAt?: Timestamp }
 export type Partner = { id: number; partnerNo: string; name: string; mobile: string; status: 'enabled' | 'disabled' | 'converted'; boundSystemUserId: number; channelId?: string }
-export type PartnerCreate = { partnerNo: string; name: string; mobile: string; username: string; password: string; channelId?: string }
+export type PartnerCreate = { partnerNo: string; name: string; mobile: string; password: string; channelId?: string }
 export type BusinessAudit = { id: number; operatorNameSnapshot: string; operatorRoleSnapshot: string; actionCode: string; targetType: string; targetId: string; sourceIp?: string; occurredAt: Timestamp }
 export type ImpersonationAudit = { id: number; sessionId: number; administratorUserId: number; targetUserId: number; httpMethod: string; requestPath: string; occurredAt: Timestamp }
 export type Cashback = { id: number; cashbackNo: string; type: 'valid' | 'deal'; status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled'; beneficiaryUserId: number; productNameSnapshot: string; amount: number; generatedAt: Timestamp; availableAt: Timestamp }
@@ -29,7 +29,9 @@ export const managementApi = {
   partners: async () => unwrap<Partner[]>(await http.get('/zsjos/partner/list')),
   createPartner: async (data: PartnerCreate) => unwrap<number>(await http.post('/zsjos/partner/create', data)),
   setPartnerEnabled: async (id: number, enabled: boolean, reason: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/${enabled ? 'enable' : 'disable'}`, { reason })),
-  convertPartner: async (id: number, data: { targetType: string; deptId: number; migrateHistoricalOrganization: boolean; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/partner/${id}/convert`, data)),
+  convertPartner: async (id: number, data: { username: string; password: string; targetType: string; deptId: number; migrateHistoricalOrganization: boolean; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/partner/${id}/convert`, data)),
+  updatePartnerMobile: async (id: number, mobile: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/mobile`, { mobile })),
+  resetPartnerPassword: async (id: number, password: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/reset-password`, { password })),
   startImpersonation: async (targetUserId: number, reason: string) => unwrap<ImpersonationSession>(await http.post('/zsjos/impersonation/start', { targetUserId, reason })),
   endImpersonation: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/impersonation/${id}/end`, undefined, { params: { reason: 'manual' } })),
   businessAudits: async (params: { pageNo: number; pageSize: number; actionCode?: string; targetType?: string }) => unwrap<PageResult<BusinessAudit>>(await http.get('/zsjos/business-audit/page', { params })),

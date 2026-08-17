@@ -8,6 +8,10 @@ export interface CategoryFieldVO {
   fieldType: number
   options?: string[]
   required: boolean
+  adminVisible: boolean
+  collectionVisible: boolean
+  collectionRequired: boolean
+  conditionRule?: Record<string, any>
   sort: number
   /** 该字段是否继承自父分类，继承字段不可在当前分类就地编辑 */
   inherited?: boolean

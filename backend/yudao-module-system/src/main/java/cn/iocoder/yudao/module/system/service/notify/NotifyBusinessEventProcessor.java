@@ -18,6 +18,7 @@ import cn.iocoder.yudao.module.system.api.notify.NotifyChannelType;
 import cn.iocoder.yudao.module.system.api.notify.NotifyChannelAdapter;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyDeliveryContext;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 
 @Service
 @Slf4j
@@ -77,15 +78,16 @@ public class NotifyBusinessEventProcessor {
                 || template.getChannelCode() != null && !channelCode.equals(template.getChannelCode())) {
             return NotifySendResult.failure("NOTIFY_TEMPLATE_INVALID", "通知模板与规则不匹配", false);
         }
-        Set<Long> recipients = new LinkedHashSet<>(rule.getSpecifiedUserIds());
+        Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
+        rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
         recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
         if (recipients.isEmpty()) {
             return NotifySendResult.failure("NOTIFY_RECIPIENT_MISSING", "通知收件人暂不可用", true);
         }
-        for (Long recipientId : recipients) {
+        for (NotifyRecipientDTO recipient : recipients) {
             if (NotifyChannelType.IN_APP.equals(channelCode)) {
                 try {
-                    messageCreator.create(event, provider, rule, template, recipientId);
+                    messageCreator.create(event, provider, rule, template, recipient);
                 } catch (DuplicateKeyException ignored) {
                     // The durable message already exists, so this retry is confirmed successful.
                 }
@@ -96,10 +98,10 @@ public class NotifyBusinessEventProcessor {
             if (adapter == null) {
                 return NotifySendResult.failure("NOTIFY_CHANNEL_MISSING", "通知渠道未配置", false);
             }
-            var variables = provider.resolveVariables(event, recipientId);
+            var variables = provider.resolveVariables(event, recipient);
             NotifySendResult result = adapter.send(NotifyDeliveryContext.builder()
                     .tenantId(event.getTenantId()).sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey())
-                    .ruleId(rule.getId()).userId(recipientId).userType(2).templateCode(template.getCode())
+                    .ruleId(rule.getId()).userId(recipient.getUserId()).userType(recipient.getUserType()).templateCode(template.getCode())
                     .smsTemplateId(template.getSmsTemplateId()).wecomMessageType(template.getWecomMessageType())
                     .title(notifyTemplateService.formatNotifyTemplateContent(template.getTitle(), variables))
                     .content(notifyTemplateService.formatNotifyTemplateContent(template.getContent(), variables))
@@ -127,7 +129,8 @@ public class NotifyBusinessEventProcessor {
                     // WebSocket is emitted by the durable in-app message AFTER_COMMIT listener.
                     continue;
                 }
-                Set<Long> recipients = new LinkedHashSet<>(rule.getSpecifiedUserIds());
+                Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
+                rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
                 recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
                 NotifyTemplateDO template = notifyTemplateService.getNotifyTemplate(rule.getTemplateId());
                 boolean websocketUsesInAppTemplate = template != null && NotifyChannelType.WEBSOCKET.equals(channelCode)
@@ -137,13 +140,13 @@ public class NotifyBusinessEventProcessor {
                         && !websocketUsesInAppTemplate)) {
                     continue;
                 }
-                for (Long recipientId : recipients) {
+                for (NotifyRecipientDTO recipient : recipients) {
                     // WebSocket is bound to the durable in-app message lifecycle.
                     // The AFTER_COMMIT listener pushes it when the recipient is online.
                     if (NotifyChannelType.IN_APP.equals(channelCode)) {
-                        createMessageBestEffort(event, provider, rule, template, recipientId);
+                        createMessageBestEffort(event, provider, rule, template, recipient);
                     } else {
-                        sendExternalBestEffort(event, provider, rule, template, recipientId, channelCode);
+                        sendExternalBestEffort(event, provider, rule, template, recipient, channelCode);
                     }
                 }
             } catch (Exception exception) {
@@ -154,10 +157,10 @@ public class NotifyBusinessEventProcessor {
     }
 
     private void sendExternalBestEffort(NotifyBusinessEvent event, NotifySceneProvider provider,
-                                        NotifyRuleDO rule, NotifyTemplateDO template, Long recipientId,
+                                        NotifyRuleDO rule, NotifyTemplateDO template, NotifyRecipientDTO recipient,
                                         String channelCode) {
         try {
-            var variables = provider.resolveVariables(event, recipientId);
+            var variables = provider.resolveVariables(event, recipient);
             var adapter = channelAdapters.stream().filter(item -> channelCode.equals(item.getChannelCode()))
                     .findFirst().orElse(null);
             if (adapter == null) {
@@ -166,7 +169,7 @@ public class NotifyBusinessEventProcessor {
             }
             NotifySendResult result = adapter.send(NotifyDeliveryContext.builder()
                     .tenantId(event.getTenantId()).sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey())
-                    .ruleId(rule.getId()).userId(recipientId).userType(2).templateCode(template.getCode())
+                    .ruleId(rule.getId()).userId(recipient.getUserId()).userType(recipient.getUserType()).templateCode(template.getCode())
                     .smsTemplateId(template.getSmsTemplateId()).wecomMessageType(template.getWecomMessageType())
                     .title(notifyTemplateService.formatNotifyTemplateContent(template.getTitle(), variables))
                     .content(notifyTemplateService.formatNotifyTemplateContent(template.getContent(), variables))
@@ -182,16 +185,16 @@ public class NotifyBusinessEventProcessor {
     }
 
     private void createMessageBestEffort(NotifyBusinessEvent event, NotifySceneProvider provider,
-                                         NotifyRuleDO rule, NotifyTemplateDO template, Long recipientId) {
+                                         NotifyRuleDO rule, NotifyTemplateDO template, NotifyRecipientDTO recipient) {
         try {
-            messageCreator.create(event, provider, rule, template, recipientId);
+            messageCreator.create(event, provider, rule, template, recipient);
         } catch (DuplicateKeyException exception) {
             // A concurrent delivery of the same rule/user/event is already persisted.
             log.debug("[createMessageBestEffort][scene({}) ruleId({}) userId({}) duplicate ignored]",
-                    event.getSceneCode(), rule.getId(), recipientId);
+                    event.getSceneCode(), rule.getId(), recipient.getUserId());
         } catch (Exception exception) {
             log.warn("[createMessageBestEffort][scene({}) ruleId({}) userId({}) creation failed]",
-                    event.getSceneCode(), rule.getId(), recipientId, exception);
+                    event.getSceneCode(), rule.getId(), recipient.getUserId(), exception);
         }
     }
 }

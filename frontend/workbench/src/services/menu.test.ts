@@ -112,12 +112,13 @@ describe('workbench menu conversion', () => {
     expect(filtered[0].children.map(child => child.name)).toEqual(['Work plans'])
   })
 
-  it('covers all 36 server-owned page routes and excludes obsolete aliases', () => {
-    expect(RENDERABLE_APP_ROUTES.size).toBe(36)
+  it('covers all 38 server-owned page routes and excludes obsolete aliases', () => {
+    expect(RENDERABLE_APP_ROUTES.size).toBe(38)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/appeals')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-aging-pool')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/opportunity-public-sea')
+    expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/sales-order-supervisor-confirmations')
   })
 
   it('keeps an authorized hidden page routable without adding it to navigation', () => {

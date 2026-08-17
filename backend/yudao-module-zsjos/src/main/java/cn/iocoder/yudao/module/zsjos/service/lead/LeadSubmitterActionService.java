@@ -39,8 +39,17 @@ public class LeadSubmitterActionService {
 
     @Transactional(rollbackFor = Exception.class)
     public void supplement(Long leadId, Long userId, LeadSubmitterSupplementReqVO req) {
+        supplementInternal(leadId, userId, null, req);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void supplementForPartner(Long leadId, Long partnerId, LeadSubmitterSupplementReqVO req) {
+        supplementInternal(leadId, null, partnerId, req);
+    }
+
+    private void supplementInternal(Long leadId, Long userId, Long partnerId, LeadSubmitterSupplementReqVO req) {
         if (eventMapper.selectByIdempotencyKey(req.getIdempotencyKey()) != null) return;
-        LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId);
+        LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId, partnerId);
         requireActionable(lead);
         Region region = region(req.getProvinceCode(), req.getCityCode());
         dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(req.getLeadCategory()));
@@ -60,22 +69,37 @@ public class LeadSubmitterActionService {
 
     @Transactional(rollbackFor = Exception.class)
     public void urge(Long leadId, Long userId, LeadUrgeReqVO req) {
-        LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId);
+        urgeInternal(leadId, userId, null, req);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void urgeForPartner(Long leadId, Long partnerId, LeadUrgeReqVO req) {
+        urgeInternal(leadId, null, partnerId, req);
+    }
+
+    private void urgeInternal(Long leadId, Long userId, Long partnerId, LeadUrgeReqVO req) {
+        LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId, partnerId);
         requireActionable(lead);
         if (lead.getOwnerUserId() == null) throw exception(LEAD_SUBMITTER_ACTION_STATE_INVALID);
         LocalDateTime now = LocalDateTime.now(ZoneId.of("Asia/Shanghai"));
-        LeadUrgeDO row = new LeadUrgeDO(); row.setLeadId(leadId); row.setSubmitterUserId(userId);
+        LeadUrgeDO row = new LeadUrgeDO(); row.setLeadId(leadId); row.setSubmitterUserId(userId); row.setPartnerId(partnerId);
         row.setTargetSalesUserId(lead.getOwnerUserId()); row.setUrgeDate(now.toLocalDate()); row.setReason(req.getReason().trim()); row.setUrgedAt(now);
         try { urgeMapper.insert(row); } catch (DuplicateKeyException ex) { throw exception(LEAD_URGE_DAILY_LIMIT); }
-        notifyPublisher.publish("zsjos.lead.submitter_urged", leadId, "lead-urge:" + row.getId(), userId, now,
-                Map.of("submitterUserId", userId, "ownerUserId", lead.getOwnerUserId(), "urge.reason", row.getReason()));
+        Map<String, Object> context = new HashMap<>();
+        context.put("submitterUserId", userId); context.put("partnerId", partnerId);
+        context.put("ownerUserId", lead.getOwnerUserId()); context.put("urge.reason", row.getReason());
+        notifyPublisher.publish("zsjos.lead.submitter_urged", leadId, "lead-urge:" + row.getId(), userId, now, context);
     }
 
-    private LeadDO requireSubmitterLeadForUpdate(Long leadId, Long userId) {
+    private LeadDO requireSubmitterLeadForUpdate(Long leadId, Long userId, Long partnerId) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        if (!Objects.equals(lead.getSourceUserId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
-        identityService.requireHistoricalSubmitter(lead, userId);
+        if (partnerId != null) {
+            if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
+        } else {
+            if (!Objects.equals(lead.getSourceUserId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
+            identityService.requireHistoricalSubmitter(lead, userId);
+        }
         return lead;
     }
 

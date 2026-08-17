@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.api.sms;
 import cn.iocoder.yudao.module.system.api.sms.dto.send.SmsSendSingleToUserReqDTO;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 
 /**
  * 短信发送 API 接口
@@ -30,5 +31,9 @@ public interface SmsSendApi {
      * @return 发送日志编号
      */
     Long sendSingleSmsToMember(@Valid SmsSendSingleToUserReqDTO reqDTO);
+
+    /** Sends to an explicitly typed user after the caller has resolved the mobile number. */
+    Long sendSingleSms(@Valid SmsSendSingleToUserReqDTO reqDTO,
+                       @NotNull(message = "用户类型不能为空") Integer userType);
 
 }

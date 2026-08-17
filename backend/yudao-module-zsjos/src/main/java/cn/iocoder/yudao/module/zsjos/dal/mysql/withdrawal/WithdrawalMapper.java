@@ -19,6 +19,12 @@ public interface WithdrawalMapper extends BaseMapperX<WithdrawalDO> {
                 .eqIfPresent(WithdrawalDO::getStatus, req.getStatus())
                 .orderByDesc(WithdrawalDO::getSubmittedAt).orderByDesc(WithdrawalDO::getId));
     }
+    default PageResult<WithdrawalDO> selectPartnerPage(WithdrawalPageReqVO req, Long partnerId) {
+        return selectPage(req, new LambdaQueryWrapperX<WithdrawalDO>()
+                .eq(WithdrawalDO::getPartnerId, partnerId)
+                .eqIfPresent(WithdrawalDO::getStatus, req.getStatus())
+                .orderByDesc(WithdrawalDO::getSubmittedAt).orderByDesc(WithdrawalDO::getId));
+    }
     @Select("SELECT * FROM zsjos_withdrawal WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=0 FOR UPDATE")
     WithdrawalDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
     default WithdrawalDO selectByProcessInstanceId(String processId) {

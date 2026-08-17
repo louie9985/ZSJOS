@@ -1,6 +1,7 @@
 import request from './request'
 import referenceRequest from './reference'
 import type { DictItem } from '@/stores/app'
+import type { ApiDateValue } from '@/utils/format'
 
 export interface LeadCatalog {
   categoryTree: CategoryNode[]
@@ -77,7 +78,7 @@ export interface LeadListItem {
   status: string
   assignmentStatus: string
   ownerUserName?: string
-  submittedAt: string
+  submittedAt: ApiDateValue
   provinceCode: string
   provinceName: string
   cityCode: string
@@ -121,6 +122,18 @@ export interface SupplementParams {
 /** 获取字典数据 */
 export function getDictByType(type: string) {
   return referenceRequest.get<never, DictItem[]>('/system/dict-data/type', { params: { type } })
+}
+
+export interface LeadComplaintItem {
+  id: number
+  leadId: number
+  leadNo?: string | null
+  reason: string
+  status: 'pending' | 'handled'
+  result?: 'founded' | 'unfounded'
+  handlerOpinion?: string
+  handledAt?: ApiDateValue
+  createTime: ApiDateValue
 }
 
 interface AreaApiNode {
@@ -180,7 +193,7 @@ export function getMyLeadPage(params: {
   assignmentStatus?: string
   sourceChannel?: string
   leadCategory?: string
-  submittedAt?: string
+  submittedAt?: ApiDateValue
 }) {
   return request.get<never, { list: LeadListItem[]; total: number }>(
     '/zsjos/lead/inbox/submitted/page',
@@ -210,7 +223,7 @@ export function createComplaint(leadId: number, data: { reason: string; evidence
 
 /** 查询投诉历史 */
 export function getMyComplaints(params: { pageNo: number; pageSize: number; status?: string }) {
-  return request.get<never, { list: unknown[]; total: number }>('/zsjos/lead-complaint/my-page', { params })
+  return request.get<never, { list: LeadComplaintItem[]; total: number }>('/zsjos/lead-complaint/my-page', { params })
 }
 
 /** 查询客资申诉记录 */

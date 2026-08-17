@@ -1,3 +1,5 @@
+import { STORAGE_KEYS } from '../constants'
+
 export type RealtimeStatus = 'connecting' | 'open' | 'closed'
 
 export type RealtimeMessage = {
@@ -5,11 +7,15 @@ export type RealtimeMessage = {
   content: unknown
 }
 
-export function buildWebSocketUrl(apiBaseUrl: string, origin: string, refreshToken: string) {
+export function getRealtimeAccessToken(storage: Pick<Storage, 'getItem'>) {
+  return storage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
+}
+
+export function buildWebSocketUrl(apiBaseUrl: string, origin: string, accessToken: string) {
   const apiUrl = new URL(apiBaseUrl, origin)
   apiUrl.protocol = apiUrl.protocol === 'https:' ? 'wss:' : 'ws:'
   apiUrl.pathname = '/infra/ws'
-  apiUrl.search = new URLSearchParams({ token: refreshToken }).toString()
+  apiUrl.search = new URLSearchParams({ token: accessToken }).toString()
   apiUrl.hash = ''
   return apiUrl.toString()
 }
@@ -21,7 +27,11 @@ export function parseRealtimeMessage(data: string): RealtimeMessage | null {
     if (typeof envelope.type !== 'string' || !envelope.type) return null
     let content = envelope.content
     if (typeof content === 'string') {
-      try { content = JSON.parse(content) } catch { /* Keep plain-text payloads compatible. */ }
+      try {
+        content = JSON.parse(content)
+      } catch {
+        /* Keep plain-text payloads compatible. */
+      }
     }
     return { type: envelope.type, content }
   } catch {

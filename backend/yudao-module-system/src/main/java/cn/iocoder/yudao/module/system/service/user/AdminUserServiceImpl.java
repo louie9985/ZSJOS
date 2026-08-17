@@ -110,6 +110,7 @@ public class AdminUserServiceImpl implements AdminUserService {
                 createReqVO.getMobile(), createReqVO.getEmail(), createReqVO.getDeptId(), createReqVO.getPostIds());
         // 2.1 插入用户
         AdminUserDO user = BeanUtils.toBean(createReqVO, AdminUserDO.class);
+        user.setWecomUserId(StrUtil.trimToNull(user.getWecomUserId()));
         user.setStatus(CommonStatusEnum.ENABLE.getStatus()); // 默认开启
         user.setPassword(encodePassword(createReqVO.getPassword())); // 加密密码
         userMapper.insert(user);
@@ -160,6 +161,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
         // 2.1 更新用户
         AdminUserDO updateObj = BeanUtils.toBean(updateReqVO, AdminUserDO.class);
+        updateObj.setWecomUserId(StrUtil.trimToNull(updateObj.getWecomUserId()));
         userMapper.updateById(updateObj);
         if (!Objects.equals(oldUser.getUsername(), updateReqVO.getUsername())
                 || !Objects.equals(oldUser.getMobile(), updateReqVO.getMobile())) {

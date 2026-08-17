@@ -6,7 +6,8 @@
 | --- | --- | --- | --- |
 | Employee page or workbench shell | `frontend/workbench` | Authorized menu mapping, typed API, desktop/mobile UI | Duplicating the page in Vue without an admin use case |
 | Administrator page or configuration | Vue administration frontend | Existing API/dictionary/permission utilities | Building an independent admin UI in the workbench |
-| User, role, menu, dictionary, tenant, authentication | `yudao-module-system` and existing framework contracts | Existing public API and authorization behavior | Reimplementing system truth in `yudao-module-zsjos` |
+| ADMIN/MEMBER identity, role, menu, dictionary, tenant, OAuth tokens | `yudao-module-system` and existing framework contracts | Existing public API and authorization behavior | Reimplementing shared identity truth in `yudao-module-zsjos` |
+| PARTNER account, profile, and business-subject resolution | `yudao-module-zsjos`, consuming System OAuth APIs | Account/subject state, tenant isolation, typed user ID, object authorization | Treating Partner Account ID or Partner ID as a System user ID |
 | Business notification templates, tenant rules, message snapshots, and delivery | `yudao-module-system` | Registered scene contract, ownership API, tenant isolation, idempotency | Letting a business module write System notification tables or accepting arbitrary URLs/expressions |
 | Workflow and approval execution | `yudao-module-bpm` | Public API, stable process/business keys, status events, idempotent business update | Reimplementing process tasks or workflow history in `yudao-module-zsjos` |
 | Product, SKU, and product-driven rule definition | Future approved product capability | Public rule-result contract, stable identifiers, versioning | Inferring rules from names or querying another module's DAL or tables |
@@ -31,8 +32,9 @@ services are not runtime persistence or behavior dependencies for this lifecycle
 
 This is a deliberate domain-boundary decision caused by different lifecycle and
 repurchase semantics, not permission to copy arbitrary existing modules. System-owned
-users, departments, posts, roles, dictionaries, tenants, authentication, and
-permissions continue to come through the existing system contracts. External payment
+departments, posts, dictionaries, tenants, OAuth tokens, and internal employee permissions
+continue to come through the existing system contracts. Partner accounts and profiles are ZSJOS-owned
+and use the shared OAuth token service through its public API. External payment
 channels may execute funds movement and report channel payment facts, while ZSJOS owns
 the lead-bound payment request, channel-transaction reference, order allocation,
 customer account and immutable ledger, and refund business records. Channel identifiers
@@ -69,6 +71,11 @@ action, operator, occurrence-time, and idempotency identifiers.
   transaction-bound event publication. System owns rule validation, rendering, message persistence,
   idempotency, and the post-commit WebSocket hint. Modules integrate through
   `NotifySceneProvider` and `NotifyBusinessEventApi`, never through cross-module notification DAL.
+- Notification delivery preserves `{userType,userId}` end to end. System owns channel dispatch and
+  typed SMS logging; an external identity owner may implement `NotifyRecipientMobileProvider` to
+  resolve its enabled account without making System depend on that module or reinterpret its ID as ADMIN.
+- BPM keeps external initiators as typed subjects in Flowable and notification contracts. UI conversion
+  may use the snapshotted external display name, but must not parse an external subject as a System user ID.
 - Authorization is cumulative: Controller feature permission uses `@PreAuthorize`, list and aggregate visibility uses Yudao DataPermission or an explicitly reviewed SQL scope, and single-object or object-bearing commands use the module-owned `@ZsjosPermission` at the Service boundary.
 - Passing feature permission, list scope, or object permission never implies either of the other checks. Batch mutations must authorize every target object before applying changes.
 

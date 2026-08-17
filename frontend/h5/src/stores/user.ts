@@ -15,6 +15,10 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!accessToken.value)
 
+  function hasPermission(permission: string) {
+    return permissions.value.includes('*:*:*') || permissions.value.includes(permission)
+  }
+
   function setTokens(access: string, refresh: string, clientId?: string) {
     accessToken.value = access
     refreshToken.value = refresh
@@ -50,6 +54,7 @@ export const useUserStore = defineStore('user', () => {
     avatar,
     permissions,
     isLoggedIn,
+    hasPermission,
     setTokens,
     setUserInfo,
     logout

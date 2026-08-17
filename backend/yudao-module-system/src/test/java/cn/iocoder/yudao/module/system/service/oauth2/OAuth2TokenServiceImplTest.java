@@ -325,6 +325,45 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
         assertNull(oauth2AccessTokenRedisDAO.get(accessTokenDO.getAccessToken()));
     }
 
+    @Test
+    public void testRemoveAccessTokenByExpectedType_expiredSuccess() {
+        OAuth2AccessTokenDO accessTokenDO = randomPojo(OAuth2AccessTokenDO.class)
+                .setUserType(UserTypeEnum.PARTNER.getValue()).setExpiresTime(LocalDateTime.now().minusMinutes(1));
+        oauth2AccessTokenMapper.insert(accessTokenDO);
+        OAuth2RefreshTokenDO refreshTokenDO = randomPojo(OAuth2RefreshTokenDO.class)
+                .setRefreshToken(accessTokenDO.getRefreshToken());
+        oauth2RefreshTokenMapper.insert(refreshTokenDO);
+
+        OAuth2AccessTokenDO result = oauth2TokenService.removeAccessToken(accessTokenDO.getAccessToken(),
+                UserTypeEnum.PARTNER.getValue());
+
+        assertNotNull(result);
+        assertNull(oauth2AccessTokenMapper.selectByAccessToken(accessTokenDO.getAccessToken()));
+        assertNull(oauth2RefreshTokenMapper.selectByRefreshToken(accessTokenDO.getRefreshToken()));
+    }
+
+    @Test
+    public void testRemoveAccessTokenByExpectedType_wrongTypeDoesNothing() {
+        OAuth2AccessTokenDO accessTokenDO = randomPojo(OAuth2AccessTokenDO.class)
+                .setUserType(UserTypeEnum.ADMIN.getValue()).setExpiresTime(LocalDateTime.now().plusDays(1));
+        oauth2AccessTokenMapper.insert(accessTokenDO);
+        OAuth2RefreshTokenDO refreshTokenDO = randomPojo(OAuth2RefreshTokenDO.class)
+                .setRefreshToken(accessTokenDO.getRefreshToken());
+        oauth2RefreshTokenMapper.insert(refreshTokenDO);
+
+        OAuth2AccessTokenDO result = oauth2TokenService.removeAccessToken(accessTokenDO.getAccessToken(),
+                UserTypeEnum.PARTNER.getValue());
+
+        assertNull(result);
+        assertNotNull(oauth2AccessTokenMapper.selectByAccessToken(accessTokenDO.getAccessToken()));
+        assertNotNull(oauth2RefreshTokenMapper.selectByRefreshToken(accessTokenDO.getRefreshToken()));
+    }
+
+    @Test
+    public void testRemoveAccessTokenByExpectedType_missingIsIdempotent() {
+        assertNull(oauth2TokenService.removeAccessToken(randomString(), UserTypeEnum.PARTNER.getValue()));
+    }
+
 
     @Test
     public void testGetAccessTokenPage() {

@@ -20,6 +20,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_NOT_EXISTS;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_SUBMITTED;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -45,6 +47,7 @@ class LeadObjectPermissionServiceTest {
     @Test
     void readAllowsOriginalSubmitter() {
         when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
 
         assertReadAllowed(10L);
     }
@@ -52,8 +55,70 @@ class LeadObjectPermissionServiceTest {
     @Test
     void readAllowsCurrentOwner() {
         when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
 
         assertReadAllowed(20L);
+    }
+
+    @Test
+    void ownerReadAllowsCurrentOwner() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+
+        assertActionAllowed(20L, "owner-read");
+    }
+
+    @Test
+    void ownerReadRejectsOriginalSubmitter() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(10L);
+
+            ServiceException error = assertThrows(ServiceException.class, () -> service.check(1L, "owner-read"));
+
+            assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        }
+    }
+
+    @Test
+    void ownerOrManagerReadAllowsCurrentOwnerAndRejectsSubmitter() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+
+        assertActionAllowed(20L, "owner-or-manager-read");
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(10L);
+            ServiceException error = assertThrows(ServiceException.class,
+                    () -> service.check(1L, "owner-or-manager-read"));
+            assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        }
+    }
+
+    @Test
+    void ownerOrManagerReadAllowsDirectAndParentDepartmentLeaders() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 102L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(102L)));
+        assertActionAllowed(30L, "owner-or-manager-read");
+
+        when(deptApi.getDeptListByLeaderUserId(40L)).thenReturn(List.of(dept(100L)));
+        when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(101L), dept(102L)));
+        assertActionAllowed(40L, "owner-or-manager-read");
+    }
+
+    @Test
+    void ownerOrManagerReadAllowsQueryAllAndRejectsParallelLeader() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
+        assertActionAllowed(50L, "owner-or-manager-read");
+
+        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, 102L));
+        when(deptApi.getDeptListByLeaderUserId(60L)).thenReturn(List.of(dept(101L)));
+        when(deptApi.getChildDeptList(101L)).thenReturn(List.of());
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(60L);
+            assertThrows(ServiceException.class, () -> service.check(1L, "owner-or-manager-read"));
+        }
     }
 
     @Test
@@ -93,6 +158,7 @@ class LeadObjectPermissionServiceTest {
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, 101L));
         when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(101L)));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
 
         assertReadAllowed(30L);
     }
@@ -104,6 +170,7 @@ class LeadObjectPermissionServiceTest {
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, 102L));
         when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(100L)));
         when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(101L), dept(102L)));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
 
         assertReadAllowed(30L);
     }
@@ -114,6 +181,7 @@ class LeadObjectPermissionServiceTest {
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, 102L));
         when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(101L)));
         when(deptApi.getChildDeptList(101L)).thenReturn(List.of());
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
 
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
@@ -150,9 +218,24 @@ class LeadObjectPermissionServiceTest {
         }
     }
     private void assertReadAllowed(Long userId) {
+        assertActionAllowed(userId, "read");
+    }
+
+    @Test
+    void readAllowsLeaderOfSubmitterDepartmentWithSubmittedPermission() {
+        when(leadMapper.selectById(1L)).thenReturn(lead(10L, 20L));
+        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
+        when(adminUserApi.getUser(10L)).thenReturn(user(10L, 102L));
+        when(deptApi.getDeptListByLeaderUserId(30L)).thenReturn(List.of(dept(100L)));
+        when(deptApi.getChildDeptList(100L)).thenReturn(List.of(dept(102L)));
+
+        assertReadAllowed(30L);
+    }
+
+    private void assertActionAllowed(Long userId, String action) {
         try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
             security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(userId);
-            assertDoesNotThrow(() -> service.check(1L, "read"));
+            assertDoesNotThrow(() -> service.check(1L, action));
         }
     }
 

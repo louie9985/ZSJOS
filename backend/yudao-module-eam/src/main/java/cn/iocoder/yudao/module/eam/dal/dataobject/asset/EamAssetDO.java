@@ -51,6 +51,18 @@ public class EamAssetDO extends BaseDO {
      */
     private Long categoryId;
     /**
+     * 分类管理模式快照：1 单件，2 批量
+     */
+    private Integer managementMode;
+    /**
+     * 资产数量；单件资产固定为 1
+     */
+    private Integer quantity;
+    /**
+     * 计量单位快照
+     */
+    private String unit;
+    /**
      * 资产状态
      *
      * 枚举 {@link EamAssetStatusEnum}

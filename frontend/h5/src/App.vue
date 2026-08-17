@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
+const userStore = useUserStore()
 
-// TabBar 页面路径
-const tabRoutes = ['/home', '/lead/list', '/earnings', '/messages', '/profile']
-const showTabBar = computed(() => tabRoutes.includes(route.path))
+const canViewLeads = computed(() => userStore.hasPermission('zsjos:lead:query-submitted'))
+const canViewEarnings = computed(() => userStore.hasPermission('zsjos:cashback:my-query'))
+const tabRoutes = computed(() => [
+  '/home',
+  ...(canViewLeads.value ? ['/lead/list'] : []),
+  ...(canViewEarnings.value ? ['/earnings'] : []),
+  '/messages',
+  '/profile'
+])
+const showTabBar = computed(() => tabRoutes.value.includes(route.path))
 
 const activeTab = computed({
   get: () => {
-    const idx = tabRoutes.indexOf(route.path)
+    const idx = tabRoutes.value.indexOf(route.path)
     return idx >= 0 ? idx : 0
   },
   set: () => {} // controlled by @change
@@ -32,9 +41,9 @@ const activeTab = computed({
     safe-area-inset-bottom
   >
     <van-tabbar-item icon="wap-home-o" to="/home">首页</van-tabbar-item>
-    <van-tabbar-item icon="orders-o" to="/lead/list">客资</van-tabbar-item>
-    <van-tabbar-item icon="gold-coin-o" to="/earnings">收益</van-tabbar-item>
-    <van-tabbar-item icon="bell" to="/messages" :badge="''">消息</van-tabbar-item>
+    <van-tabbar-item v-if="canViewLeads" icon="orders-o" to="/lead/list">客资</van-tabbar-item>
+    <van-tabbar-item v-if="canViewEarnings" icon="gold-coin-o" to="/earnings">收益</van-tabbar-item>
+    <van-tabbar-item icon="bell" to="/messages">消息</van-tabbar-item>
     <van-tabbar-item icon="user-o" to="/profile">我的</van-tabbar-item>
   </van-tabbar>
 </template>

@@ -48,6 +48,8 @@ import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
+import cn.iocoder.yudao.module.zsjos.service.registration.RegistrationChecklistConfigService;
+import cn.iocoder.yudao.module.zsjos.service.registration.RegistrationService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -99,6 +101,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private SalesOrderNumberService orderNumberService;
     @Resource private CashbackService cashbackService;
     @Resource private BusinessTaskCommandService businessTaskCommandService;
+    @Resource private RegistrationChecklistConfigService registrationChecklistConfigService;
+    @Resource private RegistrationService registrationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -585,6 +589,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (supervisorConfirmationService.getPending(round.getId(), task.getTaskDefinitionKey()) != null) {
             throw exception(SALES_ORDER_SUPERVISOR_PENDING);
         }
+        if (approve && TASK_REGISTRATION.equals(task.getTaskDefinitionKey())) {
+            registrationChecklistConfigService.getConfig();
+        }
         SalesOrderCommandService.Command command = new SalesOrderCommandService.Command(orderId, round.getId(),
                 round.getProcessInstanceId(), commandType, task.getTaskDefinitionKey(), reqVO.getTaskId(), userId,
                 fingerprint);
@@ -601,7 +608,14 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         orderMapper.updateById(order); roundMapper.updateById(round);
         BpmTaskDecisionReqDTO decision = new BpmTaskDecisionReqDTO();
         decision.setTaskId(reqVO.getTaskId()); decision.setReason(reqVO.getReason().trim());
-        if (approve) processTaskApi.approveTask(userId, decision); else processTaskApi.rejectTask(userId, decision);
+        if (approve) {
+            processTaskApi.approveTask(userId, decision);
+            if (TASK_REGISTRATION.equals(task.getTaskDefinitionKey())) {
+                registrationService.ensureCaseAfterRegistrationApproval(orderId, LocalDateTime.now());
+            }
+        } else {
+            processTaskApi.rejectTask(userId, decision);
+        }
     }
 
     @Override
@@ -632,6 +646,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         round.setStatus(ROUND_TERMINATED); round.setDecisionReason(reqVO.getReason().trim()); round.setCompletedAt(now);
         round.setTerminationIdempotencyKey(reqVO.getIdempotencyKey()); round.setVersion(round.getVersion() + 1);
         orderMapper.updateById(order); roundMapper.updateById(round);
+        registrationService.cancelByOrderId(orderId, "成交订单审批已终止", now);
         cashbackService.cancelDealCashbacks(orderId, "订单主动终止");
         processInstanceApi.terminateProcessInstanceByBusiness(userId, round.getProcessInstanceId(),
                 "zsjos.sales-order.terminate", reqVO.getReason().trim());
@@ -643,7 +658,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
-    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "read")
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "owner-or-manager-read")
     public List<SalesOrderListItemRespVO> getCustomerOrders(Long leadId, Long userId) {
         LeadDO lead = leadMapper.selectById(leadId);
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
@@ -653,7 +668,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
-    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "read")
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "owner-or-manager-read")
     public SalesOrderRespVO getCustomerOrder(Long leadId, Long orderId, Long userId) {
         LeadDO lead = leadMapper.selectById(leadId);
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
@@ -724,23 +739,24 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         LeadDO notificationLead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         Long leadSubmitterUserId = notificationLead == null ? null : notificationLead.getSourceUserId();
+        Long partnerId = notificationLead == null ? null : notificationLead.getPartnerId();
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)) {
             List<Long> resultUserIds = java.util.stream.Stream.of(
                             order.getFormalSalesUserId(), round.getSubmittedByUserId())
                     .filter(Objects::nonNull).distinct().toList();
             publishOrderNotification(EFFECTIVE, order, "sales-order-effective:" + round.getId(),
-                    List.of(), resultUserIds, leadSubmitterUserId, reason, now);
-            if (leadSubmitterUserId != null) {
+                    List.of(), resultUserIds, leadSubmitterUserId, partnerId, reason, now);
+            if (leadSubmitterUserId != null || partnerId != null) {
                 publishOrderNotification(SUBMITTER_EFFECTIVE, order,
                         "sales-order-submitter-effective:" + round.getId(), List.of(), List.of(),
-                        leadSubmitterUserId, reason, now);
+                        leadSubmitterUserId, partnerId, reason, now);
             }
         } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus)) {
             List<Long> resultUserIds = java.util.stream.Stream.of(
                             order.getFormalSalesUserId(), round.getSubmittedByUserId())
                     .filter(Objects::nonNull).distinct().toList();
             publishOrderNotification(REJECTED, order, "sales-order-rejected:" + round.getId(),
-                    List.of(), resultUserIds, leadSubmitterUserId, reason, now);
+                    List.of(), resultUserIds, leadSubmitterUserId, partnerId, reason, now);
         }
     }
 
@@ -748,8 +764,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                             ValidatedSubmission validated, int roundNo, LocalDateTime now) {
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         if (config == null) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
-        List<Long> registrationUsers = new ArrayList<>(permissionService.enabledReviewers(config.getRegistrationDeptId()));
-        List<Long> financeUsers = new ArrayList<>(permissionService.enabledReviewers(config.getFinanceDeptId()));
+        List<Long> registrationUsers = new ArrayList<>(permissionService.enabledUsers(config.getRegistrationDeptId()));
+        List<Long> financeUsers = new ArrayList<>(permissionService.enabledUsers(config.getFinanceDeptId()));
         if (registrationUsers.isEmpty() || financeUsers.isEmpty()) throw exception(SALES_ORDER_APPROVAL_CONFIG_INVALID);
         BpmProcessInstanceCreateReqDTO processReq = new BpmProcessInstanceCreateReqDTO();
         processReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
@@ -782,18 +798,19 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 registrationUsers.stream(), financeUsers.stream()).distinct().toList();
         LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
         Long leadSubmitterUserId = lead == null ? null : lead.getSourceUserId();
+        Long partnerId = lead == null ? null : lead.getPartnerId();
         publishOrderNotification(SUBMITTED, order, "sales-order-submitted:" + round.getId(),
-                reviewerUserIds, List.of(), leadSubmitterUserId, null, now);
-        if (leadSubmitterUserId != null) {
+                reviewerUserIds, List.of(), leadSubmitterUserId, partnerId, null, now);
+        if (leadSubmitterUserId != null || partnerId != null) {
             publishOrderNotification(SUBMITTER_PENDING, order,
                     "sales-order-submitter-pending:" + round.getId(), List.of(), List.of(),
-                    leadSubmitterUserId, null, now);
+                    leadSubmitterUserId, partnerId, null, now);
         }
     }
 
     private void publishOrderNotification(String sceneCode, SalesOrderDO order, String sourceEventKey,
                                           List<Long> reviewers, List<Long> resultUserIds,
-                                          Long leadSubmitterUserId, String reason, LocalDateTime occurredAt) {
+                                          Long leadSubmitterUserId, Long partnerId, String reason, LocalDateTime occurredAt) {
         SalesOrderApprovalConfigDO config = salesOrderApprovalConfigMapper.selectCurrent();
         List<String> departments = config == null ? List.of() : java.util.stream.Stream.of(
                         config.getRegistrationDeptId(), config.getFinanceDeptId())
@@ -802,6 +819,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("reviewerUserIds", reviewers); payload.put("submitterUserId", order.getSubmitterUserId());
         payload.put("resultUserIds", resultUserIds); payload.put("leadSubmitterUserId", leadSubmitterUserId);
+        payload.put("partnerId", partnerId);
         payload.put("approvalDepartments", String.join("、", departments));
         payload.put("decisionReason", StrUtil.blankToDefault(reason, ""));
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()

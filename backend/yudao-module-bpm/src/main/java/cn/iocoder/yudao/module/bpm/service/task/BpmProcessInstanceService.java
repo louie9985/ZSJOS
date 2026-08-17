@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.bpm.service.task;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.instance.*;
 import jakarta.validation.Valid;
 import org.flowable.engine.history.HistoricProcessInstance;
@@ -132,6 +133,7 @@ public interface BpmProcessInstanceService {
      * @return 实例的编号
      */
     String createProcessInstance(Long userId, @Valid BpmProcessInstanceCreateReqDTO createReqDTO);
+    String createProcessInstance(BpmStartSubjectDTO subject, @Valid BpmProcessInstanceCreateReqDTO createReqDTO);
 
     /**
      * 发起人取消流程实例
@@ -140,6 +142,9 @@ public interface BpmProcessInstanceService {
      * @param cancelReqVO 取消信息
      */
     void cancelProcessInstanceByStartUser(Long userId, @Valid BpmProcessInstanceCancelReqVO cancelReqVO);
+    void cancelProcessInstanceByStartSubject(BpmStartSubjectDTO subject, @Valid BpmProcessInstanceCancelReqVO cancelReqVO);
+    void terminateProcessInstanceByBusiness(BpmStartSubjectDTO operator, String processInstanceId,
+                                            String authorizationType, String reason);
 
     /**
      * 管理员取消流程实例

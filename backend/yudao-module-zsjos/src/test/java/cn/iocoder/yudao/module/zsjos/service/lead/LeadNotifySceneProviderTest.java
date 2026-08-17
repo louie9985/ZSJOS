@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneVariableRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -66,7 +67,17 @@ class LeadNotifySceneProviderTest {
     void resolvesAppealReviewersFromEventPayload() {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(APPEAL_SUBMITTED)
                 .payload(Map.of("appeal.reviewerUserIds", List.of(31L, 32L))).build();
-        assertEquals(Set.of(31L, 32L), provider.resolveRecipients(event, Set.of(ROLE_APPEAL_REVIEWERS)));
+        assertEquals(Set.of(NotifyRecipientDTO.admin(31L), NotifyRecipientDTO.admin(32L)),
+                provider.resolveRecipients(event, Set.of(ROLE_APPEAL_REVIEWERS)));
+    }
+
+    @Test
+    void resolvesLeadCreatedProviderAndActualOperator() {
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED)
+                .operatorUserId(10L).payload(Map.of("submitterUserId", 20L)).build();
+
+        assertEquals(Set.of(NotifyRecipientDTO.admin(10L), NotifyRecipientDTO.admin(20L)),
+                provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER, ROLE_OPERATOR)));
     }
 
     @Test
@@ -83,9 +94,10 @@ class LeadNotifySceneProviderTest {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(QUALIFICATION_SUSPENDED)
                 .payload(Map.of("ownerUserId", 20L)).build();
 
-        Set<Long> recipients = provider.resolveRecipients(event, Set.of(ROLE_OWNER, ROLE_QUALIFICATION_MANAGERS));
+        Set<NotifyRecipientDTO> recipients = provider.resolveRecipients(event, Set.of(ROLE_OWNER, ROLE_QUALIFICATION_MANAGERS));
 
-        assertEquals(Set.of(20L, 21L, 22L), recipients);
+        assertEquals(Set.of(NotifyRecipientDTO.admin(20L), NotifyRecipientDTO.admin(21L),
+                NotifyRecipientDTO.admin(22L)), recipients);
     }
 
     @Test
@@ -102,8 +114,8 @@ class LeadNotifySceneProviderTest {
         when(productMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(ASSIGNED).bizId(1L).build();
-        Map<String, Object> masked = provider.resolveVariables(event, 30L);
-        Map<String, Object> full = provider.resolveVariables(event, 10L);
+        Map<String, Object> masked = provider.resolveVariables(event, NotifyRecipientDTO.admin(30L));
+        Map<String, Object> full = provider.resolveVariables(event, NotifyRecipientDTO.admin(10L));
 
         assertEquals("KZ202608160000000001", full.get("lead.no"));
         assertEquals(1L, full.get("lead.id"));
@@ -127,8 +139,8 @@ class LeadNotifySceneProviderTest {
         when(adminUserApi.getUser(20L)).thenReturn(owner);
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(ASSIGNED).bizId(1L).build();
 
-        Map<String, Object> submitterValues = provider.resolveVariables(event, 10L);
-        Map<String, Object> ownerValues = provider.resolveVariables(event, 20L);
+        Map<String, Object> submitterValues = provider.resolveVariables(event, NotifyRecipientDTO.admin(10L));
+        Map<String, Object> ownerValues = provider.resolveVariables(event, NotifyRecipientDTO.admin(20L));
 
         assertNotEquals("负责销售", submitterValues.get("owner.name"));
         assertEquals(null, submitterValues.get("owner.id"));
@@ -150,7 +162,7 @@ class LeadNotifySceneProviderTest {
         when(permissionApi.hasAnyPermissions(30L, "zsjos:lead:query-all")).thenReturn(true);
 
         Map<String, Object> values = provider.resolveVariables(
-                NotifyBusinessEvent.builder().sceneCode(ASSIGNED).bizId(1L).build(), 30L);
+                NotifyBusinessEvent.builder().sceneCode(ASSIGNED).bizId(1L).build(), NotifyRecipientDTO.admin(30L));
 
         assertEquals("提交销售", values.get("submitter.name"));
         assertEquals("负责销售", values.get("owner.name"));

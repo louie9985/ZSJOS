@@ -1,13 +1,10 @@
 package cn.iocoder.yudao.module.zsjos.service.personnel;
 
-import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.dept.PostApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.*;
-import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
-import cn.iocoder.yudao.module.system.api.permission.RoleApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.personnel.vo.*;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerMeRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
@@ -31,27 +28,23 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private PostApi postApi;
     @Resource private LeadMapper leadMapper;
-    @Resource private PermissionApi permissionApi;
-    @Resource private RoleApi roleApi;
+    @Resource private PartnerAccountService partnerAccountService;
 
     @Override @Transactional(rollbackFor = Exception.class)
     public Long create(PartnerCreateReqVO reqVO) {
         if (mapper.selectByPartnerNo(reqVO.getPartnerNo()) != null) throw exception(PARTNER_STATE_INVALID);
-        AdminUserCreateReqDTO account = new AdminUserCreateReqDTO();
-        account.setUsername(reqVO.getUsername()); account.setPassword(reqVO.getPassword());
-        account.setNickname(reqVO.getName()); account.setMobile(reqVO.getMobile()); account.setPostIds(Set.of());
-        Long userId = adminUserApi.createUser(account);
-        assignPartnerRole(userId);
         PartnerDO partner = BeanUtils.toBean(reqVO, PartnerDO.class);
-        partner.setBoundSystemUserId(userId); partner.setStatus(PARTNER_STATUS_ENABLED);
+        partner.setBoundSystemUserId(null); partner.setStatus(PARTNER_STATUS_ENABLED);
         partner.setEnabledAt(LocalDateTime.now()); partner.setVersion(0); mapper.insert(partner);
+        partnerAccountService.create(partner.getId(), reqVO.getMobile(), reqVO.getPassword());
         return partner.getId();
     }
 
     @Override public List<PartnerRespVO> list() { return BeanUtils.toBean(mapper.selectList(), PartnerRespVO.class); }
 
-    @Override public PartnerMeRespVO getMe(Long userId) {
-        PartnerDO partner = mapper.selectByBoundUserId(userId);
+    @Override public PartnerMeRespVO getMe(Long accountId) {
+        PartnerContext context = partnerAccountService.requireContext(accountId);
+        PartnerDO partner = mapper.selectById(context.partnerId());
         if (partner == null) throw exception(PARTNER_NOT_EXISTS);
         return BeanUtils.toBean(partner, PartnerMeRespVO.class);
     }
@@ -61,19 +54,16 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         PartnerDO partner = require(id);
         if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())) throw exception(PARTNER_STATE_INVALID);
         partner.setStatus(PARTNER_STATUS_DISABLED); partner.setDisabledAt(LocalDateTime.now()); mapper.updateById(partner);
-        adminUserApi.updateUserStatus(partner.getBoundSystemUserId(), CommonStatusEnum.DISABLE.getStatus(), reqVO.getReason());
+        partnerAccountService.setEnabled(partner.getId(), false);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void enable(Long id, PartnerStateReqVO reqVO) {
         PartnerDO partner = require(id);
         if (!PARTNER_STATUS_DISABLED.equals(partner.getStatus())) throw exception(PARTNER_STATE_INVALID);
-        AdminUserRespDTO user = adminUserApi.getUser(partner.getBoundSystemUserId());
-        if (user == null || user.getPostIds() != null && !user.getPostIds().isEmpty()) throw exception(PARTNER_ACCOUNT_CONFLICT);
         partner.setStatus(PARTNER_STATUS_ENABLED); partner.setEnabledAt(LocalDateTime.now()); partner.setDisabledAt(null);
         mapper.updateById(partner);
-        adminUserApi.updateUserStatus(partner.getBoundSystemUserId(), CommonStatusEnum.ENABLE.getStatus(), reqVO.getReason());
-        assignPartnerRole(partner.getBoundSystemUserId());
+        partnerAccountService.setEnabled(partner.getId(), true);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -87,10 +77,12 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         else if ("new_media_manager".equals(reqVO.getTargetType()) && operator != null && manager != null) {
             posts = Set.of(operator.getId(), manager.getId());
         } else throw exception(PARTNER_CONVERSION_POST_INVALID);
-        AdminUserOrganizationUpdateReqDTO update = new AdminUserOrganizationUpdateReqDTO();
-        update.setUserId(partner.getBoundSystemUserId()); update.setDeptId(reqVO.getDeptId()); update.setPostIds(posts);
-        adminUserApi.updateUserOrganization(update);
-        removePartnerRole(partner.getBoundSystemUserId());
+        partnerAccountService.setEnabled(partner.getId(), false);
+        AdminUserPartnerConversionReqDTO conversion = new AdminUserPartnerConversionReqDTO()
+                .setExistingUserId(partner.getBoundSystemUserId()).setUsername(reqVO.getUsername())
+                .setPassword(reqVO.getPassword()).setNickname(partner.getName()).setMobile(partner.getMobile())
+                .setDeptId(reqVO.getDeptId()).setPostIds(posts);
+        partner.setBoundSystemUserId(adminUserApi.convertPartnerToEmployee(conversion));
         partner.setStatus(PARTNER_STATUS_CONVERTED); partner.setDisabledAt(LocalDateTime.now()); mapper.updateById(partner);
         if (reqVO.isMigrateHistoricalOrganization()) leadMapper.updateSourceDeptByPartnerId(id, reqVO.getDeptId());
     }
@@ -99,14 +91,17 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         PartnerDO partner = mapper.selectById(id); if (partner == null) throw exception(PARTNER_NOT_EXISTS); return partner;
     }
 
-    private void assignPartnerRole(Long userId) {
-        var role = roleApi.getRoleByCode("part_time_partner");
-        if (role == null) throw exception(PARTNER_ROLE_NOT_CONFIGURED);
-        permissionApi.addUserRole(userId, role.getId());
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateMobile(Long id, PartnerMobileUpdateReqVO reqVO) {
+        require(id);
+        partnerAccountService.updateMobile(id, reqVO.getMobile());
+        mapper.updateById(new PartnerDO().setId(id).setMobile(reqVO.getMobile()));
     }
 
-    private void removePartnerRole(Long userId) {
-        var role = roleApi.getRoleByCode("part_time_partner");
-        if (role != null) permissionApi.removeUserRole(userId, role.getId());
+    @Override
+    public void resetPassword(Long id, PartnerPasswordResetReqVO reqVO) {
+        require(id);
+        partnerAccountService.resetPassword(id, reqVO.getPassword());
     }
 }

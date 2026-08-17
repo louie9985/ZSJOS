@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.datapermission.core.util.DataPermissionUtils;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCreateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserOrganizationUpdateReqDTO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserPartnerConversionReqDTO;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
@@ -56,6 +57,23 @@ public class AdminUserApiImpl implements AdminUserApi {
     public AdminUserRespDTO getUser(Long id) {
         AdminUserDO user = userService.getUser(id);
         return BeanUtils.toBean(user, AdminUserRespDTO.class);
+    }
+
+    @Override
+    public Long convertPartnerToEmployee(AdminUserPartnerConversionReqDTO reqDTO) {
+        if (reqDTO.getExistingUserId() == null || userService.getUser(reqDTO.getExistingUserId()) == null) {
+            return createUser(new AdminUserCreateReqDTO().setUsername(reqDTO.getUsername())
+                    .setPassword(reqDTO.getPassword()).setNickname(reqDTO.getNickname()).setMobile(reqDTO.getMobile())
+                    .setDeptId(reqDTO.getDeptId()).setPostIds(reqDTO.getPostIds()));
+        }
+        AdminUserDO current = userService.getUser(reqDTO.getExistingUserId());
+        UserSaveReqVO update = BeanUtils.toBean(current, UserSaveReqVO.class).setId(current.getId())
+                .setUsername(reqDTO.getUsername()).setNickname(reqDTO.getNickname()).setMobile(reqDTO.getMobile())
+                .setDeptId(reqDTO.getDeptId()).setPostIds(reqDTO.getPostIds());
+        userService.updateUser(update);
+        userService.updateUserPassword(current.getId(), reqDTO.getPassword());
+        userService.updateUserStatus(current.getId(), cn.iocoder.yudao.framework.common.enums.CommonStatusEnum.ENABLE.getStatus());
+        return current.getId();
     }
 
     @Override

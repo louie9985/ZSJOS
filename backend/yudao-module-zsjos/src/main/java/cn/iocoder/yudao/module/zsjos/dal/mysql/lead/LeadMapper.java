@@ -27,6 +27,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    default LeadDO selectByPersonId(Long personId) {
+        return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getPersonId, personId)
+                .orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId).last("LIMIT 1"));
+    }
     default void updateSourceDeptByPartnerId(Long partnerId, Long deptId) {
         update(new LeadDO().setSourceDeptId(deptId), new LambdaUpdateWrapper<LeadDO>()
                 .eq(LeadDO::getPartnerId, partnerId));
@@ -171,6 +175,83 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         return selectPage(reqVO, query);
     }
 
+    default PageResult<LeadDO> selectManagementPageByScope(LeadManagementPageReqVO reqVO,
+                                                            List<Long> visibleSourceUserIds,
+                                                            List<Long> visibleOwnerUserIds,
+                                                            boolean queryAll,
+                                                            List<String> inboxStatuses,
+                                                            List<String> inboxAssignmentStatuses,
+                                                            List<String> inboxHandlingStages,
+                                                            boolean inboxMatchNone,
+                                                            List<Long> matchedLeadIds) {
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
+                .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
+                .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
+                .eqIfPresent(LeadDO::getSourceChannelId, reqVO.getSourceChannel())
+                .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
+                .eqIfPresent(LeadDO::getSourceUserId, reqVO.getSourceUserId())
+                .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
+                .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        if (inboxMatchNone) {
+            query.eq(LeadDO::getId, -1L);
+        } else {
+            if (inboxStatuses != null && !inboxStatuses.isEmpty()) query.in(LeadDO::getStatus, inboxStatuses);
+            if (inboxAssignmentStatuses != null && !inboxAssignmentStatuses.isEmpty()) {
+                query.in(LeadDO::getAssignmentStatus, inboxAssignmentStatuses);
+            }
+            if (inboxHandlingStages != null && !inboxHandlingStages.isEmpty()) {
+                query.eq(LeadDO::getStatus, "submitted").eq(LeadDO::getAssignmentStatus, "owned");
+                if (inboxHandlingStages.size() == 1
+                        && inboxHandlingStages.contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
+                    query.isNull(LeadDO::getQualificationDeadlineAt);
+                } else if (inboxHandlingStages.size() == 1
+                        && inboxHandlingStages.contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
+                    query.isNotNull(LeadDO::getQualificationDeadlineAt);
+                }
+            }
+        }
+        if (matchedLeadIds != null) {
+            if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L);
+            else query.in(LeadDO::getId, matchedLeadIds);
+        }
+        if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
+        if (!queryAll) {
+            boolean hasSourceScope = visibleSourceUserIds != null && !visibleSourceUserIds.isEmpty();
+            boolean hasOwnerScope = visibleOwnerUserIds != null && !visibleOwnerUserIds.isEmpty();
+            if (!hasSourceScope && !hasOwnerScope) {
+                query.eq(LeadDO::getId, -1L);
+            } else {
+                query.and(wrapper -> {
+                    if (hasSourceScope) wrapper.in(LeadDO::getSourceUserId, visibleSourceUserIds);
+                    if (hasOwnerScope) {
+                        if (hasSourceScope) wrapper.or();
+                        wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds);
+                    }
+                });
+            }
+        }
+        if (reqVO.getCursorActivityAt() != null && reqVO.getCursorId() != null) {
+            query.and(wrapper -> wrapper.lt(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
+                    .or(nested -> nested.eq(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
+                            .lt(LeadDO::getId, reqVO.getCursorId())));
+        }
+        query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+        return selectPage(reqVO, query);
+    }
+
+    default PageResult<LeadDO> selectPartnerPage(LeadManagementPageReqVO reqVO, Long partnerId) {
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
+                .eq(LeadDO::getPartnerId, partnerId)
+                .eqIfPresent(LeadDO::getStatus, reqVO.getStatus())
+                .eqIfPresent(LeadDO::getAssignmentStatus, reqVO.getAssignmentStatus())
+                .eqIfPresent(LeadDO::getSourceChannelId, reqVO.getSourceChannel())
+                .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
+                .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
+        if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
+        query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+        return selectPage(reqVO, query);
+    }
+
     default void touchActivity(Long leadId, java.time.LocalDateTime occurredAt) {
         update(new LeadDO().setLastActivityAt(occurredAt),
                 new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getId, leadId));
@@ -195,6 +276,36 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             if (status != null && total instanceof Number number) {
                 result.put(status.toString(), number.longValue());
             }
+        }
+        return result;
+    }
+
+    default Map<String, Long> selectManagementStatusCountsByScope(List<Long> visibleSourceUserIds,
+                                                                   List<Long> visibleOwnerUserIds,
+                                                                   boolean queryAll) {
+        QueryWrapper<LeadDO> query = new QueryWrapper<LeadDO>()
+                .select("status", "COUNT(*) AS total")
+                .groupBy("status");
+        if (!queryAll) {
+            boolean hasSourceScope = visibleSourceUserIds != null && !visibleSourceUserIds.isEmpty();
+            boolean hasOwnerScope = visibleOwnerUserIds != null && !visibleOwnerUserIds.isEmpty();
+            if (!hasSourceScope && !hasOwnerScope) {
+                query.eq("id", -1L);
+            } else {
+                query.and(wrapper -> {
+                    if (hasSourceScope) wrapper.in("source_user_id", visibleSourceUserIds);
+                    if (hasOwnerScope) {
+                        if (hasSourceScope) wrapper.or();
+                        wrapper.in("owner_user_id", visibleOwnerUserIds);
+                    }
+                });
+            }
+        }
+        Map<String, Long> result = new LinkedHashMap<>();
+        for (Map<String, Object> row : selectMaps(query)) {
+            Object status = row.get("status");
+            Object total = row.get("total");
+            if (status != null && total instanceof Number number) result.put(status.toString(), number.longValue());
         }
         return result;
     }

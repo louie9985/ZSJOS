@@ -87,29 +87,22 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
-        validateInboxAudiencePermission(reqVO.getAudience());
-        boolean queryAll = leadObjectPermissionService.hasQueryAll();
+        String relationScope = resolveRelationScope(reqVO);
+        validateRelationScopePermission(relationScope);
         LeadInboxFilterQuery inboxQuery = reqVO.getAudience() == null
                 ? new LeadInboxFilterQuery(Set.of(), Set.of(), false)
                 : inboxFilterConfigService.resolveQuery(
                         inboxFilterConfigService.getPublishedConfig(reqVO.getAudience()),
                         reqVO.getInboxGroup(), reqVO.getInboxStage());
-        Long visibleUserId = reqVO.getAudience() != null || !queryAll ? userId : null;
-        List<Long> managedOwnerUserIds = reqVO.getAudience() == null && !queryAll
-                ? sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId)) : List.of();
+        LeadVisibilityScope visibility = resolveVisibilityScope(relationScope, userId);
         List<Long> matchedLeadIds = advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter());
         List<String> statuses = List.copyOf(inboxQuery.statuses());
         List<String> assignmentStatuses = List.copyOf(inboxQuery.assignmentStatuses());
         List<String> handlingStages = List.copyOf(inboxQuery.handlingStages());
         boolean matchNone = inboxQuery.matchNone();
-        PageResult<LeadDO> page;
-        if (handlingStages.isEmpty()) {
-            page = leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,
-                    statuses, assignmentStatuses, matchNone, matchedLeadIds);
-        } else {
-            page = leadMapper.selectManagementPage(reqVO, visibleUserId, managedOwnerUserIds,
-                    statuses, assignmentStatuses, handlingStages, matchNone, matchedLeadIds);
-        }
+        PageResult<LeadDO> page = leadMapper.selectManagementPageByScope(reqVO,
+                visibility.sourceUserIds(), visibility.ownerUserIds(), visibility.queryAll(),
+                statuses, assignmentStatuses, handlingStages, matchNone, matchedLeadIds);
         if (page.getList().isEmpty()) {
             return PageResult.empty(page.getTotal());
         }
@@ -122,6 +115,18 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                         List.of(), Map.of(), false))
                 .toList();
         return new PageResult<>(result, page.getTotal());
+    }
+
+    @Override
+    public PageResult<LeadManagementRespVO> getPartnerLeadPage(LeadManagementPageReqVO reqVO, Long partnerId) {
+        PageResult<LeadDO> page = leadMapper.selectPartnerPage(reqVO, partnerId);
+        if (page.getList().isEmpty()) return PageResult.empty(page.getTotal());
+        List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
+        Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
+                intendedProductMapper.selectListByLeadIds(leadIds), LeadIntendedProductDO::getLeadId);
+        Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
+        return new PageResult<>(page.getList().stream().map(lead -> convert(lead, null, users,
+                products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false)).toList(), page.getTotal());
     }
 
     @Override
@@ -159,7 +164,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private String cursorContext(LeadManagementPageReqVO reqVO) {
-        return Integer.toHexString(Objects.hash(reqVO.getAudience(), reqVO.getInboxGroup(), reqVO.getInboxStage(),
+        return Integer.toHexString(Objects.hash(reqVO.getRelationScope(), reqVO.getAudience(),
+                reqVO.getInboxGroup(), reqVO.getInboxStage(),
                 reqVO.getKeyword(), reqVO.getStatus(), reqVO.getAssignmentStatus(), reqVO.getSourceChannel(),
                 reqVO.getLeadCategory(), reqVO.getSourceUserId(), reqVO.getOwnerUserId(), reqVO.getAdvancedFilter()));
     }
@@ -173,6 +179,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         reqVO.setAudience(INBOX_AUDIENCE_OWNER);
+        reqVO.setRelationScope("owned");
         reqVO.setOwnerUserId(ownerUserId);
         PageResult<LeadDO> page = leadMapper.selectManagementPage(reqVO, ownerUserId,
                 List.of(), List.of(), List.of(), false, advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
@@ -210,10 +217,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Override
     public Map<String, Long> getStatusCounts(Long userId) {
-        boolean queryAll = leadObjectPermissionService.hasQueryAll();
-        List<Long> managedUserIds = queryAll ? List.of()
-                : sortedUserIds(leadObjectPermissionService.getManagedUserIds(userId));
-        return leadMapper.selectManagementStatusCounts(queryAll ? null : userId, managedUserIds);
+        LeadVisibilityScope visibility = resolveVisibilityScope("all", userId);
+        return leadMapper.selectManagementStatusCountsByScope(visibility.sourceUserIds(),
+                visibility.ownerUserIds(), visibility.queryAll());
     }
 
     @Override
@@ -333,11 +339,56 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         return result;
     }
 
+    private String resolveRelationScope(LeadManagementPageReqVO reqVO) {
+        if (reqVO.getRelationScope() != null) return reqVO.getRelationScope();
+        if (INBOX_AUDIENCE_SUBMITTER.equals(reqVO.getAudience())) return "submitted";
+        if (INBOX_AUDIENCE_OWNER.equals(reqVO.getAudience())) return "owned";
+        return "all";
+    }
+
+    private void validateRelationScopePermission(String relationScope) {
+        String permission = switch (relationScope) {
+            case "submitted" -> PERMISSION_QUERY_SUBMITTED;
+            case "owned" -> PERMISSION_QUERY_OWNED;
+            case "all" -> null;
+            default -> throw exception(LEAD_PERMISSION_DENIED);
+        };
+        if (permission != null && !securityFrameworkService.hasPermission(permission)) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
+    }
+
+    private LeadVisibilityScope resolveVisibilityScope(String relationScope, Long userId) {
+        if ("all".equals(relationScope) && leadObjectPermissionService.hasQueryAll()) {
+            return new LeadVisibilityScope(List.of(), List.of(), true);
+        }
+        List<Long> relatedUserIds = sortedUserIds(leadObjectPermissionService.getRelatedAndManagedUserIds(userId));
+        boolean submitted = ("all".equals(relationScope) || "submitted".equals(relationScope))
+                && securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED);
+        boolean owned = ("all".equals(relationScope) || "owned".equals(relationScope))
+                && securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED);
+        return new LeadVisibilityScope(submitted ? relatedUserIds : List.of(),
+                owned ? relatedUserIds : List.of(), false);
+    }
+
+    private record LeadVisibilityScope(List<Long> sourceUserIds, List<Long> ownerUserIds, boolean queryAll) {}
+
+    @Override
+    public LeadManagementRespVO getPartnerLead(Long id, Long partnerId) {
+        LeadDO lead = leadMapper.selectById(id);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
+        Map<Long, AdminUserRespDTO> users = getUserMap(List.of(lead));
+        List<LeadIntendedProductDO> products = intendedProductMapper.selectListByLeadId(id);
+        List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
+        return convert(lead, null, users, products, attachments, resolveAttachmentUrls(attachments), true);
+    }
+
     private boolean isBlindIdentity(LeadDO lead, Long currentUserId) {
         return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 && lead.getSourceUserId() != null && lead.getOwnerUserId() != null
                 && !Objects.equals(lead.getSourceUserId(), lead.getOwnerUserId())
-                && !leadObjectPermissionService.canViewUnmaskedIdentity(currentUserId, lead.getOwnerUserId());
+                && !leadObjectPermissionService.canViewUnmaskedIdentity(currentUserId, lead);
     }
 
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,

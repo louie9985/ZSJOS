@@ -8,6 +8,11 @@
   flex-direction: column;
 }
 
+.lead-management-scope-shell {
+  flex: none;
+  margin-bottom: var(--crm-sp-3);
+}
+
 .lead-inbox-filter-shell {
   flex: none;
   border: none;

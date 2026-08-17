@@ -8,7 +8,7 @@ const router = useRouter()
 const route = useRoute()
 const { loading, error, loginWithPassword, initAuth } = useAuth()
 
-const username = ref('')
+const mobile = ref('')
 const password = ref('')
 
 // 获取登录后跳转地址
@@ -22,10 +22,10 @@ onMounted(async () => {
 })
 
 async function handleLogin() {
-  if (!username.value.trim()) return showToast('请输入账号')
+  if (!/^1\d{10}$/.test(mobile.value.trim())) return showToast('请输入正确的手机号')
   if (!password.value) return showToast('请输入密码')
 
-  const success = await loginWithPassword(username.value.trim(), password.value)
+  const success = await loginWithPassword(mobile.value.trim(), password.value)
   if (success) {
     router.replace(redirectPath)
   }
@@ -50,11 +50,13 @@ function handleWecomLogin() {
     <div class="login-form">
       <van-cell-group inset>
         <van-field
-          v-model="username"
-          placeholder="请输入账号"
+          v-model="mobile"
+          type="tel"
+          maxlength="11"
+          placeholder="请输入手机号"
           left-icon="user-o"
           clearable
-          autocomplete="username"
+          autocomplete="tel"
         />
         <van-field
           v-model="password"

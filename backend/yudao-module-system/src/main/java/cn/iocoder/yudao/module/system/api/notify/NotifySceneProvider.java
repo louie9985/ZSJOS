@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.system.api.notify;
 
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 
 import java.util.List;
 import java.util.Map;
@@ -12,7 +13,7 @@ public interface NotifySceneProvider {
 
     List<NotifySceneRespDTO> getScenes();
 
-    Set<Long> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles);
+    Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles);
 
-    Map<String, Object> resolveVariables(NotifyBusinessEvent event, Long recipientUserId);
+    Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient);
 }

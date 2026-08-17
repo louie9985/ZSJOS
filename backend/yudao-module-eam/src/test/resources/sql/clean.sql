@@ -1,4 +1,6 @@
 DELETE FROM "eam_category";
+DELETE FROM "eam_asset_import_row";
+DELETE FROM "eam_asset_import_batch";
 DELETE FROM "eam_category_field";
 DELETE FROM "eam_asset";
 DELETE FROM "eam_asset_change_log";

@@ -6,8 +6,11 @@ import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRoleRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneVariableRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
@@ -25,6 +28,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants
 public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private CashbackService cashbackService;
+    @Resource private PartnerAccountMapper partnerAccountMapper;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
@@ -39,19 +43,26 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
     }
 
     @Override
-    public Set<Long> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
-        Set<Long> result = new LinkedHashSet<>();
+    public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
+        Set<NotifyRecipientDTO> result = new LinkedHashSet<>();
         if (recipientRoles.contains(ROLE_REVIEWERS)) addIds(result, event.getPayload().get("reviewerUserIds"));
         if (recipientRoles.contains(ROLE_SUBMITTER)) addId(result, event.getPayload().get("submitterUserId"));
         if (recipientRoles.contains(ROLE_RESULT_ACTORS)) addIds(result, event.getPayload().get("resultUserIds"));
-        if (recipientRoles.contains(ROLE_LEAD_SUBMITTER)) addId(result, event.getPayload().get("leadSubmitterUserId"));
+        if (recipientRoles.contains(ROLE_LEAD_SUBMITTER)) {
+            if (event.getPayload().get("partnerId") instanceof Number number) {
+                PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(number.longValue());
+                if (account != null) result.add(NotifyRecipientDTO.partner(account.getId()));
+            } else {
+                addId(result, event.getPayload().get("leadSubmitterUserId"));
+            }
+        }
         if (recipientRoles.contains(ROLE_SUPERVISOR)) addId(result, event.getPayload().get("supervisorUserId"));
         if (recipientRoles.contains(ROLE_REQUESTER)) addId(result, event.getPayload().get("requesterUserId"));
         return result;
     }
 
     @Override
-    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, Long recipientUserId) {
+    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         SalesOrderDO order = orderMapper.selectById(event.getBizId());
         if (order == null) return Map.of();
         Map<String, Object> values = new LinkedHashMap<>();
@@ -62,8 +73,11 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         values.put("order.decisionReason", event.getPayload().get("decisionReason"));
         Long leadSubmitterUserId = event.getPayload().get("leadSubmitterUserId") instanceof Number number
                 ? number.longValue() : null;
+        Long partnerId = event.getPayload().get("partnerId") instanceof Number number ? number.longValue() : null;
         if (SUBMITTER_EFFECTIVE.equals(event.getSceneCode())) {
-            values.put("order.cashbackTotal", cashbackService.getOrderCashbackTotal(order.getId(), leadSubmitterUserId));
+            values.put("order.cashbackTotal", partnerId != null
+                    ? cashbackService.getPartnerOrderCashbackTotal(order.getId(), partnerId)
+                    : cashbackService.getOrderCashbackTotal(order.getId(), leadSubmitterUserId));
         }
         values.put("order.supervisorReason", event.getPayload().get("supervisorReason"));
         return values;
@@ -96,11 +110,11 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         };
     }
 
-    private void addIds(Set<Long> result, Object value) {
+    private void addIds(Set<NotifyRecipientDTO> result, Object value) {
         if (value instanceof Collection<?> values) values.forEach(item -> addId(result, item));
     }
 
-    private void addId(Set<Long> result, Object value) {
-        if (value instanceof Number number && number.longValue() > 0) result.add(number.longValue());
+    private void addId(Set<NotifyRecipientDTO> result, Object value) {
+        if (value instanceof Number number && number.longValue() > 0) result.add(NotifyRecipientDTO.admin(number.longValue()));
     }
 }

@@ -355,6 +355,23 @@
   padding: 12px;
 }
 
+.sales-order-unified-approval-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sales-order-unified-approval-page > .sales-order-supervisor-page {
+  flex: 1;
+}
+
+.sales-order-approval-page > .ant-segmented {
+  align-self: flex-start;
+  margin-bottom: 8px;
+}
+
 .sales-order-supervisor-detail {
   display: flex;
   min-width: 0;

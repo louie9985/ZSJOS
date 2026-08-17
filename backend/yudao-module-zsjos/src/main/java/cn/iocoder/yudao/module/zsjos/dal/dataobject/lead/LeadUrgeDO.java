@@ -11,6 +11,6 @@ import java.time.LocalDateTime;
 
 @TableName("zsjos_lead_urge") @KeySequence("zsjos_lead_urge_seq") @Data @EqualsAndHashCode(callSuper = true)
 public class LeadUrgeDO extends TenantBaseDO {
-    @TableId private Long id; private Long leadId; private Long submitterUserId; private Long targetSalesUserId;
+    @TableId private Long id; private Long leadId; private Long submitterUserId; private Long partnerId; private Long targetSalesUserId;
     private LocalDate urgeDate; private String reason; private LocalDateTime urgedAt;
 }

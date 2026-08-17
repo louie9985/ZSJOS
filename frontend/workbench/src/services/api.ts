@@ -21,6 +21,11 @@ export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]
 export type AssignmentLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
 export type PageResult<T> = { list: T[]; total: number }
 export type CursorPageResult<T> = { list: T[]; nextCursor?: string; hasMore: boolean }
+export type RegistrationCase = { id: number; orderId: number; orderNo?: string; orderStatus?: string; orderStatusLabel?: string; studentName?: string; studentMobile?: string; leadNo?: string; status: string; statusLabel?: string; studyPlannerUserId?: number; studyPlannerUserName?: string; registrationApprovedAt?: Timestamp; version: number; completable?: boolean; completionBlockCode?: string; completionBlockReason?: string; items?: Array<{ id: number; itemKey: string; itemType: string; title: string; sort: number; checked?: boolean; checkedByUserName?: string; checkedAt?: Timestamp }> }
+export type StudyPlanner = { id: number; nickname: string }
+export type RegistrationChecklistConfig = { templateId: number; templateVersion: number; published?: { id: number; versionNo: number; status: string; items: RegistrationChecklistItem[] }; draft?: { id: number; versionNo: number; status: string; items: RegistrationChecklistItem[] } }
+export type RegistrationChecklistItem = { id: number; itemKey: string; itemType: string; title: string; sort: number; enabled: boolean; systemRequired: boolean }
+export type MyStudent = { personId: number; leadNo?: string; name?: string; mobile?: string; wechatId?: string; activatedAt?: string; services: Array<{ serviceRelationId: number; orderId?: number; orderNo?: string; courseName?: string; skuName?: string; categoryPath?: string[]; attributeValues?: string[]; productSnapshot?: string; status: string; activatedAt?: string }> }
 export type AdvancedFilterCondition = { fieldKey: string; operator: string; value?: unknown; valueFrom?: unknown; valueTo?: unknown }
 export type AdvancedFilterGroup = { logic: 'AND' | 'OR'; conditions: AdvancedFilterCondition[]; groups: AdvancedFilterGroup[] }
 export type AdvancedFilterField = { fieldKey: string; group: string; label: string; valueType: 'text' | 'select' | 'number' | 'date'; operators: string[]; optionSource?: string; options: Array<{ value: string | number; label: string }>; optionsLoading?: boolean; optionsError?: boolean; retryOptions?: () => void }
@@ -105,10 +110,13 @@ export type ManagedLead = {
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
   availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
 }
+export type LeadComplaintEvidence = { infraFileId: number; fileUrl: string; originalName?: string; contentType?: string; fileSize?: number }
 export type LeadComplaint = {
   id: number; leadId: number; leadNo: string; complainantUserId: number; salesUserId: number; reason: string
+  complainantUserName?: string; salesUserName?: string; evidence?: LeadComplaintEvidence[]
   evidenceRefs?: string; status: 'pending' | 'handled'; result?: 'founded' | 'unfounded'
-  handlerUserId?: number; handlerOpinion?: string; handlerEvidenceRefs?: string; handledAt?: Timestamp; createTime: Timestamp
+  handlerUserId?: number; handlerUserName?: string; handlerOpinion?: string; handlerEvidenceRefs?: string
+  handlerEvidence?: LeadComplaintEvidence[]; handledAt?: Timestamp; createTime: Timestamp
 }
 export type LeadQualificationException = {
   id: number; leadNo: string; submittedName: string; submittedMobile?: string; status: string; assignmentStatus: string
@@ -127,6 +135,7 @@ export type ManagedLeadPageParams = {
   status?: string
   inboxGroup?: string
   inboxStage?: string
+  relationScope?: 'all' | 'submitted' | 'owned'
   advancedFilter?: AdvancedFilterGroup
 }
 export type LeadFollowUpImage = { infraFileId: number; originalName: string; contentType: string; fileSize: number; sort: number; url?: string }
@@ -606,6 +615,9 @@ export const api = {
   leadComplaintPage: async (status: 'pending' | 'handled') => unwrap<PageResult<LeadComplaint>>(
     await http.get('/zsjos/lead-complaint/page', { params: { status, pageNo: 1, pageSize: 100 } })
   ),
+  leadComplaints: async (leadId: number) => unwrap<LeadComplaint[]>(
+    await http.get(`/zsjos/lead-complaint/lead/${leadId}/list`)
+  ),
   decideLeadComplaint: async (id: number, result: 'founded' | 'unfounded', opinion: string, evidenceFileIds: number[]) => unwrap<boolean>(
     await http.post(`/zsjos/lead-complaint/${id}/decision`, { result, opinion, evidenceFileIds, idempotencyKey: createIdempotencyKey() })
   ),
@@ -807,5 +819,17 @@ export const api = {
   saveAssignmentRelations: async (data: { sourceUserIds: number[]; targetUserIds: number[]; mode: 'append' | 'replace' | 'remove' }) =>
     unwrap<boolean>(await http.put('/zsjos/lead-assignment/relation/save', data)),
   assignmentLogPage: async (params: { pageNo: number; pageSize: number }) =>
-    unwrap<PageResult<AssignmentLog>>(await http.get('/zsjos/lead-assignment/log/page', { params }))
+    unwrap<PageResult<AssignmentLog>>(await http.get('/zsjos/lead-assignment/log/page', { params })),
+  registrationPoolPage: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string }) => unwrap<PageResult<RegistrationCase>>(await http.get('/zsjos/registration/pool-page', { params })),
+  registrationCase: async (id: number) => unwrap<RegistrationCase>(await http.get(`/zsjos/registration/${id}`)),
+  registrationPlannerCandidates: async () => unwrap<StudyPlanner[]>(await http.get('/zsjos/registration/study-planner-candidates')),
+  updateRegistrationItem: async (id: number, itemId: number, data: { checked: boolean; version: number; idempotencyKey: string }) => unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/items/${itemId}`, data)),
+  updateRegistrationPlanner: async (id: number, data: { studyPlannerUserId: number; version: number; idempotencyKey: string }) => unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/study-planner`, data)),
+  completeRegistration: async (id: number, data: { version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post(`/zsjos/registration/${id}/complete`, data)),
+  myStudents: async (params: { pageNo: number; pageSize: number; keyword?: string }) => unwrap<PageResult<MyStudent>>(await http.get('/zsjos/student/my-page', { params })),
+  myStudent: async (personId: number) => unwrap<MyStudent>(await http.get(`/zsjos/student/my/${personId}`)),
+  registrationChecklistConfig: async () => unwrap<RegistrationChecklistConfig>(await http.get('/zsjos/registration-checklist-config')),
+  copyRegistrationChecklistDraft: async (version: number) => unwrap<number>(await http.post('/zsjos/registration-checklist-config/draft/copy', { version, idempotencyKey: crypto.randomUUID() })),
+  saveRegistrationChecklistDraft: async (data: { templateVersion: number; items: Array<{ id?: number; itemKey?: string; title: string; sort: number; enabled: boolean; systemRequired?: boolean }>; idempotencyKey: string }) => unwrap<boolean>(await http.put('/zsjos/registration-checklist-config/draft', data)),
+  publishRegistrationChecklist: async (version: number) => unwrap<boolean>(await http.post('/zsjos/registration-checklist-config/publish', { version, idempotencyKey: crypto.randomUUID() }))
 }

@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.system.service.notify;
 
 import cn.iocoder.yudao.module.system.api.notify.NotifySceneProvider;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyRuleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notify.NotifyTemplateDO;
 import org.junit.jupiter.api.Test;
@@ -47,12 +48,12 @@ class NotifyBusinessEventProcessorTest {
         when(provider.resolveRecipients(event, Set.of())).thenReturn(Set.of());
         when(notifyTemplateService.getNotifyTemplate(30L)).thenReturn(template);
         doThrow(new IllegalStateException("render failed"))
-                .when(messageCreator).create(event, provider, rule, template, 100L);
+                .when(messageCreator).create(event, provider, rule, template, NotifyRecipientDTO.admin(100L));
 
         processor.process(event);
 
-        verify(messageCreator).create(event, provider, rule, template, 100L);
-        verify(messageCreator).create(event, provider, rule, template, 200L);
+        verify(messageCreator).create(event, provider, rule, template, NotifyRecipientDTO.admin(100L));
+        verify(messageCreator).create(event, provider, rule, template, NotifyRecipientDTO.admin(200L));
     }
 
     @Test
@@ -68,7 +69,7 @@ class NotifyBusinessEventProcessorTest {
         when(provider.resolveRecipients(event, Set.of())).thenReturn(Set.of());
         when(notifyTemplateService.getNotifyTemplate(30L)).thenReturn(template);
         doThrow(new IllegalStateException("database unavailable"))
-                .when(messageCreator).create(event, provider, rule, template, 100L);
+                .when(messageCreator).create(event, provider, rule, template, NotifyRecipientDTO.admin(100L));
 
         var result = processor.processConfirmed(event);
 

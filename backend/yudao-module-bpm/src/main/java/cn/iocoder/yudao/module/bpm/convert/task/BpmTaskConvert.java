@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.util.date.DateUtils;
 import cn.iocoder.yudao.framework.common.util.number.NumberUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.bpm.controller.admin.base.user.UserSimpleBaseVO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.task.BpmTaskRespVO;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmFormDO;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmProcessDefinitionInfoDO;
@@ -52,8 +53,10 @@ public interface BpmTaskConvert {
                 return;
             }
             taskVO.setProcessInstance(BeanUtils.toBean(processInstance, BpmTaskRespVO.ProcessInstance.class));
-            AdminUserRespDTO startUser = userMap.get(NumberUtils.parseLong(processInstance.getStartUserId()));
-            taskVO.getProcessInstance().setStartUser(BeanUtils.toBean(startUser, UserSimpleBaseVO.class));
+            Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
+            AdminUserRespDTO startUser = startAdminUserId == null ? null : userMap.get(startAdminUserId);
+            taskVO.getProcessInstance().setStartUser(buildStartUser(processInstance.getStartUserId(),
+                    processInstance.getProcessVariables(), startUser));
             taskVO.getProcessInstance().setCreateTime(DateUtils.of(processInstance.getStartTime()));
             // 摘要
             taskVO.getProcessInstance().setSummary(FlowableUtils.getSummary(processDefinitionInfoMap.get(processInstance.getProcessDefinitionId()),
@@ -80,9 +83,11 @@ public interface BpmTaskConvert {
             // 流程实例
             HistoricProcessInstance processInstance = processInstanceMap.get(taskVO.getProcessInstanceId());
             if (processInstance != null) {
-                AdminUserRespDTO startUser = userMap.get(NumberUtils.parseLong(processInstance.getStartUserId()));
+                Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
+                AdminUserRespDTO startUser = startAdminUserId == null ? null : userMap.get(startAdminUserId);
                 taskVO.setProcessInstance(BeanUtils.toBean(processInstance, BpmTaskRespVO.ProcessInstance.class));
-                taskVO.getProcessInstance().setStartUser(BeanUtils.toBean(startUser, UserSimpleBaseVO.class));
+                taskVO.getProcessInstance().setStartUser(buildStartUser(processInstance.getStartUserId(),
+                        processInstance.getProcessVariables(), startUser));
                 // 摘要
                 taskVO.getProcessInstance().setSummary(FlowableUtils.getSummary(processDefinitionInfoMap.get(processInstance.getProcessDefinitionId()),
                         processInstance.getProcessVariables()));
@@ -90,6 +95,16 @@ public interface BpmTaskConvert {
             return taskVO;
         });
         return new PageResult<>(taskVOList, pageResult.getTotal());
+    }
+
+    default UserSimpleBaseVO buildStartUser(String flowableUserId, Map<String, Object> variables,
+                                            AdminUserRespDTO adminUser) {
+        if (adminUser != null) {
+            return BeanUtils.toBean(adminUser, UserSimpleBaseVO.class);
+        }
+        return BpmStartSubjectDTO.fromFlowableId(flowableUserId) == null
+                || BpmStartSubjectDTO.getAdminUserId(flowableUserId) != null ? null
+                : new UserSimpleBaseVO().setNickname(MapUtil.getStr(variables, "externalStartUserName"));
     }
 
     default List<BpmTaskRespVO> buildTaskListByProcessInstanceId(List<HistoricTaskInstance> taskList,

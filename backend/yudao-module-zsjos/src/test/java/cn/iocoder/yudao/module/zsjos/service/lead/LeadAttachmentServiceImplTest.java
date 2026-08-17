@@ -30,9 +30,9 @@ class LeadAttachmentServiceImplTest {
     void uploadReturnsStableInfraFileReference() throws Exception {
         byte[] content = new byte[]{(byte) 0xff, (byte) 0xd8, (byte) 0xff, (byte) 0xe0};
         MockMultipartFile file = new MockMultipartFile("file", "image.jpg", "image/jpeg", content);
-        FileInfoRespDTO info = new FileInfoRespDTO(42L, 24L, "image.jpg", "zsjos/lead/image.jpg",
+        FileInfoRespDTO info = new FileInfoRespDTO(42L, 24L, "image.jpg", "zsjos/lead/admin/image.jpg",
                 "https://signed.test/image", "image/jpeg", (long) content.length, "10");
-        when(fileApi.createFileInfo(any(), eq("image.jpg"), eq("zsjos/lead"), eq("image/jpeg")))
+        when(fileApi.createFileInfo(any(), eq("image.jpg"), eq("zsjos/lead/admin"), eq("image/jpeg")))
                 .thenReturn(info);
 
         LeadAttachmentUploadRespVO result = service.upload(file);
@@ -50,6 +50,29 @@ class LeadAttachmentServiceImplTest {
         when(fileApi.getFileInfo(42L)).thenReturn(info);
 
         assertThrows(ServiceException.class, () -> service.validateReferences(java.util.List.of(reference), 10L));
+    }
+
+    @Test
+    void partnerValidationRejectsNumericallyCollidingAdminFile() {
+        LeadAttachmentReqVO reference = new LeadAttachmentReqVO();
+        reference.setInfraFileId(42L);
+        FileInfoRespDTO info = new FileInfoRespDTO(42L, 24L, "image.jpg", "zsjos/lead/admin/image.jpg",
+                null, "image/jpeg", 100L, "10");
+        when(fileApi.getFileInfo(42L)).thenReturn(info);
+
+        assertThrows(ServiceException.class,
+                () -> service.validatePartnerReferences(java.util.List.of(reference), 10L));
+    }
+
+    @Test
+    void partnerValidationAcceptsTypedOwnerPath() {
+        LeadAttachmentReqVO reference = new LeadAttachmentReqVO();
+        reference.setInfraFileId(42L);
+        FileInfoRespDTO info = new FileInfoRespDTO(42L, 24L, "image.jpg",
+                "zsjos/lead/partner/10/image.jpg", null, "image/jpeg", 100L, "10");
+        when(fileApi.getFileInfo(42L)).thenReturn(info);
+
+        assertEquals(info, service.validatePartnerReferences(java.util.List.of(reference), 10L).get(42L));
     }
 
 }

@@ -15,6 +15,8 @@ public interface ErrorCodeConstants {
     ErrorCode CATEGORY_HAS_ASSET = new ErrorCode(1_070_001_002, "分类下存在资产，无法删除");
     ErrorCode CATEGORY_CODE_DUPLICATE = new ErrorCode(1_070_001_003, "分类编码已存在");
     ErrorCode CATEGORY_PARENT_ERROR = new ErrorCode(1_070_001_004, "不能设置自己或子分类为父分类");
+    ErrorCode CATEGORY_IMPORT_FILE_INVALID = new ErrorCode(1_070_001_005, "分类配置文件无效：{}");
+    ErrorCode CATEGORY_IMPORT_CONFLICT = new ErrorCode(1_070_001_006, "分类配置存在 {} 个冲突，请先修正模板");
 
     // ========== 分类字段 1-070-002-000 ==========
     ErrorCode FIELD_NOT_EXISTS = new ErrorCode(1_070_002_000, "自定义字段不存在");
@@ -27,6 +29,8 @@ public interface ErrorCodeConstants {
     ErrorCode ASSET_CODE_DUPLICATE = new ErrorCode(1_070_003_001, "资产编号已存在");
     ErrorCode ASSET_STATUS_INVALID = new ErrorCode(1_070_003_002, "资产【{}】当前状态不允许该操作");
     ErrorCode ASSET_IMPORT_LIST_EMPTY = new ErrorCode(1_070_003_003, "导入资产数据不能为空");
+    ErrorCode ASSET_IMPORT_FILE_INVALID = new ErrorCode(1_070_003_004, "资产台账文件无效：{}");
+    ErrorCode ASSET_IMPORT_CATEGORY_MISSING = new ErrorCode(1_070_003_005, "资产分类【{} / {}】不存在，请先导入分类配置");
 
     // ========== 流转 1-070-004-000 ==========
     ErrorCode TRANSFER_NOT_EXISTS = new ErrorCode(1_070_004_000, "流转单不存在");

@@ -1,6 +1,6 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { APP_CONFIG, STORAGE_KEYS } from '../constants'
-import { buildWebSocketUrl, parseRealtimeMessage, type RealtimeMessage, type RealtimeStatus } from '../services/realtime'
+import { APP_CONFIG } from '../constants'
+import { buildWebSocketUrl, getRealtimeAccessToken, parseRealtimeMessage, type RealtimeMessage, type RealtimeStatus } from '../services/realtime'
 
 type RealtimeHandler = (message: RealtimeMessage) => void
 
@@ -37,13 +37,13 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       heartbeatTimer = undefined
     }
     const connect = () => {
-      const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)
-      if (!active || !refreshToken) {
+      const accessToken = getRealtimeAccessToken(localStorage)
+      if (!active || !accessToken) {
         setStatus('closed')
         return
       }
       setStatus('connecting')
-      socket = new WebSocket(buildWebSocketUrl(APP_CONFIG.API_BASE_URL, window.location.origin, refreshToken))
+      socket = new WebSocket(buildWebSocketUrl(APP_CONFIG.API_BASE_URL, window.location.origin, accessToken))
       socket.onopen = () => {
         retryAttempt = 0
         setStatus('open')

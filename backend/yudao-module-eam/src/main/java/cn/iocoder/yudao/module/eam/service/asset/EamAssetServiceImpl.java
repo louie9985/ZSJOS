@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
 import cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum;
 import cn.iocoder.yudao.module.eam.enums.asset.EamChangeTypeEnum;
+import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.coderule.EamCodeRuleService;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_IMPORT_LIST_EMPTY;
+import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_CODE_DUPLICATE;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_NOT_EXISTS;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_STATUS_INVALID;
 
@@ -58,7 +60,7 @@ public class EamAssetServiceImpl implements EamAssetService {
     @Transactional(rollbackFor = Exception.class)
     public Long createAsset(EamAssetSaveReqVO reqVO) {
         // 1. 校验分类与自定义字段
-        categoryService.validateCategoryExists(reqVO.getCategoryId());
+        EamCategoryDO category = categoryService.validateCategoryExists(reqVO.getCategoryId());
         Map<String, Object> extFields =
                 categoryFieldService.validateAndNormalizeExtFields(reqVO.getCategoryId(), reqVO.getExtFields());
 
@@ -66,8 +68,17 @@ public class EamAssetServiceImpl implements EamAssetService {
         EamAssetDO asset = BeanUtils.toBean(reqVO, EamAssetDO.class);
         asset.setExtFields(extFields);
         asset.setStatus(EamAssetStatusEnum.IDLE.getStatus());
-        // 3. 生成资产编号（与插入同事务，规则行锁保证唯一）
-        asset.setAssetCode(codeRuleService.generateAssetCode(reqVO.getCategoryId()));
+        applyManagementSnapshot(asset, category, reqVO.getQuantity());
+        // 3. 导入可沿用已有标签；普通建档仍由编号规则生成
+        if (StrUtil.isBlank(reqVO.getAssetCode())) {
+            asset.setAssetCode(codeRuleService.generateAssetCode(reqVO.getCategoryId()));
+        } else {
+            String assetCode = reqVO.getAssetCode().trim();
+            if (assetMapper.selectByAssetCode(assetCode) != null) {
+                throw exception(ASSET_CODE_DUPLICATE);
+            }
+            asset.setAssetCode(assetCode);
+        }
         assetMapper.insert(asset);
 
         // 4. 记录建档流水
@@ -80,13 +91,14 @@ public class EamAssetServiceImpl implements EamAssetService {
     @Transactional(rollbackFor = Exception.class)
     public void updateAsset(EamAssetSaveReqVO reqVO) {
         EamAssetDO before = validateAssetExists(reqVO.getId());
-        categoryService.validateCategoryExists(reqVO.getCategoryId());
+        EamCategoryDO category = categoryService.validateCategoryExists(reqVO.getCategoryId());
         Map<String, Object> extFields =
                 categoryFieldService.validateAndNormalizeExtFields(reqVO.getCategoryId(), reqVO.getExtFields());
 
         // 状态与资产编号不通过编辑表单变更：状态归状态机，编号归编号规则
         EamAssetDO updateObj = BeanUtils.toBean(reqVO, EamAssetDO.class);
         updateObj.setExtFields(extFields);
+        applyManagementSnapshot(updateObj, category, reqVO.getQuantity());
         updateObj.setStatus(null);
         updateObj.setAssetCode(null);
         assetMapper.updateById(updateObj);
@@ -283,6 +295,14 @@ public class EamAssetServiceImpl implements EamAssetService {
      */
     private EamAssetService self() {
         return SpringUtil.getBean(EamAssetService.class);
+    }
+
+    private void applyManagementSnapshot(EamAssetDO asset, EamCategoryDO category, Integer quantity) {
+        Integer mode = category.getManagementMode() != null
+                ? category.getManagementMode() : EamManagementModeEnum.SERIALIZED.getMode();
+        asset.setManagementMode(mode);
+        asset.setUnit(StrUtil.blankToDefault(category.getUnit(), "个"));
+        asset.setQuantity(EamManagementModeEnum.isBatch(mode) && quantity != null && quantity > 0 ? quantity : 1);
     }
 
     /**

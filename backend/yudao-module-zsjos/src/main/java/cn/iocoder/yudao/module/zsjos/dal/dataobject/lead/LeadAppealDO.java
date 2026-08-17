@@ -24,6 +24,7 @@ public class LeadAppealDO extends TenantBaseDO {
     private Long reviewerDeptIdSnapshot;
     private String reviewerUserIdsSnapshot;
     private Long applicantUserId;
+    private Long partnerId;
     private String reason;
     private String evidenceRefs;
     private String invalidReasonSnapshot;

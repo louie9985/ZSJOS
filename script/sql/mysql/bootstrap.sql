@@ -53,6 +53,13 @@ SOURCE script/sql/mysql/migrations/V068__repair_partner_permissions.sql;
 SOURCE script/sql/mysql/migrations/V069__remove_invalid_partner_admin_route.sql;
 SOURCE script/sql/mysql/migrations/V070__repair_bpm_model_import_permission.sql;
 SOURCE script/sql/mysql/migrations/V071__repair_h5_and_role_permissions.sql;
+SOURCE script/sql/mysql/migrations/V072__independent_partner_identity.sql;
+SOURCE script/sql/mysql/migrations/V073__registration_fulfillment_students.sql;
+SOURCE script/sql/mysql/migrations/V074__registration_task_notifications.sql;
+SOURCE script/sql/mysql/migrations/V075__lead_created_default_notification.sql;
+SOURCE script/sql/mysql/migrations/V076__unify_sales_order_approval_entry.sql;
+SOURCE script/sql/mysql/migrations/V077__normalize_wecom_user_id_uniqueness.sql;
+SOURCE script/sql/mysql/migrations/V078__unified_lead_management_scope.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

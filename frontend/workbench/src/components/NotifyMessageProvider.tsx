@@ -50,6 +50,10 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
     if (!detail.readStatus) await api.markNotifyMessagesRead([detail.id])
     await refreshUnreadCount()
     if (detail.actionType === 'none') return
+    if (detail.sceneCode === 'zsjos.registration.task_created' && detail.bizId) {
+      navigate(APP_ROUTES.REGISTRATION_POOL, { state: { registrationCaseId: detail.bizId } })
+      return
+    }
     if (detail.sceneCode === 'zsjos.lead.public_pool' || detail.sceneCode === 'zsjos.lead.qualification_released') {
       navigate(APP_ROUTES.LEAD_CLAIM_POOL)
       return
@@ -85,10 +89,12 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
           return
         }
         const lead = await api.managedLead(detail.bizId)
-        const target = lead.relationTypes.includes('owner') ? APP_ROUTES.OWNED_LEADS : APP_ROUTES.SUBMITTED_LEADS
+        const relationScope = lead.relationTypes.includes('owner') ? 'owned' : 'submitted'
         const timedFollowUp = detail.sceneCode === 'zsjos.lead.first_follow_up_reminder'
           || detail.sceneCode === 'zsjos.lead.next_follow_up_reminder'
-        navigate(target, { state: { leadId: detail.bizId, openFollowUp: timedFollowUp } })
+        navigate(APP_ROUTES.LEAD_MANAGEMENT, {
+          state: { leadId: detail.bizId, openFollowUp: timedFollowUp, relationScope }
+        })
         return
       } catch {
         message.warning('当前账号无权查看该客资，已打开消息详情')
@@ -104,6 +110,11 @@ export function NotifyMessageProvider({ children }: PropsWithChildren) {
     if (!Number.isFinite(messageId) || displayedIds.current.has(messageId)) return
     displayedIds.current.add(messageId)
     void api.myNotifyMessage(messageId).then(detail => {
+      if (detail.sceneCode === 'zsjos.registration.task_created' && detail.bizId) {
+        window.dispatchEvent(new CustomEvent('zsjos-registration-task-created', {
+          detail: { registrationCaseId: detail.bizId }
+        }))
+      }
       notification.info({
         key: `notify-message-${detail.id}`,
         message: detail.templateTitle || detail.templateNickname,

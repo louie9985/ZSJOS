@@ -98,6 +98,8 @@ V070 is the forward repair for applied V064 environments. V064's fixed menu ID `
 
 V071 is the forward-only H5 and all-role ZSJOS permission repair. It resolves grants by tenant-scoped stable role code and stable permission code, restores one matching logically deleted grant before inserting a missing grant, retires duplicate active role/permission relations, removes `zsjos:lead:query` and every other unapproved ZSJOS permission from `part_time_partner`, and makes both finance roles share the reviewed eleven-permission finance allowlist. Administrator withdrawal remains read-only; eighteen roles with no implemented ZSJOS domain intentionally receive zero ZSJOS permissions. Orphaned H5 permission buttons become non-routable root metadata without recreating an admin page. It changes no users, account-role assignments, BPM instances, or business rows. Reruns are idempotent; recovery requires a reviewed pre-migration role-menu snapshot and a later forward migration. Generating or testing V071 does not authorize applying it to an existing database.
 
+V072 introduces the tenant-scoped `zsjos_partner_account` identity and `PARTNER(3)` message ownership. It blocks before mutation when an enabled/disabled Partner lacks a unique mobile, a unique valid System binding, or a BCrypt password hash. During an approved maintenance window it copies those hashes, backfills explicit Partner ownership on complaints, appeals, and urges, migrates Partner messages, revokes the legacy `part_time_partner` role relation, disables the legacy System accounts, and removes their ADMIN access/refresh tokens. Converted Partners and historical Flowable snapshots remain unchanged. Recovery requires the pre-migration backup; generating or testing V072 does not authorize applying it.
+
 V065 adds the tenant-scoped lead `last_activity_at` projection and compound cursor index used by employee inboxes. It backfills the maximum persisted lead, assignment, follow-up, appeal, and order activity without deleting rows. The migration is repeatable; rollback should retain the additive column and index while cursor clients are deployed.
 
 V066 adds nine stage-specific Chinese templates for first follow-up, next follow-up, and qualification reminders. It repoints only untouched V031 default rules whose rule and current template still retain the original migration creator/updater markers; administrator-created or edited rules and templates are preserved. It changes no timing-stage protocol values, reminder timing, recipients, history, or permissions. Reruns add no duplicate template codes and do not revisit rules already migrated to V066. Existing rendered messages are not rewritten; rollback should preserve administrator mappings and may restore only untouched defaults.
@@ -105,3 +107,59 @@ V066 adds nine stage-specific Chinese templates for first follow-up, next follow
 V067 establishes `leadNo` as the user-visible Lead identifier. It updates only untouched system-owned Lead notification templates from `lead.id` to `lead.no`, updates untouched ZSJOS appeal and order read-only BPM forms to show `leadNo`, and clarifies the Lead primary-key comment as 内部客资ID. Administrator-edited templates and forms, historical messages, started workflow instances, and all internal `leadId` relationships are preserved. Reruns are idempotent; rollback must use a forward migration and retain assigned business numbers.
 
 Normalizes only the current reviewer scheme option keys from `registrationReview` / `financeReview` to `registration_review` / `finance_review`. BPM task-definition condition values and immutable version snapshots are not changed. It depends on V029, is repeatable through exact-fragment replacement, and should not be reversed because the legacy keys violate the shared stable-key contract.
+### V073 registration fulfillment and students
+
+Adds the versioned registration checklist template, public-pool case and checklist snapshot,
+completion facts, per-order-item student service relations, and idempotent command audit.
+It seeds only the five confirmed checklist items for active tenants and the three feature menu
+surfaces; it does not backfill historical orders or execute permission changes outside the
+administrator configuration and `study_planner` read-only student menu grants. Apply after V072.
+The migration is additive and repeatable. Rollback is forward-only: retire menu permissions and
+preserve business facts; do not drop these tables in a live environment.
+
+### V074 registration task notifications
+
+Adds one system-owned Chinese station-message template and one enabled default in-app rule per
+active tenant for newly created registration fulfillment tasks. Recipients are resolved at delivery
+time from the stable public-pool query permission; no role name or department is inferred. The
+in-app delivery keeps the existing post-commit WebSocket hint. The migration is additive and
+repeatable and changes no task, order, permission, role, or historical message rows. Rollback is
+forward-only: disable untouched V074 rules and preserve delivered message history.
+
+### V075 Lead-created default notification
+
+Adds one enabled default in-app rule per non-deleted tenant only when the tenant has no existing
+`zsjos.lead.created` rule. The rule resolves both the Lead source user and the actual operator, so a
+sales self-sourced Lead with a selected new-media provider notifies both employees; identical users
+are deduplicated by the notification recipient set. Existing enabled or disabled administrator
+rules are preserved, and no historical Lead message is generated. The migration is repeatable and
+forward-only; rollback disables untouched V075 rules while retaining delivered message history.
+
+### V076 unified sales-order approval entry
+
+Moves ordinary review and sales-supervisor confirmation permissions under one server-owned
+`成交订单审批` page. Existing ordinary-review and supervisor grants are preserved, and enabled
+`sales_manager` roles receive the page plus supervisor-confirm action. No order, BPM task, approval
+round, or confirmation history is rewritten. The migration is repeatable and forward-only; execute
+it only after reviewing the role impact for the target environment.
+
+### V077 WeCom userid normalization
+
+Normalizes `system_users.wecom_user_id` by trimming configured values and converting blank
+values to `NULL`, then replaces the V028 raw unique index with a tenant-scoped unique index
+over a generated nonblank value. A read-only preflight blocks before mutation when trimming
+would make two configured userids collide in one tenant; it reports only the aggregate conflict
+count. The migration deletes no users and changes no accounts, roles, permissions, tokens, or
+notification history. It is repeatable and forward-only; retain normalized values and the index
+on application rollback. Generating and testing V077 does not authorize applying it to an
+existing database.
+
+### V078 unified Lead management scope
+
+Makes `客资管理` the single employee Lead route and converts the former submitted/owned pages
+into hidden relation-scope permissions. Their existing role grants are preserved and receive the
+shared page. `sales_manager` and `sales_specialist` lose only active `query-all` grants, while
+enabled sales managers receive follow-up query permission. List and object reads use current
+managed departments and child departments; writes remain action-scoped. No Lead, task, user,
+role, or history row is deleted. Reruns are idempotent. Recovery is forward-only and requires a
+reviewed role-menu snapshot before restoring any tenant-wide grant.

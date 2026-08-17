@@ -14,11 +14,17 @@ const { currentTheme } = useTheme()
 async function handleLogout() {
   try {
     await showConfirmDialog({ title: '确认退出', message: '确定要退出登录吗？' })
-    await logout()
-    userStore.logout()
-    router.replace('/login')
   } catch {
-    // 用户取消
+    return
+  }
+
+  try {
+    await logout()
+  } catch {
+    // 服务端撤销采用尽力而为，本地会话始终退出。
+  } finally {
+    userStore.logout()
+    await router.replace({ name: 'Login' })
   }
 }
 </script>
@@ -48,9 +54,34 @@ async function handleLogout() {
     </van-cell-group>
 
     <van-cell-group class="card" :border="false">
-      <van-cell title="收益中心" icon="gold-coin-o" is-link to="/earnings" />
-      <van-cell title="提现记录" icon="balance-list-o" is-link to="/withdrawal" />
-      <van-cell title="银行卡管理" icon="credit-pay" is-link to="/profile/bank-cards" />
+      <van-cell
+        v-if="userStore.hasPermission('zsjos:cashback:my-query')"
+        title="收益中心"
+        icon="gold-coin-o"
+        is-link
+        to="/earnings"
+      />
+      <van-cell
+        v-if="userStore.hasPermission('zsjos:lead-complaint:create')"
+        title="投诉记录"
+        icon="records-o"
+        is-link
+        to="/complaints"
+      />
+      <van-cell
+        v-if="userStore.hasPermission('zsjos:withdrawal:my-query')"
+        title="提现记录"
+        icon="balance-list-o"
+        is-link
+        to="/withdrawal"
+      />
+      <van-cell
+        v-if="userStore.hasPermission('zsjos:withdrawal:apply')"
+        title="银行卡管理"
+        icon="credit-pay"
+        is-link
+        to="/profile/bank-cards"
+      />
     </van-cell-group>
 
     <van-cell-group class="card" :border="false">

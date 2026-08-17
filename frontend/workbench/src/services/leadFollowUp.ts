@@ -8,7 +8,18 @@ export const addFollowUpDays = (now: Date, days: number) => {
 
 export const shouldBlockLeadSwitch = (dirty: boolean) => dirty
 
-export type LeadDetailTab = 'overview' | 'follow-ups'
+export type LeadDetailMode = 'all' | 'submitter' | 'owner' | 'manager-readonly'
+export type LeadDetailTab = 'overview' | 'follow-ups' | 'orders' | 'appeals' | 'complaints'
+
+export const detailTabsForMode = (mode: LeadDetailMode): LeadDetailTab[] => {
+  const base: LeadDetailTab[] = ['overview', 'follow-ups']
+  if (mode === 'owner') return [...base, 'orders']
+  if (mode === 'submitter') return [...base, 'appeals']
+  if (mode === 'manager-readonly') return [...base, 'appeals', 'complaints', 'orders']
+  return base
+}
+
+export const shouldShowLeadOrderTab = (mode: LeadDetailMode) => detailTabsForMode(mode).includes('orders')
 
 export const defaultLeadDetailTab = (openFollowUp: boolean): LeadDetailTab =>
   openFollowUp ? 'follow-ups' : 'overview'

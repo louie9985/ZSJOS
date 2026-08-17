@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -69,12 +70,13 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private BpmProcessTaskApi processTaskApi;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
+    @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private CashbackService cashbackService;
 
     @Override
     public List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
-        if (!Objects.equals(lead.getSourceUserId(), userId) && !Objects.equals(lead.getOwnerUserId(), userId)) {
+        if (!leadObjectPermissionService.canRead(lead, userId)) {
             throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         }
         return appealMapper.selectListByLeadId(leadId).stream().map(item -> convert(item, lead, null)).toList();
@@ -83,15 +85,30 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long submit(Long leadId, Long userId, LeadAppealSubmitReqVO reqVO) {
+        return submitInternal(leadId, userId, null, null, reqVO);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long submitForPartner(Long leadId, Long accountId, Long partnerId, LeadAppealSubmitReqVO reqVO) {
+        return submitInternal(leadId, null, accountId, partnerId, reqVO);
+    }
+
+    private Long submitInternal(Long leadId, Long userId, Long accountId, Long partnerId,
+                                LeadAppealSubmitReqVO reqVO) {
         LeadDO lead = requireLeadForUpdate(leadId);
         LeadAppealDO duplicate = appealMapper.selectBySubmissionIdempotencyKey(reqVO.getIdempotencyKey());
         if (duplicate != null) {
-            if (Objects.equals(duplicate.getLeadId(), leadId) && Objects.equals(duplicate.getApplicantUserId(), userId)) {
+            if (Objects.equals(duplicate.getLeadId(), leadId)
+                    && (partnerId != null ? Objects.equals(duplicate.getPartnerId(), partnerId)
+                    : Objects.equals(duplicate.getApplicantUserId(), userId))) {
                 return duplicate.getId();
             }
             throw exception(LEAD_APPEAL_IDEMPOTENCY_CONFLICT);
         }
-        if (!STATUS_INVALID.equals(lead.getStatus()) || !Objects.equals(lead.getSourceUserId(), userId)) {
+        if (!STATUS_INVALID.equals(lead.getStatus()) || (partnerId != null
+                ? !Objects.equals(lead.getPartnerId(), partnerId)
+                : !Objects.equals(lead.getSourceUserId(), userId))) {
             throw exception(LEAD_APPEAL_STATE_INVALID);
         }
         LeadAppealDO previous = appealMapper.selectLatestByLeadId(leadId);
@@ -101,7 +118,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         }
         ReviewerResolution resolution = resolveReviewers(roundNo, lead);
         List<Long> reviewers = resolution.reviewerUserIds();
-        String evidence = buildEvidenceJson(reqVO.getAttachments(), userId);
+        String evidence = buildEvidenceJson(reqVO.getAttachments(), partnerId == null ? userId : accountId,
+                partnerId != null);
         LocalDateTime now = LocalDateTime.now();
         LeadAppealDO appeal = new LeadAppealDO();
         appeal.setLeadId(leadId);
@@ -113,6 +131,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         appeal.setReviewerDeptIdSnapshot(resolution.reviewerDeptId());
         appeal.setReviewerUserIdsSnapshot(JsonUtils.toJsonString(reviewers));
         appeal.setApplicantUserId(userId);
+        appeal.setPartnerId(partnerId);
         appeal.setReason(reqVO.getReason().trim());
         appeal.setEvidenceRefs(evidence);
         appeal.setInvalidReasonSnapshot(lead.getInvalidReasonLabelSnapshot());
@@ -133,7 +152,10 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             processVariables.put("reviewStage", appeal.getReviewStage());
             processReq.setVariables(processVariables);
             processReq.setStartUserSelectAssignees(Map.of(APPEAL_TASK_DEFINITION_KEY, reviewers));
-            appeal.setProcessInstanceId(processInstanceApi.createProcessInstance(userId, processReq));
+            appeal.setProcessInstanceId(partnerId == null
+                    ? processInstanceApi.createProcessInstance(userId, processReq)
+                    : processInstanceApi.createProcessInstance(
+                            new BpmStartSubjectDTO(UserTypeEnum.PARTNER.getValue(), accountId), processReq));
         } catch (RuntimeException ex) {
             log.error("[submit][leadId({}) roundNo({}) processDefinitionKey({}) taskDefinitionKey({}) reviewerCount({}) BPM process start failed]",
                     leadId, roundNo, APPEAL_PROCESS_DEFINITION_KEY, APPEAL_TASK_DEFINITION_KEY, reviewers.size(), ex);
@@ -214,6 +236,13 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     }
 
     @Override
+    public List<LeadAppealRespVO> getPartnerLeadAppeals(Long leadId, Long partnerId) {
+        LeadDO lead = requireLead(leadId);
+        if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        return appealMapper.selectListByLeadId(leadId).stream().map(item -> convert(item, lead, null)).toList();
+    }
+
+    @Override
     public CursorPageResult<LeadAppealRespVO> getInboxCursor(LeadAppealPageReqVO reqVO, Long userId) {
         AppealCursor cursor = decodeInboxCursor(reqVO.getCursor(), userId, reqVO.getHandled());
         int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
@@ -290,7 +319,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
                 || !Objects.equals(task.getBusinessKey(), APPEAL_BUSINESS_KEY_PREFIX + appealId)) {
             throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         }
-        String evidenceJson = buildEvidenceJson(reqVO.getAttachments(), userId);
+        String evidenceJson = buildEvidenceJson(reqVO.getAttachments(), userId, false);
         List<String> bpmAttachments = parseEvidence(evidenceJson).stream().map(EvidenceRef::getFileUrl)
                 .filter(Objects::nonNull).toList();
         BpmTaskDecisionReqDTO decision = new BpmTaskDecisionReqDTO();
@@ -352,6 +381,11 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Override
     public LeadAttachmentUploadRespVO upload(MultipartFile file) throws IOException {
         return attachmentService.upload(file);
+    }
+
+    @Override
+    public LeadAttachmentUploadRespVO uploadForPartner(MultipartFile file, Long accountId) throws IOException {
+        return attachmentService.uploadForPartner(file, accountId);
     }
 
     private ReviewerResolution resolveReviewers(int roundNo, LeadDO lead) {
@@ -440,9 +474,11 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         return stages;
     }
 
-    private String buildEvidenceJson(List<LeadAttachmentReqVO> attachments, Long userId) {
+    private String buildEvidenceJson(List<LeadAttachmentReqVO> attachments, Long userId, boolean partner) {
         if (attachments == null || attachments.isEmpty()) return null;
-        Map<Long, FileInfoRespDTO> files = attachmentService.validateReferences(attachments, userId);
+        Map<Long, FileInfoRespDTO> files = partner
+                ? attachmentService.validatePartnerReferences(attachments, userId)
+                : attachmentService.validateReferences(attachments, userId);
         List<EvidenceRef> refs = new ArrayList<>();
         int sort = 0;
         for (LeadAttachmentReqVO item : attachments) {

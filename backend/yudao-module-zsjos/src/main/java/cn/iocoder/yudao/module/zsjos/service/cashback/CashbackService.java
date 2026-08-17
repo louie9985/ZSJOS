@@ -13,10 +13,13 @@ public interface CashbackService {
     BigDecimal resolveDealRate(String productRef);
     void cancelDealCashbacks(Long orderId, String reason);
     BigDecimal getOrderCashbackTotal(Long orderId, Long beneficiaryUserId);
+    BigDecimal getPartnerOrderCashbackTotal(Long orderId, Long partnerId);
     int settleMatured();
     void assertOrderRejectable(Long orderId);
     PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId);
+    PageResult<CashbackRespVO> getPartnerPage(CashbackPageReqVO request, Long partnerId);
     CashbackSummaryRespVO getMySummary(Long userId);
+    CashbackSummaryRespVO getPartnerSummary(Long partnerId);
 
     record DealCashbackCommand(Long leadId, Long orderId, Long orderItemId, String productRef,
                                String productName, BigDecimal actualAmount, BigDecimal rateSnapshot) {}

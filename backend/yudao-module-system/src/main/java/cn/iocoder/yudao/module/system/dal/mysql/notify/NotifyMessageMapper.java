@@ -91,10 +91,10 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                 .eq(NotifyMessageDO::getUserType, userType));
     }
 
-    default NotifyMessageDO selectByRuleUserAndEvent(Long ruleId, Long userId, String sourceEventKey) {
+    default NotifyMessageDO selectByRuleUserAndEvent(Long ruleId, Long userId, Integer userType, String sourceEventKey) {
         return selectOne(new LambdaQueryWrapperX<NotifyMessageDO>()
                 .eq(NotifyMessageDO::getNotifyRuleId, ruleId)
-                .eq(NotifyMessageDO::getUserId, userId)
+                .eq(NotifyMessageDO::getUserId, userId).eq(NotifyMessageDO::getUserType, userType)
                 .eq(NotifyMessageDO::getSourceEventKey, sourceEventKey));
     }
 

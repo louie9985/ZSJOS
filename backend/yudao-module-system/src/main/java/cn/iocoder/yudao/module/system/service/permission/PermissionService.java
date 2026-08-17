@@ -25,6 +25,9 @@ public interface PermissionService {
      */
     boolean hasAnyPermissions(Long userId, String... permissions);
 
+    /** Resolves enabled users through enabled role and menu-permission relationships. */
+    Set<Long> getEnabledUserIdsByPermission(String permission);
+
     /**
      * 判断是否有角色，任一一个即可
      *

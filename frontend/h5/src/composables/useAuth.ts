@@ -34,13 +34,13 @@ export function useAuth() {
   /**
    * 账号密码登录
    */
-  async function loginWithPassword(username: string, password: string): Promise<boolean> {
+  async function loginWithPassword(mobile: string, password: string): Promise<boolean> {
     loading.value = true
     error.value = ''
     try {
-      const result = await loginApi({ username, password, platform: 'MOBILE' })
+      const result = await loginApi({ mobile, password, platform: 'MOBILE' })
       userStore.setTokens(result.accessToken, result.refreshToken, result.clientId)
-      userStore.setUserInfo({ userId: result.userId, nickname: username })
+      userStore.setUserInfo({ userId: result.userId, nickname: mobile })
       await fetchUserInfo()
       return true
     } catch (e) {

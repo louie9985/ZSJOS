@@ -19,6 +19,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -44,6 +47,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     @Resource private DeptApi deptApi;
     @Resource private LeadAssignmentService assignmentService;
     @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
+    @Resource private PartnerAccountMapper partnerAccountMapper;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
@@ -96,7 +100,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     }
 
     @Override
-    public Set<Long> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
+    public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
         Set<Long> users = new LinkedHashSet<>();
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         for (String role : recipientRoles) {
@@ -140,14 +144,25 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             };
             if (id != null && id > 0) users.add(id);
         }
-        return users;
+        Set<NotifyRecipientDTO> recipients = users.stream().map(NotifyRecipientDTO::admin)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        if (recipientRoles.contains(ROLE_SUBMITTER) && payload.get("partnerId") instanceof Number number) {
+            PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(number.longValue());
+            if (account != null) recipients.add(NotifyRecipientDTO.partner(account.getId()));
+        }
+        return recipients;
     }
 
     @Override
-    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, Long recipientUserId) {
+    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         LeadDO lead = leadMapper.selectById(event.getBizId());
         if (lead == null) return Map.of();
-        boolean fullContact = canReadFullContact(lead, recipientUserId);
+        Long recipientUserId = UserTypeEnum.ADMIN.getValue().equals(recipient.getUserType())
+                ? recipient.getUserId() : null;
+        PartnerAccountDO partnerAccount = UserTypeEnum.PARTNER.getValue().equals(recipient.getUserType())
+                ? partnerAccountMapper.selectById(recipient.getUserId()) : null;
+        boolean fullContact = partnerAccount != null && Objects.equals(partnerAccount.getPartnerId(), lead.getPartnerId())
+                || recipientUserId != null && canReadFullContact(lead, recipientUserId);
         List<LeadIntendedProductDO> products = productMapper.selectListByLeadId(lead.getId());
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(lead.getId());
         Map<String, Object> values = new LinkedHashMap<>();
@@ -182,7 +197,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("attachment.names", attachments.stream().sorted(Comparator.comparing(LeadAttachmentDO::getSort))
                 .map(LeadAttachmentDO::getOriginalName).filter(Objects::nonNull).collect(Collectors.joining("、")));
         values.put("attachment.count", attachments.size());
-        boolean blindIdentity = isBlindIdentity(lead, recipientUserId);
+        boolean blindIdentity = recipientUserId != null && isBlindIdentity(lead, recipientUserId);
         putUser(values, "submitter", lead.getSourceUserId(), blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
         putUser(values, "owner", lead.getOwnerUserId(), blindIdentity && Objects.equals(recipientUserId, lead.getSourceUserId()));
         putUser(values, "pendingSales", lead.getPendingAssigneeUserId(), false);

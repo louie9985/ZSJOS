@@ -7,6 +7,9 @@ import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetPageReqVO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
 import org.apache.ibatis.annotations.Mapper;
 
+import java.util.Collection;
+import java.util.List;
+
 @Mapper
 public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
 
@@ -30,6 +33,14 @@ public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
     default Long selectCountByCategoryId(Long categoryId) {
         return selectCount(new LambdaQueryWrapperX<EamAssetDO>()
                 .eq(EamAssetDO::getCategoryId, categoryId));
+    }
+
+    default List<EamAssetDO> selectListByAssetCodes(Collection<String> assetCodes) {
+        if (assetCodes == null || assetCodes.isEmpty()) {
+            return List.of();
+        }
+        return selectList(new LambdaQueryWrapperX<EamAssetDO>()
+                .in(EamAssetDO::getAssetCode, assetCodes));
     }
 
 }

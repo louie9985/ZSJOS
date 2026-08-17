@@ -18,6 +18,9 @@ public class PartnerDO extends TenantBaseDO {
     private String partnerNo;
     private String name;
     private String mobile;
+    private String email;
+    private String avatar;
+    private Integer sex;
     private String status;
     private Long boundSystemUserId;
     private String channelId;

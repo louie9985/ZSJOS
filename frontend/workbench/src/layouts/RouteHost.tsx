@@ -2,6 +2,7 @@ import { Card, Result, Typography } from 'antd'
 import { APP_ROUTES } from '../constants'
 import { resolveWorkbenchComponent, WORKBENCH_COMPONENT } from '../services/menuComponentRegistry'
 import type { WorkbenchMenu } from '../services/api'
+import { Navigate, useLocation } from 'react-router-dom'
 import LeadSubmissionPage from '../pages/LeadSubmissionPage'
 import LeadManagementPage from '../pages/LeadManagementPage'
 import LeadAssignmentPage from '../pages/LeadAssignmentPage'
@@ -15,7 +16,6 @@ import LeadQualificationExceptionPage from '../pages/LeadQualificationExceptionP
 import MessageInboxPage from '../pages/MessageInboxPage'
 import LeadAppealPage from '../pages/LeadAppealPage'
 import SalesOrderApprovalPage from '../pages/SalesOrderApprovalPage'
-import SalesOrderSupervisorConfirmationPage from '../pages/SalesOrderSupervisorConfirmationPage'
 import MySalesOrderPage from '../pages/MySalesOrderPage'
 import SubordinateSalesPage from '../pages/SubordinateSalesPage'
 import ExternalRepurchasePage from '../pages/ExternalRepurchasePage'
@@ -38,6 +38,7 @@ import {
   ProductConfigPage,
   WorkPlanConfigPage
 } from '../pages/ConfigurationPages'
+import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage } from '../pages/RegistrationPages'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -51,14 +52,17 @@ interface RouteHostProps {
  * 未迁移的菜单显示占位提示。
  */
 export default function RouteHost({ menu, permissions, roles, onOpenAssignment }: RouteHostProps) {
+  const location = useLocation()
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage audience="all"/>
+  if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage selfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_COMPLAINTS) return <LeadComplaintPage/>
-  if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <LeadManagementPage audience="submitter"/>
-  if (menu?.path === APP_ROUTES.OWNED_LEADS) return <LeadManagementPage audience="owner"/>
+  if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
+    state={{ ...(location.state || {}), relationScope: 'submitted' }}/>
+  if (menu?.path === APP_ROUTES.OWNED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
+    state={{ ...(location.state || {}), relationScope: 'owned' }}/>
   if (menu?.path === APP_ROUTES.LEAD_ASSIGNMENT) return <LeadAssignmentPage/>
   if (menu?.path === APP_ROUTES.LEAD_DUPLICATE_REVIEW) return <LeadDuplicateReviewPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
@@ -72,7 +76,6 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS) return <SalesOrderSupervisorConfirmationPage/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
   if (menu?.path === APP_ROUTES.EXPORT_TASKS) return <ExportTaskPage/>
   if (menu?.path === APP_ROUTES.PERSONNEL) return <PersonnelPage permissions={permissions}/>
@@ -89,6 +92,9 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.LEAD_FOLLOW_UP_RULE) return <LeadFollowUpRuleConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.PRODUCT_CONFIG) return <ProductConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage/>
+  if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
+  if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>

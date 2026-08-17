@@ -33,10 +33,17 @@
           {{ fieldTypeName(row.fieldType) }}
         </template>
       </el-table-column>
-      <el-table-column label="必填" width="70" align="center">
+      <el-table-column label="管理端" width="90" align="center">
         <template #default="{ row }">
-          <el-tag v-if="row.required" type="danger" size="small">必填</el-tag>
-          <span v-else class="text-gray-400">否</span>
+          <el-tag v-if="row.adminVisible" type="success" size="small">显示</el-tag>
+          <span v-else class="text-gray-400">隐藏</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="员工收集表" min-width="120" align="center">
+        <template #default="{ row }">
+          <span v-if="!row.collectionVisible" class="text-gray-400">隐藏</span>
+          <el-tag v-else-if="row.collectionRequired" type="danger" size="small">必填</el-tag>
+          <el-tag v-else type="info" size="small">选填</el-tag>
         </template>
       </el-table-column>
       <el-table-column label="来源" width="90" align="center">
@@ -46,7 +53,7 @@
         </template>
       </el-table-column>
       <el-table-column label="排序" prop="sort" width="70" align="center" />
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column label="操作" width="130" align="center" fixed="right">
         <template #default="{ row }">
           <!-- 继承字段属于父分类，只能到父分类上修改，此处禁用避免误改影响其他子类 -->
           <el-tooltip v-if="row.inherited" content="继承字段请到父分类修改" placement="top">

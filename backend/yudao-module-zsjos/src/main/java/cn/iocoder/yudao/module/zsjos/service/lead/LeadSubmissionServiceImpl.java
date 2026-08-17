@@ -72,6 +72,17 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public LeadCreateRespVO createForPartner(LeadCreateReqVO reqVO, Long accountId, Long partnerId) {
+        reqVO.setDispatchMode(DISPATCH_AUTO);
+        reqVO.setSpecifiedSalesUserId(null);
+        LeadSubmissionIdentityService.Resolution identity = new LeadSubmissionIdentityService.Resolution(
+                LeadSubmissionIdentityService.Identity.PARTNER, partnerId);
+        validateOrdinaryDispatch(reqVO, null, identity.identity());
+        return create(reqVO, accountId, null, identity, false);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO createSelfSourced(LeadCreateReqVO reqVO, Long salesUserId) {
         identityService.requireSales(salesUserId);
         if (reqVO.getNewMediaProviderUserId() != null) {
@@ -104,7 +115,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
 
     private LeadCreateRespVO create(LeadCreateReqVO reqVO, Long actorUserId, Long sourceUserId,
                                     LeadSubmissionIdentityService.Resolution identity, boolean selfSourced) {
-        LeadCreateRespVO idempotent = findIdempotent(reqVO.getIdempotencyKey());
+        LeadCreateRespVO idempotent = findIdempotent(reqVO.getIdempotencyKey(), identity);
         if (idempotent != null) return idempotent;
 
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
@@ -114,12 +125,16 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         dictDataApi.validateDictDataList(DICT_SOURCE_CHANNEL, List.of(reqVO.getSourceChannel()));
         dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(reqVO.getLeadCategory()));
         List<LeadProductSnapshot> products = validateProducts(reqVO.getEffectiveProducts());
-        Map<Long, FileInfoRespDTO> attachments = attachmentService.validateReferences(
-                reqVO.getAttachments(), actorUserId);
+        Map<Long, FileInfoRespDTO> attachments = identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER
+                ? attachmentService.validatePartnerReferences(reqVO.getAttachments(), actorUserId)
+                : attachmentService.validateReferences(reqVO.getAttachments(), actorUserId);
         validateDispatch(reqVO, selfSourced);
 
         LeadDuplicateReviewDO existingReview = duplicateReviewMapper.selectByIdempotencyKey(reqVO.getIdempotencyKey());
-        if (existingReview != null) return duplicateReviewResponse(existingReview);
+        if (existingReview != null) {
+            requireSamePartnerIdentity(existingReview.getSubmissionPartnerId(), identity);
+            return duplicateReviewResponse(existingReview);
+        }
         LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
         if (match.hasMatches()) {
             LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
@@ -161,10 +176,11 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         dictDataApi.validateDictDataList(DICT_SOURCE_CHANNEL, List.of(reqVO.getSourceChannel()));
         dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(reqVO.getLeadCategory()));
         List<LeadProductSnapshot> products = validateProducts(reqVO.getEffectiveProducts());
-        Map<Long, FileInfoRespDTO> attachments = attachmentService.validateReferences(
-                reqVO.getAttachments(), submitterUserId);
         LeadSubmissionIdentityService.Resolution identity = identityService.resolveHistoricalSubmission(
                 submitterUserId, sourceType, partnerId);
+        Map<Long, FileInfoRespDTO> attachments = identity.identity() == LeadSubmissionIdentityService.Identity.PARTNER
+                ? attachmentService.validatePartnerReferences(reqVO.getAttachments(), submitterUserId)
+                : attachmentService.validateReferences(reqVO.getAttachments(), submitterUserId);
         boolean selfSourced = identity.identity() == LeadSubmissionIdentityService.Identity.SALES;
         if (!selfSourced) {
             validateOrdinaryDispatch(reqVO, submitterUserId, identity.identity());
@@ -220,13 +236,24 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         return response(leadMapper.selectById(lead.getId()), "created");
     }
 
-    private LeadCreateRespVO findIdempotent(String key) {
+    private LeadCreateRespVO findIdempotent(String key, LeadSubmissionIdentityService.Resolution identity) {
         LeadDO lead = leadMapper.selectByIdempotencyKey(key);
-        if (lead != null) return response(lead, "created");
+        if (lead != null) {
+            requireSamePartnerIdentity(lead.getPartnerId(), identity);
+            return response(lead, "created");
+        }
         LeadActivationDO activation = activationMapper.selectByIdempotencyKey(key);
         if (activation == null) return null;
+        requireSamePartnerIdentity(activation.getPartnerId(), identity);
         LeadDO activatedLead = leadMapper.selectById(activation.getLeadId());
         return response(activatedLead, "activated");
+    }
+
+    private void requireSamePartnerIdentity(Long existingPartnerId,
+                                            LeadSubmissionIdentityService.Resolution identity) {
+        if (!Objects.equals(existingPartnerId, identity.partnerId())) {
+            throw exception(LEAD_SUBMISSION_DUPLICATE);
+        }
     }
 
     private void validateContact(String mobile, String wechatId) {

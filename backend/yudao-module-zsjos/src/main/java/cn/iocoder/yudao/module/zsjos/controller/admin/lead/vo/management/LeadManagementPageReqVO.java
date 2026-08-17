@@ -26,6 +26,9 @@ public class LeadManagementPageReqVO extends PageParam {
     @Pattern(regexp = "submitter|owner", message = "客资收件箱视角不正确")
     private String audience;
 
+    @Pattern(regexp = "all|submitted|owned", message = "客资关系范围不正确")
+    private String relationScope;
+
     @Pattern(regexp = "[a-z][a-z0-9_]{1,63}", message = "客资收件箱分组不正确")
     private String inboxGroup;
 

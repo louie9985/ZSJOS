@@ -18,7 +18,7 @@
             <el-tree-select
               v-model="formData.categoryId"
               :data="categoryTree"
-              :props="{ label: 'name', children: 'children', value: 'id' }"
+              :props="treeSelectProps"
               check-strictly
               node-key="id"
               class="!w-full"
@@ -29,6 +29,26 @@
         <el-col :span="12">
           <el-form-item label="品牌型号" prop="brand">
             <el-input v-model="formData.brand" placeholder="如 Apple M3 Pro" />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="管理模式">
+            <el-input
+              :model-value="selectedCategory?.managementMode === 2 ? '批量管理' : '单件管理'"
+              disabled
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item :label="`数量（${selectedCategory?.unit || '个'}）`" prop="quantity">
+            <el-input-number
+              v-model="formData.quantity"
+              :min="1"
+              :step="1"
+              :precision="0"
+              :disabled="selectedCategory?.managementMode !== 2"
+              class="!w-full"
+            />
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -120,7 +140,7 @@
             <el-tree-select
               v-model="formData.useDeptId"
               :data="deptTree"
-              :props="{ label: 'name', children: 'children', value: 'id' }"
+              :props="treeSelectProps"
               check-strictly
               node-key="id"
               clearable
@@ -154,7 +174,12 @@
         </el-col>
         <el-col :span="24">
           <el-form-item label="备注" prop="remark">
-            <el-input v-model="formData.remark" type="textarea" :rows="2" placeholder="请输入备注" />
+            <el-input
+              v-model="formData.remark"
+              type="textarea"
+              :rows="2"
+              placeholder="请输入备注"
+            />
           </el-form-item>
         </el-col>
       </el-row>
@@ -163,7 +188,11 @@
       <el-divider content-position="left">
         <span class="text-sm text-gray-500">分类自定义字段</span>
       </el-divider>
-      <DynamicFields v-model="formData.extFields" :category-id="formData.categoryId" />
+      <DynamicFields
+        :model-value="formData.extFields || {}"
+        :category-id="formData.categoryId"
+        @update:model-value="formData.extFields = $event"
+      />
     </el-form>
 
     <template #footer>
@@ -183,11 +212,12 @@ import DynamicFields from './DynamicFields.vue'
 
 defineOptions({ name: 'EamAssetForm' })
 
-defineProps<{ categoryTree: any[] }>()
+const props = defineProps<{ categoryTree: any[] }>()
 const emit = defineEmits(['success'])
 
 const { t } = useI18n()
 const message = useMessage()
+const treeSelectProps: any = { label: 'name', children: 'children', value: 'id' }
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -199,6 +229,17 @@ const formRef = ref()
 const deptTree = ref<any[]>([])
 const userList = ref<any[]>([])
 
+const selectedCategory = computed(() => {
+  const find = (nodes: any[]): any => {
+    for (const node of nodes) {
+      if (node.id === formData.value.categoryId) return node
+      const child = find(node.children || [])
+      if (child) return child
+    }
+  }
+  return find(props.categoryTree)
+})
+
 const formRules = reactive({
   name: [{ required: true, message: '资产名称不能为空', trigger: 'blur' }],
   categoryId: [{ required: true, message: '分类不能为空', trigger: 'change' }]
@@ -208,6 +249,7 @@ function buildEmptyForm(): AssetApi.AssetVO {
   return {
     name: '',
     categoryId: undefined as any,
+    quantity: 1,
     brand: '',
     specification: '',
     sn: '',
@@ -248,6 +290,9 @@ defineExpose({ open })
 
 const submitForm = async () => {
   await formRef.value.validate()
+  if (selectedCategory.value?.managementMode !== 2) {
+    formData.value.quantity = 1
+  }
   formLoading.value = true
   try {
     const data = formData.value
@@ -264,6 +309,13 @@ const submitForm = async () => {
     formLoading.value = false
   }
 }
+
+watch(
+  () => selectedCategory.value?.managementMode,
+  (mode) => {
+    if (mode !== 2) formData.value.quantity = 1
+  }
+)
 
 onMounted(async () => {
   deptTree.value = handleTree(await DeptApi.getSimpleDeptList())

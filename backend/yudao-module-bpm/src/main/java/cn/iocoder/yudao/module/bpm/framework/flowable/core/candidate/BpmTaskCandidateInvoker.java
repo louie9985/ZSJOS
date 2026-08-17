@@ -120,7 +120,11 @@ public class BpmTaskCandidateInvoker {
             ProcessInstance processInstance = SpringUtil.getBean(BpmProcessInstanceService.class)
                     .getProcessInstance(execution.getProcessInstanceId());
             Assert.notNull(processInstance, "流程实例({}) 不存在", execution.getProcessInstanceId());
-            removeStartUserIfSkip(userIds, flowElement, Long.valueOf(processInstance.getStartUserId()));
+            Long startAdminUserId = cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO
+                    .getAdminUserId(processInstance.getStartUserId());
+            if (startAdminUserId != null) {
+                removeStartUserIfSkip(userIds, flowElement, startAdminUserId);
+            }
             return userIds;
         });
     }

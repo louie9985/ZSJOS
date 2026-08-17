@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS `eam_category` (
   `code`        varchar(50)  NOT NULL                 COMMENT '分类编码，用于资产编号前缀',
   `sort`        int          NOT NULL DEFAULT 0       COMMENT '排序',
   `status`      tinyint      NOT NULL DEFAULT 0       COMMENT '状态：0 开启 1 关闭',
+  `management_mode` tinyint  NOT NULL DEFAULT 1       COMMENT '管理模式：1 单件 2 批量',
+  `unit`        varchar(20)  NOT NULL DEFAULT '个'    COMMENT '默认计量单位',
   `remark`      varchar(500)          DEFAULT NULL    COMMENT '备注',
   `creator`     varchar(64)           DEFAULT ''      COMMENT '创建者',
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -34,6 +36,10 @@ CREATE TABLE IF NOT EXISTS `eam_category_field` (
   `field_type`  tinyint      NOT NULL                 COMMENT '字段类型：1 单行文本 2 多行文本 3 数字 4 日期 5 下拉选择',
   `options`     json                  DEFAULT NULL    COMMENT '下拉选项数组，仅字段类型为下拉选择时使用',
   `required`    bit(1)       NOT NULL DEFAULT b'0'    COMMENT '是否必填',
+  `admin_visible` bit(1)     NOT NULL DEFAULT b'1'    COMMENT '管理端是否显示',
+  `collection_visible` bit(1) NOT NULL DEFAULT b'1'   COMMENT '员工收集表是否显示',
+  `collection_required` bit(1) NOT NULL DEFAULT b'0'  COMMENT '员工收集表是否必填',
+  `condition_rule` json               DEFAULT NULL    COMMENT '员工收集表条件规则',
   `sort`        int          NOT NULL DEFAULT 0       COMMENT '排序',
   `creator`     varchar(64)           DEFAULT ''      COMMENT '创建者',
   `create_time` datetime     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -50,6 +56,9 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   `asset_code`      varchar(64)   NOT NULL                 COMMENT '资产业务编号，按编号规则生成',
   `name`            varchar(200)  NOT NULL                 COMMENT '资产名称',
   `category_id`     bigint        NOT NULL                 COMMENT '分类编号',
+  `management_mode` tinyint       NOT NULL DEFAULT 1       COMMENT '管理模式快照：1 单件 2 批量',
+  `quantity`        int           NOT NULL DEFAULT 1       COMMENT '资产数量',
+  `unit`            varchar(20)   NOT NULL DEFAULT '个'    COMMENT '计量单位快照',
   `status`          tinyint       NOT NULL DEFAULT 0       COMMENT '资产状态：0 闲置 1 在用 2 借出 3 维修中 4 待报废 5 已报废 6 已丢失 7 已冻结',
   `previous_status` tinyint                DEFAULT NULL    COMMENT '进入可逆中间态前的状态，用于维修完成/报废驳回/解冻恢复',
   `brand`           varchar(100)           DEFAULT NULL    COMMENT '品牌型号',
@@ -81,6 +90,27 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   KEY `idx_eam_asset_use_user` (`tenant_id`, `use_user_id`),
   KEY `idx_eam_asset_use_dept` (`tenant_id`, `use_dept_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = 'EAM 资产卡片';
+
+CREATE TABLE IF NOT EXISTS `eam_asset_import_batch` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `file_hash` char(64) NOT NULL, `file_name` varchar(255) NOT NULL,
+  `sheet_name` varchar(100) NOT NULL, `total_rows` int NOT NULL DEFAULT 0, `create_count` int NOT NULL DEFAULT 0,
+  `update_count` int NOT NULL DEFAULT 0, `skip_count` int NOT NULL DEFAULT 0, `warning_count` int NOT NULL DEFAULT 0,
+  `operator_id` bigint DEFAULT NULL, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_asset_import_batch_hash` (`tenant_id`,`file_hash`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 资产导入批次';
+
+CREATE TABLE IF NOT EXISTS `eam_asset_import_row` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `batch_id` bigint NOT NULL, `file_hash` char(64) NOT NULL,
+  `sheet_name` varchar(100) NOT NULL, `row_num` int NOT NULL, `asset_id` bigint NOT NULL,
+  `asset_code` varchar(64) NOT NULL, `import_action` tinyint NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_asset_import_source` (`tenant_id`,`file_hash`,`sheet_name`,`row_num`,`deleted`),
+  KEY `idx_eam_asset_import_row_batch` (`tenant_id`,`batch_id`), KEY `idx_eam_asset_import_row_asset` (`tenant_id`,`asset_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 资产导入行来源';
 
 CREATE TABLE IF NOT EXISTS `eam_asset_change_log` (
   `id`             bigint       NOT NULL AUTO_INCREMENT COMMENT '记录编号',

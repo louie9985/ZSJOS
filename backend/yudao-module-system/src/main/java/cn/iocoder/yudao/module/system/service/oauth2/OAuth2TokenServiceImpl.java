@@ -34,6 +34,7 @@ import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
@@ -213,17 +214,32 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public OAuth2AccessTokenDO removeAccessToken(String accessToken) {
-        // 删除访问令牌
         OAuth2AccessTokenDO accessTokenDO = oauth2AccessTokenMapper.selectByAccessToken(accessToken);
         if (accessTokenDO == null) {
             return null;
         }
+        deleteTokenPair(accessTokenDO);
+        return accessTokenDO;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public OAuth2AccessTokenDO removeAccessToken(String accessToken, Integer expectedUserType) {
+        OAuth2AccessTokenDO accessTokenDO = oauth2AccessTokenMapper.selectByAccessToken(accessToken);
+        if (accessTokenDO == null || expectedUserType == null
+                || !Objects.equals(accessTokenDO.getUserType(), expectedUserType)) {
+            return null;
+        }
+        deleteTokenPair(accessTokenDO);
+        return accessTokenDO;
+    }
+
+    private void deleteTokenPair(OAuth2AccessTokenDO accessTokenDO) {
         oauth2AccessTokenMapper.deleteById(accessTokenDO.getId());
-        oauth2AccessTokenRedisDAO.delete(accessToken);
+        oauth2AccessTokenRedisDAO.delete(accessTokenDO.getAccessToken());
         // 删除刷新令牌
         oauth2RefreshTokenMapper.deleteByRefreshToken(accessTokenDO.getRefreshToken());
         oauth2AccessTokenRedisDAO.delete(accessTokenDO.getRefreshToken());
-        return accessTokenDO;
     }
 
     @Override
@@ -302,8 +318,9 @@ public class OAuth2TokenServiceImpl implements OAuth2TokenService {
             AdminUserDO user = adminUserService.getUser(userId);
             return MapUtil.builder(LoginUser.INFO_KEY_NICKNAME, user.getNickname())
                     .put(LoginUser.INFO_KEY_DEPT_ID, StrUtil.toStringOrNull(user.getDeptId())).build();
-        } else if (userType.equals(UserTypeEnum.MEMBER.getValue())) {
-            // 注意：目前 Member 暂时不读取，可以按需实现
+        } else if (userType.equals(UserTypeEnum.MEMBER.getValue())
+                || userType.equals(UserTypeEnum.PARTNER.getValue())) {
+            // MEMBER 和 PARTNER 的资料由各自业务模块持有，System 仅签发通用 Token。
             return Collections.emptyMap();
         }
         throw new IllegalArgumentException("未知用户类型：" + userType);

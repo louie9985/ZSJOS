@@ -13,6 +13,8 @@ import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
 import cn.iocoder.yudao.framework.common.util.object.PageUtils;
 import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
+import cn.iocoder.yudao.module.bpm.api.task.BpmExternalStartUserProvider;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.BpmModelMetaInfoVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.simple.BpmSimpleModelNodeVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.instance.*;
@@ -38,6 +40,7 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.SimpleModelUtils;
 import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmModelService;
 import cn.iocoder.yudao.module.bpm.service.message.BpmMessageService;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
@@ -104,6 +107,8 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
 
     @Resource
     private BpmProcessDefinitionService processDefinitionService;
+    @Resource private BpmModelService modelService;
+    @Resource private List<BpmExternalStartUserProvider> externalStartUserProviders;
     @Resource
     @Lazy // 避免循环依赖
     private BpmTaskService taskService;
@@ -179,7 +184,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
             if (historicProcessInstance == null) {
                 throw exception(ErrorCodeConstants.PROCESS_INSTANCE_NOT_EXISTS);
             }
-            startUserId = Long.valueOf(historicProcessInstance.getStartUserId());
+            startUserId = BpmStartSubjectDTO.getAdminUserId(historicProcessInstance.getStartUserId());
             processInstanceStatus = FlowableUtils.getProcessInstanceStatus(historicProcessInstance);
             // 合并 DB 和前端传递的流量变量，以前端的为主
             if (CollUtil.isNotEmpty(historicProcessInstance.getProcessVariables())) {
@@ -782,6 +787,67 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         });
     }
 
+    @Override
+    @DataPermission(enable = false)
+    public String createProcessInstance(BpmStartSubjectDTO subject, BpmProcessInstanceCreateReqDTO createReqDTO) {
+        String displayName = requireExternalSubject(subject);
+        return FlowableUtils.executeAuthenticatedUserId(subject.toFlowableId(), () -> {
+            ProcessDefinition definition = processDefinitionService
+                    .getActiveProcessDefinition(createReqDTO.getProcessDefinitionKey());
+            return createExternalProcessInstance0(subject, displayName, definition, createReqDTO);
+        });
+    }
+
+    private String createExternalProcessInstance0(BpmStartSubjectDTO subject, String displayName,
+                                                   ProcessDefinition definition,
+                                                   BpmProcessInstanceCreateReqDTO reqDTO) {
+        if (definition == null) throw exception(PROCESS_DEFINITION_NOT_EXISTS);
+        if (definition.isSuspended()) throw exception(PROCESS_DEFINITION_IS_SUSPENDED);
+        BpmProcessDefinitionInfoDO definitionInfo = processDefinitionService.getProcessDefinitionInfo(definition.getId());
+        if (definitionInfo == null) throw exception(PROCESS_DEFINITION_NOT_EXISTS);
+        validateExternalCandidateStrategies(definition.getId());
+        if (CollUtil.isNotEmpty(reqDTO.getStartUserSelectAssignees())) {
+            throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
+        }
+        Map<String, Object> variables = reqDTO.getVariables() == null
+                ? new HashMap<>() : new HashMap<>(reqDTO.getVariables());
+        FlowableUtils.filterProcessInstanceFormVariable(variables);
+        variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_START_USER_ID, subject.toFlowableId());
+        variables.put("externalStartUserName", displayName);
+        variables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_STATUS,
+                BpmProcessInstanceStatusEnum.RUNNING.getStatus());
+        variables.put(BpmnVariableConstants.PROCESS_INSTANCE_SKIP_EXPRESSION_ENABLED, true);
+        ProcessInstanceBuilder builder = runtimeService.createProcessInstanceBuilder()
+                .processDefinitionId(definition.getId()).businessKey(reqDTO.getBusinessKey())
+                .variables(variables).name(definition.getName());
+        BpmModelMetaInfoVO.ProcessIdRule idRule = definitionInfo.getProcessIdRule();
+        if (idRule != null && Boolean.TRUE.equals(idRule.getEnable())) {
+            builder.predefineProcessInstanceId(processIdRedisDAO.generate(idRule));
+        }
+        return builder.start().getId();
+    }
+
+    private void validateExternalCandidateStrategies(String definitionId) {
+        Set<Integer> forbidden = Set.of(BpmTaskCandidateStrategyEnum.START_USER_SELECT.getStrategy(),
+                BpmTaskCandidateStrategyEnum.START_USER.getStrategy(),
+                BpmTaskCandidateStrategyEnum.START_USER_DEPT_LEADER.getStrategy(),
+                BpmTaskCandidateStrategyEnum.START_USER_DEPT_LEADER_MULTI.getStrategy());
+        boolean unsupported = BpmnModelUtils.getBpmnModelElements(modelService.getBpmnModelByDefinitionId(definitionId),
+                        UserTask.class).stream()
+                .map(BpmnModelUtils::parseCandidateStrategy).anyMatch(forbidden::contains);
+        if (unsupported) throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
+    }
+
+    private String requireExternalSubject(BpmStartSubjectDTO subject) {
+        if (subject == null || subject.getUserType() == null || subject.getUserId() == null) {
+            throw exception(PROCESS_INSTANCE_EXTERNAL_USER_INVALID);
+        }
+        return externalStartUserProviders.stream()
+                .filter(provider -> Objects.equals(provider.getUserType(), subject.getUserType()))
+                .findFirst().map(provider -> provider.validateAndGetDisplayName(subject.getUserId()))
+                .filter(StrUtil::isNotBlank).orElseThrow(() -> exception(PROCESS_INSTANCE_EXTERNAL_USER_INVALID));
+    }
+
     private String createProcessInstance0(Long userId, ProcessDefinition definition,
                                           Map<String, Object> variables, String businessKey,
                                           Map<String, List<Long>> startUserSelectAssignees) {
@@ -913,6 +979,34 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         // 2. 取消流程
         updateProcessInstanceCancel(cancelReqVO.getId(),
                 BpmReasonEnum.CANCEL_PROCESS_INSTANCE_BY_START_USER.format(cancelReqVO.getReason()));
+    }
+
+    @Override
+    @DataPermission(enable = false)
+    public void cancelProcessInstanceByStartSubject(BpmStartSubjectDTO subject,
+                                                    BpmProcessInstanceCancelReqVO cancelReqVO) {
+        requireExternalSubject(subject);
+        ProcessInstance instance = getProcessInstance(cancelReqVO.getId());
+        if (instance == null) throw exception(PROCESS_INSTANCE_CANCEL_FAIL_NOT_EXISTS);
+        if (!Objects.equals(instance.getStartUserId(), subject.toFlowableId())) {
+            throw exception(PROCESS_INSTANCE_CANCEL_FAIL_NOT_SELF);
+        }
+        BpmProcessDefinitionInfoDO info = processDefinitionService.getProcessDefinitionInfo(instance.getProcessDefinitionId());
+        if (info != null && BooleanUtil.isFalse(info.getAllowCancelRunningProcess())) {
+            throw exception(PROCESS_INSTANCE_CANCEL_FAIL_NOT_ALLOW);
+        }
+        if (StrUtil.isNotBlank(instance.getSuperExecutionId())) throw exception(PROCESS_INSTANCE_CANCEL_CHILD_FAIL_NOT_ALLOW);
+        updateProcessInstanceCancel(instance.getId(), "外部发起人撤销：" + cancelReqVO.getReason());
+    }
+
+    @Override
+    public void terminateProcessInstanceByBusiness(BpmStartSubjectDTO operator, String processInstanceId,
+                                                   String authorizationType, String reason) {
+        String displayName = requireExternalSubject(operator);
+        ProcessInstance instance = getProcessInstance(processInstanceId);
+        if (instance == null) throw exception(PROCESS_INSTANCE_CANCEL_FAIL_NOT_EXISTS);
+        updateProcessInstanceCancel(processInstanceId, "业务授权[" + authorizationType + "]，操作人["
+                + operator.toFlowableId() + "/" + displayName + "]：" + reason);
     }
 
     @Override
@@ -1048,8 +1142,8 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
 
             @Override
             public void afterCommit() {
-                String name = generateProcessInstanceName(Long.valueOf(instance.getStartUserId()),
-                        processDefinition, processDefinitionInfo, instance.getProcessVariables());
+                String name = generateProcessInstanceName(instance.getStartUserId(), processDefinition,
+                        processDefinitionInfo, instance.getProcessVariables());
                 if (ObjUtil.notEqual(instance.getName(), name)) {
                     runtimeService.setProcessInstanceName(instance.getProcessInstanceId(), name);
                 }
@@ -1065,6 +1159,29 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
             }
 
         });
+    }
+
+    private String generateProcessInstanceName(String flowableStartUserId,
+                                               ProcessDefinition definition,
+                                               BpmProcessDefinitionInfoDO definitionInfo,
+                                               Map<String, Object> variables) {
+        Long adminUserId = BpmStartSubjectDTO.getAdminUserId(flowableStartUserId);
+        if (adminUserId != null) {
+            return generateProcessInstanceName(adminUserId, definition, definitionInfo, variables);
+        }
+        if (definition == null || definitionInfo == null) {
+            return null;
+        }
+        BpmModelMetaInfoVO.TitleSetting titleSetting = definitionInfo.getTitleSetting();
+        if (titleSetting == null || !BooleanUtil.isTrue(titleSetting.getEnable())) {
+            return definition.getName();
+        }
+        Map<String, Object> cloneVariables = new HashMap<>(variables);
+        cloneVariables.put(BpmnVariableConstants.PROCESS_INSTANCE_VARIABLE_START_USER_ID,
+                variables.getOrDefault("externalStartUserName", flowableStartUserId));
+        cloneVariables.put(BpmnVariableConstants.PROCESS_START_TIME, DateUtil.now());
+        cloneVariables.put(BpmnVariableConstants.PROCESS_DEFINITION_NAME, definition.getName().trim());
+        return StrUtil.format(titleSetting.getTitle(), cloneVariables);
     }
 
 }

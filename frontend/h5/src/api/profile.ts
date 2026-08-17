@@ -25,7 +25,7 @@ export function getProfile() {
 }
 
 /** 修改账号资料 */
-export function updateProfile(data: Partial<UserProfile>) {
+export function updateProfile(data: Partial<Omit<UserProfile, 'mobile'>>) {
   return request.put<never, void>('/zsjos/profile/update', data)
 }
 

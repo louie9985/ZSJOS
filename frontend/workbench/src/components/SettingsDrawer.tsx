@@ -89,7 +89,7 @@ const SettingsDrawer: React.FC = () => {
       <Drawer
         title="系统设置"
         placement="right"
-        width={320}
+        size={320}
         open={open}
         onClose={() => setOpen(false)}
         styles={{ body: { paddingTop: 12 } }}

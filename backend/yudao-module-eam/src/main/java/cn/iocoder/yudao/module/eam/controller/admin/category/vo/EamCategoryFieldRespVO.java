@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.util.List;
+import java.util.Map;
 
 @Schema(description = "管理后台 - EAM 分类自定义字段 Response VO")
 @Data
@@ -29,6 +30,18 @@ public class EamCategoryFieldRespVO {
 
     @Schema(description = "是否必填", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
     private Boolean required;
+
+    @Schema(description = "管理端是否显示", example = "true")
+    private Boolean adminVisible;
+
+    @Schema(description = "员工收集表是否显示", example = "true")
+    private Boolean collectionVisible;
+
+    @Schema(description = "员工收集表是否必填", example = "false")
+    private Boolean collectionRequired;
+
+    @Schema(description = "员工收集表条件规则")
+    private Map<String, Object> conditionRule;
 
     @Schema(description = "排序", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer sort;

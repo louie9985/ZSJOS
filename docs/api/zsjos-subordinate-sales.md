@@ -7,10 +7,18 @@ Base path: `/admin-api/zsjos/subordinate-sales`. All endpoints require authentic
 - `GET /page`: permission `zsjos:subordinate-sales:query`; supports `keyword`, `accountStatus`, `presence`, `accepting`, `pageNo`, and `pageSize`.
 - `GET /{salesUserId}/overview`: returns the same metric contract for one managed sales user.
 - `GET /{salesUserId}/leads`: reuses the Lead management table response and limits rows to current ownership by that managed sales user.
-- `GET /{salesUserId}/tasks`: returns current pending first/subsequent follow-up tasks; `bucket` is `overdue`, `today`, `future`, or `unscheduled` using Beijing time.
+- `GET /{salesUserId}/tasks`: returns current pending first/subsequent follow-up tasks; `bucket` is `overdue`, `today`, `future`, or `unscheduled` using Beijing time. An empty task set returns an empty page and never issues an empty-ID Lead query.
 - `GET /transfer-candidates`: returns enabled, currently eligible sales specialists inside the manager's department tree.
 
 The list includes disabled sales accounts that still hold the stable `sales_specialist` post. `canReceiveNewLeads` is true only when account enabled, sales eligibility valid, presence online, and intake mode accepting. Lead-category metrics follow the enabled System dictionary order and append `未配置` only when historical unmatched values exist.
+
+Selecting an in-scope Lead reuses the Workbench owned-Lead detail in `manager-readonly` mode. The manager can read the full overview, follow-up history, appeal history, complaint history, and customer-order history, but no Lead, appeal, complaint, follow-up, or order write action is exposed. The detail calls the existing domain read APIs with `zsjos:subordinate-sales:query`; every call still requires the live System department-leader relationship through the Lead object-permission boundary.
+
+- `GET /zsjos/lead/get?id={leadId}`: complete Lead overview.
+- `GET /zsjos/lead/{leadId}/follow-ups/page`: paged follow-up history.
+- `GET /zsjos/lead/appeal/lead/{leadId}/list`: appeal history.
+- `GET /zsjos/lead-complaint/lead/{leadId}/list`: complaint history with display names and signed evidence URLs.
+- `GET /zsjos/sales-order/lead/{leadId}/customer-orders` and `/{orderId}`: customer order list and detail; only the Lead owner, an in-scope department manager, or `zsjos:lead:query-all` may pass the order-specific object action. A submitter-only relationship is insufficient.
 
 ## Commands
 

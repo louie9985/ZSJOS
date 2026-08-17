@@ -12,5 +12,9 @@ import java.util.Map;
 public interface LeadAttachmentService {
     LeadAttachmentUploadRespVO upload(MultipartFile file) throws IOException;
 
+    LeadAttachmentUploadRespVO uploadForPartner(MultipartFile file, Long accountId) throws IOException;
+
     Map<Long, FileInfoRespDTO> validateReferences(List<LeadAttachmentReqVO> attachments, Long submitterUserId);
+
+    Map<Long, FileInfoRespDTO> validatePartnerReferences(List<LeadAttachmentReqVO> attachments, Long accountId);
 }

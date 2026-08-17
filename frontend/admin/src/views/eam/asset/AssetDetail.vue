@@ -5,8 +5,19 @@
         <el-descriptions-item label="资产编号">{{ detail.assetCode || '-' }}</el-descriptions-item>
         <el-descriptions-item label="资产名称">{{ detail.name || '-' }}</el-descriptions-item>
         <el-descriptions-item label="分类">{{ detail.categoryName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="管理模式">
+          {{ detail.managementMode === 2 ? '批量管理' : '单件管理' }}
+        </el-descriptions-item>
+        <el-descriptions-item label="数量">
+          {{ detail.quantity || 1 }} {{ detail.unit || '个' }}
+        </el-descriptions-item>
         <el-descriptions-item label="状态">
-          <dict-tag :type="'eam_asset_status'" :value="detail.status" />
+          <dict-tag
+            v-if="detail.status != null"
+            :type="'eam_asset_status'"
+            :value="detail.status"
+          />
+          <span v-else>-</span>
         </el-descriptions-item>
         <el-descriptions-item label="品牌型号">{{ detail.brand || '-' }}</el-descriptions-item>
         <el-descriptions-item label="规格参数">
@@ -33,7 +44,9 @@
         <el-descriptions-item label="存放地点" :span="2">
           {{ detail.location || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ detail.remark || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="备注" :span="2">{{
+          detail.remark || '-'
+        }}</el-descriptions-item>
       </el-descriptions>
 
       <!-- 分类自定义字段 -->
@@ -42,11 +55,7 @@
           <span class="text-sm text-gray-500">自定义字段</span>
         </el-divider>
         <el-descriptions :column="2" border>
-          <el-descriptions-item
-            v-for="item in extFieldEntries"
-            :key="item.key"
-            :label="item.label"
-          >
+          <el-descriptions-item v-for="item in extFieldEntries" :key="item.key" :label="item.label">
             {{ item.value }}
           </el-descriptions-item>
         </el-descriptions>
@@ -146,7 +155,7 @@ const open = async (id: number) => {
         : Promise.resolve([])
     ])
     changeLogs.value = logs
-    fieldDefs.value = defs
+    fieldDefs.value = defs.filter((field) => field.adminVisible !== false)
   } finally {
     loading.value = false
   }

@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * EAM 分类自定义字段定义 DO
@@ -61,6 +62,23 @@ public class EamCategoryFieldDO extends BaseDO {
      * 是否必填
      */
     private Boolean required;
+    /**
+     * 是否在管理端资产表单显示
+     */
+    private Boolean adminVisible;
+    /**
+     * 是否在员工收集表显示
+     */
+    private Boolean collectionVisible;
+    /**
+     * 员工收集表是否必填
+     */
+    private Boolean collectionRequired;
+    /**
+     * 员工收集表条件显示/必填规则；当前管理端仅保存配置，不执行
+     */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, Object> conditionRule;
     /**
      * 表单中的顺序
      */

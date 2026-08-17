@@ -8,6 +8,7 @@ import java.util.List;
 
 public interface LeadSubmissionService {
     LeadCreateRespVO create(LeadCreateReqVO reqVO, Long submitterUserId);
+    LeadCreateRespVO createForPartner(LeadCreateReqVO reqVO, Long accountId, Long partnerId);
     LeadCreateRespVO createSelfSourced(LeadCreateReqVO reqVO, Long salesUserId);
     List<LeadAssignmentUserRespVO> getNewMediaProviders();
 }

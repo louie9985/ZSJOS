@@ -25,6 +25,15 @@ public class EamAssetRespVO {
     @Schema(description = "分类编号", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Long categoryId;
 
+    @Schema(description = "管理模式：1 单件，2 批量")
+    private Integer managementMode;
+
+    @Schema(description = "数量")
+    private Integer quantity;
+
+    @Schema(description = "计量单位")
+    private String unit;
+
     @Schema(description = "分类名称", example = "设备资产")
     private String categoryName;
 

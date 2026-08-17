@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.*;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWithdrawalRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.withdrawal.*;
@@ -126,6 +127,22 @@ class WithdrawalServiceImplTest {
         assertEquals("https://signed.test/proof", response.getProofUrl());
         assertEquals("622200001234", response.getCardNumber());
         verify(auditService).record(any(), any(), any(), eq("50"), eq("finance"), any());
+    }
+
+    @Test void partnerDetailUsesDedicatedRedactedContract() {
+        WithdrawalDO row = withdrawal(50L, "paid").setPartnerId(8L).setCardNumberSnapshot("622200001234")
+                .setBankNameSnapshot("中世健银行").setBankTransactionNo("TX1").setProofFileId(90L)
+                .setPaidByUserId(30L);
+        when(withdrawalMapper.selectById(50L)).thenReturn(row);
+
+        PartnerWithdrawalRespVO response = service.getPartnerDetail(50L, 8L);
+
+        assertEquals(50L, response.getId());
+        assertEquals("中世健银行", response.getBankNameSnapshot());
+        assertNotEquals("622200001234", response.getMaskedCardNumber());
+        assertFalse(java.util.Arrays.stream(PartnerWithdrawalRespVO.class.getDeclaredFields())
+                .anyMatch(field -> field.getName().equals("processInstanceId") || field.getName().equals("paidByUserId")
+                        || field.getName().equals("proofFileId") || field.getName().equals("bankTransactionNo")));
     }
 
     private WithdrawalDO invocationWithdrawal(org.mockito.invocation.InvocationOnMock inv){return inv.getArgument(0);}

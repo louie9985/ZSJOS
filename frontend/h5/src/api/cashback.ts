@@ -1,4 +1,5 @@
 import request from './request'
+import type { ApiDateValue } from '@/utils/format'
 
 export interface CashbackSummary {
   totalAmount: number
@@ -28,10 +29,10 @@ export interface CashbackItem {
   rateSnapshot?: number
   amount: number
   observationDaysSnapshot: number
-  generatedAt: string
-  availableAt?: string
-  settledAt?: string
-  cancelledAt?: string
+  generatedAt: ApiDateValue
+  availableAt?: ApiDateValue
+  settledAt?: ApiDateValue
+  cancelledAt?: ApiDateValue
   cancelReason?: string
 }
 

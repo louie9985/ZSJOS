@@ -1,7 +1,7 @@
 import request from './request'
 
 export interface LoginParams {
-  username: string
+  mobile: string
   password: string
   platform?: 'PC' | 'MOBILE'
 }
@@ -24,7 +24,7 @@ export interface PermissionInfo {
   permissions: string[]
 }
 
-/** 账号密码登录 */
+/** 手机号密码登录 */
 export function login(data: LoginParams) {
   return request.post<never, LoginResult>('/zsjos/auth/login', {
     ...data,
@@ -34,7 +34,7 @@ export function login(data: LoginParams) {
 
 /** 退出登录 */
 export function logout() {
-  return request.post<never, void>('/zsjos/auth/logout')
+  return request.post<never, void>('/zsjos/auth/logout', undefined, { _skipAuthRefresh: true })
 }
 
 /** 获取权限信息 */

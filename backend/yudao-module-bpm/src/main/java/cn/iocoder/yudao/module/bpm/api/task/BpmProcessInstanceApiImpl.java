@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.bpm.api.task;
 
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.instance.BpmProcessInstanceCancelReqVO;
 import jakarta.annotation.Resource;
@@ -27,6 +28,17 @@ public class BpmProcessInstanceApiImpl implements BpmProcessInstanceApi {
     }
 
     @Override
+    public String createProcessInstance(BpmStartSubjectDTO subject, BpmProcessInstanceCreateReqDTO reqDTO) {
+        return processInstanceService.createProcessInstance(subject, reqDTO);
+    }
+
+    @Override
+    public void cancelProcessInstanceByStartSubject(BpmStartSubjectDTO subject, String processInstanceId, String reason) {
+        processInstanceService.cancelProcessInstanceByStartSubject(subject, new BpmProcessInstanceCancelReqVO()
+                .setId(processInstanceId).setReason(reason));
+    }
+
+    @Override
     public void cancelProcessInstanceByStartUser(Long userId, String processInstanceId, String reason) {
         BpmProcessInstanceCancelReqVO request = new BpmProcessInstanceCancelReqVO();
         request.setId(processInstanceId);
@@ -46,6 +58,18 @@ public class BpmProcessInstanceApiImpl implements BpmProcessInstanceApi {
         request.setId(processInstanceId);
         request.setReason("业务授权[" + authorizationType.trim() + "]：" + reason.trim());
         processInstanceService.cancelProcessInstanceByAdmin(operatorUserId, request);
+    }
+
+    @Override
+    public void terminateProcessInstanceByBusiness(BpmStartSubjectDTO operator, String processInstanceId,
+                                                   String authorizationType, String reason) {
+        if (operator == null || operator.getUserType() == null || operator.getUserId() == null
+                || processInstanceId == null || processInstanceId.isBlank()
+                || authorizationType == null || authorizationType.isBlank()
+                || reason == null || reason.isBlank()) {
+            throw new IllegalArgumentException("Business process termination parameters must not be blank");
+        }
+        processInstanceService.terminateProcessInstanceByBusiness(operator, processInstanceId, authorizationType, reason);
     }
 
 }

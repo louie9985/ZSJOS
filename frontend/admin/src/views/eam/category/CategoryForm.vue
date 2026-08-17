@@ -11,7 +11,7 @@
         <el-tree-select
           v-model="formData.parentId"
           :data="parentOptions"
-          :props="{ label: 'name', children: 'children', value: 'id' }"
+          :props="treeSelectProps"
           check-strictly
           node-key="id"
           class="!w-full"
@@ -23,6 +23,19 @@
       </el-form-item>
       <el-form-item label="分类编码" prop="code">
         <el-input v-model="formData.code" placeholder="用于拼接资产编号，如 IT" />
+      </el-form-item>
+      <el-form-item label="管理模式" prop="managementMode">
+        <el-segmented
+          v-model="formData.managementMode"
+          :options="[
+            { label: '单件管理', value: 1 },
+            { label: '批量管理', value: 2 }
+          ]"
+          class="!w-full"
+        />
+      </el-form-item>
+      <el-form-item label="计量单位" prop="unit">
+        <el-input v-model="formData.unit" placeholder="如 个、本、套、箱" />
       </el-form-item>
       <el-form-item label="排序" prop="sort">
         <el-input-number v-model="formData.sort" :min="0" class="!w-full" :controls="false" />
@@ -61,6 +74,7 @@ const emit = defineEmits(['success'])
 
 const { t } = useI18n()
 const message = useMessage()
+const treeSelectProps: any = { label: 'name', children: 'children', value: 'id' }
 
 const dialogVisible = ref(false)
 const dialogTitle = ref('')
@@ -72,12 +86,16 @@ const formData = ref<CategoryApi.CategoryVO>({
   code: '',
   sort: 0,
   status: 0,
+  managementMode: 1,
+  unit: '个',
   remark: ''
 })
 const formRules = reactive({
   parentId: [{ required: true, message: '父分类不能为空', trigger: 'change' }],
   name: [{ required: true, message: '分类名称不能为空', trigger: 'blur' }],
   code: [{ required: true, message: '分类编码不能为空', trigger: 'blur' }],
+  managementMode: [{ required: true, message: '管理模式不能为空', trigger: 'change' }],
+  unit: [{ required: true, message: '计量单位不能为空', trigger: 'blur' }],
   sort: [{ required: true, message: '排序不能为空', trigger: 'blur' }],
   status: [{ required: true, message: '状态不能为空', trigger: 'change' }]
 })
@@ -86,9 +104,7 @@ const formRef = ref()
 /** 编辑时把自身从父分类候选中剔除，避免选出环形结构 */
 const parentOptions = computed(() => {
   const list = props.categoryList.filter((item) => item.id !== formData.value.id)
-  return [
-    { id: 0, name: '顶级分类', children: handleTree(list as any, 'id', 'parentId') }
-  ]
+  return [{ id: 0, name: '顶级分类', children: handleTree(list as any, 'id', 'parentId') }]
 })
 
 const open = async (type: string, id?: number, parentId?: number) => {
@@ -136,6 +152,8 @@ const resetForm = () => {
     code: '',
     sort: 0,
     status: 0,
+    managementMode: 1,
+    unit: '个',
     remark: ''
   }
   formRef.value?.resetFields()

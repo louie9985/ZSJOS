@@ -16,7 +16,6 @@ export interface PartnerCreateVO {
   partnerNo: string
   name: string
   mobile: string
-  username: string
   password: string
   channelId?: string
 }
@@ -32,8 +31,14 @@ export const convertPartner = (
   id: number,
   data: {
     targetType: string
+    username: string
+    password: string
     deptId: number
     migrateHistoricalOrganization: boolean
     reason: string
   }
 ) => request.post({ url: `/zsjos/partner/${id}/convert`, data })
+export const updatePartnerMobile = (id: number, mobile: string) =>
+  request.put({ url: `/zsjos/partner/${id}/mobile`, data: { mobile } })
+export const resetPartnerPassword = (id: number, password: string) =>
+  request.put({ url: `/zsjos/partner/${id}/reset-password`, data: { password } })

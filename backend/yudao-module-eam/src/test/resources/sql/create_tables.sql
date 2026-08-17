@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS "eam_category" (
     "code"        varchar(50)  NOT NULL,
     "sort"        int          NOT NULL DEFAULT 0,
     "status"      tinyint      NOT NULL DEFAULT 0,
+    "management_mode" tinyint  NOT NULL DEFAULT 1,
+    "unit"        varchar(20)  NOT NULL DEFAULT '个',
     "remark"      varchar(500)          DEFAULT NULL,
     "creator"     varchar(64)           DEFAULT '',
     "create_time" timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -26,6 +28,10 @@ CREATE TABLE IF NOT EXISTS "eam_category_field" (
     "field_type"  tinyint      NOT NULL,
     "options"     varchar(2000)         DEFAULT NULL,
     "required"    bit          NOT NULL DEFAULT FALSE,
+    "admin_visible" bit        NOT NULL DEFAULT TRUE,
+    "collection_visible" bit   NOT NULL DEFAULT TRUE,
+    "collection_required" bit  NOT NULL DEFAULT FALSE,
+    "condition_rule" varchar(2000) DEFAULT NULL,
     "sort"        int          NOT NULL DEFAULT 0,
     "creator"     varchar(64)           DEFAULT '',
     "create_time" timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -41,6 +47,9 @@ CREATE TABLE IF NOT EXISTS "eam_asset" (
     "asset_code"      varchar(64)   NOT NULL,
     "name"            varchar(200)  NOT NULL,
     "category_id"     bigint        NOT NULL,
+    "management_mode" tinyint       NOT NULL DEFAULT 1,
+    "quantity"        int           NOT NULL DEFAULT 1,
+    "unit"            varchar(20)   NOT NULL DEFAULT '个',
     "status"          tinyint       NOT NULL DEFAULT 0,
     "previous_status" tinyint                DEFAULT NULL,
     "brand"           varchar(100)           DEFAULT NULL,
@@ -65,6 +74,38 @@ CREATE TABLE IF NOT EXISTS "eam_asset" (
     "update_time"     timestamp     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "deleted"         bit           NOT NULL DEFAULT FALSE,
     "tenant_id"       bigint        NOT NULL DEFAULT 0,
+    PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "eam_asset_import_batch" (
+    "id" bigint NOT NULL AUTO_INCREMENT,
+    "file_hash" char(64) NOT NULL,
+    "file_name" varchar(255) NOT NULL,
+    "sheet_name" varchar(100) NOT NULL,
+    "total_rows" int NOT NULL DEFAULT 0,
+    "create_count" int NOT NULL DEFAULT 0,
+    "update_count" int NOT NULL DEFAULT 0,
+    "skip_count" int NOT NULL DEFAULT 0,
+    "warning_count" int NOT NULL DEFAULT 0,
+    "operator_id" bigint DEFAULT NULL,
+    "creator" varchar(64) DEFAULT '', "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '', "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE, "tenant_id" bigint NOT NULL DEFAULT 0,
+    PRIMARY KEY ("id")
+);
+
+CREATE TABLE IF NOT EXISTS "eam_asset_import_row" (
+    "id" bigint NOT NULL AUTO_INCREMENT,
+    "batch_id" bigint NOT NULL,
+    "file_hash" char(64) NOT NULL,
+    "sheet_name" varchar(100) NOT NULL,
+    "row_num" int NOT NULL,
+    "asset_id" bigint NOT NULL,
+    "asset_code" varchar(64) NOT NULL,
+    "import_action" tinyint NOT NULL,
+    "creator" varchar(64) DEFAULT '', "create_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updater" varchar(64) DEFAULT '', "update_time" timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "deleted" bit NOT NULL DEFAULT FALSE, "tenant_id" bigint NOT NULL DEFAULT 0,
     PRIMARY KEY ("id")
 );
 

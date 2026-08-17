@@ -1676,7 +1676,10 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                             // 情况二：转交给部门负责人审批
                             if (ObjectUtils.equalsAny(assignStartUserHandlerType,
                                     BpmUserTaskAssignStartUserHandlerTypeEnum.TRANSFER_DEPT_LEADER.getType())) {
-                                AdminUserRespDTO startUser = adminUserApi.getUser(Long.valueOf(processInstance.getStartUserId()));
+                                Long startAdminUserId = cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO
+                                        .getAdminUserId(processInstance.getStartUserId());
+                                Assert.notNull(startAdminUserId, "外部发起人不支持按发起人部门负责人处理");
+                                AdminUserRespDTO startUser = adminUserApi.getUser(startAdminUserId);
                                 Assert.notNull(startUser, "提交人({})信息为空", processInstance.getStartUserId());
                                 DeptRespDTO dept = startUser.getDeptId() != null ? deptApi.getDept(startUser.getDeptId()) : null;
                                 Assert.notNull(dept, "提交人({})部门({})信息为空", processInstance.getStartUserId(), startUser.getDeptId());
@@ -1700,7 +1703,9 @@ public class BpmTaskServiceImpl implements BpmTaskService {
                     }
 
                     // 发送消息
-                    AdminUserRespDTO startUser = adminUserApi.getUser(Long.valueOf(processInstance.getStartUserId()));
+                    Long startAdminUserId = cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO
+                            .getAdminUserId(processInstance.getStartUserId());
+                    AdminUserRespDTO startUser = startAdminUserId == null ? null : adminUserApi.getUser(startAdminUserId);
                     messageService.sendMessageWhenTaskAssigned(BpmTaskConvert.INSTANCE.convert(processInstance, startUser, task));
                 });
             }

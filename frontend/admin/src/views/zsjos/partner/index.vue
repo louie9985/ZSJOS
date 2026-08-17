@@ -10,7 +10,7 @@
       <el-table-column label="状态"
         ><template #default="scope">{{ statusLabels[scope.row.status] }}</template></el-table-column
       >
-      <el-table-column label="操作" width="260">
+      <el-table-column label="操作" width="420">
         <template #default="scope">
           <el-button
             v-if="scope.row.status === 'enabled'"
@@ -36,6 +36,8 @@
             @click="openConvert(scope.row)"
             >转为员工</el-button
           >
+          <el-button v-if="scope.row.status !== 'converted'" v-hasPermi="['zsjos:partner:update-state']" link @click="changeMobile(scope.row)">改手机号</el-button>
+          <el-button v-if="scope.row.status !== 'converted'" v-hasPermi="['zsjos:partner:update-state']" link @click="resetPassword(scope.row)">重置密码</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -50,9 +52,6 @@
       <el-form-item label="姓名"><el-input v-model="createForm.name" /></el-form-item>
       <el-form-item label="手机号"
         ><el-input v-model="createForm.mobile" maxlength="11"
-      /></el-form-item>
-      <el-form-item label="用户名" required
-        ><el-input v-model="createForm.username" maxlength="32"
       /></el-form-item>
       <el-form-item label="初始密码" required
         ><el-input v-model="createForm.password" type="password" show-password maxlength="20"
@@ -74,6 +73,8 @@
           ><el-radio-button value="new_media_manager">新媒体主管</el-radio-button></el-radio-group
         ></el-form-item
       >
+      <el-form-item label="员工用户名" required><el-input v-model="convertForm.username" maxlength="32" /></el-form-item>
+      <el-form-item label="员工初始密码" required><el-input v-model="convertForm.password" type="password" show-password maxlength="20" /></el-form-item>
       <el-form-item label="归属部门" required
         ><el-tree-select
           v-model="convertForm.deptId"
@@ -114,12 +115,13 @@ const createForm = reactive<PartnerApi.PartnerCreateVO>({
   partnerNo: '',
   name: '',
   mobile: '',
-  username: '',
   password: '',
   channelId: ''
 })
 const convertForm = reactive({
   targetType: 'new_media_employee',
+  username: '',
+  password: '',
   deptId: undefined as number | undefined,
   migrateHistoricalOrganization: false,
   reason: ''
@@ -138,10 +140,9 @@ const load = async () => {
 }
 const submitCreate = async () => {
   if (
-    !/^[A-Za-z0-9_]{4,32}$/.test(createForm.username) ||
-    !/^(?=.*[A-Za-z])(?=.*\d).{8,20}$/.test(createForm.password)
+    !/^1\d{10}$/.test(createForm.mobile) || !/^(?=.*[A-Za-z])(?=.*\d).{8,20}$/.test(createForm.password)
   )
-    return message.warning('请检查用户名及密码规则')
+    return message.warning('请检查手机号及密码规则')
   await PartnerApi.createPartner(createForm)
   createVisible.value = false
   message.success('兼职账号已创建')
@@ -162,12 +163,28 @@ const openConvert = async (row: PartnerApi.PartnerVO) => {
   convertVisible.value = true
 }
 const submitConvert = async () => {
-  if (!selectedId.value || !convertForm.deptId || !convertForm.reason.trim())
+  if (!selectedId.value || !convertForm.deptId || !convertForm.reason.trim() ||
+      !/^[A-Za-z0-9_]{4,32}$/.test(convertForm.username) ||
+      !/^(?=.*[A-Za-z])(?=.*\d).{8,20}$/.test(convertForm.password))
     return message.warning('请完整填写转换信息')
   await PartnerApi.convertPartner(selectedId.value, { ...convertForm, deptId: convertForm.deptId })
   convertVisible.value = false
   message.success('兼职已转为员工')
   await load()
+}
+const changeMobile = async (row: PartnerApi.PartnerVO) => {
+  const result = await message.prompt('请输入新的登录手机号', '修改手机号')
+  const mobile = result.value.trim()
+  if (!/^1\d{10}$/.test(mobile)) return message.warning('手机号格式不正确')
+  await PartnerApi.updatePartnerMobile(row.id, mobile)
+  message.success('手机号已修改，原 Partner Token 已撤销')
+  await load()
+}
+const resetPassword = async (row: PartnerApi.PartnerVO) => {
+  const result = await message.prompt('请输入 8-20 位且包含字母和数字的新密码', '重置密码')
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,20}$/.test(result.value)) return message.warning('密码格式不正确')
+  await PartnerApi.resetPartnerPassword(row.id, result.value)
+  message.success('密码已重置，原 Partner Token 已撤销')
 }
 onMounted(load)
 </script>

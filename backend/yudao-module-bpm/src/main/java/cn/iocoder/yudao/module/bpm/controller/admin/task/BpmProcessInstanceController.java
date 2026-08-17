@@ -7,6 +7,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.number.NumberUtils;
 import cn.iocoder.yudao.module.bpm.controller.admin.base.user.UserSimpleBaseVO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
 import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.instance.*;
 import cn.iocoder.yudao.module.bpm.convert.task.BpmProcessInstanceConvert;
 import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmCategoryDO;
@@ -82,7 +83,9 @@ public class BpmProcessInstanceController {
                 convertSet(processDefinitionMap.values(), ProcessDefinition::getCategory));
         Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
                 convertSet(pageResult.getList(), HistoricProcessInstance::getProcessDefinitionId));
-        Set<Long> userIds = convertSet(pageResult.getList(), processInstance -> NumberUtils.parseLong(processInstance.getStartUserId()));
+        Set<Long> userIds = pageResult.getList().stream().map(HistoricProcessInstance::getStartUserId)
+                .map(BpmStartSubjectDTO::getAdminUserId).filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
         userIds.addAll(convertSetByFlatMap(taskMap.values(),
                 tasks -> tasks.stream().map(Task::getAssignee).filter(StrUtil::isNotBlank).map(Long::parseLong)));
         Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(userIds);
@@ -111,8 +114,9 @@ public class BpmProcessInstanceController {
         Map<String, BpmCategoryDO> categoryMap = categoryService.getCategoryMap(
                 convertSet(processDefinitionMap.values(), ProcessDefinition::getCategory));
         // 发起人信息
-        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(
-                convertSet(pageResult.getList(), processInstance -> NumberUtils.parseLong(processInstance.getStartUserId())));
+        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(pageResult.getList().stream()
+                .map(HistoricProcessInstance::getStartUserId).map(BpmStartSubjectDTO::getAdminUserId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
         Map<Long, DeptRespDTO> deptMap = deptApi.getDeptMap(
                 convertSet(userMap.values(), AdminUserRespDTO::getDeptId));
         Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
@@ -143,7 +147,8 @@ public class BpmProcessInstanceController {
                 processInstance.getProcessDefinitionId());
         BpmProcessDefinitionInfoDO processDefinitionInfo = processDefinitionService.getProcessDefinitionInfo(
                 processInstance.getProcessDefinitionId());
-        AdminUserRespDTO startUser = adminUserApi.getUser(NumberUtils.parseLong(processInstance.getStartUserId()));
+        Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
+        AdminUserRespDTO startUser = startAdminUserId == null ? null : adminUserApi.getUser(startAdminUserId);
         DeptRespDTO dept = null;
         if (startUser != null && startUser.getDeptId() != null) {
             dept = deptApi.getDept(startUser.getDeptId());
@@ -212,15 +217,20 @@ public class BpmProcessInstanceController {
         if (historicProcessInstance == null) {
             throw exception(PROCESS_INSTANCE_NOT_EXISTS);
         }
-        AdminUserRespDTO startUser = adminUserApi.getUser(Long.valueOf(historicProcessInstance.getStartUserId()));
-        DeptRespDTO dept = deptApi.getDept(startUser.getDeptId());
+        Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(historicProcessInstance.getStartUserId());
+        AdminUserRespDTO startUser = startAdminUserId == null ? null : adminUserApi.getUser(startAdminUserId);
+        DeptRespDTO dept = startUser != null && startUser.getDeptId() != null ? deptApi.getDept(startUser.getDeptId()) : null;
         List<HistoricTaskInstance> tasks = taskService.getFinishedTaskListByProcessInstanceIdWithoutCancel(processInstanceId);
         Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(
                 convertSet(tasks, item -> Long.valueOf(item.getAssignee())));
         return success(BpmProcessInstanceConvert.INSTANCE.buildProcessInstancePrintData(historicProcessInstance,
                 processDefinitionService.getProcessDefinitionInfo(historicProcessInstance.getProcessDefinitionId()),
                 tasks, userMap,
-                new UserSimpleBaseVO().setNickname(startUser.getNickname()).setDeptName(dept.getName())));
+                startUser != null
+                        ? new UserSimpleBaseVO().setNickname(startUser.getNickname())
+                                .setDeptName(dept == null ? null : dept.getName())
+                        : new UserSimpleBaseVO().setNickname(cn.hutool.core.map.MapUtil.getStr(
+                                historicProcessInstance.getProcessVariables(), "externalStartUserName"))));
     }
 
 }

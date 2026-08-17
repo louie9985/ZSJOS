@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addFollowUpDays, appendQuickNote, chunkSnakeRows, defaultLeadDetailTab, filterFollowUps,
-  shouldBlockLeadSwitch, snakeColumnsForWidth, snakeRowReversed
+  addFollowUpDays, appendQuickNote, chunkSnakeRows, defaultLeadDetailTab, detailTabsForMode, filterFollowUps,
+  shouldBlockLeadSwitch, shouldShowLeadOrderTab, snakeColumnsForWidth, snakeRowReversed
 } from './leadFollowUp'
 
 describe('lead follow-up form logic', () => {
@@ -23,6 +23,21 @@ describe('lead follow-up form logic', () => {
   it('opens customer details on overview unless a follow-up task requested the form', () => {
     expect(defaultLeadDetailTab(false)).toBe('overview')
     expect(defaultLeadDetailTab(true)).toBe('follow-ups')
+  })
+
+  it('shows customer orders to the owner and read-only subordinate manager', () => {
+    expect(shouldShowLeadOrderTab('owner')).toBe(true)
+    expect(shouldShowLeadOrderTab('submitter')).toBe(false)
+    expect(shouldShowLeadOrderTab('all')).toBe(false)
+    expect(shouldShowLeadOrderTab('manager-readonly')).toBe(true)
+  })
+
+  it('shows the complete read-only history to a subordinate sales manager', () => {
+    expect(detailTabsForMode('manager-readonly')).toEqual([
+      'overview', 'follow-ups', 'appeals', 'complaints', 'orders'
+    ])
+    expect(detailTabsForMode('owner')).toEqual(['overview', 'follow-ups', 'orders'])
+    expect(detailTabsForMode('submitter')).toEqual(['overview', 'follow-ups', 'appeals'])
   })
 })
 

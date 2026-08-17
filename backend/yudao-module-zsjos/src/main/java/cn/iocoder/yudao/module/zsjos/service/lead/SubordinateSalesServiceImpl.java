@@ -94,7 +94,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
                 .toList();
         Set<Long> leadIds = tasks.stream().filter(task -> BIZ_TYPE_LEAD.equals(task.getBizType()))
                 .map(BusinessTaskDO::getBizId).collect(Collectors.toSet());
-        Map<Long, LeadDO> leads = leadMapper.selectBatchIds(leadIds).stream()
+        Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
         List<SubordinateTaskRespVO> rows = tasks.stream().map(task -> {
             SubordinateTaskRespVO row = new SubordinateTaskRespVO();

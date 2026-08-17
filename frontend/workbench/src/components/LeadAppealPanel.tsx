@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Empty, Form, Image, Input, Modal, Skeleton, Space, Tag, Timeline, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type LeadAppeal, type LeadAppealEvidence, type ManagedLead } from '../services/api'
+import type { LeadDetailMode } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
@@ -23,7 +24,7 @@ function Evidence({ items }: { items?: LeadAppealEvidence[] }) {
 
 export default function LeadAppealPanel({ lead, audience, onChanged }: {
   lead: ManagedLead
-  audience: 'submitter' | 'owner'
+  audience: LeadDetailMode
   onChanged: () => void
 }) {
   const [items, setItems] = useState<LeadAppeal[]>([])

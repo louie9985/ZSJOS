@@ -1,11 +1,7 @@
 <template>
   <!-- 按分类的自定义字段定义动态渲染表单项；字段定义随分类切换而重新加载 -->
   <template v-for="field in fields" :key="field.fieldKey">
-    <el-form-item
-      :label="field.fieldName"
-      :prop="`extFields.${field.fieldKey}`"
-      :rules="buildRule(field)"
-    >
+    <el-form-item :label="field.fieldName" :prop="`extFields.${field.fieldKey}`">
       <el-input
         v-if="field.fieldType === FieldType.TEXT"
         v-model="model[field.fieldKey]"
@@ -75,13 +71,6 @@ const model = computed({
   set: (val) => emit('update:modelValue', val)
 })
 
-const buildRule = (field: CategoryFieldApi.CategoryFieldVO) => {
-  if (!field.required) {
-    return []
-  }
-  return [{ required: true, message: `${field.fieldName}不能为空`, trigger: 'blur' }]
-}
-
 /** 分类切换后，丢弃不再属于新分类的扩展字段值，避免提交时被后端拒绝 */
 const loadFields = async (categoryId?: number) => {
   if (!categoryId) {
@@ -90,7 +79,8 @@ const loadFields = async (categoryId?: number) => {
   }
   loading.value = true
   try {
-    fields.value = await CategoryFieldApi.getEffectiveFieldList(categoryId)
+    const definitions = await CategoryFieldApi.getEffectiveFieldList(categoryId)
+    fields.value = definitions.filter((field) => field.adminVisible !== false)
     const allowed = new Set(fields.value.map((f) => f.fieldKey))
     const next: Record<string, any> = {}
     Object.entries(model.value).forEach(([key, value]) => {

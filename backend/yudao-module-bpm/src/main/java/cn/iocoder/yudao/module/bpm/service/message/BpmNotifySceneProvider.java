@@ -1,11 +1,13 @@
 package cn.iocoder.yudao.module.bpm.service.message;
 
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.module.system.api.notify.NotifyActionType;
 import cn.iocoder.yudao.module.system.api.notify.NotifySceneProvider;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRoleRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneVariableRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyRecipientDTO;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -37,16 +39,18 @@ public class BpmNotifySceneProvider implements NotifySceneProvider {
     }
 
     @Override
-    public Set<Long> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
+    public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
         if (!recipientRoles.contains(TARGET_USER)) {
             return Set.of();
         }
         Object value = event.getPayload().get("targetUserId");
-        return value instanceof Number number ? Set.of(number.longValue()) : Set.of();
+        Object userType = event.getPayload().get("targetUserType");
+        return value instanceof Number number ? Set.of(new NotifyRecipientDTO(
+                userType instanceof Number type ? type.intValue() : UserTypeEnum.ADMIN.getValue(), number.longValue())) : Set.of();
     }
 
     @Override
-    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, Long recipientUserId) {
+    public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         return event.getPayload();
     }
 }

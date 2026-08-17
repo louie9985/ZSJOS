@@ -29,7 +29,7 @@
         <el-tree-select
           v-model="queryParams.categoryId"
           :data="categoryTree"
-          :props="{ label: 'name', children: 'children', value: 'id' }"
+          :props="treeSelectProps"
           check-strictly
           node-key="id"
           clearable
@@ -38,12 +38,7 @@
         />
       </el-form-item>
       <el-form-item label="状态" prop="status">
-        <el-select
-          v-model="queryParams.status"
-          placeholder="请选择状态"
-          clearable
-          class="!w-200px"
-        >
+        <el-select v-model="queryParams.status" placeholder="请选择状态" clearable class="!w-200px">
           <el-option
             v-for="dict in getIntDictOptions('eam_asset_status')"
             :key="dict.value"
@@ -58,12 +53,7 @@
         <el-button v-hasPermi="['eam:asset:create']" type="primary" @click="openForm('create')">
           <Icon icon="ep:plus" class="mr-5px" /> 新增
         </el-button>
-        <el-button
-          v-hasPermi="['eam:asset:import']"
-          type="warning"
-          plain
-          @click="openImport"
-        >
+        <el-button v-hasPermi="['eam:asset:import']" type="warning" plain @click="openImport">
           <Icon icon="ep:upload" class="mr-5px" /> 导入
         </el-button>
         <el-button
@@ -84,6 +74,12 @@
       <el-table-column label="资产编号" prop="assetCode" min-width="140" fixed="left" />
       <el-table-column label="资产名称" prop="name" min-width="160" show-overflow-tooltip />
       <el-table-column label="分类" prop="categoryName" min-width="110" />
+      <el-table-column label="管理" width="80" align="center">
+        <template #default="{ row }">{{ row.managementMode === 2 ? '批量' : '单件' }}</template>
+      </el-table-column>
+      <el-table-column label="数量" min-width="90" align="center">
+        <template #default="{ row }">{{ row.quantity || 1 }} {{ row.unit || '个' }}</template>
+      </el-table-column>
       <el-table-column label="状态" min-width="90" align="center">
         <template #default="{ row }">
           <dict-tag :type="'eam_asset_status'" :value="row.status" />
@@ -122,12 +118,7 @@
           >
             编辑
           </el-button>
-          <el-button
-            v-hasPermi="['eam:asset:qrcode']"
-            link
-            type="primary"
-            @click="openQrCode(row)"
-          >
+          <el-button v-hasPermi="['eam:asset:qrcode']" link type="primary" @click="openQrCode(row)">
             二维码
           </el-button>
           <el-button
@@ -150,7 +141,7 @@
   </ContentWrap>
 
   <AssetForm ref="formRef" :category-tree="categoryTree" @success="getList" />
-  <AssetImportForm ref="importRef" @success="getList" />
+  <AssetImportForm ref="importRef" @success="handleImportSuccess" />
   <AssetDetail ref="detailRef" />
   <QrCodeDialog ref="qrCodeRef" />
 </template>
@@ -171,6 +162,7 @@ defineOptions({ name: 'EamAsset' })
 
 const message = useMessage()
 const { t } = useI18n()
+const treeSelectProps: any = { label: 'name', children: 'children', value: 'id' }
 
 const loading = ref(false)
 const exportLoading = ref(false)
@@ -229,6 +221,11 @@ const openDetail = (id: number) => {
 const importRef = ref()
 const openImport = () => {
   importRef.value.open()
+}
+
+const handleImportSuccess = async () => {
+  await loadCategoryTree()
+  await getList()
 }
 
 const qrCodeRef = ref()

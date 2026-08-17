@@ -35,16 +35,14 @@ class SalesOrderObjectPermissionServiceTest {
     @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService agingPoolService;
 
     @Test
-    void enabledReviewersExcludesEveryDepartmentLeaderAndDisabledUser() {
+    void enabledUsersIncludesDepartmentLeadersAndExcludesDisabledUser() {
         DeptRespDTO child = dept(11L, 102L);
         when(deptApi.getChildDeptList(10L)).thenReturn(List.of(child));
-        when(deptApi.getDept(10L)).thenReturn(dept(10L, 101L));
-        when(deptApi.getDept(11L)).thenReturn(child);
         when(adminUserApi.getUserListByDeptIds(Set.of(10L, 11L))).thenReturn(List.of(
                 user(101L, ENABLE.getStatus()), user(102L, ENABLE.getStatus()),
                 user(103L, ENABLE.getStatus()), user(104L, DISABLE.getStatus())));
 
-        assertEquals(Set.of(103L), service.enabledReviewers(10L));
+        assertEquals(Set.of(101L, 102L, 103L), service.enabledUsers(10L));
     }
 
     private DeptRespDTO dept(Long id, Long leaderId) {

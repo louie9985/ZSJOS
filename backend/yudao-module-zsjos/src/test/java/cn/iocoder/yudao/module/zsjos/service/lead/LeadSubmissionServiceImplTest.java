@@ -35,6 +35,7 @@ import java.util.Set;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_CONTACT_REQUIRED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_MOBILE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_REGION_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -92,6 +93,20 @@ class LeadSubmissionServiceImplTest {
         ServiceException error = assertThrows(ServiceException.class, () -> service.create(req, 1L));
 
         assertEquals(LEAD_MOBILE_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void partnerCannotReplayAnotherPartnersIdempotencyKey() {
+        LeadCreateReqVO req = baseRequest();
+        LeadDO existing = new LeadDO().setId(100L).setPartnerId(99L)
+                .setSubmissionIdempotencyKey(req.getIdempotencyKey());
+        when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.createForPartner(req, 20L, 10L));
+
+        assertEquals(LEAD_SUBMISSION_DUPLICATE.getCode(), error.getCode());
+        verify(activationMapper, never()).selectByIdempotencyKey(any());
     }
 
     @Test
