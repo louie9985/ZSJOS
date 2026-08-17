@@ -34,7 +34,7 @@ public class LeadBusinessTaskSceneProvider implements BusinessTaskSceneProvider 
         Map<Long, BusinessTaskDisplay> result = new HashMap<>();
         for (BusinessTaskDO task : tasks) {
             LeadDO lead = leads.get(task.getBizId());
-            String name = lead == null ? "客资 #" + task.getBizId() : lead.getSubmittedName();
+            String name = displayName(lead);
             String title = switch (task.getTaskType()) {
                 case TASK_TYPE_ASSIGNMENT_ACCEPT -> "待接客资：" + name;
                 case TASK_TYPE_FIRST_FOLLOW_UP -> "首次跟进：" + name;
@@ -52,5 +52,13 @@ public class LeadBusinessTaskSceneProvider implements BusinessTaskSceneProvider 
                     lead == null ? null : lead.getSubmittedMobile(), actionCode));
         }
         return result;
+    }
+
+    private String displayName(LeadDO lead) {
+        if (lead == null || lead.getLeadNo() == null || lead.getLeadNo().isBlank()) {
+            return "客资记录不可用";
+        }
+        return lead.getSubmittedName() == null || lead.getSubmittedName().isBlank()
+                ? lead.getLeadNo() : lead.getLeadNo() + " · " + lead.getSubmittedName();
     }
 }

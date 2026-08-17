@@ -257,6 +257,19 @@ SELECT 'business_notify_v011' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V011'), 'PASS', 'FAIL') AS result;
 SELECT 'business_notify_templates_v016' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V016'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_number_user_visible_contract_v067' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V067'), 'PASS', 'FAIL') AS result;
+SELECT 'lead_default_notify_templates_use_lead_no' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_notify_template
+         WHERE deleted=b'0' AND scene_code LIKE 'zsjos.lead.%'
+           AND ((creator=updater
+                 AND creator IN ('quick-init','migration-V011','migration-V016','migration-V031',
+                                 'migration-V040','migration-V056','migration-V066'))
+                OR updater='migration-V067')
+           AND (title LIKE '%{{lead.id}}%' OR summary LIKE '%{{lead.id}}%'
+                OR content LIKE '%{{lead.id}}%' OR params LIKE '%"lead.id"%')
+       ), 'PASS', 'FAIL') AS result;
 SELECT 'lead_invalid_remark_v017' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V017'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_actions_v018' AS check_name,
@@ -336,6 +349,17 @@ SELECT 'zsjos_bpm_readonly_forms' AS check_name,
             OR COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[2]')),'$.props.readonly'))='true'),0)<>1
             OR (expected.expected_fields=4 AND COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[3]')),'$.props.disabled'))='true'),0)<>1)
             OR (expected.expected_fields=4 AND COALESCE(MIN(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(form.fields,'$[3]')),'$.props.readonly'))='true'),0)<>1)
+       ),'PASS','FAIL') AS result;
+SELECT 'zsjos_default_bpm_forms_use_lead_no' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM bpm_form
+         WHERE deleted=b'0'
+           AND remark IN ('zsjos-system-form:lead-appeal-review',
+                          'zsjos-system-form:sales-order-dual-approval')
+           AND ((creator=updater AND creator IN ('quick-init','migration-V024'))
+                OR updater='migration-V067')
+           AND (COALESCE(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(fields,'$[1]')),'$.field')),'')<>'leadNo'
+                OR COALESCE(JSON_UNQUOTE(JSON_EXTRACT(JSON_UNQUOTE(JSON_EXTRACT(fields,'$[1]')),'$.title')),'')<>'客资编号')
        ),'PASS','FAIL') AS result;
 SELECT 'sales_order_v023_columns' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_order'
@@ -556,15 +580,103 @@ SELECT 'V054 Lead business number counters' AS check_name,
        ), 'PASS','FAIL') AS result;
 SELECT 'V063 partner role' AS check_name,
        IF((SELECT COUNT(*) FROM system_role WHERE code='part_time_partner' AND deleted=b'0')>0,'PASS','FAIL') AS result;
-SELECT 'V063 partner permissions' AS check_name,
-       IF((SELECT COUNT(*) FROM system_menu WHERE id BETWEEN 6901 AND 6912 AND deleted=b'0')=12,'PASS','FAIL') AS result;
+SELECT 'V069 invalid partner admin route retired' AS check_name,
+       IF(NOT EXISTS (SELECT 1 FROM system_menu
+                      WHERE path='partner-portal' AND component_name='ZsjosPartnerPortal' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'V071 exact partner permissions' AS check_name,
+       IF(NOT EXISTS (
+         SELECT r.id FROM system_role r
+         LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
+         WHERE r.code='part_time_partner' AND r.deleted=b'0'
+         GROUP BY r.id
+         HAVING COUNT(DISTINCT m.permission)<>10
+            OR COUNT(DISTINCT CASE WHEN m.permission IN
+              ('zsjos:partner:self-query','zsjos:lead:submit','zsjos:lead:query-submitted',
+               'zsjos:lead:submitter-supplement','zsjos:lead:urge','zsjos:lead-complaint:create',
+               'zsjos:lead:appeal:create','zsjos:cashback:my-query',
+               'zsjos:withdrawal:my-query','zsjos:withdrawal:apply') THEN m.permission END)<>10
+       ), 'PASS','FAIL') AS result;
+SELECT 'V071 exact finance permissions' AS check_name,
+       IF(NOT EXISTS (
+         SELECT r.id FROM system_role r
+         LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
+         WHERE r.code IN ('finance_manager','finance_specialist') AND r.deleted=b'0'
+         GROUP BY r.id
+         HAVING COUNT(DISTINCT m.permission)<>11
+            OR COUNT(DISTINCT CASE WHEN m.permission IN
+              ('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:cashback:finance-query',
+               'zsjos:withdrawal:finance-query','zsjos:withdrawal:review','zsjos:withdrawal:payout',
+               'zsjos:export:query','zsjos:export:order','zsjos:export:finance-order',
+               'zsjos:export:cashback','zsjos:export:withdrawal') THEN m.permission END)<>11
+            OR SUM(CASE WHEN m.permission='zsjos:export:lead' THEN 1 ELSE 0 END)>0
+       ), 'PASS','FAIL') AS result;
+SELECT 'V071 administrator finance separation' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_role r
+         JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+         JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
+         WHERE r.code='system_administrator' AND r.deleted=b'0'
+           AND m.permission IN ('zsjos:sales-order:review','zsjos:cashback:finance-query',
+                                'zsjos:withdrawal:finance-query','zsjos:withdrawal:review',
+                                'zsjos:withdrawal:payout','zsjos:export:order',
+                                'zsjos:export:finance-order','zsjos:export:cashback',
+                                'zsjos:export:withdrawal')
+       ) AND NOT EXISTS (
+         SELECT r.id FROM system_role r
+         LEFT JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+         LEFT JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
+         WHERE r.code='system_administrator' AND r.deleted=b'0'
+         GROUP BY r.id
+         HAVING SUM(CASE WHEN m.permission='zsjos:withdrawal:admin-query' THEN 1 ELSE 0 END)<>1
+            OR SUM(CASE WHEN m.permission='zsjos:export:lead' THEN 1 ELSE 0 END)<>1
+       ), 'PASS','FAIL') AS result;
+SELECT 'V071 zero-ZSJOS roles' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_role r
+         JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id AND rm.deleted=b'0'
+         JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0' AND m.permission LIKE 'zsjos:%'
+         WHERE r.deleted=b'0' AND r.code IN
+           ('center_head','content_director','filming_editor','study_planner','academic_specialist',
+            'delivery_manager','exam_manager','exam_specialist','career_planner','career_manager',
+            'ip_teacher','product_rd_head','teaching_assistant','recruitment_manager',
+            'recruitment_specialist','hr_specialist','admin_manager','admin_specialist')
+       ), 'PASS','FAIL') AS result;
+SELECT 'V071 no duplicate role permissions' AS check_name,
+       IF(NOT EXISTS (
+         SELECT rm.role_id,rm.tenant_id,m.permission
+         FROM system_role_menu rm JOIN system_menu m ON m.id=rm.menu_id AND m.deleted=b'0'
+         WHERE rm.deleted=b'0' AND m.permission<>''
+         GROUP BY rm.role_id,rm.tenant_id,m.permission HAVING COUNT(*)>1
+       ), 'PASS','FAIL') AS result;
+SELECT 'V071 app-only permission placement' AS check_name,
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:partner:self-query'
+                  AND parent_id=0 AND type=3 AND path='' AND component='' AND deleted=b'0')
+          AND NOT EXISTS (
+            SELECT 1 FROM system_menu child
+            LEFT JOIN system_menu parent ON parent.id=child.parent_id AND parent.deleted=b'0'
+            WHERE child.deleted=b'0' AND child.permission IN
+              ('zsjos:partner:self-query','zsjos:lead:submit','zsjos:lead:query-submitted',
+               'zsjos:lead:submitter-supplement','zsjos:lead:urge','zsjos:lead-complaint:create',
+               'zsjos:lead:appeal:create','zsjos:cashback:my-query',
+               'zsjos:withdrawal:my-query','zsjos:withdrawal:apply')
+              AND child.parent_id<>0 AND parent.id IS NULL
+          ),'PASS','FAIL') AS result;
+SELECT 'V071 active menu parent integrity' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_menu child
+         LEFT JOIN system_menu parent ON parent.id=child.parent_id AND parent.deleted=b'0'
+         WHERE child.deleted=b'0' AND child.parent_id<>0 AND parent.id IS NULL
+       ),'PASS','FAIL') AS result;
 SELECT 'V063 cashback defaults' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_product_category WHERE parent_id=0 AND deleted=b'0'
              AND (default_valid_cashback_amount IS NULL OR default_deal_cashback_rate IS NULL))=0,'PASS','FAIL') AS result;
-SELECT 'V064 BPM model import permission' AS check_name,
+SELECT 'V070 BPM model import permission repair' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu
-           WHERE id=6913 AND permission='bpm:model:import'
-             AND parent_id=1193 AND type=3 AND deleted=b'0')=1,'PASS','FAIL') AS result;
+           WHERE permission='bpm:model:import' AND parent_id=1193
+             AND type=3 AND status=0 AND deleted=b'0')=1,'PASS','FAIL') AS result;
 SELECT 'V065 lead activity cursor ordering' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
              AND table_name='zsjos_lead' AND column_name='last_activity_at')=1

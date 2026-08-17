@@ -15,6 +15,20 @@ import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
 
+const MAX_ROOT_FONT_SIZE = 54
+
+function capRootFontSize() {
+  const root = document.documentElement
+  const current = Number.parseFloat(root.style.fontSize)
+  if (current > MAX_ROOT_FONT_SIZE) {
+    root.style.fontSize = `${MAX_ROOT_FONT_SIZE}px`
+  }
+}
+
+capRootFontSize()
+window.addEventListener('resize', capRootFontSize)
+window.addEventListener('pageshow', capRootFontSize)
+
 const app = createApp(App)
 const pinia = createPinia()
 

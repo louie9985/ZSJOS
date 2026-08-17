@@ -133,7 +133,7 @@ function BatchResultModal({
               <Tag color={item.success ? "success" : "error"}>
                 {item.success ? "成功" : "失败"}
               </Tag>
-              <span>{item.leadNo || `内部记录 ${item.leadId}`}</span>
+              <span>{item.leadNo || '编号不可用'}</span>
               <Typography.Text type={item.success ? undefined : "danger"}>
                 {item.message}
               </Typography.Text>

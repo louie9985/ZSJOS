@@ -22,12 +22,12 @@ public class CashbackExportTypeProvider extends AbstractPagedExportTypeProvider<
         return cashbackService.getPage(request, null);
     }
     @Override protected List<String> columns() {
-        return List.of("返现ID", "返现编号", "类型", "状态", "受益人ID", "客资ID", "订单ID", "产品",
+        return List.of("返现ID", "返现编号", "类型", "状态", "受益人ID", "客资编号", "订单ID", "产品",
                 "基准金额", "返现比例", "返现金额", "可提现时间", "结算时间");
     }
     @Override protected List<Object> toRow(CashbackRespVO item) {
         return List.of(value(item.getId()), value(item.getCashbackNo()), value(item.getType()), value(item.getStatus()),
-                value(item.getBeneficiaryUserId()), value(item.getLeadId()), value(item.getOrderId()),
+                value(item.getBeneficiaryUserId()), value(item.getLeadNo()), value(item.getOrderId()),
                 value(item.getProductNameSnapshot()), value(item.getBaseAmount()), value(item.getRateSnapshot()),
                 value(item.getAmount()), value(item.getAvailableAt()), value(item.getSettledAt()));
     }

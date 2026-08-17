@@ -31,9 +31,10 @@
       @selection-change="selected = $event"
     >
       <el-table-column type="selection" width="48" />
+      <el-table-column label="客资编号" prop="leadNo" width="220" />
       <el-table-column label="客资" min-width="180"
         ><template #default="{ row }">{{
-          row.submittedName || row.name || `客资 #${row.id}`
+          row.submittedName || row.name || '未命名客资'
         }}</template></el-table-column
       >
       <el-table-column label="状态" prop="status" width="140" />

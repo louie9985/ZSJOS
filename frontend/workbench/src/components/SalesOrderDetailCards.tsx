@@ -1,8 +1,10 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Card, Descriptions, Empty, Image, Space, Table, Tag, Typography } from 'antd'
 import { CheckOutlined, CloseOutlined, EditOutlined, StopOutlined, UserSwitchOutlined } from '@ant-design/icons'
-import type { SalesOrder, SalesOrderListItem } from '../services/api'
+import { api, type SalesOrder, type SalesOrderListItem } from '../services/api'
 import { formatTimestamp } from '../services/time'
-import { canReviewSalesOrderTask } from '../services/salesOrder'
+import { buildDictionaryLabelMap, canReviewSalesOrderTask, resolveDictionaryLabel, type DictionaryLoadState } from '../services/salesOrder'
+import { DICT_TYPE } from '../constants'
 
 export const SALES_ORDER_STATUS_LABELS: Record<SalesOrder['status'], string> = {
   pending_approval: '待审核', revision_required: '已驳回待修改', effective: '已通过', terminated: '已终止'
@@ -16,6 +18,13 @@ export const SALES_ORDER_TASK_LABELS: Record<string, string> = {
 const TASK_STATUS_LABELS: Record<number, string> = { 1: '审批中', 2: '审批通过', 3: '审批不通过', 4: '已取消', 5: '已退回', 7: '审批通过中' }
 const APPROVAL_NODE_STATUS_LABELS: Record<string, string> = { pending: '审批中', approved: '已通过', rejected: '已驳回', cancelled: '已取消' }
 const APPROVAL_NODE_STATUS_COLORS: Record<string, string> = { pending: 'gold', approved: 'green', rejected: 'red', cancelled: 'default' }
+const ORDER_DICTIONARY_TYPES = [
+  DICT_TYPE.ORDER_STUDENT_NATURE,
+  DICT_TYPE.ORDER_SERVICE_PERIOD,
+  DICT_TYPE.ORDER_STUDENT_SOURCE,
+  DICT_TYPE.ORDER_FEE_MODE,
+  DICT_TYPE.ORDER_PAYMENT_METHOD
+]
 
 export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
   order: SalesOrder
@@ -27,6 +36,21 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
   onRevise?: () => void
   onTerminate?: () => void
 }) {
+  const [dictionaryState, setDictionaryState] = useState<DictionaryLoadState>('loading')
+  const [dictionaryLabels, setDictionaryLabels] = useState<Record<string, Map<string, string>>>({})
+  const loadDictionaries = useCallback(async () => {
+    setDictionaryState('loading')
+    try {
+      const results = await Promise.all(ORDER_DICTIONARY_TYPES.map(type => api.dictDataByType(type)))
+      setDictionaryLabels(Object.fromEntries(ORDER_DICTIONARY_TYPES.map((type, index) => [type, buildDictionaryLabelMap(results[index])])))
+      setDictionaryState('ready')
+    } catch {
+      setDictionaryLabels({})
+      setDictionaryState('error')
+    }
+  }, [])
+  useEffect(() => { void loadDictionaries() }, [loadDictionaries])
+  const label = (type: string, value?: string) => resolveDictionaryLabel(value, dictionaryLabels[type] || new Map(), dictionaryState)
   const task = approvalContext || order
   const canReview = approvalContext ? canReviewSalesOrderTask(order, approvalContext) : false
   const supervisorConfirmation = task.taskDefinitionKey === 'registrationReview'
@@ -49,6 +73,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       </Space>
     </div>
     {supervisorPending && <Alert type="info" showIcon message={`${supervisorConfirmation.requesterUserName || '审批人'}已申请主管审批`} description={supervisorConfirmation.requestReason}/>}
+    {dictionaryState === 'error' && <Alert type="warning" showIcon message="订单字典标签加载失败" description="订单原始编码未展示，请重试加载业务标签。"
+      action={<Button size="small" onClick={() => void loadDictionaries()}>重试</Button>}/>}
     {order.status === 'revision_required' && <Alert type="error" showIcon message="订单已驳回，等待补正" description={order.decisionReason || '审批人未填写可展示的驳回原因'}/>}
     {order.status === 'terminated' && <Alert type="warning" showIcon message="订单审批已终止"
       description={order.terminationReason || '未记录终止原因'}/>}
@@ -74,16 +100,16 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
       <Card size="small" title="学员资料" className="sales-order-card">
         <Descriptions column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
           <Descriptions.Item label="购买方">{order.buyerName || '-'}</Descriptions.Item><Descriptions.Item label="学员姓名">{order.studentName}</Descriptions.Item>
-          <Descriptions.Item label="学员性质">{order.studentNature || '-'}</Descriptions.Item><Descriptions.Item label="手机号">{order.studentMobile || '-'}</Descriptions.Item>
+          <Descriptions.Item label="学员性质">{label(DICT_TYPE.ORDER_STUDENT_NATURE, order.studentNature)}</Descriptions.Item><Descriptions.Item label="手机号">{order.studentMobile || '-'}</Descriptions.Item>
           <Descriptions.Item label="微信号">{order.studentWechatId || '-'}</Descriptions.Item><Descriptions.Item label="所在地区">{[order.provinceName, order.cityName].filter(Boolean).join(' / ') || '-'}</Descriptions.Item>
         </Descriptions>
       </Card>
       <Card size="small" title="成交及付款" className="sales-order-card">
         <Descriptions column={{ xs: 1, sm: 2 }} layout="vertical" size="small" colon={false}>
           <Descriptions.Item label="订单总金额">¥{Number(order.totalAmount).toFixed(2)}</Descriptions.Item><Descriptions.Item label="客户付款时间">{formatTimestamp(order.customerPaidAt)}</Descriptions.Item>
-          <Descriptions.Item label="缴费方式">{order.feeMode || '-'}</Descriptions.Item><Descriptions.Item label="支付方式">{order.paymentMethod || '-'}</Descriptions.Item>
+          <Descriptions.Item label="缴费方式">{label(DICT_TYPE.ORDER_FEE_MODE, order.feeMode)}</Descriptions.Item><Descriptions.Item label="支付方式">{label(DICT_TYPE.ORDER_PAYMENT_METHOD, order.paymentMethod)}</Descriptions.Item>
           <Descriptions.Item label="商定考试时间">{order.agreedExamTime || '-'}</Descriptions.Item><Descriptions.Item label="开通班种">{order.classType || '-'}</Descriptions.Item>
-          <Descriptions.Item label="服务周期">{order.servicePeriod || '-'}</Descriptions.Item><Descriptions.Item label="学生来源">{order.studentSource || '-'}</Descriptions.Item>
+          <Descriptions.Item label="服务周期">{label(DICT_TYPE.ORDER_SERVICE_PERIOD, order.servicePeriod)}</Descriptions.Item><Descriptions.Item label="学生来源">{label(DICT_TYPE.ORDER_STUDENT_SOURCE, order.studentSource)}</Descriptions.Item>
         </Descriptions>
       </Card>
       <Card size="small" title="成交课程" className="sales-order-card sales-order-card-wide">

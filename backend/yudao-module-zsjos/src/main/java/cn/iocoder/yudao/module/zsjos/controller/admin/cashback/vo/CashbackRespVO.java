@@ -12,6 +12,7 @@ public class CashbackRespVO {
     private String status;
     private Long beneficiaryUserId;
     private Long leadId;
+    private String leadNo;
     private Long orderId;
     private Long orderItemId;
     private String productRefSnapshot;

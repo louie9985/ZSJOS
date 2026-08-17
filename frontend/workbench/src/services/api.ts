@@ -1,6 +1,7 @@
 import axios, { type AxiosRequestConfig } from 'axios'
 import { APP_CONFIG, STORAGE_KEYS } from '../constants'
 import { handleImpersonationInvalid, resolveImpersonationSessionHeader } from './impersonation'
+import { createIdempotencyKey } from './idempotency'
 import type { Timestamp } from './time'
 
 export type User = { id: number; nickname: string; avatar?: string; username?: string }
@@ -577,13 +578,13 @@ export const api = {
   agingPoolCandidates: async (cycleId: number) =>
     unwrap<Array<{ id: number; nickname: string }>>(await http.get(`/zsjos/lead/aging-pool/${cycleId}/candidates`)),
   assignAgingPool: async (cycleId: number, salesUserId: number) => unwrap<boolean>(
-    await http.post(`/zsjos/lead/aging-pool/${cycleId}/assign`, { salesUserId, idempotencyKey: crypto.randomUUID() })
+    await http.post(`/zsjos/lead/aging-pool/${cycleId}/assign`, { salesUserId, idempotencyKey: createIdempotencyKey() })
   ),
   exitAgingPool: async (cycleId: number, reason: string) => unwrap<boolean>(
-    await http.post(`/zsjos/lead/aging-pool/${cycleId}/exit`, { reason, idempotencyKey: crypto.randomUUID() })
+    await http.post(`/zsjos/lead/aging-pool/${cycleId}/exit`, { reason, idempotencyKey: createIdempotencyKey() })
   ),
   requestAgingPoolTransfer: async (cycleId: number, reason: string) => unwrap<number>(
-    await http.post(`/zsjos/lead/aging-pool/${cycleId}/transfer-request`, { reason, idempotencyKey: crypto.randomUUID() })
+    await http.post(`/zsjos/lead/aging-pool/${cycleId}/transfer-request`, { reason, idempotencyKey: createIdempotencyKey() })
   ),
   managedLeadStatusCounts: async () => unwrap<Record<string, number>>(await http.get('/zsjos/lead/status-counts')),
   judgeLeadValid: async (id: number, data: { leadCategory?: string; remark: string; idempotencyKey: string }) =>
@@ -600,13 +601,13 @@ export const api = {
     unwrap<boolean>(await http.put(`/zsjos/lead/${id}/submitter-supplement`, data)),
   urgeLead: async (id: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/lead/${id}/urge`, { reason })),
   createLeadComplaint: async (id: number, reason: string, evidenceFileIds: number[]) => unwrap<number>(
-    await http.post(`/zsjos/lead-complaint/lead/${id}`, { reason, evidenceFileIds, idempotencyKey: crypto.randomUUID() })
+    await http.post(`/zsjos/lead-complaint/lead/${id}`, { reason, evidenceFileIds, idempotencyKey: createIdempotencyKey() })
   ),
   leadComplaintPage: async (status: 'pending' | 'handled') => unwrap<PageResult<LeadComplaint>>(
     await http.get('/zsjos/lead-complaint/page', { params: { status, pageNo: 1, pageSize: 100 } })
   ),
   decideLeadComplaint: async (id: number, result: 'founded' | 'unfounded', opinion: string, evidenceFileIds: number[]) => unwrap<boolean>(
-    await http.post(`/zsjos/lead-complaint/${id}/decision`, { result, opinion, evidenceFileIds, idempotencyKey: crypto.randomUUID() })
+    await http.post(`/zsjos/lead-complaint/${id}/decision`, { result, opinion, evidenceFileIds, idempotencyKey: createIdempotencyKey() })
   ),
   qualificationExceptionPage: async (type: 'suspended' | 'recycle_pending', params: { pageNo: number; pageSize: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<PageResult<LeadQualificationException>>(await http.post('/zsjos/lead/qualification-exception/search-page', { type, ...params }))

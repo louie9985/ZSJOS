@@ -128,6 +128,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             Map<String, Object> processVariables = new LinkedHashMap<>();
             processVariables.put("appealId", appeal.getId());
             processVariables.put("leadId", leadId);
+            processVariables.put("leadNo", lead.getLeadNo());
             processVariables.put("roundNo", roundNo);
             processVariables.put("reviewStage", appeal.getReviewStage());
             processReq.setVariables(processVariables);

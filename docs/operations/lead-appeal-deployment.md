@@ -7,7 +7,7 @@
 1. 在受控环境先执行增量迁移 `script/sql/mysql/migrations/V015__lead_three_level_appeal.sql` 和 `V016__complete_lead_notify_templates.sql`。确认 V022 已集成且 V023、V024、V025 已按序执行后，再执行 `V026__lead_appeal_reviewer_snapshot.sql` 并运行 `script/sql/mysql/verify-bootstrap.sql`；缺少 V022 的环境不得执行 V024 或 V026。
 2. 为每个租户配置恰好一名启用的 `boss` 角色用户；迁移只在角色编码缺失时创建角色，不自动分配账号。
 3. 在 Admin 进入“工作流程 → 流程管理 → 流程模型”，新建 BPMN 模型：流程标识填写 `zsjos_lead_appeal_review`，流程名称填写“客资申诉复核”，设为不可见、发起范围为全员，并指定流程管理员。
-4. 在“表单设计”选择“客资申诉流程关联信息”。该表单只读，只展示 `appealId`、`leadId`、`roundNo` 和 `reviewStage`；申诉仍由 ZSJOS 工作台提交，不从 Admin 通用流程入口手工发起。
+4. 在“表单设计”选择“客资申诉流程关联信息”。该表单只读，只展示 `appealId`、用户可见的 `leadNo`、`roundNo` 和 `reviewStage`；内部流程变量仍保留 `leadId` 用于业务关联。申诉仍由 ZSJOS 工作台提交，不从 Admin 通用流程入口手工发起。
 5. 在“流程设计”点击“打开文件”，选择清单中当前推荐版本文件。不要使用模型列表顶部只接受 JSON 模型包的“导入模型”；发布记录登记资产版本、SHA-256、Flowable 定义 ID/版本、部署时间和操作人。
 6. 保存并发布，确认流程 Key、任务 Key `appealReview` 和多人或签（任一人通过或驳回即结束）配置正确。
 

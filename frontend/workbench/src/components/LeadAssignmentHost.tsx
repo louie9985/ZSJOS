@@ -240,6 +240,7 @@ export function LeadDetails({ lead }: { lead: PendingLead }) {
     </div>
 
     <div className="assignment-sheet-fields">
+      <AssignmentField label="客资编号" value={lead.leadNo} />
       <AssignmentField label="手机号" value={lead.maskedMobile} />
       <AssignmentField label="微信号" value={lead.maskedWechatId} />
       <AssignmentField label="地区" value={region} />

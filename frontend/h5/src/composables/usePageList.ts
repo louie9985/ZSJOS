@@ -1,6 +1,4 @@
 import { ref, type Ref } from 'vue'
-import type { ApiResponse } from '@/api/request'
-
 interface PageResult<T> {
   list: T[]
   total: number
@@ -28,6 +26,7 @@ export function usePageList<T, P extends Record<string, unknown> = Record<string
   const finished = ref(false)
   const pageNo = ref(1)
   const total = ref(0)
+  const error = ref('')
 
   function getParams(): P {
     if (!extraParams) return {} as P
@@ -38,6 +37,7 @@ export function usePageList<T, P extends Record<string, unknown> = Record<string
   async function loadMore() {
     if (loading.value || finished.value) return
     loading.value = true
+    error.value = ''
     try {
       const params = { ...getParams(), pageNo: pageNo.value, pageSize } as P & { pageNo: number; pageSize: number }
       const result = await apiFn(params)
@@ -49,7 +49,8 @@ export function usePageList<T, P extends Record<string, unknown> = Record<string
       total.value = result.total
       finished.value = list.value.length >= result.total
       pageNo.value++
-    } catch {
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : '加载失败'
       finished.value = true
     } finally {
       loading.value = false
@@ -82,6 +83,7 @@ export function usePageList<T, P extends Record<string, unknown> = Record<string
     refreshing,
     finished,
     total,
+    error,
     loadMore,
     refresh,
     reset

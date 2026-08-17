@@ -29,9 +29,9 @@ export interface WithdrawalApplyParams {
 export interface WithdrawalItem {
   id: number
   status: 'pending_review' | 'approved' | 'rejected' | 'paid' | 'cancelled'
-  amount: number
-  createdAt: string
-  bankName: string
+  applicationAmount: number
+  submittedAt: string
+  bankNameSnapshot: string
   maskedCardNumber: string
 }
 

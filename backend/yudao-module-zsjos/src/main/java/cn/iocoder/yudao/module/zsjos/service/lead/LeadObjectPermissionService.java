@@ -81,6 +81,13 @@ public class LeadObjectPermissionService {
         return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
     }
 
+    /**
+     * 管理员及负责人部门主管可以查看提交人与负责人的完整员工身份信息。
+     */
+    public boolean canViewUnmaskedIdentity(Long userId, Long ownerUserId) {
+        return hasQueryAll() || managesOwnerDepartment(userId, ownerUserId);
+    }
+
     private Long effectiveSalesUserId(LeadDO lead) {
         LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
         if (cycle == null) return lead.getOwnerUserId();

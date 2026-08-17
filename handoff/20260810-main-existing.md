@@ -31,6 +31,49 @@
 
 ## Entries
 
+### Workstream registration: 2026-08-16 22:05:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Use the confirmed local test accounts to run and repair the end-to-end partner, sales, sales-manager, registration-service, finance, earnings, withdrawal, and in-app-notification flows until the implemented business path is operational.
+- Non-goals: Production or shared-environment changes; real customer data; permission grants inferred from account names; WebSocket requirements for the partner H5; destructive database operations; migration execution; BPM definition changes; dependency additions; branch, commit, push, or publication operations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `da80424aca79079dfecdbd55af1ef46070758ed2`
+- Target branch: `main`
+- Ownership scope: Existing H5 lead, message, earnings, withdrawal, authentication, formatting and focused test/build files; existing System partner-message controller/tests; existing ZSJOS lead/order/cashback/notification implementation and focused tests only when a reproduced runtime defect requires it; Workbench client/pages only when an employee-flow runtime defect is reproduced; directly affected API/permission documentation; this handoff file. Existing overlapping changes are preserved as the baseline.
+- Owner: Codex `/root`
+- Dependencies: Local backend on `48080`, partner H5 on `10086`, employee Workbench on `5174`, existing System/BPM/ZSJOS APIs, server-owned dictionaries/menus/permissions, and the user-confirmed local test accounts. No new package dependency.
+- Integration order: Repair reproduced H5 submission/list defects; verify partner message delivery; progress the same synthetic lead through sales, manager, registration and finance boundaries; verify cashback/withdrawal and notifications; run focused and full proportional checks; append delivery evidence.
+- Verification plan: Authenticated desktop/mobile browser checks for every supplied role; real HTTP and database read-only contract checks where UI diagnostics are insufficient; H5 typecheck/production build; Workbench tests/typecheck/build for touched files; focused System/ZSJOS tests and Maven package for backend changes; authorized/unauthorized and ownership checks; `git diff --check`. Test mutations are limited to clearly marked local synthetic business records; no destructive cleanup is performed.
+
+### Workstream registration: 2026-08-16 20:01:40 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Add the V070 forward repair for the BPM model import permission that V064 failed to create because menu ID 6913 was already occupied.
+- Non-goals: Rewriting applied V064; deleting menu or role grants; automatically granting `bpm:model:import`; deploying BPM; changing accounts, services, branches, commits, or dependencies.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V070__repair_bpm_model_import_permission.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; directly affected permission-flow documentation if needed; this handoff file. Existing overlapping changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Standard BPM model menu `1193`; V064 migration history; V068/V069 partner-permission repairs. No new package dependency.
+- Integration order: Add permission-identity-based V070, append it after V069 in bootstrap, replace the invalid fixed-ID verification, document the forward repair, then run SQL/static checks.
+- Verification plan: Confirm version ordering and repository/database permission uniqueness; validate parent menu/type/status fields; review repeatability and rollback limitations; run `git diff --check`; do not mutate the local database without separate execution confirmation.
+
+### 2026-08-16 20:03:25 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- User goal: Use migration version V070 to repair the missing BPM model import permission after V064 was applied without creating it.
+- Key decisions: Preserve applied V064; resolve authorization by stable permission code rather than a fixed menu ID; let MySQL allocate the new ID; fail before version registration when the standard parent is absent or an active conflicting/duplicate permission exists; do not grant any role.
+- Execution or analysis result: Added V070 and synchronized bootstrap, permission verification, migration guidance, and permission-flow documentation. The migration inserts only the active `bpm:model:import` button under menu 1193 when missing and records both schema registries.
+- Changed files: `script/sql/mysql/migrations/V070__repair_bpm_model_import_permission.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/architecture/data-and-permission-flow.md`; `handoff/20260810-main-existing.md`.
+- Verification evidence: `git diff --check` passed with only existing CRLF conversion warnings. Read-only local MySQL checks confirmed active parent menu 1193 exists, active `bpm:model:import` count is zero, and V070 is not registered. Reviewed version order after V069, permission/type/status verification, precondition failures, repeatability, and rollback limitation. Runtime execution remains unverified because database mutation was not authorized in this turn.
+- Dependency or integration impact: Existing and fresh environments must apply V070; BPM publisher roles still require explicit manual assignment of `bpm:model:import`. No role, account, BPM model, service, dependency, branch, commit, push, or publication changed.
+- Remaining work: Execute V070 against the intended local database, verify the inserted menu and both version rows, assign it to the BPM publisher role, refresh the login session, then import and deploy the withdrawal model.
+
 ### Workstream registration: 2026-08-16 15:59:09 +08:00
 
 - Workstream ID: `20260810-main-existing`
@@ -1416,3 +1459,157 @@
 - Verification evidence: Before updating, remote and local dirty paths overlapped only in the two confirmed frontend files. Their final worktree blobs match `origin/main` exactly: `LeadManagementPage.tsx` is `2c98ddb28c1b3a678a92d41d0e748c90016cfcb5`; `tsconfig.tsbuildinfo` is `7f37585afedc1ec89d0e54ad6052bb8d122592e1`. The unrelated dirty-path set remained 160 paths with identical pre/post SHA-256 `b55d012f9d28ab54abbb8cfc0e2429e54b657ccc14778342190fb439dfaf71e4`. HEAD and `origin/main` match, ahead/behind is `0/0`, the index is empty, and no merge or rebase state remains. Tests/build/browser checks were not run because this was a repository synchronization task and running the new H5/Workbench build could rewrite tracked generated or dependency artifacts.
 - Dependency or integration impact: The worktree now contains the remote H5 frontend and its committed `node_modules`; no local dependency installation, commit, push, service operation, database action, branch/worktree change, rebase, or merge commit occurred. The two confirmed local frontend versions were intentionally discarded; all other local work remains.
 - Remaining work: Existing unrelated local modifications and untracked files remain uncommitted. The pulled H5 and Workbench behavior has not been locally acceptance-tested in this turn.
+
+### Workstream registration: 2026-08-16 17:20:36 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Remove internal English timing-stage values from user-visible reminder messages and provide distinct, readable Chinese copy for advance, due, and overdue reminders.
+- Non-goals: Do not change timing-stage protocol values, reminder timing, recipients, permissions, delivery frequency, historical messages, administrator-customized rules/templates, external services, or execute database migrations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- Target branch: `main`
+- Ownership scope: `BusinessTaskReminderService` and its focused test; additive `V066` notification-template migration and bootstrap/migration documentation; directly affected notification data-flow documentation; this handoff record. Existing overlapping dirty files are preserved as the baseline.
+- Owner: Codex `/root`
+- Dependencies: Existing System notification rule/template APIs, `advance/due/overdue` timing-stage contract, and V031 default reminder rules/templates; no new dependency.
+- Integration order: User-visible stage mapping -> focused tests -> additive default-template migration -> bootstrap/documentation synchronization -> focused verification.
+- Verification plan: Focused ZSJOS reminder tests and module compile where dependencies permit; SQL scope/repeatability/static checks; bootstrap source-order review; targeted `git diff --check`. No migration execution or service restart without separate confirmation.
+
+### 2026-08-16 17:26:17 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- User goal: 将预警、到期、逾期提醒中的 `advance`、`due`、`overdue` 等内部英文值改为中文，并为不同阶段提供更易读、不同文案的提醒消息。
+- Key decisions: 保留 `advance/due/overdue` 作为规则计算、事件幂等和内部协议值；在用户可见消息变量边界转换为“即将到期/已到期/已逾期”；新增九个按业务场景和阶段拆分的中文默认模板；V066 仅重绑 creator/updater 仍为 V031 的未定制默认规则，管理员修改过的模板和规则不覆盖；无进展 `warning` 入口改为“无进展预警”。
+- Execution or analysis result: `BusinessTaskReminderService` 不再把英文阶段值放入站内信展示变量；无进展预警复用下次跟进场景时也不再泄漏 `warning`；V066 插入首次跟进、下次跟进、有效性判定各自的提前/到期/逾期中文模板，并将未定制的 V031 规则切换到对应模板；bootstrap、迁移说明和权限/数据流架构文档已同步。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/BusinessTaskReminderService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/task/BusinessTaskReminderServiceTest.java`; `script/sql/mysql/migrations/V066__readable_timed_reminder_templates.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/architecture/data-and-permission-flow.md`; this handoff record.
+- Verification evidence: Focused Maven reactor test/compile passed: `BusinessTaskReminderServiceTest` 3/3 and `LeadAgingPoolServiceImplTest` 4/4, total 7/7. `python script/sql/mysql/tools/zsjos_db.py check` passed. Static migration checks found 9 template rows, 8 `UNION ALL` rows, no delete/drop/truncate statements, and correct V065 -> V066 bootstrap order. Targeted `git diff --check` passed with only existing LF/CRLF normalization warnings. MySQL client is unavailable, so live SQL parser/database execution and migration repeatability were not run.
+- Dependency or integration impact: No dependency, permission, role, service, database, branch, commit, push, or publication operation. V066 is additive and must be applied in a controlled environment before runtime deployment; no historical messages are rewritten.
+- Remaining work: Apply V066 after separate database approval, restart/redeploy the relevant service, and verify one authenticated reminder in each stage through the real notification pipeline. Existing unrelated dirty files remain untouched.
+
+### 2026-08-16 17:27:46 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- User goal: 更正提醒消息中仍可能被管理员自定义模板引用的超期公海提前阶段值。
+- Key decisions: 将超期公海提前提醒事件上下文中的 `reminder.stage=advance` 也转换为“即将到期”；保留内部规则和幂等协议不变。
+- Execution or analysis result: `LeadAgingPoolServiceImpl` 的超期公海提前提醒不再向模板变量暴露英文 `advance`；无进展 `warning` 的中文转换保持不变。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolServiceImpl.java`; this handoff record.
+- Verification evidence: The focused Maven reactor was rerun after this correction; `LeadAgingPoolServiceImplTest` 4/4 and `BusinessTaskReminderServiceTest` 3/3 passed, and the ZSJOS module compiled successfully.
+- Dependency or integration impact: None; no database, service, permission, branch, commit, push, or publication operation.
+- Remaining work: Same as the preceding delivery entry: apply V066 with database approval and perform authenticated runtime notification checks.
+
+### 2026-08-16 17:33:23 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbddf87f30a9ba5e49`
+- User goal: 客资自动分配后，提交人与负责人互相只能看到脱敏的员工身份信息；`query-all` 管理员和负责人部门主管保留完整身份可见，客户字段不变。
+- Key decisions: 仅在 `assignment_status=owned`、提交人与负责人不同且查看者不是管理员/负责人部门主管时，对对方姓名使用现有中文姓名脱敏规则并隐藏对方用户 ID；同一人、管理员和负责人部门主管不脱敏。管理端响应与站内通知变量共用同一业务边界，客户姓名、手机号、微信号继续遵循既有客资字段权限。
+- Execution or analysis result: 新增对象权限服务的完整员工身份判定；客资列表/详情/导出使用者响应投影和通知变量均按当前收件人/查看者执行双盲投影；补充架构数据流说明及普通双方、主管/管理员例外测试。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProviderTest.java`; `docs/architecture/data-and-permission-flow.md`; this handoff record.
+- Verification evidence: `git diff --check` reached the changed files with only existing LF/CRLF warnings; Maven reactor compilation reached ZSJOS and then was blocked by the pre-existing unrelated `LeadTransferRequestServiceImpl.java:112` missing `LinkedHashMap` import. The focused tests could not execute because module compilation stopped before test compilation. No runtime/API/browser check was available.
+- Dependency or integration impact: No new dependency, database, permission grant, service, branch, commit, push, or external-state operation. Existing unrelated dirty worktree changes were preserved.
+- Remaining work: Resolve the unrelated compile error in a separate authorized change, then rerun `LeadManagementServiceImplTest` and `LeadNotifySceneProviderTest`, the ZSJOS module test suite, and an authenticated API/UI check for ordinary submitter, ordinary owner, department manager, and `query-all` administrator views.
+
+### 2026-08-16 17:22:00 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `17340436a16611ecbf70e3447230dbbe892f4e73`
+- User goal: 修复首次选择成交课程分类时，分类被空课程值回写清除的问题。
+- Key decisions: 空 `value` 只清理当前课程的 SKU/属性引用，不再覆盖用户刚选择的分类路径；非空 `spuRef::skuRef` 仍执行课程分类、课程和 SKU 属性回显。
+- Execution or analysis result: 修复了 `undefined -> ''` 的首次 Form 回写触发 effect 重置；第二次选择之所以正常，是因为后续仍为 `''`，不再触发 `value` 依赖变化。
+- Changed files: `frontend/workbench/src/components/SalesOrderCoursePicker.tsx`; `handoff/20260810-main-existing.md`。
+- Verification evidence: 定向 Vitest 2/2 通过；`git diff --check` 通过，仅有换行符转换提示。`npm run typecheck` 与 `npm run build` 被工作区既有 `frontend/workbench/src/layouts/RouteHost.tsx:56` 类型错误阻断（`"all"` 不属于 `"submitter" | "owner"`），与本次文件无关。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、服务或外部状态变更；未提交、推送或切换分支。
+- Remaining work: 在具备成交权限的登录会话中验证首次分类选择和后续课程选择的真实交互；另行修复 RouteHost 既有类型错误后再运行完整构建。
+
+### Workstream registration: 2026-08-16 17:26:26 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Replace every user-visible Lead number with `leadNo` across ZSJOS clients, notifications, BPM presentation, initialization, API labels, and directly affected documentation while preserving internal numeric Lead identifiers.
+- Non-goals: Do not change Lead primary/foreign keys, URL or command identifiers, object-permission keys, event business identifiers, administrator-customized notification templates, historical rendered messages, already-started BPM instances, external services, or execute database migrations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- Target branch: `main`
+- Ownership scope: ZSJOS Lead response projections and notification variables/tests; Lead-related BPM start variables, manifest/forms/assets and focused tests; Workbench/Admin/H5 Lead-number presentation and tests; additive V067 migration plus bootstrap/schema/verification artifacts; directly affected Lead, notification, BPM and migration documentation; root `AGENTS.md`; this handoff. Existing dirty reminder/V066 files remain preserved and may be extended only where the confirmed Lead-number behavior directly overlaps.
+- Owner: Codex `/root`
+- Dependencies: Existing `leadNo` generation and Lead projections, System notification provider contract, BPM public process API, current frontend typed service contracts, and the uncommitted V066 reminder-template work. No new npm or Maven dependency.
+- Integration order: Backend projections/variables -> BPM runtime/presentation -> frontend displays -> forward migration/baselines/docs/durable rule -> focused and repository scans.
+- Verification plan: Focused backend notification/BPM/projection tests; ZSJOS Maven tests and server package where the repository permits; Workbench tests/typecheck/build, Admin scoped checks/build, H5 typecheck/build; SQL order/repeatability/schema checks without execution; desktop/mobile browser checks when a runnable authenticated environment is available; `git diff --check`; final scans proving user-visible Lead numbers use `leadNo` and remaining `leadId/id` usages are internal-only.
+
+### Workstream coordination: 2026-08-16 17:30:15 +08:00
+
+- User correction: `V066` has already been used and must not be changed by the Lead-number task.
+- Decision: Preserve `V066__readable_timed_reminder_templates.sql` byte-for-byte as existing work. All Lead-number data synchronization is assigned to new additive migration `V067`; historical migrations and applied V066 behavior remain unchanged.
+
+### 2026-08-16 17:33:23 +08:00 (delivery append)
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbddf87f30a9ba5e49`
+- User goal: 客资自动分配后，提交人与负责人互相只能看到脱敏员工身份；`query-all` 管理员和负责人部门主管保持完整身份，客户字段不变。
+- Key decisions: 在 `assignment_status=owned` 且双方不同、查看者无管理员/负责人部门主管身份权限时，隐藏对方用户 ID 并使用现有中文姓名脱敏；管理响应和通知变量均执行该边界，同一人及管理例外不脱敏。
+- Execution or analysis result: 完成权限服务、客资响应转换、通知变量、测试和架构数据流说明修改；保留所有既有未相关工作区变更。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProviderTest.java`; `docs/architecture/data-and-permission-flow.md`; this handoff record.
+- Verification evidence: `git diff --check` only reported pre-existing LF/CRLF and generated H5 dependency-tree whitespace. Maven reactor reached ZSJOS compilation but remained blocked by unrelated `LeadTransferRequestServiceImpl.java:112` missing `LinkedHashMap`; focused tests therefore remain unverified. Runtime/API/browser checks were not available.
+- Dependency or integration impact: None; no dependency, database, permission grant, service, branch, commit, push, or publication operation.
+- Remaining work: After the unrelated compile error is resolved separately, rerun focused tests, the ZSJOS module suite, and authenticated ordinary submitter/owner, manager, and `query-all` acceptance checks.
+
+### 2026-08-16 17:52:00 +08:00 (delivery append)
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- User goal: 完整扫描所有客资编号调用，将用户可见编号统一替换为 `leadNo`，持久化该规则，并在 V066 已占用的前提下使用 V067。
+- Key decisions: 用户可见的前端字段、通知、BPM 只读表单、任务标题和导出统一使用 `leadNo`；`leadId/id` 继续作为主外键、URL、命令、权限、路由、事件和组件 key 等内部标识；兼容通知变量 `lead.id` 明确标记为“内部客资ID”；V067 仅更新未被管理员修改的系统默认模板和表单，不改写历史消息、在途流程或历史迁移；V066 全程保持字节不变。
+- Execution or analysis result: 完成 Workbench、Admin、H5、后端通知/BPM/任务/返现投影/导出的用户可见编号替换；增加 V067 前向迁移、fresh bootstrap 基线和只读验证；同步通知、BPM、数据库迁移文档；在根 `AGENTS.md` 固化 Lead 标识契约；最终扫描中剩余 `lead.id` 仅为兼容性说明和用于检测旧模板的校验表达式，内部 `leadId/id` 调用保持不变。
+- Changed files: `AGENTS.md`; backend Lead notification, BPM start-variable, business-task, cashback projection, Lead/cashback export and focused test files under `backend/yudao-module-zsjos`; Lead-number presentation files under `frontend/workbench/src`, `frontend/admin/src`, and `frontend/h5/src`; `script/sql/mysql/migrations/V067__lead_number_user_visible_contract.sql`; `script/sql/mysql/{00-bootstrap-schema.sql,01-bootstrap-system-seed.sql,02-bootstrap-zsjos-seed.sql,bootstrap.sql,verify-bootstrap.sql}`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/migrations/README.md`; `docs/api/system-business-notifications.md`; `docs/operations/{database-migrations,lead-appeal-deployment,sales-order-dual-approval-deployment}.md`; this handoff record.
+- Verification evidence: Backend focused Maven reactor passed 63/63 tests with ZSJOS main/test compilation; Workbench `npm test` passed 37 files/197 tests; Admin task-file ESLint passed and `pnpm build:local` passed; H5 `npm run build` passed; `python script/sql/mysql/tools/zsjos_db.py check` passed manifests, migration order, desired schema, Java mappings, baseline versions, and verification consistency; targeted `git diff --check` passed with line-ending warnings only; V067 is unique and ordered after V066; V066 SHA-256 remained `47827F3287B8D37B2C1A95F195C35CDA8E0E4F574EDF42EE5A87DD15B48F8EAF`. Workbench typecheck/build remain blocked by the pre-existing `frontend/workbench/src/layouts/RouteHost.tsx:56` audience type error; Admin full `ts:check` remains blocked by eight pre-existing errors outside task files. Authenticated desktop/mobile browser checks were unavailable without a runnable authenticated backend session.
+- Dependency or integration impact: No new dependency, primary/foreign-key contract, API route, permission, branch, commit, push, migration execution, service operation, BPM publication, or external-state change. V067 must be applied after V066 through the controlled migration flow; administrator customizations remain preserved.
+- Remaining work: Apply V067 only through the separately authorized migration process, then run `verify-bootstrap.sql` and authenticated desktop/mobile acceptance checks. Resolve the recorded Workbench and Admin baseline type errors in their owning workstreams before requiring clean full frontend type/build gates.
+
+### 2026-08-16 22:32:07 +08:00 (delivery append)
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- User goal: 使用本地兼职、销售、销售主管、报名服务和财务测试账号边跑边修，完整验证 H5 客资提交、销售处理、双中心成交审批、站内信、收益、银行卡和提现业务链路；兼职端不依赖 WebSocket，企微路径保留但暂不打通。
+- Key decisions: 通过真实本地业务数据验证端到端流程；兼职消息仅走有所有权校验的站内信接口；用户可见订单枚举只展示 System 字典标签，加载失败不回退内部编码；不修改账号权限，不执行 V071，不篡改返现记录绕过七天观察期，不移除企微保留路径。
+- Execution or analysis result: H5 成功提交客资，销售完成抢单、首次跟进、有效判定和成交录入，报名与财务依次完成双中心 BPM 审批，订单最终通过并生成有效返现与成交返现；兼职 H5 收到判有效、进入成交审批及成交结果站内信，收益汇总同步正确，银行卡新增成功。报名菜单仅包含其审批职责，财务具备成交审批、返现、提现和导出入口，销售主管无财务权限；该订单未申请主管确认，因此主管确认列表为空符合流程。修复 LAN HTTP 环境幂等键生成、H5 数组式时间渲染、站内信与收益字段契约，以及成交审批详情直接暴露内部字典编码的问题。当前返现均处于七天观察期，可提现金额为零，H5 正确禁用申请且财务无待审提现单，因此本轮无法在不破坏业务规则的情况下生成真实审核或打款记录。
+- Changed files: `frontend/h5/src/utils/idempotency.ts` 及本工作流中已登记的 H5 接口、认证、消息、客资、收益、提现和页面状态文件；`frontend/workbench/src/services/idempotency.ts`; `frontend/workbench/src/services/idempotency.test.ts`; `frontend/workbench/src/components/SalesOrderDetailCards.tsx`; `frontend/workbench/src/services/salesOrder.ts`; `frontend/workbench/src/services/salesOrder.test.ts`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/app/partner/PartnerAppMessageController.java`; 对应 System/ZSJOS 测试、权限迁移与直接受影响文档；this handoff record.
+- Verification evidence: 真实浏览器链路覆盖兼职提交、销售抢单/跟进/判定/成交、报名审批、财务审批、订单最终通过、三类兼职站内信、收益汇总、银行卡新增、提现零余额状态及各测试角色菜单；成交详情复测显示“新学员、零售缴费、学习二维码、1年、直接招生”等后端字典标签。H5 生产构建通过；Workbench 全量 Vitest 38/38 files、201/201 tests 通过；Maven reactor 聚焦测试通过，System `PartnerAppMessageControllerTest` 6/6，ZSJOS `CashbackServiceImplTest`、`SalesOrderServiceImplTest`、`WithdrawalServiceImplTest` 合计 34/34，相关 20 个 reactor 模块构建成功；`zsjos-db.ps1 check` 通过；定向 `git diff --check` 通过，仅有既有行尾转换提示。Workbench typecheck/build 仍被既有 `frontend/workbench/src/layouts/RouteHost.tsx:56` audience 联合类型错误阻断，与本轮修改无关。
+- Dependency or integration impact: 无新增 npm/Maven 依赖；未修改真实账号权限、未执行 V071、未重启或重配置共享服务、未切分支、提交、推送或发布。真实本地测试产生一条客资、一个成交订单、两笔返现和一张测试银行卡；均为用户明确授权的本地开发数据。
+- Remaining work: 返现七天观察期结束并形成可提现余额后，再实测提现申请、财务审核/驳回和打款状态流转；另行修复 `RouteHost.tsx:56` 既有类型错误后补跑 Workbench typecheck/build。V071 仍只生成和静态验证，应用到现有数据库需再次明确确认。
+
+### Workstream registration: 2026-08-17 09:32:18 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Pull and fast-forward local `main` to the latest `origin/main`, taking remote frontend content on conflicts and stopping for confirmation on any non-frontend conflict.
+- Non-goals: No push, commit, rebase, branch/worktree operation, dependency installation, SQL execution, service operation, cleanup, formatting, or modification of unrelated local work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `69741138b4c3fee9dc051fbdddf87f30a9ba5e49`
+- Target branch: `main`
+- Ownership scope: Fast-forward integration of remote commit `d562b33b41`; this handoff record. The remote 137 paths and the current local dirty paths have no overlap, so every existing dirty file remains under its current owner.
+- Owner: Codex `/root`
+- Dependencies: `origin/main` at `d562b33b41`; current dirty main worktree.
+- Integration order: Record scope, fingerprint the existing dirty-path set, fast-forward with automatic stashing disabled, then verify HEAD/remote equality and unchanged dirty-path ownership.
+- Verification plan: Confirm fast-forward ancestry and `0/0` ahead/behind state; verify no merge/rebase state or staged changes; compare the pre/post dirty-path set hash; do not run builds or SQL because the task only synchronizes an already committed remote EAM module.
+
+### 2026-08-17 09:33:01 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d562b33b41a7dda74d6c76868eb19f6b2ad7dae2`
+- User goal: Pull the latest remote repository code, use remote frontend content for conflicts, and request confirmation for any other conflict.
+- Key decisions: Fast-forwarded because local committed history was an ancestor of `origin/main`; preserved the complete existing dirty worktree because the remote 137 paths had zero overlap with local changes; did not install dependencies, execute EAM SQL, create a merge commit, or push.
+- Execution or analysis result: Local `main` now exactly matches `origin/main` at `d562b33b41a7dda74d6c76868eb19f6b2ad7dae2`. No frontend or non-frontend conflict occurred. The remote EAM asset-management backend, Admin frontend, SQL module, verification assets, and handoff file were added by the fast-forward.
+- Changed files: The 137 files in remote commit `d562b33b41` (EAM module source/tests, Admin EAM API/views, server Maven wiring, EAM migrations/schema/verification, and `handoff/eam-asset-management.md`); `handoff/20260810-main-existing.md` for this task record.
+- Verification evidence: The remote/local overlap scan returned zero paths. The dirty-path set remained 5,384 paths with identical pre/post SHA-256 `c66cd6ee2a7ed53833ade5cdc8f1fc6947e9aeb7590071470b1eade7cf160901`. HEAD and `origin/main` match, ahead/behind is `0/0`, the index is empty, and no merge or rebase state remains. Tests, builds, browser checks, dependency installation, and SQL verification were not run because this turn only synchronized an already committed remote module without changing its behavior.
+- Dependency or integration impact: The worktree now contains the remotely authored EAM Maven module and SQL artifacts. No local dependency decision, database change, service operation, permission change, branch/worktree operation, commit, merge commit, push, or publication occurred. All pre-existing local modifications and untracked files remain.
+- Remaining work: Existing local changes remain uncommitted. The pulled EAM module has not been compiled, tested, initialized, or acceptance-tested locally in this turn.

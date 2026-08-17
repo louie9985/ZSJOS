@@ -2,6 +2,8 @@
 
 本矩阵以 `system_menu` 返回的正式路径为准。React Workbench 只渲染授权菜单；隐藏菜单仍可在授权后直达，但不出现在导航。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
 
+H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计入下表 36 个页面路由。V071 只把已失去有效父菜单的兼职权限按钮归为根级、无 path/component 的不可路由元数据，不重建已由 V069 退役的 `partner-portal` 页面。
+
 | # | 菜单 | 正式路径 | React Workbench | Vue Admin 组件 |
 |---:|---|---|---|---|
 | 1 | 提交客资 | `/zsjos/leads/submit` | `LeadSubmissionPage` | `zsjos/leadSubmission/index` |

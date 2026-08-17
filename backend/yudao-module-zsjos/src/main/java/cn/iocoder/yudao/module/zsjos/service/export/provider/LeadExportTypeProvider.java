@@ -22,11 +22,11 @@ public class LeadExportTypeProvider extends AbstractPagedExportTypeProvider<Lead
         return leadManagementService.getLeadPage(request, creatorUserId);
     }
     @Override protected List<String> columns() {
-        return List.of("客资ID", "姓名", "手机号", "微信号", "来源渠道", "客资分类", "客资状态", "分配状态",
+        return List.of("客资编号", "姓名", "手机号", "微信号", "来源渠道", "客资分类", "客资状态", "分配状态",
                 "负责人", "提交时间", "意向产品");
     }
     @Override protected List<Object> toRow(LeadManagementRespVO item) {
-        return List.of(value(item.getId()), value(item.getSubmittedName()), value(item.getSubmittedMobile()),
+        return List.of(value(item.getLeadNo()), value(item.getSubmittedName()), value(item.getSubmittedMobile()),
                 value(item.getSubmittedWechatId()), value(item.getSourceChannel()), value(item.getLeadCategory()),
                 value(item.getStatus()), value(item.getAssignmentStatus()), value(item.getOwnerUserName()),
                 value(item.getSubmittedAt()), item.getIntendedProducts() == null ? "" : item.getIntendedProducts().stream()

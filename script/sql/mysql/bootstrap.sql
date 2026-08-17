@@ -47,6 +47,12 @@ SOURCE script/sql/mysql/migrations/V062__finance_order_export_permission.sql;
 SOURCE script/sql/mysql/migrations/V063__partner_portal_app_api_role.sql;
 SOURCE script/sql/mysql/migrations/V064__bpm_model_import_permission.sql;
 SOURCE script/sql/mysql/migrations/V065__inbox_cursor_activity_ordering.sql;
+SOURCE script/sql/mysql/migrations/V066__readable_timed_reminder_templates.sql;
+SOURCE script/sql/mysql/migrations/V067__lead_number_user_visible_contract.sql;
+SOURCE script/sql/mysql/migrations/V068__repair_partner_permissions.sql;
+SOURCE script/sql/mysql/migrations/V069__remove_invalid_partner_admin_route.sql;
+SOURCE script/sql/mysql/migrations/V070__repair_bpm_model_import_permission.sql;
+SOURCE script/sql/mysql/migrations/V071__repair_h5_and_role_permissions.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

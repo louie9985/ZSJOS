@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.dao.DuplicateKeyException;
 
@@ -186,10 +188,29 @@ class LeadTransferRequestServiceImplTest {
         verifyNoInteractions(processInstanceApi, notifyEventPublisher);
     }
 
+    @Test
+    void createPublishesLeadNumberToBpm() {
+        prepareCreateThroughInsert("transfer-number");
+        doAnswer(invocation -> { ((LeadTransferRequestDO) invocation.getArgument(0)).setId(9L); return 1; })
+                .when(requestMapper).insert(any(LeadTransferRequestDO.class));
+        when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-1");
+
+        Long result = service.create(3L, 20L,
+                new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                        .setIdempotencyKey("transfer-number").setReason("持续跟进"));
+
+        assertEquals(9L, result);
+        ArgumentCaptor<BpmProcessInstanceCreateReqDTO> captor =
+                ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
+        verify(processInstanceApi).createProcessInstance(eq(20L), captor.capture());
+        assertEquals("KZ202608160000000002", captor.getValue().getVariables().get("leadNo"));
+        assertEquals(2L, captor.getValue().getVariables().get("leadId"));
+    }
+
     private void prepareCreateThroughInsert(String idempotencyKey) {
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
         cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned");
-        LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
+        LeadDO lead = new LeadDO(); lead.setId(2L); lead.setLeadNo("KZ202608160000000002"); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
         when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);

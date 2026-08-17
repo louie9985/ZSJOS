@@ -583,6 +583,7 @@ export default function LeadManagementPage({ audience }: { audience: 'submitter'
                     </span>
                     <LeadStateTags lead={item}/>
                   </div>
+                  <span>{item.leadNo}</span>
                   <span>{productText(item)}</span>
                   <span>{item.submittedMobile || '无手机号'} · {item.submittedWechatId || '无微信号'}</span>
                 </div>

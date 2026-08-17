@@ -199,6 +199,7 @@ class LeadAppealServiceImplTest {
         verify(processInstanceApi).createProcessInstance(eq(7L), processCaptor.capture());
         BpmProcessInstanceCreateReqDTO processRequest = processCaptor.getValue();
         assertEquals(List.of(30L), processRequest.getStartUserSelectAssignees().get("appealReview"));
+        assertEquals("KZ202608160000000008", processRequest.getVariables().get("leadNo"));
         assertDoesNotThrow(() -> processRequest.getVariables().remove("appealId"));
     }
 
@@ -379,6 +380,7 @@ class LeadAppealServiceImplTest {
     private LeadDO invalidLead(Long ownerUserId) {
         LeadDO lead = new LeadDO();
         lead.setId(8L);
+        lead.setLeadNo("KZ202608160000000008");
         lead.setStatus(STATUS_INVALID);
         lead.setSourceUserId(7L);
         lead.setOwnerUserId(ownerUserId);

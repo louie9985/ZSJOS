@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { showToast, showDialog } from 'vant'
+import { showToast, showConfirmDialog } from 'vant'
 import { getLeadDetail, urgeLead, type LeadListItem } from '@/api/lead'
-import { formatDateTime, maskMobile } from '@/utils/format'
+import { formatDateTime, formatLeadNo, maskMobile } from '@/utils/format'
 
 defineOptions({ name: 'LeadDetail' })
 
@@ -13,17 +13,26 @@ const leadId = Number(route.params.id)
 
 const lead = ref<LeadListItem>()
 const loading = ref(true)
+const loadError = ref('')
 const urgeLoading = ref(false)
 
-onMounted(async () => {
+async function loadLead() {
+  loading.value = true
+  loadError.value = ''
   try {
     lead.value = await getLeadDetail(leadId)
+  } catch (cause) {
+    loadError.value = cause instanceof Error ? cause.message : '客资详情加载失败'
   } finally {
     loading.value = false
   }
-})
+}
 
-const actions = computed(() => lead.value?.availableActions || [])
+onMounted(loadLead)
+
+const actions = computed(() => new Set(
+  (lead.value?.availableActions || []).filter(action => action.enabled).map(action => action.code)
+))
 
 const statusMap: Record<string, { text: string; color: string }> = {
   submitted: { text: '已提交', color: 'var(--h5-info)' },
@@ -46,15 +55,11 @@ const assignmentMap: Record<string, string> = {
 // 催办
 async function handleUrge() {
   try {
-    const { value } = await showDialog({
+    await showConfirmDialog({
       title: '催办客资',
       message: '确定催办此客资？同一客资每天最多催办一次。',
-      showCancelButton: true,
       confirmButtonText: '确认催办'
-    }).catch(() => ({ value: false })) as unknown as { value: boolean }
-
-    // showDialog with showCancelButton doesn't return value directly
-    // Instead just proceed since it resolved (didn't throw)
+    })
     urgeLoading.value = true
     await urgeLead(leadId, '请尽快跟进')
     showToast({ message: '催办成功', type: 'success' })
@@ -83,6 +88,9 @@ function goAppeal() {
     <van-nav-bar title="客资详情" left-arrow @click-left="$router.back()" />
 
     <van-skeleton :loading="loading" :row="8" style="padding: 16px;">
+      <van-empty v-if="loadError" :description="loadError" image="error">
+        <van-button size="small" type="primary" @click="loadLead">重新加载</van-button>
+      </van-empty>
       <template v-if="lead">
         <!-- 状态卡片 -->
         <div class="card status-card">
@@ -95,7 +103,7 @@ function goAppeal() {
             </span>
             <span class="status-card__assignment">{{ assignmentMap[lead.assignmentStatus] || lead.assignmentStatus }}</span>
           </div>
-          <div class="status-card__no">{{ lead.leadNo }}</div>
+          <div class="status-card__no">{{ formatLeadNo(lead.leadNo) }}</div>
         </div>
 
         <!-- 客户信息 -->
@@ -114,16 +122,16 @@ function goAppeal() {
         <!-- 意向课程 -->
         <div v-if="lead.intendedProducts && (lead.intendedProducts as unknown[]).length > 0" class="card">
           <div class="section-title">意向课程</div>
-          <div v-for="(product, idx) in (lead.intendedProducts as any[])" :key="idx" class="product-item">
-            <span>{{ product.spuNameSnapshot || product.productNameSnapshot || '课程' }}</span>
-            <van-tag v-if="product.isPrimary" type="primary" size="medium">主意向</van-tag>
+          <div v-for="product in lead.intendedProducts" :key="`${product.spuRef}-${product.skuRef || ''}`" class="product-item">
+            <span>{{ product.spuName || '课程' }}</span>
+            <van-tag v-if="product.primary" type="primary" size="medium">主意向</van-tag>
           </div>
         </div>
 
         <!-- 底部操作栏 -->
-        <div v-if="actions.length > 0" class="detail-actions safe-area-bottom">
+        <div v-if="actions.size > 0" class="detail-actions safe-area-bottom">
           <van-button
-            v-if="actions.includes('supplement') || actions.includes('submitter-supplement')"
+            v-if="actions.has('SUBMITTER_SUPPLEMENT')"
             size="small"
             round
             plain
@@ -132,7 +140,7 @@ function goAppeal() {
             补充
           </van-button>
           <van-button
-            v-if="actions.includes('urge')"
+            v-if="actions.has('URGE')"
             size="small"
             round
             plain
@@ -142,7 +150,7 @@ function goAppeal() {
             催办
           </van-button>
           <van-button
-            v-if="actions.includes('complaint')"
+            v-if="actions.has('CREATE_COMPLAINT')"
             size="small"
             round
             plain
@@ -151,7 +159,7 @@ function goAppeal() {
             投诉
           </van-button>
           <van-button
-            v-if="actions.includes('appeal') || lead.status === 'invalid'"
+            v-if="actions.has('CREATE_APPEAL')"
             size="small"
             round
             type="primary"

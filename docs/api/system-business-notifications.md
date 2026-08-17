@@ -43,7 +43,9 @@ All paths below are under the administration API prefix and use the standard res
 | `GET` | `/system/notify-message/my-get?id=` | Read one message owned by the current user |
 
 Existing template and message APIs include `title`, `summary`, `sceneCode`, and controlled action
-metadata. Templates support `{{lead.id}}` dotted variables and retain compatibility with legacy
+metadata. Lead templates use `{{lead.no}}` for the user-visible 客资编号. `{{lead.id}}` remains a
+compatibility-only internal identifier and is labeled 内部客资ID in the variable catalog. Templates
+retain compatibility with legacy
 `{name}` placeholders. A scene template is rejected when it references variables outside that
 scene's published catalog.
 

@@ -82,6 +82,8 @@ platform: PC 或 MOBILE，默认 PC
 
 只有拥有 `part_time_partner` 角色的账号可以通过该接口登录。
 
+当前保留“企业微信登录”入口，但暂不打通。点击入口只提示暂未开放，不发起 OAuth，也不调用 `/app-api/zsjos/auth/wecom-login`。
+
 ### 2. 退出登录
 
 ```
@@ -225,6 +227,16 @@ GET /app-api/system/dict-data/type?type=zsjos_lead_category
 ```
 
 当前字典选项由管理员维护，V063 不会自动添加业务选项。
+
+字典请求使用只携带 `tenant-id` 的公共数据客户端，不携带兼职 ADMIN Token。加载失败必须展示错误和重试入口，不得静默返回空数组或前端静态选项。
+
+## 三-A、地区接口
+
+```
+GET /app-api/system/area/tree
+```
+
+地区同样使用只携带 `tenant-id` 的公共数据客户端。前端提交节点的 `selectionCode`，不使用内部 `id` 替代；不存在 `/app-api/zsjos/lead/area-tree` 接口。
 
 ## 四、课程和产品
 
@@ -444,7 +456,10 @@ submittedAt
       "submittedAt": "2026-08-16T10:00:00",
       "intendedProducts": [],
       "attachments": [],
-      "availableActions": []
+      "availableActions": [
+        { "code": "SUBMITTER_SUPPLEMENT", "enabled": true },
+        { "code": "URGE", "enabled": false }
+      ]
     }
   ]
 }
@@ -457,6 +472,8 @@ GET /app-api/zsjos/lead/get?id={leadId}
 ```
 
 只能查看本人有提交人历史权限的客资。
+
+所有页面只把非空 `leadNo` 展示为客资编号；缺失时显示“客资编号暂未生成”，不能回退展示 `id` 或 `leadId`。动作只消费启用的大写编码 `SUBMITTER_SUPPLEMENT`、`URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`。
 
 ### 补充本人客资
 
@@ -831,6 +848,14 @@ status
 GET /app-api/zsjos/withdrawal/my/{id}
 ```
 
+列表和详情金额、银行快照和申请时间字段统一为：
+
+```
+applicationAmount
+bankNameSnapshot
+submittedAt
+```
+
 ### 取消提现
 
 ```
@@ -839,7 +864,20 @@ PUT /app-api/zsjos/withdrawal/{id}/cancel
 
 只有待财务审核状态允许取消。
 
-## 十二、前端需要处理的状态
+## 十二、个人站内消息
+
+```
+GET /app-api/zsjos/messages/page
+GET /app-api/zsjos/messages/{id}
+PUT /app-api/zsjos/messages/read
+GET /app-api/zsjos/messages/unread-count
+```
+
+已读请求体为 `{ "ids": [1, 2] }`。消息沿用 System 字段 `templateTitle`、`templateSummary`、`templateContent`、`templateType`、`readStatus`、`createTime`。四个接口要求 `part_time_partner` 角色，并按当前 ADMIN 用户校验消息所有权。
+
+HTTP 401 和业务 `code=401` 进入同一个单航班刷新流程。刷新请求不进入普通拦截器，原请求最多重放一次；刷新失败时全部等待请求结束、认证状态清空并统一返回登录页。
+
+## 十三、前端需要处理的状态
 
 ```
 401：未登录、Token 过期，需要刷新或重新登录

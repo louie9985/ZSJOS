@@ -40,6 +40,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_P
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_SUBMITTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.any;
@@ -137,6 +138,45 @@ class LeadManagementServiceImplTest {
 
         assertEquals(List.of("submitter", "owner"), result.getRelationTypes());
         assertEquals("销售一号", result.getOwnerUserName());
+    }
+
+    @Test
+    void detailBlindsSubmitterAndOwnerIdentitiesForOrdinaryCounterpart() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        AdminUserRespDTO submitter = user(10L, 0); submitter.setNickname("提交销售");
+        AdminUserRespDTO owner = user(20L, 0); owner.setNickname("负责销售");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter, 20L, owner));
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canRead(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.canViewUnmaskedIdentity(10L, 20L)).thenReturn(false);
+
+        LeadManagementRespVO result = service.getLead(1L, 10L);
+
+        assertEquals("提交销售", result.getSourceUserName());
+        assertEquals(10L, result.getSourceUserId());
+        assertNotEquals("负责销售", result.getOwnerUserName());
+        assertEquals(null, result.getOwnerUserId());
+    }
+
+    @Test
+    void detailKeepsIdentitiesForManagerScope() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        AdminUserRespDTO submitter = user(10L, 0); submitter.setNickname("提交销售");
+        AdminUserRespDTO owner = user(20L, 0); owner.setNickname("负责销售");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter, 20L, owner));
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canRead(lead, 30L)).thenReturn(true);
+        when(leadObjectPermissionService.canViewUnmaskedIdentity(30L, 20L)).thenReturn(true);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals("提交销售", result.getSourceUserName());
+        assertEquals("负责销售", result.getOwnerUserName());
+        assertEquals(20L, result.getOwnerUserId());
     }
 
     @Test

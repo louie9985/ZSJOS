@@ -15,6 +15,13 @@ body {
   color: var(--h5-text-primary);
 }
 
+#app {
+  width: 100%;
+  max-width: 10rem;
+  min-height: 100vh;
+  margin: 0 auto;
+}
+
 /* 安全区适配 */
 .safe-area-bottom {
   padding-bottom: constant(safe-area-inset-bottom);

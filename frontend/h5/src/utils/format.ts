@@ -1,5 +1,7 @@
 import dayjs from 'dayjs'
 
+export type ApiDateValue = string | number[]
+
 /** 格式化金额 */
 export function formatAmount(amount: number | undefined | null): string {
   if (amount == null) return '0.00'
@@ -7,14 +9,23 @@ export function formatAmount(amount: number | undefined | null): string {
 }
 
 /** 格式化日期 */
-export function formatDate(dateStr: string | undefined | null, format = 'YYYY-MM-DD'): string {
-  if (!dateStr) return '--'
-  return dayjs(dateStr).format(format)
+export function formatDate(dateValue: ApiDateValue | undefined | null, format = 'YYYY-MM-DD'): string {
+  if (!dateValue) return '--'
+  const normalized = Array.isArray(dateValue)
+    ? `${dateValue[0]}-${String(dateValue[1]).padStart(2, '0')}-${String(dateValue[2]).padStart(2, '0')}T${String(dateValue[3] || 0).padStart(2, '0')}:${String(dateValue[4] || 0).padStart(2, '0')}:${String(dateValue[5] || 0).padStart(2, '0')}`
+    : dateValue
+  const parsed = dayjs(normalized)
+  return parsed.isValid() ? parsed.format(format) : '--'
 }
 
 /** 格式化日期时间 */
-export function formatDateTime(dateStr: string | undefined | null): string {
-  return formatDate(dateStr, 'YYYY-MM-DD HH:mm')
+export function formatDateTime(dateValue: ApiDateValue | undefined | null): string {
+  return formatDate(dateValue, 'YYYY-MM-DD HH:mm')
+}
+
+/** 用户可见客资编号；内部 ID 不作为回退值。 */
+export function formatLeadNo(value?: string | null): string {
+  return value?.trim() || '客资编号暂未生成'
 }
 
 /** 手机号脱敏 */

@@ -35,6 +35,12 @@ Use this order when repository guidance conflicts:
 - Administrator-maintained data **MUST** come from a dictionary or business API in production flows.
 - The workbench may call existing system and business APIs. New ZSJOS-owned backend behavior belongs in `yudao-module-zsjos`, but existing system or CRM capabilities **MUST NOT** be copied there merely to centralize calls.
 
+### Lead identifier contract
+
+- Every user-visible Lead identifier **MUST** use the business number `leadNo`, including frontend labels and values, notifications, BPM read-only forms, task titles, exports, and delivery documentation.
+- Internal `leadId` or `id` values **MUST** remain internal identifiers for primary and foreign keys, API paths and commands, permissions, routing, event identity, React/Vue keys, and other technical relationships. They **MUST NOT** be presented as the customer-facing "客资编号" or used as a fallback when `leadNo` is unavailable.
+- Compatibility fields or notification variables that expose an internal identifier **MUST** be explicitly labeled "内部客资ID". Existing historical migrations, rendered messages, and started workflow snapshots are not rewritten merely to adopt this presentation contract.
+
 Read only the architecture documents relevant to the task:
 
 - Cross-runtime or startup work: `docs/architecture/system-overview.md`

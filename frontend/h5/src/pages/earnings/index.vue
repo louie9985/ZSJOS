@@ -3,13 +3,14 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCashbackSummary, getCashbackPage, type CashbackSummary, type CashbackItem } from '@/api/cashback'
 import { usePageList } from '@/composables/usePageList'
-import { formatAmount, formatDate } from '@/utils/format'
+import { formatAmount, formatDate, formatLeadNo } from '@/utils/format'
 
 defineOptions({ name: 'Earnings' })
 
 const router = useRouter()
 const summary = ref<CashbackSummary>()
 const summaryLoading = ref(true)
+const summaryError = ref('')
 const activeTab = ref('all')
 
 const tabs = [
@@ -18,13 +19,19 @@ const tabs = [
   { key: 'deal', label: '成交返现' }
 ]
 
-onMounted(async () => {
+async function loadSummary() {
+  summaryLoading.value = true
+  summaryError.value = ''
   try {
     summary.value = await getCashbackSummary()
+  } catch (cause) {
+    summaryError.value = cause instanceof Error ? cause.message : '收益汇总加载失败'
   } finally {
     summaryLoading.value = false
   }
-})
+}
+
+onMounted(loadSummary)
 
 const filterParams = () => {
   const params: Record<string, unknown> = {}
@@ -34,7 +41,7 @@ const filterParams = () => {
   return params
 }
 
-const { list, loading, refreshing, finished, loadMore, refresh } = usePageList(
+const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
   (params) => getCashbackPage(params as Parameters<typeof getCashbackPage>[0]),
   filterParams
 )
@@ -71,6 +78,10 @@ const statusColor: Record<string, string> = {
     <!-- 汇总卡片 -->
     <div class="earnings-summary">
       <van-skeleton :loading="summaryLoading" :row="2">
+        <van-empty v-if="summaryError" :description="summaryError" image="error">
+          <van-button size="small" type="primary" @click="loadSummary">重新加载</van-button>
+        </van-empty>
+        <template v-else>
         <div class="earnings-summary__grid">
           <div class="earnings-summary__item">
             <div class="earnings-summary__value">¥{{ formatAmount(summary?.totalAmount) }}</div>
@@ -95,6 +106,7 @@ const statusColor: Record<string, string> = {
         >
           去提现
         </van-button>
+        </template>
       </van-skeleton>
     </div>
 
@@ -123,11 +135,14 @@ const statusColor: Record<string, string> = {
             </span>
           </div>
           <div class="earnings-item__footer">
-            {{ formatDate(item.generatedAt) }}
+            {{ formatLeadNo(item.leadNo) }} · {{ formatDate(item.generatedAt) }}
           </div>
         </div>
 
-        <van-empty v-if="!loading && list.length === 0" description="暂无返现记录" />
+        <van-empty v-if="!loading && error" :description="error" image="error">
+          <van-button type="primary" round size="small" @click="refresh">重新加载</van-button>
+        </van-empty>
+        <van-empty v-if="!loading && !error && list.length === 0" description="暂无返现记录" />
       </van-list>
     </van-pull-refresh>
   </div>

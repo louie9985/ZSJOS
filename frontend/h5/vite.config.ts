@@ -20,7 +20,8 @@ export default defineConfig({
     }
   },
   server: {
-    port: 5175,
+    port: 10086,
+    strictPort: true,
     proxy: {
       '/app-api': {
         target: 'http://192.168.2.38:48080',

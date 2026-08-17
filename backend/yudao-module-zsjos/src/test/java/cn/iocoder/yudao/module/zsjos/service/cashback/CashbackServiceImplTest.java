@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.zsjos.service.cashback;
 
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
@@ -20,6 +22,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -85,6 +88,18 @@ class CashbackServiceImplTest {
         } finally {
             TenantContextHolder.clear();
         }
+    }
+
+    @Test void pageProjectsLeadNumber() {
+        CashbackDO cashback = new CashbackDO().setId(10L).setLeadId(1L);
+        when(mapper.selectPage(any(CashbackPageReqVO.class), isNull(Long.class)))
+                .thenReturn(new PageResult<>(List.of(cashback), 1L));
+        when(leadMapper.selectBatchIds(Set.of(1L))).thenReturn(List.of(
+                new LeadDO().setId(1L).setLeadNo("KZ202608160000000001")));
+
+        var result = service.getPage(new CashbackPageReqVO(), null);
+
+        assertEquals("KZ202608160000000001", result.getList().get(0).getLeadNo());
     }
 
     private void eligibleLead() {

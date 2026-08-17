@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
+import { createIdempotencyKey } from './idempotency'
 
 type SubmissionContext = {
   idempotencyKey: string
@@ -7,18 +8,18 @@ type SubmissionContext = {
 
 export function createSubmissionGate() {
   let locked = false
-  let idempotencyKey = crypto.randomUUID()
+  let idempotencyKey = createIdempotencyKey()
   return {
     get key() { return idempotencyKey },
     get locked() { return locked },
-    resetIntent() { if (!locked) idempotencyKey = crypto.randomUUID() },
+    resetIntent() { if (!locked) idempotencyKey = createIdempotencyKey() },
     async run(task: (context: SubmissionContext) => Promise<void>) {
       if (locked) return false
       locked = true
       let completed = false
       try {
         await task({ idempotencyKey, complete: () => { completed = true } })
-        if (completed) idempotencyKey = crypto.randomUUID()
+        if (completed) idempotencyKey = createIdempotencyKey()
         return true
       } finally {
         locked = false

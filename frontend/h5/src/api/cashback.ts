@@ -19,6 +19,7 @@ export interface CashbackItem {
   type: 'valid' | 'deal'
   status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled'
   leadId: number
+  leadNo?: string
   orderId?: number
   orderItemId?: number
   productRefSnapshot: string

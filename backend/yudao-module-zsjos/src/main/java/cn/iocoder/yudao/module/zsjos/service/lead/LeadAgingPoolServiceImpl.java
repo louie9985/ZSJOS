@@ -250,7 +250,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                 }
                 Map<String,Object> context = new LinkedHashMap<>(); context.put("ownerUserId", lead.getOwnerUserId());
                 context.put("frozenDeptId", owner.getDeptId()); context.put("agingPool.cycleId", null);
-                context.put("agingPool.dueAt", dueAt); context.put("reminder.stage", "advance"); context.put("reminder.dueAt", dueAt);
+                context.put("agingPool.dueAt", dueAt); context.put("reminder.stage", "即将到期"); context.put("reminder.dueAt", dueAt);
                 NotifySendResult result = notifyPublisher.publishConfirmed(AGING_POOL_REMINDER, lead.getId(),
                         "aging-pool-reminder:" + lead.getId() + ":" + nextCycleNo + ":" + rule.getId(),
                         rule.getId(), null, now, context);
@@ -323,7 +323,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     private void publishNoProgress(LeadDO lead, Long ownerUserId, String stage, LocalDateTime now) {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("ownerUserId", ownerUserId);
-        context.put("reminder.stage", stage);
+        context.put("reminder.stage", "warning".equals(stage) ? "无进展预警" : stage);
         context.put("assignment.reason", "released".equals(stage) ? "无进展宽限期结束" : "长期无有效进展");
         notifyPublisher.publish("released".equals(stage) ? PUBLIC_POOL : NEXT_FOLLOW_UP_REMINDER,
                 lead.getId(), "lead-no-progress:" + stage + ":" + lead.getId() + ":" + now,

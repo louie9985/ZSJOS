@@ -121,7 +121,7 @@ public class LeadManagementController {
 
     @GetMapping("/get")
     @Operation(summary = "获得客资详情")
-    @Parameter(name = "id", description = "客资编号", required = true)
+    @Parameter(name = "id", description = "内部客资ID", required = true)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
     public CommonResult<LeadManagementRespVO> getLead(@RequestParam("id") Long id) {
         return success(leadManagementService.getLead(id, getLoginUserId()));

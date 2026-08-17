@@ -6,6 +6,7 @@ import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
 import LeadIntendedProductEditor, { selectionFromManagedProduct, type IntendedProductSelection } from './LeadIntendedProductEditor'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
+import { createIdempotencyKey } from '../services/idempotency'
 
 type Values = {
   name: string; mobile?: string; wechatId?: string; regionPath: string[]
@@ -114,7 +115,7 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
         skuUnknown: item.skuUnknown, primary: item.key === primaryKey }))
       if (submitterOnly) await api.supplementLead(lead.id, {
         provinceCode, cityCode, leadCategory: values.leadCategory!, intendedProducts,
-        remark: values.reason?.trim() || undefined, idempotencyKey: crypto.randomUUID()
+        remark: values.reason?.trim() || undefined, idempotencyKey: createIdempotencyKey()
       })
       else await api.updateLeadBasicInfo(lead.id, {
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,

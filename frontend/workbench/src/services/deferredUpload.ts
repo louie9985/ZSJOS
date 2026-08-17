@@ -1,3 +1,5 @@
+import { createIdempotencyKey } from './idempotency'
+
 export type DeferredUploadStatus = 'pending' | 'uploading' | 'done' | 'error'
 
 export type DeferredUploadItem<T> = {
@@ -15,7 +17,7 @@ export type DeferredUploadItem<T> = {
 
 export function createDeferredUploadItem<T>(file: File): DeferredUploadItem<T> {
   return {
-    uid: crypto.randomUUID(), name: file.name, type: file.type, size: file.size,
+    uid: createIdempotencyKey(), name: file.name, type: file.type, size: file.size,
     file, previewUrl: URL.createObjectURL(file), status: 'pending'
   }
 }

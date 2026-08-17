@@ -27,6 +27,7 @@ import java.util.Set;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
 
@@ -51,6 +52,7 @@ class LeadNotifySceneProviderTest {
 
         assertEquals(39, scenes.size());
         assertEquals(39, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("lead.no"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("followUp.result"));
         assertTrue(variableKeys(scene(scenes, FOLLOW_UP_RECORDED)).contains("followUp.result"));
@@ -90,6 +92,7 @@ class LeadNotifySceneProviderTest {
     void resolvesContactValuesAccordingToRecipientPermission() {
         LeadDO lead = new LeadDO();
         lead.setId(1L);
+        lead.setLeadNo("KZ202608160000000001");
         lead.setSourceUserId(10L);
         lead.setOwnerUserId(20L);
         lead.setSubmittedName("张三丰");
@@ -102,10 +105,56 @@ class LeadNotifySceneProviderTest {
         Map<String, Object> masked = provider.resolveVariables(event, 30L);
         Map<String, Object> full = provider.resolveVariables(event, 10L);
 
+        assertEquals("KZ202608160000000001", full.get("lead.no"));
+        assertEquals(1L, full.get("lead.id"));
         assertFalse("13800138000".equals(masked.get("lead.mobile")));
         assertFalse("wechat-full".equals(masked.get("lead.wechatId")));
         assertEquals("13800138000", full.get("lead.mobile"));
         assertEquals("wechat-full", full.get("lead.wechatId"));
+    }
+
+    @Test
+    void blindsCounterpartIdentityForSubmitterAndOwnerNotifications() {
+        LeadDO lead = new LeadDO();
+        lead.setId(1L); lead.setSourceUserId(10L); lead.setOwnerUserId(20L);
+        lead.setAssignmentStatus("owned"); lead.setSubmittedName("张三丰");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(productMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        AdminUserRespDTO submitter = new AdminUserRespDTO(); submitter.setId(10L); submitter.setNickname("提交销售");
+        AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(20L); owner.setNickname("负责销售");
+        when(adminUserApi.getUser(10L)).thenReturn(submitter);
+        when(adminUserApi.getUser(20L)).thenReturn(owner);
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(ASSIGNED).bizId(1L).build();
+
+        Map<String, Object> submitterValues = provider.resolveVariables(event, 10L);
+        Map<String, Object> ownerValues = provider.resolveVariables(event, 20L);
+
+        assertNotEquals("负责销售", submitterValues.get("owner.name"));
+        assertEquals(null, submitterValues.get("owner.id"));
+        assertNotEquals("提交销售", ownerValues.get("submitter.name"));
+        assertEquals(null, ownerValues.get("submitter.id"));
+    }
+
+    @Test
+    void keepsCounterpartIdentityForQueryAllNotificationRecipient() {
+        LeadDO lead = new LeadDO();
+        lead.setId(1L); lead.setSourceUserId(10L); lead.setOwnerUserId(20L); lead.setAssignmentStatus("owned");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(productMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        AdminUserRespDTO submitter = new AdminUserRespDTO(); submitter.setId(10L); submitter.setNickname("提交销售");
+        AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(20L); owner.setNickname("负责销售");
+        when(adminUserApi.getUser(10L)).thenReturn(submitter);
+        when(adminUserApi.getUser(20L)).thenReturn(owner);
+        when(permissionApi.hasAnyPermissions(30L, "zsjos:lead:query-all")).thenReturn(true);
+
+        Map<String, Object> values = provider.resolveVariables(
+                NotifyBusinessEvent.builder().sceneCode(ASSIGNED).bizId(1L).build(), 30L);
+
+        assertEquals("提交销售", values.get("submitter.name"));
+        assertEquals("负责销售", values.get("owner.name"));
+        assertEquals(10L, values.get("submitter.id"));
     }
 
     private static NotifySceneRespDTO scene(List<NotifySceneRespDTO> scenes, String code) {

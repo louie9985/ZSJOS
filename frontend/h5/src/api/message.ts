@@ -2,13 +2,14 @@ import request from './request'
 
 export interface MessageItem {
   id: number
-  title: string
-  content: string
-  type: string
+  templateTitle: string
+  templateSummary?: string
+  templateContent: string
+  templateType: number
   bizType?: string
   bizId?: number
-  read: boolean
-  createdAt: string
+  readStatus: boolean
+  createTime: string
 }
 
 /** 消息列表 */

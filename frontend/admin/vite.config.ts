@@ -33,7 +33,7 @@ export default ({command, mode}: ConfigEnv): UserConfig => {
         // 服务端渲染
         server: {
             port: env.VITE_PORT, // 端口号
-            host: "0.0.0.0",
+            host: "::",
             open: env.VITE_OPEN === 'true',
             // 本地跨域代理. 目前注释的原因：暂时没有用途，server 端已经支持跨域
             // proxy: {

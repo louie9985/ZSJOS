@@ -1,4 +1,5 @@
 import request from './request'
+import referenceRequest from './reference'
 import type { DictItem } from '@/stores/app'
 
 export interface LeadCatalog {
@@ -59,7 +60,7 @@ export interface IntendedProduct {
 
 export interface LeadCreateResult {
   leadId: number
-  leadNo: string
+  leadNo?: string | null
   reviewId?: number | null
   outcome: 'activated' | 'review_pending' | 'duplicate_rejected' | 'duplicate_auto_closed'
   assignmentStatus: string
@@ -68,7 +69,7 @@ export interface LeadCreateResult {
 
 export interface LeadListItem {
   id: number
-  leadNo: string
+  leadNo?: string | null
   submittedName: string
   submittedMobile?: string
   sourceChannel: string
@@ -77,9 +78,27 @@ export interface LeadListItem {
   assignmentStatus: string
   ownerUserName?: string
   submittedAt: string
-  intendedProducts: unknown[]
+  provinceCode: string
+  provinceName: string
+  cityCode: string
+  cityName: string
+  remark?: string
+  intendedProducts: LeadProductItem[]
   attachments: unknown[]
-  availableActions: string[]
+  availableActions: LeadAction[]
+}
+
+export interface LeadAction {
+  code: string
+  enabled: boolean
+}
+
+export interface LeadProductItem {
+  spuRef: string
+  spuName: string
+  skuRef?: string
+  skuName?: string
+  primary: boolean
 }
 
 export interface UploadResult {
@@ -91,17 +110,46 @@ export interface UploadResult {
 }
 
 export interface SupplementParams {
-  provinceCode?: string
-  cityCode?: string
-  leadCategory?: string
-  intendedProducts?: IntendedProduct[]
+  provinceCode: string
+  cityCode: string
+  leadCategory: string
+  intendedProducts: IntendedProduct[]
   remark?: string
   idempotencyKey: string
 }
 
 /** 获取字典数据 */
 export function getDictByType(type: string) {
-  return request.get<never, DictItem[]>('/system/dict-data/type', { params: { type } })
+  return referenceRequest.get<never, DictItem[]>('/system/dict-data/type', { params: { type } })
+}
+
+interface AreaApiNode {
+  id: number
+  name: string
+  selectionCode?: string
+  leafSelectable?: boolean
+  children?: AreaApiNode[]
+}
+
+export interface LeadAreaNode {
+  code: string
+  name: string
+  leafSelectable?: boolean
+  children?: LeadAreaNode[]
+}
+
+function normalizeAreaNode(node: AreaApiNode): LeadAreaNode {
+  return {
+    code: node.selectionCode || String(node.id),
+    name: node.name,
+    leafSelectable: node.leafSelectable,
+    children: node.children?.map(normalizeAreaNode)
+  }
+}
+
+export async function getAreaTree() {
+  const nodes = await referenceRequest.get<never, AreaApiNode[]>('/system/area/tree')
+  return nodes.map(normalizeAreaNode)
 }
 
 /** 获取课程目录 */

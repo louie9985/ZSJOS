@@ -63,6 +63,12 @@ license to hard-code tenant assumptions into business components.
 
 The partner frontend uses `/app-api/zsjos/**`, but partner identities remain tenant-scoped System ADMIN users. `yudao.web.app-api-admin-prefixes` contains only `/zsjos/`, so this narrow app-api partition resolves ADMIN tokens while every other `/app-api/**` route retains the standard MEMBER identity. Partner login and refresh additionally require the stable `part_time_partner` role; feature permissions and service-level ownership checks remain cumulative. Admin and workbench routes under `/admin-api/**` are unchanged.
 
+The H5 System reference-data client is deliberately separate from the authenticated business client. It calls `GET /app-api/system/dict-data/type` and `GET /app-api/system/area/tree` with `tenant-id` only and removes `Authorization`; those public System endpoints therefore cannot misinterpret an ADMIN token as a MEMBER token. Reference-data failures are visible and retryable. The retained WeCom login entry is an unavailable product path only: it starts no OAuth flow and calls no backend login endpoint until a later approved integration.
+
+Partner role grants are resolved by stable permission code. Numeric menu IDs are not authorization identities and must not be reused to infer or assign partner permissions. The partner role must not inherit work-plan permissions through menu-ID collisions, and finance review remains an explicitly assigned administrator capability rather than a default partner grant.
+
+V071 makes the partner and selected review/finance roles declarative allowlists, gives `finance_manager` and `finance_specialist` the same finance permissions, preserves administrator withdrawal as read-only, and intentionally removes ZSJOS permissions from roles whose ZSJOS domains are not implemented. The complete 34-role target is recorded in `zsjos-role-permission-matrix.md`. App-only or orphaned partner permission buttons are non-routable metadata; V071 does not recreate the retired `partner-portal` administrator page.
+
 Account-password login accepts either the tenant-scoped username or mobile number. New usernames
 are 4-32 letters, digits, or underscores; newly set passwords are 8-20 characters and contain both
 letters and digits. Login validation deliberately remains compatible with historical password hashes.
@@ -116,6 +122,8 @@ Workbench lazy loading uses the additive `/system/notify-message/my-cursor` cont
 `list`, `nextCursor`, and `hasMore`, with server ordering `create_time DESC, id DESC`; the legacy
 page contract remains for compatibility.
 WebSocket events are refresh hints, while the persisted message page remains authoritative.
+
+The partner H5 exposes the same persisted personal messages through `/app-api/zsjos/messages/**`. The Controller requires the `part_time_partner` role and supplies the authenticated ADMIN user ID/type to every page, detail, read, and unread-count service call. Message ownership is therefore checked per record; no per-role message menu permission is copied into the ZSJOS matrix.
 
 Business notification templates are global system configuration, while notification rules and
 specified recipients are tenant-scoped. A tenant rule may select only a registered business scene,
@@ -193,6 +201,7 @@ These concepts are related but not interchangeable:
 - A post describes an organizational job assignment. The same post definition may be used where the confirmed business model allows it; its name alone does not grant permissions.
 - A role groups menu and operation permissions. Users receive effective permissions through backend role assignments and framework rules.
 - Menus determine authorized navigation metadata; button or operation permissions protect actions.
+- BPM model import is exposed only by the server-owned `bpm:model:import` button permission under the standard BPM model menu. The permission definition does not grant any role; BPM publisher roles receive it through normal System role administration.
 
 Frontend code must not derive a role from a department or post name, or derive a post
 from a role name. Initialization SQL must create and connect each confirmed entity using
@@ -319,7 +328,10 @@ otherwise
 - 收件箱归类是对客资主状态和分配状态的只读投影，不是新的持久化状态。前端只能展示服务端返回的筛选项，不得自行补齐尚未实现的跟进、申诉、机会或订单状态。
 - 客资状态由后端拆分投影：`qualificationStatus` 表示待判定大类/已判有效/已判无效，`followUpStatus` 表示待首跟/跟进中/成交待审核/已成交，`handlingStage` 进一步区分待分配、待接单、待首跟和有效性判定计时中，`assignmentStatus` 表示分配生命周期，`operationalStatus` 表示挂起等控制状态。有效性判定计时从当前归属周期首次跟进成功开始；前端不得根据 `status`、分配字段或机会状态自行拼装按钮和用户状态，写操作只能消费 `availableActions`，任务提醒按 `handlingStage` 和对应非空截止时间展示。
 - Full submitted mobile and WeChat values are returned to an authorized submitter,
-  owner, or `query-all` administrator. Frontends must not broaden that authorization.
+  owner, or `query-all` administrator. After automatic assignment, ordinary submitter
+  and owner views blind the counterpart employee identity (name and user ID); the
+  submitting user, owner-department managers, and `query-all` administrators retain
+  the complete employee identity. Frontends must not broaden either authorization.
 - `query-all` is an explicit permission-based bypass for the current tenant; it is
   never inferred from a role, post, department, or display name.
 - Team visibility is resolved from current System department leader relationships, not
@@ -393,7 +405,7 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
 - Before qualification, append-only follow-up records belong to Lead. Only the current owner can create them; the submitter, current owner, leaders of the owner's department hierarchy, and `zsjos:lead:query-all` may read them. After qualification creates an Opportunity, subsequent sales follow-up belongs to Opportunity instead.
 - `lead_first_follow_up` and `lead_follow_up_reminder` are completed or replaced only by the lead follow-up transaction. The employee today-task APIs are assignee-scoped and expose stable action codes rather than a generic completion endpoint.
 - 跟进备注和下次跟进时间均为必填，下次时间必须晚于当前时间。无效客资不再允许新增跟进；判无效及成交订单最终生效会取消未完成的首次跟进、下次跟进和适用的判定任务，并清空 Lead/Opportunity 当前下次跟进投影，历史跟进记录保持不变。
-- 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 阶段配置。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。直属主管只取销售当前部门负责人，不向上级部门递归。
+- 首次跟进、下次跟进和有效性判定提醒使用 System 租户通知规则中的 `advance/due/overdue` 内部阶段值。ZSJOS 扫描仍为 pending 的业务任务，按当前规则发送最紧急的适用阶段，并在 `zsjos_business_task_notify_stage` 中按内部阶段值做任务/阶段幂等；配置变化立即影响未发送阶段，已经处理的阶段不补发或重写。消息展示边界将三个阶段转换为“即将到期/已到期/已逾期”，系统默认规则分别使用阶段化中文标题、摘要和正文，不向用户暴露内部英文值；管理员自定义模板仍由 System 配置管理。直属主管只取销售当前部门负责人，不向上级部门递归。
 - Business editing overlays have presentation priority over assignment prompts. An assignment may continue to expire on the server while the workbench defers its modal, so reconnect, focus refresh and polling always reload server truth.
 
 ### Subordinate-sales management

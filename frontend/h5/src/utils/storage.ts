@@ -1,6 +1,7 @@
 const TOKEN_KEY = 'h5_access_token'
 const REFRESH_TOKEN_KEY = 'h5_refresh_token'
 const TENANT_KEY = 'h5_tenant_id'
+const CLIENT_ID_KEY = 'h5_oauth2_client_id'
 
 export function getToken(): string {
   return localStorage.getItem(TOKEN_KEY) || ''
@@ -32,4 +33,16 @@ export function getTenantId(): string {
 
 export function setTenantId(id: string): void {
   localStorage.setItem(TENANT_KEY, id)
+}
+
+export function getClientId(): string {
+  return localStorage.getItem(CLIENT_ID_KEY) || 'zsjos-mobile'
+}
+
+export function setClientId(clientId: string): void {
+  localStorage.setItem(CLIENT_ID_KEY, clientId)
+}
+
+export function removeClientId(): void {
+  localStorage.removeItem(CLIENT_ID_KEY)
 }

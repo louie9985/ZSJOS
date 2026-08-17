@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canReviewSalesOrderTask, mergeSalesOrderListItems, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
+import { buildDictionaryLabelMap, canReviewSalesOrderTask, mergeSalesOrderListItems, resolveDictionaryLabel, salesOrderDetailToListItem, salesOrderTaskKey, validateSalesOrderSubmission } from './salesOrder'
 import type { SalesOrder, SalesOrderApprovalStatus, SalesOrderListItem } from './api'
 
 describe('validateSalesOrderSubmission', () => {
@@ -56,5 +56,24 @@ describe('sales-order inbox helpers', () => {
     expect(canReviewSalesOrderTask(order, task)).toBe(true)
     order.registrationApproval = { status: 'approved', reviewerUserId: 233, reviewerUserName: '审核员甲', endTime: 1 }
     expect(canReviewSalesOrderTask(order, task)).toBe(false)
+  })
+})
+
+describe('sales-order dictionary labels', () => {
+  const labels = buildDictionaryLabelMap([
+    { dictType: 'zsjos_order_fee_mode', value: 'retail', label: '零售缴费' },
+    { dictType: 'zsjos_order_payment_method', value: 'learning_qr', label: '学习二维码' }
+  ])
+
+  it('shows backend-owned labels without exposing stable values', () => {
+    expect(resolveDictionaryLabel('retail', labels, 'ready')).toBe('零售缴费')
+    expect(resolveDictionaryLabel('learning_qr', labels, 'ready')).toBe('学习二维码')
+  })
+
+  it('distinguishes loading, failed, missing, and empty values', () => {
+    expect(resolveDictionaryLabel('retail', labels, 'loading')).toBe('标签加载中')
+    expect(resolveDictionaryLabel('retail', labels, 'error')).toBe('标签加载失败')
+    expect(resolveDictionaryLabel('unknown', labels, 'ready')).toBe('标签未配置')
+    expect(resolveDictionaryLabel(undefined, labels, 'ready')).toBe('-')
   })
 })

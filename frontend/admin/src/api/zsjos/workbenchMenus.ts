@@ -2,6 +2,7 @@ import request from '@/config/axios'
 
 export interface WorkbenchListItem {
   id: number
+  leadNo?: string
   name?: string
   submittedName?: string
   studentName?: string

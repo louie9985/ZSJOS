@@ -3844,7 +3844,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_customer_account_ledger` (
 
 -- zsjos_lead
 CREATE TABLE IF NOT EXISTS `zsjos_lead` (
-  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '客资编号',
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '内部客资ID',
   `lead_no` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资业务编号',
   `person_id` bigint NOT NULL COMMENT 'Person 编号',
   `submitted_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '表单原始姓名',

@@ -755,7 +755,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         processReq.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
         processReq.setBusinessKey(BUSINESS_KEY_PREFIX + order.getId());
         Map<String, Object> variables = new LinkedHashMap<>();
-        variables.put("orderId", order.getId()); variables.put("leadId", order.getLeadId()); variables.put("personId", order.getPersonId()); variables.put("roundNo", roundNo);
+        LeadDO processLead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
+        variables.put("orderId", order.getId()); variables.put("leadId", order.getLeadId());
+        variables.put("leadNo", processLead == null ? null : processLead.getLeadNo());
+        variables.put("personId", order.getPersonId()); variables.put("roundNo", roundNo);
         variables.put("registrationUsers", registrationUsers); variables.put("financeUsers", financeUsers);
         processReq.setVariables(variables);
         processReq.setStartUserSelectAssignees(Map.of(TASK_REGISTRATION, registrationUsers, TASK_FINANCE, financeUsers));

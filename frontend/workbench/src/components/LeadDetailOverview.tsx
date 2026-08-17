@@ -503,8 +503,8 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                     <span className="lead-field-value">{lead.submittedName}</span>
                   </div>
                   <div className="lead-profile-row">
-                    <span className="lead-field-label">编号</span>
-                    <span className="lead-field-value">#{lead.id}</span>
+                    <span className="lead-field-label">客资编号</span>
+                    <span className="lead-field-value">{lead.leadNo}</span>
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">手机号</span>

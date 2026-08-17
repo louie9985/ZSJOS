@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getToken, setToken, removeToken, getRefreshToken, setRefreshToken, removeRefreshToken } from '@/utils/storage'
+import {
+  getToken, setToken, removeToken, getRefreshToken, setRefreshToken, removeRefreshToken,
+  setClientId, removeClientId
+} from '@/utils/storage'
 
 export const useUserStore = defineStore('user', () => {
   const accessToken = ref(getToken())
@@ -12,11 +15,12 @@ export const useUserStore = defineStore('user', () => {
 
   const isLoggedIn = computed(() => !!accessToken.value)
 
-  function setTokens(access: string, refresh: string) {
+  function setTokens(access: string, refresh: string, clientId?: string) {
     accessToken.value = access
     refreshToken.value = refresh
     setToken(access)
     setRefreshToken(refresh)
+    if (clientId) setClientId(clientId)
   }
 
   function setUserInfo(info: { userId: number; nickname: string; avatar?: string; permissions?: string[] }) {
@@ -35,6 +39,7 @@ export const useUserStore = defineStore('user', () => {
     permissions.value = []
     removeToken()
     removeRefreshToken()
+    removeClientId()
   }
 
   return {

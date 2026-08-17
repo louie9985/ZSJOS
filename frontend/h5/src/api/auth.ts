@@ -37,13 +37,6 @@ export function logout() {
   return request.post<never, void>('/zsjos/auth/logout')
 }
 
-/** 刷新 Token */
-export function refreshToken(refreshToken: string, clientId?: string) {
-  return request.post<never, LoginResult>('/zsjos/auth/refresh-token', null, {
-    params: { refreshToken, clientId }
-  })
-}
-
 /** 获取权限信息 */
 export function getPermissionInfo() {
   return request.get<never, PermissionInfo>('/zsjos/auth/permission-info')

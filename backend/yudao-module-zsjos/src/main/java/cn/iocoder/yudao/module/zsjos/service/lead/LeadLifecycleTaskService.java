@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRuleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import jakarta.annotation.Resource;
@@ -19,12 +20,13 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 public class LeadLifecycleTaskService {
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private BusinessEventMapper eventMapper;
+    @Resource private LeadMapper leadMapper;
     @Resource private LeadFollowUpRuleService followUpRuleService;
 
     public void createAssignmentTask(Long leadId, Long assigneeId, Long assignmentHistoryId,
                                      LocalDateTime dueAt, String dispatchMode) {
         taskCommandService.create(command(TASK_TYPE_ASSIGNMENT_ACCEPT, leadId, assigneeId,
-                "待接客资：客资 #" + leadId, "OPEN_LEAD_ASSIGNMENT", dueAt,
+                "待接客资：" + leadNumber(leadId), "OPEN_LEAD_ASSIGNMENT", dueAt,
                 JsonUtils.toJsonString(Map.of("assignmentHistoryId", assignmentHistoryId,
                         "dispatchMode", dispatchMode)), "lead-assignment-accept:" + assignmentHistoryId));
     }
@@ -44,7 +46,7 @@ public class LeadLifecycleTaskService {
         int timeoutMinutes = rule.getFirstFollowUpTimeoutMinutes();
         LocalDateTime dueAt = ownershipStartedAt.plusMinutes(timeoutMinutes);
         taskCommandService.create(command(TASK_TYPE_FIRST_FOLLOW_UP, leadId, assigneeId,
-                "首次跟进：客资 #" + leadId, "OPEN_LEAD_FOLLOW_UP", dueAt,
+                "首次跟进：" + leadNumber(leadId), "OPEN_LEAD_FOLLOW_UP", dueAt,
                 JsonUtils.toJsonString(Map.of("assignmentHistoryId", assignmentHistoryId,
                         "ruleId", rule.getId(), "ruleVersion", rule.getVersion() == null ? 0 : rule.getVersion(),
                         "timeoutMinutes", timeoutMinutes, "ownershipStartedAt", ownershipStartedAt.toString())),
@@ -67,7 +69,7 @@ public class LeadLifecycleTaskService {
         taskCommandService.complete(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId, changedAt);
         if (dueAt == null) return;
         taskCommandService.create(command(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId,
-                "跟进提醒：客资 #" + leadId, "OPEN_LEAD_FOLLOW_UP", dueAt,
+                "跟进提醒：" + leadNumber(leadId), "OPEN_LEAD_FOLLOW_UP", dueAt,
                 JsonUtils.toJsonString(Map.of(
                 "followUpRecordScope", recordScope,
                 "followUpRecordId", recordId)),
@@ -141,7 +143,12 @@ public class LeadLifecycleTaskService {
 
     private String leadName(LeadDO lead) {
         return lead.getSubmittedName() == null || lead.getSubmittedName().isBlank()
-                ? "客资 #" + lead.getId() : lead.getSubmittedName();
+                ? lead.getLeadNo() : lead.getSubmittedName();
+    }
+
+    private String leadNumber(Long leadId) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        return lead == null || lead.getLeadNo() == null ? "客资记录不可用" : lead.getLeadNo();
     }
 
     private String qualificationTaskKey(Long leadId, int roundNo) {

@@ -1,7 +1,7 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { showToast } from 'vant'
 import { useUserStore } from '@/stores/user'
-import { getToken, getTenantId, getRefreshToken } from '@/utils/storage'
+import { getToken, getTenantId, getRefreshToken, getClientId } from '@/utils/storage'
 import router from '@/router'
 
 /** 统一响应结构 */
@@ -26,26 +26,70 @@ request.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   return config
 })
 
-// 是否正在刷新 token
-let isRefreshing = false
-let refreshSubscribers: Array<(token: string) => void> = []
+type RetryableConfig = InternalAxiosRequestConfig & { _authRetried?: boolean }
+let refreshPromise: Promise<string> | null = null
+let redirectingToLogin = false
 
-function subscribeTokenRefresh(cb: (token: string) => void) {
-  refreshSubscribers.push(cb)
+function clearAuthentication() {
+  useUserStore().logout()
+  if (!redirectingToLogin) {
+    redirectingToLogin = true
+    void router.replace({ name: 'Login' }).finally(() => { redirectingToLogin = false })
+  }
 }
 
-function onTokenRefreshed(token: string) {
-  refreshSubscribers.forEach(cb => cb(token))
-  refreshSubscribers = []
+async function refreshAccessToken(): Promise<string> {
+  if (refreshPromise) return refreshPromise
+  const refreshToken = getRefreshToken()
+  if (!refreshToken) {
+    clearAuthentication()
+    throw new Error('登录已失效')
+  }
+  refreshPromise = axios.post<ApiResponse<{
+    accessToken: string
+    refreshToken: string
+    clientId?: string
+  }>>(`${import.meta.env.VITE_APP_BASE_API}/zsjos/auth/refresh-token`, null, {
+    params: { refreshToken, clientId: getClientId() },
+    headers: { 'tenant-id': getTenantId() }
+  }).then((response) => {
+    if (response.data.code !== 0 || !response.data.data?.accessToken) {
+      throw new Error(response.data.msg || '登录已失效')
+    }
+    const result = response.data.data
+    useUserStore().setTokens(result.accessToken, result.refreshToken, result.clientId || getClientId())
+    return result.accessToken
+  }).catch((error) => {
+    clearAuthentication()
+    throw error
+  }).finally(() => {
+    refreshPromise = null
+  })
+  return refreshPromise
+}
+
+async function recoverAndReplay(config: RetryableConfig) {
+  if (config._authRetried) {
+    clearAuthentication()
+    throw new Error('登录已失效')
+  }
+  config._authRetried = true
+  const token = await refreshAccessToken()
+  config.headers.Authorization = `Bearer ${token}`
+  return request(config)
 }
 
 // 响应拦截器
 request.interceptors.response.use(
-  (response: AxiosResponse<ApiResponse>) => {
+  async (response: AxiosResponse<ApiResponse>) => {
     const { code, msg, data } = response.data
 
     if (code === 0) {
       return data as unknown as AxiosResponse
+    }
+
+    if (code === 401) {
+      return recoverAndReplay(response.config as RetryableConfig)
     }
 
     // 业务错误
@@ -56,49 +100,8 @@ request.interceptors.response.use(
     const { response, config } = error
 
     // 401: Token 过期
-    if (response?.status === 401) {
-      const userStore = useUserStore()
-      const refreshTokenValue = getRefreshToken()
-
-      if (!refreshTokenValue) {
-        userStore.logout()
-        router.replace({ name: 'Login' })
-        return Promise.reject(error)
-      }
-
-      if (!isRefreshing) {
-        isRefreshing = true
-        try {
-          const res = await axios.post<ApiResponse<{ accessToken: string; refreshToken: string }>>(
-            `${import.meta.env.VITE_APP_BASE_API}/zsjos/auth/refresh-token`,
-            null,
-            { params: { refreshToken: refreshTokenValue } }
-          )
-          if (res.data.code === 0) {
-            const { accessToken, refreshToken } = res.data.data
-            userStore.setTokens(accessToken, refreshToken)
-            onTokenRefreshed(accessToken)
-            isRefreshing = false
-            // 重试原请求
-            config.headers.Authorization = `Bearer ${accessToken}`
-            return request(config)
-          }
-        } catch {
-          // refresh 也失败了
-        }
-        isRefreshing = false
-        userStore.logout()
-        router.replace({ name: 'Login' })
-        return Promise.reject(error)
-      }
-
-      // 排队等待刷新完成
-      return new Promise(resolve => {
-        subscribeTokenRefresh((token) => {
-          config.headers.Authorization = `Bearer ${token}`
-          resolve(request(config))
-        })
-      })
+    if (response?.status === 401 && config) {
+      return recoverAndReplay(config as RetryableConfig)
     }
 
     // 403

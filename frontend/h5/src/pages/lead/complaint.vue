@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showToast } from 'vant'
 import { createComplaint, uploadLeadAttachment } from '@/api/lead'
 import ImageUploader from '@/components/ImageUploader.vue'
+import { createIdempotencyKey } from '@/utils/idempotency'
 
 defineOptions({ name: 'LeadComplaint' })
 
@@ -26,7 +27,7 @@ async function handleSubmit() {
     await createComplaint(leadId, {
       reason: reason.value.trim(),
       evidenceFileIds,
-      idempotencyKey: crypto.randomUUID()
+      idempotencyKey: createIdempotencyKey()
     })
     showSuccessToast('投诉已提交')
     router.back()

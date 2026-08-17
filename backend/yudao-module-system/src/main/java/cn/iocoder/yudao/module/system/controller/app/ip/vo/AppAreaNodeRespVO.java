@@ -15,6 +15,12 @@ public class AppAreaNodeRespVO {
     @Schema(description = "名字", requiredMode = Schema.RequiredMode.REQUIRED, example = "北京")
     private String name;
 
+    @Schema(description = "业务提交编码")
+    private String selectionCode;
+
+    @Schema(description = "省级节点是否允许直接选择")
+    private Boolean leafSelectable;
+
     /**
      * 子节点
      */

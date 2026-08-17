@@ -23,7 +23,7 @@ const filterParams = () => {
   return params
 }
 
-const { list, loading, refreshing, finished, loadMore, refresh } = usePageList(
+const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
   (params) => getWithdrawalPage(params as Parameters<typeof getWithdrawalPage>[0]),
   filterParams
 )
@@ -58,18 +58,21 @@ const statusMap: Record<string, { text: string; color: string }> = {
       <van-list v-model:loading="loading" :finished="finished" finished-text="没有更多了" @load="loadMore">
         <div v-for="item in list" :key="item.id" class="card withdrawal-item" @click="goDetail(item.id)">
           <div class="withdrawal-item__header">
-            <span class="withdrawal-item__amount">¥{{ formatAmount(item.amount) }}</span>
+            <span class="withdrawal-item__amount">¥{{ formatAmount(item.applicationAmount) }}</span>
             <span class="withdrawal-item__status" :style="{ color: statusMap[item.status]?.color }">
               {{ statusMap[item.status]?.text || item.status }}
             </span>
           </div>
           <div class="withdrawal-item__footer">
-            <span>{{ item.bankName }} · {{ item.maskedCardNumber }}</span>
-            <span>{{ formatDateTime(item.createdAt) }}</span>
+            <span>{{ item.bankNameSnapshot }} · {{ item.maskedCardNumber }}</span>
+            <span>{{ formatDateTime(item.submittedAt) }}</span>
           </div>
         </div>
 
-        <van-empty v-if="!loading && list.length === 0" description="暂无提现记录" />
+        <van-empty v-if="!loading && error" :description="error" image="error">
+          <van-button type="primary" round size="small" @click="refresh">重新加载</van-button>
+        </van-empty>
+        <van-empty v-if="!loading && !error && list.length === 0" description="暂无提现记录" />
       </van-list>
     </van-pull-refresh>
   </div>

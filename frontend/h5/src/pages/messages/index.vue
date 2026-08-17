@@ -10,7 +10,7 @@ defineOptions({ name: 'Messages' })
 const router = useRouter()
 const unreadCount = ref(0)
 
-const { list, loading, refreshing, finished, loadMore, refresh } = usePageList(
+const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
   (params) => getMessagePage(params),
   undefined,
   { immediate: true }
@@ -19,14 +19,16 @@ const { list, loading, refreshing, finished, loadMore, refresh } = usePageList(
 onMounted(async () => {
   try {
     unreadCount.value = await getUnreadCount()
-  } catch { /* ignore */ }
+  } catch {
+    unreadCount.value = 0
+  }
 })
 
 function goDetail(item: MessageItem) {
   // 标记已读
-  if (!item.read) {
+  if (!item.readStatus) {
     markRead([item.id]).catch(() => {})
-    item.read = true
+    item.readStatus = true
     if (unreadCount.value > 0) unreadCount.value--
   }
 
@@ -57,23 +59,26 @@ const typeIcon: Record<string, string> = {
         <van-cell
           v-for="item in list"
           :key="item.id"
-          :title="item.title"
-          :label="formatDateTime(item.createdAt)"
+          :title="item.templateTitle"
+          :label="formatDateTime(item.createTime)"
           clickable
           @click="goDetail(item)"
         >
           <template #icon>
             <div class="msg-icon-wrap">
-              <van-icon :name="typeIcon[item.type] || 'bell'" size="20" color="var(--h5-primary)" />
-              <div v-if="!item.read" class="msg-dot" />
+              <van-icon :name="typeIcon[item.bizType || ''] || 'bell'" size="20" color="var(--h5-primary)" />
+              <div v-if="!item.readStatus" class="msg-dot" />
             </div>
           </template>
           <template #value>
-            <span class="msg-preview">{{ item.content }}</span>
+            <span class="msg-preview">{{ item.templateSummary || item.templateContent }}</span>
           </template>
         </van-cell>
 
-        <van-empty v-if="!loading && list.length === 0" description="暂无消息" image="default" />
+        <van-empty v-if="!loading && !error && list.length === 0" description="暂无消息" image="default" />
+        <van-empty v-if="!loading && error" :description="error" image="error">
+          <van-button size="small" type="primary" @click="refresh">重新加载</van-button>
+        </van-empty>
       </van-list>
     </van-pull-refresh>
   </div>

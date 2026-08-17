@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
-import { getLeadCatalog, createLead, type LeadCatalog, type LeadCreateResult } from '@/api/lead'
+import { getAreaTree, getLeadCatalog, createLead, type LeadCatalog, type LeadCreateResult } from '@/api/lead'
 import { useDict } from '@/composables/useDict'
 import type { DictItem } from '@/stores/app'
 import type { AreaNode } from '@/components/AreaPicker.vue'
@@ -10,7 +10,8 @@ import type { SelectedProduct } from '@/components/ProductPicker.vue'
 import AreaPicker from '@/components/AreaPicker.vue'
 import ProductPicker from '@/components/ProductPicker.vue'
 import ImageUploader from '@/components/ImageUploader.vue'
-import request from '@/api/request'
+import { formatLeadNo } from '@/utils/format'
+import { createIdempotencyKey } from '@/utils/idempotency'
 
 defineOptions({ name: 'LeadSubmit' })
 
@@ -21,6 +22,7 @@ const { loadSourceChannels, loadLeadCategories } = useDict()
 const currentStep = ref(0)
 const submitting = ref(false)
 const dataLoading = ref(true)
+const dataError = ref('')
 
 // 表单数据
 const form = reactive({
@@ -47,24 +49,28 @@ const uploaderRef = ref<InstanceType<typeof ImageUploader>>()
 const submitResult = ref<LeadCreateResult>()
 
 // --- Init ---
-onMounted(async () => {
+async function loadConfiguration() {
+  dataLoading.value = true
+  dataError.value = ''
   try {
     const [catalogData, sources, categories, areaData] = await Promise.all([
       getLeadCatalog(),
       loadSourceChannels(),
       loadLeadCategories(),
-      request.get<never, AreaNode[]>('/zsjos/lead/area-tree').catch(() => [] as AreaNode[])
+      getAreaTree()
     ])
     catalog.value = catalogData
     sourceChannels.value = sources
     leadCategories.value = categories
     areaTree.value = areaData
   } catch {
-    showToast('加载配置失败，请重试')
+    dataError.value = '配置加载失败，请重试'
   } finally {
     dataLoading.value = false
   }
-})
+}
+
+onMounted(loadConfiguration)
 
 // --- Steps ---
 const steps = [
@@ -133,12 +139,14 @@ async function handleSubmit() {
       remark: form.remark.trim() || undefined,
       attachments: attachmentIds.map(id => ({ infraFileId: id })),
       dispatchMode: 'auto',
-      idempotencyKey: crypto.randomUUID()
+      idempotencyKey: createIdempotencyKey()
     })
     submitResult.value = result
     currentStep.value = 4 // 结果页
-  } catch {
-    // 错误已由拦截器处理
+  } catch (cause) {
+    if (cause instanceof TypeError) {
+      showToast({ message: cause.message || '提交失败，请重试', type: 'fail' })
+    }
   } finally {
     submitting.value = false
   }
@@ -168,10 +176,10 @@ function goDetail() {
 const outcomeInfo = computed(() => {
   if (!submitResult.value) return null
   const map: Record<string, { icon: string; color: string; title: string; desc: string }> = {
-    activated: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: `客资编号：${submitResult.value.leadNo}` },
+    activated: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: formatLeadNo(submitResult.value.leadNo) },
     review_pending: { icon: 'info-o', color: 'var(--h5-warning)', title: '疑似重复，已进入复核', desc: `复核单号：#${submitResult.value.reviewId}` },
     duplicate_rejected: { icon: 'close', color: 'var(--h5-danger)', title: '提交被拒绝', desc: '已有相同活动客资，本次提交未创建' },
-    duplicate_auto_closed: { icon: 'info-o', color: 'var(--h5-info)', title: '历史重复', desc: `已有客资：${submitResult.value.leadNo}` }
+    duplicate_auto_closed: { icon: 'info-o', color: 'var(--h5-info)', title: '历史重复', desc: formatLeadNo(submitResult.value.leadNo) }
   }
   return map[submitResult.value.outcome] || map.activated
 })
@@ -197,6 +205,10 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
     <div v-if="dataLoading" style="padding: 60px; text-align: center;">
       <van-loading size="36" color="var(--h5-primary)">加载配置中...</van-loading>
     </div>
+
+    <van-empty v-else-if="dataError" :description="dataError" image="error">
+      <van-button size="small" type="primary" @click="loadConfiguration">重新加载</van-button>
+    </van-empty>
 
     <template v-else>
       <!-- Step 1: 客户信息 -->

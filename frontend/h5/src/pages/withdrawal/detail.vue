@@ -13,15 +13,22 @@ const id = Number(route.params.id)
 
 const detail = ref<WithdrawalItem>()
 const loading = ref(true)
+const loadError = ref('')
 const cancelling = ref(false)
 
-onMounted(async () => {
+async function loadDetail() {
+  loading.value = true
+  loadError.value = ''
   try {
     detail.value = await getWithdrawalDetail(id)
+  } catch (cause) {
+    loadError.value = cause instanceof Error ? cause.message : '提现详情加载失败'
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadDetail)
 
 async function handleCancel() {
   try {
@@ -51,9 +58,12 @@ const statusMap: Record<string, { text: string; color: string }> = {
     <van-nav-bar title="提现详情" left-arrow @click-left="$router.back()" />
 
     <van-skeleton :loading="loading" :row="6" style="padding: 16px;">
+      <van-empty v-if="loadError" :description="loadError" image="error">
+        <van-button size="small" type="primary" @click="loadDetail">重新加载</van-button>
+      </van-empty>
       <template v-if="detail">
         <div class="card detail-amount-card">
-          <div class="detail-amount">¥{{ formatAmount(detail.amount) }}</div>
+          <div class="detail-amount">¥{{ formatAmount(detail.applicationAmount) }}</div>
           <div class="detail-status" :style="{ color: statusMap[detail.status]?.color }">
             {{ statusMap[detail.status]?.text || detail.status }}
           </div>
@@ -61,9 +71,9 @@ const statusMap: Record<string, { text: string; color: string }> = {
 
         <div class="card">
           <van-cell-group :border="false">
-            <van-cell title="收款银行" :value="detail.bankName" />
+            <van-cell title="收款银行" :value="detail.bankNameSnapshot" />
             <van-cell title="卡号" :value="detail.maskedCardNumber" />
-            <van-cell title="申请时间" :value="formatDateTime(detail.createdAt)" />
+            <van-cell title="申请时间" :value="formatDateTime(detail.submittedAt)" />
           </van-cell-group>
         </div>
 

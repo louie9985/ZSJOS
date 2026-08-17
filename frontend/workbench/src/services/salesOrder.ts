@@ -1,4 +1,17 @@
-import type { SalesOrder, SalesOrderListItem } from './api'
+import type { DictData, SalesOrder, SalesOrderListItem } from './api'
+
+export type DictionaryLoadState = 'loading' | 'ready' | 'error'
+
+export function buildDictionaryLabelMap(items: DictData[]) {
+  return new Map(items.map(item => [item.value, item.label]))
+}
+
+export function resolveDictionaryLabel(value: string | undefined, labels: Map<string, string>, state: DictionaryLoadState) {
+  if (!value) return '-'
+  if (state === 'loading') return '标签加载中'
+  if (state === 'error') return '标签加载失败'
+  return labels.get(value) || '标签未配置'
+}
 
 export function validateSalesOrderSubmission(
   mobile: string | undefined,

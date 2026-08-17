@@ -93,6 +93,7 @@ export default function LeadQualificationExceptionPage() {
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
     <Spin spinning={loading}>
       <Table rowKey="id" dataSource={items} pagination={false} locale={{ emptyText: <Empty description="暂无异常客资"/> }} scroll={{ x: 860 }} columns={[
+        { title: '客资编号', dataIndex: 'leadNo', width: 220 },
         { title: '客户', key: 'name', render: (_, row) => <div><strong>{row.submittedName}</strong><div>{row.submittedMobile || '无手机号'}</div></div> },
         { title: '阶段', dataIndex: 'handlingStage', render: value => <Tag color="warning">{LEAD_HANDLING_STAGE_LABELS[value] || '未知处理阶段'}</Tag> },
         { title: type === 'suspended' ? '当前销售' : '回收来源销售', key: 'owner', render: (_, row) => type === 'suspended' ? row.ownerUserName || `用户 #${row.ownerUserId}` : row.recycleSourceOwnerUserName || `用户 #${row.recycleSourceOwnerUserId}` },

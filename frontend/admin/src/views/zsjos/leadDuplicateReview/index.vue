@@ -24,7 +24,7 @@ const leadCandidates = computed(() => {
       .filter((item) => item.leadId)
       .map((item) => ({
         value: item.leadId!,
-        label: `${item.leadNo || `内部记录 ${item.leadId}`} · ${item.personName} · ${item.leadStatus || '未知状态'}`
+        label: `${item.leadNo || '编号不可用'} · ${item.personName} · ${item.leadStatus || '未知状态'}`
       }))
   } catch {
     return []

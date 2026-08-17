@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -108,8 +109,13 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         BpmProcessInstanceCreateReqDTO process = new BpmProcessInstanceCreateReqDTO();
         process.setProcessDefinitionKey(PROCESS_DEFINITION_KEY);
         process.setBusinessKey("lead-transfer:" + record.getId());
-        process.setVariables(Map.of("requestId", record.getId(), "leadId", leadId,
-                "fromOwnerUserId", lead.getOwnerUserId(), "requestedOwnerUserId", requesterUserId));
+        Map<String, Object> processVariables = new LinkedHashMap<>();
+        processVariables.put("requestId", record.getId());
+        processVariables.put("leadId", leadId);
+        processVariables.put("leadNo", lead.getLeadNo());
+        processVariables.put("fromOwnerUserId", lead.getOwnerUserId());
+        processVariables.put("requestedOwnerUserId", requesterUserId);
+        process.setVariables(processVariables);
         process.setStartUserSelectAssignees(Map.of(TASK_DEFINITION_KEY, List.of(dept.getLeaderUserId())));
         try {
             record.setProcessInstanceId(processInstanceApi.createProcessInstance(requesterUserId, process));

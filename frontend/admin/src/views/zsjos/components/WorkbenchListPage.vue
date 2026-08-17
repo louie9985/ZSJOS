@@ -29,10 +29,14 @@
     >
     <el-empty v-if="!loading && !rows.length && !error && !unauthorized" description="暂无数据" />
     <el-table v-else v-loading="loading" :data="rows" row-key="id" stripe>
-      <el-table-column label="编号" prop="id" width="100" />
+      <el-table-column :label="numberLabel" :prop="numberField" :width="numberField === 'leadNo' ? 220 : 100" />
       <el-table-column label="名称/客户" min-width="180"
         ><template #default="{ row }">{{
-          row.submittedName || row.studentName || row.nickname || row.name || `记录 #${row.id}`
+          row.submittedName ||
+          row.studentName ||
+          row.nickname ||
+          row.name ||
+          (numberField === 'leadNo' ? '未命名客资' : `记录 #${row.id}`)
         }}</template></el-table-column
       >
       <el-table-column label="状态" prop="status" width="140" />
@@ -63,9 +67,9 @@
   <el-drawer v-model="detailOpen" :title="`${title}详情`" size="520px"
     ><el-descriptions v-if="selected" :column="1" border
       ><el-descriptions-item
-        v-for="(value, key) in selected"
-        :key="String(key)"
-        :label="String(key)"
+        v-for="([key, value]) in detailEntries"
+        :key="key"
+        :label="detailLabel(key)"
         >{{ display(value) }}</el-descriptions-item
       ></el-descriptions
     ></el-drawer
@@ -79,8 +83,10 @@ const props = withDefaults(
     endpoint: string
     description?: string
     query?: Record<string, unknown>
+    numberField?: string
+    numberLabel?: string
   }>(),
-  { description: '服务端数据列表', query: () => ({}) }
+  { description: '服务端数据列表', query: () => ({}), numberField: 'id', numberLabel: '编号' }
 )
 const loading = ref(false)
 const error = ref('')
@@ -91,6 +97,9 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 const selected = ref<MenuApi.WorkbenchListItem>()
 const detailOpen = ref(false)
+const detailEntries = computed(() => Object.entries(selected.value || {})
+  .filter(([key]) => !(props.numberField === 'leadNo' && key === 'id')))
+const detailLabel = (key: string) => key === props.numberField ? props.numberLabel : key
 const formatTime = (value: unknown) =>
   value ? new Date(Number(value)).toLocaleString('zh-CN') : '-'
 const display = (value: unknown) =>

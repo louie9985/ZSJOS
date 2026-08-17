@@ -43,6 +43,7 @@ class ExportTypeProviderTest {
         try (var context = providerContext()) {
             LeadManagementRespVO row = new LeadManagementRespVO();
             row.setId(9_007_199_254_740_993L);
+            row.setLeadNo("KZ202608160000000001");
             row.setSubmittedName("测试客资");
             row.setSubmittedMobile("13800000000");
             when(context.getBean(LeadManagementService.class).getLeadPage(any(), eq(7L)))
@@ -59,7 +60,8 @@ class ExportTypeProviderTest {
                 assertEquals("EXP001", sheet.getRow(1).getCell(0).getStringCellValue());
                 assertEquals("导出人", sheet.getRow(0).getCell(1).getStringCellValue());
                 assertEquals("提交人", sheet.getRow(1).getCell(1).getStringCellValue());
-                assertEquals("9007199254740993", sheet.getRow(1).getCell(3).getStringCellValue());
+                assertEquals("客资编号", sheet.getRow(0).getCell(3).getStringCellValue());
+                assertEquals("KZ202608160000000001", sheet.getRow(1).getCell(3).getStringCellValue());
                 assertEquals("测试客资", sheet.getRow(1).getCell(4).getStringCellValue());
             }
         }

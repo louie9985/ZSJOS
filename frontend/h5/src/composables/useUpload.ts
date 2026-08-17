@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { showToast } from 'vant'
 import { uploadLeadAttachment, type UploadResult } from '@/api/lead'
+import { createIdempotencyKey } from '@/utils/idempotency'
 
 export interface UploadFile {
   id: string
@@ -23,7 +24,7 @@ export function useUpload(maxCount = 9) {
       return
     }
 
-    const id = crypto.randomUUID()
+    const id = createIdempotencyKey()
     const url = URL.createObjectURL(file)
     const item: UploadFile = { id, file, url, status: 'uploading' }
     fileList.value.push(item)

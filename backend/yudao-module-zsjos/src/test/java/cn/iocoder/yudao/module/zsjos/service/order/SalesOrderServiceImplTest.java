@@ -148,7 +148,8 @@ class SalesOrderServiceImplTest {
         assertEquals("key-1", roundCaptor.getValue().getSubmissionIdempotencyKey());
         verify(processInstanceApi).createProcessInstance(eq(20L), argThat(req ->
                 req.getStartUserSelectAssignees().get(TASK_REGISTRATION).size() == 2
-                        && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1));
+                        && req.getStartUserSelectAssignees().get(TASK_FINANCE).size() == 1
+                        && "KZ202608160000000001".equals(req.getVariables().get("leadNo"))));
     }
 
     @Test
@@ -525,10 +526,12 @@ class SalesOrderServiceImplTest {
     }
 
     private void mockEligibleLeadAndOpportunity() {
-        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus("valid");
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setLeadNo("KZ202608160000000001");
+        lead.setPersonId(10L); lead.setOwnerUserId(20L); lead.setStatus("valid");
         OpportunityDO opportunity = new OpportunityDO(); opportunity.setId(30L); opportunity.setLeadId(1L);
         opportunity.setPersonId(10L); opportunity.setOwnerUserId(20L); opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        lenient().when(leadMapper.selectById(1L)).thenReturn(lead);
         lenient().when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
         AreaRespDTO province = new AreaRespDTO();
         province.setId(120000); province.setName("天津市"); province.setType(2); province.setStatus(0); province.setLeafSelectable(true);

@@ -35,6 +35,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.Set;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.*;
@@ -127,7 +128,18 @@ public class CashbackServiceImpl implements CashbackService {
 
     @Override
     public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
-        return BeanUtils.toBean(mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
+        PageResult<CashbackRespVO> result = BeanUtils.toBean(
+                mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
+        Set<Long> leadIds = new HashSet<>();
+        result.getList().stream().map(CashbackRespVO::getLeadId).filter(Objects::nonNull).forEach(leadIds::add);
+        Map<Long, String> leadNumbers = new HashMap<>();
+        if (!leadIds.isEmpty()) {
+            for (LeadDO lead : leadMapper.selectBatchIds(leadIds)) {
+                leadNumbers.put(lead.getId(), lead.getLeadNo());
+            }
+        }
+        result.getList().forEach(item -> item.setLeadNo(leadNumbers.get(item.getLeadId())));
+        return result;
     }
 
     @Override

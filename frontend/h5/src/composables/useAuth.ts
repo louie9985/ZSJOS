@@ -2,11 +2,9 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { login as loginApi, getPermissionInfo } from '@/api/auth'
-import { isInWecom, getWecomCodeFromUrl } from '@/utils/wecom'
-import request from '@/api/request'
 
 /**
- * 认证 composable — 封装企微 OAuth + 密码登录双路径
+ * 兼职端本期仅支持账号密码登录。
  */
 export function useAuth() {
   const router = useRouter()
@@ -17,8 +15,7 @@ export function useAuth() {
   /**
    * 初始化认证：
    * 1. 已有 token → 尝试获取用户信息
-   * 2. 企微环境且 URL 带 code → 用 code 换 token
-   * 3. 否则需要登录
+   * 2. 否则需要登录
    */
   async function initAuth(): Promise<boolean> {
     // 已有 token，验证有效性
@@ -31,43 +28,7 @@ export function useAuth() {
       }
     }
 
-    // 企微环境，检查 URL 中的 OAuth code
-    if (isInWecom()) {
-      const code = getWecomCodeFromUrl()
-      if (code) {
-        return await loginWithWecomCode(code)
-      }
-    }
-
     return false
-  }
-
-  /**
-   * 企微 OAuth code 换 token
-   */
-  async function loginWithWecomCode(code: string): Promise<boolean> {
-    loading.value = true
-    error.value = ''
-    try {
-      const result = await request.post<never, { userId: number; accessToken: string; refreshToken: string }>(
-        '/zsjos/auth/wecom-login',
-        { code }
-      )
-      userStore.setTokens(result.accessToken, result.refreshToken)
-      userStore.setUserInfo({ userId: result.userId, nickname: '' })
-      await fetchUserInfo()
-      // 清除 URL 中的 code 参数
-      const url = new URL(window.location.href)
-      url.searchParams.delete('code')
-      url.searchParams.delete('state')
-      window.history.replaceState({}, '', url.toString())
-      return true
-    } catch (e) {
-      error.value = e instanceof Error ? e.message : '企微登录失败'
-      return false
-    } finally {
-      loading.value = false
-    }
   }
 
   /**
@@ -78,7 +39,7 @@ export function useAuth() {
     error.value = ''
     try {
       const result = await loginApi({ username, password, platform: 'MOBILE' })
-      userStore.setTokens(result.accessToken, result.refreshToken)
+      userStore.setTokens(result.accessToken, result.refreshToken, result.clientId)
       userStore.setUserInfo({ userId: result.userId, nickname: username })
       await fetchUserInfo()
       return true
@@ -115,7 +76,6 @@ export function useAuth() {
     loading,
     error,
     initAuth,
-    loginWithWecomCode,
     loginWithPassword,
     fetchUserInfo,
     doLogout

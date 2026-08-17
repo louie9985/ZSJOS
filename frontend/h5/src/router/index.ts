@@ -107,29 +107,11 @@ const router = createRouter({
   ]
 })
 
-// 是否已初始化认证（仅首次进入时尝试企微 OAuth）
-let authInitialized = false
-
 router.beforeEach(async (to) => {
   const userStore = useUserStore()
   const requiresAuth = to.meta.requiresAuth !== false
 
   if (!requiresAuth) return
-
-  // 首次进入：如果在企微环境且 URL 有 code，尝试自动登录
-  if (!authInitialized) {
-    authInitialized = true
-    if (userStore.isLoggedIn) {
-      // token 存在，放行（实际有效性由 API 层 401 兜底）
-      return
-    }
-    // 检查 URL 中是否带有企微 OAuth code
-    const code = new URLSearchParams(window.location.search).get('code')
-    if (code) {
-      // 有 code 先放行到目标页，由页面 onMounted 里的 initAuth 处理
-      return
-    }
-  }
 
   if (!userStore.isLoggedIn) {
     return { name: 'Login', query: { redirect: to.fullPath } }

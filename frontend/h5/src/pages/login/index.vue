@@ -3,7 +3,6 @@ import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { showToast } from 'vant'
 import { useAuth } from '@/composables/useAuth'
-import { isInWecom, redirectToWecomOAuth } from '@/utils/wecom'
 
 const router = useRouter()
 const route = useRoute()
@@ -11,13 +10,11 @@ const { loading, error, loginWithPassword, initAuth } = useAuth()
 
 const username = ref('')
 const password = ref('')
-const wecomLoading = ref(false)
 
 // 获取登录后跳转地址
 const redirectPath = (route.query.redirect as string) || '/home'
 
 onMounted(async () => {
-  // 如果在企微环境且 URL 带 code，尝试自动登录
   const success = await initAuth()
   if (success) {
     router.replace(redirectPath)
@@ -35,17 +32,9 @@ async function handleLogin() {
 }
 
 function handleWecomLogin() {
-  // 企微 OAuth 跳转（需要后端配置 corpId 和 agentId）
-  // 暂用占位，实际上线需要从配置获取
-  const corpId = import.meta.env.VITE_WECOM_CORP_ID || ''
-  const agentId = import.meta.env.VITE_WECOM_AGENT_ID || ''
-  if (!corpId) {
-    showToast('企微配置未就绪')
-    return
-  }
-  const redirectUri = window.location.origin + '/home'
-  redirectToWecomOAuth(corpId, agentId, redirectUri)
+  showToast('企业微信登录暂未开放，请使用账号密码登录')
 }
+
 </script>
 
 <template>
@@ -90,17 +79,10 @@ function handleWecomLogin() {
           登录
         </van-button>
 
-        <van-button
-          v-if="isInWecom()"
-          block
-          round
-          plain
-          :loading="wecomLoading"
-          class="login-wecom-btn"
-          @click="handleWecomLogin"
-        >
-          企业微信一键登录
+        <van-button block round plain class="login-wecom-btn" @click="handleWecomLogin">
+          企业微信登录（暂未开放）
         </van-button>
+
       </div>
 
       <div v-if="error" class="login-error">{{ error }}</div>
@@ -156,8 +138,8 @@ function handleWecomLogin() {
 }
 .login-wecom-btn {
   margin-top: 12px;
-  color: var(--h5-primary);
-  border-color: var(--h5-primary);
+  color: var(--h5-text-secondary);
+  border-color: var(--h5-divider);
 }
 
 .login-error {

@@ -1,5 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
+import cn.hutool.core.util.DesensitizedUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -284,8 +285,15 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                           boolean detail) {
         LeadManagementRespVO result = BeanUtils.toBean(lead, LeadManagementRespVO.class);
         result.setSourceChannel(lead.getSourceChannelId());
-        result.setSourceUserName(userName(users, lead.getSourceUserId()));
-        result.setOwnerUserName(userName(users, lead.getOwnerUserId()));
+        boolean blindIdentity = isBlindIdentity(lead, currentUserId);
+        boolean viewerIsOwner = Objects.equals(currentUserId, lead.getOwnerUserId());
+        boolean viewerIsSubmitter = Objects.equals(currentUserId, lead.getSourceUserId());
+        result.setSourceUserId(blindIdentity && viewerIsOwner ? null : lead.getSourceUserId());
+        result.setSourceUserName(blindIdentity && viewerIsOwner
+                ? maskedUserName(users, lead.getSourceUserId()) : userName(users, lead.getSourceUserId()));
+        result.setOwnerUserId(blindIdentity && viewerIsSubmitter ? null : lead.getOwnerUserId());
+        result.setOwnerUserName(blindIdentity && viewerIsSubmitter
+                ? maskedUserName(users, lead.getOwnerUserId()) : userName(users, lead.getOwnerUserId()));
         result.setPendingAssigneeUserName(userName(users, lead.getPendingAssigneeUserId()));
         result.setHandlingStage(LeadHandlingStage.resolve(lead));
         result.setQualifiedByUserName(userName(users, lead.getQualifiedByUserId()));
@@ -323,6 +331,13 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             result.setAvailableActions(resolveActions(lead, opportunity, activeOrder, currentUserId));
         }
         return result;
+    }
+
+    private boolean isBlindIdentity(LeadDO lead, Long currentUserId) {
+        return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                && lead.getSourceUserId() != null && lead.getOwnerUserId() != null
+                && !Objects.equals(lead.getSourceUserId(), lead.getOwnerUserId())
+                && !leadObjectPermissionService.canViewUnmaskedIdentity(currentUserId, lead.getOwnerUserId());
     }
 
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,
@@ -458,6 +473,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private static String userName(Map<Long, AdminUserRespDTO> users, Long userId) {
         AdminUserRespDTO user = userId == null ? null : users.get(userId);
         return user == null ? null : user.getNickname();
+    }
+
+    private static String maskedUserName(Map<Long, AdminUserRespDTO> users, Long userId) {
+        String name = userName(users, userId);
+        return name == null ? null : DesensitizedUtil.chineseName(name);
     }
 
     private static <T> Map<Long, List<T>> groupByLeadId(List<T> values, Function<T, Long> keyFunction) {

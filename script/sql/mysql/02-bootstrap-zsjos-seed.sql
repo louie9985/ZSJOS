@@ -268,7 +268,7 @@ VALUES ('V023', 'Add direct sales-order entry and dual-center approval', 'sales-
 SET @zsjos_bpm_form_conf = '{"form":{"labelPosition":"right","labelWidth":"120px","size":"default"},"submitBtn":false,"resetBtn":false}';
 SET @zsjos_bpm_field_appeal_id = '{"type":"input","field":"appealId","title":"申诉编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
 SET @zsjos_bpm_field_order_id = '{"type":"input","field":"orderId","title":"订单编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
-SET @zsjos_bpm_field_lead_id = '{"type":"input","field":"leadId","title":"客资编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
+SET @zsjos_bpm_field_lead_no = '{"type":"input","field":"leadNo","title":"客资编号","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
 SET @zsjos_bpm_field_round_no = '{"type":"input","field":"roundNo","title":"审批轮次","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
 SET @zsjos_bpm_field_review_stage = '{"type":"input","field":"reviewStage","title":"复核阶段","props":{"disabled":true,"readonly":true},"hidden":false,"display":true}';
 
@@ -279,12 +279,12 @@ SELECT seed.name,0,@zsjos_bpm_form_conf,seed.fields,seed.marker,
 FROM `system_tenant` tenant
 CROSS JOIN (
   SELECT '客资申诉流程关联信息' name,
-         JSON_ARRAY(@zsjos_bpm_field_appeal_id,@zsjos_bpm_field_lead_id,
+         JSON_ARRAY(@zsjos_bpm_field_appeal_id,@zsjos_bpm_field_lead_no,
                     @zsjos_bpm_field_round_no,@zsjos_bpm_field_review_stage) fields,
          'zsjos-system-form:lead-appeal-review' marker
   UNION ALL
   SELECT '成交会签流程关联信息',
-         JSON_ARRAY(@zsjos_bpm_field_order_id,@zsjos_bpm_field_lead_id,@zsjos_bpm_field_round_no),
+         JSON_ARRAY(@zsjos_bpm_field_order_id,@zsjos_bpm_field_lead_no,@zsjos_bpm_field_round_no),
          'zsjos-system-form:sales-order-dual-approval'
 ) seed
 WHERE tenant.deleted=b'0' AND tenant.status=0

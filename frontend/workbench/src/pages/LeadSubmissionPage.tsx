@@ -10,6 +10,7 @@ import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferr
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import EmployeeSelect from '../components/EmployeeSelect'
 import type { SalesUser } from '../services/api'
+import { createIdempotencyKey } from '../services/idempotency'
 
 const { Title } = Typography
 type Option = { label: string; value: string }
@@ -109,7 +110,7 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
     if (submittingRef.current) return
     submittingRef.current = true; setSubmitting(true)
     try {
-      const idempotencyKey = idempotencyKeyRef.current ?? crypto.randomUUID()
+      const idempotencyKey = idempotencyKeyRef.current ?? createIdempotencyKey()
       idempotencyKeyRef.current = idempotencyKey
       const uploadResult = await uploadDeferredFiles(files, api.uploadLeadAttachment, setFiles)
       if (uploadResult.failed) { message.error('有图片上传失败，请重试失败项'); return }

@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePageList } from '@/composables/usePageList'
 import { getMyLeadPage, type LeadListItem } from '@/api/lead'
+import { formatDateTime, formatLeadNo } from '@/utils/format'
 
 defineOptions({ name: 'LeadList' })
 
@@ -24,7 +25,7 @@ const filterParams = computed(() => {
   return params
 })
 
-const { list, loading, refreshing, finished, loadMore, refresh } = usePageList(
+const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList(
   (params) => getMyLeadPage(params as Parameters<typeof getMyLeadPage>[0]),
   filterParams
 )
@@ -70,7 +71,7 @@ const statusMap: Record<string, { text: string; type: string }> = {
           v-for="item in list"
           :key="item.id"
           :title="item.submittedName"
-          :label="item.submittedAt?.slice(0, 16)"
+          :label="`${formatLeadNo(item.leadNo)} · ${formatDateTime(item.submittedAt)}`"
           is-link
           @click="goDetail(item.id)"
         >
@@ -81,7 +82,10 @@ const statusMap: Record<string, { text: string; type: string }> = {
           </template>
         </van-cell>
 
-        <van-empty v-if="!loading && list.length === 0" description="暂无客资记录">
+        <van-empty v-if="!loading && error" :description="error" image="error">
+          <van-button type="primary" round size="small" @click="refresh">重新加载</van-button>
+        </van-empty>
+        <van-empty v-if="!loading && !error && list.length === 0" description="暂无客资记录">
           <van-button type="primary" round size="small" @click="goSubmit">去提交客资</van-button>
         </van-empty>
       </van-list>

@@ -22,6 +22,10 @@ export default function SalesOrderCoursePicker({ catalog, value, onChange, disab
   const [attrValues, setAttrValues] = useState<Record<string, string>>({})
   const [skuRef, setSkuRef] = useState<string>()
   useEffect(() => {
+    if (!value) {
+      setSpuRef(undefined); setSkuRef(undefined); setAttrValues({})
+      return
+    }
     const [nextSpu, nextSku] = value?.split('::') || []
     const spu = catalog.spus.find(item => item.spuRef === nextSpu)
     setSpuRef(nextSpu || undefined); setSkuRef(nextSku || undefined)

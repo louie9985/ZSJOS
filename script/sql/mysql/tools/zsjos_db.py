@@ -874,6 +874,8 @@ def test_fresh() -> None:
 
     def execute(container: str) -> None:
         docker_mysql_file(container, SQL_ROOT / "bootstrap.sql")
+        docker_mysql_query(container, "ALTER DATABASE zsjos_test COLLATE utf8mb4_0900_ai_ci")
+        docker_mysql_file(container, SQL_ROOT / "migrations" / "V071__repair_h5_and_role_permissions.sql")
         output = docker_mysql_file(container, SQL_ROOT / "verify" / "core.sql").stdout.decode(errors="replace")
         failure_lines = [line for line in output.splitlines() if re.search(r"(?:^|\t)(FAIL|MISSING)$", line)]
         if failure_lines:

@@ -7,6 +7,7 @@ import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import type { LeadAttachment } from '../services/api'
 import EmployeeSelect from '../components/EmployeeSelect'
+import { createIdempotencyKey } from '../services/idempotency'
 
 type ResultType = LeadDuplicateReviewDecision['resultType']
 type DuplicateCandidate = { personId: number; leadId?: number; leadNo?: string; personName: string; leadStatus?: string }
@@ -67,7 +68,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       const uploaded = await uploadDeferredFiles(files, api.uploadDuplicateReviewAttachment, setFiles)
       if (uploaded.failed) { message.error('复核附件上传失败，请修正后重试'); return }
       await api.decideDuplicateReview(processing.id, { ...values,
-        attachments: uploaded.items.map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: crypto.randomUUID() })
+        attachments: uploaded.items.map(item => ({ infraFileId: item.uploaded!.infraFileId })), idempotencyKey: createIdempotencyKey() })
       message.success('复核结论已提交'); setProcessing(undefined); await load()
     } catch (cause) { message.error(cause instanceof Error ? cause.message : '复核提交失败'); await load() }
     finally { setSaving(false) }
@@ -137,7 +138,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       <Form form={form} layout="vertical">
         <Form.Item name="resultType" label="复核结论" rules={[{ required: true }]}><Select options={Object.entries(labels).map(([value, label]) => ({ value, label }))}/></Form.Item>
         {resultType === 'reuse_person' && <Form.Item name="matchedPersonId" label="客户编号" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }}/></Form.Item>}
-        {(resultType === 'reactivate_lead' || resultType === 'notify_owner') && <Form.Item name="matchedLeadId" label="客资编号" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={processingCandidates.filter(item => item.leadId).map(item => ({ value: item.leadId!, label: `${item.leadNo || `内部记录 ${item.leadId}`} · ${item.personName} · ${item.leadStatus || '未知状态'}` }))}/></Form.Item>}
+        {(resultType === 'reactivate_lead' || resultType === 'notify_owner') && <Form.Item name="matchedLeadId" label="客资编号" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={processingCandidates.filter(item => item.leadId).map(item => ({ value: item.leadId!, label: `${item.leadNo || '编号不可用'} · ${item.personName} · ${item.leadStatus || '未知状态'}` }))}/></Form.Item>}
         {resultType === 'reactivate_lead' && <Form.Item name="selectedSalesUserId" label="归属销售" rules={[{ required: true }]}><EmployeeSelect users={sales} showSearch optionFilterProp="label" /></Form.Item>}
         <Form.Item name="opinion" label="复核意见" rules={[{ required: true, whitespace: true }, { max: 2000 }]}><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
         <Form.Item label="复核附件"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" disabled={saving}/></Form.Item>

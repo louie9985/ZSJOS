@@ -4,6 +4,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRuleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import org.junit.jupiter.api.Test;
@@ -28,6 +29,7 @@ class LeadLifecycleTaskServiceTest {
     @InjectMocks private LeadLifecycleTaskService service;
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private BusinessEventMapper eventMapper;
+    @Mock private LeadMapper leadMapper;
     @Mock private LeadFollowUpRuleService followUpRuleService;
 
     @Test
@@ -35,6 +37,8 @@ class LeadLifecycleTaskServiceTest {
         LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO();
         rule.setId(7L); rule.setVersion(3); rule.setFirstFollowUpTimeoutMinutes(90);
         when(followUpRuleService.requireEnabledRule()).thenReturn(rule);
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setLeadNo("KZ202608160000000001");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
         LocalDateTime acceptedAt = LocalDateTime.of(2026, 8, 9, 10, 0);
 
         service.createFirstFollowUpTask(1L, 10L, 88L, acceptedAt,
@@ -46,6 +50,7 @@ class LeadLifecycleTaskServiceTest {
         assertEquals("lead_first_follow_up", task.taskType());
         assertEquals(acceptedAt.plusMinutes(90), task.dueAt());
         assertEquals("lead-first-follow-up:88", task.idempotencyKey());
+        assertEquals("首次跟进：KZ202608160000000001", task.title());
         assertTrue(task.payload().contains("\"ruleVersion\":3"));
 
         ArgumentCaptor<BusinessEventDO> eventCaptor = ArgumentCaptor.forClass(BusinessEventDO.class);
@@ -60,7 +65,8 @@ class LeadLifecycleTaskServiceTest {
         rule.setId(7L); rule.setVersion(4); rule.setQualificationTimeoutMinutes(4320);
         when(followUpRuleService.requireEnabledRule()).thenReturn(rule);
         LeadDO lead = new LeadDO();
-        lead.setId(1L); lead.setStatus("submitted"); lead.setQualificationRoundNo(2);
+        lead.setId(1L); lead.setLeadNo("KZ202608160000000001");
+        lead.setStatus("submitted"); lead.setQualificationRoundNo(2);
         LocalDateTime startedAt = LocalDateTime.of(2026, 8, 9, 10, 0);
 
         service.createQualificationTask(lead, 10L, startedAt);
@@ -81,6 +87,8 @@ class LeadLifecycleTaskServiceTest {
     void createsDistinctReminderKeysForLeadAndOpportunityRecordsWithSameId() {
         LocalDateTime changedAt = LocalDateTime.of(2026, 8, 10, 10, 0);
         LocalDateTime dueAt = changedAt.plusDays(1);
+        LeadDO lead = new LeadDO(); lead.setId(8L); lead.setLeadNo("KZ202608160000000008");
+        when(leadMapper.selectById(8L)).thenReturn(lead);
 
         service.replaceFollowUpReminder(8L, 10L, "lead", 1L, dueAt, changedAt);
         service.replaceFollowUpReminder(8L, 10L, "opportunity", 1L, dueAt, changedAt);

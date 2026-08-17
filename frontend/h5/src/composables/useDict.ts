@@ -13,6 +13,7 @@ const DICT_TYPES = {
 export function useDict() {
   const appStore = useAppStore()
   const loading = ref(false)
+  const error = ref('')
 
   async function loadDict(type: string): Promise<DictItem[]> {
     // 命中缓存
@@ -20,12 +21,14 @@ export function useDict() {
     if (cached.length > 0) return cached
 
     loading.value = true
+    error.value = ''
     try {
       const items = await getDictByType(type)
       appStore.setDict(type, items)
       return items
-    } catch {
-      return []
+    } catch (cause) {
+      error.value = cause instanceof Error ? cause.message : '字典加载失败'
+      throw cause
     } finally {
       loading.value = false
     }
@@ -46,6 +49,7 @@ export function useDict() {
 
   return {
     loading,
+    error,
     loadDict,
     loadSourceChannels,
     loadLeadCategories,

@@ -152,6 +152,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(lead.getId());
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("lead.id", lead.getId());
+        values.put("lead.no", lead.getLeadNo());
         values.put("lead.name", fullContact ? lead.getSubmittedName() : DesensitizedUtil.chineseName(lead.getSubmittedName()));
         values.put("lead.mobile", fullContact ? lead.getSubmittedMobile() : DesensitizedUtil.mobilePhone(lead.getSubmittedMobile()));
         values.put("lead.wechatId", fullContact ? lead.getSubmittedWechatId() : maskWechat(lead.getSubmittedWechatId()));
@@ -181,10 +182,11 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("attachment.names", attachments.stream().sorted(Comparator.comparing(LeadAttachmentDO::getSort))
                 .map(LeadAttachmentDO::getOriginalName).filter(Objects::nonNull).collect(Collectors.joining("、")));
         values.put("attachment.count", attachments.size());
-        putUser(values, "submitter", lead.getSourceUserId());
-        putUser(values, "owner", lead.getOwnerUserId());
-        putUser(values, "pendingSales", lead.getPendingAssigneeUserId());
-        putUser(values, "operator", event.getOperatorUserId());
+        boolean blindIdentity = isBlindIdentity(lead, recipientUserId);
+        putUser(values, "submitter", lead.getSourceUserId(), blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
+        putUser(values, "owner", lead.getOwnerUserId(), blindIdentity && Objects.equals(recipientUserId, lead.getSourceUserId()));
+        putUser(values, "pendingSales", lead.getPendingAssigneeUserId(), false);
+        putUser(values, "operator", event.getOperatorUserId(), false);
         values.put("event.time", event.getOccurredAt());
         values.put("event.scene", event.getSceneCode());
         if (event.getPayload() != null) {
@@ -212,7 +214,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
 
     private List<NotifySceneVariableRespDTO> variables(String sceneCode) {
         List<NotifySceneVariableRespDTO> variables = new ArrayList<>(List.of(
-                variable("lead.id", "客资编号"), variable("lead.name", "客户姓名", true),
+                variable("lead.no", "客资编号"), variable("lead.id", "内部客资ID"),
+                variable("lead.name", "客户姓名", true),
                 variable("lead.mobile", "手机号码", true), variable("lead.wechatId", "微信号", true),
                 variable("lead.sourceType", "来源类型"), variable("lead.sourceChannel", "来源渠道"),
                 variable("lead.province", "省份"), variable("lead.city", "城市"),
@@ -340,10 +343,22 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         return false;
     }
 
-    private void putUser(Map<String, Object> values, String prefix, Long userId) {
+    private boolean isBlindIdentity(LeadDO lead, Long recipientUserId) {
+        return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                && lead.getSourceUserId() != null && lead.getOwnerUserId() != null
+                && !Objects.equals(lead.getSourceUserId(), lead.getOwnerUserId())
+                && !hasUnmaskedIdentityAccess(recipientUserId, lead.getOwnerUserId());
+    }
+
+    private boolean hasUnmaskedIdentityAccess(Long userId, Long ownerUserId) {
+        return permissionApi.hasAnyPermissions(userId, QUERY_ALL_PERMISSION)
+                || managesOwnerDepartment(userId, ownerUserId);
+    }
+
+    private void putUser(Map<String, Object> values, String prefix, Long userId, boolean masked) {
         AdminUserRespDTO user = userId == null ? null : adminUserApi.getUser(userId);
-        values.put(prefix + ".id", userId);
-        values.put(prefix + ".name", user == null ? "" : user.getNickname());
+        values.put(prefix + ".id", masked ? null : userId);
+        values.put(prefix + ".name", user == null ? "" : masked ? DesensitizedUtil.chineseName(user.getNickname()) : user.getNickname());
     }
 
     private String dictLabel(String type, String value) {

@@ -13,6 +13,7 @@
       >
     </el-alert>
     <el-table v-loading="loading" :data="list" empty-text="暂无异常客资">
+      <el-table-column label="客资编号" prop="leadNo" min-width="220" />
       <el-table-column label="客户" min-width="150">
         <template #default="scope"
           ><strong>{{ scope.row.submittedName }}</strong

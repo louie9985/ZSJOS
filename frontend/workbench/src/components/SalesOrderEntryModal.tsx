@@ -146,11 +146,11 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           onSubmitted(submittedOrderId)
         } else if (orderId) {
           await api.resubmitSalesOrder(orderId, request)
-          message.success('成交订单已补正并重新提交会签')
+          message.success('成交订单已补正并重新提交')
           onSubmitted(orderId)
         } else {
           const submittedOrderId = await api.submitSalesOrder(lead.id, request)
-          message.success('成交订单已提交会签')
+          message.success('成交订单已提交')
           onSubmitted(submittedOrderId)
         }
         complete()

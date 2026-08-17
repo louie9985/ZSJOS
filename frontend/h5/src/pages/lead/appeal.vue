@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showToast } from 'vant'
 import { getLeadAppeals, submitAppeal, uploadAppealAttachment, type UploadResult } from '@/api/lead'
 import { formatDateTime } from '@/utils/format'
+import { createIdempotencyKey } from '@/utils/idempotency'
 
 defineOptions({ name: 'LeadAppeal' })
 
@@ -58,7 +59,7 @@ async function onFileChange(event: Event) {
     if (fileList.value.length >= 9) break
     const file = files[i]
     if (file.size > 10 * 1024 * 1024) { showToast(`${file.name} 超过 10MB`); continue }
-    const id = crypto.randomUUID()
+    const id = createIdempotencyKey()
     const url = URL.createObjectURL(file)
     fileList.value.push({ id, url, status: 'uploading' })
     try {
@@ -89,7 +90,7 @@ async function handleSubmit() {
 
     await submitAppeal(leadId, {
       reason: reason.value.trim(),
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: createIdempotencyKey(),
       attachments
     })
     showSuccessToast('申诉已提交')

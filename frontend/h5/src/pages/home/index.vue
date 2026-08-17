@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { getCashbackSummary, type CashbackSummary } from '@/api/cashback'
 import { getMyLeadPage, type LeadListItem } from '@/api/lead'
 import { getPartnerMe, type PartnerInfo } from '@/api/profile'
+import { formatLeadNo } from '@/utils/format'
 
 defineOptions({ name: 'Home' })
 
@@ -15,8 +16,11 @@ const partner = ref<PartnerInfo>()
 const summary = ref<CashbackSummary>()
 const recentLeads = ref<LeadListItem[]>([])
 const loading = ref(true)
+const loadError = ref('')
 
-onMounted(async () => {
+async function loadHome() {
+  loading.value = true
+  loadError.value = ''
   try {
     const [partnerData, summaryData, leadsData] = await Promise.all([
       getPartnerMe(),
@@ -26,12 +30,14 @@ onMounted(async () => {
     partner.value = partnerData
     summary.value = summaryData
     recentLeads.value = leadsData.list
-  } catch {
-    // 错误已由拦截器处理
+  } catch (cause) {
+    loadError.value = cause instanceof Error ? cause.message : '工作台加载失败'
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(loadHome)
 
 function goSubmit() {
   router.push('/lead/submit')
@@ -65,6 +71,10 @@ const statusMap: Record<string, { text: string; color: string }> = {
 
 <template>
   <div class="page-container">
+    <van-empty v-if="!loading && loadError" :description="loadError" image="error">
+      <van-button size="small" type="primary" @click="loadHome">重新加载</van-button>
+    </van-empty>
+    <template v-else>
     <!-- 渐变头部 -->
     <div class="page-header-gradient home-header">
       <div class="home-header__greeting">
@@ -133,7 +143,7 @@ const statusMap: Record<string, { text: string; color: string }> = {
             v-for="lead in recentLeads"
             :key="lead.id"
             :title="lead.submittedName"
-            :label="lead.submittedAt?.slice(0, 10)"
+            :label="`${formatLeadNo(lead.leadNo)} · ${lead.submittedAt?.slice(0, 10) || '-'}`"
             is-link
             @click="goLeadDetail(lead.id)"
           >
@@ -146,6 +156,7 @@ const statusMap: Record<string, { text: string; color: string }> = {
         </van-cell-group>
       </van-skeleton>
     </div>
+    </template>
   </div>
 </template>
 

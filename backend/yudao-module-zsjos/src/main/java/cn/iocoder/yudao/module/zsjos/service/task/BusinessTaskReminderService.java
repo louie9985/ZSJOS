@@ -72,7 +72,7 @@ public class BusinessTaskReminderService {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("ownerUserId", task.getAssigneeId());
         context.put("submitterUserId", lead == null ? null : lead.getSourceUserId());
-        context.put("reminder.stage", urgent.getTimingStage());
+        context.put("reminder.stage", stageLabel(urgent.getTimingStage()));
         context.put("reminder.dueAt", task.getDueAt());
         notifyEventPublisher.publish(scene, task.getBizId(),
                 "business-task-reminder:" + task.getId() + ":" + urgent.getTimingStage(), urgent.getId(),
@@ -99,6 +99,15 @@ public class BusinessTaskReminderService {
 
     private int urgency(String stage) {
         return switch (stage) { case "overdue" -> 3; case "due" -> 2; default -> 1; };
+    }
+
+    private String stageLabel(String stage) {
+        return switch (stage) {
+            case "overdue" -> "已逾期";
+            case "due" -> "已到期";
+            case "advance" -> "即将到期";
+            default -> stage;
+        };
     }
 
     private String sceneFor(String taskType) {
