@@ -155,6 +155,10 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
       return
     }
   }
+  if (detail.bizType === 'student_service' && isPositiveId(detail.bizId)) {
+    deps.navigate(APP_ROUTES.MY_STUDENTS, { state: { serviceRelationId: detail.bizId } })
+    return
+  }
   if (detail.sceneCode === 'zsjos.lead.appeal_submitted' && isPositiveId(detail.bizId)) {
     try {
       if (await hasPendingAppeal(detail.bizId)) {

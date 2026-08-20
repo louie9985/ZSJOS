@@ -238,16 +238,11 @@ class RegistrationServiceImplTest {
         route.setDepartmentId(40L); route.setVersion(0);
         RegistrationCaseChecklistItemDO plannerItem = new RegistrationCaseChecklistItemDO();
         plannerItem.setId(202L); plannerItem.setItemType("study_planner"); plannerItem.setVersion(0);
-        RoleRespDTO role = new RoleRespDTO(); role.setId(50L); role.setStatus(0);
         AdminUserRespDTO planner = new AdminUserRespDTO();
         planner.setId(30L); planner.setDeptId(40L); planner.setStatus(0); planner.setNickname("规划师");
         when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
         when(caseRouteMapper.selectByCaseId(1L)).thenReturn(List.of(route));
         when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(plannerItem));
-        when(roleApi.getRoleByCode("study_planner")).thenReturn(role);
-        when(permissionApi.getUserRoleIdListByRoleIds(List.of(50L))).thenReturn(java.util.Set.of(30L));
-        when(adminUserApi.getUserList(java.util.Set.of(30L))).thenReturn(List.of(planner));
-        when(deptApi.getChildDeptList(40L)).thenReturn(List.of());
         when(adminUserApi.getUser(30L)).thenReturn(planner);
         RegistrationPlannerUpdateReqVO request = new RegistrationPlannerUpdateReqVO();
         request.setVersion(0); request.setIdempotencyKey("same-planner"); request.setStudyPlannerUserId(30L);

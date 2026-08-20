@@ -31,5 +31,6 @@ public class StudentContactExtensionDO extends TenantBaseDO {
     private LocalDateTime submittedAt;
     private LocalDateTime resolvedAt;
     private String idempotencyKey;
+    private String withdrawalIdempotencyKey;
     private Integer version;
 }

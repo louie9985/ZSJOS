@@ -23,4 +23,5 @@ public class StudentContactExtensionRespVO {
     private String decisionReason;
     private LocalDateTime submittedAt;
     private LocalDateTime resolvedAt;
+    private Integer version;
 }

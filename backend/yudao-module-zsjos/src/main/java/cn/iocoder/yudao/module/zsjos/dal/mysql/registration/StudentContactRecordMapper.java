@@ -6,6 +6,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactR
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 
 @Mapper
 public interface StudentContactRecordMapper extends BaseMapperX<StudentContactRecordDO> {
@@ -15,6 +17,13 @@ public interface StudentContactRecordMapper extends BaseMapperX<StudentContactRe
     default List<StudentContactRecordDO> selectByRelationId(Long relationId) {
         return selectList(new LambdaQueryWrapperX<StudentContactRecordDO>()
                 .eq(StudentContactRecordDO::getServiceRelationId, relationId)
-                .orderByDesc(StudentContactRecordDO::getSubmittedAt));
+                .orderByDesc(StudentContactRecordDO::getSubmittedAt)
+                .orderByDesc(StudentContactRecordDO::getId));
+    }
+    default PageResult<StudentContactRecordDO> selectPageByRelationId(PageParam page, Long relationId) {
+        return selectPage(page, new LambdaQueryWrapperX<StudentContactRecordDO>()
+                .eq(StudentContactRecordDO::getServiceRelationId, relationId)
+                .orderByDesc(StudentContactRecordDO::getSubmittedAt)
+                .orderByDesc(StudentContactRecordDO::getId));
     }
 }

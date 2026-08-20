@@ -60,9 +60,9 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage selfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_COMPLAINTS) return <LeadComplaintPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
-    state={{ ...(location.state || {}) }}/>
+    state={{ ...(location.state || {}), relationScope: 'submitted' }}/>
   if (menu?.path === APP_ROUTES.OWNED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
-    state={{ ...(location.state || {}) }}/>
+    state={{ ...(location.state || {}), relationScope: 'owned' }}/>
   if (menu?.path === APP_ROUTES.LEAD_ASSIGNMENT) return <LeadAssignmentPage/>
   if (menu?.path === APP_ROUTES.LEAD_DUPLICATE_REVIEW) return <LeadDuplicateReviewPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {

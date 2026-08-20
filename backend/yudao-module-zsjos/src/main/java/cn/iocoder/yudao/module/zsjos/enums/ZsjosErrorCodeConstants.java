@@ -221,8 +221,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode REGISTRATION_ATTACHMENT_LIMIT = new ErrorCode(1_900_010_018, "每个清单项最多上传 9 个附件");
     ErrorCode REGISTRATION_ATTACHMENT_REQUIRED = new ErrorCode(1_900_010_019, "请先上传必需的报名履约附件");
     ErrorCode REGISTRATION_IDEMPOTENCY_RESULT_INVALID = new ErrorCode(1_900_010_020, "报名履约幂等结果不存在或已失效，请使用新的幂等键重试");
-    ErrorCode STUDENT_NOT_EXISTS = new ErrorCode(1_900_010_012, "学员不存在或未分配给当前用户");
-    ErrorCode STUDENT_PERMISSION_DENIED = new ErrorCode(1_900_010_013, "无权查看该学员");
+    ErrorCode STUDENT_NOT_EXISTS = new ErrorCode(1_900_010_036, "学员不存在或未分配给当前用户");
+    ErrorCode STUDENT_PERMISSION_DENIED = new ErrorCode(1_900_010_037, "无权查看该学员");
     ErrorCode STUDENT_SERVICE_NOT_EXISTS = new ErrorCode(1_900_010_021, "学员服务关系不存在或已结束");
     ErrorCode STUDENT_SERVICE_NOT_ACCEPTED = new ErrorCode(1_900_010_022, "请先确认接收该学员服务");
     ErrorCode STUDENT_SERVICE_ALREADY_ACCEPTED = new ErrorCode(1_900_010_023, "该学员服务已确认接收");

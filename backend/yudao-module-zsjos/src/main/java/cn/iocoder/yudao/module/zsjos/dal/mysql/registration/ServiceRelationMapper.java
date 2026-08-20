@@ -20,9 +20,29 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
     default List<ServiceRelationDO> selectActiveByCollaborator(Long userId) {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
                         .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    default List<ServiceRelationDO> selectActiveByCollaboratorAndPerson(Long userId, Long personId) {
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))
+                .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    default boolean existsActiveByCollaboratorAndPerson(Long userId, Long personId) {
+        return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))) > 0;
     }
 
     default int accept(Long id, Long userId, LocalDateTime now, Integer version) {
@@ -34,6 +54,17 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .set(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .set(ServiceRelationDO::getAcceptedByUserId, userId)
                 .set(ServiceRelationDO::getAcceptedAt, now)
+                .set(ServiceRelationDO::getVersion, version + 1));
+    }
+
+    default int cancelActive(Long id, Integer version, LocalDateTime now, String reason) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getVersion, version)
+                .set(ServiceRelationDO::getStatus, "cancelled")
+                .set(ServiceRelationDO::getTerminatedAt, now)
+                .set(ServiceRelationDO::getTerminationReason, reason)
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
     default List<ServiceRelationDO> selectByOwnerUserId(Long ownerUserId) {

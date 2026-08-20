@@ -3790,12 +3790,12 @@ CREATE TABLE IF NOT EXISTS `zsjos_work_change` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工作计划与任务变更历史';
 
 CREATE TABLE IF NOT EXISTS `zsjos_business_task_notify_stage` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `task_id` bigint NOT NULL, `notify_rule_id` bigint NOT NULL,
+  `id` bigint NOT NULL AUTO_INCREMENT, `task_id` bigint NOT NULL, `task_version` int NOT NULL DEFAULT 0, `notify_rule_id` bigint NOT NULL,
   `stage` varchar(16) NOT NULL, `emitted_at` datetime NOT NULL,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_task_stage` (`tenant_id`,`task_id`,`stage`),
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_task_version_stage` (`tenant_id`,`task_id`,`task_version`,`stage`),
   KEY `idx_tenant_rule` (`tenant_id`,`notify_rule_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务任务提醒阶段幂等记录';
 
@@ -5098,12 +5098,24 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_config_version` (
   UNIQUE KEY `uk_tenant_version_no` (`tenant_id`,`version_no`,`deleted`), KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系配置版本';
 
+CREATE TABLE IF NOT EXISTS `zsjos_student_contact_config_command` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `operation` varchar(24) NOT NULL, `idempotency_key` varchar(64) NOT NULL,
+  `config_id` bigint NOT NULL, `expected_version` int NOT NULL,
+  `request_fingerprint` varchar(64) NOT NULL DEFAULT '', `result_config_id` bigint NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL, PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+  KEY `idx_tenant_config_operation` (`tenant_id`,`config_id`,`operation`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系配置幂等命令';
+
 CREATE TABLE IF NOT EXISTS `zsjos_student_contact_record` (
   `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL, `task_id` bigint NOT NULL,
   `contact_type` varchar(64) NOT NULL, `successful` bit(1) NOT NULL, `unsuccessful_reason_value` varchar(100) DEFAULT NULL,
   `unsuccessful_reason_label_snapshot` varchar(100) DEFAULT NULL, `remark` varchar(2000) NOT NULL,
   `attachment_file_ids_json` json NOT NULL, `checklist_result_json` json NOT NULL, `next_contact_at` datetime NOT NULL,
   `operator_user_id` bigint NOT NULL, `submitted_at` datetime NOT NULL, `idempotency_key` varchar(128) NOT NULL,
+  `request_fingerprint` varchar(64) NOT NULL DEFAULT '',
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL, PRIMARY KEY (`id`),
@@ -5118,10 +5130,12 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_extension` (
   `attachment_file_ids_json` json NOT NULL, `applicant_user_id` bigint NOT NULL, `reviewer_user_id` bigint NOT NULL,
   `process_instance_id` varchar(64) DEFAULT NULL, `decision_reason` varchar(1000) DEFAULT NULL,
   `submitted_at` datetime NOT NULL, `resolved_at` datetime DEFAULT NULL, `idempotency_key` varchar(128) NOT NULL,
+  `withdrawal_idempotency_key` varchar(64) DEFAULT NULL,
   `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL, PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`), UNIQUE KEY `uk_tenant_process` (`tenant_id`,`process_instance_id`),
+  UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+  UNIQUE KEY `uk_tenant_withdrawal_idempotency` (`tenant_id`,`withdrawal_idempotency_key`), UNIQUE KEY `uk_tenant_process` (`tenant_id`,`process_instance_id`),
   KEY `idx_tenant_reviewer_status` (`tenant_id`,`reviewer_user_id`,`status`,`submitted_at`), KEY `idx_tenant_task_status` (`tenant_id`,`task_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系延期申请快照';
 

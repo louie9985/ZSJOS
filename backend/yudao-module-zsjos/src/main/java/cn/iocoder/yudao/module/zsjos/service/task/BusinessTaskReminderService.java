@@ -8,12 +8,16 @@ import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskNotifyStageDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskNotifyStageMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadNotifyEventPublisher;
 import cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactNotifyPublisher;
 import jakarta.annotation.Resource;
@@ -23,9 +27,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Objects;
+import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
@@ -48,10 +57,13 @@ public class BusinessTaskReminderService {
     @Resource private StudentContactNotifyPublisher studentNotifyPublisher;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
+    @Resource private PermissionApi permissionApi;
     @Resource private BusinessTaskCommandService taskCommandService;
+    @Resource private ServiceRelationMapper relationMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public int emitPending(LocalDateTime now) {
+        reassignAssistanceTasks(now);
         List<NotifyTimingRuleRespDTO> rules = notifyRuleApi.getEnabledTimingRules(SCENES);
         int maximumAdvance = rules.stream().filter(rule -> "advance".equals(rule.getTimingStage()))
                 .map(NotifyTimingRuleRespDTO::getTimingOffsetMinutes).max(Integer::compareTo).orElse(0);
@@ -75,12 +87,12 @@ public class BusinessTaskReminderService {
         List<NotifyTimingRuleRespDTO> applicable = rules.stream()
                 .filter(rule -> scene.equals(rule.getSceneCode()))
                 .filter(rule -> isDue(task.getDueAt(), rule, now))
-                .filter(rule -> !stageMapper.exists(task.getId(), rule.getTimingStage()))
+                .filter(rule -> !stageMapper.exists(task.getId(), task.getVersion(), rule.getTimingStage()))
                 .toList();
         if (applicable.isEmpty()) return 0;
         NotifyTimingRuleRespDTO urgent = applicable.stream().max(Comparator.comparingInt(
                 rule -> urgency(rule.getTimingStage()))).orElseThrow();
-        for (NotifyTimingRuleRespDTO rule : applicable) recordStage(task.getId(), rule, now);
+        for (NotifyTimingRuleRespDTO rule : applicable) recordStage(task, rule, now);
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("reminder.stage", stageLabel(urgent.getTimingStage()));
         context.put("reminder.dueAt", task.getDueAt());
@@ -106,9 +118,9 @@ public class BusinessTaskReminderService {
         return 1;
     }
 
-    private void recordStage(Long taskId, NotifyTimingRuleRespDTO rule, LocalDateTime now) {
+    private void recordStage(BusinessTaskDO task, NotifyTimingRuleRespDTO rule, LocalDateTime now) {
         BusinessTaskNotifyStageDO stage = new BusinessTaskNotifyStageDO();
-        stage.setTaskId(taskId); stage.setNotifyRuleId(rule.getId());
+        stage.setTaskId(task.getId()); stage.setTaskVersion(task.getVersion()); stage.setNotifyRuleId(rule.getId());
         stage.setStage(rule.getTimingStage()); stage.setEmittedAt(now);
         try { stageMapper.insert(stage); } catch (DuplicateKeyException ignored) { }
     }
@@ -150,7 +162,11 @@ public class BusinessTaskReminderService {
     private Long currentSupervisor(Long plannerUserId) {
         AdminUserRespDTO planner = adminUserApi.getUser(plannerUserId);
         DeptRespDTO dept = planner == null || planner.getDeptId() == null ? null : deptApi.getDept(planner.getDeptId());
-        return dept == null || plannerUserId.equals(dept.getLeaderUserId()) ? null : dept.getLeaderUserId();
+        Long supervisorId = dept == null ? null : dept.getLeaderUserId();
+        AdminUserRespDTO supervisor = supervisorId == null ? null : adminUserApi.getUser(supervisorId);
+        return supervisor == null || plannerUserId.equals(supervisorId)
+                || !CommonStatusEnum.ENABLE.getStatus().equals(supervisor.getStatus())
+                || !permissionApi.hasAnyPermissions(supervisorId, PERMISSION_EXTENSION_REVIEW) ? null : supervisorId;
     }
 
     private void createAssistanceTask(BusinessTaskDO task, Long supervisorId) {
@@ -158,5 +174,39 @@ public class BusinessTaskReminderService {
                 "协助完成学员首次联系", "请协助学习规划师完成已到期的首次联系任务", ACTION_ASSISTANCE,
                 null, null, JsonUtils.toJsonString(Map.of("sourceTaskId", task.getId(),
                         "serviceRelationId", task.getBizId())), "student-assistance:" + task.getId()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private void reassignAssistanceTasks(LocalDateTime now) {
+        Long lastId = 0L;
+        List<BusinessTaskDO> candidates;
+        Map<Long, Long> supervisorCache = new HashMap<>();
+        Set<Long> resolvedPlanners = new HashSet<>();
+        do {
+            candidates = taskMapper.selectPendingAssistanceAfter(lastId, 200);
+            for (BusinessTaskDO task : candidates) {
+                lastId = task.getId();
+                ServiceRelationDO relation = relationMapper.selectById(task.getBizId());
+                if (relation == null || !"active".equals(relation.getStatus())) continue;
+                Long plannerId = relation.getOwnerUserId();
+                if (!resolvedPlanners.contains(plannerId)) {
+                    Long current = currentSupervisor(plannerId);
+                    if (current != null) supervisorCache.put(plannerId, current);
+                    resolvedPlanners.add(plannerId);
+                }
+                Long supervisorId = supervisorCache.get(plannerId);
+                if (supervisorId == null || Objects.equals(supervisorId, task.getAssigneeId())) continue;
+                Map<String, Object> payload = new LinkedHashMap<>();
+                Map<?, ?> existing = JsonUtils.parseObject(task.getPayload(), Map.class);
+                if (existing != null) existing.forEach((key, value) -> payload.put(String.valueOf(key), value));
+                List<Map<String, Object>> transfers = payload.get("supervisorTransfers") instanceof List<?> values
+                        ? new ArrayList<>((List<Map<String, Object>>) values) : new ArrayList<>();
+                transfers.add(Map.of("previousUserId", task.getAssigneeId(), "assignedUserId", supervisorId,
+                        "transferredAt", now.toString()));
+                payload.put("supervisorTransfers", transfers);
+                taskMapper.reassignPendingAssistance(task.getId(), task.getAssigneeId(), supervisorId,
+                        JsonUtils.toJsonString(payload));
+            }
+        } while (candidates.size() == 200);
     }
 }

@@ -76,6 +76,7 @@ SOURCE script/sql/mysql/migrations/V091__lead_flow_history_permission.sql;
 SOURCE script/sql/mysql/migrations/V092__subordinate_sales_pause_all_permission.sql;
 SOURCE script/sql/mysql/migrations/V093__sales_order_supervisor_notifications.sql;
 SOURCE script/sql/mysql/migrations/V094__student_contact_chain.sql;
+SOURCE script/sql/mysql/migrations/V095__student_contact_extension_bpm_form.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 

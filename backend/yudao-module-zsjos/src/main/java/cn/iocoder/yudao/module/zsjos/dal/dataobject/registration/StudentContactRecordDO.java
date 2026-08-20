@@ -28,4 +28,5 @@ public class StudentContactRecordDO extends TenantBaseDO {
     private Long operatorUserId;
     private LocalDateTime submittedAt;
     private String idempotencyKey;
+    private String requestFingerprint;
 }

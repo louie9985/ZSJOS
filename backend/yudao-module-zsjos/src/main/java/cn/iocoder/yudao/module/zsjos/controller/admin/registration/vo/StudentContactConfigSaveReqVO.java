@@ -10,11 +10,12 @@ import java.util.Map;
 public class StudentContactConfigSaveReqVO {
     @NotNull private Long id;
     @NotNull private Integer version;
-    @Min(5) @Max(10080) private Integer firstContactTimeoutMinutes;
-    @Min(5) @Max(43200) private Integer studyPlanTimeoutMinutes;
-    @NotEmpty private List<@Valid ChecklistItemReqVO> checklist;
+    @NotBlankIdempotency private String idempotencyKey;
+    @NotNull @Min(5) @Max(10080) private Integer firstContactTimeoutMinutes;
+    @NotNull @Min(5) @Max(43200) private Integer studyPlanTimeoutMinutes;
+    @NotEmpty private List<@NotNull @Valid ChecklistItemReqVO> checklist;
     @NotNull @Size(max = 50) private List<@NotBlank @Size(max = 200) String> quickNotes;
-    @NotNull private Map<String, List<String>> collaboratorTabs;
+    @NotNull private Map<@NotBlank String, @NotNull List<@NotBlank String>> collaboratorTabs;
     @Data public static class ChecklistItemReqVO {
         @NotBlank @Pattern(regexp = "^[a-z][a-z0-9_]{2,63}$") private String key;
         @NotBlank @Size(max = 100) private String title;

@@ -6,8 +6,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactC
 
 public interface StudentContactConfigService {
     StudentContactConfigRespVO get();
-    Long copyDraft();
+    Long copyDraft(Long publishedId, Integer publishedVersion, String idempotencyKey);
     void updateDraft(StudentContactConfigSaveReqVO request);
-    void publish(Long id, Integer version);
+    void publish(Long id, Integer version, String idempotencyKey);
     StudentContactConfigVersionDO requirePublished();
 }

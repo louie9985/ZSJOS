@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactServic
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -15,6 +16,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 
 import java.util.List;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -34,8 +37,9 @@ public class StudentContactController {
 
     @GetMapping("/{relationId}/contact-records")
     @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
-    public CommonResult<List<StudentContactRecordRespVO>> getRecords(@PathVariable Long relationId) {
-        return success(service.getRecords(relationId, SecurityFrameworkUtils.getLoginUserId()));
+    public CommonResult<PageResult<StudentContactRecordRespVO>> getRecords(@PathVariable Long relationId,
+                                                                            @Valid PageParam page) {
+        return success(service.getRecords(relationId, page, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/{relationId}/accept")
@@ -68,7 +72,7 @@ public class StudentContactController {
     }
 
     @GetMapping("/{relationId}/collaborator-candidates")
-    @PreAuthorize("@ss.hasPermission('zsjos:student-collaborator:assign')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct')")
     public CommonResult<List<StudyPlannerSimpleRespVO>> getCollaboratorCandidates(
             @PathVariable Long relationId, @RequestParam String type) {
         return success(service.getCollaboratorCandidates(relationId, type, SecurityFrameworkUtils.getLoginUserId()));
@@ -86,14 +90,16 @@ public class StudentContactController {
     @PreAuthorize("@ss.hasPermission('zsjos:student-contact-extension:apply')")
     public CommonResult<Boolean> withdrawExtension(@PathVariable Long extensionId,
                                                     @Valid @RequestBody ExtensionWithdrawReqVO request) {
-        service.withdrawExtension(extensionId, request.getReason(), SecurityFrameworkUtils.getLoginUserId());
+        service.withdrawExtension(extensionId, request.getVersion(), request.getReason(), request.getIdempotencyKey(),
+                SecurityFrameworkUtils.getLoginUserId());
         return success(true);
     }
 
     @GetMapping("/extensions")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-contact-extension:apply', 'zsjos:student-contact-extension:review')")
-    public CommonResult<List<StudentContactExtensionRespVO>> getExtensions() {
-        return success(service.getExtensions(SecurityFrameworkUtils.getLoginUserId()));
+    public CommonResult<PageResult<StudentContactExtensionRespVO>> getExtensions(
+            @Valid PageParam page, @RequestParam(required = false) String statusScope) {
+        return success(service.getExtensions(page, statusScope, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/assistance/{taskId}/complete")
@@ -104,18 +110,23 @@ public class StudentContactController {
         return success(true);
     }
 
-    @PostMapping("/attachments")
+    @PostMapping("/{relationId}/attachments")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-contact:first-submit', 'zsjos:student-contact:study-plan-submit', "
             + "'zsjos:student-contact:submit', 'zsjos:student-contact-extension:apply')")
-    public CommonResult<StudentContactAttachmentRespVO> uploadAttachment(@RequestParam("file") MultipartFile file)
+    public CommonResult<StudentContactAttachmentRespVO> uploadAttachment(@PathVariable Long relationId,
+                                                                          @RequestParam("file") MultipartFile file)
             throws IOException {
-        return success(service.uploadAttachment(file));
+        return success(service.uploadAttachment(relationId, SecurityFrameworkUtils.getLoginUserId(), file));
     }
 
     @Data
     public static class ExtensionWithdrawReqVO {
-        @NotBlank
+        @NotNull
+        private Integer version;
+        @NotBlank @jakarta.validation.constraints.Size(max = 1000)
         private String reason;
+        @NotBlankIdempotency
+        private String idempotencyKey;
     }
 
     @Data

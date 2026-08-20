@@ -57,12 +57,23 @@ public class MyStudentServiceImpl implements MyStudentService {
         return convert(userId, personId, relations);
     }
 
+    @Override
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
+    public MyStudentRespVO getMyStudentByService(Long userId, Long relationId) {
+        ServiceRelationDO relation = relationMapper.selectById(relationId);
+        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_NOT_EXISTS);
+        List<ServiceRelationDO> relations = selectAssignedRelationsForPerson(userId, relation.getPersonId());
+        if (relations.stream().noneMatch(item -> Objects.equals(item.getId(), relationId))) {
+            throw exception(STUDENT_NOT_EXISTS);
+        }
+        return convert(userId, relation.getPersonId(), relations);
+    }
+
     private List<ServiceRelationDO> selectAssignedRelationsForPerson(Long userId, Long personId) {
         List<ServiceRelationDO> owned = relationMapper.selectActiveByOwnerAndPerson(userId, personId);
         Map<Long, ServiceRelationDO> result = new LinkedHashMap<>();
         owned.forEach(relation -> result.put(relation.getId(), relation));
-        relationMapper.selectActiveByCollaborator(userId).stream()
-                .filter(relation -> Objects.equals(relation.getPersonId(), personId))
+        relationMapper.selectActiveByCollaboratorAndPerson(userId, personId).stream()
                 .forEach(relation -> result.put(relation.getId(), relation));
         return new ArrayList<>(result.values());
     }

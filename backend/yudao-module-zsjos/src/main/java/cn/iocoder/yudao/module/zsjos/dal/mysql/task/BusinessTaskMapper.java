@@ -40,13 +40,32 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     default int updatePendingDueAt(Long id, LocalDateTime dueAt) {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
-                .set(BusinessTaskDO::getDueAt, dueAt).set(BusinessTaskDO::getRemindAt, dueAt));
+                .set(BusinessTaskDO::getDueAt, dueAt).set(BusinessTaskDO::getRemindAt, dueAt)
+                .setSql("version = version + 1"));
     }
 
     default int reassignPendingById(Long id, Long assigneeId) {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
                 .set(BusinessTaskDO::getAssigneeId, assigneeId));
+    }
+
+    default List<BusinessTaskDO> selectPendingAssistanceAfter(Long lastId, int limit) {
+        return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getTaskType, "student_first_contact_assistance")
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .gt(BusinessTaskDO::getId, lastId)
+                .orderByAsc(BusinessTaskDO::getId).last("LIMIT " + limit));
+    }
+
+    default int reassignPendingAssistance(Long id, Long previousAssigneeId, Long assigneeId, String payload) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id)
+                .eq(BusinessTaskDO::getTaskType, "student_first_contact_assistance")
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .eq(BusinessTaskDO::getAssigneeId, previousAssigneeId)
+                .set(BusinessTaskDO::getAssigneeId, assigneeId)
+                .set(BusinessTaskDO::getPayload, payload));
     }
 
     default int completeAssistance(Long id, Long assigneeId, LocalDateTime completedAt, String payload) {

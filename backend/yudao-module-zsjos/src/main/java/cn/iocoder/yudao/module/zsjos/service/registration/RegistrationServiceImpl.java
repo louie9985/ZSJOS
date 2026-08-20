@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.hutool.core.io.FileUtil;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.infra.framework.file.core.utils.FileTypeUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
@@ -40,7 +41,10 @@ import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
+import lombok.extern.slf4j.Slf4j;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
@@ -54,6 +58,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.*;
 
 @Service
+@Slf4j
 public class RegistrationServiceImpl implements RegistrationService {
     private static final Map<String, String> ATTACHMENT_MIME_BY_EXTENSION = Map.of(
             "jpg", "image/jpeg", "jpeg", "image/jpeg", "png", "image/png", "webp", "image/webp",
@@ -86,6 +91,7 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private BusinessTaskMapper businessTaskMapper;
     @Resource private StudentContactExtensionMapper studentContactExtensionMapper;
+    @Resource private BpmProcessInstanceApi processInstanceApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -371,6 +377,7 @@ public class RegistrationServiceImpl implements RegistrationService {
         RegistrationCaseRouteDO plannerRoute = caseRouteMapper.selectByCaseId(caseId).stream()
                 .filter(route -> ASSIGNEE_STUDY_PLANNER.equals(route.getAssigneeType())).findFirst()
                 .orElseThrow(() -> exception(REGISTRATION_ROUTE_INVALID));
+        if (Objects.equals(previousPlannerId, reqVO.getStudyPlannerUserId())) return convert(registrationCase, true);
         if (resolveRouteCandidates(plannerRoute, userId).stream()
                 .noneMatch(item -> Objects.equals(item.getId(), reqVO.getStudyPlannerUserId()))) {
             throw exception(REGISTRATION_STUDY_PLANNER_INVALID);
@@ -389,11 +396,9 @@ public class RegistrationServiceImpl implements RegistrationService {
         plannerItem.setChecked(true); plannerItem.setCheckedByUserId(userId); plannerItem.setCheckedAt(now);
         plannerItem.setVersion(plannerItem.getVersion() + 1); caseItemMapper.updateById(plannerItem);
         touch(registrationCase);
-        if (!Objects.equals(previousPlannerId, reqVO.getStudyPlannerUserId())) {
-            SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
-            registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order, resolveLeadNo(order),
-                    reqVO.getStudyPlannerUserId());
-        }
+        SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
+        registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order, resolveLeadNo(order),
+                reqVO.getStudyPlannerUserId());
         return convert(registrationCase, true);
     }
 
@@ -466,21 +471,52 @@ public class RegistrationServiceImpl implements RegistrationService {
     @Transactional(rollbackFor = Exception.class)
     public void cancelByOrderId(Long orderId, String reason, LocalDateTime now) {
         RegistrationCaseDO registrationCase = caseMapper.selectByOrderId(orderId);
-        if (registrationCase == null || STATUS_COMPLETED.equals(registrationCase.getStatus()) || STATUS_CANCELLED.equals(registrationCase.getStatus())) return;
-        RegistrationCaseDO locked = caseMapper.selectByIdForUpdate(registrationCase.getId(), TenantContextHolder.getRequiredTenantId());
-        locked.setStatus(STATUS_CANCELLED); locked.setCancelledAt(now); locked.setCancelReason(reason);
-        locked.setVersion(locked.getVersion() + 1); caseMapper.updateById(locked);
+        if (registrationCase == null) return;
+        List<cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO> bpmCancellations = new ArrayList<>();
+        if (!STATUS_COMPLETED.equals(registrationCase.getStatus()) && !STATUS_CANCELLED.equals(registrationCase.getStatus())) {
+            RegistrationCaseDO locked = caseMapper.selectByIdForUpdate(registrationCase.getId(), TenantContextHolder.getRequiredTenantId());
+            if (locked != null && !STATUS_COMPLETED.equals(locked.getStatus())
+                    && !STATUS_CANCELLED.equals(locked.getStatus())) {
+                locked.setStatus(STATUS_CANCELLED); locked.setCancelledAt(now); locked.setCancelReason(reason);
+                locked.setVersion(locked.getVersion() + 1); caseMapper.updateById(locked);
+            }
+        }
         serviceRelationMapper.selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
-                .eq(ServiceRelationDO::getOrderId, orderId)).forEach(relation -> {
+                .eq(ServiceRelationDO::getOrderId, orderId)
+                .eq(ServiceRelationDO::getStatus, "active")).forEach(relation -> {
+            ServiceRelationDO lockedRelation = serviceRelationMapper.selectByIdForUpdate(
+                    relation.getId(), TenantContextHolder.getRequiredTenantId());
+            if (lockedRelation == null || !"active".equals(lockedRelation.getStatus())) return;
+            String terminationReason = reason == null || reason.isBlank() ? "订单已取消" : reason.trim();
+            if (serviceRelationMapper.cancelActive(lockedRelation.getId(), lockedRelation.getVersion(), now,
+                    terminationReason) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
             for (String type : List.of(StudentContactConstants.TYPE_FIRST_CONTACT, StudentContactConstants.TYPE_STUDY_PLAN,
                     StudentContactConstants.TYPE_CONTACT, StudentContactConstants.TYPE_ASSISTANCE)) {
-                businessTaskMapper.cancelPending(type, relation.getId(), null, now, "服务关系已取消");
+                businessTaskMapper.cancelPending(type, lockedRelation.getId(), null, now, "服务关系已取消");
             }
             studentContactExtensionMapper.selectList(new LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO>()
-                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getServiceRelationId, relation.getId())
+                    .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getServiceRelationId, lockedRelation.getId())
                     .eq(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactExtensionDO::getStatus, "pending"))
-                    .forEach(extension -> { extension.setStatus("cancelled"); extension.setDecisionReason("服务关系已取消"); extension.setResolvedAt(now); extension.setVersion(extension.getVersion() + 1); studentContactExtensionMapper.updateById(extension); });
+                    .forEach(extension -> {
+                        if (studentContactExtensionMapper.transitionPending(extension.getId(), extension.getVersion(),
+                                "cancelled", "服务关系已取消", null, now) == 1
+                                && extension.getProcessInstanceId() != null) bpmCancellations.add(extension);
+                    });
         });
+        if (!bpmCancellations.isEmpty()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    bpmCancellations.forEach(extension -> {
+                        try { processInstanceApi.cancelProcessInstanceByStartUser(extension.getApplicantUserId(),
+                                extension.getProcessInstanceId(), "服务关系已取消"); }
+                        catch (RuntimeException ex) {
+                            log.error("[cancelByOrderId][extensionId({}) BPM cancellation failed after commit]",
+                                    extension.getId(), ex);
+                        }
+                    });
+                }
+            });
+        }
     }
 
     private RegistrationCaseDO lockEditable(Long caseId, Integer expectedVersion) {

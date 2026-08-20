@@ -146,6 +146,15 @@ describe('notify message business actions', () => {
       'workType=supervisor&orderId=29&taskId=task%2F1&confirmationId=31'))
   })
 
+  it('opens student contact notifications at the exact service relation', async () => {
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'student_service', bizId: 41,
+      sceneCode: 'zsjos.student.first_contact_reminder' }), {
+      navigate, warn: vi.fn(), refreshUnreadCount: vi.fn().mockResolvedValue(undefined)
+    })
+    expect(navigate).toHaveBeenCalledWith(expect.any(String), { state: { serviceRelationId: 41 } })
+  })
+
   it('falls back to overview when the server does not expose the requested tab', async () => {
     vi.spyOn(api, 'myPendingLeads').mockResolvedValue([])
     vi.spyOn(api, 'managedLead').mockResolvedValue({ id: 29, visibleTabs: ['overview'] } as never)

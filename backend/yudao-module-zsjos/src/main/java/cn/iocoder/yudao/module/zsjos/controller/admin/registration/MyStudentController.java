@@ -37,4 +37,10 @@ public class MyStudentController {
     public CommonResult<MyStudentRespVO> getMyStudent(@PathVariable Long personId) {
         return success(studentService.getMyStudent(SecurityFrameworkUtils.getLoginUserId(), personId));
     }
+
+    @GetMapping("/my/by-service/{relationId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    public CommonResult<MyStudentRespVO> getMyStudentByService(@PathVariable Long relationId) {
+        return success(studentService.getMyStudentByService(SecurityFrameworkUtils.getLoginUserId(), relationId));
+    }
 }

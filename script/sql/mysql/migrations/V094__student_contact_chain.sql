@@ -8,6 +8,19 @@
 -- This file must not be executed against an existing environment without separate approval.
 
 SET @v094_sql := IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_business_task_notify_stage' AND column_name='task_version')=0,
+  'ALTER TABLE `zsjos_business_task_notify_stage` ADD COLUMN `task_version` int NOT NULL DEFAULT 0 AFTER `task_id`', 'SELECT 1');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
+SET @v094_sql := IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_business_task_notify_stage' AND index_name='uk_tenant_task_stage'),
+  'ALTER TABLE `zsjos_business_task_notify_stage` DROP INDEX `uk_tenant_task_stage`', 'SELECT 1');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
+SET @v094_sql := IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_business_task_notify_stage' AND index_name='uk_tenant_task_version_stage'),
+  'SELECT 1', 'ALTER TABLE `zsjos_business_task_notify_stage` ADD UNIQUE KEY `uk_tenant_task_version_stage` (`tenant_id`,`task_id`,`task_version`,`stage`)');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
+
+SET @v094_sql := IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
   AND table_name='zsjos_service_relation' AND column_name='acceptance_status')=0,
   'ALTER TABLE `zsjos_service_relation` ADD COLUMN `acceptance_status` varchar(24) NOT NULL DEFAULT ''pending'' AFTER `owner_user_id`', 'SELECT 1');
 PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
@@ -48,6 +61,22 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_config_version` (
   KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系配置版本';
 
+CREATE TABLE IF NOT EXISTS `zsjos_student_contact_config_command` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `operation` varchar(24) NOT NULL, `idempotency_key` varchar(64) NOT NULL,
+  `config_id` bigint NOT NULL, `expected_version` int NOT NULL,
+  `request_fingerprint` varchar(64) NOT NULL DEFAULT '', `result_config_id` bigint NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+  KEY `idx_tenant_config_operation` (`tenant_id`,`config_id`,`operation`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系配置幂等命令';
+
+SET @v094_sql := IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_contact_config_command' AND column_name='request_fingerprint')=0,
+  'ALTER TABLE `zsjos_student_contact_config_command` ADD COLUMN `request_fingerprint` varchar(64) NOT NULL DEFAULT '''' AFTER `expected_version`', 'SELECT 1');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
+
 CREATE TABLE IF NOT EXISTS `zsjos_student_contact_record` (
   `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL, `task_id` bigint NOT NULL,
   `contact_type` varchar(64) NOT NULL, `successful` bit(1) NOT NULL,
@@ -55,7 +84,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_record` (
   `unsuccessful_reason_label_snapshot` varchar(100) DEFAULT NULL, `remark` varchar(2000) NOT NULL,
   `attachment_file_ids_json` json NOT NULL, `checklist_result_json` json NOT NULL,
   `next_contact_at` datetime NOT NULL, `operator_user_id` bigint NOT NULL, `submitted_at` datetime NOT NULL,
-  `idempotency_key` varchar(128) NOT NULL, `creator` varchar(64) DEFAULT '',
+  `idempotency_key` varchar(128) NOT NULL, `request_fingerprint` varchar(64) NOT NULL DEFAULT '',
+  `creator` varchar(64) DEFAULT '',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
@@ -63,6 +93,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_record` (
   UNIQUE KEY `uk_tenant_task` (`tenant_id`,`task_id`),
   KEY `idx_tenant_relation_submitted` (`tenant_id`,`service_relation_id`,`submitted_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='不可变学员联系记录';
+
+SET @v094_sql := IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_contact_record' AND column_name='request_fingerprint')=0,
+  'ALTER TABLE `zsjos_student_contact_record` ADD COLUMN `request_fingerprint` varchar(64) NOT NULL DEFAULT '''' AFTER `idempotency_key`', 'SELECT 1');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
 
 CREATE TABLE IF NOT EXISTS `zsjos_student_contact_extension` (
   `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL, `task_id` bigint NOT NULL,
@@ -72,15 +107,26 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_extension` (
   `applicant_user_id` bigint NOT NULL, `reviewer_user_id` bigint NOT NULL,
   `process_instance_id` varchar(64) DEFAULT NULL, `decision_reason` varchar(1000) DEFAULT NULL,
   `submitted_at` datetime NOT NULL, `resolved_at` datetime DEFAULT NULL,
-  `idempotency_key` varchar(128) NOT NULL, `version` int NOT NULL DEFAULT 0,
+  `idempotency_key` varchar(128) NOT NULL, `withdrawal_idempotency_key` varchar(64) DEFAULT NULL,
+  `version` int NOT NULL DEFAULT 0,
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
   PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+  UNIQUE KEY `uk_tenant_withdrawal_idempotency` (`tenant_id`,`withdrawal_idempotency_key`),
   UNIQUE KEY `uk_tenant_process` (`tenant_id`,`process_instance_id`),
   KEY `idx_tenant_reviewer_status` (`tenant_id`,`reviewer_user_id`,`status`,`submitted_at`),
   KEY `idx_tenant_task_status` (`tenant_id`,`task_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系延期申请快照';
+
+SET @v094_sql := IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_contact_extension' AND column_name='withdrawal_idempotency_key')=0,
+  'ALTER TABLE `zsjos_student_contact_extension` ADD COLUMN `withdrawal_idempotency_key` varchar(64) DEFAULT NULL AFTER `idempotency_key`', 'SELECT 1');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
+SET @v094_sql := IF(EXISTS(SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+  AND table_name='zsjos_student_contact_extension' AND index_name='uk_tenant_withdrawal_idempotency'),
+  'SELECT 1', 'ALTER TABLE `zsjos_student_contact_extension` ADD UNIQUE KEY `uk_tenant_withdrawal_idempotency` (`tenant_id`,`withdrawal_idempotency_key`)');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
 
 CREATE TABLE IF NOT EXISTS `zsjos_student_collaborator_assignment_log` (
   `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL,
@@ -139,7 +185,20 @@ WHERE relation_row.deleted=b'0' AND relation_row.content_director_user_id IS NUL
 UPDATE `zsjos_service_relation`
 SET `acceptance_status`='pending',`accepted_by_user_id`=NULL,`accepted_at`=NULL,
     `updater`='migration-V094',`update_time`=NOW()
-WHERE `status`='active' AND `deleted`=b'0' AND `acceptance_status`<>'pending';
+WHERE `status`='active' AND `deleted`=b'0' AND `acceptance_status`<>'pending'
+  AND `accepted_by_user_id` IS NULL AND `accepted_at` IS NULL;
+
+SET @v094_menu_collision := (SELECT COUNT(*) FROM `system_menu` existing JOIN (
+  SELECT 73400 id,'zsjos:student-contact-config:query' permission UNION ALL
+  SELECT 73401,'zsjos:student-contact-config:update' UNION ALL SELECT 73402,'zsjos:student-contact-config:publish' UNION ALL
+  SELECT 73410,'zsjos:student-contact-extension:review' UNION ALL SELECT 73420,'zsjos:student:accept' UNION ALL
+  SELECT 73421,'zsjos:student-contact:first-submit' UNION ALL SELECT 73422,'zsjos:student-contact:study-plan-submit' UNION ALL
+  SELECT 73423,'zsjos:student-contact:submit' UNION ALL SELECT 73424,'zsjos:student-contact-extension:apply' UNION ALL
+  SELECT 73425,'zsjos:student-collaborator:assign' UNION ALL SELECT 73426,'zsjos:student-collaborator:correct'
+) expected ON expected.id=existing.id WHERE COALESCE(existing.permission,'')<>expected.permission);
+SET @v094_sql := IF(@v094_menu_collision=0, 'SELECT 1',
+  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT=''V094 menu ID collision: existing menu ownership differs''');
+PREPARE v094_stmt FROM @v094_sql; EXECUTE v094_stmt; DEALLOCATE PREPARE v094_stmt;
 
 SET @v094_zsjos_menu_id := (SELECT `id` FROM `system_menu`
   WHERE `path`='/zsjos' AND `parent_id`=0 AND `deleted`=b'0' ORDER BY `id` LIMIT 1);
@@ -149,7 +208,7 @@ INSERT INTO `system_menu`
 (73400,'学员联系配置','zsjos:student-contact-config:query',2,63,@v094_zsjos_menu_id,'/zsjos/student-contact-config','ep:setting','zsjos/studentContactConfig/index','ZsjosStudentContactConfig',0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
 (73401,'更新学员联系配置','zsjos:student-contact-config:update',3,1,73400,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
 (73402,'发布学员联系配置','zsjos:student-contact-config:publish',3,2,73400,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
-(73410,'异常情况处理','zsjos:student-contact-extension:review',2,64,@v094_zsjos_menu_id,'/zsjos/student-contact-exceptions','ep:warning','zsjos/student-contact-exceptions','ZsjosStudentContactExceptions',0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
+(73410,'异常情况处理','zsjos:student-contact-extension:review',2,64,@v094_zsjos_menu_id,'/zsjos/student-contact-exceptions','ep:warning','zsjos/studentContactExceptions/index','ZsjosStudentContactExceptions',0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
 (73420,'确认接收学员','zsjos:student:accept',3,1,73020,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
 (73421,'提交首次联系','zsjos:student-contact:first-submit',3,2,73020,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
 (73422,'提交学习计划','zsjos:student-contact:study-plan-submit',3,3,73020,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
@@ -158,14 +217,16 @@ INSERT INTO `system_menu`
 (73425,'分配学员协作者','zsjos:student-collaborator:assign',3,6,73020,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0'),
 (73426,'纠正学员协作者','zsjos:student-collaborator:correct',3,3,73400,'','','',NULL,0,b'1',b'1',b'0','migration-V094',NOW(),'migration-V094',NOW(),b'0')
 ON DUPLICATE KEY UPDATE `name`=VALUES(`name`),`permission`=VALUES(`permission`),`parent_id`=VALUES(`parent_id`),
- `path`=VALUES(`path`),`component`=VALUES(`component`),`component_name`=VALUES(`component_name`),
- `status`=0,`deleted`=b'0',`updater`='migration-V094',`update_time`=NOW();
+ `type`=VALUES(`type`),`sort`=VALUES(`sort`),`path`=VALUES(`path`),`icon`=VALUES(`icon`),
+ `component`=VALUES(`component`),`component_name`=VALUES(`component_name`),`status`=VALUES(`status`),
+ `visible`=VALUES(`visible`),`keep_alive`=VALUES(`keep_alive`),`always_show`=VALUES(`always_show`),
+ `deleted`=b'0',`updater`='migration-V094',`update_time`=NOW();
 
 INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT role_row.id,menu_row.id,'migration-V094',NOW(),'migration-V094',NOW(),b'0',role_row.tenant_id
 FROM `system_role` role_row JOIN `system_menu` menu_row ON menu_row.deleted=b'0'
 WHERE role_row.deleted=b'0'
-  AND ((role_row.code='system_administrator' AND menu_row.id BETWEEN 73400 AND 73426)
+  AND ((role_row.code='system_administrator' AND menu_row.id IN (73400,73401,73402,73410,73420,73421,73422,73423,73424,73425,73426))
     OR (role_row.code='study_planner' AND menu_row.id IN (73420,73421,73422,73423,73424,73425)))
   AND NOT EXISTS (SELECT 1 FROM `system_role_menu` grant_row
     WHERE grant_row.role_id=role_row.id AND grant_row.menu_id=menu_row.id
@@ -216,7 +277,9 @@ FROM `system_tenant` tenant JOIN (
 ) seed JOIN `system_notify_template` template ON template.code=seed.template_code AND template.deleted=b'0'
 WHERE tenant.deleted=b'0' AND NOT EXISTS (SELECT 1 FROM `system_notify_rule` rule_row
   WHERE rule_row.tenant_id=tenant.id AND rule_row.scene_code=seed.scene_code
-    AND rule_row.timing_stage=seed.stage AND rule_row.deleted=b'0');
+    AND rule_row.name=seed.name AND rule_row.channel_code='in_app'
+    AND rule_row.template_id=template.id AND rule_row.timing_stage=seed.stage
+    AND rule_row.timing_offset_minutes=seed.offset_minutes AND rule_row.deleted=b'0');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 VALUES ('V094','Student acceptance and continuous contact chain','V094__student_contact_chain.sql',NOW())

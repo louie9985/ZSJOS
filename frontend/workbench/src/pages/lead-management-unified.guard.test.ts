@@ -6,8 +6,8 @@ describe('unified Lead management route', () => {
     const routeHost = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
 
     expect(routeHost).toContain('APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>')
-    expect(routeHost).not.toContain("relationScope: 'submitted'")
-    expect(routeHost).not.toContain("relationScope: 'owned'")
+    expect(routeHost).toContain("relationScope: 'submitted'")
+    expect(routeHost).toContain("relationScope: 'owned'")
     expect(routeHost).not.toContain('<LeadManagementPage audience=')
   })
 
@@ -15,7 +15,7 @@ describe('unified Lead management route', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
 
     expect(page).toContain("const audience: LeadAudience = 'all'")
-    expect(page).not.toContain('relationScope')
+    expect(page).toContain('relationScope: routeState?.relationScope')
   })
 
   it('keeps all simple status filters without restoring relation tabs', () => {

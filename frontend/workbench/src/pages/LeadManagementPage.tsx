@@ -79,7 +79,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const routeState = location.state as { leadId?: number; openFollowUp?: boolean } | null
+  const routeState = location.state as { leadId?: number; openFollowUp?: boolean; relationScope?: 'submitted' | 'owned' } | null
   const queryLeadId = Number(searchParams.get('leadId')) || undefined
   const requestedLeadId = routeState?.leadId || queryLeadId
   const requestedTab = parseLeadDetailTab(searchParams.get('tab'))
@@ -151,6 +151,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         pageNo: targetPage,
         pageSize: PAGE_SIZE,
         keyword: keyword || undefined, advancedFilter,
+        relationScope: routeState?.relationScope,
         simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus,
       }
       const result = audience === 'all'
@@ -197,7 +198,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         }
       }
     }
-  }, [advancedFilter, audience, keyword, requestedLeadId, simpleStatus])
+  }, [advancedFilter, audience, keyword, requestedLeadId, routeState?.relationScope, simpleStatus])
 
   useEffect(() => { void loadMetadata() }, [loadMetadata])
   useEffect(() => {

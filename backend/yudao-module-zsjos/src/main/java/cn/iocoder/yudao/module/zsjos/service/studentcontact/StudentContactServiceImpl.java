@@ -1,6 +1,10 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
+import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
@@ -26,11 +30,14 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
+import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
@@ -61,12 +68,15 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private FileApi fileApi;
 
-    @Override public StudentContactContextRespVO getContext(Long relationId, Long userId) {
+    @Override
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
+    public StudentContactContextRespVO getContext(Long relationId, Long userId) {
         ServiceRelationDO relation = requireReadable(relationId, userId);
         StudentContactContextRespVO result = new StudentContactContextRespVO();
         result.setServiceRelationId(relationId); result.setAcceptanceStatus(relation.getAcceptanceStatus());
         result.setAcceptedAt(relation.getAcceptedAt()); result.setVersion(relation.getVersion());
-        StudentContactConfigVersionDO config = configService.requirePublished();
+        BusinessTaskDO task = currentTask(relationId);
+        StudentContactConfigVersionDO config = task == null ? configService.requirePublished() : configFromTask(task);
         result.setFirstContactChecklist(checklist(config));
         result.setQuickNotes(JsonUtils.parseArray(config.getQuickNotesJson(), String.class));
         result.setFirstContactTimeoutMinutes(config.getFirstContactTimeoutMinutes());
@@ -81,7 +91,6 @@ public class StudentContactServiceImpl implements StudentContactService {
             if (configured instanceof Collection<?> values) values.stream().map(String::valueOf).forEach(visible::add);
             result.setVisibleTabs(visible);
         }
-        BusinessTaskDO task = currentTask(relationId);
         if (task != null) {
             StudentContactContextRespVO.CurrentTaskVO row = new StudentContactContextRespVO.CurrentTaskVO();
             row.setId(task.getId()); row.setType(task.getTaskType()); row.setStatus(task.getStatus()); row.setDueAt(task.getDueAt());
@@ -97,11 +106,14 @@ public class StudentContactServiceImpl implements StudentContactService {
         return result;
     }
 
-    @Override public List<StudentContactRecordRespVO> getRecords(Long relationId, Long userId) {
+    @Override
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
+    public PageResult<StudentContactRecordRespVO> getRecords(Long relationId, PageParam page, Long userId) {
         requireReadable(relationId, userId);
-        List<StudentContactRecordDO> rows = recordMapper.selectByRelationId(relationId);
-        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(rows.stream().map(StudentContactRecordDO::getOperatorUserId).toList());
-        return rows.stream().map(row -> {
+        PageResult<StudentContactRecordDO> rows = recordMapper.selectPageByRelationId(page, relationId);
+        Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(rows.getList().stream()
+                .map(StudentContactRecordDO::getOperatorUserId).toList());
+        return new PageResult<>(rows.getList().stream().map(row -> {
             StudentContactRecordRespVO result = new StudentContactRecordRespVO();
             result.setId(row.getId()); result.setContactType(row.getContactType()); result.setSuccessful(row.getSuccessful());
             result.setUnsuccessfulReasonValue(row.getUnsuccessfulReasonValue());
@@ -110,10 +122,11 @@ public class StudentContactServiceImpl implements StudentContactService {
             result.setCompletedChecklistKeys(parseStrings(row.getChecklistResultJson())); result.setNextContactAt(row.getNextContactAt());
             result.setOperatorUserId(row.getOperatorUserId()); result.setOperatorUserName(name(users.get(row.getOperatorUserId())));
             result.setSubmittedAt(row.getSubmittedAt()); return result;
-        }).toList();
+        }).toList(), rows.getTotal());
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "accept")
     public void accept(Long relationId, StudentServiceAcceptReqVO request, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
         if ("accepted".equals(relation.getAcceptanceStatus())) return;
@@ -126,39 +139,44 @@ public class StudentContactServiceImpl implements StudentContactService {
                 "student-contact:accept:" + relationId, config.getId());
     }
 
-    @Override public Long submitFirstContact(Long relationId, StudentFirstContactSubmitReqVO request, Long userId) {
+    @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
+    public Long submitFirstContact(Long relationId, StudentFirstContactSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_FIRST_CONTACT, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(),
                 request.getCompletedChecklistKeys(), request.getNextContactAt(), request.getExtensionReasonValue(),
                 request.getExtensionDescription(), request.getExtensionAttachmentFileIds(), request.getIdempotencyKey(), userId);
     }
 
-    @Override public Long submitStudyPlan(Long relationId, StudentStudyPlanSubmitReqVO request, Long userId) {
+    @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
+    public Long submitStudyPlan(Long relationId, StudentStudyPlanSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_STUDY_PLAN, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null,
                 request.getNextContactAt(), request.getExtensionReasonValue(), request.getExtensionDescription(),
                 request.getExtensionAttachmentFileIds(), request.getIdempotencyKey(), userId);
     }
 
-    @Override public Long submitContact(Long relationId, StudentContactSubmitReqVO request, Long userId) {
+    @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
+    public Long submitContact(Long relationId, StudentContactSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_CONTACT, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null,
                 request.getNextContactAt(), null, null, null, request.getIdempotencyKey(), userId);
     }
 
-    @Transactional(rollbackFor = Exception.class)
-    protected Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
+    private Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
                           String remark, List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
                           String extensionReason, String extensionDescription, List<Long> extensionAttachments,
                           String idempotencyKey, Long userId) {
+        ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        String requestFingerprint = contactFingerprint(expectedType, successful, unsuccessfulReason, remark,
+                attachments, checklistKeys, nextAt, extensionReason, extensionDescription, extensionAttachments);
         StudentContactRecordDO replay = recordMapper.selectByIdempotencyKey(idempotencyKey);
         if (replay != null) {
-            if (!Objects.equals(replay.getServiceRelationId(), relationId) || !Objects.equals(replay.getTaskId(), taskId)) {
-                throw exception(STUDENT_CONTACT_FORM_INVALID);
-            }
+            validateReplay(replay, relationId, taskId, userId, requestFingerprint);
             return replay.getId();
         }
-        ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
         if (task == null || !"pending".equals(task.getStatus()) || !expectedType.equals(task.getTaskType())
@@ -167,9 +185,11 @@ public class StudentContactServiceImpl implements StudentContactService {
             throw exception(STUDENT_CONTACT_TASK_INVALID);
         }
         StudentContactConfigVersionDO config = configFromTask(task);
-        validateAttachments(attachments);
+        validateAttachments(attachments, relationId, userId);
         String reasonLabel = Boolean.TRUE.equals(successful) ? null : dictLabel(DICT_UNSUCCESSFUL_REASON, unsuccessfulReason);
-        if (Boolean.TRUE.equals(successful) && TYPE_FIRST_CONTACT.equals(expectedType)) validateChecklist(config, checklistKeys);
+        if (Boolean.TRUE.equals(successful) && TYPE_FIRST_CONTACT.equals(expectedType)) {
+            validateChecklist(config, checklistKeys, attachments);
+        }
         StudentContactRecordDO record = new StudentContactRecordDO();
         record.setServiceRelationId(relationId); record.setTaskId(taskId); record.setContactType(expectedType);
         record.setSuccessful(successful); record.setUnsuccessfulReasonValue(Boolean.TRUE.equals(successful) ? null : unsuccessfulReason);
@@ -177,10 +197,12 @@ public class StudentContactServiceImpl implements StudentContactService {
         record.setAttachmentFileIdsJson(JsonUtils.toJsonString(attachments == null ? List.of() : attachments));
         record.setChecklistResultJson(JsonUtils.toJsonString(checklistKeys == null ? List.of() : checklistKeys));
         record.setNextContactAt(nextAt); record.setOperatorUserId(userId); record.setSubmittedAt(LocalDateTime.now());
-        record.setIdempotencyKey(idempotencyKey);
+        record.setIdempotencyKey(idempotencyKey); record.setRequestFingerprint(requestFingerprint);
         try { recordMapper.insert(record); } catch (DuplicateKeyException duplicate) {
             StudentContactRecordDO concurrent = recordMapper.selectByIdempotencyKey(idempotencyKey);
-            if (concurrent == null) throw duplicate; return concurrent.getId();
+            if (concurrent == null) throw duplicate;
+            validateReplay(concurrent, relationId, taskId, userId, requestFingerprint);
+            return concurrent.getId();
         }
         taskCommandService.completeByKey(task.getIdempotencyKey(), record.getSubmittedAt());
         if (TYPE_FIRST_CONTACT.equals(expectedType)) {
@@ -197,13 +219,19 @@ public class StudentContactServiceImpl implements StudentContactService {
         return record.getId();
     }
 
-    @Override public List<StudyPlannerSimpleRespVO> getCollaboratorCandidates(Long relationId, String type, Long userId) {
-        ServiceRelationDO relation = requireOwned(relationId, userId);
+    @Override
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "assign")
+    public List<StudyPlannerSimpleRespVO> getCollaboratorCandidates(Long relationId, String type, Long userId) {
+        ServiceRelationDO relation = relationMapper.selectById(relationId);
+        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
+        boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
+        if (!owner && !correction) throw exception(STUDENT_PERMISSION_DENIED);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String scene = scene(type);
         if (scene == null) throw exception(STUDENT_COLLABORATOR_INVALID);
         Set<Long> ids = new LinkedHashSet<>();
-        userRelationMapper.selectListBySourceUserIds(scene, List.of(userId)).stream()
+        userRelationMapper.selectListBySourceUserIds(scene, List.of(relation.getOwnerUserId())).stream()
                 .filter(row -> CommonStatusEnum.ENABLE.getStatus().equals(row.getStatus()))
                 .map(LeadAssignmentRelationDO::getTargetUserId).forEach(ids::add);
         return adminUserApi.getUserList(ids).stream().filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
@@ -212,22 +240,28 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "assign")
     public void assignCollaborator(Long relationId, StudentCollaboratorAssignReqVO request, Long userId) {
-        StudentCollaboratorAssignmentLogDO replay = assignmentLogMapper.selectByIdempotencyKey(request.getIdempotencyKey());
-        if (replay != null) return;
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId, TenantContextHolder.getRequiredTenantId());
         if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
         if (!owner && !correction || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
+        StudentCollaboratorAssignmentLogDO replay = assignmentLogMapper.selectByIdempotencyKey(request.getIdempotencyKey());
+        if (replay != null) {
+            if (!Objects.equals(replay.getServiceRelationId(), relationId)
+                    || !Objects.equals(replay.getCollaboratorType(), request.getCollaboratorType())
+                    || !Objects.equals(replay.getAssignedUserId(), request.getUserId())
+                    || !Objects.equals(replay.getOperatorUserId(), userId)) throw exception(STUDENT_COLLABORATOR_INVALID);
+            return;
+        }
         Long previous = COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())
                 ? relation.getContentDirectorUserId() : relation.getCareerPlannerUserId();
         if (previous != null && !correction) throw exception(STUDENT_COLLABORATOR_ALREADY_ASSIGNED);
         if (previous != null && (request.getCorrectionReason() == null || request.getCorrectionReason().isBlank())) {
             throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
         }
-        Long relationSource = relation.getOwnerUserId();
-        boolean candidate = getCollaboratorCandidates(relationId, request.getCollaboratorType(), relationSource).stream()
+        boolean candidate = getCollaboratorCandidates(relationId, request.getCollaboratorType(), userId).stream()
                 .anyMatch(row -> row.getId().equals(request.getUserId()));
         if (!candidate) throw exception(STUDENT_COLLABORATOR_INVALID);
         if (!Objects.equals(relation.getVersion(), request.getVersion())) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
@@ -241,14 +275,27 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
-    public void withdrawExtension(Long extensionId, String reason, Long userId) {
-        StudentContactExtensionDO extension = extensionMapper.selectById(extensionId);
-        if (extension == null || !"pending".equals(extension.getStatus()) || !userId.equals(extension.getApplicantUserId())) {
+    @ZsjosPermission(bizType = "student-contact-extension", bizId = "#extensionId", action = "withdraw")
+    public void withdrawExtension(Long extensionId, Integer version, String reason, String idempotencyKey, Long userId) {
+        StudentContactExtensionDO extension = extensionMapper.selectByIdForUpdate(
+                extensionId, TenantContextHolder.getRequiredTenantId());
+        if (extension != null && "withdrawn".equals(extension.getStatus())
+                && idempotencyKey.equals(extension.getWithdrawalIdempotencyKey())) return;
+        if (extension == null || !"pending".equals(extension.getStatus())
+                || !userId.equals(extension.getApplicantUserId()) || !version.equals(extension.getVersion())) {
             throw exception(STUDENT_CONTACT_EXTENSION_NOT_EXISTS);
         }
-        processInstanceApi.cancelProcessInstanceByStartUser(userId, extension.getProcessInstanceId(), reason);
-        extension.setStatus("withdrawn"); extension.setDecisionReason(reason); extension.setResolvedAt(LocalDateTime.now());
-        extension.setVersion(extension.getVersion() + 1); extensionMapper.updateById(extension);
+        if (extensionMapper.transitionPending(extensionId, version, "withdrawn", reason.trim(), idempotencyKey,
+                LocalDateTime.now()) != 1) throw exception(STUDENT_CONTACT_EXTENSION_NOT_EXISTS);
+        String processInstanceId = extension.getProcessInstanceId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCommit() {
+                try { processInstanceApi.cancelProcessInstanceByStartUser(userId, processInstanceId, reason.trim()); }
+                catch (RuntimeException ex) {
+                    log.error("[withdrawExtension][extensionId({}) BPM cancellation failed after commit]", extensionId, ex);
+                }
+            }
+        });
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -257,19 +304,21 @@ public class StudentContactServiceImpl implements StudentContactService {
         StudentContactExtensionDO extension = extensionMapper.selectByProcessIdForUpdate(
                 processInstanceId, TenantContextHolder.getRequiredTenantId());
         if (extension == null || !"pending".equals(extension.getStatus())) return;
+        String status;
         if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(processStatus)
-                && taskMapper.updatePendingDueAt(extension.getTaskId(), extension.getRequestedDueAt()) == 1) {
-            extension.setStatus("approved");
-        } else {
-            extension.setStatus(BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus) ? "rejected" : "cancelled");
-        }
-        extension.setDecisionReason(reason); extension.setResolvedAt(LocalDateTime.now());
-        extension.setVersion(extension.getVersion() + 1); extensionMapper.updateById(extension);
+                && taskMapper.updatePendingDueAt(extension.getTaskId(), extension.getRequestedDueAt()) == 1) status = "approved";
+        else status = BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(processStatus) ? "rejected" : "cancelled";
+        if (extensionMapper.transitionPending(extension.getId(), extension.getVersion(), status, reason, null,
+                LocalDateTime.now()) != 1) throw exception(STUDENT_CONTACT_EXTENSION_NOT_EXISTS);
     }
 
     @Override
-    public List<StudentContactExtensionRespVO> getExtensions(Long userId) {
-        return extensionMapper.selectVisible(userId).stream().map(row -> {
+    public PageResult<StudentContactExtensionRespVO> getExtensions(PageParam page, String statusScope, Long userId) {
+        if (statusScope != null && !Set.of("pending", "history", "all").contains(statusScope)) {
+            throw exception(STUDENT_CONTACT_FORM_INVALID);
+        }
+        PageResult<StudentContactExtensionDO> rows = extensionMapper.selectVisiblePage(page, userId, statusScope);
+        return new PageResult<>(rows.getList().stream().map(row -> {
             StudentContactExtensionRespVO result = new StudentContactExtensionRespVO();
             result.setId(row.getId()); result.setServiceRelationId(row.getServiceRelationId()); result.setTaskId(row.getTaskId());
             result.setStatus(row.getStatus()); result.setOriginalDueAt(row.getOriginalDueAt());
@@ -279,12 +328,14 @@ public class StudentContactServiceImpl implements StudentContactService {
             result.setApplicantUserId(row.getApplicantUserId()); result.setReviewerUserId(row.getReviewerUserId());
             result.setProcessInstanceId(row.getProcessInstanceId()); result.setDecisionReason(row.getDecisionReason());
             result.setSubmittedAt(row.getSubmittedAt()); result.setResolvedAt(row.getResolvedAt());
+            result.setVersion(row.getVersion());
             return result;
-        }).toList();
+        }).toList(), rows.getTotal());
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-assistance", bizId = "#taskId", action = "complete")
     public void completeAssistance(Long taskId, String remark, Long userId) {
         BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
         if (task == null || !TYPE_ASSISTANCE.equals(task.getTaskType()) || !userId.equals(task.getAssigneeId())) {
@@ -305,7 +356,7 @@ public class StudentContactServiceImpl implements StudentContactService {
                                  LocalDateTime requestedDueAt, String reasonValue, String description,
                                  List<Long> attachments, Long applicant, String idempotencyKey) {
         if (reasonValue == null || description == null || description.isBlank()) throw exception(STUDENT_CONTACT_FORM_INVALID);
-        validateAttachments(attachments);
+        validateAttachments(attachments, relation.getId(), applicant);
         String reasonLabel = dictLabel(DICT_EXTENSION_REASON, reasonValue);
         Long reviewer = requireSupervisor(applicant);
         StudentContactExtensionDO extension = new StudentContactExtensionDO();
@@ -317,15 +368,34 @@ public class StudentContactServiceImpl implements StudentContactService {
         extension.setIdempotencyKey(idempotencyKey); extension.setVersion(0); extensionMapper.insert(extension);
         BpmProcessInstanceCreateReqDTO process = new BpmProcessInstanceCreateReqDTO();
         process.setProcessDefinitionKey(PROCESS_EXTENSION); process.setBusinessKey("student-contact-extension:" + extension.getId());
-        process.setVariables(Map.of("extensionId", extension.getId(), "serviceRelationId", relation.getId(),
-                "requestedDueAt", requestedDueAt.toString()));
+        process.setVariables(Map.of(
+                "extensionId", extension.getId(),
+                "serviceRelationId", relation.getId(),
+                "originalDueAt", originalDueAt.toString(),
+                "requestedDueAt", requestedDueAt.toString(),
+                "reasonValue", extension.getReasonValue(),
+                "reasonLabel", extension.getReasonLabelSnapshot(),
+                "description", extension.getDescription(),
+                "attachmentFileIds", extension.getAttachmentFileIdsJson(),
+                "applicantUserId", extension.getApplicantUserId(),
+                "submittedAt", extension.getSubmittedAt().toString()));
         process.setStartUserSelectAssignees(Map.of(TASK_EXTENSION_REVIEW, List.of(reviewer)));
         try { extension.setProcessInstanceId(processInstanceApi.createProcessInstance(applicant, process)); }
         catch (RuntimeException ex) {
             log.error("[createExtension][extensionId({}) process start failed]", extension.getId(), ex);
             throw exception(STUDENT_CONTACT_PROCESS_UNAVAILABLE);
         }
-        extensionMapper.updateById(extension);
+        String processInstanceId = extension.getProcessInstanceId();
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override public void afterCompletion(int status) {
+                if (status != STATUS_ROLLED_BACK) return;
+                try { processInstanceApi.cancelProcessInstanceByStartUser(applicant, processInstanceId, "业务事务已回滚"); }
+                catch (RuntimeException ex) {
+                    log.error("[createExtension][extensionId({}) rollback compensation failed]", extension.getId(), ex);
+                }
+            }
+        });
+        if (extensionMapper.updateById(extension) != 1) throw exception(STUDENT_CONTACT_PROCESS_UNAVAILABLE);
     }
 
     private Long createTask(ServiceRelationDO relation, String type, LocalDateTime dueAt, String key, Long configId) {
@@ -352,10 +422,13 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (config == null) throw exception(STUDENT_CONTACT_CONFIG_INVALID); return config;
     }
 
-    private void validateChecklist(StudentContactConfigVersionDO config, List<String> completed) {
-        Set<String> required = checklist(config).stream().map(StudentContactContextRespVO.ChecklistItemVO::getKey)
+    private void validateChecklist(StudentContactConfigVersionDO config, List<String> completed, List<Long> attachments) {
+        List<StudentContactContextRespVO.ChecklistItemVO> items = checklist(config);
+        Set<String> required = items.stream().map(StudentContactContextRespVO.ChecklistItemVO::getKey)
                 .collect(java.util.stream.Collectors.toSet());
         if (completed == null || !new HashSet<>(completed).containsAll(required)) throw exception(STUDENT_CONTACT_FORM_INVALID);
+        if (items.stream().anyMatch(item -> Boolean.TRUE.equals(item.getAttachmentRequired()))
+                && (attachments == null || attachments.isEmpty())) throw exception(STUDENT_CONTACT_FORM_INVALID);
     }
 
     private List<StudentContactContextRespVO.ChecklistItemVO> checklist(StudentContactConfigVersionDO config) {
@@ -418,21 +491,53 @@ public class StudentContactServiceImpl implements StudentContactService {
     private String scene(String type) { return COLLABORATOR_DIRECTOR.equals(type) ? RELATION_PLANNER_DIRECTOR : COLLABORATOR_CAREER.equals(type) ? RELATION_PLANNER_CAREER : null; }
     private String name(AdminUserRespDTO user) { return user == null ? null : user.getNickname(); }
     @Override
-    public StudentContactAttachmentRespVO uploadAttachment(MultipartFile file) throws IOException {
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
+    public StudentContactAttachmentRespVO uploadAttachment(Long relationId, Long userId, MultipartFile file) throws IOException {
+        requireOwned(relationId, userId);
         if (file == null || file.isEmpty() || file.getSize() > 20L * 1024 * 1024) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
         FileInfoRespDTO saved = fileApi.createFileInfo(file.getBytes(), file.getOriginalFilename(),
-                "zsjos/student-contact", file.getContentType());
+                attachmentDirectory(relationId, userId), file.getContentType());
         return new StudentContactAttachmentRespVO(saved.getId(), file.getOriginalFilename(), saved.getUrl(),
                 file.getContentType(), file.getSize());
     }
-    private void validateAttachments(List<Long> fileIds) {
+    private void validateAttachments(List<Long> fileIds, Long relationId, Long userId) {
         if (fileIds == null) return;
         if (fileIds.size() > 9 || fileIds.stream().anyMatch(Objects::isNull)) throw exception(STUDENT_CONTACT_FORM_INVALID);
         for (Long fileId : new LinkedHashSet<>(fileIds)) {
-            if (fileApi.getFileInfo(fileId) == null) throw exception(STUDENT_CONTACT_FORM_INVALID);
+            FileInfoRespDTO file;
+            try { file = fileApi.getFileInfo(fileId); }
+            catch (ServiceException ex) { throw exception(STUDENT_CONTACT_FORM_INVALID); }
+            String prefix = attachmentDirectory(relationId, userId) + "/";
+            if (file == null || !String.valueOf(userId).equals(file.getCreator()) || file.getPath() == null
+                    || !file.getPath().startsWith(prefix)) throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
+    }
+    private void validateReplay(StudentContactRecordDO replay, Long relationId, Long taskId, Long userId,
+                                String requestFingerprint) {
+        if (!Objects.equals(replay.getServiceRelationId(), relationId) || !Objects.equals(replay.getTaskId(), taskId)
+                || !Objects.equals(replay.getOperatorUserId(), userId)
+                || !Objects.equals(replay.getRequestFingerprint(), requestFingerprint)) {
+            throw exception(STUDENT_CONTACT_FORM_INVALID);
+        }
+    }
+    private String contactFingerprint(String type, Boolean successful, String unsuccessfulReason, String remark,
+                                      List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
+                                      String extensionReason, String extensionDescription,
+                                      List<Long> extensionAttachments) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", type); payload.put("successful", successful);
+        payload.put("unsuccessfulReason", unsuccessfulReason); payload.put("remark", remark);
+        payload.put("attachments", attachments == null ? List.of() : attachments);
+        payload.put("checklistKeys", checklistKeys == null ? List.of() : checklistKeys);
+        payload.put("nextAt", nextAt == null ? null : nextAt.toString());
+        payload.put("extensionReason", extensionReason); payload.put("extensionDescription", extensionDescription);
+        payload.put("extensionAttachments", extensionAttachments == null ? List.of() : extensionAttachments);
+        return DigestUtil.sha256Hex(JsonUtils.toJsonString(payload));
+    }
+    private String attachmentDirectory(Long relationId, Long userId) {
+        return "zsjos/student-contact/" + relationId + "/" + userId;
     }
     private List<Long> parseLongs(String json) { return json == null ? List.of() : JsonUtils.parseArray(json, Long.class); }
     private List<String> parseStrings(String json) { return json == null ? List.of() : JsonUtils.parseArray(json, String.class); }

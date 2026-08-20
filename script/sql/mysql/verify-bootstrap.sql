@@ -539,11 +539,28 @@ SELECT 'student_contact_chain' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
              AND table_name='zsjos_service_relation'
              AND column_name IN ('acceptance_status','accepted_by_user_id','accepted_at','content_director_user_id','career_planner_user_id'))=5
-          AND (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
-             AND table_name IN ('zsjos_student_contact_config_version','zsjos_student_contact_record',
-                                'zsjos_student_contact_extension','zsjos_student_collaborator_assignment_log'))=4
+           AND (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+              AND table_name IN ('zsjos_student_contact_config_version','zsjos_student_contact_record',
+                                 'zsjos_student_contact_config_command','zsjos_student_contact_extension',
+                                 'zsjos_student_collaborator_assignment_log'))=5
+           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+              AND table_name='zsjos_student_contact_extension' AND column_name='withdrawal_idempotency_key')
+           AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+              AND ((table_name='zsjos_student_contact_config_command' AND column_name='request_fingerprint')
+                OR (table_name='zsjos_student_contact_record' AND column_name='request_fingerprint')))=2
+           AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+              AND table_name='zsjos_business_task_notify_stage' AND column_name='task_version')
           AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V094')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V094')
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V095')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V095')
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant tenant
+            LEFT JOIN bpm_form form ON form.tenant_id=tenant.id
+              AND form.remark='zsjos-system-form:student-contact-extension' AND form.deleted=b'0'
+            WHERE tenant.deleted=b'0' AND tenant.status=0
+            GROUP BY tenant.id HAVING COUNT(form.id)<>1
+          )
           AND (SELECT COUNT(*) FROM system_dict_type WHERE type IN
              ('zsjos_student_contact_unsuccessful_reason','zsjos_student_contact_extension_reason') AND deleted=b'0')=2
           AND (SELECT COUNT(DISTINCT code) FROM zsjos_user_relation_scene WHERE code IN

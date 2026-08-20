@@ -56,7 +56,7 @@ class MyStudentServiceImplTest {
         item.setProductSnapshot(JsonUtils.toJsonString(snapshot));
 
         when(relationMapper.selectActiveByOwnerAndPerson(8L, 2L)).thenReturn(List.of(relation));
-        when(relationMapper.selectActiveByCollaborator(8L)).thenReturn(List.of());
+        when(relationMapper.selectActiveByCollaboratorAndPerson(8L, 2L)).thenReturn(List.of());
         when(personMapper.selectById(2L)).thenReturn(person);
         when(leadMapper.selectById(5L)).thenReturn(lead);
         when(orderMapper.selectBatchIds(Set.of(3L))).thenReturn(List.of(order));
@@ -83,7 +83,7 @@ class MyStudentServiceImplTest {
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(14L); item.setOrderId(13L);
 
         when(relationMapper.selectActiveByOwnerAndPerson(18L, 12L)).thenReturn(List.of());
-        when(relationMapper.selectActiveByCollaborator(18L)).thenReturn(List.of(relation));
+        when(relationMapper.selectActiveByCollaboratorAndPerson(18L, 12L)).thenReturn(List.of(relation));
         when(personMapper.selectById(12L)).thenReturn(person);
         when(orderMapper.selectBatchIds(Set.of(13L))).thenReturn(List.of(order));
         when(orderItemMapper.selectBatchIds(Set.of(14L))).thenReturn(List.of(item));
