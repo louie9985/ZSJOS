@@ -15,6 +15,8 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -46,14 +48,16 @@ class LeadNotifySceneProviderTest {
     @Mock private DeptApi deptApi;
     @Mock private LeadAgingPoolCycleMapper agingPoolCycleMapper;
     @Mock private LeadAssignmentService assignmentService;
+    @Mock private PartnerAccountMapper partnerAccountMapper;
 
     @Test
     void registersAllScenesWithSceneSpecificVariables() {
         List<NotifySceneRespDTO> scenes = provider.getScenes();
 
-        assertEquals(39, scenes.size());
-        assertEquals(39, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertEquals(40, scenes.size());
+        assertEquals(40, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("lead.no"));
+        assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("lead.name"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("followUp.result"));
         assertTrue(variableKeys(scene(scenes, FOLLOW_UP_RECORDED)).contains("followUp.result"));
@@ -61,6 +65,7 @@ class LeadNotifySceneProviderTest {
         assertTrue(variableKeys(scene(scenes, APPEAL_SUBMITTED)).contains("appeal.roundNo"));
         assertTrue(variableKeys(scene(scenes, SUBMITTER_URGED)).contains("urge.reason"));
         assertTrue(scenes.stream().anyMatch(item -> COMPLAINT_FOUNDED.equals(item.getCode())));
+        assertTrue(variableKeys(scene(scenes, COMPLAINT_UNFOUNDED)).contains("complaint.handlerOpinion"));
     }
 
     @Test
@@ -78,6 +83,35 @@ class LeadNotifySceneProviderTest {
 
         assertEquals(Set.of(NotifyRecipientDTO.admin(10L), NotifyRecipientDTO.admin(20L)),
                 provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER, ROLE_OPERATOR)));
+    }
+
+    @Test
+    void resolvesDedicatedProviderOnlyFromExplicitPayload() {
+        NotifyBusinessEvent linked = NotifyBusinessEvent.builder().sceneCode(CREATED)
+                .operatorUserId(10L).payload(Map.of("newMediaProviderUserId", 20L)).build();
+        NotifyBusinessEvent unlinked = NotifyBusinessEvent.builder().sceneCode(CREATED)
+                .operatorUserId(10L).payload(Map.of()).build();
+
+        assertEquals(Set.of(NotifyRecipientDTO.admin(20L)),
+                provider.resolveRecipients(linked, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
+        assertEquals(Set.of(), provider.resolveRecipients(unlinked, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
+    }
+
+    @Test
+    void resolvesActualAdminAndPartnerComplainants() {
+        PartnerAccountDO partnerAccount = new PartnerAccountDO();
+        partnerAccount.setId(71L); partnerAccount.setPartnerId(70L);
+        when(partnerAccountMapper.selectByPartnerId(70L)).thenReturn(partnerAccount);
+
+        NotifyBusinessEvent adminComplaint = NotifyBusinessEvent.builder().sceneCode(COMPLAINT_FOUNDED)
+                .payload(Map.of("complaint.complainantUserId", 10L)).build();
+        NotifyBusinessEvent partnerComplaint = NotifyBusinessEvent.builder().sceneCode(COMPLAINT_UNFOUNDED)
+                .payload(Map.of("complaint.partnerId", 70L)).build();
+
+        assertEquals(Set.of(NotifyRecipientDTO.admin(10L)),
+                provider.resolveRecipients(adminComplaint, Set.of(ROLE_COMPLAINANT)));
+        assertEquals(Set.of(NotifyRecipientDTO.partner(71L)),
+                provider.resolveRecipients(partnerComplaint, Set.of(ROLE_COMPLAINANT)));
     }
 
     @Test

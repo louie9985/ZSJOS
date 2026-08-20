@@ -31,4 +31,11 @@ public interface LeadAssignmentHistoryMapper extends BaseMapperX<LeadAssignmentH
         return result;
     }
 
+    default List<LeadAssignmentHistoryDO> selectByLeadId(Long leadId) {
+        return selectList(new LambdaQueryWrapperX<LeadAssignmentHistoryDO>()
+                .eq(LeadAssignmentHistoryDO::getLeadId, leadId)
+                .orderByDesc(LeadAssignmentHistoryDO::getOccurredAt)
+                .orderByDesc(LeadAssignmentHistoryDO::getId));
+    }
+
 }

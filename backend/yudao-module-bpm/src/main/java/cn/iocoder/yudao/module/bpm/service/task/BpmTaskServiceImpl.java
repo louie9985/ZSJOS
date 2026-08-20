@@ -692,7 +692,10 @@ public class BpmTaskServiceImpl implements BpmTaskService {
 
         // 情况三：审批普通的任务。大多数情况下，都是这样
         // 2.1 更新 task 状态、原因、签字
-        updateTaskStatusAndReason(task.getId(), BpmTaskStatusEnum.APPROVE.getStatus(), reqVO.getReason());
+        boolean waitForParallelSign = task.getParentTaskId() == null
+                && BpmTaskSignTypeEnum.PARALLEL.getType().equals(task.getScopeType());
+        updateTaskStatusAndReason(task.getId(), waitForParallelSign
+                ? BpmTaskStatusEnum.APPROVING.getStatus() : BpmTaskStatusEnum.APPROVE.getStatus(), reqVO.getReason());
         if (signEnable) {
             taskService.setVariableLocal(task.getId(), BpmnVariableConstants.TASK_SIGN_PIC_URL, reqVO.getSignPicUrl());
         }
@@ -737,7 +740,16 @@ public class BpmTaskServiceImpl implements BpmTaskService {
             runtimeService.removeVariable(task.getProcessInstanceId(), returnFlagKey);
         }
 
-        // 7. 调用 BPM complete 去完成任务
+        // 7. 并行加签把普通审批和主管审批都作为完成条件。普通审批先通过时，父任务退出审批人的待办，
+        // 但保留运行实例；最后一个主管子任务通过后，由 handleParentTaskIfSign 完成父任务。
+        if (waitForParallelSign) {
+            // 上面的局部变量写入已经递增任务 REV，不能再保存审批开始时读取的旧实体，否则会触发乐观锁异常。
+            taskService.setOwner(task.getId(), task.getAssignee());
+            taskService.setAssignee(task.getId(), null);
+            return;
+        }
+
+        // 8. 调用 BPM complete 去完成任务
         Map<String,Object> taskVariables = MapUtil.emptyIfNull(reqVO.getVariables()); // task local variables. 一般用于任务内嵌流程表单
         taskService.complete(task.getId(), taskVariables, true);
 
@@ -849,6 +861,7 @@ public class BpmTaskServiceImpl implements BpmTaskService {
      * <p>
      * 1. 如果是【向前】加签，则需要重新激活父任务，让它可以被审批
      * 2. 如果是【向后】加签，则需要完成父任务，让它完成审批
+     * 3. 如果是【并行】加签，则主任务和子任务都通过后才完成父任务
      *
      * @param parentTaskId 父任务编号
      */
@@ -890,6 +903,14 @@ public class BpmTaskServiceImpl implements BpmTaskService {
             // 3.2.2 完成自己（因为它已经没有子任务，所以也可以完成）
             updateTaskStatus(parentTaskId, BpmTaskStatusEnum.APPROVE.getStatus());
             taskService.complete(parentTaskId);
+        } else if (BpmTaskSignTypeEnum.PARALLEL.getType().equals(scopeType)) {
+            Integer status = (Integer) parentTask.getTaskLocalVariables().get(BpmnVariableConstants.TASK_VARIABLE_STATUS);
+            if (ObjectUtil.notEqual(status, BpmTaskStatusEnum.APPROVING.getStatus())) {
+                return;
+            }
+            taskService.resolveTask(parentTaskId);
+            updateTaskStatus(parentTaskId, BpmTaskStatusEnum.APPROVE.getStatus());
+            taskService.complete(parentTaskId);
         }
 
         // 4. 递归处理父任务
@@ -928,6 +949,9 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         if (instance == null) {
             throw exception(PROCESS_INSTANCE_NOT_EXISTS);
         }
+
+        // 并行加签的主任务先驳回时，流程将按主任务决定结束，不再保留主管子任务。
+        cancelParallelSignChildren(task, "主审批任务已驳回");
 
         // 2.1 更新流程任务为不通过
         updateTaskStatusAndReason(task.getId(), BpmTaskStatusEnum.REJECT.getStatus(), reqVO.getReason());
@@ -1327,7 +1351,8 @@ public class BpmTaskServiceImpl implements BpmTaskService {
         BpmTaskConvert.INSTANCE.copyTo(parentTask, task);
 
         // 2.1 向前加签，设置审批人
-        if (BpmTaskSignTypeEnum.BEFORE.getType().equals(parentTask.getScopeType())) {
+        if (BpmTaskSignTypeEnum.BEFORE.getType().equals(parentTask.getScopeType())
+                || BpmTaskSignTypeEnum.PARALLEL.getType().equals(parentTask.getScopeType())) {
             task.setAssignee(assignee);
             // 2.2 向后加签，设置 owner 不设置 assignee 是因为不能同时审批，需要等父任务完成
         } else {
@@ -1341,6 +1366,22 @@ public class BpmTaskServiceImpl implements BpmTaskService {
             updateTaskStatus(task.getId(), BpmTaskStatusEnum.WAIT.getStatus());
         }
         return task.getId();
+    }
+
+    private void cancelParallelSignChildren(Task task, String reason) {
+        if (task.getParentTaskId() != null
+                || !BpmTaskSignTypeEnum.PARALLEL.getType().equals(task.getScopeType())) {
+            return;
+        }
+        List<Task> childTaskList = getAllChildTaskList(task);
+        childTaskList.forEach(childTask -> updateTaskStatusAndReason(childTask.getId(),
+                BpmTaskStatusEnum.CANCEL.getStatus(), reason));
+        if (CollUtil.isNotEmpty(childTaskList)) {
+            taskService.deleteTasks(convertList(childTaskList, Task::getId));
+        }
+        TaskEntityImpl taskEntity = (TaskEntityImpl) task;
+        taskEntity.setScopeType(null);
+        taskService.saveTask(taskEntity);
     }
 
     @Override

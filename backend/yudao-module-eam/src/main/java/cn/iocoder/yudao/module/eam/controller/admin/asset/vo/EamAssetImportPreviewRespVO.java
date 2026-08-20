@@ -39,11 +39,13 @@ public class EamAssetImportPreviewRespVO {
         private String categoryName;
         private Integer managementMode;
         private Integer quantity;
-        private String sourceUserName;
+        private String useUserName;
+        private String supervisorName;
         private String matchedUserName;
+        private String matchedSupervisorName;
         private String action;
         @Builder.Default
-        private Map<String, Object> sourceFields = new LinkedHashMap<>();
+        private Map<String, Object> mappedFields = new LinkedHashMap<>();
         @Builder.Default
         private List<String> defaultedFields = new ArrayList<>();
         @Builder.Default

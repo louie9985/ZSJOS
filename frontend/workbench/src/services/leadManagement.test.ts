@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, pinLeadFirst, prioritizeLeads, protocolDisplayLabel, resolveLeadSelection, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -24,6 +24,41 @@ describe('lead management paging helpers', () => {
   it('merges lazy-loaded pages without duplicate records', () => {
     expect(mergeUniqueLeads([lead(1, '旧名称')], [lead(1, '新名称'), lead(2, '客户二')]))
       .toEqual([lead(1, '新名称'), lead(2, '客户二')])
+  })
+
+  it('keeps the just-changed lead selected after activity sorting moves it', () => {
+    const reordered = [lead(2, '刚跟进的客资'), lead(1, '其他客资')]
+
+    expect(resolveLeadSelection(reordered, { preferredId: 2, currentId: 1 })).toBe(2)
+  })
+
+  it('preserves a deep-linked selection even when lazy page one does not contain it', () => {
+    expect(resolveLeadSelection([lead(1, '第一页客资')], {
+      requestedId: 42, preserveRequestedId: true
+    })).toBe(42)
+  })
+
+  it('pins a hydrated deep-linked lead into the left list', () => {
+    expect(pinLeadFirst([lead(1, '第一页客资')], lead(42, '通知客资')).map(item => item.id)).toEqual([42, 1])
+  })
+
+  it('puts the newest unseen action leads first while preserving backend order otherwise', () => {
+    expect(prioritizeLeads([lead(1, '普通'), lead(2, '旧动作'), lead(3, '新动作')], [2, 3]).map(item => item.id))
+      .toEqual([2, 3, 1])
+    expect(prioritizeLeads([lead(1, '普通'), lead(2, '旧动作'), lead(3, '新动作')], [3, 2]).map(item => item.id))
+      .toEqual([3, 2, 1])
+  })
+
+  it('falls back to the first lead when the changed lead leaves the filtered result', () => {
+    const filtered = [lead(1, '当前第一条'), lead(3, '其他客资')]
+
+    expect(resolveLeadSelection(filtered, { preferredId: 2, currentId: 2 })).toBe(1)
+  })
+
+  it('preserves a manual selection instead of restoring a stale route request', () => {
+    const rows = [lead(1, '路由客资'), lead(2, '手工选择客资')]
+
+    expect(resolveLeadSelection(rows, { currentId: 2, requestedId: 1 })).toBe(2)
   })
 
   it('sums server status counts', () => {

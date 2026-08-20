@@ -231,7 +231,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);
         notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), actorUserId,
-                lead.getSubmittedAt(), eventContext(lead));
+                lead.getSubmittedAt(), eventContext(lead, actorUserId));
         dispatchService.start(lead, reqVO.getSpecifiedSalesUserId(), actorUserId);
         return response(leadMapper.selectById(lead.getId()), "created");
     }
@@ -353,6 +353,10 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechatId);
         lead.setSourceType(sourceType(identity));
         lead.setSourceUserId(sourceUserId); lead.setPartnerId(identity.partnerId());
+        if (identity.identity() == LeadSubmissionIdentityService.Identity.SALES) {
+            lead.setSourceProviderUserId(reqVO.getNewMediaProviderUserId());
+            lead.setSourceProviderRecorded(true);
+        }
         AdminUserRespDTO submitter = sourceUserId == null ? null : adminUserApi.getUser(sourceUserId);
         lead.setSourceDeptId(submitter == null ? null : submitter.getDeptId());
         lead.setSourceChannelId(reqVO.getSourceChannel());
@@ -409,11 +413,15 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         return activation;
     }
 
-    private Map<String, Object> eventContext(LeadDO lead) {
+    private Map<String, Object> eventContext(LeadDO lead, Long actorUserId) {
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("submitterUserId", lead.getSourceUserId());
         context.put("ownerUserId", lead.getOwnerUserId());
         context.put("pendingSalesUserId", lead.getPendingAssigneeUserId());
+        if (SOURCE_SALES_SELF.equals(lead.getSourceType())
+                && !Objects.equals(lead.getSourceUserId(), actorUserId)) {
+            context.put("newMediaProviderUserId", lead.getSourceUserId());
+        }
         return context;
     }
 

@@ -10,6 +10,29 @@ export interface RegistrationChecklistItem {
   checkedByUserId?: number
   checkedByUserName?: string
   checkedAt?: string
+  attachmentRequired?: boolean
+  attachments?: RegistrationAttachment[]
+}
+
+export interface RegistrationAttachment {
+  id: number
+  fileUrl: string
+  originalName: string
+  fileSize: number
+  uploadedByUserName?: string
+  uploadedAt?: string
+}
+export interface RegistrationRoute {
+  id: number
+  optionKey: string
+  departmentId: number
+  departmentName: string
+  assigneeType: 'study_planner' | 'content_director'
+  assigneeTypeLabel: string
+  selected: boolean
+  assigneeUserId?: number
+  assigneeUserName?: string
+  sort: number
 }
 
 export interface RegistrationCase {
@@ -32,6 +55,7 @@ export interface RegistrationCase {
   completionBlockCode?: string
   completionBlockReason?: string
   items: RegistrationChecklistItem[]
+  routes: RegistrationRoute[]
 }
 
 export interface StudyPlanner {
@@ -55,7 +79,6 @@ export interface StudentService {
 
 export interface MyStudent {
   personId: number
-  leadId: number
   leadNo?: string
   name: string
   mobile?: string
@@ -75,6 +98,44 @@ export const getRegistrationCase = (id: number) =>
 
 export const getStudyPlannerCandidates = () =>
   request.get<StudyPlanner[]>({ url: '/zsjos/registration/study-planner-candidates' })
+
+export const getRouteCandidates = (id: number, routeId: number) =>
+  request.get<StudyPlanner[]>({ url: `/zsjos/registration/${id}/routes/${routeId}/candidates` })
+
+export const updateRegistrationRoutes = (
+  id: number,
+  routes: Array<{ routeId: number; selected: boolean; assigneeUserId?: number }>,
+  version: number
+) =>
+  request.put<RegistrationCase>({
+    url: `/zsjos/registration/${id}/routes`,
+    data: { routes, version, idempotencyKey: crypto.randomUUID() }
+  })
+
+export const uploadRegistrationAttachment = (
+  id: number,
+  itemId: number,
+  file: File,
+  version: number
+) => {
+  const data = new FormData()
+  data.append('file', file)
+  return request.upload<{ version: number }>({
+    url: `/zsjos/registration/${id}/items/${itemId}/attachments?version=${version}&idempotencyKey=${crypto.randomUUID()}`,
+    data
+  })
+}
+
+export const deleteRegistrationAttachment = (
+  id: number,
+  itemId: number,
+  attachmentId: number,
+  version: number
+) =>
+  request.delete<RegistrationCase>({
+    url: `/zsjos/registration/${id}/items/${itemId}/attachments/${attachmentId}`,
+    data: { version, idempotencyKey: crypto.randomUUID() }
+  })
 
 export const updateRegistrationItem = (
   id: number,

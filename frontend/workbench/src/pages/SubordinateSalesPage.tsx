@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Button,
@@ -7,7 +7,6 @@ import {
   Input,
   List,
   Modal,
-  Pagination,
   Popover,
   Select,
   Skeleton,
@@ -23,7 +22,7 @@ import {
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import {
   ArrowLeftOutlined,
-  ReloadOutlined,
+  PoweroffOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import EmployeeAvatar from "../components/EmployeeAvatar";
@@ -46,6 +45,7 @@ import { dictionaryDisplayLabel } from "../services/leadManagement";
 import { formatTimestamp } from "../services/time";
 import {
   formatCurrency,
+  appendSubordinateSalesRows,
   receiveStatusLabel,
   summarizeBatchResult,
   todayStatusLabel,
@@ -670,42 +670,102 @@ export default function SubordinateSalesPage({
 }) {
   const [rows, setRows] = useState<SubordinateSales[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(1);
+  const [loadedPage, setLoadedPage] = useState(0);
   const [keyword, setKeyword] = useState("");
+  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [presence, setPresence] = useState<string>();
   const [accountStatus, setAccountStatus] = useState<number>();
   const [accepting, setAccepting] = useState<boolean>();
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState("");
+  const [loadMoreError, setLoadMoreError] = useState("");
   const [selectedSales, setSelectedSales] = useState<SubordinateSales>();
   const [reasonAction, setReasonAction] = useState<ReasonAction>();
   const [reasonSaving, setReasonSaving] = useState(false);
+  const [pausingAll, setPausingAll] = useState(false);
   const [reasonForm] = Form.useForm();
-  const load = useCallback(async () => {
+  const listRef = useRef<HTMLDivElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const requestVersionRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+
+  const requestPage = useCallback((pageNo: number) => api.subordinateSalesPage({
+    pageNo,
+    pageSize: PAGE_SIZE,
+    keyword: keyword.trim() || undefined,
+    presence,
+    accountStatus,
+    accepting,
+    advancedFilter,
+  }), [accepting, accountStatus, advancedFilter, keyword, presence]);
+
+  const loadFirstPage = useCallback(async (preserveSelection = false) => {
+    const requestVersion = ++requestVersionRef.current;
     setLoading(true);
     setError("");
+    setLoadMoreError("");
     try {
-      const result = await api.subordinateSalesPage({
-        pageNo: page,
-        pageSize: PAGE_SIZE,
-        keyword: keyword.trim() || undefined,
-        presence,
-        accountStatus,
-        accepting,
-      });
+      const result = await requestPage(1);
+      if (requestVersion !== requestVersionRef.current) return;
       setRows(result.list);
       setTotal(result.total);
+      setLoadedPage(1);
+      setSelectedSales(current => {
+        if (!preserveSelection || !current) return preserveSelection ? current : undefined;
+        return result.list.find(row => row.userId === current.userId) || result.list[0];
+      });
     } catch (loadError) {
+      if (requestVersion !== requestVersionRef.current) return;
       setError(
         loadError instanceof Error ? loadError.message : "下属销售加载失败",
       );
     } finally {
-      setLoading(false);
+      if (requestVersion === requestVersionRef.current) setLoading(false);
     }
-  }, [accepting, accountStatus, keyword, page, presence]);
+  }, [requestPage]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    setRows([]);
+    setTotal(0);
+    setLoadedPage(0);
+    setSelectedSales(undefined);
+    listRef.current?.scrollTo({ top: 0 });
+    void loadFirstPage();
+  }, [loadFirstPage]);
+
+  const loadMore = useCallback(async () => {
+    if (loading || loadingMoreRef.current || rows.length >= total) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    setLoadMoreError("");
+    const requestVersion = requestVersionRef.current;
+    const nextPage = loadedPage + 1;
+    try {
+      const result = await requestPage(nextPage);
+      if (requestVersion !== requestVersionRef.current) return;
+      setRows(current => appendSubordinateSalesRows(current, result.list));
+      setTotal(result.total);
+      setLoadedPage(nextPage);
+    } catch (loadError) {
+      if (requestVersion !== requestVersionRef.current) return;
+      setLoadMoreError(loadError instanceof Error ? loadError.message : "更多下属销售加载失败");
+    } finally {
+      loadingMoreRef.current = false;
+      if (requestVersion === requestVersionRef.current) setLoadingMore(false);
+    }
+  }, [loadedPage, loading, requestPage, rows.length, total]);
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    const root = listRef.current;
+    if (!sentinel || !root || loading || loadMoreError || rows.length >= total) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMore();
+    }, { root, rootMargin: "240px 0px" });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [loadMore, loadMoreError, loading, rows.length, total]);
   const submitReasonAction = async () => {
     if (!reasonAction) return;
     const values = await reasonForm.validateFields();
@@ -725,7 +785,7 @@ export default function SubordinateSalesPage({
         );
       message.success("操作成功");
       setReasonAction(undefined);
-      await load();
+      await loadFirstPage(true);
     } catch (saveError) {
       message.error(
         saveError instanceof Error ? saveError.message : "操作失败",
@@ -743,25 +803,49 @@ export default function SubordinateSalesPage({
     reasonForm.resetFields();
     setReasonAction(action);
   };
+  const confirmPauseAll = () => {
+    Modal.confirm({
+      title: "确认一键下班",
+      content: "将把当前主管管理范围内的全部销售（包括停用账号）设置为暂停接单。现有客资、账号状态和页面在线状态不会改变。",
+      okText: "全部暂停接单",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: async () => {
+        setPausingAll(true);
+        try {
+          const result = await api.pauseAllSubordinateDispatch();
+          message.success(`共 ${result.totalCount} 人，已暂停 ${result.changedCount} 人，原已暂停 ${result.alreadyPausedCount} 人`);
+          await loadFirstPage(true);
+        } catch (pauseError) {
+          message.error(pauseError instanceof Error ? pauseError.message : "一键下班失败");
+          throw pauseError;
+        } finally {
+          setPausingAll(false);
+        }
+      },
+    });
+  };
   return (
     <section className="workspace-page subordinate-sales-page">
       <div className="subordinate-toolbar">
         <Space wrap>
-          <Input.Search
-            allowClear
-            placeholder="姓名 / 账号 / 手机号"
-            onSearch={(value) => {
-              setPage(1);
+          <AdvancedFilterToolbar
+            scene="subordinate_sales"
+            placeholder="搜索姓名、账号或手机号"
+            keyword={keyword}
+            value={advancedFilter}
+            onKeyword={(value) => {
               setKeyword(value);
             }}
-            style={{ width: 260 }}
+            onChange={(value) => {
+              setAdvancedFilter(value);
+            }}
           />
           <Select
             allowClear
             placeholder="账号状态"
             value={accountStatus}
             onChange={(value) => {
-              setPage(1);
               setAccountStatus(value);
             }}
             style={{ width: 130 }}
@@ -775,7 +859,6 @@ export default function SubordinateSalesPage({
             placeholder="页面状态"
             value={presence}
             onChange={(value) => {
-              setPage(1);
               setPresence(value);
             }}
             style={{ width: 130 }}
@@ -789,7 +872,6 @@ export default function SubordinateSalesPage({
             placeholder="接单状态"
             value={accepting}
             onChange={(value) => {
-              setPage(1);
               setAccepting(value);
             }}
             style={{ width: 130 }}
@@ -799,9 +881,11 @@ export default function SubordinateSalesPage({
             ]}
           />
         </Space>
-        <Button icon={<ReloadOutlined />} onClick={() => void load()}>
-          刷新
-        </Button>
+        {permissions.includes("zsjos:subordinate-sales:pause-all") && (
+          <Button danger icon={<PoweroffOutlined />} loading={pausingAll} onClick={confirmPauseAll}>
+            一键下班
+          </Button>
+        )}
       </div>
       {error && (
         <Alert
@@ -810,7 +894,7 @@ export default function SubordinateSalesPage({
           showIcon
           message={error}
           action={
-            <Button size="small" onClick={() => void load()}>
+            <Button size="small" onClick={() => void loadFirstPage()}>
               重试
             </Button>
           }
@@ -820,11 +904,12 @@ export default function SubordinateSalesPage({
         className={`subordinate-inbox-layout ${selectedSales ? "show-detail" : "show-list"}`}
       >
         <aside className="subordinate-sales-list-pane">
-          <div className="subordinate-sales-list">
+          <div className="subordinate-sales-list" ref={listRef}>
             {loading && !rows.length ? (
               <Skeleton active />
             ) : rows.length ? (
-              rows.map((row) => (
+              <>
+              {rows.map((row) => (
                 <button
                   type="button"
                   key={row.userId}
@@ -870,20 +955,18 @@ export default function SubordinateSalesPage({
                     </span>
                   </div>
                 </button>
-              ))
+              ))}
+              <div ref={sentinelRef} className="subordinate-sales-load-sentinel" aria-hidden="true" />
+              {loadingMore && <div className="subordinate-sales-load-state"><Button type="text" size="small" loading>正在加载更多</Button></div>}
+              {loadMoreError && <Alert className="subordinate-sales-load-error" type="error" showIcon message={loadMoreError}
+                action={<Button size="small" onClick={() => void loadMore()}>重试</Button>} />}
+              {!loadingMore && !loadMoreError && rows.length >= total && (
+                <div className="subordinate-sales-load-state">已加载全部 {total} 人</div>
+              )}
+              </>
             ) : (
               <Empty image={<TeamOutlined />} description="暂无下属销售" />
             )}
-          </div>
-          <div className="subordinate-sales-pagination">
-            <Pagination
-              size="small"
-              current={page}
-              pageSize={PAGE_SIZE}
-              total={total}
-              showSizeChanger={false}
-              onChange={setPage}
-            />
           </div>
         </aside>
         <main className="subordinate-sales-detail-pane">
@@ -892,7 +975,7 @@ export default function SubordinateSalesPage({
               sales={selectedSales}
               permissions={permissions}
               onBack={() => setSelectedSales(undefined)}
-              onChanged={() => void load()}
+              onChanged={() => void loadFirstPage(true)}
               onReasonAction={openReasonAction}
             />
           ) : (

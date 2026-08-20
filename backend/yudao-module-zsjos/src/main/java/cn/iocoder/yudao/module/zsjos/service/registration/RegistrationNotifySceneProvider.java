@@ -27,14 +27,36 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
         return List.of(new NotifySceneRespDTO(NOTIFY_SCENE_TASK_CREATED, "新报名履约任务", List.of(
                 new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                 new NotifySceneVariableRespDTO("order.id", "订单编号", false),
-                new NotifySceneVariableRespDTO("order.no", "订单号", false),
-                new NotifySceneVariableRespDTO("student.name", "学员姓名", true)),
+                new NotifySceneVariableRespDTO("order.no", "订单号", false)),
                 List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_POOL_HANDLERS, "报名履约公共池处理人")),
+                List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false),
+                new NotifySceneRespDTO(NOTIFY_SCENE_PLANNER_ASSIGNED, "学习规划师分配", List.of(
+                        new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
+                        new NotifySceneVariableRespDTO("order.no", "订单号", false),
+                        new NotifySceneVariableRespDTO("lead.no", "客资编号", false)),
+                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_STUDY_PLANNER, "学习规划师")),
+                List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false),
+                new NotifySceneRespDTO(NOTIFY_SCENE_DIRECTOR_ASSIGNED, "编导学员分配", List.of(
+                        new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
+                        new NotifySceneVariableRespDTO("order.no", "订单号", false),
+                        new NotifySceneVariableRespDTO("lead.no", "客资编号", false)),
+                List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_CONTENT_DIRECTOR, "编导")),
                 List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false));
     }
 
     @Override
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> roles) {
+        Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
+        if (roles.contains(NOTIFY_ROLE_STUDY_PLANNER)) {
+            Object plannerId = payload.get("studyPlannerUserId");
+            if (plannerId instanceof Number number) return Set.of(NotifyRecipientDTO.admin(number.longValue()));
+            return Set.of();
+        }
+        if (roles.contains(NOTIFY_ROLE_CONTENT_DIRECTOR)) {
+            Object directorId = payload.get("contentDirectorUserId");
+            if (directorId instanceof Number number) return Set.of(NotifyRecipientDTO.admin(number.longValue()));
+            return Set.of();
+        }
         if (!roles.contains(NOTIFY_ROLE_POOL_HANDLERS)) return Set.of();
         Set<Long> userIds = permissionApi.getEnabledUserIdsByPermission(PERMISSION_QUERY_POOL);
         if (userIds.isEmpty()) {
@@ -47,11 +69,12 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
 
     @Override
     public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
+        Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Map<String, Object> result = new LinkedHashMap<>();
-        result.put("registration.caseId", event.getPayload().get("registrationCaseId"));
-        result.put("order.id", event.getPayload().get("orderId"));
-        result.put("order.no", event.getPayload().get("orderNo"));
-        result.put("student.name", event.getPayload().get("studentName"));
+        result.put("registration.caseId", payload.get("registrationCaseId"));
+        result.put("order.id", payload.get("orderId"));
+        result.put("order.no", payload.get("orderNo"));
+        result.put("lead.no", payload.get("leadNo"));
         return result;
     }
 }

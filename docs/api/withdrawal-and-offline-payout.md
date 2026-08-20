@@ -1,6 +1,6 @@
 # Withdrawal and offline payout API
 
-The independent partner frontend uses `/app-api/zsjos/**`; only an enabled ordinary partner may apply. Admin/workbench review APIs remain under `/admin-api/zsjos/**`. The server locks selected `available` cashback rows in ascending ID order, snapshots the full bank account, creates one Withdrawal and item rows, changes cashback to `withdrawing`, and starts BPM process `zsjos_partner_withdrawal` with the single task key `financeReview`. Reviewers are enabled System users who currently have `zsjos:withdrawal:review`; V063 creates the permission but intentionally assigns no finance user.
+The independent partner frontend uses `/part-api/zsjos/**`; only an enabled ordinary partner may apply. Admin/workbench review APIs remain under `/admin-api/zsjos/**`. The server locks selected `available` cashback rows in ascending ID order, snapshots the full bank account, creates one Withdrawal and item rows, changes cashback to `withdrawing`, and starts BPM process `zsjos_partner_withdrawal` with the single task key `financeReview`. Reviewers are enabled System users who currently have `zsjos:withdrawal:review`; V063 creates the permission but intentionally assigns no finance user.
 
 ## State contract
 

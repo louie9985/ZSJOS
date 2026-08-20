@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 
@@ -144,6 +145,11 @@ public class LeadLifecycleTaskService {
     private String leadName(LeadDO lead) {
         return lead.getSubmittedName() == null || lead.getSubmittedName().isBlank()
                 ? lead.getLeadNo() : lead.getSubmittedName();
+    }
+
+    public int reassignPendingSalesTasks(Long leadId, Long assigneeId) {
+        return taskCommandService.reassignPending(
+                List.of(TASK_TYPE_FIRST_FOLLOW_UP, TASK_TYPE_FOLLOW_UP_REMINDER), leadId, assigneeId);
     }
 
     private String leadNumber(Long leadId) {

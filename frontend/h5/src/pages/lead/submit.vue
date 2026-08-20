@@ -128,7 +128,7 @@ async function handleSubmit() {
       provinceCode: form.area!.provinceCode,
       cityCode: form.area!.cityCode,
       intendedProducts: form.products.map(p => ({
-        spuRef: p.spuUnknown ? '' : p.spuRef,
+        spuRef: p.spuUnknown ? undefined : p.spuRef,
         skuRef: p.skuRef,
         spuUnknown: p.spuUnknown,
         skuUnknown: p.skuUnknown,

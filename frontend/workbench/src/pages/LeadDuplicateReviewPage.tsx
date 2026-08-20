@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Button, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
-import { api, type AssignmentUser, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
+import { Alert, Avatar, Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
+import { api, type AdvancedFilterGroup, type AssignmentUser, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import type { LeadAttachment } from '../services/api'
 import EmployeeSelect from '../components/EmployeeSelect'
 import { createIdempotencyKey } from '../services/idempotency'
+import DetailFieldGrid from '../components/DetailFieldGrid'
+import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 
 type ResultType = LeadDuplicateReviewDecision['resultType']
 type DuplicateCandidate = { personId: number; leadId?: number; leadNo?: string; personName: string; leadStatus?: string }
@@ -19,6 +20,8 @@ const resultLabel = (value?: string) => value && value in labels ? labels[value 
 
 export default function LeadDuplicateReviewPage({ permissions }: { permissions: string[] }) {
   const [status, setStatus] = useState<'pending' | 'completed'>('pending')
+  const [keyword, setKeyword] = useState('')
+  const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<LeadDuplicateReview[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -34,13 +37,13 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   const load = useCallback(async () => {
     setLoading(true); setError('')
     try {
-      const next = (await api.duplicateReviewPage(status)).list
+      const next = (await api.duplicateReviewPage({ status, pageNo: 1, pageSize: 100, keyword: keyword || undefined, advancedFilter })).list
       setItems(next)
       setSelected(current => next.find(item => item.id === current?.id) ?? next[0])
     }
     catch (cause) { setItems([]); setSelected(undefined); setError(cause instanceof Error ? cause.message : '复核队列加载失败') }
     finally { setLoading(false) }
-  }, [status])
+  }, [advancedFilter, keyword, status])
   useEffect(() => { void load() }, [load])
 
   const openProcess = async (row: LeadDuplicateReview) => {
@@ -93,11 +96,15 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
           </div>
           {selected.status === 'pending' && canProcess && <Button type="primary" onClick={() => void openProcess(selected)}>处理</Button>}
         </header>
-        <section className="message-detail-section">
+        <section className="lead-card duplicate-review-section">
           <Typography.Title level={5}>提交快照</Typography.Title>
-          <Descriptions bordered column={1} size="small" items={Object.entries(parsed.submission).map(([key, value]) => ({ key, label: key, children: typeof value === 'object' ? JSON.stringify(value) : String(value ?? '-') }))}/>
+          <DetailFieldGrid columns={1} items={Object.entries(parsed.submission).map(([key, value]) => ({
+            key,
+            label: key,
+            value: typeof value === 'object' ? JSON.stringify(value) : String(value ?? '-')
+          }))}/>
         </section>
-        <section className="message-detail-section">
+        <section className="lead-card duplicate-review-section">
           <Typography.Title level={5}>候选对象</Typography.Title>
           <pre className="duplicate-review-snapshot">{JSON.stringify(parsed.candidates, null, 2)}</pre>
         </section>
@@ -107,11 +114,11 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
     <header className="message-inbox-header">
       <div><Typography.Title level={4}>重复客资复核</Typography.Title><Typography.Text type="secondary">公共队列按提交时间处理，结论提交后不可覆盖</Typography.Text></div>
       <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
-      <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
     </header>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
     <div className="message-inbox-layout">
       <aside className="message-inbox-list-pane">
+        <div className="message-inbox-toolbar"><AdvancedFilterToolbar scene="duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
         <div className="message-inbox-list" aria-label="重复客资复核列表">
           {loading ? <div className="message-inbox-skeleton"><Skeleton active paragraph={{ rows: 8 }}/></div>
             : items.length ? items.map(item => {

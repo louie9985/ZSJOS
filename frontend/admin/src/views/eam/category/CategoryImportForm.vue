@@ -28,12 +28,38 @@
     </el-upload>
 
     <template v-if="result">
-      <div class="my-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div class="my-4 grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+        <el-statistic title="分类总数" :value="result.categoryCount" />
+        <el-statistic title="子分类" :value="result.leafCategoryCount" />
+        <el-statistic title="字段总数" :value="result.fieldCount" />
         <el-statistic title="新增" :value="result.createCount" />
         <el-statistic title="更新" :value="result.updateCount" />
         <el-statistic title="跳过" :value="result.skipCount" />
         <el-statistic title="冲突" :value="result.conflictCount" />
       </div>
+      <div class="mb-3 grid gap-2 sm:grid-cols-3">
+        <el-alert
+          :title="result.leafCategoryCount > 0 ? `子分类已识别 ${result.leafCategoryCount} 个` : '未识别到子分类'"
+          :type="result.leafCategoryCount > 0 ? 'success' : 'warning'"
+          :closable="false"
+        />
+        <el-alert
+          :title="result.legacyFieldCount === 0 ? '未发现旧原表字段' : `发现旧原表字段 ${result.legacyFieldCount} 个`"
+          :type="result.legacyFieldCount === 0 ? 'success' : 'error'"
+          :closable="false"
+        />
+        <el-alert
+          :title="result.credentialFieldCount === 0 ? '未发现密码/凭据字段' : `发现凭据字段 ${result.credentialFieldCount} 个`"
+          :type="result.credentialFieldCount === 0 ? 'success' : 'error'"
+          :closable="false"
+        />
+      </div>
+      <el-alert
+        class="mb-3"
+        :title="result.allManagementFieldsOptional ? '管理端字段全部为选填' : '存在管理端必填字段，请检查模板'"
+        :type="result.allManagementFieldsOptional ? 'success' : 'error'"
+        :closable="false"
+      />
       <el-alert
         v-if="result.conflictCount > 0"
         title="存在冲突，请修正模板后重新预检"

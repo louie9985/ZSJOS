@@ -17,9 +17,9 @@ const PAGE_SIZE = 10
 
 type Values = { method: string; result: string; leadCategory?: string; remark: string; nextFollowUpAt: dayjs.Dayjs }
 
-export default function LeadFollowUpPanel({ lead, open, onOpen, onClose, onChanged, onDirtyChange, onTotalChange }: {
+export default function LeadFollowUpPanel({ lead, open, refreshVersion, onOpen, onClose, onChanged, onDirtyChange, onTotalChange }: {
   lead: ManagedLead; open: boolean; onOpen?: () => void; onClose: () => void; onChanged?: () => void
-  onDirtyChange?: (dirty: boolean) => void; onTotalChange?: (total: number) => void
+  refreshVersion?: number; onDirtyChange?: (dirty: boolean) => void; onTotalChange?: (total: number) => void
 }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
@@ -54,8 +54,9 @@ export default function LeadFollowUpPanel({ lead, open, onOpen, onClose, onChang
     } finally { setLoading(false) }
   }, [lead.id, onTotalChange])
 
+  useEffect(() => { void loadRecords() }, [loadRecords, refreshVersion])
+
   useEffect(() => {
-    void loadRecords()
     Promise.all([
       api.dictDataByType(DICT_TYPE.LEAD_FOLLOW_UP_METHOD), api.dictDataByType(DICT_TYPE.LEAD_FOLLOW_UP_RESULT),
       api.dictDataByType(DICT_TYPE.LEAD_CATEGORY), api.dictDataByType(DICT_TYPE.LEAD_FOLLOW_UP_QUICK_NOTE)
@@ -64,7 +65,7 @@ export default function LeadFollowUpPanel({ lead, open, onOpen, onClose, onChang
     }).catch(() => setError('跟进字典加载失败，请重试'))
     form.setFieldsValue({ leadCategory: lead.leadCategory })
     setDirty(false); setImages([])
-  }, [form, lead.id, lead.leadCategory, loadRecords])
+  }, [form, lead.id, lead.leadCategory])
 
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (dirty) event.preventDefault() }

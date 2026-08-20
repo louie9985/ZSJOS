@@ -18,4 +18,5 @@ public class RegistrationCommandDO extends TenantBaseDO {
     private String idempotencyKey;
     private String requestFingerprint;
     private Long operatorUserId;
+    private Long resultAttachmentId;
 }

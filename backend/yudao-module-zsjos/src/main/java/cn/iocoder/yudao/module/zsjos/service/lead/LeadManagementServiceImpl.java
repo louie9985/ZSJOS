@@ -27,6 +27,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
@@ -84,6 +87,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService salesOrderPermissionService;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private PartnerMapper partnerMapper;
+    @Resource private BusinessTaskMapper businessTaskMapper;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -165,7 +170,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     private String cursorContext(LeadManagementPageReqVO reqVO) {
         return Integer.toHexString(Objects.hash(reqVO.getRelationScope(), reqVO.getAudience(),
-                reqVO.getInboxGroup(), reqVO.getInboxStage(),
+                reqVO.getInboxGroup(), reqVO.getInboxStage(), reqVO.getSimpleStatus(),
                 reqVO.getKeyword(), reqVO.getStatus(), reqVO.getAssignmentStatus(), reqVO.getSourceChannel(),
                 reqVO.getLeadCategory(), reqVO.getSourceUserId(), reqVO.getOwnerUserId(), reqVO.getAdvancedFilter()));
     }
@@ -201,7 +206,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (lead == null) {
             throw exception(LEAD_NOT_EXISTS);
         }
-        if (!leadObjectPermissionService.canRead(lead, userId) && !agingPoolService.canRead(id, userId)) {
+        if (!leadObjectPermissionService.canReadDetail(lead, userId)) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
         Map<Long, AdminUserRespDTO> users = getUserMap(List.of(lead));
@@ -294,12 +299,23 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         boolean blindIdentity = isBlindIdentity(lead, currentUserId);
         boolean viewerIsOwner = Objects.equals(currentUserId, lead.getOwnerUserId());
         boolean viewerIsSubmitter = Objects.equals(currentUserId, lead.getSourceUserId());
+        boolean selfSourcedWithoutProvider = SOURCE_SALES_SELF.equals(lead.getSourceType())
+                && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
+                && lead.getSourceProviderUserId() == null;
         result.setSourceUserId(blindIdentity && viewerIsOwner ? null : lead.getSourceUserId());
-        result.setSourceUserName(blindIdentity && viewerIsOwner
-                ? maskedUserName(users, lead.getSourceUserId()) : userName(users, lead.getSourceUserId()));
+        result.setSourceUserName(selfSourcedWithoutProvider ? null : (blindIdentity && viewerIsOwner
+                ? maskedUserName(users, lead.getSourceUserId()) : userName(users, lead.getSourceUserId())));
         result.setOwnerUserId(blindIdentity && viewerIsSubmitter ? null : lead.getOwnerUserId());
         result.setOwnerUserName(blindIdentity && viewerIsSubmitter
                 ? maskedUserName(users, lead.getOwnerUserId()) : userName(users, lead.getOwnerUserId()));
+        result.setSourceLabel(sourceLabel(lead.getSourceType()));
+        if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) {
+            var partner = partnerMapper.selectById(lead.getPartnerId());
+            String partnerName = partner == null ? null : partner.getName();
+            result.setSourceUserName(blindIdentity && viewerIsOwner && partnerName != null
+                    ? DesensitizedUtil.chineseName(partnerName) : partnerName);
+            result.setSourceUserId(null);
+        }
         result.setPendingAssigneeUserName(userName(users, lead.getPendingAssigneeUserId()));
         result.setHandlingStage(LeadHandlingStage.resolve(lead));
         result.setQualifiedByUserName(userName(users, lead.getQualifiedByUserId()));
@@ -311,14 +327,30 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (Objects.equals(currentUserId, lead.getOwnerUserId())) {
             relationTypes.add("owner");
         }
+        if (detail && currentUserId != null
+                && leadObjectPermissionService.canReadStudentSalesHistory(lead, currentUserId)) {
+            relationTypes.add("student_service_owner");
+        }
         result.setRelationTypes(relationTypes);
+        result.setOverviewVisible(true);
+        List<String> visibleTabs = detail ? resolveVisibleTabs(lead, currentUserId) : List.of();
+        result.setVisibleTabs(visibleTabs);
+        result.setNextFollowUpAt(null);
+        result.setIdentityMaskMode(blindIdentity && (viewerIsOwner || viewerIsSubmitter)
+                ? "counterparty_masked" : "full");
         result.setPrimaryProduct(products.stream().filter(item -> Boolean.TRUE.equals(item.getIsPrimary()))
                 .findFirst().map(this::convertProduct).orElse(null));
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+        // Keep the legacy Lead timestamp internal; customer-facing conversion is opportunity won time.
+        result.setConvertedAt(opportunity == null ? null : opportunity.getWonAt());
         result.setQualificationStatus(LeadStateProjection.qualification(lead));
         result.setFollowUpStatus(LeadStateProjection.followUp(lead, opportunity));
         result.setOperationalStatus(LeadStateProjection.operational(lead));
         if (detail) {
+            if (visibleTabs.contains(DETAIL_TAB_FOLLOW_UPS)) {
+                BusinessTaskDO pendingFollowUp = businessTaskMapper.selectPendingFollowUpReminderByLeadId(lead.getId());
+                result.setNextFollowUpAt(pendingFollowUp == null ? null : pendingFollowUp.getDueAt());
+            }
             result.setIntendedProducts(products.stream().map(this::convertProduct).toList());
             result.setAttachments(attachments.stream()
                     .map(attachment -> convertAttachment(attachment, attachmentUrls)).toList());
@@ -326,8 +358,11 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (opportunity != null) {
                 LeadManagementRespVO.OpportunityVO opportunityVO = new LeadManagementRespVO.OpportunityVO();
                 opportunityVO.setId(opportunity.getId()); opportunityVO.setStatus(opportunity.getStatus());
-                opportunityVO.setNextFollowUpAt(opportunity.getNextFollowUpAt()); result.setOpportunity(opportunityVO);
+                opportunityVO.setNextFollowUpAt(opportunity.getNextFollowUpAt());
+                opportunityVO.setWonAt(opportunity.getWonAt()); result.setOpportunity(opportunityVO);
             }
+            SalesOrderDO latestFirstPurchase = salesOrderMapper.selectLatestFirstPurchaseByLeadId(lead.getId());
+            if (latestFirstPurchase != null) result.setSalesOrderSubmittedAt(latestFirstPurchase.getSubmittedAt());
             SalesOrderDO activeOrder = salesOrderMapper.selectActiveByLeadId(lead.getId(),
                     cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES);
             if (activeOrder != null) {
@@ -385,10 +420,40 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private boolean isBlindIdentity(LeadDO lead, Long currentUserId) {
-        return ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+        // A specified assignment is an explicit mutual identity disclosure between submitter and sales owner.
+        return !DISPATCH_SPECIFIED.equals(lead.getDispatchMode())
+                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 && lead.getSourceUserId() != null && lead.getOwnerUserId() != null
                 && !Objects.equals(lead.getSourceUserId(), lead.getOwnerUserId())
                 && !leadObjectPermissionService.canViewUnmaskedIdentity(currentUserId, lead);
+    }
+
+    private List<String> resolveVisibleTabs(LeadDO lead, Long userId) {
+        List<String> tabs = new ArrayList<>();
+        tabs.add(DETAIL_TAB_OVERVIEW);
+        if (securityFrameworkService.hasPermission(PERMISSION_DETAIL_FOLLOW_UP_READ)) tabs.add(DETAIL_TAB_FOLLOW_UPS);
+        if (canReadAppealRecords(lead, userId)) tabs.add(DETAIL_TAB_APPEALS);
+        if (securityFrameworkService.hasPermission(PERMISSION_DETAIL_COMPLAINT_READ)) tabs.add(DETAIL_TAB_COMPLAINTS);
+        if (securityFrameworkService.hasPermission(PERMISSION_DETAIL_ORDER_READ)) tabs.add(DETAIL_TAB_ORDERS);
+        if (securityFrameworkService.hasPermission(PERMISSION_DETAIL_FLOW_READ)) tabs.add(DETAIL_TAB_FLOW_HISTORY);
+        return tabs;
+    }
+
+    private boolean canReadAppealRecords(LeadDO lead, Long userId) {
+        return Objects.equals(lead.getSourceUserId(), userId)
+                || securityFrameworkService.hasAnyPermissions(PERMISSION_DETAIL_APPEAL_READ,
+                PERMISSION_APPEAL_REVIEW_SALES_MANAGER, PERMISSION_APPEAL_REVIEW_QUALITY,
+                PERMISSION_APPEAL_REVIEW_CHAIRMAN);
+    }
+
+    private static String sourceLabel(String sourceType) {
+        if (sourceType == null) return "来源未配置";
+        return switch (sourceType) {
+            case SOURCE_PARTNER -> "兼职提交";
+            case SOURCE_INTERNAL_NEW_MEDIA -> "新媒体提交";
+            case SOURCE_SALES_SELF -> "销售自拓录";
+            default -> "来源未配置";
+        };
     }
 
     private List<LeadManagementRespVO.ActionVO> resolveActions(LeadDO lead, OpportunityDO opportunity,

@@ -7,7 +7,10 @@ const detailPages = [
   'pages/MySalesOrderPage.tsx',
   'pages/SalesOrderApprovalPage.tsx',
   'components/SalesOrderSupervisorInbox.tsx',
-  'pages/LeadDuplicateReviewPage.tsx'
+  'pages/LeadDuplicateReviewPage.tsx',
+  'pages/LeadQualificationExceptionPage.tsx',
+  'pages/LeadComplaintPage.tsx',
+  'pages/ManagementPages.tsx'
 ]
 
 describe('employee detail drawer breakpoints', () => {
@@ -17,10 +20,11 @@ describe('employee detail drawer breakpoints', () => {
       const openLines = source.split('\n').filter(line => line.includes('setDrawerOpen(true)'))
 
       expect(openLines.length).toBeGreaterThan(0)
-      for (const line of openLines) {
+      if (page.includes('SalesOrderSupervisorInbox.tsx'))
+        expect(source).toContain("window.matchMedia(\"(max-width: 768px)\").matches")
+      else for (const line of openLines)
         expect(line).toContain("window.matchMedia('(max-width: 768px)').matches")
-      }
-      expect(source).toMatch(/<main className="(?:message-inbox|lead-inbox|sales-order)-detail-pane">/)
+      expect(source).toMatch(/<main className="(?:message-inbox|lead-inbox|sales-order|business-inbox)-detail-pane">/)
     })
   }
 })

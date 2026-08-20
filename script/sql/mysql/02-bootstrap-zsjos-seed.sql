@@ -322,7 +322,8 @@ INSERT IGNORE INTO `system_menu`
 (6815,'停启下属账号','zsjos:subordinate-sales:account-status',3,1,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
 (6816,'修改下属接单','zsjos:subordinate-sales:dispatch-mode',3,2,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
 (6817,'批量转派客资','zsjos:subordinate-sales:batch-transfer',3,3,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
-(6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0');
+(6818,'批量释放公海','zsjos:subordinate-sales:batch-public-sea',3,4,6814,'','','',NULL,0,b'1',b'1',b'1','quick-init',NOW(),'quick-init',NOW(),b'0'),
+(6819,'一键下班','zsjos:subordinate-sales:pause-all',3,5,6814,'','','',NULL,0,b'1',b'1',b'0','quick-init',NOW(),'quick-init',NOW(),b'0');
 
 INSERT INTO `system_role_menu` (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT DISTINCT source.role_id,target.id,'quick-init',NOW(),'quick-init',NOW(),b'0',source.tenant_id

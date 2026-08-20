@@ -29,5 +29,11 @@ public class MyStudentRespVO {
         private String productSnapshot;
         private String status;
         private LocalDateTime activatedAt;
+        private String acceptanceStatus;
+        private LocalDateTime acceptedAt;
+        private Integer version;
+        private Boolean owner;
+        private Long contentDirectorUserId;
+        private Long careerPlannerUserId;
     }
 }

@@ -20,6 +20,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadHandlingStage;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadSimpleStatusQuery;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_PENDING;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNMENT_UNASSIGNED;
@@ -210,6 +211,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 }
             }
         }
+        applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
         if (matchedLeadIds != null) {
             if (matchedLeadIds.isEmpty()) query.eq(LeadDO::getId, -1L);
             else query.in(LeadDO::getId, matchedLeadIds);
@@ -239,6 +241,33 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
         return selectPage(reqVO, query);
     }
 
+    private static void applySimpleStatus(LambdaQueryWrapperX<LeadDO> query, LeadSimpleStatusQuery filter) {
+        if (!filter.leadStatuses().isEmpty()) query.in(LeadDO::getStatus, filter.leadStatuses());
+        if (!filter.assignmentStatuses().isEmpty()) {
+            query.in(LeadDO::getAssignmentStatus, filter.assignmentStatuses());
+        }
+        if (filter.handlingStages().contains(LeadHandlingStage.FIRST_FOLLOW_PENDING)) {
+            query.isNull(LeadDO::getQualificationDeadlineAt);
+        } else if (filter.handlingStages().contains(LeadHandlingStage.QUALIFICATION_PENDING)) {
+            query.isNotNull(LeadDO::getQualificationDeadlineAt);
+        }
+        applyOpportunityStatus(query, filter.requiredOpportunityStatuses(), false);
+        applyOpportunityStatus(query, filter.excludedOpportunityStatuses(), true);
+    }
+
+    private static void applyOpportunityStatus(LambdaQueryWrapperX<LeadDO> query, java.util.Set<String> statuses,
+                                               boolean excluded) {
+        if (statuses.isEmpty()) return;
+        String placeholders = java.util.stream.IntStream.range(0, statuses.size())
+                .mapToObj(index -> "{" + index + "}").collect(java.util.stream.Collectors.joining(","));
+        String sql = "SELECT 1 FROM zsjos_opportunity o WHERE o.lead_id = zsjos_lead.id "
+                + "AND o.tenant_id = zsjos_lead.tenant_id AND o.type = 'initial_conversion' "
+                + "AND o.deleted = b'0' AND o.status IN (" + placeholders + ")";
+        Object[] parameters = statuses.toArray();
+        if (excluded) query.notExists(sql, parameters);
+        else query.exists(sql, parameters);
+    }
+
     default PageResult<LeadDO> selectPartnerPage(LeadManagementPageReqVO reqVO, Long partnerId) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
                 .eq(LeadDO::getPartnerId, partnerId)
@@ -248,6 +277,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
+        applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
         query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
         return selectPage(reqVO, query);
     }

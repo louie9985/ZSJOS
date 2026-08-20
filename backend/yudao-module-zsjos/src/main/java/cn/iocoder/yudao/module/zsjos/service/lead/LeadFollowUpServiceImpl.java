@@ -56,7 +56,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
-    @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private LeadCollaborationService collaborationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -64,7 +64,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         LocalDateTime occurredAt = LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        agingPoolService.requireCanOperateForUpdate(leadId, lead.getOwnerUserId(), operatorUserId);
+        collaborationService.requireCanOperateForUpdate(lead, operatorUserId);
         if (!canFollow(lead)) {
             throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         }

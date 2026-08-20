@@ -14,17 +14,18 @@ export interface AssetVO {
   specification?: string
   sn?: string
   barcode?: string
-  originalValue?: number
-  netValue?: number
   purchaseDate?: string
-  source?: number
-  warrantyDate?: string
   useDeptId?: number
   useDeptName?: string
   useUserId?: number
   useUserName?: string
+  useUserNameSnapshot?: string
+  supervisorUserId?: number
+  supervisorNameSnapshot?: string
+  joinDate?: string
+  commitmentAccepted?: boolean
+  commitmentDate?: string
   location?: string
-  expectedLife?: number
   remark?: string
   fileUrls?: string[]
   extFields?: Record<string, any>
@@ -107,10 +108,12 @@ export interface AssetImportRowVO {
   categoryName: string
   managementMode: number
   quantity: number
-  sourceUserName?: string
+  useUserName?: string
+  supervisorName?: string
   matchedUserName?: string
+  matchedSupervisorName?: string
   action: 'CREATE' | 'UPDATE' | 'SKIP_EXISTING' | 'SKIP_SAME_FILE'
-  sourceFields: Record<string, any>
+  mappedFields: Record<string, any>
   defaultedFields: string[]
   warnings: string[]
 }

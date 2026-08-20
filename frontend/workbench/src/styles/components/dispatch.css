@@ -24,6 +24,16 @@
   padding-inline: 12px;
 }
 
+.sales-dispatch-status-alert {
+  margin: 0;
+  border-color: color-mix(in srgb, var(--crm-color-error) 55%, var(--crm-border));
+  background: color-mix(in srgb, var(--crm-color-error) 10%, var(--crm-bg-container));
+}
+
+.sales-dispatch-status-alert .ant-alert-message {
+  font-weight: 600;
+}
+
 .sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {
   font-size: var(--crm-font-base);
   white-space: nowrap;

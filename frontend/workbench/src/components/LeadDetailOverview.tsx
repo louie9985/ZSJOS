@@ -204,8 +204,7 @@ function LatestFollowUp({ leadId }: { leadId: number }) {
 
 /* ========== 流转时间线 ========== */
 
-function FlowTimeline({ lead }: { lead: ManagedLead }) {
-  const events = useMemo(() => {
+export function buildLeadFlowEvents(lead: ManagedLead): Array<{ time?: number; label: string; detail?: string }> {
     const list: Array<{ time?: number; label: string; detail?: string }> = []
     if (lead.submittedAt) {
       list.push({
@@ -234,6 +233,9 @@ function FlowTimeline({ lead }: { lead: ManagedLead }) {
     if (lead.suspendedAt) {
       list.push({ time: lead.suspendedAt, label: '挂起' })
     }
+    if (lead.salesOrderSubmittedAt) {
+      list.push({ time: lead.salesOrderSubmittedAt, label: '录入成交' })
+    }
     if (lead.convertedAt) {
       list.push({ time: lead.convertedAt, label: '成交转化' })
     }
@@ -241,7 +243,17 @@ function FlowTimeline({ lead }: { lead: ManagedLead }) {
       list.push({ time: lead.closedAt, label: '关闭', detail: lead.closeReason || undefined })
     }
     return list.sort((a, b) => (b.time || 0) - (a.time || 0))
-  }, [lead])
+}
+
+export function leadSourceDispatchTag(lead: Pick<ManagedLead, 'sourceType' | 'dispatchMode'>):
+  { label: string; color: 'blue' | 'orange' } | undefined {
+  if (lead.sourceType !== 'internal_new_media') return
+  if (lead.dispatchMode === 'auto') return { label: '自动分配', color: 'blue' }
+  if (lead.dispatchMode === 'specified') return { label: '指定派单', color: 'orange' }
+}
+
+function FlowTimeline({ lead }: { lead: ManagedLead }) {
+  const events = useMemo(() => buildLeadFlowEvents(lead), [lead])
 
   if (events.length === 0) return null
 
@@ -389,11 +401,18 @@ const PIPELINE_STEPS = [
   { key: 'submitted', label: '提交' },
   { key: 'following', label: '跟进' },
   { key: 'qualified', label: '判定' },
-  { key: 'converted', label: '成交' },
+  { key: 'deal_entered', label: '录入成交' },
+  { key: 'converted', label: '成交转化' },
 ] as const
 
-function pipelineStepIndex(lead: ManagedLead): number {
-  if (lead.convertedAt) return 3
+export function pipelineStepIndex(lead: ManagedLead): number {
+  // Current stage follows the server's lifecycle projection; timestamps remain historical events.
+  if (lead.followUpStatus === 'won' || lead.status === 'won') return 4
+  if (
+    lead.followUpStatus === 'deal_pending_approval' ||
+    lead.activeSalesOrderStatus === 'pending_approval' ||
+    lead.activeSalesOrderStatus === 'revision_required'
+  ) return 3
   if (lead.qualifiedAt || lead.qualificationStatus === 'valid' || lead.qualificationStatus === 'invalid') return 2
   if (lead.currentAssignmentFirstFollowUpAt || lead.followUpStatus) return 1
   return 0
@@ -476,13 +495,15 @@ function LeadStatusLabels({ lead }: { lead: ManagedLead }) {
 
 /* ========== 主导出：概览 ========== */
 
-export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, toolbar }: {
+export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, showFollowUp, toolbar }: {
   lead: ManagedLead
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
+  showFollowUp: boolean
   /** 操作工具条（使用 OverflowToolbar 渲染） */
   toolbar?: React.ReactNode
 }) {
+  const sourceDispatchTag = leadSourceDispatchTag(lead)
   return (
     <div className="lead-detail-overview-v2">
       <div className="lead-overview-grid">
@@ -523,6 +544,21 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                 </div>
                 <div className="lead-profile-meta">
                   <div className="lead-profile-row">
+                    <span className="lead-field-label">来源</span>
+                    <span className="lead-field-value lead-source-value">
+                      <span className="lead-source-label">{lead.sourceLabel || '来源未配置'}</span>
+                      {sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}
+                    </span>
+                  </div>
+                  <div className="lead-profile-row">
+                    <span className="lead-field-label">提交人</span>
+                    <span className="lead-field-value">{lead.sourceUserName || '-'}</span>
+                  </div>
+                  <div className="lead-profile-row">
+                    <span className="lead-field-label">所属销售</span>
+                    <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}</span>
+                  </div>
+                  <div className="lead-profile-row">
                     <span className="lead-field-label">分类</span>
                     <span className="lead-field-value">{categoryLabel(lead.leadCategory)}</span>
                   </div>
@@ -554,9 +590,9 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                   )}
                 </section>
 
-                <section className="lead-card">
+                {showFollowUp && <section className="lead-card">
                   <LatestFollowUp leadId={lead.id} />
-                </section>
+                </section>}
               </div>
 
               {/* 满宽：备注与附件 */}
@@ -606,7 +642,7 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
               <LeadStatusLabels lead={lead} />
             </div>
           </section>
-          <LeadFollowUpCharts leadId={lead.id} />
+          {showFollowUp && <LeadFollowUpCharts leadId={lead.id} />}
         </aside>
       </div>
     </div>

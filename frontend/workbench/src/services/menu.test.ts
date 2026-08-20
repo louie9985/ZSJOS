@@ -3,6 +3,7 @@ import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
 import { AuthenticationError, buildMenuTree, type RawMenu, unwrap } from './api'
 import {
   buildTwoLevelNavigation,
+  canOpenLeadDetailDeepLink,
   filterRenderableMenus,
   findMenuByPath,
   findPageByPath,
@@ -112,8 +113,8 @@ describe('workbench menu conversion', () => {
     expect(filtered[0].children.map(child => child.name)).toEqual(['Work plans'])
   })
 
-  it('covers all 38 server-owned page routes and excludes obsolete aliases', () => {
-    expect(RENDERABLE_APP_ROUTES.size).toBe(38)
+  it('covers all server-owned page routes and excludes obsolete aliases', () => {
+    expect(RENDERABLE_APP_ROUTES.size).toBe(40)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/appeals')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-aging-pool')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
@@ -133,6 +134,40 @@ describe('workbench menu conversion', () => {
     expect(findMenuByPath(routes, APP_ROUTES.LEAD_MANAGEMENT)?.name).toBe('Lead management')
     expect(navigation[0]?.pages).toEqual([])
     expect(getInaccessiblePathFallback(navigation, APP_ROUTES.LEAD_MANAGEMENT, routes)).toBeUndefined()
+  })
+
+  it('allows an object-authorized Lead overview deep link even when every history tab is hidden', () => {
+    expect(canOpenLeadDetailDeepLink(
+      APP_ROUTES.LEAD_MANAGEMENT,
+      '?leadId=42',
+      ['zsjos:sales-order:review']
+    )).toBe(true)
+    expect(canOpenLeadDetailDeepLink(
+      APP_ROUTES.LEAD_MANAGEMENT,
+      '?leadId=42',
+      ['zsjos:lead-detail:follow-up-read']
+    )).toBe(true)
+    expect(canOpenLeadDetailDeepLink(
+      APP_ROUTES.LEAD_MANAGEMENT,
+      '?leadId=42',
+      ['zsjos:lead:appeal:create']
+    )).toBe(false)
+    expect(canOpenLeadDetailDeepLink(
+      APP_ROUTES.LEAD_MANAGEMENT,
+      '',
+      ['zsjos:sales-order:review']
+    )).toBe(false)
+  })
+
+  it('exposes the unified Lead management page when the server marks it visible', () => {
+    const routes = filterRenderableMenus(buildMenuTree([menu({
+      id: 6735,
+      name: 'Workbench',
+      path: '/zsjos',
+      children: [menu({ id: 6770, parentId: 6735, name: '客资管理', path: 'leads/manage', visible: true })]
+    })]), RENDERABLE_APP_ROUTES)
+
+    expect(buildTwoLevelNavigation(routes)[0]?.pages.map(page => page.key)).toContain('/zsjos/leads/manage')
   })
 
   it('supports a root that is itself a page', () => {

@@ -16,9 +16,14 @@ public interface LeadDuplicateReviewMapper extends BaseMapperX<LeadDuplicateRevi
                 .eq(LeadDuplicateReviewDO::getSubmissionIdempotencyKey, key));
     }
 
-    default PageResult<LeadDuplicateReviewDO> selectPage(PageParam page, String status) {
-        return selectPage(page, new LambdaQueryWrapperX<LeadDuplicateReviewDO>()
-                .eqIfPresent(LeadDuplicateReviewDO::getStatus, status)
+    default PageResult<LeadDuplicateReviewDO> selectPage(PageParam page, String status, java.util.List<Long> matchedIds) {
+        LambdaQueryWrapperX<LeadDuplicateReviewDO> query = new LambdaQueryWrapperX<LeadDuplicateReviewDO>()
+                .eqIfPresent(LeadDuplicateReviewDO::getStatus, status);
+        if (matchedIds != null) {
+            if (matchedIds.isEmpty()) query.eq(LeadDuplicateReviewDO::getId, -1L);
+            else query.in(LeadDuplicateReviewDO::getId, matchedIds);
+        }
+        return selectPage(page, query
                 .orderByAsc(LeadDuplicateReviewDO::getCreateTime)
                 .orderByAsc(LeadDuplicateReviewDO::getId));
     }

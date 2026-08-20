@@ -71,6 +71,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_FOLLOW_UP_TIME_INVALID = new ErrorCode(1_900_003_026, "下次跟进时间必须晚于当前时间");
     ErrorCode LEAD_FOLLOW_UP_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_027, "跟进请求幂等键已被其他客资使用");
     ErrorCode BUSINESS_TASK_BUCKET_INVALID = new ErrorCode(1_900_003_028, "待办时间分组无效");
+    ErrorCode BUSINESS_TASK_NOT_EXISTS = new ErrorCode(1_900_003_080, "业务待办不存在");
+    ErrorCode BUSINESS_TASK_COMPLETE_FORBIDDEN = new ErrorCode(1_900_003_081, "无权完成该业务待办");
+    ErrorCode LEAD_COLLABORATION_POOL_CONFLICT = new ErrorCode(1_900_003_082, "客资同时存在人工公海与超期公海记录，请联系管理员核查");
     ErrorCode LEAD_QUALIFICATION_STATE_INVALID = new ErrorCode(1_900_003_029, "当前客资状态不允许进行有效性判定");
     ErrorCode LEAD_INVALID_REASON_INVALID = new ErrorCode(1_900_003_030, "无效原因不存在或已停用");
     ErrorCode LEAD_QUALIFICATION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_031, "判定或处置请求幂等键已被其他客资使用");
@@ -154,7 +157,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_VOUCHER_REQUIRED = new ErrorCode(1_900_006_006, "已付款的非零订单必须上传缴费凭证");
     ErrorCode SALES_ORDER_ATTACHMENT_INVALID = new ErrorCode(1_900_006_007, "缴费凭证不存在或文件类型不支持");
     ErrorCode SALES_ORDER_APPROVAL_CONFIG_INVALID = new ErrorCode(1_900_006_008, "报名履约或财务结算审批部门未配置有效人员");
-    ErrorCode SALES_ORDER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_006_009, "成交订单会签流程尚未部署或暂不可用");
+    ErrorCode SALES_ORDER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_006_009, "成交订单审批流程尚未部署或暂不可用");
     ErrorCode SALES_ORDER_STATE_INVALID = new ErrorCode(1_900_006_010, "当前订单状态不允许执行该操作");
     ErrorCode SALES_ORDER_PERMISSION_DENIED = new ErrorCode(1_900_006_011, "无权查看或处理该成交订单");
     ErrorCode SALES_ORDER_ALREADY_HANDLED = new ErrorCode(1_900_006_012, "该审批任务已由其他人员处理");
@@ -167,8 +170,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_SUPERVISOR_NOT_CONFIGURED = new ErrorCode(1_900_006_019, "订单正式销售或其直属部门负责人未配置");
     ErrorCode SALES_ORDER_SUPERVISOR_DISABLED = new ErrorCode(1_900_006_020, "订单销售直属部门负责人已停用或不存在");
     ErrorCode SALES_ORDER_SUPERVISOR_SELF = new ErrorCode(1_900_006_021, "订单正式销售不能同时作为自己的直属主管");
-    ErrorCode SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED = new ErrorCode(1_900_006_022, "本轮当前中心已申请过主管确认");
-    ErrorCode SALES_ORDER_SUPERVISOR_PENDING = new ErrorCode(1_900_006_023, "当前中心正在等待主管确认，暂不能审批");
+    ErrorCode SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED = new ErrorCode(1_900_006_022, "本轮已申请过主管确认");
     ErrorCode SALES_ORDER_SUPERVISOR_CONFIRMATION_NOT_EXISTS = new ErrorCode(1_900_006_024, "主管确认记录不存在");
     ErrorCode SALES_ORDER_SUPERVISOR_TASK_EXPIRED = new ErrorCode(1_900_006_025, "主管确认任务已处理或已失效");
     ErrorCode SALES_ORDER_SUPERVISOR_PERMISSION_DENIED = new ErrorCode(1_900_006_026, "当前用户不是该申请指定的销售直属主管");
@@ -213,7 +215,28 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode REGISTRATION_FINANCE_PENDING = new ErrorCode(1_900_010_012, "财务审核通过后才能完成报名履约");
     ErrorCode REGISTRATION_FINANCE_REVISION_REQUIRED = new ErrorCode(1_900_010_013, "财务审核未通过，订单补正并重新审核通过后才能完成报名履约");
     ErrorCode REGISTRATION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_010_014, "幂等键已用于其他报名履约操作");
-    ErrorCode STUDENT_NOT_EXISTS = new ErrorCode(1_900_010_012, "学员不存在或不属于当前学习规划师");
+    ErrorCode REGISTRATION_ROUTE_INVALID = new ErrorCode(1_900_010_015, "请选择有效的流转部门并配置对应负责人");
+    ErrorCode REGISTRATION_ROUTE_ASSIGNEE_INVALID = new ErrorCode(1_900_010_016, "流转负责人不存在、已停用或不符合部门岗位要求");
+    ErrorCode REGISTRATION_ATTACHMENT_INVALID = new ErrorCode(1_900_010_017, "附件不存在、格式不支持或超过大小限制");
+    ErrorCode REGISTRATION_ATTACHMENT_LIMIT = new ErrorCode(1_900_010_018, "每个清单项最多上传 9 个附件");
+    ErrorCode REGISTRATION_ATTACHMENT_REQUIRED = new ErrorCode(1_900_010_019, "请先上传必需的报名履约附件");
+    ErrorCode REGISTRATION_IDEMPOTENCY_RESULT_INVALID = new ErrorCode(1_900_010_020, "报名履约幂等结果不存在或已失效，请使用新的幂等键重试");
+    ErrorCode STUDENT_NOT_EXISTS = new ErrorCode(1_900_010_012, "学员不存在或未分配给当前用户");
     ErrorCode STUDENT_PERMISSION_DENIED = new ErrorCode(1_900_010_013, "无权查看该学员");
+    ErrorCode STUDENT_SERVICE_NOT_EXISTS = new ErrorCode(1_900_010_021, "学员服务关系不存在或已结束");
+    ErrorCode STUDENT_SERVICE_NOT_ACCEPTED = new ErrorCode(1_900_010_022, "请先确认接收该学员服务");
+    ErrorCode STUDENT_SERVICE_ALREADY_ACCEPTED = new ErrorCode(1_900_010_023, "该学员服务已确认接收");
+    ErrorCode STUDENT_SERVICE_VERSION_CONFLICT = new ErrorCode(1_900_010_024, "学员服务已被其他人员修改，请刷新后重试");
+    ErrorCode STUDENT_CONTACT_CONFIG_INVALID = new ErrorCode(1_900_010_025, "教务联系配置尚未正确发布");
+    ErrorCode STUDENT_CONTACT_TASK_INVALID = new ErrorCode(1_900_010_026, "当前联系任务不存在、已处理或类型不匹配");
+    ErrorCode STUDENT_CONTACT_FORM_INVALID = new ErrorCode(1_900_010_027, "联系表单内容不完整或下次联系时间无效");
+    ErrorCode STUDENT_CONTACT_REASON_INVALID = new ErrorCode(1_900_010_028, "未联系原因或延期原因不存在、已停用或类型不匹配");
+    ErrorCode STUDENT_CONTACT_SUPERVISOR_INVALID = new ErrorCode(1_900_010_029, "学习规划师直属部门负责人未配置、已停用、为本人或缺少处理权限");
+    ErrorCode STUDENT_CONTACT_EXTENSION_ACTIVE = new ErrorCode(1_900_010_030, "该任务已有待处理的延期申请");
+    ErrorCode STUDENT_CONTACT_EXTENSION_NOT_EXISTS = new ErrorCode(1_900_010_031, "联系延期申请不存在或已处理");
+    ErrorCode STUDENT_CONTACT_PROCESS_UNAVAILABLE = new ErrorCode(1_900_010_032, "联系延期审批流程尚未部署或暂不可用");
+    ErrorCode STUDENT_COLLABORATOR_INVALID = new ErrorCode(1_900_010_033, "协作者不存在、已停用或不在当前学习规划师的可选关系中");
+    ErrorCode STUDENT_COLLABORATOR_ALREADY_ASSIGNED = new ErrorCode(1_900_010_034, "该类协作者已分配，学习规划师不能修改");
+    ErrorCode STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED = new ErrorCode(1_900_010_035, "管理员纠正协作者时必须填写原因");
 
 }

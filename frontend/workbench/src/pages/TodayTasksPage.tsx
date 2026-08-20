@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Empty, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type BpmTask, type BusinessTask, type BusinessTaskBucket, type PageResult } from '../services/api'
@@ -54,7 +54,7 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
     }
     if (task.actionCode === 'OPEN_LEAD_FOLLOW_UP') {
       navigate(APP_ROUTES.LEAD_MANAGEMENT, {
-        state: { leadId: task.bizId, openFollowUp: true, relationScope: 'owned' }
+        state: { leadId: task.bizId, openFollowUp: true }
       })
       return
     }
@@ -64,6 +64,15 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
     }
     if (task.actionCode === 'OPEN_WORK_PLAN_ITEM' || task.actionCode === 'REVIEW_WORK_PLAN_ITEM') {
       navigate(`${APP_ROUTES.WORK_PLANS}?itemId=${task.bizId}`)
+    }
+  }
+
+  const completeBirthdayCare = async (task: BusinessTask) => {
+    try {
+      await api.completeBirthdayCare(task.id)
+      await load()
+    } catch (error) {
+      setError(errorText(error, '生日关怀完成失败'))
     }
   }
 
@@ -138,7 +147,11 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
                       <Typography.Text type="secondary">{formatTimestamp(task.dueAt || task.completedAt || task.cancelledAt, '无时间')}</Typography.Text>
                     </Space>
                   </div>
-                  {task.actionable && view === 'pending' && <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />}
+                  {task.actionCode === 'COMPLETE_BIRTHDAY_CARE' && view === 'pending' ? (
+                    <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成生日关怀" onClick={() => void completeBirthdayCare(task)} />
+                  ) : task.actionable && view === 'pending' ? (
+                    <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />
+                  ) : null}
                 </div>
               ))
             ) : (
@@ -154,6 +167,7 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
 
 function BpmTaskPanel() {
   const navigate = useNavigate()
+  const { message } = App.useApp()
   const [view, setView] = useState<TaskView>('pending')
   const [pageNo, setPageNo] = useState(1)
   const [page, setPage] = useState<PageResult<BpmTask>>({ list: [], total: 0 })
@@ -178,6 +192,17 @@ function BpmTaskPanel() {
   useEffect(() => {
     void load()
   }, [load])
+  const openTask = async (task: BpmTask) => {
+    try {
+      const target = await api.salesOrderApprovalTaskTarget(task.id)
+      const params = new URLSearchParams({ workType: target.workType, orderId: String(target.orderId), taskId: target.taskId })
+      if (target.confirmationId) params.set('confirmationId', String(target.confirmationId))
+      navigate(`${APP_ROUTES.SALES_ORDER_APPROVALS}?${params}`)
+    } catch {
+      navigate(`${APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(task.id)}`)
+      message.warning('该任务暂不能在成交审批页定位，已打开通用审批页')
+    }
+  }
   return (
     <section className="task-center-panel" aria-label="审批任务">
       <header className="task-panel-header">
@@ -229,7 +254,7 @@ function BpmTaskPanel() {
                       <Typography.Text type="secondary">{formatTimestamp(task.endTime || task.createTime)}</Typography.Text>
                     </Space>
                   </div>
-                  {view === 'pending' && <Button type="text" icon={<RightOutlined />} aria-label="查看审批" onClick={() => navigate(`${APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(task.id)}`)} />}
+                  {view === 'pending' && <Button type="text" icon={<RightOutlined />} aria-label="查看审批" onClick={() => void openTask(task)} />}
                 </div>
               ))
             ) : (

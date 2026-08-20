@@ -32,3 +32,6 @@ export const getClaimPoolPage = (
   params.advancedFilter
     ? request.post({ url: '/zsjos/lead/claim-pool/search-page', data: params })
     : request.get({ url: '/zsjos/lead/claim-pool/page', params })
+
+export const claimLead = (id: number): Promise<boolean> =>
+  request.post({ url: `/zsjos/lead/${id}/claim` })

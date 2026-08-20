@@ -5,7 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { getCashbackSummary, type CashbackSummary } from '@/api/cashback'
 import { getMyLeadPage, type LeadListItem } from '@/api/lead'
 import { getPartnerMe, type PartnerInfo } from '@/api/profile'
-import { formatDate, formatLeadNo } from '@/utils/format'
+import { formatDate, formatLeadNo, formatLeadStatus } from '@/utils/format'
 
 defineOptions({ name: 'Home' })
 
@@ -59,13 +59,14 @@ function goLeadDetail(id: number) {
   router.push(`/lead/${id}`)
 }
 
-const statusMap: Record<string, { text: string; color: string }> = {
-  submitted: { text: '已提交', color: 'var(--h5-info)' },
-  valid: { text: '有效', color: 'var(--h5-success)' },
-  invalid: { text: '无效', color: 'var(--h5-danger)' },
-  suspended: { text: '已挂起', color: 'var(--h5-warning)' },
-  converted: { text: '已转化', color: 'var(--h5-primary)' },
-  closed: { text: '已关闭', color: 'var(--h5-text-secondary)' }
+const statusColor: Record<string, string> = {
+  submitted: 'var(--h5-info)',
+  valid: 'var(--h5-success)',
+  invalid: 'var(--h5-danger)',
+  suspended: 'var(--h5-warning)',
+  won: 'var(--h5-success)',
+  converted: 'var(--h5-primary)',
+  closed: 'var(--h5-text-secondary)'
 }
 </script>
 
@@ -148,8 +149,8 @@ const statusMap: Record<string, { text: string; color: string }> = {
             @click="goLeadDetail(lead.id)"
           >
             <template #value>
-              <span :style="{ color: statusMap[lead.status]?.color || 'var(--h5-text-secondary)', fontSize: '12px' }">
-                {{ statusMap[lead.status]?.text || lead.status }}
+              <span :style="{ color: statusColor[lead.status] || 'var(--h5-text-secondary)', fontSize: '12px' }">
+                {{ formatLeadStatus(lead.status) }}
               </span>
             </template>
           </van-cell>

@@ -120,6 +120,8 @@ After applying V043, run `verify-bootstrap.sql` and confirm the V041 objects, co
 
 V073 is additive and follows V072. It creates the versioned checklist, public-pool case, immutable checklist snapshot, completion facts, per-order-item service relationship and command-idempotency tables. It seeds exactly five confirmed items for active tenants, adds menu metadata, grants checklist configuration to `system_administrator`, and grants only My Students to `study_planner`. It does not backfill historical orders and does not grant public-pool handling to ordinary roles. Existing-environment execution still requires a separate approval and a preflight review of orders whose registration node already passed.
 
+V083 adds checklist attachment flags, versioned route options, case route snapshots and attachment metadata. It resolves the exact, unique active System department names `学生服务与交付中心` and `新媒体与客资中心` once, stores their IDs, and exposes a verification failure when either name is missing or ambiguous. It snapshots routes only for active/pending cases, grants only My Students to enabled `content_director` roles, and adds the director-assignment in-app notification. It does not execute file deletion, backfill completed historical cases, or grant public-pool permissions. Apply after V082 and before V084; execution against an existing environment requires separate approval.
+
 Rollback is forward-only: retire the menus/permissions and preserve business facts. Verify all V073 checks in `verify-bootstrap.sql`; do not drop tables containing completion or audit records.
 
 ## V074 registration task notifications
@@ -154,7 +156,109 @@ execution, require `unified_lead_management_scope_v078` in `verify-bootstrap.sql
 Rollback is a reviewed forward migration based on the captured grant snapshot; do not broadly
 restore tenant-wide Lead access.
 
+## V080 Lead-source provider notification
+
+V080 follows V079 and adds the global `ZSJOS_LEAD_SOURCE_LINKED` template. It changes only an
+enabled, otherwise untouched V075 rule from `submitter + operator` to `operator`, then creates one
+enabled `new_media_provider` rule for the same tenant. The provider message is exactly
+`{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`.
+Runtime delivery resolves this role only for sales self-sourced submissions with an explicitly
+selected provider. The migration preserves disabled, edited, and administrator-created rules,
+does not create historical messages, and is repeatable. After controlled execution, verify both
+rule contracts, the exact template variables and content, both V080 version registries, and no
+historical Outbox/message growth. Rollback is forward-only and retains delivered history.
+
+## V086 Lead detail tab permissions
+
+V086 follows V085 and adds four System button permissions under Lead management for follow-up,
+appeal, complaint, and order history. It restores or inserts role-menu relations by mapping the
+previous effective read permissions, so deployment does not unexpectedly hide an existing tab;
+administrators may then configure each permission independently. The migration changes no Lead,
+order, student, task, BPM, account, or history row. It is repeatable, records both schema-version
+registries, and must pass the V086 checks in `verify-bootstrap.sql`. Existing-environment execution
+still requires the normal separate approval; rollback is forward-only through role permission
+configuration and preserves business history.
+
+## V087 business notification identifier repair
+
+V087 follows the already-applied V085 notification rewrite and the occupied V086 Lead-detail
+permission migration. It is a forward repair: V085 and V086 remain immutable. The migration
+includes logically deleted notification snapshots and resolves identifiers through tenant-matched
+Lead, order and registration relations even when the related business row is logically deleted.
+It repairs residual structured name keys, backfills missing registration `lead.no` or `order.no`
+parameters, and rebuilds template parameter arrays without duplicates. Legacy message snapshots
+whose parameters are not JSON objects are isolated and left unchanged; if such a malformed value
+still contains a forbidden customer-name key, V087 blocks instead of guessing. For valid JSON
+objects, unresolved relations needed for mutation, identifier gaps, non-string legacy values and
+conflicting stored numbers block before V087 is recorded. V087 never guesses a name after V085
+removed its structured source and does not replace an unverifiable historical body. Before
+controlled execution, retain a database backup and the
+actual applied V085 artifact/checksum; a pre-V085 backup is required to prove already-rewritten
+bodies contain no value whose structured source was removed. Rollback is forward-only and must
+preserve notification history. V087 compares template snapshots and business numbers as binary
+UTF-8 values and gives its temporary repair table the notification-table collation, so execution
+does not depend on the database connection's default collation.
+
+## V089 registration attachment idempotency result
+
+V089 follows V088 and adds only nullable `zsjos_registration_command.result_attachment_id`. New
+attachment uploads persist their exact business attachment result on the command ledger; historical
+commands are deliberately not inferred from file name or size. The migration is guarded and
+repeatable, deletes or rewrites no rows, and leaves Infra storage unchanged. Before deployment, run
+`verify-collaboration-pool-overlap.sql` as a separate read-only preflight and investigate every
+returned Lead; application code fails closed on overlaps and V089 does not clean them. After a
+separately approved execution, require the V089 and collaboration-pool checks in
+`verify-bootstrap.sql` to return `PASS`. Rollback is application-only and retains the nullable column.
+
+## V090 Lead complaint result notifications
+
+V090 follows V089 and adds two global templates plus at most two enabled complaint-result rules per
+non-deleted tenant. The founded and unfounded rules both use the persisted `complainant` recipient
+role, the `in_app` channel, and the `business_detail` action; runtime recipient resolution uses the
+complaint record's employee or partner subject. Templates render `lead.no` and the handler opinion
+and expose no internal Lead ID as a customer-facing identifier. The migration changes no complaint,
+Lead, account, existing rule, Outbox, or historical message row. It is repeatable through stable
+template codes and tenant/scene/channel/action/recipient guards, records both version registries,
+and is wired after V089 in bootstrap order. Existing-environment execution requires separate
+approval and must then pass the V090 checks in `verify-bootstrap.sql`. Recovery is forward-only:
+disable untouched V090 rules while retaining templates and delivered history.
+
+## V091 Lead flow-history permission
+
+V091 follows V090 and adds the System button permission `zsjos:lead-detail:flow-read` under Lead
+management. On the first successful installation only, it grants the permission to enabled roles
+whose stable code is `sales_manager`; it does not grant `sales_specialist`, submitters, or ordinary
+sales. The runtime permission remains cumulative with the existing Lead object reader, so the role
+grant cannot expand the set of visible Leads. A successful V091 version marker prevents later
+bootstrap reruns from restoring a role-menu relation that an administrator manually removed.
+
+The migration changes no Lead, business event, assignment history, aging-pool event, account, or
+historical row. It is additive, transaction-wrapped, repeatable, and forward-only, and it is wired
+after V090 in fresh bootstrap order. Existing-environment execution still requires separate
+approval. After controlled execution, run `verify-bootstrap.sql` to verify the version markers and
+permission definition; role assignment is intentionally not a permanent verifier invariant because
+administrator changes are authoritative. Recovery is performed through System role permission
+configuration while retaining the permission definition and all business history.
+
+## V092 subordinate sales one-click pause permission
+
+V092 follows V091 and adds `zsjos:subordinate-sales:pause-all` under the existing subordinate-sales
+menu. On first installation only, enabled roles with stable code `sales_manager` receive the
+permission. The version marker prevents a later bootstrap rerun from restoring an administrator's
+manual removal. The migration defines permission metadata only and does not pause users or modify
+accounts, dispatch preferences, page presence, Leads, assignments, or audit history.
+
+The migration is additive, transaction-wrapped, repeatable, and forward-only. Applying it to an
+existing environment remains a separately approved operation. After controlled execution, run
+`verify-bootstrap.sql`; role membership is intentionally not a permanent verification invariant.
+
 ## Optional modules
+
+## V094 student contact chain
+
+`V094__student_contact_chain.sql` adds acceptance/collaborator columns, contact configuration and immutable record tables, extension snapshots, collaborator audit logs, empty administrator-maintained reason dictionaries, user-relation scenes, permissions, menus, and notification rules. It marks historical active service relations pending acceptance and converts historical director routes to collaborator assignments without creating contact tasks. The migration is repeatable and forward-only and must not be run without the separate database-execution confirmation.
+
+Before enabling submissions that exceed the configured interval, deploy and activate the BPM process definition with key `zsjos_student_contact_extension` and task definition key `deliverySupervisorReview`. V094 does not fabricate a BPM model or personnel relationships. After controlled application, run `verify-bootstrap.sql` and verify the V094 schema/version result before releasing the UI.
 
 An approved optional module adds its own manifest under
 `script/sql/mysql/modules/`, desired schema, migration directory starting at

@@ -38,7 +38,7 @@ import {
   ProductConfigPage,
   WorkPlanConfigPage
 } from '../pages/ConfigurationPages'
-import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage } from '../pages/RegistrationPages'
+import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -60,9 +60,9 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage selfSourced/>
   if (menu?.path === APP_ROUTES.LEAD_COMPLAINTS) return <LeadComplaintPage/>
   if (menu?.path === APP_ROUTES.SUBMITTED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
-    state={{ ...(location.state || {}), relationScope: 'submitted' }}/>
+    state={{ ...(location.state || {}) }}/>
   if (menu?.path === APP_ROUTES.OWNED_LEADS) return <Navigate replace to={APP_ROUTES.LEAD_MANAGEMENT}
-    state={{ ...(location.state || {}), relationScope: 'owned' }}/>
+    state={{ ...(location.state || {}) }}/>
   if (menu?.path === APP_ROUTES.LEAD_ASSIGNMENT) return <LeadAssignmentPage/>
   if (menu?.path === APP_ROUTES.LEAD_DUPLICATE_REVIEW) return <LeadDuplicateReviewPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_CLAIM_POOL) {
@@ -95,6 +95,8 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage/>
+  if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>
+  if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>

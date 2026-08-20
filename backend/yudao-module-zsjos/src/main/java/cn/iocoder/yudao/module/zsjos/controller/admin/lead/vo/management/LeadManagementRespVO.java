@@ -16,6 +16,7 @@ public class LeadManagementRespVO {
     private String submittedMobile;
     private String submittedWechatId;
     private String sourceType;
+    private String sourceLabel;
     private Long sourceUserId;
     private String sourceUserName;
     private String sourceChannel;
@@ -41,6 +42,7 @@ public class LeadManagementRespVO {
     private LocalDateTime publicPoolAt;
     private LocalDateTime submittedAt;
     private LocalDateTime lastActivityAt;
+    private LocalDateTime nextFollowUpAt;
     private LocalDateTime currentAssignmentFirstFollowUpAt;
     private LocalDateTime currentAssignmentFirstFollowUpDeadlineAt;
     private LocalDateTime qualificationStartedAt;
@@ -51,6 +53,7 @@ public class LeadManagementRespVO {
     private LocalDateTime qualifiedAt;
     private String validDescription;
     private LocalDateTime convertedAt;
+    private LocalDateTime salesOrderSubmittedAt;
     private String invalidReason;
     private String invalidReasonLabelSnapshot;
     private String invalidDescription;
@@ -63,6 +66,9 @@ public class LeadManagementRespVO {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
     private List<String> relationTypes;
+    private Boolean overviewVisible;
+    private List<String> visibleTabs;
+    private String identityMaskMode;
     private LeadProductVO primaryProduct;
     private List<LeadProductVO> intendedProducts;
     private List<LeadAttachmentVO> attachments;
@@ -76,6 +82,7 @@ public class LeadManagementRespVO {
         private Long id;
         private String status;
         private LocalDateTime nextFollowUpAt;
+        private LocalDateTime wonAt;
     }
 
     @Data

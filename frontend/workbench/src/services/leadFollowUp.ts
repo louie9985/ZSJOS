@@ -8,21 +8,24 @@ export const addFollowUpDays = (now: Date, days: number) => {
 
 export const shouldBlockLeadSwitch = (dirty: boolean) => dirty
 
-export type LeadDetailMode = 'all' | 'submitter' | 'owner' | 'manager-readonly'
-export type LeadDetailTab = 'overview' | 'follow-ups' | 'orders' | 'appeals' | 'complaints'
+export type LeadDetailMode = 'all' | 'submitter' | 'owner' | 'manager-readonly' | 'student-readonly'
+export type LeadDetailTab = 'overview' | 'follow-ups' | 'orders' | 'appeals' | 'complaints' | 'flow-history'
 
-export const detailTabsForMode = (mode: LeadDetailMode): LeadDetailTab[] => {
-  const base: LeadDetailTab[] = ['overview', 'follow-ups']
-  if (mode === 'owner') return [...base, 'orders']
-  if (mode === 'submitter') return [...base, 'appeals']
-  if (mode === 'manager-readonly') return [...base, 'appeals', 'complaints', 'orders']
-  return base
-}
+const LEAD_DETAIL_TABS: LeadDetailTab[] = ['overview', 'follow-ups', 'orders', 'appeals', 'complaints', 'flow-history']
 
-export const shouldShowLeadOrderTab = (mode: LeadDetailMode) => detailTabsForMode(mode).includes('orders')
+export const parseLeadDetailTab = (value?: string | null): LeadDetailTab | undefined =>
+  LEAD_DETAIL_TABS.includes(value as LeadDetailTab) ? value as LeadDetailTab : undefined
+
+export const detailTabsFromProjection = (tabs?: LeadDetailTab[]): LeadDetailTab[] =>
+  tabs?.length ? Array.from(new Set(tabs)) : ['overview']
+
+export const shouldShowLeadOrderTab = (tabs?: LeadDetailTab[]) => detailTabsFromProjection(tabs).includes('orders')
 
 export const defaultLeadDetailTab = (openFollowUp: boolean): LeadDetailTab =>
   openFollowUp ? 'follow-ups' : 'overview'
+
+export const resolveLeadDetailTab = (tabs: LeadDetailTab[], requested?: LeadDetailTab): LeadDetailTab =>
+  requested && tabs.includes(requested) ? requested : 'overview'
 
 /* ==================== 跟进记录蛇形时间线 ==================== */
 

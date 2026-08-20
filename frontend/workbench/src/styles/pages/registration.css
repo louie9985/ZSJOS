@@ -45,12 +45,13 @@
   flex: none;
 }
 
+.registration-summary-card,
 .registration-checklist-card {
   padding: var(--crm-card-pad);
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-md);
   background: var(--crm-bg-container);
-  box-shadow: var(--crm-shadow);
+  box-shadow: var(--crm-shadow-card);
 }
 
 .registration-checklist-card h5 {
@@ -123,7 +124,51 @@
 }
 
 .registration-config-item {
-  padding: var(--crm-sp-2) 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 160px auto auto;
+  align-items: center;
+  gap: var(--crm-gap);
+  padding: var(--crm-sp-2);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-container);
+}
+
+.registration-config-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  margin-top: var(--crm-sp-4);
+}
+
+.registration-config-section-heading h5 {
+  margin: 0;
+}
+
+.registration-config-route {
+  grid-template-columns: minmax(220px, 1fr) 160px auto auto;
+}
+
+.registration-attachment-row {
+  align-items: flex-start;
+}
+
+.registration-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-1) var(--crm-sp-3);
+}
+
+.registration-attachment-list > span {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: var(--crm-sp-1);
+}
+
+.registration-attachment-list a {
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 768px) {
@@ -143,5 +188,10 @@
 
   .registration-checklist-row .ant-select {
     width: 100%;
+  }
+
+  .registration-config-item,
+  .registration-config-route {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

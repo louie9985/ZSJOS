@@ -7,10 +7,12 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageRe
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.cashback.CashbackMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.product.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,11 +35,13 @@ class CashbackServiceImplTest {
     private final CashbackServiceImpl service = new CashbackServiceImpl();
     @Mock CashbackMapper mapper; @Mock LeadMapper leadMapper; @Mock LeadIntendedProductMapper intendedMapper;
     @Mock PartnerMapper partnerMapper; @Mock ZsjosProductMapper productMapper;
+    @Mock PartnerAccountMapper partnerAccountMapper;
     @Mock ZsjosProductCategoryMapper categoryMapper; @Mock SalesOrderMapper orderMapper; @Mock ConfigApi configApi;
 
     @BeforeEach void setup() {
         ReflectionTestUtils.setField(service, "mapper", mapper); ReflectionTestUtils.setField(service, "leadMapper", leadMapper);
         ReflectionTestUtils.setField(service, "intendedProductMapper", intendedMapper); ReflectionTestUtils.setField(service, "partnerMapper", partnerMapper);
+        ReflectionTestUtils.setField(service, "partnerAccountMapper", partnerAccountMapper);
         ReflectionTestUtils.setField(service, "productMapper", productMapper); ReflectionTestUtils.setField(service, "categoryMapper", categoryMapper);
         ReflectionTestUtils.setField(service, "orderMapper", orderMapper); ReflectionTestUtils.setField(service, "configApi", configApi);
     }
@@ -45,7 +49,7 @@ class CashbackServiceImplTest {
     @Test void nonPartnerDoesNotGenerate() {
         when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L).setSourceType("new_media"));
         assertNull(service.ensureValidCashback(1L));
-        verifyNoInteractions(intendedMapper, partnerMapper);
+        verifyNoInteractions(intendedMapper, partnerMapper, partnerAccountMapper);
     }
 
     @Test void validCashbackUsesProductRuleAndIsIdempotent() {
@@ -56,7 +60,8 @@ class CashbackServiceImplTest {
         when(categoryMapper.selectById(5L)).thenReturn(new ZsjosProductCategoryDO().setId(5L).setParentId(0L));
         doAnswer(invocation -> { invocation.<CashbackDO>getArgument(0).setId(9L); return 1; }).when(mapper).insert(any(CashbackDO.class));
         assertEquals(9L, service.ensureValidCashback(1L));
-        verify(mapper).insert(argThat((CashbackDO row) -> new BigDecimal("12.35").equals(row.getAmount())));
+        verify(mapper).insert(argThat((CashbackDO row) -> new BigDecimal("12.35").equals(row.getAmount())
+                && row.getBeneficiaryUserId() == null && Long.valueOf(8L).equals(row.getPartnerId())));
         when(mapper.selectByBusinessKey("valid:1")).thenReturn(new CashbackDO().setId(9L).setStatus("pending_settlement"));
         assertEquals(9L, service.ensureValidCashback(1L));
     }
@@ -102,9 +107,52 @@ class CashbackServiceImplTest {
         assertEquals("KZ202608160000000001", result.getList().get(0).getLeadNo());
     }
 
-    private void eligibleLead() {
-        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L).setSourceType("partner").setSourceUserId(7L).setPartnerId(8L));
+    @Test void mismatchedPartnerAccountIsRejected() {
+        enabledPartnerLead();
+        when(partnerAccountMapper.selectById(7L)).thenReturn(new PartnerAccountDO().setId(7L)
+                .setPartnerId(9L).setStatus(0));
+
+        assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.ensureValidCashback(1L));
+        verifyNoInteractions(intendedMapper);
+    }
+
+    @Test void disabledPartnerAccountDoesNotGenerate() {
+        enabledPartnerLead();
+        when(partnerAccountMapper.selectById(7L)).thenReturn(new PartnerAccountDO().setId(7L)
+                .setPartnerId(8L).setStatus(1));
+
+        assertNull(service.ensureValidCashback(1L));
+        verifyNoInteractions(intendedMapper);
+    }
+
+    @Test void legacySystemUserBindingRemainsCompatible() {
+        enabledPartnerLead();
         when(partnerMapper.selectById(8L)).thenReturn(new PartnerDO().setId(8L).setBoundSystemUserId(7L)
+                .setStatus("enabled").setEnabledAt(LocalDateTime.now()));
+        when(intendedMapper.selectPrimaryByLeadId(1L)).thenReturn(new LeadIntendedProductDO()
+                .setProductRef("P1").setProductNameSnapshot("课程"));
+        when(productMapper.selectByProductRef("P1")).thenReturn(new ZsjosProductDO().setId(4L)
+                .setProductRef("P1").setCategoryId(5L).setValidCashbackAmount(BigDecimal.ONE)
+                .setDealCashbackRate(BigDecimal.ZERO));
+        when(categoryMapper.selectById(5L)).thenReturn(new ZsjosProductCategoryDO().setId(5L).setParentId(0L));
+        doAnswer(invocation -> { invocation.<CashbackDO>getArgument(0).setId(11L); return 1; })
+                .when(mapper).insert(any(CashbackDO.class));
+
+        assertEquals(11L, service.ensureValidCashback(1L));
+        verify(mapper).insert(argThat((CashbackDO row) -> Long.valueOf(7L).equals(row.getBeneficiaryUserId())
+                && Long.valueOf(8L).equals(row.getPartnerId())));
+    }
+
+    private void eligibleLead() {
+        enabledPartnerLead();
+        when(partnerAccountMapper.selectById(7L)).thenReturn(new PartnerAccountDO().setId(7L)
+                .setPartnerId(8L).setStatus(0));
+    }
+
+    private void enabledPartnerLead() {
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setId(1L).setSourceType("partner").setSourceUserId(7L).setPartnerId(8L));
+        when(partnerMapper.selectById(8L)).thenReturn(new PartnerDO().setId(8L)
                 .setStatus("enabled").setEnabledAt(LocalDateTime.now()));
     }
 }

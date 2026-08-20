@@ -52,7 +52,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     @Override
     public List<NotifySceneRespDTO> getScenes() {
         return List.of(
-                scene(CREATED, "客资新建", ROLE_SUBMITTER, ROLE_OPERATOR),
+                scene(CREATED, "客资新建", ROLE_SUBMITTER, ROLE_OPERATOR, ROLE_NEW_MEDIA_PROVIDER),
                 scene(ACTIVATED, "重复客资激活", ROLE_SUBMITTER, ROLE_OWNER, ROLE_OPERATOR),
                 scene(ASSIGNED, "首次派单", ROLE_PENDING_SALES, ROLE_SUBMITTER),
                 scene(REASSIGNED, "重新派单", ROLE_PENDING_SALES, ROLE_SUBMITTER),
@@ -77,7 +77,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
-                scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_OWNER, ROLE_DIRECT_LEADER),
+                scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_COMPLAINANT, ROLE_OWNER, ROLE_DIRECT_LEADER),
+                scene(COMPLAINT_UNFOUNDED, "销售投诉不成立", ROLE_COMPLAINANT),
                 scene(DUPLICATE_REACTIVATED, "重复客资重新激活", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER),
                 scene(DUPLICATE_OWNER_REMINDER, "重复客资提醒所属销售", ROLE_OWNER),
                 scene(TRANSFER_REQUESTED, "公海转派申请待审批", ROLE_TRANSFER_REVIEWER),
@@ -131,6 +132,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             }
             Long id = switch (role) {
                 case ROLE_SUBMITTER -> longValue(payload.get("submitterUserId"));
+                case ROLE_NEW_MEDIA_PROVIDER -> longValue(payload.get("newMediaProviderUserId"));
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
                 case ROLE_OWNER -> longValue(payload.get("ownerUserId"));
                 case ROLE_OPERATOR -> event.getOperatorUserId();
@@ -140,6 +142,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 case ROLE_PREVIOUS_COLLABORATOR -> longValue(payload.get("previousCollaboratorUserId"));
                 case ROLE_TRANSFER_REVIEWER -> longValue(payload.get("transferReviewerUserId"));
                 case ROLE_REQUESTER -> longValue(payload.get("requesterUserId"));
+                case ROLE_COMPLAINANT -> longValue(payload.get("complaint.complainantUserId"));
                 default -> null;
             };
             if (id != null && id > 0) users.add(id);
@@ -147,6 +150,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         Set<NotifyRecipientDTO> recipients = users.stream().map(NotifyRecipientDTO::admin)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
         if (recipientRoles.contains(ROLE_SUBMITTER) && payload.get("partnerId") instanceof Number number) {
+            PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(number.longValue());
+            if (account != null) recipients.add(NotifyRecipientDTO.partner(account.getId()));
+        }
+        if (recipientRoles.contains(ROLE_COMPLAINANT) && payload.get("complaint.partnerId") instanceof Number number) {
             PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(number.longValue());
             if (account != null) recipients.add(NotifyRecipientDTO.partner(account.getId()));
         }
@@ -168,7 +175,6 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("lead.id", lead.getId());
         values.put("lead.no", lead.getLeadNo());
-        values.put("lead.name", fullContact ? lead.getSubmittedName() : DesensitizedUtil.chineseName(lead.getSubmittedName()));
         values.put("lead.mobile", fullContact ? lead.getSubmittedMobile() : DesensitizedUtil.mobilePhone(lead.getSubmittedMobile()));
         values.put("lead.wechatId", fullContact ? lead.getSubmittedWechatId() : maskWechat(lead.getSubmittedWechatId()));
         values.put("lead.sourceType", lead.getSourceType());
@@ -210,7 +216,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                     "followUp.remark", "followUp.nextAt", "qualification.reason", "appeal.id",
                     "appeal.roundNo", "appeal.stage", "appeal.reason", "appeal.decisionReason");
             copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
-            copyContext(values, event.getPayload(), "urge.reason", "complaint.handlerUserId");
+            copyContext(values, event.getPayload(), "urge.reason", "complaint.result",
+                    "complaint.handlerUserId", "complaint.handlerOpinion");
             copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
         }
         return values;
@@ -230,7 +237,6 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     private List<NotifySceneVariableRespDTO> variables(String sceneCode) {
         List<NotifySceneVariableRespDTO> variables = new ArrayList<>(List.of(
                 variable("lead.no", "客资编号"), variable("lead.id", "内部客资ID"),
-                variable("lead.name", "客户姓名", true),
                 variable("lead.mobile", "手机号码", true), variable("lead.wechatId", "微信号", true),
                 variable("lead.sourceType", "来源类型"), variable("lead.sourceChannel", "来源渠道"),
                 variable("lead.province", "省份"), variable("lead.city", "城市"),
@@ -282,8 +288,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("appeal.decisionReason", "裁决理由"));
         } else if (SUBMITTER_URGED.equals(sceneCode)) {
             variables.add(variable("urge.reason", "催促原因"));
-        } else if (COMPLAINT_FOUNDED.equals(sceneCode)) {
+        } else if (Set.of(COMPLAINT_FOUNDED, COMPLAINT_UNFOUNDED).contains(sceneCode)) {
+            variables.add(variable("complaint.result", "投诉处理结果"));
             variables.add(variable("complaint.handlerUserId", "投诉处理人编号"));
+            variables.add(variable("complaint.handlerOpinion", "投诉处理意见"));
         }
         return List.copyOf(variables);
     }
@@ -299,6 +307,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     private String roleLabel(String role) {
         return switch (role) {
             case ROLE_SUBMITTER -> "提交人"; case ROLE_PENDING_SALES -> "待接销售";
+            case ROLE_NEW_MEDIA_PROVIDER -> "新媒体提供方";
             case ROLE_OWNER -> "当前负责人"; case ROLE_OPERATOR -> "操作人";
             case ROLE_PREVIOUS_OWNER -> "原负责人"; case ROLE_NEW_OWNER -> "新负责人";
             case ROLE_QUALIFICATION_MANAGERS -> "原销售部门及上级部门负责人";
@@ -308,6 +317,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             case ROLE_COLLABORATOR -> "协同销售";
             case ROLE_PREVIOUS_COLLABORATOR -> "原协同销售";
             case ROLE_FROZEN_DEPT_LEADER -> "冻结部门主管";
+            case ROLE_COMPLAINANT -> "投诉提交人";
             default -> role;
         };
     }

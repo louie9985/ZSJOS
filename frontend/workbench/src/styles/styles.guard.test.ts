@@ -113,14 +113,17 @@ describe('spacing and sizing anchors', () => {
       /\.lead-management-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.message-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.sales-order-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.work-plan-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.claim-pool-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.subordinate-sales-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.business-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.registration-page,.registration-config-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.sales-order-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.work-plan-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
-      /\.subordinate-sales-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
+      /\.subordinate-sales-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
+      /\.business-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
     ]
     expect(anchors.filter(re => !re.test(joined)).map(re => re.source)).toEqual([])
   })
@@ -133,7 +136,9 @@ describe('spacing and sizing anchors', () => {
       'message-inbox-layout',
       'sales-order-inbox-layout',
       'work-plan-layout',
-      'subordinate-inbox-layout'
+      'subordinate-inbox-layout',
+      'aging-pool-layout',
+      'business-inbox-layout'
     ]
     const offenders = layouts.filter(name => {
       const body = joined.split(`.${name} {`)[1]?.split('}')[0] ?? ''
@@ -148,6 +153,18 @@ describe('spacing and sizing anchors', () => {
     expect(joined).toMatch(/\.dispatch-status-tag \{[^}]*height: var\(--crm-control-h\)/)
     expect(joined).toMatch(/\.dispatch-mode-button \{[^}]*height: var\(--crm-control-h\)/)
     expect(joined).toMatch(/\.lead-product-checkbox \{[^}]*min-height: var\(--crm-control-h\)/)
+  })
+
+  it('keeps semantic detail fields responsive and token driven', () => {
+    const detailFields = readFileSync(join(ROOT, 'components/detail-field-grid.css'), 'utf8')
+    expect(detailFields).toMatch(/\.detail-field-grid \{[^}]*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\)/)
+    expect(detailFields).toMatch(/\.detail-field \{[^}]*padding: var\(--crm-sp-2\) var\(--crm-sp-3\)/)
+    expect(detailFields).toMatch(/@media \(max-width: 768px\)[\s\S]*\.detail-field-grid\.columns-3[\s\S]*grid-template-columns: minmax\(0, 1fr\)/)
+  })
+
+  it('aligns order detail labels left and values right', () => {
+    expect(joined).toMatch(/\.sales-order-detail \.detail-field dt \{[^}]*text-align: left/)
+    expect(joined).toMatch(/\.sales-order-detail \.detail-field dd \{[^}]*text-align: right/)
   })
 
   it('keeps intended-product checkbox hit areas on the control and label', () => {

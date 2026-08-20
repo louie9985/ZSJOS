@@ -89,11 +89,6 @@
       <el-table-column label="使用人" prop="useUserName" min-width="100" />
       <el-table-column label="使用部门" prop="useDeptName" min-width="120" />
       <el-table-column label="存放地点" prop="location" min-width="140" show-overflow-tooltip />
-      <el-table-column label="原值" prop="originalValue" min-width="110" align="right">
-        <template #default="{ row }">
-          {{ row.originalValue != null ? `¥${row.originalValue}` : '-' }}
-        </template>
-      </el-table-column>
       <el-table-column
         label="购入日期"
         prop="purchaseDate"
@@ -179,7 +174,6 @@ const queryParams = reactive({
   status: undefined,
   useDeptId: undefined,
   useUserId: undefined,
-  source: undefined
 })
 
 const getList = async () => {

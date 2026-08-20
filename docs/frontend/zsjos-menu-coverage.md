@@ -44,6 +44,10 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 36 | 报名履约公共池 | `/zsjos/registration-pool` | `RegistrationPoolPage` | `zsjos/registration-pool` |
 | 37 | 履约清单配置 | `/zsjos/registration-checklist-config` | `RegistrationChecklistConfigPage` | `zsjos/registrationChecklistConfig/index` |
 | 38 | 我的学员 | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
+| 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
+| 40 | 异常情况处理 | `/zsjos/student-contact-exceptions` | `StudentContactExceptionsPage` | `zsjos/studentContactExceptions/index` |
+
+“我的学员”按 Person 聚合并按服务关系切换。学习规划师确认接收后，在概览中可随时选择性分配编导或职业规划师；两项均不创建任务且不阻塞联系链。后三个教务标签由服务端发布配置决定协作者只读可见性，前端仅渲染服务端返回的 `visibleTabs`。
 
 Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落地为 `src/views/zsjos/registration-pool.vue` 和 `src/views/zsjos/my-students.vue`，与服务端菜单的 `component` 值直接对应。
 
@@ -52,5 +56,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - 申诉正式路径仅为 `/zsjos/appeals`，不提供 `/zsjos/leads/appeals` 兼容跳转。
 - 商机公海正式路径仅为 `/zsjos/lead-aging-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
 - `/zsjos/leads/manage` 是服务端隐藏菜单：具备菜单授权时可以直接访问，但不显示在 React 导航中。
+- 订单、学员、审批和业务通知可深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={overview|follow-ups|orders|appeals|complaints|flow-history}`；省略或传入非法 `tab` 时进入概览。该入口只加载指定详情，不扩大客资列表。通知按场景选择跟进、申诉、投诉或概览页签，当前不自动改投流转记录；前端只会激活服务端 `visibleTabs` 中的目标页签，不可见时回退概览。五个业务标签权限在 System 角色权限管理中独立配置，`flow-history` 对应 `zsjos:lead-detail:flow-read`，不得由角色名或前端 mode 推断。
 - 历史 `/zsjos/sales-order-supervisor-confirmations` 仅由 React 重定向到 `/zsjos/sales-order-approvals`，服务端不再发布独立主管确认页面菜单。
 - 新增或修改页面菜单时，必须同步服务端菜单种子、React `APP_ROUTES`/`RENDERABLE_APP_ROUTES`/`RouteHost`、Vue `component` 文件和本矩阵。
+The subordinate-sales left pane uses the shared 20-row append lazy-loading pattern with a scroll-root sentinel, stable server ordering, deduplication, stale-request rejection, and retryable load-more failure. The `一键下班` command is rendered only from `zsjos:subordinate-sales:pause-all`; its scope is entirely server-owned. The home page and header consume one dispatch-status provider so mode, heartbeat, page-offline state, retry, and eligibility remain synchronized without duplicate polling.

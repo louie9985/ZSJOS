@@ -14,6 +14,16 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSupervi
 
 @Mapper
 public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<SalesOrderSupervisorConfirmationDO> {
+    default SalesOrderSupervisorConfirmationDO selectBySupervisorTaskId(String taskId) {
+        return selectOne(SalesOrderSupervisorConfirmationDO::getSupervisorTaskId, taskId);
+    }
+    default SalesOrderSupervisorConfirmationDO selectLatestByOrderId(Long orderId) {
+        return selectOne(new LambdaQueryWrapperX<SalesOrderSupervisorConfirmationDO>()
+                .eq(SalesOrderSupervisorConfirmationDO::getOrderId, orderId)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getId)
+                .last("LIMIT 1"));
+    }
     default SalesOrderSupervisorConfirmationDO selectByRoundAndTaskKey(Long roundId, String taskKey) {
         return selectOne(new LambdaQueryWrapperX<SalesOrderSupervisorConfirmationDO>()
                 .eq(SalesOrderSupervisorConfirmationDO::getApprovalRoundId, roundId)

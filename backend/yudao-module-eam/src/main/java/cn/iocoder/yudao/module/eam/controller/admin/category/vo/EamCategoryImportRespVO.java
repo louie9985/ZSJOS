@@ -20,6 +20,12 @@ public class EamCategoryImportRespVO {
     private Integer updateCount;
     private Integer skipCount;
     private Integer conflictCount;
+    private Integer categoryCount;
+    private Integer leafCategoryCount;
+    private Integer fieldCount;
+    private Integer legacyFieldCount;
+    private Integer credentialFieldCount;
+    private Boolean allManagementFieldsOptional;
     @Builder.Default
     private List<Item> items = new ArrayList<>();
 

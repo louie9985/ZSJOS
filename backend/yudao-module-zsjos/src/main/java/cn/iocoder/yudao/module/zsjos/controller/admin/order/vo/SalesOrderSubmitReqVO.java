@@ -18,7 +18,7 @@ public class SalesOrderSubmitReqVO {
     @NotBlank @Size(max = 32) private String provinceCode;
     @NotBlank @Size(max = 100) private String provinceName;
     @NotBlank @Size(max = 32) private String cityCode;
-    @NotBlank @Size(max = 100) private String cityName;
+    @Size(max = 100) private String cityName;
     @Size(max = 100) private String agreedExamTime;
     @Size(max = 100) private String classType;
     @NotBlank @Size(max = 64) private String servicePeriod;
@@ -29,8 +29,8 @@ public class SalesOrderSubmitReqVO {
     @Size(max = 1000) private String remark;
     @Size(max = 1000) private String studentSpecialRequirements;
     @Size(max = 1000) private String materialDeliveryContact;
-    @NotEmpty @Size(max = 50) @Valid private List<Item> items;
-    @NotEmpty @Size(max = 6) @Valid private List<Attachment> paymentVouchers;
+    @NotEmpty @Size(max = 50) private List<@Valid Item> items;
+    @NotEmpty @Size(max = 6) private List<@Valid Attachment> paymentVouchers;
     @NotBlank @Size(max = 128) private String idempotencyKey;
 
     @Data

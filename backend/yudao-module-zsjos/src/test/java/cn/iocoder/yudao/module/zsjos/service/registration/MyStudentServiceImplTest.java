@@ -42,10 +42,11 @@ class MyStudentServiceImplTest {
     void getMyStudentReturnsStructuredCourseRights() {
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(1L); relation.setPersonId(2L); relation.setOrderId(3L); relation.setOrderItemId(4L);
-        relation.setStatus("active"); relation.setActivatedAt(LocalDateTime.of(2026, 8, 17, 12, 0));
+        relation.setOwnerUserId(8L); relation.setStatus("active");
+        relation.setActivatedAt(LocalDateTime.of(2026, 8, 17, 12, 0));
         PersonDO person = new PersonDO(); person.setId(2L); person.setName("测试学员");
         LeadDO lead = new LeadDO(); lead.setId(5L); lead.setLeadNo("KZ202608170001");
-        SalesOrderDO order = new SalesOrderDO(); order.setId(3L); order.setOrderNo("OD202608170001");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(3L); order.setLeadId(5L); order.setOrderNo("OD202608170001");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(4L); item.setOrderId(3L);
         LeadProductSnapshot snapshot = new LeadProductSnapshot("course-1", "营养课程", 10L, "基础课程",
                 List.of(new ZsjosProductCategoryPathNodeVO(7L, "中医营养学"),
@@ -54,17 +55,45 @@ class MyStudentServiceImplTest {
                 "{\"delivery\":\"线上\",\"period\":\"一天\"}", BigDecimal.ZERO, false, false);
         item.setProductSnapshot(JsonUtils.toJsonString(snapshot));
 
-        when(relationMapper.selectByOwnerAndPerson(8L, 2L)).thenReturn(List.of(relation));
+        when(relationMapper.selectActiveByOwnerAndPerson(8L, 2L)).thenReturn(List.of(relation));
+        when(relationMapper.selectActiveByCollaborator(8L)).thenReturn(List.of());
         when(personMapper.selectById(2L)).thenReturn(person);
-        when(leadMapper.selectByPersonId(2L)).thenReturn(lead);
+        when(leadMapper.selectById(5L)).thenReturn(lead);
         when(orderMapper.selectBatchIds(Set.of(3L))).thenReturn(List.of(order));
         when(orderItemMapper.selectBatchIds(Set.of(4L))).thenReturn(List.of(item));
 
-        MyStudentRespVO.ServiceVO result = service.getMyStudent(8L, 2L).getServices().getFirst();
+        MyStudentRespVO student = service.getMyStudent(8L, 2L);
+        MyStudentRespVO.ServiceVO result = student.getServices().getFirst();
 
+        assertEquals(5L, student.getLeadId());
         assertEquals("营养课程", result.getCourseName());
         assertEquals("营养课程 - 线上班", result.getSkuName());
         assertEquals(List.of("中医营养学", "基础课程"), result.getCategoryPath());
         assertEquals(List.of("线上", "一天"), result.getAttributeValues());
+    }
+
+    @Test
+    void getMyStudentIncludesServiceRelationCollaboratorAssignment() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(11L); relation.setPersonId(12L); relation.setOrderId(13L); relation.setOrderItemId(14L);
+        relation.setRegistrationCaseId(15L); relation.setStatus("active"); relation.setActivatedAt(LocalDateTime.now());
+        relation.setContentDirectorUserId(18L); relation.setAcceptanceStatus("accepted"); relation.setVersion(3);
+        PersonDO person = new PersonDO(); person.setId(12L); person.setName("编导学员");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(13L); order.setOrderNo("OD202608180001");
+        SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(14L); item.setOrderId(13L);
+
+        when(relationMapper.selectActiveByOwnerAndPerson(18L, 12L)).thenReturn(List.of());
+        when(relationMapper.selectActiveByCollaborator(18L)).thenReturn(List.of(relation));
+        when(personMapper.selectById(12L)).thenReturn(person);
+        when(orderMapper.selectBatchIds(Set.of(13L))).thenReturn(List.of(order));
+        when(orderItemMapper.selectBatchIds(Set.of(14L))).thenReturn(List.of(item));
+
+        MyStudentRespVO result = service.getMyStudent(18L, 12L);
+
+        assertEquals("编导学员", result.getName());
+        assertEquals(1, result.getServices().size());
+        assertEquals("accepted", result.getServices().getFirst().getAcceptanceStatus());
+        assertEquals(false, result.getServices().getFirst().getOwner());
+        assertEquals(18L, result.getServices().getFirst().getContentDirectorUserId());
     }
 }

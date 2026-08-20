@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Tabs, Typography, message } from 'antd'
-import { BellOutlined, CheckOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
+import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
 import { api, type DictData, type LeadAppealEvidence, type ManagedLead } from '../services/api'
 import { applyInvalidRemarkTemplate } from '../services/leadManagement'
 import { DICT_TYPE } from '../constants'
-import { defaultLeadDetailTab, detailTabsForMode, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
+import { defaultLeadDetailTab, detailTabsFromProjection, resolveLeadDetailTab, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import LeadDetailOverview from './LeadDetailOverview'
 import LeadFollowUpPanel from './LeadFollowUpPanel'
 import LeadAppealPanel from './LeadAppealPanel'
+import LeadFlowHistoryPanel from './LeadFlowHistoryPanel'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import LeadBasicInfoModal from './LeadBasicInfoModal'
 import LeadComplaintPanel from './LeadComplaintPanel'
@@ -18,21 +19,26 @@ import OverflowToolbar, { type ToolbarAction } from './OverflowToolbar'
 import SalesOrderEntryModal from './SalesOrderEntryModal'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import FollowUpModal from './FollowUpModal'
+import { formatTimestamp } from '../services/time'
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, onDirtyChange, onChanged }: {
+export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, onDirtyChange, onChanged }: {
   lead: ManagedLead
   categories: DictData[]
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
   mode: LeadDetailMode
   autoExpandFollowUp: boolean
+  initialTab?: LeadDetailTab
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
 }) {
-  const readOnly = mode === 'manager-readonly'
-  const visibleTabs = detailTabsForMode(mode)
-  const [activeTab, setActiveTab] = useState<LeadDetailTab>(defaultLeadDetailTab(autoExpandFollowUp))
+  const readOnly = mode === 'manager-readonly' || mode === 'student-readonly'
+  const visibleTabs = detailTabsFromProjection(lead.visibleTabs)
+  const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
+  const visibleTabKey = visibleTabs.join(',')
+  const [activeTab, setActiveTab] = useState<LeadDetailTab>(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
   const [followUpTotal, setFollowUpTotal] = useState(0)
+  const [followUpRefreshVersion, setFollowUpRefreshVersion] = useState(0)
   const [orderTotal, setOrderTotal] = useState<number>()
   const [invalidOpen, setInvalidOpen] = useState(false)
   const [invalidReasons, setInvalidReasons] = useState<DictData[]>([])
@@ -120,8 +126,15 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   }
 
   useEffect(() => {
-    setActiveTab(defaultLeadDetailTab(autoExpandFollowUp)); setFollowUpTotal(0); setOrderTotal(undefined); setFollowUpOpen(!readOnly)
-  }, [autoExpandFollowUp, lead.id, readOnly])
+    setActiveTab(resolveLeadDetailTab(visibleTabs, requestedInitialTab)); setFollowUpTotal(0); setOrderTotal(undefined); setFollowUpOpen(!readOnly)
+  // visibleTabKey tracks server projection changes without resetting on every render.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lead.id, readOnly, requestedInitialTab, visibleTabKey])
+
+  const handleStandaloneFollowUpSuccess = () => {
+    setFollowUpRefreshVersion(current => current + 1)
+    onChanged()
+  }
 
   const toolbarActions: ToolbarAction[] = [
     actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpModalOpen(true) },
@@ -137,15 +150,23 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   ].filter(Boolean) as ToolbarAction[]
 
   const tabItems = visibleTabs.map(tab => {
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content"><LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined}/></div> }
-    if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/></div> }
-    if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} audience={mode} onChanged={onChanged}/></div> }
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content"><LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined}/></div> }
+    if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/></div> }
+    if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
+    if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id}/></div> }
     return { key: tab, label: `订单记录${orderTotal === undefined ? '' : ` (${orderTotal})`}`, children: <div className="lead-detail-tab-content"><LeadCustomerOrders leadId={lead.id} onCount={setOrderTotal}/></div> }
   })
 
   return <div className="lead-inbox-detail">
-    <div className="lead-detail-hero"><Typography.Title level={4}>{lead.submittedName}</Typography.Title></div>
+    <div className="lead-detail-hero">
+      <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
+      {visibleTabs.includes('follow-ups') && lead.nextFollowUpAt && <div className="lead-hero-next-followup">
+        <ClockCircleOutlined />
+        <span className="lead-hero-next-label">下次跟进</span>
+        <span className="lead-hero-next-time">{formatTimestamp(lead.nextFollowUpAt)}</span>
+      </div>}
+    </div>
     <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => setActiveTab(key as LeadDetailTab)} items={tabItems}/>
     {!readOnly && <>
       <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为无效`} danger open={invalidConfirmOpen} onOpenChange={setInvalidConfirmOpen} onConfirm={judgeInvalid}><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={prepareJudgeInvalid}>确认判无效</Button></IrreversiblePopconfirm></Space>}>
@@ -167,7 +188,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       <Modal title="发起销售投诉" open={complaintOpen} confirmLoading={submitterActionSaving} onCancel={() => setComplaintOpen(false)} onOk={async () => { if (!complaintReason.trim()) { message.warning('请填写投诉原因'); return } setSubmitterActionSaving(true); try { await api.createLeadComplaint(lead.id, complaintReason.trim(), []); message.success('投诉已提交'); setComplaintReason(''); setComplaintOpen(false) } catch (error) { message.error(error instanceof Error ? error.message : '投诉提交失败') } finally { setSubmitterActionSaving(false) } }}><Form.Item label="投诉原因" required><Input.TextArea value={complaintReason} onChange={event => setComplaintReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写投诉事实与诉求"/></Form.Item></Modal>
       <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined} open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)} onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
       <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)} onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
-      <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={onChanged}/>
+      <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={handleStandaloneFollowUpSuccess}/>
     </>}
   </div>
 }

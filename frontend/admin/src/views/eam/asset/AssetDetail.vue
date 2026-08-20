@@ -25,28 +25,25 @@
         </el-descriptions-item>
         <el-descriptions-item label="序列号">{{ detail.sn || '-' }}</el-descriptions-item>
         <el-descriptions-item label="条码">{{ detail.barcode || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="原值">
-          {{ detail.originalValue != null ? `¥${detail.originalValue}` : '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="净值">
-          {{ detail.netValue != null ? `¥${detail.netValue}` : '-' }}
-        </el-descriptions-item>
         <el-descriptions-item label="购入日期">
           {{ detail.purchaseDate || '-' }}
-        </el-descriptions-item>
-        <el-descriptions-item label="保修到期">
-          {{ detail.warrantyDate || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="使用部门">
           {{ detail.useDeptName || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="使用人">{{ detail.useUserName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="使用人姓名快照">{{ detail.useUserNameSnapshot || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="上级">{{ detail.supervisorNameSnapshot || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="入司日期">{{ detail.joinDate || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="使用人承诺">{{ detail.commitmentAccepted ? '已承诺' : '待补' }}</el-descriptions-item>
+        <el-descriptions-item label="承诺日期">{{ detail.commitmentDate || '-' }}</el-descriptions-item>
         <el-descriptions-item label="存放地点" :span="2">
           {{ detail.location || '-' }}
         </el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{
           detail.remark || '-'
         }}</el-descriptions-item>
+        <el-descriptions-item label="附件" :span="2"><el-link v-for="url in detail.fileUrls || []" :key="url" :href="url" target="_blank" class="mr-3">{{ url.split('/').pop() || url }}</el-link><span v-if="!(detail.fileUrls || []).length">-</span></el-descriptions-item>
       </el-descriptions>
 
       <!-- 分类自定义字段 -->

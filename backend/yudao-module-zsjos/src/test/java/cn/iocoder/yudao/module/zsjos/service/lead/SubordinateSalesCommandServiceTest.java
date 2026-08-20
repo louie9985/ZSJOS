@@ -31,6 +31,7 @@ class SubordinateSalesCommandServiceTest {
     @Mock private SubordinateSalesAuditLogMapper auditLogMapper;
     @Mock private LeadDispatchService dispatchService;
     @Mock private LeadObjectPermissionService permissionService;
+    @Mock private LeadAgingPoolService agingPoolService;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -61,6 +62,21 @@ class SubordinateSalesCommandServiceTest {
         when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
         assertThrows(ServiceException.class, () -> service.transferOne(1L, 20L, 10L, "无变化"));
         verifyNoInteractions(dispatchService);
+    }
+
+    @Test
+    void manualPublicSeaRejectsActiveAgingPool() {
+        LeadDO lead = lead(1L, 20L); lead.setStatus("valid"); lead.setAssignmentStatus("owned");
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(agingPoolService.getActiveCycle(1L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO());
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.releasePublicSeaOne(1L, 30L, 10L, "协同跟进"));
+
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_COLLABORATION_POOL_CONFLICT.getCode(),
+                error.getCode());
+        verify(publicSeaRecordMapper, never()).insert(any(LeadPublicSeaRecordDO.class));
     }
 
     private static LeadDO lead(Long id, Long owner) {

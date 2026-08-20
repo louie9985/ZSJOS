@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.order;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessTaskApi;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
@@ -11,12 +12,16 @@ import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderDecisionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderRepurchaseReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderTerminateReqVO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
@@ -28,12 +33,14 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAppealMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadLifecycleTaskService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadInboxFilterConfigService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadCollaborationService;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
@@ -55,6 +62,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -81,6 +89,7 @@ class SalesOrderServiceImplTest {
     @Mock private LeadAppealMapper leadAppealMapper;
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private PersonMapper personMapper;
+    @Mock private PartnerMapper partnerMapper;
     @Mock private ZsjosProductSkuService skuService;
     @Mock private SalesOrderObjectPermissionService permissionService;
     @Mock private FileApi fileApi;
@@ -90,9 +99,11 @@ class SalesOrderServiceImplTest {
     @Mock private BpmProcessTaskApi processTaskApi;
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Mock private AdminUserApi adminUserApi;
     @Mock private DeptApi deptApi;
     @Mock private LeadInboxFilterConfigService inboxFilterConfigService;
     @Mock private LeadAgingPoolService agingPoolService;
+    @Mock private LeadCollaborationService collaborationService;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private SalesOrderCommandService commandService;
     @Mock private AdvancedFilterService advancedFilterService;
@@ -105,6 +116,9 @@ class SalesOrderServiceImplTest {
         TenantContextHolder.setTenantId(1L);
         lenient().when(advancedFilterService.matchOrderIds(any())).thenReturn(null);
         lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
+        lenient().when(collaborationService.requireCanOperateForUpdate(any(LeadDO.class), anyLong()))
+                .thenAnswer(invocation -> new LeadCollaborationService.OperationContext(false, null,
+                        invocation.<LeadDO>getArgument(0).getOwnerUserId()));
         lenient().when(commandService.fingerprint(any())).thenReturn("fingerprint");
         lenient().when(orderNumberService.next()).thenReturn("OD202608141200000001");
         lenient().when(cashbackService.isEligibleDealLead(anyLong())).thenReturn(false);
@@ -233,7 +247,7 @@ class SalesOrderServiceImplTest {
         OpportunityDO mismatched = new OpportunityDO();
         mismatched.setId(30L); mismatched.setLeadId(1L); mismatched.setPersonId(99L);
         mismatched.setOwnerUserId(20L); mismatched.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
-        when(opportunityMapper.selectByLeadId(1L)).thenReturn(mismatched);
+        when(opportunityMapper.selectByLeadIdForUpdate(1L, 1L)).thenReturn(mismatched);
 
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.createAndSubmit(1L, 20L, request(BigDecimal.ZERO, "13800138000", null)));
@@ -399,6 +413,80 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void getProjectsAuthoritativeLinkedLeadProfile() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("SO-100"); order.setLeadId(1L); order.setStatus(STATUS_EFFECTIVE);
+        order.setStudentName("订单学员"); order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        LeadDO lead = new LeadDO();
+        lead.setId(1L); lead.setLeadNo("KZ202608191041490002"); lead.setSubmittedName("客资客户");
+        lead.setSubmittedMobile("19926231001"); lead.setSubmittedWechatId("wx-customer");
+        lead.setSourceType(SOURCE_INTERNAL_NEW_MEDIA); lead.setSourceUserId(31L); lead.setOwnerUserId(32L);
+        lead.setSourceChannelId("information_flow"); lead.setLeadCategory("high_intent"); lead.setDispatchMode("auto");
+        lead.setProvinceName("广东省"); lead.setCityName("湛江市");
+        AdminUserRespDTO sourceUser = new AdminUserRespDTO(); sourceUser.setId(31L); sourceUser.setNickname("新媒体专员");
+        AdminUserRespDTO ownerUser = new AdminUserRespDTO(); ownerUser.setId(32L); ownerUser.setNickname("销售专员2");
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+        when(adminUserApi.getUserMap(Set.of(31L, 32L))).thenReturn(Map.of(31L, sourceUser, 32L, ownerUser));
+
+        var result = service.get(100L, 40L);
+
+        assertNotNull(result.getLeadProfile());
+        assertEquals("KZ202608191041490002", result.getLeadProfile().getLeadNo());
+        assertEquals("客资客户", result.getLeadProfile().getSubmittedName());
+        assertEquals("新媒体提交", result.getLeadProfile().getSourceLabel());
+        assertEquals("新媒体专员", result.getLeadProfile().getSourceUserName());
+        assertEquals("销售专员2", result.getLeadProfile().getOwnerUserName());
+        assertEquals("information_flow", result.getLeadProfile().getSourceChannel());
+        assertEquals("high_intent", result.getLeadProfile().getLeadCategory());
+    }
+
+    @Test
+    void getOmitsLeadProfileForUnlinkedRepurchase() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("SO-100"); order.setStatus(STATUS_EFFECTIVE);
+        order.setOrderType(ORDER_TYPE_REPURCHASE); order.setStudentName("复购学员");
+        order.setTotalAmount(BigDecimal.ZERO); order.setSubmitterUserId(20L);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+
+        var result = service.get(100L, 20L);
+
+        assertNull(result.getLeadProfile());
+        verifyNoInteractions(adminUserApi, partnerMapper);
+    }
+
+    @Test
+    void getPrefersApprovalRoundLabelSnapshotsOverCurrentDictionaryProjection() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setOrderNo("SO-100"); order.setLeadId(1L); order.setStatus(STATUS_PENDING_APPROVAL);
+        order.setStudentName("当前名称"); order.setStudentNature("adult"); order.setServicePeriod("one_year");
+        order.setStudentSource("lead"); order.setFeeMode("full"); order.setPaymentMethod("wechat");
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setRoundNo(1); round.setProcessInstanceId("process-1");
+        round.setOrderSnapshot(JsonUtils.toJsonString(Map.of(
+                "snapshotVersion", 1,
+                "orderLabels", Map.of("studentNature", "录入时性质", "servicePeriod", "录入时周期",
+                        "studentSource", "录入时来源", "feeMode", "录入时缴费方式", "paymentMethod", "录入时支付方式"),
+                "leadProfile", Map.of("leadNo", "KZ202608191234560001", "submittedName", "录入时客户",
+                        "leadCategory", "a", "leadCategoryLabelSnapshot", "录入时分类",
+                        "sourceChannel", "b", "sourceChannelLabelSnapshot", "录入时渠道"))));
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(roundMapper.selectLatestByOrderId(100L)).thenReturn(round);
+        when(itemMapper.selectListByOrderId(100L)).thenReturn(List.of());
+        when(processTaskApi.getProcessNodeStatuses("process-1", Set.of(TASK_REGISTRATION, TASK_FINANCE))).thenReturn(List.of());
+
+        var result = service.get(100L, 20L);
+
+        assertEquals("录入时性质", result.getStudentNatureLabelSnapshot());
+        assertEquals("录入时支付方式", result.getPaymentMethodLabelSnapshot());
+        assertEquals("录入时分类", result.getLeadProfile().getLeadCategoryLabelSnapshot());
+        assertEquals("录入时渠道", result.getLeadProfile().getSourceChannelLabelSnapshot());
+        assertEquals("KZ202608191234560001", result.getLeadProfile().getLeadNo());
+    }
+
+    @Test
     void approvalInboxRestrictsSingleCenterUserToRegistrationTasks() {
         SalesOrderPageReqVO reqVO = new SalesOrderPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setHandled(false); reqVO.setCenter(CENTER_REGISTRATION);
@@ -426,7 +514,27 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void reviseKeepsOrderAndStartsNewImmutableRound() {
+    void approveRemainsAvailableWhileSupervisorParallelSignIsPending() {
+        SalesOrderDecisionReqVO request = mockPendingFinanceDecision("approve-1");
+
+        service.approve(100L, 20L, request);
+
+        verify(supervisorConfirmationService, never()).cancelPending(eq(200L), eq(TASK_FINANCE), any(LocalDateTime.class));
+        verify(processTaskApi).approveTask(eq(20L), argThat(decision -> "finance-task".equals(decision.getTaskId())));
+    }
+
+    @Test
+    void rejectRemainsAvailableWhileSupervisorParallelSignIsPending() {
+        SalesOrderDecisionReqVO request = mockPendingFinanceDecision("reject-1");
+
+        service.reject(100L, 20L, request);
+
+        verify(supervisorConfirmationService).cancelPending(eq(200L), eq(TASK_FINANCE), any(LocalDateTime.class));
+        verify(processTaskApi).rejectTask(eq(20L), argThat(decision -> "finance-task".equals(decision.getTaskId())));
+    }
+
+    @Test
+    void reviseCreatesIndependentSuccessorAndPreservesRejectedOrder() {
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setLeadId(1L); order.setOpportunityId(30L); order.setStatus(STATUS_REVISION_REQUIRED);
         when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
@@ -440,18 +548,46 @@ class SalesOrderServiceImplTest {
         when(permissionService.enabledUsers(1040L)).thenReturn(Set.of(401L));
         when(processInstanceApi.createProcessInstance(eq(20L), any())).thenReturn("process-2");
         when(skuService.validateLeadProduct("spu-1", false, "sku-1", false)).thenReturn(product());
+        doAnswer(invocation -> { SalesOrderDO inserted = invocation.getArgument(0); inserted.setId(101L); return 1; })
+                .when(orderMapper).insert(any(SalesOrderDO.class));
         doAnswer(invocation -> { ((SalesOrderApprovalRoundDO) invocation.getArgument(0)).setId(201L); return 1; })
                 .when(roundMapper).insert(any(SalesOrderApprovalRoundDO.class));
 
-        service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null));
+        Long successorId = service.reviseAndResubmit(100L, 20L, request(BigDecimal.ZERO, "13800138000", null));
 
-        assertEquals(STATUS_PENDING_APPROVAL, order.getStatus());
-        assertEquals(201L, order.getCurrentApprovalRoundId());
-        verify(itemMapper).deleteByOrderId(100L);
-        verify(roundMapper).insert(org.mockito.Mockito.<SalesOrderApprovalRoundDO>argThat(round -> round.getOrderId().equals(100L)
-                && round.getRoundNo() == 2 && "process-2".equals(round.getProcessInstanceId())
+        assertEquals(101L, successorId);
+        assertEquals(STATUS_SUPERSEDED, order.getStatus());
+        assertEquals(101L, order.getSupersededByOrderId());
+        verify(itemMapper, never()).deleteByOrderId(100L);
+        verify(orderMapper).insert(org.mockito.Mockito.<SalesOrderDO>argThat(inserted -> Objects.equals(inserted.getId(), 101L)
+                && Objects.equals(inserted.getSupersedesOrderId(), 100L)
+                && STATUS_PENDING_APPROVAL.equals(inserted.getStatus())));
+        verify(roundMapper).insert(org.mockito.Mockito.<SalesOrderApprovalRoundDO>argThat(round -> round.getOrderId().equals(101L)
+                && round.getRoundNo() == 1 && "process-2".equals(round.getProcessInstanceId())
                 && round.getOrderSnapshot() != null));
+        verify(registrationService).cancelByOrderId(eq(100L), eq("原订单已被接续"), any());
         verify(businessTaskCommandService).completeByKey(eq(TASK_REVISION_KEY_PREFIX + 200L), any());
+    }
+
+    @Test
+    void reviseRechecksIdempotencyAfterLockAndReturnsConcurrentSuccessor() {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setStatus(STATUS_REVISION_REQUIRED);
+        SalesOrderDO successor = new SalesOrderDO();
+        successor.setId(101L); successor.setSupersedesOrderId(100L);
+        SalesOrderApprovalRoundDO successorRound = new SalesOrderApprovalRoundDO();
+        successorRound.setOrderId(101L);
+        when(roundMapper.selectByIdempotencyKey("key-1")).thenReturn(null, successorRound);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        when(orderMapper.selectById(101L)).thenReturn(successor);
+
+        Long successorId = service.reviseAndResubmit(100L, 20L,
+                request(BigDecimal.ZERO, "13800138000", null));
+
+        assertEquals(101L, successorId);
+        verify(orderMapper, never()).updateById(any(SalesOrderDO.class));
+        verify(orderMapper, never()).insert(any(SalesOrderDO.class));
+        verifyNoInteractions(processInstanceApi);
     }
 
     @Test
@@ -479,8 +615,8 @@ class SalesOrderServiceImplTest {
 
         assertNotNull(listPermission);
         assertNotNull(detailPermission);
-        assertEquals("owner-or-manager-read", listPermission.action());
-        assertEquals("owner-or-manager-read", detailPermission.action());
+        assertEquals("sales-history-read", listPermission.action());
+        assertEquals("sales-history-read", detailPermission.action());
     }
 
     @Test
@@ -571,10 +707,30 @@ class SalesOrderServiceImplTest {
         opportunity.setPersonId(10L); opportunity.setOwnerUserId(20L); opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
         when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
         lenient().when(leadMapper.selectById(1L)).thenReturn(lead);
-        lenient().when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        lenient().when(opportunityMapper.selectByLeadIdForUpdate(1L, 1L)).thenReturn(opportunity);
         AreaRespDTO province = new AreaRespDTO();
         province.setId(120000); province.setName("天津市"); province.setType(2); province.setStatus(0); province.setLeafSelectable(true);
         lenient().when(areaApi.getArea(120000)).thenReturn(province);
+    }
+
+    private SalesOrderDecisionReqVO mockPendingFinanceDecision(String idempotencyKey) {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setStatus(STATUS_PENDING_APPROVAL); order.setCurrentApprovalRoundId(200L); order.setVersion(3);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO();
+        round.setId(200L); round.setOrderId(100L); round.setStatus(ROUND_PENDING);
+        round.setProcessInstanceId("process-1"); round.setVersion(4);
+        BpmTaskRespDTO task = new BpmTaskRespDTO();
+        task.setId("finance-task"); task.setProcessInstanceId("process-1");
+        task.setBusinessKey(BUSINESS_KEY_PREFIX + 100L); task.setTaskDefinitionKey(TASK_FINANCE); task.setSignTask(false);
+        when(orderMapper.selectByIdForUpdate(100L, 1L)).thenReturn(order);
+        when(roundMapper.selectByIdForUpdate(200L, 1L)).thenReturn(round);
+        when(processTaskApi.getTodoTask(20L, "finance-task")).thenReturn(task);
+
+        SalesOrderDecisionReqVO request = new SalesOrderDecisionReqVO();
+        request.setTaskId("finance-task"); request.setApprovalRoundId(200L);
+        request.setOrderVersion(3); request.setRoundVersion(4); request.setReason("审批意见");
+        request.setIdempotencyKey(idempotencyKey);
+        return request;
     }
 
     private SalesOrderSubmitReqVO request(BigDecimal amount, String mobile, String wechat) {

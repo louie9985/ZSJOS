@@ -11,8 +11,8 @@
 .aging-pool-layout {
   display: grid;
   min-height: 620px;
-  grid-template-columns: minmax(300px,380px) minmax(0,1fr);
-  gap: 10px;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0,1fr);
+  gap: var(--crm-gap);
 }
 
 .aging-pool-list,.aging-pool-detail {
@@ -49,6 +49,15 @@
 
 .aging-pool-detail-heading h4 {
   margin: 0 0 4px!important;
+}
+
+.aging-pool-summary-card {
+  padding: var(--crm-card-pad);
+  margin-bottom: var(--crm-gap);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
 }
 
 @media(max-width:768px) {

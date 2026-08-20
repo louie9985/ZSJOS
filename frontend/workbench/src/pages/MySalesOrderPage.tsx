@@ -8,12 +8,15 @@ import SalesOrderEntryModal, { type SalesOrderEntryLead } from '../components/Sa
 import { formatTimestamp } from '../services/time'
 import { mergeSalesOrderListItems, salesOrderDetailToListItem } from '../services/salesOrder'
 import { useSubmissionGuard } from '../services/submissionGuard'
+import { useNavigate } from 'react-router-dom'
+import { APP_ROUTES } from '../constants'
 
 const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
-const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0 }
+const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0, superseded: 0 }
 
 export default function MySalesOrderPage() {
+  const navigate = useNavigate()
   const requestedOrderId = useRef(Number(new URLSearchParams(location.search).get('orderId')) || undefined)
   const [status, setStatus] = useState<StatusTab>('all')
   const [keyword, setKeyword] = useState('')
@@ -91,8 +94,9 @@ export default function MySalesOrderPage() {
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
-      : detail ? <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)}
-        onTerminate={() => { resetTerminationIntent(); setTerminateOpen(true) }}/>
+      : detail ? <><div className="sales-order-detail-actions">{detail.supersedesOrderId && <Button onClick={() => setSelectedId(detail.supersedesOrderId)}>查看原订单</Button>}{detail.supersededByOrderId && <Button type="primary" onClick={() => setSelectedId(detail.supersededByOrderId)}>查看重提订单</Button>}{detail.leadId && <Button onClick={() => navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadId=${detail.leadId}`)}>客户档案</Button>}</div>
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)}
+          onTerminate={() => { resetTerminationIntent(); setTerminateOpen(true) }}/></>
         : <Empty description="从左侧选择一条订单"/>
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
     id: detail.leadId || 0, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,
@@ -102,8 +106,7 @@ export default function MySalesOrderPage() {
 
   return <section className="workspace-page sales-order-inbox-page">
     <header className="sales-order-inbox-header">
-      <div><Typography.Title level={4}>我的订单</Typography.Title><Typography.Text type="secondary">查看本人提交的全部成交订单及当前状态</Typography.Text></div>
-      <Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
+      <div><Typography.Title level={4}>我的订单</Typography.Title><Typography.Text type="secondary">查看本人提交的全部成交订单及当前状态</Typography.Text></div><Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
     </header>
     {countsError && <Alert
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
@@ -111,7 +114,7 @@ export default function MySalesOrderPage() {
     }
     {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => setStatus(key as StatusTab)} items={[
       { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
-      { key: 'revision_required', label: `已驳回待修改 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }
+      { key: 'revision_required', label: `已驳回待修改 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `已被重提 ${counts.superseded}` }
     ]}/>}
     <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">

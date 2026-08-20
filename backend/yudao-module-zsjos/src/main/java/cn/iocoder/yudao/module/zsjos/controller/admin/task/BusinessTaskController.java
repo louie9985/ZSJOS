@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import java.time.LocalDateTime;
 
 @Tag(name = "管理后台 - 我的业务待办")
 @RestController
@@ -45,4 +46,13 @@ public class BusinessTaskController {
     public CommonResult<PageResult<BusinessTaskRespVO>> getMyTaskPage(@Valid BusinessTaskPageReqVO reqVO) {
         return success(taskService.getMyPage(getLoginUserId(), reqVO));
     }
+
+    @PostMapping("/{id}/complete-birthday-care")
+    @Operation(summary = "完成员工生日关怀待办")
+    @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")
+    public CommonResult<Boolean> completeBirthdayCare(@PathVariable("id") Long id) {
+        return success(commandService.completeBirthdayCare(id, getLoginUserId(), LocalDateTime.now()));
+    }
+
+    @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService commandService;
 }

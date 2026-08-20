@@ -1,7 +1,6 @@
 package cn.iocoder.yudao.module.eam.dal.dataobject.asset;
 
 import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
-import cn.iocoder.yudao.framework.mybatis.core.type.StringListTypeHandler;
 import cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
@@ -15,7 +14,6 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -85,25 +83,9 @@ public class EamAssetDO extends BaseDO {
      */
     private String barcode;
     /**
-     * 原值
-     */
-    private BigDecimal originalValue;
-    /**
-     * 净值
-     */
-    private BigDecimal netValue;
-    /**
      * 购入日期
      */
     private LocalDate purchaseDate;
-    /**
-     * 来源，字典 eam_asset_source
-     */
-    private Integer source;
-    /**
-     * 保修到期日
-     */
-    private LocalDate warrantyDate;
     /**
      * 使用部门
      */
@@ -113,13 +95,33 @@ public class EamAssetDO extends BaseDO {
      */
     private Long useUserId;
     /**
+     * 使用人姓名快照；用户匹配失败或历史名称变化时保留
+     */
+    private String useUserNameSnapshot;
+    /**
+     * 直属上级用户
+     */
+    private Long supervisorUserId;
+    /**
+     * 直属上级姓名快照
+     */
+    private String supervisorNameSnapshot;
+    /**
+     * 入司日期
+     */
+    private LocalDate joinDate;
+    /**
+     * 使用人承诺是否确认
+     */
+    private Boolean commitmentAccepted;
+    /**
+     * 承诺日期
+     */
+    private LocalDate commitmentDate;
+    /**
      * 存放地点
      */
     private String location;
-    /**
-     * 预计使用年限（月）
-     */
-    private Integer expectedLife;
     /**
      * 备注
      */
@@ -127,7 +129,7 @@ public class EamAssetDO extends BaseDO {
     /**
      * 附件地址数组
      */
-    @TableField(typeHandler = StringListTypeHandler.class)
+    @TableField(typeHandler = JacksonTypeHandler.class)
     private List<String> fileUrls;
     /**
      * 分类自定义字段扩展值 JSON

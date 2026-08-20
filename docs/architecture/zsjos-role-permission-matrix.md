@@ -23,10 +23,10 @@
 |---:|---|---|
 | 1 | `center_head` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 2 | `dept_manager` | 保持已批准的提交方和组织范围能力，不按名称追加销售、财务或管理员权限 |
-| 3 | `content_director` | 零 ZSJOS 菜单，当前没有已落地职责 |
+| 3 | `content_director` | `我的学员`（仅查询实际分配给自己的学员） |
 | 4 | `new_media_operator` | 通过 `query-submitted` 查看本人提交客资；部门主管关系可将同一权限范围扩到当前所管部门及子部门员工，不按角色名称扩权 |
 | 5 | `filming_editor` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 6 | `sales_manager` | 通过 `query-owned` 查看本人及当前所管部门、子部门销售负责的客资，并具备跟进记录只读能力；不得持有 `query-all` |
+| 6 | `sales_manager` | 通过 `query-owned` 查看本人及当前所管部门、子部门销售负责的客资，并具备跟进记录、流转记录只读能力及下属销售一键暂停接单能力；不得持有 `query-all` |
 | 7 | `sales_specialist` | 通过 `query-owned` 查看本人负责的客资，保留接单/抢单、跟进判定、自拓、建单、本人订单、公海申请和本人工作计划能力；不得持有 `query-all` |
 | 8 | `enrollment_manager` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 9 | `enrollment_specialist` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
@@ -63,7 +63,10 @@
 - 每个租户的兼职角色必须恰好拥有上述 10 个有效权限，两个财务角色必须各自恰好拥有相同 11 项。
 - 同一租户、角色和 permission 最多一个有效 `system_role_menu` 关系；权限按钮不得指向已删除父菜单。
 - `system_administrator` 必须有提现只读和客资导出，且不得有常规财务审核、提现审核/打款或资金导出。
-- V073 后 `study_planner` 仅新增 `zsjos:student:query-my`；其余原零菜单角色仍不得存在任何有效 `zsjos:%` 权限。
+- V073 后 `study_planner` 仅新增 `zsjos:student:query-my`；V083 后 `content_director` 同样仅新增该查询菜单。两者均不因此获得报名履约公共池权限。
+- V086 增加 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read` 四个独立只读权限。迁移只按原有效可见权限做兼容授权，后续由 System 角色权限管理分别配置；任何一个标签权限都不能替代 Lead 对象关系校验。
 - V071 只改变菜单元数据和角色菜单关系，不改变真实账号、用户角色关系、BPM 或业务数据；应用现有数据库需要单独确认。
 
 V073 grants `system_administrator` only the registration-checklist query/update/publish permissions and grants `study_planner` only My Students. Registration public-pool permissions are intentionally unassigned and must be configured by an administrator; role names and departments never imply them.
+
+V083 grants `content_director` only My Students. Runtime route candidates use the stable content-director post code and the persisted department subtree; this menu grant does not change candidate eligibility or public-pool access.

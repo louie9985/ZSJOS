@@ -1,13 +1,13 @@
 下面是兼职端前端完整接口清单。统一前缀：
 
 ```
-/app-api
+/part-api
 ```
 
 兼职业务接口统一使用：
 
 ```
-/app-api/zsjos/**
+/part-api/zsjos/**
 ```
 
 请求头：
@@ -44,7 +44,7 @@ pageSize: 每页数量，最大 200
 ### 1. 兼职登录
 
 ```
-POST /app-api/zsjos/auth/login
+POST /part-api/zsjos/auth/login
 ```
 
 请求：
@@ -82,12 +82,12 @@ platform: PC 或 MOBILE，默认 PC
 
 只有拥有 `part_time_partner` 角色的账号可以通过该接口登录。
 
-当前保留“企业微信登录”入口，但暂不打通。点击入口只提示暂未开放，不发起 OAuth，也不调用 `/app-api/zsjos/auth/wecom-login`。
+当前保留“企业微信登录”入口，但暂不打通。点击入口只提示暂未开放，不发起 OAuth，也不调用 `/part-api/zsjos/auth/wecom-login`。
 
 ### 2. 退出登录
 
 ```
-POST /app-api/zsjos/auth/logout
+POST /part-api/zsjos/auth/logout
 ```
 
 只需要携带 `Authorization`。接口按 `PARTNER` 主体类型幂等撤销：token 已过期、已删除或重复调用均成功，ADMIN/MEMBER token 不会被删除。
@@ -97,7 +97,7 @@ POST /app-api/zsjos/auth/logout
 ### 3. 刷新 Token
 
 ```
-POST /app-api/zsjos/auth/refresh-token?refreshToken={refreshToken}&clientId={clientId}
+POST /part-api/zsjos/auth/refresh-token?refreshToken={refreshToken}&clientId={clientId}
 ```
 
 `clientId` 可选。
@@ -105,7 +105,7 @@ POST /app-api/zsjos/auth/refresh-token?refreshToken={refreshToken}&clientId={cli
 ### 4. 获取权限信息
 
 ```
-GET /app-api/zsjos/auth/permission-info
+GET /part-api/zsjos/auth/permission-info
 ```
 
 返回当前用户、角色、菜单和权限列表。
@@ -130,7 +130,7 @@ zsjos:withdrawal:apply
 ### 1. 获取账号资料
 
 ```
-GET /app-api/zsjos/profile/get
+GET /part-api/zsjos/profile/get
 ```
 
 返回账号昵称、手机号、邮箱、头像、性别、部门、岗位、角色等信息。
@@ -138,7 +138,7 @@ GET /app-api/zsjos/profile/get
 ### 2. 修改账号资料
 
 ```
-PUT /app-api/zsjos/profile/update
+PUT /part-api/zsjos/profile/update
 ```
 
 请求：
@@ -156,7 +156,7 @@ PUT /app-api/zsjos/profile/update
 ### 3. 修改密码
 
 ```
-PUT /app-api/zsjos/profile/update-password
+PUT /part-api/zsjos/profile/update-password
 ```
 
 请求：
@@ -173,7 +173,7 @@ PUT /app-api/zsjos/profile/update-password
 ### 4. 获取兼职主体信息
 
 ```
-GET /app-api/zsjos/partner/me
+GET /part-api/zsjos/partner/me
 ```
 
 返回：
@@ -238,14 +238,14 @@ GET /app-api/system/dict-data/type?type=zsjos_lead_category
 GET /app-api/system/area/tree
 ```
 
-地区同样使用只携带 `tenant-id` 的公共数据客户端。前端提交节点的 `selectionCode`，不使用内部 `id` 替代；不存在 `/app-api/zsjos/lead/area-tree` 接口。
+地区同样使用只携带 `tenant-id` 的公共数据客户端。前端提交节点的 `selectionCode`，不使用内部 `id` 替代；不存在 `/part-api/zsjos/lead/area-tree` 接口。
 
 ## 四、课程和产品
 
 ### 获取课程目录
 
 ```
-GET /app-api/zsjos/lead/product/catalog
+GET /part-api/zsjos/lead/product/catalog
 ```
 
 返回：
@@ -294,7 +294,7 @@ price
 ## 五、客资附件
 
 ```
-POST /app-api/zsjos/lead/attachment/upload
+POST /part-api/zsjos/lead/attachment/upload
 ```
 
 请求类型：
@@ -328,7 +328,7 @@ file
 ### 创建客资
 
 ```
-POST /app-api/zsjos/lead/create
+POST /part-api/zsjos/lead/create
 ```
 
 请求示例：
@@ -421,7 +421,7 @@ duplicate_auto_closed
 ## 七、本人提交客资列表
 
 ```
-GET /app-api/zsjos/lead/inbox/submitted/page
+GET /part-api/zsjos/lead/inbox/submitted/page
 ```
 
 查询参数：
@@ -470,7 +470,7 @@ submittedAt
 ### 获取客资详情
 
 ```
-GET /app-api/zsjos/lead/get?id={leadId}
+GET /part-api/zsjos/lead/get?id={leadId}
 ```
 
 只能查看本人有提交人历史权限的客资。
@@ -480,7 +480,7 @@ GET /app-api/zsjos/lead/get?id={leadId}
 ### 补充本人客资
 
 ```
-PUT /app-api/zsjos/lead/{id}/submitter-supplement
+PUT /part-api/zsjos/lead/{id}/submitter-supplement
 ```
 
 请求：
@@ -518,7 +518,7 @@ PUT /app-api/zsjos/lead/{id}/submitter-supplement
 ### 催办客资
 
 ```
-POST /app-api/zsjos/lead/{id}/urge
+POST /part-api/zsjos/lead/{id}/urge
 ```
 
 请求：
@@ -536,7 +536,7 @@ POST /app-api/zsjos/lead/{id}/urge
 ### 创建投诉
 
 ```
-POST /app-api/zsjos/lead-complaint/lead/{leadId}
+POST /part-api/zsjos/lead-complaint/lead/{leadId}
 ```
 
 请求：
@@ -560,7 +560,7 @@ idempotencyKey 必填
 ### 查询本人投诉历史
 
 ```
-GET /app-api/zsjos/lead-complaint/my-page
+GET /part-api/zsjos/lead-complaint/my-page
 ```
 
 查询参数：
@@ -578,13 +578,13 @@ status
 ### 查询客资申诉记录
 
 ```
-GET /app-api/zsjos/lead/appeal/lead/{leadId}/list
+GET /part-api/zsjos/lead/appeal/lead/{leadId}/list
 ```
 
 ### 上传申诉附件
 
 ```
-POST /app-api/zsjos/lead/appeal/attachment/upload
+POST /part-api/zsjos/lead/appeal/attachment/upload
 ```
 
 请求类型：
@@ -597,7 +597,7 @@ file: 文件
 ### 提交申诉
 
 ```
-POST /app-api/zsjos/lead/appeal/lead/{leadId}/submit
+POST /part-api/zsjos/lead/appeal/lead/{leadId}/submit
 ```
 
 请求：
@@ -627,7 +627,7 @@ idempotencyKey 必填
 ### 查询本人返现分页
 
 ```
-GET /app-api/zsjos/cashback/my-page
+GET /part-api/zsjos/cashback/my-page
 ```
 
 查询参数：
@@ -682,7 +682,7 @@ cancelReason
 ### 返现汇总
 
 ```
-GET /app-api/zsjos/cashback/my-summary
+GET /part-api/zsjos/cashback/my-summary
 ```
 
 返回：
@@ -707,7 +707,7 @@ GET /app-api/zsjos/cashback/my-summary
 ### 提现汇总
 
 ```
-GET /app-api/zsjos/withdrawal/my-summary
+GET /part-api/zsjos/withdrawal/my-summary
 ```
 
 返回：
@@ -733,7 +733,7 @@ V063 默认一级课程分类规则：
 ### 查询本人银行卡
 
 ```
-GET /app-api/zsjos/withdrawal/my-cards
+GET /part-api/zsjos/withdrawal/my-cards
 ```
 
 返回：
@@ -754,7 +754,7 @@ GET /app-api/zsjos/withdrawal/my-cards
 ### 新增银行卡
 
 ```
-POST /app-api/zsjos/withdrawal/my-cards
+POST /part-api/zsjos/withdrawal/my-cards
 ```
 
 请求：
@@ -771,7 +771,7 @@ POST /app-api/zsjos/withdrawal/my-cards
 ### 删除银行卡
 
 ```
-DELETE /app-api/zsjos/withdrawal/my-cards/{id}
+DELETE /part-api/zsjos/withdrawal/my-cards/{id}
 ```
 
 只能删除本人银行卡。
@@ -779,13 +779,13 @@ DELETE /app-api/zsjos/withdrawal/my-cards/{id}
 ### 设置默认银行卡
 
 ```
-PUT /app-api/zsjos/withdrawal/my-cards/{id}/default
+PUT /part-api/zsjos/withdrawal/my-cards/{id}/default
 ```
 
 ### 提交提现申请
 
 ```
-POST /app-api/zsjos/withdrawal/apply
+POST /part-api/zsjos/withdrawal/apply
 ```
 
 使用已保存银行卡：
@@ -833,7 +833,7 @@ saveCard: 是否保存直接提交的银行卡
 ### 查询本人提现分页
 
 ```
-GET /app-api/zsjos/withdrawal/my-page
+GET /part-api/zsjos/withdrawal/my-page
 ```
 
 查询参数：
@@ -847,7 +847,7 @@ status
 ### 查询提现详情
 
 ```
-GET /app-api/zsjos/withdrawal/my/{id}
+GET /part-api/zsjos/withdrawal/my/{id}
 ```
 
 列表和详情金额、银行快照和申请时间字段统一为：
@@ -861,7 +861,7 @@ submittedAt
 ### 取消提现
 
 ```
-PUT /app-api/zsjos/withdrawal/{id}/cancel
+PUT /part-api/zsjos/withdrawal/{id}/cancel
 ```
 
 只有待财务审核状态允许取消。
@@ -869,10 +869,10 @@ PUT /app-api/zsjos/withdrawal/{id}/cancel
 ## 十二、个人站内消息
 
 ```
-GET /app-api/zsjos/messages/page
-GET /app-api/zsjos/messages/{id}
-PUT /app-api/zsjos/messages/read
-GET /app-api/zsjos/messages/unread-count
+GET /part-api/zsjos/messages/page
+GET /part-api/zsjos/messages/{id}
+PUT /part-api/zsjos/messages/read
+GET /part-api/zsjos/messages/unread-count
 ```
 
 已读请求体为 `{ "ids": [1, 2] }`。消息沿用 System 字段 `templateTitle`、`templateSummary`、`templateContent`、`templateType`、`readStatus`、`createTime`。四个接口要求 `part_time_partner` 角色，并按当前 ADMIN 用户校验消息所有权。

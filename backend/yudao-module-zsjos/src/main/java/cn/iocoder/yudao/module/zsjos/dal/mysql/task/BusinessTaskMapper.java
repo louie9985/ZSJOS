@@ -11,9 +11,12 @@ import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Collection;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.BIZ_TYPE_LEAD;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_STATUS_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FOLLOW_UP_REMINDER;
 
 @Mapper
 public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
@@ -23,6 +26,45 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     default BusinessTaskDO selectByIdempotencyKey(String idempotencyKey) {
         return selectOne(new LambdaQueryWrapperX<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getIdempotencyKey, idempotencyKey));
+    }
+
+    default BusinessTaskDO selectPendingByRelationAndType(Long relationId, String taskType) {
+        return selectOne(new LambdaQueryWrapperX<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getBizType, "student_service")
+                .eq(BusinessTaskDO::getBizId, relationId)
+                .eq(BusinessTaskDO::getTaskType, taskType)
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .orderByDesc(BusinessTaskDO::getId).last("LIMIT 1"));
+    }
+
+    default int updatePendingDueAt(Long id, LocalDateTime dueAt) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getDueAt, dueAt).set(BusinessTaskDO::getRemindAt, dueAt));
+    }
+
+    default int reassignPendingById(Long id, Long assigneeId) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getAssigneeId, assigneeId));
+    }
+
+    default int completeAssistance(Long id, Long assigneeId, LocalDateTime completedAt, String payload) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id).eq(BusinessTaskDO::getTaskType, "student_first_contact_assistance")
+                .eq(BusinessTaskDO::getAssigneeId, assigneeId).eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getStatus, "completed").set(BusinessTaskDO::getCompletedAt, completedAt)
+                .set(BusinessTaskDO::getPayload, payload));
+    }
+
+    default BusinessTaskDO selectPendingFollowUpReminderByLeadId(Long leadId) {
+        return selectOne(new LambdaQueryWrapperX<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getTaskType, TASK_TYPE_FOLLOW_UP_REMINDER)
+                .eq(BusinessTaskDO::getBizType, BIZ_TYPE_LEAD)
+                .eq(BusinessTaskDO::getBizId, leadId)
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .orderByDesc(BusinessTaskDO::getId)
+                .last("LIMIT 1"));
     }
 
     default List<BusinessTaskDO> selectExpiredPending(String taskType, LocalDateTime now, int limit) {
@@ -138,6 +180,24 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
     default int completePendingByKey(String idempotencyKey, LocalDateTime completedAt) {
         return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getIdempotencyKey, idempotencyKey)
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getStatus, "completed")
+                .set(BusinessTaskDO::getCompletedAt, completedAt));
+    }
+
+    default int reassignPending(Collection<String> taskTypes, Long bizId, Long assigneeId) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .in(BusinessTaskDO::getTaskType, taskTypes)
+                .eq(BusinessTaskDO::getBizId, bizId)
+                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
+                .set(BusinessTaskDO::getAssigneeId, assigneeId));
+    }
+
+    default int completeBirthdayCare(Long id, Long assigneeId, LocalDateTime completedAt) {
+        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
+                .eq(BusinessTaskDO::getId, id)
+                .eq(BusinessTaskDO::getTaskType, "EMPLOYEE_BIRTHDAY_CARE")
+                .eq(BusinessTaskDO::getAssigneeId, assigneeId)
                 .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
                 .set(BusinessTaskDO::getStatus, "completed")
                 .set(BusinessTaskDO::getCompletedAt, completedAt));

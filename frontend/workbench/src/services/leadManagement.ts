@@ -6,6 +6,33 @@ export function mergeUniqueLeads<T extends { id: number }>(current: T[], incomin
   return Array.from(byId.values())
 }
 
+export function pinLeadFirst<T extends { id: number }>(items: T[], lead: T): T[] {
+  return [lead, ...items.filter(item => item.id !== lead.id)]
+}
+
+export function prioritizeLeads<T extends { id: number }>(items: T[], priorityIds: number[]): T[] {
+  if (!priorityIds.length) return items
+  const priority = new Map(priorityIds.map((id, index) => [id, index]))
+  return [...items].sort((left, right) => {
+    const leftIndex = priority.get(left.id)
+    const rightIndex = priority.get(right.id)
+    if (leftIndex === undefined && rightIndex === undefined) return 0
+    if (leftIndex === undefined) return 1
+    if (rightIndex === undefined) return -1
+    return leftIndex - rightIndex
+  })
+}
+
+export function resolveLeadSelection<T extends { id: number }>(
+  items: T[],
+  options: { preferredId?: number; currentId?: number; requestedId?: number; preserveRequestedId?: boolean }
+): number | undefined {
+  const availableIds = new Set(items.map(item => item.id))
+  if (options.preserveRequestedId && options.requestedId !== undefined) return options.requestedId
+  const candidates = [options.preferredId, options.currentId, options.requestedId]
+  return candidates.find(id => id !== undefined && availableIds.has(id)) ?? items[0]?.id
+}
+
 export function sumStatusCounts(counts: Record<string, number>): number {
   return Object.values(counts).reduce((total, count) => total + count, 0)
 }

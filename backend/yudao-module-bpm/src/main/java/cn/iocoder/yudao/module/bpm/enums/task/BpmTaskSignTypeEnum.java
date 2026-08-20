@@ -20,7 +20,11 @@ public enum BpmTaskSignTypeEnum {
     /**
      * 向后加签，需要后置任务全部审批完，才会通过原审批人节点
      */
-    AFTER("after", "向后加签");
+    AFTER("after", "向后加签"),
+    /**
+     * 并行加签，原审批人与加签人可同时处理，任一主任务决定会取消未完成的加签任务
+     */
+    PARALLEL("parallel", "并行加签");
 
     /**
      * 类型

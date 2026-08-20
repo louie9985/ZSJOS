@@ -28,6 +28,21 @@ export function formatLeadNo(value?: string | null): string {
   return value?.trim() || '客资编号暂未生成'
 }
 
+const LEAD_STATUS_LABELS: Record<string, string> = {
+  submitted: '已提交',
+  suspended: '已挂起',
+  valid: '有效',
+  invalid: '无效',
+  won: '已成交',
+  closed: '已关闭',
+  converted: '已转化'
+}
+
+/** 客资状态只展示中文标签，未知协议值不直接暴露给用户。 */
+export function formatLeadStatus(status?: string | null): string {
+  return status ? LEAD_STATUS_LABELS[status] || '未知状态' : '未知状态'
+}
+
 /** 手机号脱敏 */
 export function maskMobile(mobile: string | undefined | null): string {
   if (!mobile) return '--'

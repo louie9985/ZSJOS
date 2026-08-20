@@ -58,8 +58,9 @@ public class YudaoWebAutoConfiguration {
              */
             private Map<String, Predicate<Class<?>>> buildPathPrefixes(WebProperties webProperties) {
                 AntPathMatcher antPathMatcher = new AntPathMatcher(".");
-                Map<String, Predicate<Class<?>>> pathPrefixes = Maps.newLinkedHashMapWithExpectedSize(2);
+                Map<String, Predicate<Class<?>>> pathPrefixes = Maps.newLinkedHashMapWithExpectedSize(3);
                 putPathPrefix(pathPrefixes, webProperties.getAdminApi(), antPathMatcher);
+                putPathPrefix(pathPrefixes, webProperties.getPartnerApi(), antPathMatcher);
                 putPathPrefix(pathPrefixes, webProperties.getAppApi(), antPathMatcher);
                 return pathPrefixes;
             }

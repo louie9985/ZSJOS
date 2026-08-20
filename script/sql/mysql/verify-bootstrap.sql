@@ -3,6 +3,93 @@ SET NAMES utf8mb4;
 
 SELECT 'schema_version' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_schema_version'), 'PASS', 'FAIL') AS result;
+SELECT 'employee_birthday_care_migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V081'), 'PASS', 'FAIL') AS result;
+SELECT 'registration_planner_notification_migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V082'), 'PASS', 'FAIL') AS result;
+SELECT 'registration_routes_attachments_migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V083'), 'PASS', 'FAIL') AS result;
+SELECT 'registration_route_tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+            AND table_name IN ('zsjos_registration_route_option','zsjos_registration_case_route','zsjos_registration_item_attachment'))=3,
+          'PASS','FAIL') AS result;
+SELECT 'registration_exact_default_routes' AS check_name,
+       IF(NOT EXISTS (SELECT version_row.id FROM zsjos_registration_checklist_version version_row
+            WHERE version_row.status='published' AND version_row.deleted=b'0'
+              AND (SELECT COUNT(*) FROM zsjos_registration_route_option option_row
+                   WHERE option_row.tenant_id=version_row.tenant_id AND option_row.version_id=version_row.id
+                     AND option_row.option_key IN ('student_delivery','new_media') AND option_row.deleted=b'0')<>2),
+          'PASS','FAIL') AS result;
+SELECT 'content_director_my_students_menu' AS check_name,
+       IF(NOT EXISTS (SELECT 1 FROM system_role role_row
+            WHERE role_row.code='content_director' AND role_row.status=0 AND role_row.deleted=b'0'
+              AND NOT EXISTS (SELECT 1 FROM system_role_menu relation_row
+                   WHERE relation_row.role_id=role_row.id AND relation_row.menu_id=73020
+                     AND relation_row.tenant_id=role_row.tenant_id AND relation_row.deleted=b'0')),
+          'PASS','FAIL') AS result;
+SELECT 'employee_birthday_care_job' AS check_name,
+       IF((SELECT COUNT(*) FROM infra_job WHERE handler_name='employeeBirthdayCareJob' AND deleted=b'0')=1, 'PASS', 'FAIL') AS result;
+SELECT 'employee_birthday_care_menu' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu
+            WHERE id IN (602100,602101,602102) AND deleted=b'0')=3
+          AND (SELECT COUNT(*) FROM system_menu
+                WHERE parent_id=602100 AND id IN (602101,602102) AND deleted=b'0')=2,
+          'PASS', 'FAIL') AS result;
+SELECT 'employee_birthday_care_menu_repair_migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V084'), 'PASS', 'FAIL') AS result;
+SELECT 'employee_birthday_care_super_admin_menu' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_role role_row
+             WHERE role_row.code='super_admin' AND role_row.status=0 AND role_row.deleted=b'0'
+               AND (SELECT COUNT(*) FROM system_role_menu relation_row
+                     WHERE relation_row.role_id=role_row.id AND relation_row.tenant_id=role_row.tenant_id
+                       AND relation_row.menu_id IN (602100,602101,602102) AND relation_row.deleted=b'0')<>3
+          ), 'PASS', 'FAIL') AS result;
+
+SELECT 'business_notification_customer_name_migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V085')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V085'), 'PASS', 'FAIL') AS result;
+SELECT 'business_notification_identifier_repair_migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V087')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V087'), 'PASS', 'FAIL') AS result;
+SELECT 'business_notification_templates_no_customer_name_variables' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_notify_template
+             WHERE ((scene_code LIKE 'zsjos.lead.%' AND (title LIKE '%lead.name%' OR summary LIKE '%lead.name%' OR content LIKE '%lead.name%' OR params LIKE '%lead.name%'))
+                 OR (scene_code LIKE 'zsjos.sales_order.%' AND (title LIKE '%order.studentName%' OR summary LIKE '%order.studentName%' OR content LIKE '%order.studentName%' OR params LIKE '%order.studentName%'))
+                 OR (scene_code LIKE 'zsjos.registration.%' AND (title LIKE '%student.name%' OR summary LIKE '%student.name%' OR content LIKE '%student.name%' OR params LIKE '%student.name%')))
+          ), 'PASS', 'FAIL') AS result;
+SELECT 'business_notification_history_parameter_json_valid' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_notify_message
+             WHERE (scene_code LIKE 'zsjos.lead.%' OR scene_code LIKE 'zsjos.sales_order.%'
+                    OR scene_code LIKE 'zsjos.registration.%')
+               AND (template_params IS NULL OR JSON_VALID(template_params)=0
+                    OR JSON_TYPE(template_params)<>'OBJECT')
+          ), 'PASS', 'FAIL') AS result;
+SELECT 'business_notification_history_no_customer_name_parameters' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_notify_message
+             WHERE JSON_VALID(template_params)
+               AND ((scene_code LIKE 'zsjos.lead.%' AND JSON_CONTAINS_PATH(template_params,'one','$."lead.name"'))
+                 OR (scene_code LIKE 'zsjos.sales_order.%' AND JSON_CONTAINS_PATH(template_params,'one','$."order.studentName"'))
+                 OR (scene_code LIKE 'zsjos.registration.%' AND JSON_CONTAINS_PATH(template_params,'one','$."student.name"')))
+          ), 'PASS', 'FAIL') AS result;
+SELECT 'business_notification_template_params_unique' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_notify_template template_row
+             WHERE (template_row.scene_code LIKE 'zsjos.lead.%'
+                 OR template_row.scene_code LIKE 'zsjos.sales_order.%'
+                 OR template_row.scene_code LIKE 'zsjos.registration.%')
+               AND JSON_VALID(template_row.params)
+               AND JSON_TYPE(template_row.params)='ARRAY'
+               AND JSON_LENGTH(template_row.params)<>(
+                 SELECT COUNT(DISTINCT param_row.param_value)
+                 FROM JSON_TABLE(template_row.params,'$[*]'
+                   COLUMNS(param_value varchar(255) PATH '$')) param_row)
+          ), 'PASS', 'FAIL') AS result;
 
 SELECT 'V072 partner identity schema' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_partner_account')
@@ -33,7 +120,7 @@ SELECT 'source_channel_empty' AS check_name,
 SELECT 'default_assignment_rule' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_lead_assignment_rule WHERE tenant_id=1 AND code='default' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_management_menu' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6770 AND permission='zsjos:lead:query' AND parent_id=6735 AND visible=b'0' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6770 AND permission='zsjos:lead:query' AND parent_id=6735 AND visible=b'1' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_management_query_all_permission' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6771 AND permission='zsjos:lead:query-all' AND parent_id=6770 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_management_v002' AS check_name,
@@ -138,7 +225,7 @@ SELECT 'wecom_user_id_uniqueness_v077' AS check_name,
 SELECT 'unified_lead_management_scope_v078' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V078')
           AND EXISTS(SELECT 1 FROM system_menu WHERE id=6770 AND path='leads/manage'
-                     AND component='zsjos/lead/index' AND visible=b'0' AND deleted=b'0')
+                     AND component='zsjos/lead/index' AND visible=b'1' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (6778,6779) AND parent_id=6770
                AND type=3 AND path='' AND component='' AND visible=b'1' AND deleted=b'0')=2
           AND NOT EXISTS(
@@ -155,6 +242,22 @@ SELECT 'unified_lead_management_scope_v078' AS check_name,
                 JOIN system_menu menu ON menu.id=rm.menu_id AND menu.permission='zsjos:lead-follow-up:query'
                 WHERE rm.role_id=role.id AND rm.tenant_id=role.tenant_id
                   AND rm.deleted=b'0' AND menu.deleted=b'0')),
+          'PASS','FAIL') AS result;
+SELECT 'unified_lead_management_visibility_v079' AS check_name,
+       IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V079')
+          AND EXISTS(SELECT 1 FROM system_menu WHERE id=6770 AND path='leads/manage'
+                     AND visible=b'1' AND deleted=b'0')
+          AND NOT EXISTS(
+            SELECT 1
+            FROM system_role_menu source
+            JOIN system_menu source_menu ON source_menu.id=source.menu_id
+              AND source_menu.permission IN ('zsjos:lead:query','zsjos:lead:query-all',
+                                              'zsjos:lead:query-submitted','zsjos:lead:query-owned')
+              AND source_menu.deleted=b'0'
+            LEFT JOIN system_role_menu page_grant
+              ON page_grant.role_id=source.role_id AND page_grant.tenant_id=source.tenant_id
+             AND page_grant.menu_id=6770 AND page_grant.deleted=b'0'
+            WHERE source.deleted=b'0' AND page_grant.role_id IS NULL),
           'PASS','FAIL') AS result;
 SELECT 'crm_lifecycle_confirmed_rules_v056' AS check_name,
        IF(EXISTS(SELECT 1 FROM zsjos_schema_version WHERE version='V056')
@@ -261,7 +364,7 @@ SELECT 'sales_accept_permission' AS check_name,
 SELECT 'lead_follow_up_rule_v006' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V006'), 'PASS', 'FAIL') AS result;
 SELECT 'lead_unified_management_scopes' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6770 AND path='leads/manage' AND visible=b'0' AND deleted=b'0')
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6770 AND path='leads/manage' AND visible=b'1' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (6778,6779) AND type=3 AND parent_id=6770
                  AND permission IN ('zsjos:lead:query-submitted','zsjos:lead:query-owned')
                  AND visible=b'1' AND path='' AND component='' AND deleted=b'0')=2, 'PASS', 'FAIL') AS result;
@@ -432,6 +535,22 @@ SELECT 'sales_order_v023_dictionaries' AS check_name,
        IF((SELECT COUNT(DISTINCT type) FROM system_dict_type WHERE type IN ('zsjos_order_student_nature','zsjos_order_service_period',
            'zsjos_order_student_source','zsjos_order_fee_mode','zsjos_order_payment_method') AND deleted=b'0')=5,
           'PASS','FAIL') AS result;
+SELECT 'student_contact_chain' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND table_name='zsjos_service_relation'
+             AND column_name IN ('acceptance_status','accepted_by_user_id','accepted_at','content_director_user_id','career_planner_user_id'))=5
+          AND (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name IN ('zsjos_student_contact_config_version','zsjos_student_contact_record',
+                                'zsjos_student_contact_extension','zsjos_student_collaborator_assignment_log'))=4
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V094')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V094')
+          AND (SELECT COUNT(*) FROM system_dict_type WHERE type IN
+             ('zsjos_student_contact_unsuccessful_reason','zsjos_student_contact_extension_reason') AND deleted=b'0')=2
+          AND (SELECT COUNT(DISTINCT code) FROM zsjos_user_relation_scene WHERE code IN
+             ('registration_manager_study_planner','registration_specialist_study_planner',
+              'study_planner_content_director','study_planner_career_planner') AND deleted=b'0')=4,
+          'PASS','FAIL') AS result
+UNION ALL
 SELECT 'module_schema_versions' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version WHERE module_code='core'
             AND version IN ('V001','V017','V018','V019','V020','V021','V022','V023','V024','V025','V026','V033','V034','V035','V036','V037','V038','V039','V040','V041','V042','V043','V044','V045'))=24,
@@ -753,6 +872,15 @@ SELECT 'V074 registration notification rules' AS check_name,
        IF((SELECT COUNT(*) FROM system_notify_rule
              WHERE scene_code='zsjos.registration.task_created'
                AND creator='migration-V074' AND deleted=b'0')=
+           (SELECT COUNT(*) FROM system_tenant WHERE deleted=b'0'),'PASS','FAIL') AS result;
+SELECT 'V082 planner notification template' AS check_name,
+       IF((SELECT COUNT(*) FROM system_notify_template
+             WHERE code='ZSJOS_REGISTRATION_PLANNER_ASSIGNED'
+               AND scene_code='zsjos.registration.planner_assigned' AND deleted=b'0')=1,'PASS','FAIL') AS result;
+SELECT 'V082 planner notification rules' AS check_name,
+       IF((SELECT COUNT(*) FROM system_notify_rule
+             WHERE scene_code='zsjos.registration.planner_assigned'
+               AND creator='migration-V082' AND deleted=b'0')=
           (SELECT COUNT(*) FROM system_tenant WHERE deleted=b'0'),'PASS','FAIL') AS result;
 SELECT 'V075 Lead-created notification coverage' AS check_name,
        IF(NOT EXISTS (
@@ -765,18 +893,129 @@ SELECT 'V075 Lead-created notification coverage' AS check_name,
                  AND rule_row.deleted=b'0'
             )
        ),'PASS','FAIL') AS result;
-SELECT 'V075 Lead-created default rule contract' AS check_name,
+SELECT 'V080 migrated Lead-created sales rule contract' AS check_name,
        IF(NOT EXISTS (
          SELECT 1 FROM system_notify_rule rule_row
-          WHERE rule_row.creator='migration-V075' AND rule_row.deleted=b'0'
+          WHERE rule_row.creator='migration-V075' AND rule_row.updater='migration-V080'
+            AND rule_row.deleted=b'0'
             AND (rule_row.scene_code<>'zsjos.lead.created'
               OR rule_row.channel_code<>'in_app' OR rule_row.action_type<>'business_detail'
               OR rule_row.status<>0
-              OR NOT JSON_CONTAINS(rule_row.recipient_roles, JSON_QUOTE('submitter'))
+              OR JSON_LENGTH(rule_row.recipient_roles)<>1
               OR NOT JSON_CONTAINS(rule_row.recipient_roles, JSON_QUOTE('operator')))
        ),'PASS','FAIL') AS result;
 SELECT 'V075 Lead-created notification version' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V075'),'PASS','FAIL') AS result;
+SELECT 'V080 Lead-source provider template contract' AS check_name,
+       IF((SELECT COUNT(*) FROM system_notify_template
+            WHERE code='ZSJOS_LEAD_SOURCE_LINKED'
+              AND scene_code='zsjos.lead.created'
+              AND title='新客资来源关联'
+              AND summary='{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。'
+              AND content='{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。'
+              AND JSON_LENGTH(params)=2
+              AND JSON_CONTAINS(params,JSON_QUOTE('operator.name'))
+              AND JSON_CONTAINS(params,JSON_QUOTE('lead.no'))
+              AND status=0 AND deleted=b'0')=1,'PASS','FAIL') AS result;
+SELECT 'V080 Lead-source provider rule contract' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_notify_rule rule_row
+          JOIN system_notify_template template ON template.id=rule_row.template_id
+          WHERE rule_row.creator='migration-V080'
+            AND (rule_row.scene_code<>'zsjos.lead.created'
+              OR rule_row.channel_code<>'in_app'
+              OR template.code<>'ZSJOS_LEAD_SOURCE_LINKED'
+              OR rule_row.action_type<>'business_detail' OR rule_row.status<>0
+              OR JSON_LENGTH(rule_row.recipient_roles)<>1
+              OR NOT JSON_CONTAINS(rule_row.recipient_roles,JSON_QUOTE('new_media_provider')))
+       ),'PASS','FAIL') AS result;
+SELECT 'V080 migrated tenant provider-rule coverage' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_notify_rule sales_rule
+          WHERE sales_rule.creator='migration-V075'
+            AND sales_rule.updater='migration-V080' AND sales_rule.deleted=b'0'
+            AND NOT EXISTS (
+              SELECT 1 FROM system_notify_rule provider_rule
+               JOIN system_notify_template provider_template
+                 ON provider_template.id=provider_rule.template_id
+              WHERE provider_rule.tenant_id=sales_rule.tenant_id
+                AND provider_rule.creator='migration-V080'
+                AND provider_rule.scene_code='zsjos.lead.created'
+                AND provider_rule.deleted=b'0'
+                AND provider_template.code='ZSJOS_LEAD_SOURCE_LINKED'
+            )
+       ),'PASS','FAIL') AS result;
+SELECT 'V080 Lead-source provider notification version' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V080')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V080'),'PASS','FAIL') AS result;
+
+SELECT 'V088 Lead source provider identity columns' AS check_name,
+       IF(EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema=DATABASE() AND table_name='zsjos_lead'
+                    AND column_name='source_provider_user_id')
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema=DATABASE() AND table_name='zsjos_lead'
+                    AND column_name='source_provider_recorded')
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V088'),
+          'PASS','FAIL') AS result;
+SELECT 'V089 registration attachment idempotency result' AS check_name,
+       IF(EXISTS (SELECT 1 FROM information_schema.columns
+                  WHERE table_schema=DATABASE() AND table_name='zsjos_registration_command'
+                    AND column_name='result_attachment_id')
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V089'),
+          'PASS','FAIL') AS result;
+SELECT 'V090 Lead complaint result notifications' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V090')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V090')
+          AND (SELECT COUNT(*) FROM system_notify_template
+               WHERE code IN ('ZSJOS_LEAD_COMPLAINT_RESULT_FOUNDED',
+                              'ZSJOS_LEAD_COMPLAINT_RESULT_UNFOUNDED')
+                 AND deleted=b'0')=2
+          AND NOT EXISTS (
+            SELECT tenant.id FROM system_tenant tenant
+            WHERE tenant.deleted=b'0' AND EXISTS (
+              SELECT scene.scene_code FROM (
+                SELECT 'zsjos.lead.complaint_founded' scene_code UNION ALL
+                SELECT 'zsjos.lead.complaint_unfounded'
+              ) scene
+              WHERE NOT EXISTS (
+                SELECT 1 FROM system_notify_rule rule_row
+                WHERE rule_row.tenant_id=tenant.id
+                  AND rule_row.scene_code=scene.scene_code
+                  AND rule_row.channel_code='in_app'
+                  AND rule_row.action_type='business_detail'
+                  AND rule_row.deleted=b'0'
+                  AND JSON_CONTAINS(rule_row.recipient_roles,JSON_QUOTE('complainant'))
+              )
+            )
+          ),'PASS','FAIL') AS result;
+SELECT 'V091 Lead flow history permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V091')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V091')
+          AND (SELECT COUNT(*) FROM system_menu
+               WHERE id=6924 AND permission='zsjos:lead-detail:flow-read'
+                 AND parent_id=6770 AND type=3 AND deleted=b'0')=1,
+           'PASS','FAIL') AS result;
+SELECT 'V092 subordinate sales pause-all permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V092')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V092')
+          AND (SELECT COUNT(*) FROM system_menu
+               WHERE id=6819 AND permission='zsjos:subordinate-sales:pause-all'
+                 AND parent_id=6814 AND type=3 AND deleted=b'0')=1,
+          'PASS','FAIL') AS result;
+SELECT 'collaboration pools mutually exclusive' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM zsjos_lead_aging_pool_cycle cycle
+            JOIN zsjos_lead_public_sea_record manual
+              ON manual.tenant_id=cycle.tenant_id AND manual.lead_id=cycle.lead_id
+             AND manual.deleted=b'0'
+            WHERE cycle.deleted=b'0'
+              AND cycle.status IN ('waiting_assignment','assigned','deal_pending')
+          ),'PASS','FAIL') AS result;
 SELECT 'V063 cashback defaults' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_product_category WHERE parent_id=0 AND deleted=b'0'
              AND (default_valid_cashback_amount IS NULL OR default_deal_cashback_rate IS NULL))=0,'PASS','FAIL') AS result;
@@ -789,4 +1028,14 @@ SELECT 'V065 lead activity cursor ordering' AS check_name,
              AND table_name='zsjos_lead' AND column_name='last_activity_at')=1
           AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
              AND table_name='zsjos_lead' AND index_name='idx_tenant_last_activity')>0,
+          'PASS','FAIL') AS result;
+SELECT 'V086 schema version' AS check_item,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V086')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V086'), 'PASS', 'FAIL') AS result;
+SELECT 'V086 Lead detail tab permissions' AS check_item,
+       IF((SELECT COUNT(*) FROM system_menu
+           WHERE id BETWEEN 6920 AND 6923 AND deleted=b'0'
+             AND permission IN ('zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read',
+                                'zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read'))=4,
           'PASS','FAIL') AS result;

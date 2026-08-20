@@ -35,6 +35,23 @@ Use this order when repository guidance conflicts:
 - Administrator-maintained data **MUST** come from a dictionary or business API in production flows.
 - The workbench may call existing system and business APIs. New ZSJOS-owned backend behavior belongs in `yudao-module-zsjos`, but existing system or CRM capabilities **MUST NOT** be copied there merely to centralize calls.
 
+### Configurable permission contract
+
+- User-visible page or view access **MUST** be represented by server-owned menu permission configuration, and user-visible operations such as create, edit, delete, export, submit, approve, or audit **MUST** be represented by server-owned menu/button permission configuration by default.
+- Frontends **MUST** consume the server-returned menu and permission state to control routes and action entry points. Backends **MUST** independently enforce the corresponding permission identifiers; hiding a frontend control is not authorization.
+- Permission identifiers declared at backend authorization boundaries, including identifiers used by annotations such as `@PreAuthorize`, are the stable link to configured menu/button permissions and are not prohibited hardcoding. Role names, user IDs, static permission lists, and authorization decisions **MUST NOT** be hardcoded as substitutes for configured permissions.
+- Object visibility, data scope, ownership constraints, lifecycle preconditions, and rules such as "only the creator may edit an unsubmitted record" are domain authorization or business invariants. They **MAY** be enforced in backend code and **MUST NOT** be misrepresented as menu/button permissions when configuration cannot express them safely.
+- If a required page or operation permission cannot be implemented through the established menu/button permission mechanism, the AI **MUST** first explain the concrete limitation, proposed hardcoded rule or value, code location, affected scope, risks, and alternatives, and **MUST** obtain explicit user confirmation before hardcoding it.
+
+### Dictionary selection and snapshot contract
+
+- User-editable, stable business enumeration choices shown in dropdowns or equivalent selectors **MUST** use administrator-maintained dictionary types and entries by default. Frontends and backends **MUST NOT** substitute hardcoded option arrays, labels, or business-enum choices for an available dictionary source.
+- Selectors for entities such as users, departments, posts, products, SKUs, customers, or other business records **MUST** use the authoritative system or owning business API and are not dictionary selectors. Workflow commands, state-machine actions, and other non-configurable technical choices **MUST** use their authoritative framework or business contract rather than being disguised as administrator-editable dictionaries.
+- When a dictionary selection is persisted as part of a business record, the owning business data **MUST** store both the selected dictionary value/code and the display label at selection time as a snapshot. It **MUST** also store the dictionary type or version when required to disambiguate or reproduce the selection.
+- Historical detail, workflow forms, notifications, exports, and other persisted-record projections **MUST** display the stored snapshot label. They **MUST NOT** silently re-resolve the current dictionary label as the historical value, so later dictionary renaming, disabling, or deletion does not alter the recorded business meaning. A new user selection creates a new snapshot; an unchanged historical selection retains its existing snapshot.
+- Transient query filters do not create business snapshots merely because they use a dictionary selector. Existing historical records that predate a snapshot field **MUST NOT** be assigned invented historical labels; any compatibility fallback or data repair requires an identified source and documented scope.
+- If a business dropdown cannot use the established dictionary mechanism, the AI **MUST** first explain the concrete limitation, proposed hardcoded values, code location, affected scope, snapshot implications, risks, and alternatives, and **MUST** obtain explicit user confirmation before hardcoding it.
+
 ### Lead identifier contract
 
 - Every user-visible Lead identifier **MUST** use the business number `leadNo`, including frontend labels and values, notifications, BPM read-only forms, task titles, exports, and delivery documentation.

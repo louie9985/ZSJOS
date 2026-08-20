@@ -18,6 +18,7 @@ public interface SubordinateSalesService {
     List<LeadAssignmentUserRespVO> getTransferCandidates(Long managerUserId);
     void updateAccountStatus(Long salesUserId, SubordinateAccountStatusReqVO reqVO, Long managerUserId);
     void updateDispatchMode(Long salesUserId, SubordinateDispatchModeReqVO reqVO, Long managerUserId);
+    SubordinatePauseAllRespVO pauseAllDispatch(Long managerUserId);
     SubordinateBatchResultVO batchTransfer(SubordinateBatchTransferReqVO reqVO, Long managerUserId);
     SubordinateBatchResultVO batchReleasePublicSea(SubordinateBatchPublicSeaReqVO reqVO, Long managerUserId);
 }

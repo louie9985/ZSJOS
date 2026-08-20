@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.eam.controller.admin.asset.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -52,20 +51,8 @@ public class EamAssetRespVO {
     @Schema(description = "条码", example = "6901234567890")
     private String barcode;
 
-    @Schema(description = "原值", example = "15999.00")
-    private BigDecimal originalValue;
-
-    @Schema(description = "净值", example = "12000.00")
-    private BigDecimal netValue;
-
     @Schema(description = "购入日期", example = "2026-01-15")
     private LocalDate purchaseDate;
-
-    @Schema(description = "来源", example = "1")
-    private Integer source;
-
-    @Schema(description = "保修到期日", example = "2029-01-15")
-    private LocalDate warrantyDate;
 
     @Schema(description = "使用部门编号", example = "100")
     private Long useDeptId;
@@ -79,11 +66,26 @@ public class EamAssetRespVO {
     @Schema(description = "使用人名称", example = "张三")
     private String useUserName;
 
+    @Schema(description = "使用人姓名快照", example = "张三")
+    private String useUserNameSnapshot;
+
+    @Schema(description = "直属上级用户编号", example = "2")
+    private Long supervisorUserId;
+
+    @Schema(description = "直属上级姓名快照", example = "李四")
+    private String supervisorNameSnapshot;
+
+    @Schema(description = "入司日期", example = "2024-08-01")
+    private LocalDate joinDate;
+
+    @Schema(description = "使用人承诺是否确认", example = "true")
+    private Boolean commitmentAccepted;
+
+    @Schema(description = "承诺日期", example = "2026-08-17")
+    private LocalDate commitmentDate;
+
     @Schema(description = "存放地点", example = "总部三楼研发区")
     private String location;
-
-    @Schema(description = "预计使用年限（月）", example = "36")
-    private Integer expectedLife;
 
     @Schema(description = "备注", example = "研发部专用")
     private String remark;

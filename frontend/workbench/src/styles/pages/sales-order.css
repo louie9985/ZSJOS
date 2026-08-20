@@ -182,6 +182,14 @@
   gap: 12px;
 }
 
+.sales-order-detail .detail-field dt {
+  text-align: left;
+}
+
+.sales-order-detail .detail-field dd {
+  text-align: right;
+}
+
 .sales-order-detail-hero {
   display: flex;
   align-items: center;
@@ -213,7 +221,18 @@
 .sales-order-card {
   min-width: 0;
   overflow: hidden;
-  border-radius: 8px;
+  border-radius: var(--crm-radius-md);
+  box-shadow: var(--crm-shadow-card);
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+
+.sales-order-lead-card {
+  width: 100%;
+}
+
+.sales-order-card:hover {
+  box-shadow: var(--crm-shadow-raised);
+  transform: translateY(-1px);
 }
 
 .sales-order-card-wide {
@@ -233,21 +252,6 @@
 
 .sales-order-card .ant-card-body {
   padding: 4px 14px 12px;
-}
-
-.sales-order-card .ant-descriptions-item-label {
-  padding-top: 8px!important;
-  padding-bottom: 2px!important;
-  color: var(--crm-text-secondary)!important;
-}
-
-.sales-order-card .ant-descriptions-item-content {
-  padding-right: 12px!important;
-  padding-bottom: 8px!important;
-  border-bottom: 1px solid var(--crm-border);
-  font-weight: 500;
-  overflow-wrap: anywhere;
-  white-space: pre-wrap;
 }
 
 .sales-order-card .ant-table-wrapper {
@@ -340,6 +344,11 @@
     grid-template-columns: 1fr;
   }
 
+  .sales-order-lead-card .lead-profile-fields,
+  .sales-order-lead-card .lead-profile-meta {
+    grid-template-columns: 1fr;
+  }
+
   .sales-order-card-wide {
     grid-column: auto;
   }
@@ -349,45 +358,18 @@
   }
 }
 
-.sales-order-supervisor-page {
-  height: 100%;
-  min-height: 0;
-  padding: 12px;
-}
-
-.sales-order-unified-approval-page {
-  display: flex;
-  height: 100%;
-  min-height: 0;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.sales-order-unified-approval-page > .sales-order-supervisor-page {
-  flex: 1;
-}
-
-.sales-order-approval-page > .ant-segmented {
-  align-self: flex-start;
-  margin-bottom: 8px;
-}
-
 .sales-order-supervisor-detail {
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--crm-gap);
 }
 
 .sales-order-supervisor-actions {
-  min-height: 40px;
+  min-height: var(--crm-control-h);
 }
 
 @media(max-width:768px) {
-  .sales-order-supervisor-page {
-    padding: 8px;
-  }
-
   .sales-order-supervisor-actions {
     display: grid!important;
     grid-template-columns: 1fr 1fr;
@@ -396,4 +378,9 @@
   .sales-order-supervisor-actions .ant-btn {
     width: 100%;
   }
+}
+.sales-order-detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
 }

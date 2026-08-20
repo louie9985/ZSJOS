@@ -70,6 +70,8 @@ export const APP_ROUTES = {
   REGISTRATION_POOL: '/zsjos/registration-pool',
   REGISTRATION_CHECKLIST_CONFIG: '/zsjos/registration-checklist-config',
   MY_STUDENTS: '/zsjos/my-students',
+  STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
+  STUDENT_CONTACT_EXCEPTIONS: '/zsjos/student-contact-exceptions',
   SUBORDINATE_SALES: '/zsjos/subordinate-sales',
   TODAY_TASKS: '/zsjos/tasks/today',
   WORK_PLANS: '/zsjos/work-plans',
@@ -113,6 +115,8 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.REGISTRATION_POOL,
   APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG,
   APP_ROUTES.MY_STUDENTS,
+  APP_ROUTES.STUDENT_CONTACT_CONFIG,
+  APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS,
   APP_ROUTES.TODAY_TASKS,
   APP_ROUTES.WORK_PLANS,
   APP_ROUTES.SUBORDINATE_SALES,
@@ -151,6 +155,8 @@ export const DICT_TYPE = {
   ,ORDER_STUDENT_SOURCE: 'zsjos_order_student_source'
   ,ORDER_FEE_MODE: 'zsjos_order_fee_mode'
   ,ORDER_PAYMENT_METHOD: 'zsjos_order_payment_method'
+  ,STUDENT_CONTACT_UNSUCCESSFUL_REASON: 'zsjos_student_contact_unsuccessful_reason'
+  ,STUDENT_CONTACT_EXTENSION_REASON: 'zsjos_student_contact_extension_reason'
 } as const
 
 // ========== Lead Management ==========

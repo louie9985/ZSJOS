@@ -88,3 +88,21 @@ export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path
     || (authorizedMenus && findMenuByPath(authorizedMenus, path))) return
   return getInitialTarget(items)
 }
+
+const LEAD_DETAIL_ENTRY_PERMISSIONS = new Set([
+  'zsjos:lead:query',
+  'zsjos:subordinate-sales:query',
+  'zsjos:student:query-my',
+  'zsjos:sales-order:query',
+  'zsjos:sales-order:review',
+  'zsjos:lead-detail:follow-up-read',
+  'zsjos:lead-detail:appeal-read',
+  'zsjos:lead-detail:complaint-read',
+  'zsjos:lead-detail:order-read'
+])
+
+export function canOpenLeadDetailDeepLink(path: string, search: string, permissions: string[]): boolean {
+  if (path !== APP_ROUTES.LEAD_MANAGEMENT
+      || !Number(new URLSearchParams(search).get('leadId'))) return false
+  return permissions.some(permission => LEAD_DETAIL_ENTRY_PERMISSIONS.has(permission))
+}

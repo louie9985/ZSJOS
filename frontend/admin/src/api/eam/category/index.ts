@@ -26,6 +26,12 @@ export interface CategoryImportRespVO {
   updateCount: number
   skipCount: number
   conflictCount: number
+  categoryCount: number
+  leafCategoryCount: number
+  fieldCount: number
+  legacyFieldCount: number
+  credentialFieldCount: number
+  allManagementFieldsOptional: boolean
   items: CategoryImportItemVO[]
 }
 

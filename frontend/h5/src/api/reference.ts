@@ -3,7 +3,8 @@ import { getTenantId } from '@/utils/storage'
 import type { ApiResponse } from './request'
 
 const referenceRequest = axios.create({
-  baseURL: import.meta.env.VITE_APP_BASE_API as string,
+  // 字典、地区等公共参考数据仍由 MEMBER app-api 提供，不携带兼职 Token。
+  baseURL: import.meta.env.VITE_APP_REFERENCE_API as string || '/app-api',
   timeout: 15000
 })
 

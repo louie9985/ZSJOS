@@ -52,6 +52,19 @@
       "minimumMigration": "V052",
       "path": "zsjos_partner_withdrawal/1.0.0/process.bpmn20.xml",
       "sha256": "ef4d0834672dcddc727b56935e31dfbc801ed0d2f8460de56241fb828029d5bc"
+    },
+    {
+      "processKey": "zsjos_student_contact_extension",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["deliverySupervisorReview"],
+      "businessVariables": ["extensionId", "serviceRelationId", "requestedDueAt"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["extensionId", "serviceRelationId", "requestedDueAt"],
+      "businessKeyFormat": "student-contact-extension:{extensionId}",
+      "minimumMigration": "V094",
+      "path": "zsjos_student_contact_extension/1.0.0/process.bpmn20.xml",
+      "sha256": "0f86f6fb459d56cab490b46e9ff983571089a88ecccf988c586908c95ad6d4ec"
     }
   ]
 }

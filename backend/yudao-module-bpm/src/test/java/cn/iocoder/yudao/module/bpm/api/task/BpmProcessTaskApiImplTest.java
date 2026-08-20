@@ -151,6 +151,21 @@ class BpmProcessTaskApiImplTest extends BaseMockitoUnitTest {
     }
 
     @Test
+    void createParallelSignTaskKeepsParallelTypeAtPublicBoundary() {
+        when(bpmTaskService.createSignTask(eq(USER_ID), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of("child-task-2"));
+        BpmTaskSignReqDTO request = new BpmTaskSignReqDTO();
+        request.setTaskId("parent-task"); request.setAssigneeUserId(300L); request.setReason("主管并行审批");
+
+        String result = processTaskApi.createParallelSignTask(USER_ID, request);
+
+        assertEquals("child-task-2", result);
+        verify(bpmTaskService).createSignTask(eq(USER_ID), org.mockito.ArgumentMatchers.<BpmTaskSignCreateReqVO>argThat(value ->
+                "parent-task".equals(value.getId()) && value.getUserIds().equals(Set.of(300L))
+                        && "parallel".equals(value.getType()) && "主管并行审批".equals(value.getReason())));
+    }
+
+    @Test
     void getProcessNodeStatusesGroupsMultipleInstancesInOneBatch() {
         Task first = mock(Task.class); when(first.getProcessInstanceId()).thenReturn("process-1");
         when(first.getTaskDefinitionKey()).thenReturn("registrationReview");

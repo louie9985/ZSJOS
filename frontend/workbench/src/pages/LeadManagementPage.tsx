@@ -1,30 +1,30 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Badge,
   Button,
   Empty,
   Skeleton,
-  Segmented,
   Space,
   Spin,
   Tag,
-  Tabs,
   Typography
 } from 'antd'
-import { ReloadOutlined } from '@ant-design/icons'
-import { useLocation } from 'react-router-dom'
-import { api, type AdvancedFilterGroup, type DictData, type LeadInboxFilterProfile, type ManagedLead } from '../services/api'
-import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
+import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
+import { api, type AdvancedFilterGroup, type DictData, type LeadSimpleStatus, type ManagedLead } from '../services/api'
+import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import { NameAvatar } from '../components/LeadDetailOverview'
 import LeadDetail from '../components/LeadDetail'
 import {
-  defaultInboxStage,
   dictionaryDisplayLabel,
   hasNextLeadInboxPage,
   isLeadInboxUnauthorized,
   mergeUniqueLeads,
+  pinLeadFirst,
+  prioritizeLeads,
   protocolDisplayLabel,
+  resolveLeadSelection,
   tryStartLeadPageRequest
 } from '../services/leadManagement'
 import {
@@ -32,7 +32,7 @@ import {
   LEAD_QUALIFICATION_STATUS_LABELS,
   LEAD_FOLLOW_UP_STATUS_LABELS
 } from '../constants'
-import { shouldBlockLeadSwitch } from '../services/leadFollowUp'
+import { parseLeadDetailTab, shouldBlockLeadSwitch } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
 import { useRealtimeEvent } from '../components/RealtimeProvider'
 import {
@@ -44,8 +44,21 @@ import {
 } from '../services/leadInboxUnseen'
 
 const PAGE_SIZE = 20
-type LeadAudience = 'all' | 'submitter' | 'owner'
-type LeadRelationScope = 'all' | 'submitted' | 'owned'
+type LeadAudience = 'all'
+type LeadSimpleStatusSelection = 'all' | LeadSimpleStatus
+type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean }
+
+const SIMPLE_STATUS_OPTIONS: Array<{ key: LeadSimpleStatusSelection; label: string }> = [
+  { key: 'all', label: '全部' },
+  { key: 'first_follow_pending', label: '待首跟' },
+  { key: 'following', label: '待跟进' },
+  { key: 'qualification_pending', label: '待判定' },
+  { key: 'deal_pending_approval', label: '成交待审核' },
+  { key: 'won', label: '已成交' },
+  { key: 'invalid', label: '已判无效' },
+  { key: 'closed', label: '已关闭' },
+  { key: 'suspended', label: '已挂起' }
+]
 
 function productText(lead: ManagedLead) {
   const product = lead.primaryProduct
@@ -62,17 +75,18 @@ function LeadStateTags({ lead }: { lead: ManagedLead }) {
   </Space>
 }
 
-export default function LeadManagementPage({ permissions }: { permissions: string[] }) {
+export default function LeadManagementPage({ permissions, detailOnly = false }: { permissions: string[]; detailOnly?: boolean }) {
+  const navigate = useNavigate()
   const location = useLocation()
-  const routeState = location.state as { leadId?: number; openFollowUp?: boolean; relationScope?: LeadRelationScope } | null
-  const requestedLeadId = routeState?.leadId
-  const canViewSubmitted = permissions.includes('zsjos:lead:query-submitted')
-  const canViewOwned = permissions.includes('zsjos:lead:query-owned')
-  const initialRelationScope = routeState?.relationScope === 'submitted' && canViewSubmitted
-    ? 'submitted'
-    : routeState?.relationScope === 'owned' && canViewOwned ? 'owned' : 'all'
-  const [relationScope, setRelationScope] = useState<LeadRelationScope>(initialRelationScope)
-  const audience: LeadAudience = relationScope === 'submitted' ? 'submitter' : relationScope === 'owned' ? 'owner' : 'all'
+  const [searchParams] = useSearchParams()
+  const routeState = location.state as { leadId?: number; openFollowUp?: boolean } | null
+  const queryLeadId = Number(searchParams.get('leadId')) || undefined
+  const requestedLeadId = routeState?.leadId || queryLeadId
+  const requestedTab = parseLeadDetailTab(searchParams.get('tab'))
+    || (routeState?.openFollowUp ? 'follow-ups' : undefined)
+  const returnToValue = searchParams.get('returnTo')
+  const returnTo = returnToValue?.startsWith('/zsjos/sales-order-approvals') ? returnToValue : undefined
+  const audience: LeadAudience = 'all'
   const [items, setItems] = useState<ManagedLead[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
@@ -82,11 +96,7 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
   const [loadMoreError, setLoadMoreError] = useState('')
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
-  const [inboxGroup, setInboxGroup] = useState('all')
-  const [inboxStage, setInboxStage] = useState('all')
-  const [filterProfile, setFilterProfile] = useState<LeadInboxFilterProfile>({ groups: [] })
-  const [filterLoading, setFilterLoading] = useState(true)
-  const [metadataError, setMetadataError] = useState('')
+  const [simpleStatus, setSimpleStatus] = useState<LeadSimpleStatusSelection>('all')
   const [categories, setCategories] = useState<DictData[]>([])
   const [channels, setChannels] = useState<DictData[]>([])
   const [categoryError, setCategoryError] = useState(false)
@@ -100,45 +110,37 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
   const requestVersion = useRef(0)
   const metadataVersion = useRef(0)
   const activePageRequests = useRef(new Set<string>())
+  const routeSelectionRef = useRef<number | undefined>(requestedLeadId)
+  const unseenIdsRef = useRef(unseenIds)
   const listScrollRef = useRef<HTMLDivElement>(null)
   const listSentinelRef = useRef<HTMLDivElement>(null)
   const itemIdsRef = useRef<number[]>([])
 
-  useEffect(() => {
-    if (routeState?.relationScope === 'submitted' && canViewSubmitted) setRelationScope('submitted')
-    else if (routeState?.relationScope === 'owned' && canViewOwned) setRelationScope('owned')
-    else if (routeState?.relationScope) setRelationScope('all')
-  }, [canViewOwned, canViewSubmitted, routeState?.relationScope])
-
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
-    setMetadataError('')
     setCategoryError(false)
     setChannelError(false)
-    setFilterLoading(true)
-    const filterProfileRequest = audience === 'all'
-      ? Promise.resolve({ groups: [] } as LeadInboxFilterProfile)
-      : api.leadInboxFilterProfile(audience)
     const results = await Promise.allSettled([
-      filterProfileRequest,
       api.dictDataByType(DICT_TYPE.LEAD_CATEGORY),
       api.dictDataByType(DICT_TYPE.LEAD_SOURCE_CHANNEL)
     ])
     if (version !== metadataVersion.current) return
-    if (results[0].status === 'fulfilled') setFilterProfile(results[0].value)
-    if (results[1].status === 'fulfilled') setCategories(results[1].value)
+    if (results[0].status === 'fulfilled') setCategories(results[0].value)
     else { setCategories([]); setCategoryError(true) }
-    if (results[2].status === 'fulfilled') setChannels(results[2].value)
+    if (results[1].status === 'fulfilled') setChannels(results[1].value)
     else { setChannels([]); setChannelError(true) }
-    if (results.some(result => result.status === 'rejected')) setMetadataError('筛选项加载不完整，可重试恢复字典和筛选配置。')
-    setFilterLoading(false)
-  }, [audience])
+  }, [])
 
-  const loadPage = useCallback(async (targetPage: number, replace: boolean, version: number) => {
+  const loadPage = useCallback(async (
+    targetPage: number,
+    replace: boolean,
+    version: number,
+    options: LeadPageLoadOptions = {}
+  ) => {
     const requestKey = tryStartLeadPageRequest(activePageRequests.current, version, targetPage)
     if (!requestKey) return
     if (replace) {
-      setInitialLoading(true)
+      if (!options.silent) setInitialLoading(true)
       setInitialError('')
     } else {
       setLoadingMore(true)
@@ -149,19 +151,33 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
         pageNo: targetPage,
         pageSize: PAGE_SIZE,
         keyword: keyword || undefined, advancedFilter,
-        inboxGroup: inboxGroup === 'all' ? undefined : inboxGroup,
-        inboxStage: inboxStage === 'all' ? undefined : inboxStage,
-        relationScope
+        simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus,
       }
       const result = audience === 'all'
         ? await api.allLeadPage(params)
         : await api.managedLeadInboxPage(audience, params)
       if (version !== requestVersion.current) return
-      setItems(current => replace ? result.list : mergeUniqueLeads(current, result.list))
+      setItems(current => {
+        const previousPinned = routeSelectionRef.current === undefined
+          ? undefined
+          : current.find(item => item.id === routeSelectionRef.current)
+        const next = prioritizeLeads(
+          replace ? result.list : mergeUniqueLeads(current, result.list),
+          [...unseenIdsRef.current].reverse()
+        )
+        return previousPinned && !next.some(item => item.id === previousPinned.id)
+          ? pinLeadFirst(next, previousPinned)
+          : next
+      })
       setTotal(result.total)
       setPageNo(targetPage)
-      if (replace) setSelectedId(current => requestedLeadId
-        || (current && result.list.some(item => item.id === current) ? current : result.list[0]?.id))
+      if (replace) setSelectedId(current => resolveLeadSelection(result.list, {
+        preferredId: options.preferredSelectedId,
+        currentId: current,
+        requestedId: routeSelectionRef.current ?? requestedLeadId,
+        preserveRequestedId: routeSelectionRef.current !== undefined
+      }))
+      return result.list
     } catch (loadError) {
       if (version === requestVersion.current) {
         const message = loadError instanceof Error ? loadError.message : '客资列表加载失败'
@@ -174,14 +190,18 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
     } finally {
       activePageRequests.current.delete(requestKey)
       if (version === requestVersion.current) {
-        if (replace) setInitialLoading(false)
-        else setLoadingMore(false)
+        if (replace) {
+          if (!options.silent) setInitialLoading(false)
+        } else {
+          setLoadingMore(false)
+        }
       }
     }
-  }, [advancedFilter, audience, inboxGroup, inboxStage, keyword, relationScope, requestedLeadId])
+  }, [advancedFilter, audience, keyword, requestedLeadId, simpleStatus])
 
   useEffect(() => { void loadMetadata() }, [loadMetadata])
   useEffect(() => {
+    if (detailOnly) return
     const version = ++requestVersion.current
     setPageNo(1)
     setInitialLoading(false)
@@ -190,18 +210,20 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
     setLoadMoreError('')
     if (listScrollRef.current) listScrollRef.current.scrollTop = 0
     void loadPage(1, true, version)
-  }, [loadPage])
+  }, [detailOnly, loadPage])
 
-  const loadDetail = useCallback(async (id: number) => {
-    setDetailLoading(true)
+  const loadDetail = useCallback(async (id: number, silent = false) => {
+    if (!silent) setDetailLoading(true)
     setDetailError('')
     try {
-      setDetail(await api.managedLead(id))
+      const loaded = await api.managedLead(id)
+      setDetail(loaded)
+      setItems(current => current.some(item => item.id === id) ? current : pinLeadFirst(current, loaded))
     } catch (loadError) {
       setDetail(undefined)
       setDetailError(loadError instanceof Error ? loadError.message : '客资详情加载失败')
     } finally {
-      setDetailLoading(false)
+      if (!silent) setDetailLoading(false)
     }
   }, [])
 
@@ -216,8 +238,14 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
   }, [selectedId])
 
   const refreshAfterLeadChange = useCallback(async (id: number) => {
+    setSelectedId(id)
     const version = ++requestVersion.current
-    await Promise.all([loadMetadata(), loadPage(1, true, version), loadDetail(id)])
+    if (listScrollRef.current) listScrollRef.current.scrollTop = 0
+    const [, refreshedItems] = await Promise.all([
+      loadMetadata(),
+      loadPage(1, true, version, { preferredSelectedId: id, silent: true })
+    ])
+    if (!refreshedItems || refreshedItems.some(item => item.id === id)) await loadDetail(id, true)
   }, [loadDetail, loadMetadata, loadPage])
 
   useEffect(() => { itemIdsRef.current = items.map(item => item.id) }, [items])
@@ -233,6 +261,14 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
       await Promise.all([loadMetadata(), loadPage(1, true, version)])
       if (leadId == null || itemIdsRef.current.includes(leadId)) return
     }
+    if (leadId != null && !itemIdsRef.current.includes(leadId)) {
+      try {
+        const loaded = await api.managedLead(leadId)
+        setItems(current => pinLeadFirst(current, loaded))
+      } catch {
+        // The list refresh remains best effort; object authorization is enforced by managedLead.
+      }
+    }
   }, [loadMetadata, loadPage])
 
   // 接单成功由 LeadAssignmentHost 打标记，这里据此刷新，销售不必手动刷新页面
@@ -240,6 +276,7 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
     const onUnseenChange = (event: Event) => {
       const ids = (event as CustomEvent<UnseenLeadDetail>).detail?.leadIds ?? []
       setUnseenIds(ids)
+      unseenIdsRef.current = ids
       const added = ids.find(id => !itemIdsRef.current.includes(id))
       if (added != null) void refreshUntilVisible(added)
     }
@@ -250,16 +287,6 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
   // 转派、回收等由他人触发的归属变化同样要落到列表上
   useRealtimeEvent('zsjos_lead_assignment', () => { void refreshUntilVisible() })
 
-  const activeGroup = useMemo(
-    () => filterProfile.groups.find(item => item.key === inboxGroup),
-    [filterProfile.groups, inboxGroup]
-  )
-  useEffect(() => {
-    if (!filterProfile.groups.length || filterProfile.groups.some(item => item.key === inboxGroup)) return
-    const firstGroup = filterProfile.groups[0]
-    setInboxGroup(firstGroup.key)
-    setInboxStage(defaultInboxStage(filterProfile.groups, firstGroup.key))
-  }, [filterProfile.groups, inboxGroup])
   const categoryLabel = useCallback(
     (value?: string) => dictionaryDisplayLabel(categories, value, categoryError),
     [categories, categoryError]
@@ -286,17 +313,8 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
   const selectLead = (id: number) => {
     if (shouldBlockLeadSwitch(followUpDirty) && !window.confirm('当前表单尚未提交，切换客资将丢失已填写内容。确定继续吗？')) return
     setFollowUpDirty(false)
+    routeSelectionRef.current = undefined
     setSelectedId(id)
-  }
-  const changeInboxGroup = (key: string) => {
-    setInboxGroup(key)
-    setInboxStage(defaultInboxStage(filterProfile.groups, key))
-  }
-  const changeRelationScope = (value: string | number) => {
-    setRelationScope(value as LeadRelationScope)
-    setInboxGroup('all')
-    setInboxStage('all')
-    setAdvancedFilter(undefined)
   }
   const detailContent = detailLoading
     ? <Skeleton active paragraph={{ rows: 10 }}/>
@@ -305,53 +323,28 @@ export default function LeadManagementPage({ permissions }: { permissions: strin
       : detail
         ? <LeadDetail lead={detail} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           mode={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
+          initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
           onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)}/>
         : <Empty description="从左侧选择一条客资"/>
 
+  if (detailOnly) {
+    return <section className="workspace-page lead-management-page lead-management-detail-only">
+      <main className="lead-inbox-detail-pane">{detailContent}</main>
+    </section>
+  }
+
   return <section className="workspace-page lead-management-page">
-    <header className="lead-management-scope-shell">
-      <Segmented
-        value={relationScope}
-        onChange={changeRelationScope}
-        options={[
-          { value: 'all', label: '全部' },
-          { value: 'submitted', label: '我提交的', disabled: !canViewSubmitted },
-          { value: 'owned', label: '我负责的', disabled: !canViewOwned }
-        ]}
-      />
+    <header className="lead-simple-status-shell" role="group" aria-label="客资状态筛选">
+      {returnTo && <Button icon={<ArrowLeftOutlined/>} onClick={() => navigate(returnTo)}>返回订单审批</Button>}
+      {SIMPLE_STATUS_OPTIONS.map(option => <button
+        type="button"
+        key={option.key}
+        className={simpleStatus === option.key ? 'active' : ''}
+        aria-pressed={simpleStatus === option.key}
+        onClick={() => setSimpleStatus(option.key)}
+      >{option.label}</button>)}
+      <Button icon={<ReloadOutlined/>} onClick={() => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current); if (selectedId) void loadDetail(selectedId, true) }}>刷新</Button>
     </header>
-    {audience !== 'all' && filterCount(advancedFilter) === 0 && <header className="lead-inbox-filter-shell">
-      {metadataError && <Alert className="lead-inbox-metadata-error" type="warning" showIcon message={metadataError} action={<Button type="link" size="small" onClick={() => void loadMetadata()}>重试</Button>}/>} 
-      {filterLoading
-        ? <Skeleton active title={false} paragraph={{ rows: 2 }}/>
-        : filterProfile.groups.length > 0
-          ? <>
-            <Tabs
-              className="lead-inbox-group-tabs"
-              activeKey={inboxGroup}
-              onChange={changeInboxGroup}
-              items={filterProfile.groups.map(group => ({
-                key: group.key,
-                label: group.label
-              }))}
-            />
-            {activeGroup?.sections.length ? <div className="lead-inbox-filter-sections">
-              {activeGroup.sections.map(section => <div className="lead-inbox-filter-row" key={section.key}>
-                <span className="lead-inbox-filter-label">{section.label}</span>
-                <div className="lead-inbox-filter-options">
-                  {section.options.map(option => <button
-                    type="button"
-                    key={option.key}
-                    className={inboxStage === option.key ? 'active' : ''}
-                    aria-pressed={inboxStage === option.key}
-                    onClick={() => setInboxStage(option.key)}
-                  >{option.label}</button>)}
-                </div>
-              </div>)}
-            </div> : null}
-          </>
-          : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用筛选配置"/>}
-    </header>}
     <div className="lead-inbox-layout">
       <aside className="lead-inbox-list-pane">
         <div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>

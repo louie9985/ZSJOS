@@ -45,6 +45,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
@@ -72,14 +73,23 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private LeadObjectPermissionService leadObjectPermissionService;
     @Resource private CashbackService cashbackService;
+    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     public List<LeadAppealRespVO> getLeadAppeals(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
-        if (!leadObjectPermissionService.canRead(lead, userId)) {
+        if (!leadObjectPermissionService.canReadDetail(lead, userId) || !canReadAppealRecords(lead, userId)) {
             throw exception(LEAD_APPEAL_PERMISSION_DENIED);
         }
         return appealMapper.selectListByLeadId(leadId).stream().map(item -> convert(item, lead, null)).toList();
+    }
+
+    /** Submitters may read the appeal history of their own Lead; other readers need appeal capability. */
+    private boolean canReadAppealRecords(LeadDO lead, Long userId) {
+        return Objects.equals(lead.getSourceUserId(), userId)
+                || permissionApi.hasAnyPermissions(userId, PERMISSION_DETAIL_APPEAL_READ,
+                PERMISSION_APPEAL_REVIEW_SALES_MANAGER, PERMISSION_APPEAL_REVIEW_QUALITY,
+                PERMISSION_APPEAL_REVIEW_CHAIRMAN);
     }
 
     @Override
@@ -189,8 +199,28 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         taskReq.setTaskDefinitionKey(APPEAL_TASK_DEFINITION_KEY);
         taskReq.setProcessVariableName(APPEAL_REVIEW_STAGE_VARIABLE);
         taskReq.setProcessVariableValues(new ArrayList<>(reviewStages(reviewPermissions)));
-        PageResult<BpmTaskRespDTO> taskPage = Boolean.TRUE.equals(reqVO.getHandled())
-                ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+        List<Long> matchedAppealIds = advancedFilterService.matchAppealIds(reqVO.getKeyword(), reqVO.getAdvancedFilter());
+        PageResult<BpmTaskRespDTO> taskPage;
+        if (matchedAppealIds == null) {
+            taskPage = Boolean.TRUE.equals(reqVO.getHandled())
+                    ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+        } else {
+            Set<Long> matched = new HashSet<>(matchedAppealIds);
+            List<BpmTaskRespDTO> eligible = new ArrayList<>();
+            int requestedPageNo = reqVO.getPageNo(), requestedPageSize = reqVO.getPageSize(), scanPage = 1;
+            long total;
+            do {
+                taskReq.setPageNo(scanPage++); taskReq.setPageSize(100);
+                PageResult<BpmTaskRespDTO> scanned = Boolean.TRUE.equals(reqVO.getHandled())
+                        ? processTaskApi.getDoneTaskPage(userId, taskReq) : processTaskApi.getTodoTaskPage(userId, taskReq);
+                scanned.getList().stream().filter(task -> matched.contains(parseAppealId(task.getBusinessKey())))
+                        .forEach(eligible::add);
+                total = scanned.getTotal();
+            } while ((long) (scanPage - 1) * 100 < total);
+            int from = Math.min((requestedPageNo - 1) * requestedPageSize, eligible.size());
+            int to = Math.min(from + requestedPageSize, eligible.size());
+            taskPage = new PageResult<>(eligible.subList(from, to), (long) eligible.size());
+        }
         Set<Long> appealIds = taskPage.getList().stream().map(BpmTaskRespDTO::getBusinessKey)
                 .map(this::parseAppealId).filter(Objects::nonNull)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
@@ -244,13 +274,15 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     @Override
     public CursorPageResult<LeadAppealRespVO> getInboxCursor(LeadAppealPageReqVO reqVO, Long userId) {
-        AppealCursor cursor = decodeInboxCursor(reqVO.getCursor(), userId, reqVO.getHandled());
+        int fingerprint = Objects.hash(reqVO.getKeyword(), reqVO.getAdvancedFilter());
+        AppealCursor cursor = decodeInboxCursor(reqVO.getCursor(), userId, reqVO.getHandled(), fingerprint);
         int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
         List<LeadAppealRespVO> all = new ArrayList<>();
         int pageNo = 1; long total;
         do {
             LeadAppealPageReqVO pageReq = new LeadAppealPageReqVO();
             pageReq.setHandled(reqVO.getHandled()); pageReq.setPageNo(pageNo++); pageReq.setPageSize(100);
+            pageReq.setKeyword(reqVO.getKeyword()); pageReq.setAdvancedFilter(reqVO.getAdvancedFilter());
             PageResult<LeadAppealRespVO> page = getInboxPage(pageReq, userId);
             all.addAll(page.getList()); total = page.getTotal();
         } while (all.size() < total);
@@ -262,18 +294,19 @@ public class LeadAppealServiceImpl implements LeadAppealService {
         boolean more = eligible.size() > limit;
         List<LeadAppealRespVO> list = more ? eligible.subList(0, limit) : eligible;
         LeadAppealRespVO last = list.isEmpty() ? null : list.get(list.size() - 1);
-        return new CursorPageResult<>(list, more ? encodeInboxCursor(last, userId, reqVO.getHandled()) : null, more);
+        return new CursorPageResult<>(list, more ? encodeInboxCursor(last, userId, reqVO.getHandled(), fingerprint) : null, more);
     }
 
-    private String encodeInboxCursor(LeadAppealRespVO item, Long userId, Boolean handled) {
-        String raw = item.getSubmittedAt() + "|" + item.getId() + "|" + userId + "|" + handled;
+    private String encodeInboxCursor(LeadAppealRespVO item, Long userId, Boolean handled, int fingerprint) {
+        String raw = item.getSubmittedAt() + "|" + item.getId() + "|" + userId + "|" + handled + "|" + fingerprint;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
-    private AppealCursor decodeInboxCursor(String value, Long userId, Boolean handled) {
+    private AppealCursor decodeInboxCursor(String value, Long userId, Boolean handled, int fingerprint) {
         if (value == null || value.isBlank()) return null;
         try {
             String[] p = new String(Base64.getUrlDecoder().decode(value), java.nio.charset.StandardCharsets.UTF_8).split("\\|", -1);
-            if (p.length != 4 || !p[2].equals(String.valueOf(userId)) || !p[3].equals(String.valueOf(handled))) throw new IllegalArgumentException();
+            if (p.length != 5 || !p[2].equals(String.valueOf(userId)) || !p[3].equals(String.valueOf(handled))
+                    || !p[4].equals(String.valueOf(fingerprint))) throw new IllegalArgumentException();
             return new AppealCursor(LocalDateTime.parse(p[0]), Long.parseLong(p[1]));
         } catch (RuntimeException ex) { throw new IllegalArgumentException("Invalid appeal cursor", ex); }
     }

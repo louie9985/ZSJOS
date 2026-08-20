@@ -91,6 +91,20 @@
           <span v-else>-</span>
         </template>
       </el-table-column>
+      <el-table-column label="操作" width="100" fixed="right">
+        <template #default="scope">
+          <el-button
+            v-hasPermi="['zsjos:lead:claim']"
+            link
+            type="primary"
+            :loading="claimingId === scope.row.id"
+            :disabled="claimingId !== undefined && claimingId !== scope.row.id"
+            @click="handleClaim(scope.row)"
+          >
+            抢单
+          </el-button>
+        </template>
+      </el-table-column>
     </el-table>
 
     <Pagination
@@ -113,6 +127,8 @@ const loading = ref(false)
 const error = ref('')
 const list = ref<ClaimPoolApi.LeadClaimPoolVO[]>([])
 const total = ref(0)
+const claimingId = ref<number>()
+const message = useMessage()
 const queryParams = reactive<ClaimPoolApi.LeadClaimPoolPageReqVO>({ pageNo: 1, pageSize: 20 })
 const unauthorized = computed(
   () => error.value.includes('403') || error.value.includes('无权') || error.value.includes('权限')
@@ -136,6 +152,18 @@ const getList = async () => {
 }
 const handleSearch = (keyword: string) => { queryParams.keyword = keyword || undefined; queryParams.pageNo = 1; void getList() }
 const handleFilter = (advancedFilter?: AdvancedFilterGroup) => { queryParams.advancedFilter = advancedFilter; queryParams.pageNo = 1; void getList() }
+
+const handleClaim = async (row: ClaimPoolApi.LeadClaimPoolVO) => {
+  if (claimingId.value !== undefined) return
+  claimingId.value = row.id
+  try {
+    await ClaimPoolApi.claimLead(row.id)
+    message.success('抢单成功')
+    await getList()
+  } finally {
+    claimingId.value = undefined
+  }
+}
 
 const areaText = (row: ClaimPoolApi.LeadClaimPoolVO) =>
   [row.provinceName, row.cityName].filter(Boolean).join(' / ') || '-'

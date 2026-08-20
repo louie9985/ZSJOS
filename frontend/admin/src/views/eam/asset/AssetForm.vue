@@ -67,30 +67,6 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="原值" prop="originalValue">
-            <el-input-number
-              v-model="formData.originalValue"
-              :min="0"
-              :precision="2"
-              :controls="false"
-              class="!w-full"
-              placeholder="购入价格"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="净值" prop="netValue">
-            <el-input-number
-              v-model="formData.netValue"
-              :min="0"
-              :precision="2"
-              :controls="false"
-              class="!w-full"
-              placeholder="当前估值，手工维护"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
           <el-form-item label="购入日期" prop="purchaseDate">
             <el-date-picker
               v-model="formData.purchaseDate"
@@ -98,40 +74,6 @@
               value-format="YYYY-MM-DD"
               class="!w-full"
               placeholder="请选择购入日期"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="来源" prop="source">
-            <el-select v-model="formData.source" class="!w-full" clearable placeholder="请选择来源">
-              <el-option
-                v-for="dict in getIntDictOptions('eam_asset_source')"
-                :key="dict.value"
-                :label="dict.label"
-                :value="dict.value"
-              />
-            </el-select>
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="保修到期" prop="warrantyDate">
-            <el-date-picker
-              v-model="formData.warrantyDate"
-              type="date"
-              value-format="YYYY-MM-DD"
-              class="!w-full"
-              placeholder="请选择保修到期日"
-            />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="预计寿命" prop="expectedLife">
-            <el-input-number
-              v-model="formData.expectedLife"
-              :min="0"
-              :controls="false"
-              class="!w-full"
-              placeholder="单位：月"
             />
           </el-form-item>
         </el-col>
@@ -167,6 +109,11 @@
             </el-select>
           </el-form-item>
         </el-col>
+        <el-col :span="12"><el-form-item label="上级" prop="supervisorUserId"><el-select v-model="formData.supervisorUserId" clearable filterable class="!w-full"><el-option v-for="user in userList" :key="user.id" :label="user.nickname" :value="user.id" /></el-select></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="入司日期" prop="joinDate"><el-date-picker v-model="formData.joinDate" type="date" value-format="YYYY-MM-DD" class="!w-full" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="使用人承诺"><el-checkbox v-model="formData.commitmentAccepted">已承诺</el-checkbox></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="承诺日期"><el-date-picker v-model="formData.commitmentDate" type="date" value-format="YYYY-MM-DD" class="!w-full" /></el-form-item></el-col>
+        <el-col :span="24"><el-form-item label="上传附件"><el-upload action="/admin-api/infra/file/upload" :file-list="(formData.fileUrls || []).map((url) => ({ name: url.split('/').pop() || url, url }))" :on-success="(res) => formData.fileUrls = [...(formData.fileUrls || []), res.data]" :on-remove="(_file, files) => formData.fileUrls = files.map((item) => item.url || '')"><el-button>选择文件</el-button></el-upload></el-form-item></el-col>
         <el-col :span="24">
           <el-form-item label="存放地点" prop="location">
             <el-input v-model="formData.location" placeholder="如 总部三楼研发区" />
@@ -203,7 +150,6 @@
 </template>
 
 <script setup lang="ts">
-import { getIntDictOptions } from '@/utils/dict'
 import { handleTree } from '@/utils/tree'
 import * as AssetApi from '@/api/eam/asset'
 import * as DeptApi from '@/api/system/dept'
@@ -254,15 +200,14 @@ function buildEmptyForm(): AssetApi.AssetVO {
     specification: '',
     sn: '',
     barcode: '',
-    originalValue: undefined,
-    netValue: undefined,
     purchaseDate: undefined,
-    source: undefined,
-    warrantyDate: undefined,
     useDeptId: undefined,
     useUserId: undefined,
     location: '',
-    expectedLife: undefined,
+    supervisorUserId: undefined,
+    joinDate: undefined,
+    commitmentAccepted: false,
+    commitmentDate: undefined,
     remark: '',
     fileUrls: [],
     extFields: {}

@@ -26,6 +26,12 @@ public class MyStudentController {
         return success(studentService.getMyPage(SecurityFrameworkUtils.getLoginUserId(), reqVO));
     }
 
+    @PostMapping("/my/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    public CommonResult<PageResult<MyStudentRespVO>> searchMyPage(@Valid @RequestBody MyStudentPageReqVO reqVO) {
+        return success(studentService.getMyPage(SecurityFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
     @GetMapping("/my/{personId}")
     @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
     public CommonResult<MyStudentRespVO> getMyStudent(@PathVariable Long personId) {

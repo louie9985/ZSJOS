@@ -15,25 +15,46 @@ import {
 import {
   BellOutlined,
   CheckOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  LinkOutlined
 } from '@ant-design/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, AuthenticationError, type NotifyMessage } from '../services/api'
 import { applyReadStatus, buildNotifyMessageCursorParams, type NotifyMessageView } from '../services/notifyMessage'
 import { formatTimestamp } from '../services/time'
 import { useNotifyMessages } from '../components/NotifyMessageProvider'
 import { useRealtime, useRealtimeEvent } from '../components/RealtimeProvider'
+import DetailFieldGrid from '../components/DetailFieldGrid'
+import {
+  executeNotifyMessageAction,
+  classifyNotifyActionError,
+  isNotifyLeadActionCandidate,
+  resolveNotifyLeadAction,
+  type NotifyLeadAction
+} from '../services/notifyMessageAction'
 
 const CURSOR_LIMIT = 20
 
+type LeadActionProbe = { messageId: number; status: 'loading' | 'error' }
+
 const senderName = (item: NotifyMessage) => item.templateNickname?.trim() || '系统消息'
 
-function MessageDetail({ message }: { message?: NotifyMessage }) {
+function MessageDetail({
+  message,
+  leadAction,
+  leadActionLoading,
+  onOpenLead
+}: {
+  message?: NotifyMessage
+  leadAction?: NotifyLeadAction | null
+  leadActionLoading?: boolean
+  onOpenLead?: (message: NotifyMessage) => void
+}) {
   if (!message) return <Empty description="从左侧选择一条消息"/>
   const sender = senderName(message)
-  return <article className="message-inbox-detail">
-    <header className="message-detail-hero">
+  return <article className="business-inbox-detail message-inbox-detail">
+    <header className="business-inbox-detail-hero message-detail-hero">
       <Avatar size={44} icon={<BellOutlined/>}/>
       <div className="message-detail-heading">
         <Space size={8} wrap>
@@ -42,24 +63,34 @@ function MessageDetail({ message }: { message?: NotifyMessage }) {
         </Space>
         <Typography.Text type="secondary">{formatTimestamp(message.createTime)}</Typography.Text>
       </div>
+      {leadActionLoading && <Button size="small" loading>查看客资</Button>}
+      {!leadActionLoading && leadAction && <Button
+        size="small"
+        type="primary"
+        icon={<LinkOutlined/>}
+        onClick={() => onOpenLead?.(message)}
+      >查看客资</Button>}
     </header>
-    <section className="message-detail-section">
+    <section className="business-inbox-card message-detail-section">
       <Typography.Text type="secondary">消息摘要</Typography.Text>
       <Typography.Paragraph>{message.templateSummary}</Typography.Paragraph>
       <Typography.Text type="secondary">完整正文</Typography.Text>
       <Typography.Paragraph>{message.templateContent}</Typography.Paragraph>
     </section>
-    <dl className="message-detail-meta">
-      <div><dt>发送人</dt><dd>{sender}</dd></div>
-      <div><dt>发送时间</dt><dd>{formatTimestamp(message.createTime)}</dd></div>
-      <div><dt>阅读状态</dt><dd>{message.readStatus ? '已读' : '未读'}</dd></div>
-      {message.readTime && <div><dt>阅读时间</dt><dd>{formatTimestamp(message.readTime)}</dd></div>}
-    </dl>
+    <section className="business-inbox-card message-detail-meta-card">
+      <DetailFieldGrid className="message-detail-meta" items={[
+        { key: 'sender', label: '发送人', value: sender },
+        { key: 'sentAt', label: '发送时间', value: formatTimestamp(message.createTime) },
+        { key: 'readStatus', label: '阅读状态', value: message.readStatus ? '已读' : '未读' },
+        ...(message.readTime ? [{ key: 'readAt', label: '阅读时间', value: formatTimestamp(message.readTime) }] : [])
+      ]}/>
+    </section>
   </article>
 }
 
 export default function MessageInboxPage({ view }: { view: NotifyMessageView }) {
   const { message: toast } = App.useApp()
+  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const screens = Grid.useBreakpoint()
   const { status } = useRealtime()
@@ -75,6 +106,9 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const [unauthorized, setUnauthorized] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [markingAll, setMarkingAll] = useState(false)
+  const [leadActions, setLeadActions] = useState<Record<number, NotifyLeadAction | null>>({})
+  const [leadActionProbe, setLeadActionProbe] = useState<LeadActionProbe>()
+  const [leadProbeAttempt, setLeadProbeAttempt] = useState(0)
   const loadMoreRef = useRef<HTMLDivElement>(null)
 
   const load = useCallback(async (append = false) => {
@@ -121,6 +155,31 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
   useEffect(() => {
+    const item = selected
+    if (!item || !isNotifyLeadActionCandidate(item)) {
+      setLeadActionProbe(undefined)
+      return
+    }
+    if (Object.prototype.hasOwnProperty.call(leadActions, item.id)) {
+      setLeadActionProbe(undefined)
+      return
+    }
+    let active = true
+    setLeadActionProbe({ messageId: item.id, status: 'loading' })
+    void resolveNotifyLeadAction(item).then(action => {
+      if (active) setLeadActions(current => ({ ...current, [item.id]: action }))
+    }).catch(error => {
+      if (!active) return
+      const kind = classifyNotifyActionError(error)
+      if (kind === 'forbidden' || kind === 'missing') {
+        setLeadActions(current => ({ ...current, [item.id]: null }))
+        return
+      }
+      setLeadActionProbe({ messageId: item.id, status: 'error' })
+    })
+    return () => { active = false }
+  }, [leadActions, leadProbeAttempt, selected])
+  useEffect(() => {
     if (screens.md) setDrawerOpen(false)
   }, [screens.md])
   useRealtimeEvent('notify-message-new', () => { void load() })
@@ -142,8 +201,17 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
 
   const selectMessage = (item: NotifyMessage) => {
     setSelected(item)
+    setLeadProbeAttempt(current => current + 1)
     if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
     void markRead(item)
+  }
+
+  const openLead = (item: NotifyMessage) => {
+    void executeNotifyMessageAction(item, {
+      navigate,
+      warn: toast.warning,
+      refreshUnreadCount
+    }).catch(openError => toast.error(openError instanceof Error ? openError.message : '打开客资失败'))
   }
 
   const markAllRead = async () => {
@@ -166,7 +234,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const emptyText = view === 'unread' ? '暂无未读消息' : '暂无消息'
   const pageTitle = view === 'unread' ? '未读消息' : '全部消息'
   const errorAlert = error && <Alert
-    className="message-inbox-error"
+    className="business-inbox-error"
     type={unauthorized ? 'warning' : 'error'}
     showIcon
     message={unauthorized ? '登录状态已失效' : error}
@@ -175,44 +243,41 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
     </Button>}
   />
 
-  return <section className="message-inbox-page">
-    <header className="message-inbox-header">
-      <div>
+  return <section className="workspace-page business-inbox-page message-center-page">
+    <header className="business-inbox-scope-bar message-center-scope-bar">
+      <div className="message-center-heading">
         <Typography.Title level={4}>{pageTitle}</Typography.Title>
         <Space size={8}>
           <Badge status={status === 'open' ? 'success' : 'warning'} text={status === 'open' ? '实时连接' : '正在重连'}/>
           <Typography.Text type="secondary">未读 {unreadCount} 条</Typography.Text>
         </Space>
       </div>
-      <Space>
-        <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
-        <Button type="primary" icon={<CheckOutlined/>} loading={markingAll} disabled={unreadCount === 0} onClick={() => void markAllRead()}>全部已读</Button>
-      </Space>
+      <Space><Button icon={<ReloadOutlined/>} onClick={() => { void load(); void refreshUnreadCount(); setLeadActions({}); setLeadProbeAttempt(value => value + 1) }}>刷新</Button><Button type="primary" icon={<CheckOutlined/>} loading={markingAll} disabled={unreadCount === 0} onClick={() => void markAllRead()}>全部已读</Button></Space>
     </header>
     {errorAlert}
-    <div className="message-inbox-layout">
-      <aside className="message-inbox-list-pane">
-        <div className="message-inbox-list" aria-label={`${pageTitle}列表`}>
+    <div className="business-inbox-layout">
+      <aside className="business-inbox-list-pane">
+        <div className="business-inbox-scroll message-center-list" aria-label={`${pageTitle}列表`}>
           {loading ? <div className="message-inbox-skeleton"><Skeleton active paragraph={{ rows: 8 }}/></div> : messages.length ? messages.map(item => {
             const active = selected?.id === item.id
             const sender = senderName(item)
             return <button
               key={item.id}
               type="button"
-              className={`message-inbox-item${active ? ' active' : ''}${item.readStatus ? '' : ' unread'}`}
+              className={`business-inbox-item message-center-item${active ? ' active' : ''}${item.readStatus ? '' : ' unread'}`}
               onClick={() => selectMessage(item)}
             >
-              <div className="message-inbox-item-main">
+              <div className="business-inbox-item-main">
                 <Avatar size={38}>{sender.slice(0, 1)}</Avatar>
-                <div className="message-inbox-item-copy">
-                  <div className="message-inbox-item-title">
+                <div className="business-inbox-item-copy message-center-item-copy">
+                  <div className="business-inbox-item-title">
                     <strong>{item.templateTitle || sender}</strong>
                     {!item.readStatus && <Tag color="processing">未读</Tag>}
                   </div>
-                  <span>{item.templateSummary}</span>
+                  <span className="message-center-item-summary">{item.templateSummary}</span>
                 </div>
               </div>
-              <div className="message-inbox-item-meta">
+              <div className="business-inbox-item-meta">
                 <Badge status={item.readStatus ? 'default' : 'processing'}/>
                 <span>{formatTimestamp(item.createTime)}</span>
               </div>
@@ -223,17 +288,27 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
           </div>}
         </div>
       </aside>
-      <main className="message-inbox-detail-pane"><MessageDetail message={selected}/></main>
+      <main className="business-inbox-detail-pane"><MessageDetail
+        message={selected}
+        leadAction={selected ? leadActions[selected.id] : null}
+        leadActionLoading={leadActionProbe?.messageId === selected?.id && leadActionProbe?.status === 'loading'}
+        onOpenLead={openLead}
+      /></main>
     </div>
     <Drawer
-      className="message-inbox-mobile-drawer"
+      className="business-inbox-mobile-drawer message-inbox-mobile-drawer"
       title="消息详情"
       placement="bottom"
       height="78vh"
       open={drawerOpen}
       onClose={() => setDrawerOpen(false)}
     >
-      <MessageDetail message={selected}/>
+      <MessageDetail
+        message={selected}
+        leadAction={selected ? leadActions[selected.id] : null}
+        leadActionLoading={leadActionProbe?.messageId === selected?.id && leadActionProbe?.status === 'loading'}
+        onOpenLead={openLead}
+      />
     </Drawer>
   </section>
 }

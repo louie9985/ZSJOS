@@ -13,7 +13,10 @@ public class StudentObjectPermissionProvider implements ZsjosObjectPermissionPro
     @Resource private ServiceRelationMapper relationMapper;
     @Override public String getBizType() { return "student"; }
     @Override public boolean hasPermission(Long bizId, String action, Long userId) {
-        return "read".equals(action) && !relationMapper.selectByOwnerAndPerson(userId, bizId).isEmpty();
+        if (!"read".equals(action)) return false;
+        if (!relationMapper.selectActiveByOwnerAndPerson(userId, bizId).isEmpty()) return true;
+        return relationMapper.selectActiveByCollaborator(userId).stream()
+                .anyMatch(relation -> java.util.Objects.equals(relation.getPersonId(), bizId));
     }
     @Override public void check(Long bizId, String action, Long userId) {
         if (!hasPermission(bizId, action, userId)) throw exception(STUDENT_PERMISSION_DENIED);

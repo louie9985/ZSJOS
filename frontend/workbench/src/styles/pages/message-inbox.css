@@ -217,39 +217,7 @@
 }
 
 .message-detail-meta {
-  display: grid;
-  grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: 0;
-  margin: 0;
-  border-top: 1px solid var(--crm-border);
-}
-
-.message-detail-meta>div {
-  display: grid;
-  grid-template-columns: 88px minmax(0,1fr);
-  padding: 12px 0;
-  border-bottom: 1px solid var(--crm-border);
-}
-
-.message-detail-meta>div:nth-child(odd) {
-  padding-right: 20px;
-}
-
-/* 奇数项独占末行时跨列，否则 border-bottom 只画到左列宽度。
-   未读消息无「阅读时间」，dl 只剩 3 项即触发。 */
-.message-detail-meta>div:last-child:nth-child(odd) {
-  grid-column: 1 / -1;
-  padding-right: 0;
-}
-
-.message-detail-meta dt {
-  color: var(--crm-text-secondary);
-}
-
-.message-detail-meta dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
+  margin-top: var(--crm-sp-4);
 }
 
 @media(max-width:768px) {
@@ -308,13 +276,6 @@
     align-items: flex-start;
   }
 
-  .message-detail-meta {
-    grid-template-columns: 1fr;
-  }
-
-  .message-detail-meta>div:nth-child(odd) {
-    padding-right: 0;
-  }
 }
 
 .message-inbox-header {
@@ -379,6 +340,198 @@
   font-size: 13px;
 }
 
+/* The header popup keeps a stable footprint; only the unread list scrolls. */
+.message-center-popover .ant-popover-inner {
+  padding: 0;
+  overflow: hidden;
+}
+
+.message-center-popover .ant-popover-title {
+  min-height: 44px;
+  padding: 12px 16px;
+  margin: 0;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.message-center-popup-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.message-center-popup {
+  display: grid;
+  width: min(400px, calc(100vw - 24px));
+  height: min(440px, calc(100vh - 96px));
+  min-height: 280px;
+  grid-template-rows: minmax(0, 1fr) 44px;
+}
+
+.message-center-popup-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.message-center-popup-skeleton {
+  padding: 16px;
+}
+
+.message-center-popup-state {
+  display: grid;
+  height: 100%;
+  padding: 16px;
+  place-items: center;
+}
+
+.message-center-popup-state .ant-alert {
+  width: 100%;
+}
+
+.message-center-popup-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--crm-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.message-center-popup-item:hover,
+.message-center-popup-item:focus-visible {
+  background: var(--crm-bg-sunken);
+}
+
+.message-center-popup-item:focus-visible {
+  outline: 2px solid var(--crm-color-primary);
+  outline-offset: -2px;
+}
+
+.message-center-popup-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.message-center-popup-copy strong,
+.message-center-popup-copy > span,
+.message-center-popup-copy time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-center-popup-copy > span,
+.message-center-popup-copy time {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.message-center-popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 4px 10px;
+  border-top: 1px solid var(--crm-border);
+}
+
+.message-center-popup-load-more {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+/* Message center uses the shared business inbox geometry; duplicate review keeps
+   the legacy message-inbox selectors above until its own migration. */
+.message-center-scope-bar {
+  justify-content: space-between;
+}
+
+.message-center-heading {
+  min-width: 0;
+}
+
+.message-center-heading h4 {
+  margin: 0 !important;
+}
+
+.message-center-item {
+  overflow: hidden;
+  flex: none;
+}
+
+.message-center-item-copy {
+  overflow: hidden;
+}
+
+.message-center-item .business-inbox-item-title strong {
+  min-width: 0;
+  flex: 1;
+}
+
+.message-center-item-copy > .message-center-item-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.5;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.message-inbox-detail {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.message-inbox-detail .message-detail-heading {
+  overflow: hidden;
+  flex: 1;
+}
+
+.message-inbox-detail .message-detail-section .ant-typography {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.message-detail-meta-card {
+  min-width: 0;
+}
+
+.message-detail-meta .detail-field dt {
+  text-align: left;
+}
+
+.message-detail-meta .detail-field dd {
+  text-align: right;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .message-center-scope-bar {
+    align-items: stretch;
+  }
+
+  .message-center-scope-bar > .ant-btn {
+    width: 100%;
+  }
+}
+
 .duplicate-review-detail .message-detail-hero > .ant-btn {
   margin-left: auto;
 }
@@ -391,6 +544,20 @@
   border-radius: var(--crm-radius-sm);
   background: var(--crm-bg-sunken);
   box-shadow: var(--crm-shadow-inset);
+}
+
+.duplicate-review-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.duplicate-review-section {
+  padding: var(--crm-card-pad);
+}
+
+.duplicate-review-section h5 {
+  margin-top: 0;
 }
 
 @media (max-width: 768px) {

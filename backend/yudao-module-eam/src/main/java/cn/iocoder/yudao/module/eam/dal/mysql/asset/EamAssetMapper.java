@@ -21,7 +21,6 @@ public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
                 .eqIfPresent(EamAssetDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(EamAssetDO::getUseDeptId, reqVO.getUseDeptId())
                 .eqIfPresent(EamAssetDO::getUseUserId, reqVO.getUseUserId())
-                .eqIfPresent(EamAssetDO::getSource, reqVO.getSource())
                 .orderByDesc(EamAssetDO::getId));
     }
 

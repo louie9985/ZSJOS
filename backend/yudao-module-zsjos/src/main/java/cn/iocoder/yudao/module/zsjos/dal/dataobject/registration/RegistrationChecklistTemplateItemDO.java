@@ -20,4 +20,5 @@ public class RegistrationChecklistTemplateItemDO extends TenantBaseDO {
     private Integer sort;
     private Boolean enabled;
     private Boolean systemRequired;
+    private Boolean attachmentRequired;
 }

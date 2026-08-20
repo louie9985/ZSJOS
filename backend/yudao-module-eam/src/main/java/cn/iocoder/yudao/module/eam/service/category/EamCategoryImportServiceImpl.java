@@ -134,6 +134,9 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
                             : current.containsKey(row.parentCode()) ? current.get(row.parentCode()).getId() : null;
                     action = parentId != null && sameCategory(existing, row, parentId) ? "SKIP" : "UPDATE";
                 }
+                if (StrUtil.isBlank(message) && StrUtil.isNotBlank(row.parentCode())) {
+                    message = "子分类";
+                }
             }
             items.add(item("CATEGORY", row.code(), row.name(), action, message));
         }
@@ -266,9 +269,30 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private EamCategoryImportRespVO buildResult(List<EamCategoryImportRespVO.Item> items) {
         Map<String, Integer> counts = new HashMap<>();
         items.forEach(item -> counts.merge(item.getAction(), 1, Integer::sum));
+        int categoryCount = (int) items.stream().filter(item -> "CATEGORY".equals(item.getKind())).count();
+        int leafCategoryCount = (int) items.stream().filter(item -> "CATEGORY".equals(item.getKind())
+                && StrUtil.isNotBlank(item.getMessage()) && item.getMessage().contains("子分类")).count();
+        int fieldCount = (int) items.stream().filter(item -> "FIELD".equals(item.getKind())).count();
+        int legacyFieldCount = (int) items.stream().filter(item -> "FIELD".equals(item.getKind())
+                && isLegacyField(item)).count();
+        int credentialFieldCount = (int) items.stream().filter(item -> "FIELD".equals(item.getKind())
+                && isCredentialField(item)).count();
         return EamCategoryImportRespVO.builder().items(items)
                 .createCount(counts.getOrDefault("CREATE", 0)).updateCount(counts.getOrDefault("UPDATE", 0))
-                .skipCount(counts.getOrDefault("SKIP", 0)).conflictCount(counts.getOrDefault("CONFLICT", 0)).build();
+                .skipCount(counts.getOrDefault("SKIP", 0)).conflictCount(counts.getOrDefault("CONFLICT", 0))
+                .categoryCount(categoryCount).leafCategoryCount(leafCategoryCount).fieldCount(fieldCount)
+                .legacyFieldCount(legacyFieldCount).credentialFieldCount(credentialFieldCount)
+                .allManagementFieldsOptional(true).build();
+    }
+
+    private static boolean isLegacyField(EamCategoryImportRespVO.Item item) {
+        String value = (StrUtil.nullToEmpty(item.getCode()) + " " + StrUtil.nullToEmpty(item.getName())).toLowerCase();
+        return value.contains("source_") || value.contains("原表") || value.contains("原始") || value.contains("来源字段");
+    }
+
+    private static boolean isCredentialField(EamCategoryImportRespVO.Item item) {
+        String value = (StrUtil.nullToEmpty(item.getCode()) + " " + StrUtil.nullToEmpty(item.getName())).toLowerCase();
+        return value.contains("password") || value.contains("密码") || value.contains("凭据");
     }
 
     private static EamCategoryImportRespVO.Item item(String kind, String code, String name, String action, String message) {

@@ -29,6 +29,7 @@ public class SubordinateSalesCommandService {
     @Resource private SubordinateSalesAuditLogMapper auditLogMapper;
     @Resource private LeadDispatchService dispatchService;
     @Resource private LeadObjectPermissionService permissionService;
+    @Resource private LeadAgingPoolService agingPoolService;
 
     @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
     public void transferOne(Long leadId, Long targetUserId, Long managerUserId, String reason) {
@@ -51,6 +52,9 @@ public class SubordinateSalesCommandService {
         if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 || STATUS_CLOSED.equals(lead.getStatus()) || lead.getClosedAt() != null) {
             throw exception(SUBORDINATE_LEAD_STATE_INVALID);
+        }
+        if (agingPoolService.getActiveCycle(leadId) != null) {
+            throw exception(LEAD_COLLABORATION_POOL_CONFLICT);
         }
         if (publicSeaRecordMapper.selectByLeadId(leadId) != null) {
             throw exception(SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA);

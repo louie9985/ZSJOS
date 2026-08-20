@@ -28,7 +28,9 @@ public class LeadAppealController {
 
     @GetMapping("/lead/{leadId}/list")
     @Operation(summary = "获得客资申诉记录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:appeal:create','zsjos:lead:appeal:query','zsjos:subordinate-sales:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:appeal-read','zsjos:lead:appeal:create',"
+            + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
+            + "'zsjos:lead:appeal:review-chairman')")
     public CommonResult<List<LeadAppealRespVO>> getList(@PathVariable Long leadId) {
         return success(appealService.getLeadAppeals(leadId, WebFrameworkUtils.getLoginUserId()));
     }
@@ -49,6 +51,19 @@ public class LeadAppealController {
     @GetMapping("/inbox-cursor")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
     public CommonResult<CursorPageResult<LeadAppealRespVO>> getInboxCursor(@Valid LeadAppealPageReqVO reqVO) {
+        return success(appealService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/inbox/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
+    public CommonResult<PageResult<LeadAppealRespVO>> searchInboxPage(@Valid @RequestBody LeadAppealPageReqVO reqVO) {
+        return success(appealService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/inbox/search-cursor")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
+    public CommonResult<CursorPageResult<LeadAppealRespVO>> searchInboxCursor(
+            @Valid @RequestBody LeadAppealPageReqVO reqVO) {
         return success(appealService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 

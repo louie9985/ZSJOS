@@ -58,6 +58,9 @@ public class NotifyMessageRespVO {
     @Schema(description = "业务编号")
     private Long bizId;
 
+    @Schema(description = "业务事件幂等键，仅用于受控业务动作定位")
+    private String sourceEventKey;
+
     @Schema(description = "是否已读", requiredMode = Schema.RequiredMode.REQUIRED, example = "true")
     private Boolean readStatus;
 

@@ -14,8 +14,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.CREATED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ROLE_NEW_MEDIA_PROVIDER;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ROLE_OPERATOR;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.ROLE_SUBMITTER;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
 
@@ -33,11 +33,16 @@ class LeadNotificationTenantInitializerTest {
 
         ArgumentCaptor<List<NotifyDefaultRuleReqDTO>> captor = ArgumentCaptor.forClass(List.class);
         verify(notifyRuleApi).initializeDefaultRules(captor.capture());
-        assertEquals(1, captor.getValue().size());
-        NotifyDefaultRuleReqDTO rule = captor.getValue().get(0);
-        assertEquals(CREATED, rule.getSceneCode());
-        assertEquals("ZSJOS_LEAD_CREATED", rule.getTemplateCode());
-        assertEquals(List.of(ROLE_SUBMITTER, ROLE_OPERATOR), rule.getRecipientRoles());
-        assertEquals(NotifyActionType.BUSINESS_DETAIL, rule.getActionType());
+        assertEquals(2, captor.getValue().size());
+        NotifyDefaultRuleReqDTO salesRule = captor.getValue().get(0);
+        assertEquals(CREATED, salesRule.getSceneCode());
+        assertEquals("ZSJOS_LEAD_CREATED", salesRule.getTemplateCode());
+        assertEquals(List.of(ROLE_OPERATOR), salesRule.getRecipientRoles());
+        assertEquals(NotifyActionType.BUSINESS_DETAIL, salesRule.getActionType());
+        NotifyDefaultRuleReqDTO providerRule = captor.getValue().get(1);
+        assertEquals(CREATED, providerRule.getSceneCode());
+        assertEquals("ZSJOS_LEAD_SOURCE_LINKED", providerRule.getTemplateCode());
+        assertEquals(List.of(ROLE_NEW_MEDIA_PROVIDER), providerRule.getRecipientRoles());
+        assertEquals(NotifyActionType.BUSINESS_DETAIL, providerRule.getActionType());
     }
 }

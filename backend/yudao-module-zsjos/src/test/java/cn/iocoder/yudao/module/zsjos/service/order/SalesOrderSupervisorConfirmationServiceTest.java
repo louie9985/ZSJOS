@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskSignReqDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
@@ -29,6 +30,8 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
@@ -55,6 +58,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
     @Mock private DeptApi deptApi;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
     @Mock private PermissionApi permissionApi;
+    @Mock private SalesOrderObjectPermissionService objectPermissionService;
 
     private SalesOrderDO order;
     private SalesOrderApprovalRoundDO round;
@@ -82,7 +86,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
     void requestCreatesBeforeSignTaskAndLocksCenter() {
         mockOrdinaryTask();
         mockSupervisor(SUPERVISOR_ID, CommonStatusEnum.ENABLE.getStatus());
-        when(processTaskApi.createBeforeSignTask(eq(REQUESTER_ID), any())).thenReturn("supervisor-task-1");
+        when(processTaskApi.createParallelSignTask(eq(REQUESTER_ID), any())).thenReturn("supervisor-task-1");
         doAnswer(invocation -> {
             ((SalesOrderSupervisorConfirmationDO) invocation.getArgument(0)).setId(300L);
             return 1;
@@ -91,7 +95,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
         service.request(ORDER_ID, REQUESTER_ID, request());
 
         ArgumentCaptor<BpmTaskSignReqDTO> signCaptor = ArgumentCaptor.forClass(BpmTaskSignReqDTO.class);
-        verify(processTaskApi).createBeforeSignTask(eq(REQUESTER_ID), signCaptor.capture());
+        verify(processTaskApi).createParallelSignTask(eq(REQUESTER_ID), signCaptor.capture());
         assertEquals("task-1", signCaptor.getValue().getTaskId());
         assertEquals(SUPERVISOR_ID, signCaptor.getValue().getAssigneeUserId());
         verify(confirmationMapper).insert(argThat((SalesOrderSupervisorConfirmationDO row) -> SUPERVISOR_PENDING.equals(row.getStatus())
@@ -130,7 +134,7 @@ class SalesOrderSupervisorConfirmationServiceTest {
         dept.setLeaderUserId(SUPERVISOR_ID);
         when(adminUserApi.getUser(SUPERVISOR_ID)).thenReturn(user(SUPERVISOR_ID, 11L, CommonStatusEnum.DISABLE.getStatus()));
         assertError(SALES_ORDER_SUPERVISOR_DISABLED.getCode());
-        verify(processTaskApi, never()).createBeforeSignTask(anyLong(), any());
+        verify(processTaskApi, never()).createParallelSignTask(anyLong(), any());
     }
 
     @Test
@@ -141,20 +145,21 @@ class SalesOrderSupervisorConfirmationServiceTest {
 
         assertError(SALES_ORDER_SUPERVISOR_PERMISSION_NOT_GRANTED.getCode());
 
-        verify(processTaskApi, never()).createBeforeSignTask(anyLong(), any());
+        verify(processTaskApi, never()).createParallelSignTask(anyLong(), any());
     }
 
     @Test
-    void requestRejectsSecondRequestForTheSameRoundAndCenter() {
+    void requestRejectsSecondRequestForTheSameRoundFromEitherCenter() {
         mockOrdinaryTask();
-        when(confirmationMapper.selectByRoundAndTaskKey(ROUND_ID, TASK_REGISTRATION))
-                .thenReturn(new SalesOrderSupervisorConfirmationDO());
+        SalesOrderSupervisorConfirmationDO existing = new SalesOrderSupervisorConfirmationDO();
+        existing.setTaskDefinitionKey(TASK_FINANCE);
+        when(confirmationMapper.selectByRoundId(ROUND_ID)).thenReturn(List.of(existing));
 
         ServiceException error = assertThrows(ServiceException.class,
                 () -> service.request(ORDER_ID, REQUESTER_ID, request()));
 
         assertEquals(SALES_ORDER_SUPERVISOR_ALREADY_REQUESTED.getCode(), error.getCode());
-        verify(processTaskApi, never()).createBeforeSignTask(anyLong(), any());
+        verify(processTaskApi, never()).createParallelSignTask(anyLong(), any());
     }
 
     @Test
@@ -172,6 +177,38 @@ class SalesOrderSupervisorConfirmationServiceTest {
         verify(processTaskApi).approveTask(eq(SUPERVISOR_ID), captor.capture());
         assertEquals("supervisor-task-1", captor.getValue().getTaskId());
         verify(processTaskApi, never()).rejectTask(anyLong(), any());
+        ArgumentCaptor<NotifyBusinessEvent> eventCaptor = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(notifyBusinessEventApi).publish(eventCaptor.capture());
+        assertEquals("需要主管把关", eventCaptor.getValue().getPayload().get("supervisorReason"));
+        assertEquals("同意主管确认", eventCaptor.getValue().getPayload().get("decisionReason"));
+    }
+
+    @Test
+    void notificationTargetUsesPersistedTaskAndChecksRecipientAndObject() {
+        SalesOrderSupervisorConfirmationDO confirmation = pendingConfirmation();
+        when(confirmationMapper.selectById(300L)).thenReturn(confirmation);
+
+        var supervisorTarget = service.getNotificationTarget(ORDER_ID,
+                cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants.SUPERVISOR_REQUESTED,
+                "zsjos.sales_order.supervisor_requested:300", SUPERVISOR_ID);
+        assertEquals("supervisor", supervisorTarget.getWorkType());
+        assertEquals("supervisor-task-1", supervisorTarget.getTaskId());
+        assertEquals(300L, supervisorTarget.getConfirmationId());
+        verify(objectPermissionService).check(ORDER_ID, "read");
+
+        var requesterTarget = service.getNotificationTarget(ORDER_ID,
+                cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants.SUPERVISOR_DECIDED,
+                "zsjos.sales_order.supervisor_decided:300", REQUESTER_ID);
+        assertEquals("approval", requesterTarget.getWorkType());
+        assertEquals("task-1", requesterTarget.getTaskId());
+        verify(objectPermissionService).check(ORDER_ID, "review");
+
+        assertThrows(ServiceException.class, () -> service.getNotificationTarget(ORDER_ID,
+                cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants.SUPERVISOR_REQUESTED,
+                "zsjos.sales_order.supervisor_requested:300", REQUESTER_ID));
+        assertThrows(ServiceException.class, () -> service.getNotificationTarget(ORDER_ID,
+                cn.iocoder.yudao.module.zsjos.enums.SalesOrderNotifySceneConstants.SUPERVISOR_REQUESTED,
+                "zsjos.sales_order.supervisor_decided:300", SUPERVISOR_ID));
     }
 
     @Test
@@ -225,7 +262,8 @@ class SalesOrderSupervisorConfirmationServiceTest {
         row.setId(300L); row.setOrderId(ORDER_ID); row.setApprovalRoundId(ROUND_ID);
         row.setTaskDefinitionKey(TASK_REGISTRATION); row.setRequesterUserId(REQUESTER_ID);
         row.setSupervisorUserId(SUPERVISOR_ID); row.setParentTaskId("task-1");
-        row.setSupervisorTaskId("supervisor-task-1"); row.setStatus(SUPERVISOR_PENDING); row.setVersion(0);
+        row.setSupervisorTaskId("supervisor-task-1"); row.setRequestReason("需要主管把关");
+        row.setStatus(SUPERVISOR_PENDING); row.setVersion(0);
         return row;
     }
 

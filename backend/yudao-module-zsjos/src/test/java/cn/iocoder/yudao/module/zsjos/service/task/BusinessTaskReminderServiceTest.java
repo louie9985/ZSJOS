@@ -3,12 +3,17 @@ package cn.iocoder.yudao.module.zsjos.service.task;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.notify.NotifyRuleApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyTimingRuleRespDTO;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskNotifyStageDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskNotifyStageMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadNotifyEventPublisher;
+import cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactNotifyPublisher;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +41,10 @@ class BusinessTaskReminderServiceTest {
     @Mock private LeadMapper leadMapper;
     @Mock private NotifyRuleApi notifyRuleApi;
     @Mock private LeadNotifyEventPublisher publisher;
+    @Mock private StudentContactNotifyPublisher studentPublisher;
+    @Mock private AdminUserApi adminUserApi;
+    @Mock private DeptApi deptApi;
+    @Mock private BusinessTaskCommandService taskCommandService;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(9L); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -78,6 +87,30 @@ class BusinessTaskReminderServiceTest {
         assertEquals(0, service.emitDueForTask(8L, now));
 
         verifyNoInteractions(stageMapper, publisher);
+    }
+
+    @Test
+    void firstContactDueCreatesSupervisorAssistanceTask() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 19, 12, 0);
+        BusinessTaskDO task = task("pending", now); task.setTaskType("student_first_contact");
+        task.setBizType("student_service");
+        NotifyTimingRuleRespDTO due = new NotifyTimingRuleRespDTO(9L,
+                "zsjos.student.first_contact_reminder", "due", 0);
+        AdminUserRespDTO planner = new AdminUserRespDTO(); planner.setId(30L); planner.setDeptId(40L);
+        DeptRespDTO dept = new DeptRespDTO(); dept.setId(40L); dept.setLeaderUserId(50L);
+        when(notifyRuleApi.getEnabledTimingRules(anyCollection())).thenReturn(List.of(due));
+        when(taskMapper.selectByIdForUpdate(8L, 9L)).thenReturn(task);
+        when(adminUserApi.getUser(30L)).thenReturn(planner); when(deptApi.getDept(40L)).thenReturn(dept);
+
+        assertEquals(1, service.emitDueForTask(8L, now));
+
+        verify(studentPublisher).publish(eq("zsjos.student.first_contact_reminder"), eq(20L),
+                contains(":due"), eq(9L), eq(now), anyMap());
+        ArgumentCaptor<BusinessTaskCreateCommand> taskCaptor = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(taskCommandService).create(taskCaptor.capture());
+        assertEquals("student_first_contact_assistance", taskCaptor.getValue().taskType());
+        assertEquals(50L, taskCaptor.getValue().assigneeId());
+        assertEquals("student-assistance:8", taskCaptor.getValue().idempotencyKey());
     }
 
     private BusinessTaskDO task(String status, LocalDateTime dueAt) {

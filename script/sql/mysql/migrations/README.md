@@ -34,6 +34,8 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V042__normalize_legacy_lead_filter_status.sql` repairs active submitter/owner inbox configurations left with the retired `converted` Lead state after V037. It uses JSON paths instead of serialized-text matching, preserves immutable filter-version snapshots, and is repeatable. The application normalizes a legacy snapshot to `won` only when it is read or republished as a new version.
 
+`V088__lead_source_provider_identity.sql` adds nullable Lead fields for the explicit new-media provider and a recording marker used by newly created sales-self leads. It does not backfill historical rows because their legacy `source_user_id` cannot distinguish a selected provider from the submitting salesperson. The marker keeps historical display and filtering behavior unchanged; new rows use the provider-aware submitter projection. The migration is additive, repeatable, and forward-only.
+
 `V044__default_employee_avatar.sql` adds the global System-owned default employee avatar configuration after the order lifecycle V043 migration. It inserts only the missing empty system configuration, preserves any administrator-configured value on rerun, and does not update user rows or create file records. Rollback removes only the configuration after clients are prepared to use nickname initials directly.
 
 `V046__customer_order_advanced_filter_indexes.sql` follows the menu-component V045 migration and adds only two missing secondary indexes used by customer/order advanced-filter plans. It changes no business rows, dictionaries, menus, or permissions. Each DDL statement checks `information_schema.statistics`, records both schema-version formats, and is safe to rerun. Migration execution still requires separate environment approval.
@@ -52,6 +54,14 @@ Apply migrations in filename order. `V006__lead_acceptance_follow_up.sql` adds o
 
 `V022__workbench_foundation.sql` adds the generic BusinessTask display/reminder fields, the simplified work-plan task tree, completion reports, plan summaries, versioned templates/fields and sixteen explicit configuration/execution permissions. It does not infer or add ordinary role grants; administrators assign the required permissions through System role management. The lead workstream owns `V021`, which must be integrated before `V022` in the release migration chain. The local development database may rebuild only the explicitly approved zero-row V022 work-plan tables; released environments must not rewrite this applied migration.
 `V033__split_work_plan_query_permission.sql` converts the Work Plan page node into a permission-free route and adds a separate `zsjos:work-plan:query` button node. It follows the already published V023-V032 sequence after resolving the former V023 collision. Existing roles and tenant packages that already include the route inherit the new query node, so upgrades preserve access while allowing future read-only grants without selecting every operation.
+
+### V085 - business notification customer-name removal
+
+Replaces structured customer/student name variables in ZSJOS Lead, order and registration notification templates with `leadNo` or the relevant business number, and rewrites matching rendered message snapshots through their tenant-scoped business relationships. It updates administrator templates as well as system defaults because the identifier rule is mandatory. The migration aborts before mutation when a targeted structured snapshot cannot be parsed or resolved, never guesses names in arbitrary text, is repeatable and forward-only, and requires a reviewed backup before execution.
+
+### V087 - business notification identifier repair
+
+V087 is the forward-only repair for already-applied V085 environments; V085 remains immutable and V086 is reserved for Lead-detail tab permissions. It covers logically deleted notification messages and related business records, repairs remaining structured customer-name keys through tenant-scoped Lead/order/registration relations, backfills the business-number key that V085 omitted from registration snapshots, and rebuilds template parameter arrays without duplicates. Historical message parameters that are not JSON objects are isolated and left unchanged unless their raw value still contains a forbidden customer-name key, which blocks the migration. Valid structured rows still fail closed on relations required for mutation, missing user-visible identifiers, non-string legacy values, and conflicting stored identifiers. Template and business-number comparisons use binary UTF-8 semantics, and the temporary repair table explicitly matches the notification-table collation instead of inheriting the connection default. It never uses an internal Lead ID as a visible identifier, guesses a removed name, or overwrites an unverifiable rendered body. Real execution requires a reviewed backup and a separate approval.
 
 Dictionary business data does not belong here; put it under
 `../dictionary-data/` and obtain explicit synchronization approval first.
@@ -163,3 +173,72 @@ enabled sales managers receive follow-up query permission. List and object reads
 managed departments and child departments; writes remain action-scoped. No Lead, task, user,
 role, or history row is deleted. Reruns are idempotent. Recovery is forward-only and requires a
 reviewed role-menu snapshot before restoring any tenant-wide grant.
+
+### V080 Lead-source provider notification
+
+Splits only untouched enabled V075 Lead-created defaults into an operator-only submission-success
+rule and a dedicated `new_media_provider` rule. The provider rule uses the global
+`ZSJOS_LEAD_SOURCE_LINKED` template and renders
+`{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`.
+Runtime context resolves that role only for a sales self-sourced Lead with an explicitly selected
+provider. Disabled, edited, or administrator-created rules are preserved, historical messages are
+not generated, and reruns do not duplicate the template or rule. Apply after V079; rollback is
+forward-only and retains delivered history.
+
+### V081 Employee birthday care
+
+Adds the HRM birthday-care configuration menu, in-app notification template/rule, and a repeatable ten-minute `employeeBirthdayCareJob` definition. The job is disabled by business configuration until an administrator selects recipient departments and enables the feature. It does not seed departments, employees, accounts, or permissions.
+
+### V082 Registration planner notifications
+
+Adds the system-owned in-app template and default rule for assigning a registration case to a study planner. The rule sends only to the assigned planner; the message uses the user-visible `leadNo`. Runtime resolution for the existing registration-task scene now intersects the public-pool permission with the configured registration approval department subtree, so administrators outside that center are excluded. No permissions, departments, accounts, business rows, or historical messages are changed. The migration is repeatable and forward-only; preserve delivered history when disabling a rule.
+
+### V083 Registration routes and checklist attachments
+
+Adds versioned department route options, per-case department/assignee snapshots, attachment checklist metadata and a director-assignment notification. Default routes resolve the exact unique active department names `学生服务与交付中心` and `新媒体与客资中心` once and persist their IDs; verification fails on missing or ambiguous mappings. Pending/processing cases receive route snapshots, completed historical cases are unchanged, and enabled `content_director` roles receive only the existing My Students menu. Apply after V082 and before V084. The migration is repeatable and forward-only.
+
+### V084 Employee birthday-care menu repair
+
+Repairs V081's menu IDs, which overlap the V058 FMS currency and finance-parameter menus. It creates the birthday-care page and two permissions with IDs `602100-602102`, preserves all FMS rows, and grants the repaired menu only to enabled `super_admin` roles. Existing ordinary-role permissions are not changed. The migration is repeatable and forward-only.
+
+### V086 Lead detail tab permissions
+
+Adds independent read permissions for follow-up, appeal, complaint, and order tabs under the existing Lead management menu. Existing effective permissions are mapped to the corresponding new read permission so deployment does not hide records that a role can currently read; administrators can then adjust each tab through standard System role management. The migration changes menu metadata and role-menu relations only, is repeatable, and does not execute business-data or permission cleanup.
+
+### V089 Registration attachment idempotency result
+
+Adds nullable `zsjos_registration_command.result_attachment_id` so an attachment-upload replay can
+return only the exact attachment created by the original command. Historical command rows are not
+guessed or backfilled; a replay without a valid exact result fails with a stable application error.
+The migration is additive, repeatable, and forward-only. It changes no attachment, Infra file,
+permission, account, or historical command row and must not be executed against an existing database
+without the normal separate approval.
+
+### V090 Lead complaint result notifications
+
+Adds separate system-owned in-app result templates and complainant-targeted rules for founded and
+unfounded Lead complaint decisions. The runtime resolves the immutable internal complainant user or
+Partner subject stored on the complaint record; it does not infer the recipient from a current role,
+department, or Lead relationship. Existing founded notifications to the sales owner and direct leader
+remain unchanged. The migration inserts at most two rules per active tenant, preserves administrator
+rules and historical messages, is repeatable, and is forward-only. Applying V090 to an existing
+database remains a separate deployment action.
+
+### V091 Lead flow history permission
+
+Adds the independent `zsjos:lead-detail:flow-read` button permission under Lead management and
+grants it only to enabled `sales_manager` roles in each tenant on the first successful V091 install.
+Once the V091 version marker exists, reruns do not restore a role-menu relation removed by an
+administrator. Runtime access remains cumulative
+with the existing Lead object permission; the grant does not widen Lead visibility. The migration
+changes no Lead, business-event, assignment-history, aging-pool, account, or historical row, is
+repeatable, and is forward-only. Existing-environment execution remains a separate approved action.
+
+### V092 subordinate sales one-click pause
+
+Adds `zsjos:subordinate-sales:pause-all` under the existing subordinate-sales menu and grants it
+only to enabled `sales_manager` roles on the first successful V092 install. Reruns preserve any
+later administrator removal. The runtime command derives its entire target set from the current
+manager hierarchy and stable `sales_specialist` post, including disabled accounts; the migration
+itself changes no account, dispatch preference, Lead, presence, or audit data. It is additive,
+repeatable, and forward-only. Existing-environment execution remains a separate approved action.

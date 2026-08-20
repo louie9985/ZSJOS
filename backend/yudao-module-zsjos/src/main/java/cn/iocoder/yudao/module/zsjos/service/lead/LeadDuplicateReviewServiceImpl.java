@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,10 +46,12 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private SecurityFrameworkService securityFrameworkService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     public PageResult<LeadDuplicateReviewRespVO> getPage(LeadDuplicateReviewPageReqVO request) {
-        PageResult<LeadDuplicateReviewDO> page = reviewMapper.selectPage(request, request.getStatus());
+        List<Long> matchedIds = advancedFilterService.matchDuplicateReviewIds(request.getKeyword(), request.getAdvancedFilter());
+        PageResult<LeadDuplicateReviewDO> page = reviewMapper.selectPage(request, request.getStatus(), matchedIds);
         return new PageResult<>(page.getList().stream().map(this::toResponse).toList(), page.getTotal());
     }
 

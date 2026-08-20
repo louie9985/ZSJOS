@@ -38,6 +38,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_R
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -236,6 +237,22 @@ class LeadSubmissionServiceImplTest {
     void selfSourcedSourceFallsBackToSubmittingSales() {
         assertEquals(10L, LeadSubmissionServiceImpl.selfSourcedSourceUserId(null, 10L));
         assertEquals(20L, LeadSubmissionServiceImpl.selfSourcedSourceUserId(20L, 10L));
+    }
+
+    @Test
+    void leadCreatedContextIncludesOnlyExplicitSelfSourcedProvider() {
+        LeadDO linked = new LeadDO().setSourceType("sales_self_sourced").setSourceUserId(20L);
+        Map<String, Object> linkedContext = ReflectionTestUtils.invokeMethod(service, "eventContext", linked, 10L);
+        assertEquals(20L, linkedContext.get("newMediaProviderUserId"));
+
+        LeadDO fallback = new LeadDO().setSourceType("sales_self_sourced").setSourceUserId(10L);
+        Map<String, Object> fallbackContext = ReflectionTestUtils.invokeMethod(service, "eventContext", fallback, 10L);
+        assertFalse(fallbackContext.containsKey("newMediaProviderUserId"));
+
+        LeadDO newMediaSubmission = new LeadDO().setSourceType("internal_new_media").setSourceUserId(20L);
+        Map<String, Object> newMediaContext = ReflectionTestUtils.invokeMethod(
+                service, "eventContext", newMediaSubmission, 20L);
+        assertFalse(newMediaContext.containsKey("newMediaProviderUserId"));
     }
 
     @Test

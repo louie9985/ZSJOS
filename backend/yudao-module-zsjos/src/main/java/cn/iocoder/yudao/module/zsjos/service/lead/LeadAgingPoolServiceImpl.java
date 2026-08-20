@@ -60,6 +60,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Resource private TransactionTemplate transactionTemplate;
     @Resource private LeadInboxFilterConfigService inboxFilterConfigService;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private LeadPublicSeaRecordMapper publicSeaRecordMapper;
 
     @Override
     public PageResult<LeadAgingPoolRespVO> getPage(LeadAgingPoolPageReqVO reqVO, Long userId) {
@@ -384,6 +385,14 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void terminateForOwnerTransfer(Long leadId, Long newOwnerUserId, Long operatorUserId, LocalDateTime now) {
+        terminateForOwnerTransfer(leadId, newOwnerUserId, operatorUserId, now,
+                "管理员正式转派，原超期公海周期终止");
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void terminateForOwnerTransfer(Long leadId, Long newOwnerUserId, Long operatorUserId,
+                                          LocalDateTime now, String reason) {
         LeadAgingPoolCycleDO cycle = cycleMapper.selectActiveByLeadIdForUpdate(
                 leadId, TenantContextHolder.getRequiredTenantId());
         if (cycle == null) return;
@@ -391,7 +400,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
             throw exception(LEAD_AGING_POOL_STATE_INVALID);
         }
         cycle.setStatus(AGING_POOL_EXITED); cycle.setExitedAt(now);
-        cycle.setExitReason("管理员正式转派，原超期公海周期终止");
+        cycle.setExitReason(reason);
         updateCycle(cycle);
         addEvent(cycle, AGING_POOL_EVENT_EXITED, operatorUserId, cycle.getCollaboratorUserId(), null,
                 cycle.getExitReason(), "aging-pool-transfer-exit:" + cycle.getId() + ":" + now, now);
@@ -486,6 +495,8 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         LeadFollowUpRuleDO rule = ruleService.requireEnabledRule();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null || cycleMapper.selectActiveByLeadId(lead.getId()) != null) return false;
+        if (publicSeaRecordMapper.selectByLeadIdForUpdate(
+                lead.getId(), TenantContextHolder.getRequiredTenantId()) != null) return false;
         if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                 || !STATUS_VALID.equals(lead.getStatus())) return false;
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());

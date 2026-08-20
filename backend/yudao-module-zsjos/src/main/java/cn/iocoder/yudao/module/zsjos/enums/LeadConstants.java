@@ -58,6 +58,17 @@ public interface LeadConstants {
     String INBOX_AUDIENCE_AGING_POOL = "agingPool";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
+    String PERMISSION_DETAIL_FOLLOW_UP_READ = "zsjos:lead-detail:follow-up-read";
+    String PERMISSION_DETAIL_APPEAL_READ = "zsjos:lead-detail:appeal-read";
+    String PERMISSION_DETAIL_COMPLAINT_READ = "zsjos:lead-detail:complaint-read";
+    String PERMISSION_DETAIL_ORDER_READ = "zsjos:lead-detail:order-read";
+    String PERMISSION_DETAIL_FLOW_READ = "zsjos:lead-detail:flow-read";
+    String DETAIL_TAB_OVERVIEW = "overview";
+    String DETAIL_TAB_FOLLOW_UPS = "follow-ups";
+    String DETAIL_TAB_APPEALS = "appeals";
+    String DETAIL_TAB_COMPLAINTS = "complaints";
+    String DETAIL_TAB_ORDERS = "orders";
+    String DETAIL_TAB_FLOW_HISTORY = "flow-history";
     String INBOX_FILTER_FIELD_STATUS = "status";
     String INBOX_FILTER_FIELD_ASSIGNMENT_STATUS = "assignment_status";
     String INBOX_FILTER_FIELD_HANDLING_STAGE = "handling_stage";

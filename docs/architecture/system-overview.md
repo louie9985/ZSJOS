@@ -4,7 +4,7 @@
 
 ZSJ-OS uses the existing multi-module administration platform as its backend and
 administrator-facing system, with a separate employee workbench for employee-facing
-flows. The system has three active development surfaces with different ownership and
+flows. The system has four active development surfaces with different ownership and
 toolchains.
 
 ## Runtime surfaces
@@ -14,6 +14,12 @@ toolchains.
 | Backend and assembly | `backend/`, `backend/yudao-server/`, `backend/yudao-module-*/` | Java 25, Spring Boot 4.1, Maven | Authentication, authorization, tenant isolation, system capabilities, business APIs, persistence, runtime assembly |
 | Administration frontend | `frontend/admin/` | Vue 3, TypeScript, Vite, Pinia, Element Plus | Administrator configuration and management workflows |
 | Employee workbench | `frontend/workbench/` | React, TypeScript, Vite, Ant Design 6, Pro Components | Employee navigation and business workflows backed by existing APIs |
+| Partner H5 | `frontend/h5/` | Vue 3, TypeScript, Vite, Vant | Independent PARTNER login and partner-owned mobile workflows |
+
+Administration and employee APIs use `/admin-api/**` with ADMIN identities. Member APIs use
+`/app-api/**` with MEMBER identities. The partner H5 uses `/part-api/zsjos/**` with PARTNER
+identities; its public dictionary and area lookups remain on `/app-api/system/**` without a
+partner bearer token. Development and production proxies must forward both H5 prefixes.
 
 `../CRM-demo-Ant-design` is a design reference when available. It is not a runtime
 dependency or a source of production data, routes, permissions, or API contracts.

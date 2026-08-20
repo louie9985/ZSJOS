@@ -145,13 +145,22 @@
   white-space: nowrap;
 }
 
-.subordinate-sales-pagination {
+.subordinate-sales-load-state {
   display: flex;
-  min-height: 42px;
-  flex: none;
-  align-items: flex-end;
+  min-height: 36px;
+  align-items: center;
   justify-content: center;
-  padding-top: 8px;
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+}
+
+.subordinate-sales-load-sentinel {
+  height: 1px;
+  flex: none;
+}
+
+.subordinate-sales-load-error {
+  flex: none;
 }
 
 /* ========== 详情面板 ========== */

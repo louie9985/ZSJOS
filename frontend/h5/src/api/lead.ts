@@ -52,7 +52,7 @@ export interface LeadCreateParams {
 }
 
 export interface IntendedProduct {
-  spuRef: string
+  spuRef?: string
   skuRef?: string
   spuUnknown: boolean
   skuUnknown: boolean

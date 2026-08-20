@@ -19,6 +19,7 @@
 @import './pages/registration.css';
 @import './components/lead-detail.css';
 @import './components/lead-detail-v2.css';
+@import './components/detail-field-grid.css';
 @import './components/lead-charts.css';
 @import './components/follow-up.css';
 @import './components/snake-timeline.css';
@@ -27,6 +28,7 @@
 @import './components/attachment.css';
 @import './components/dispatch.css';
 @import './components/advanced-filter.css';
+@import './components/business-inbox.css';
 @import './components/settings-drawer.css';
 @import './components/tab-bar.css';
 @import './antd-overrides.css';

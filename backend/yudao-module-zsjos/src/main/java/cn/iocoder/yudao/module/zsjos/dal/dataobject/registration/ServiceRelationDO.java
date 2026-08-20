@@ -21,6 +21,11 @@ public class ServiceRelationDO extends TenantBaseDO {
     private Long registrationCaseId;
     private String status;
     private Long ownerUserId;
+    private String acceptanceStatus;
+    private Long acceptedByUserId;
+    private LocalDateTime acceptedAt;
+    private Long contentDirectorUserId;
+    private Long careerPlannerUserId;
     private String serviceSnapshot;
     private LocalDateTime activatedAt;
     private LocalDateTime pausedAt;
