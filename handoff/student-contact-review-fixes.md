@@ -43,3 +43,18 @@
 - Dependency or integration impact: no new dependency; merging will advance local `main` only. Remote branches, services, databases, BPM definitions, and migrations remain unchanged.
 - Remaining work: create the approved feature commit, fast-forward `main`, rerun affected verification, and append the merged delivery record.
 - Status: `ready-to-merge`
+
+## Integration Delivery 2026-08-20 11:27:14 +08:00
+
+- Beijing time: `2026-08-20 11:27:14 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d446cb5905524ee7c5af55ace2f2dedeaedf975c` after the fast-forward integration
+- User goal: merge all applicable local branches while preserving unrelated worktree changes.
+- Key decisions: committed the student-contact workstream as `d446cb5905`; fast-forwarded `main` from `efb8f7bb09`; did not create a redundant merge for `codex/crm-lifecycle-gap-implementation` because it was already an ancestor; did not merge the divergent external `gitee/master`; retained `handoff/main.md` and `handoff/avatar-storage-fix.md` outside both commits; did not push or execute migrations.
+- Execution or analysis result: `main` now contains `codex/student-contact-review-fixes`, `codex/crm-lifecycle-gap-implementation`, and `origin/main`; the integration completed without conflicts.
+- Changed files: the 55 files in feature commit `d446cb5905` plus this appended integration record.
+- Verification evidence: on integrated `main`, ZSJOS tests passed `433/433`; Workbench tests passed `317/317`, typecheck passed, and production build passed; Vue scoped ESLint and `pnpm build:local` passed; `python script/sql/mysql/tools/zsjos_db.py check` passed; `git diff --check` passed; ancestry checks returned success for the CRM branch, student-contact branch, and `origin/main`.
+- Dependency or integration impact: local `main` advanced only; no dependency, remote branch, service, database, BPM deployment, migration state, or permission assignment changed. V094/V095 remain unapplied.
+- Remaining work: authenticated desktop/mobile verification and controlled V094/V095/BPM rollout remain separate operational work; pushing local `main` requires separate confirmation.
+- Status: `merged`
