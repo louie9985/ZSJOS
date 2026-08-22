@@ -29,6 +29,7 @@ import DetailFieldGrid from '../components/DetailFieldGrid'
 import {
   executeNotifyMessageAction,
   classifyNotifyActionError,
+  isNotifyBusinessActionCandidate,
   isNotifyLeadActionCandidate,
   resolveNotifyLeadAction,
   type NotifyLeadAction
@@ -44,11 +45,13 @@ function MessageDetail({
   message,
   leadAction,
   leadActionLoading,
+  businessAction,
   onOpenLead
 }: {
   message?: NotifyMessage
   leadAction?: NotifyLeadAction | null
   leadActionLoading?: boolean
+  businessAction?: boolean
   onOpenLead?: (message: NotifyMessage) => void
 }) {
   if (!message) return <Empty description="从左侧选择一条消息"/>
@@ -70,6 +73,12 @@ function MessageDetail({
         icon={<LinkOutlined/>}
         onClick={() => onOpenLead?.(message)}
       >查看客资</Button>}
+      {!leadActionLoading && !leadAction && businessAction && <Button
+        size="small"
+        type="primary"
+        icon={<LinkOutlined/>}
+        onClick={() => onOpenLead?.(message)}
+      >查看业务</Button>}
     </header>
     <section className="business-inbox-card message-detail-section">
       <Typography.Text type="secondary">消息摘要</Typography.Text>
@@ -292,6 +301,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
         message={selected}
         leadAction={selected ? leadActions[selected.id] : null}
         leadActionLoading={leadActionProbe?.messageId === selected?.id && leadActionProbe?.status === 'loading'}
+        businessAction={Boolean(selected && isNotifyBusinessActionCandidate(selected))}
         onOpenLead={openLead}
       /></main>
     </div>
@@ -307,6 +317,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
         message={selected}
         leadAction={selected ? leadActions[selected.id] : null}
         leadActionLoading={leadActionProbe?.messageId === selected?.id && leadActionProbe?.status === 'loading'}
+        businessAction={Boolean(selected && isNotifyBusinessActionCandidate(selected))}
         onOpenLead={openLead}
       />
     </Drawer>

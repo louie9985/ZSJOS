@@ -422,7 +422,12 @@ public class BpmTaskServiceImpl implements BpmTaskService {
 
     @Override
     public Task getTask(String id) {
-        return taskService.createTaskQuery().taskId(id).includeTaskLocalVariables().singleResult();
+        // Keep task detail lookup under the same tenant boundary as todo-page. Flowable's
+        // taskId-only query can otherwise return null in a tenant-scoped request even though
+        // the task is visible in the assignee/tenant todo query.
+        return taskService.createTaskQuery().taskId(id)
+                .taskTenantId(FlowableUtils.getTenantId())
+                .includeTaskLocalVariables().singleResult();
     }
 
     @Override

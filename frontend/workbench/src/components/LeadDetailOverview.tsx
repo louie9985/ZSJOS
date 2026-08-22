@@ -7,7 +7,7 @@ import {
   ExclamationCircleOutlined,
   PauseCircleOutlined
 } from '@ant-design/icons'
-import { api, type LeadFollowUp, type ManagedLead, type ManagedLeadProduct } from '../services/api'
+import { api, type LeadFollowUp, type ManagedLead, type ManagedLeadProduct, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import {
   LEAD_DISPATCH_MODE_LABELS,
@@ -245,6 +245,34 @@ export function buildLeadFlowEvents(lead: ManagedLead): Array<{ time?: number; l
     return list.sort((a, b) => (b.time || 0) - (a.time || 0))
 }
 
+function LatestStudentContact({ records }: { records: StudentContactRecord[] }) {
+  const record = records[0]
+  if (!record) return (
+    <div className="lead-latest-followup">
+      <div className="lead-section-header"><Typography.Text strong>最近联系</Typography.Text></div>
+      <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无联系记录" />
+    </div>
+  )
+  return (
+    <div className="lead-latest-followup">
+      <div className="lead-section-header">
+        <Typography.Text strong>最近联系</Typography.Text>
+        <Typography.Text type="secondary">{formatTimestamp(new Date(record.submittedAt).getTime())}</Typography.Text>
+      </div>
+      <div className="lead-latest-followup-body">
+        <div className="lead-latest-followup-tags">
+          <Tag>{record.successful ? '已联系' : '未联系成功'}</Tag>
+          {record.operatorUserName && <Tag color="blue">{record.operatorUserName}</Tag>}
+        </div>
+        <Typography.Paragraph className="lead-latest-followup-remark" ellipsis={{ rows: 2, expandable: 'collapsible' }}>
+          {record.remark}
+        </Typography.Paragraph>
+        {record.nextContactAt && <Typography.Text type="secondary" className="lead-latest-followup-next">下次联系：{formatTimestamp(new Date(record.nextContactAt).getTime())}</Typography.Text>}
+      </div>
+    </div>
+  )
+}
+
 export function leadSourceDispatchTag(lead: Pick<ManagedLead, 'sourceType' | 'dispatchMode'>):
   { label: string; color: 'blue' | 'orange' } | undefined {
   if (lead.sourceType !== 'internal_new_media') return
@@ -439,6 +467,39 @@ function LeadStatusPipeline({ lead }: { lead: ManagedLead }) {
   )
 }
 
+const STUDENT_STEPS = [
+  { key: 'student_first_contact', label: '首联' },
+  { key: 'student_study_plan', label: '制定学习计划' },
+  { key: 'student_contact', label: '督学' },
+  { key: 'student_exam', label: '考试' },
+] as const
+
+function StudentTaskPipeline({ context, records }: { context: StudentContactContext; records: StudentContactRecord[] }) {
+  const completedTypes = new Set(records.map(record => record.contactType))
+  const currentIndex = STUDENT_STEPS.findIndex(step => step.key === context.currentTask?.type)
+  return <div className="lead-status-pipeline">
+    {STUDENT_STEPS.map((step, index) => {
+      const state = completedTypes.has(step.key) || (currentIndex >= 0 && index < currentIndex) ? 'done' : index === currentIndex ? 'current' : 'future'
+      return <div key={step.key} className={`lead-status-node ${state}`}>
+        <div className="lead-status-dot" />
+        {index < STUDENT_STEPS.length - 1 && <div className="lead-status-connector" />}
+        <span className="lead-status-step-label">{step.label}</span>
+      </div>
+    })}
+  </div>
+}
+
+function StudentTaskLabels({ context }: { context: StudentContactContext }) {
+  const task = context.currentTask
+  const taskLabel = STUDENT_STEPS.find(step => step.key === task?.type)?.label || '暂无待办'
+  const items: Array<{ label: string; value: string; color: StatusColor }> = [
+    { label: '当前任务', value: taskLabel, color: task?.overdue ? 'red' : task ? 'blue' : 'gray' },
+    { label: '任务状态', value: task?.overdue ? '已逾期' : task ? '待处理' : '暂无', color: task?.overdue ? 'red' : task ? 'orange' : 'gray' },
+    { label: '服务接收', value: context.acceptanceStatus === 'accepted' ? '已接收' : '待接收', color: context.acceptanceStatus === 'accepted' ? 'green' : 'orange' },
+  ]
+  return <div className="lead-status-labels">{items.map(item => <div key={item.label} className={`lead-status-label-item color-${item.color}`}><span className="lead-status-label-name">{item.label}</span><span className="lead-status-label-value">{item.value}</span></div>)}</div>
+}
+
 /* ========== 状态卡：色条标签墙 ========== */
 
 type StatusColor = 'green' | 'blue' | 'orange' | 'red' | 'gray'
@@ -495,13 +556,16 @@ function LeadStatusLabels({ lead }: { lead: ManagedLead }) {
 
 /* ========== 主导出：概览 ========== */
 
-export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, showFollowUp, toolbar }: {
+export type StudentOverviewContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
+
+export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext }: {
   lead: ManagedLead
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
   showFollowUp: boolean
   /** 操作工具条（使用 OverflowToolbar 渲染） */
   toolbar?: React.ReactNode
+  studentContext?: StudentOverviewContext
 }) {
   const sourceDispatchTag = leadSourceDispatchTag(lead)
   return (
@@ -577,9 +641,17 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
               <div className="lead-overview-row-half">
                 <section className="lead-card">
                   <div className="lead-card-header">
-                    <Typography.Text strong>意向产品</Typography.Text>
+                    <Typography.Text strong>{studentContext ? '成交产品' : '意向产品'}</Typography.Text>
                   </div>
-                  {lead.intendedProducts?.length ? (
+                  {studentContext ? (
+                    <div className="lead-product-list">
+                      <div className="lead-product-card primary">
+                        <div className="lead-product-card-header"><Tag color="green" bordered={false}>已成交</Tag><span className="lead-product-name">{studentContext.service.courseName || studentContext.service.skuName || '课程服务'}</span></div>
+                        {studentContext.service.skuName && studentContext.service.skuName !== studentContext.service.courseName && <span className="lead-product-sku">{studentContext.service.skuName}</span>}
+                        {studentContext.service.orderNo && <span className="lead-product-sku">订单号：{studentContext.service.orderNo}</span>}
+                      </div>
+                    </div>
+                  ) : lead.intendedProducts?.length ? (
                     <div className="lead-product-list">
                       {[...lead.intendedProducts].sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0)).map(product => (
                         <ProductCard key={product.id} product={product} />
@@ -590,8 +662,8 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                   )}
                 </section>
 
-                {showFollowUp && <section className="lead-card">
-                  <LatestFollowUp leadId={lead.id} />
+                {(studentContext || showFollowUp) && <section className="lead-card">
+                  {studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : <LatestFollowUp leadId={lead.id} />}
                 </section>}
               </div>
 
@@ -603,7 +675,11 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
 
             {/* 4 列：时效进度 + 客资流转 */}
             <div className="lead-overview-col-secondary">
-              {(lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
+              {studentContext?.contactContext.currentTask?.dueAt && <section className="lead-card">
+                <div className="lead-card-header"><Typography.Text strong>联系任务时效</Typography.Text></div>
+                <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div>
+              </section>}
+              {!studentContext && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
                 <section className="lead-card">
                   <div className="lead-card-header">
                     <Typography.Text strong>时效进度</Typography.Text>
@@ -631,18 +707,18 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
 
         {/* 右侧边栏 3 列：提示 → 工具条 → 状态卡 → 跟进图表 */}
         <aside className="lead-overview-aside">
-          <AsideAlerts lead={lead} />
+          {!studentContext && <AsideAlerts lead={lead} />}
           {/* 磨砂工具条 */}
           {toolbar}
           {/* 状态卡：Pipeline + 色条标签墙 */}
           <section className="lead-card lead-status-card">
             <div className="lead-status-card-body">
-              <LeadStatusPipeline lead={lead} />
+              {studentContext ? <StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} /> : <LeadStatusPipeline lead={lead} />}
               <div className="lead-status-divider" />
-              <LeadStatusLabels lead={lead} />
+              {studentContext ? <StudentTaskLabels context={studentContext.contactContext} /> : <LeadStatusLabels lead={lead} />}
             </div>
           </section>
-          {showFollowUp && <LeadFollowUpCharts leadId={lead.id} />}
+          {!studentContext && showFollowUp && <LeadFollowUpCharts leadId={lead.id} />}
         </aside>
       </div>
     </div>

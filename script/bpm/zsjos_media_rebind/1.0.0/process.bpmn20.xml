@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" targetNamespace="https://zsjos.com/bpm">
+  <process id="zsjos_media_rebind" name="新媒体账号换绑" isExecutable="true">
+    <startEvent id="StartEvent" name="提交换绑"/>
+    <sequenceFlow id="flow_start_review" sourceRef="StartEvent" targetRef="managerReviewer"/>
+    <userTask id="managerReviewer" name="主管复核" flowable:assignee="${assignee}"><extensionElements><flowable:candidateStrategy>35</flowable:candidateStrategy><flowable:collection>${coll_userList}</flowable:collection></extensionElements></userTask>
+    <sequenceFlow id="flow_review_end" sourceRef="managerReviewer" targetRef="EndEvent"/>
+    <endEvent id="EndEvent" name="完成"/>
+  </process>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"><bpmndi:BPMNPlane id="Plane" bpmnElement="zsjos_media_rebind"><bpmndi:BPMNShape id="StartShape" bpmnElement="StartEvent"><omgdc:Bounds x="100" y="100" width="36" height="36"/></bpmndi:BPMNShape></bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</definitions>

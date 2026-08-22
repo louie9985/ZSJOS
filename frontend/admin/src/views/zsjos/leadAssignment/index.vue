@@ -50,6 +50,16 @@
         >
           <Icon icon="ep:operation" class="mr-5px" />批量配置
         </el-button>
+        <el-button
+          v-if="isAdminMode"
+          type="danger"
+          plain
+          :disabled="checkedRows.length === 0"
+          v-hasPermi="[updatePermission]"
+          @click="openBatchRemoveDrawer"
+        >
+          <Icon icon="ep:delete" class="mr-5px" />批量移除
+        </el-button>
         <el-button plain v-hasPermi="[logPermission]" @click="openLogDialog">
           <Icon icon="ep:document" class="mr-5px" />变更记录
         </el-button>
@@ -75,11 +85,14 @@
       <el-table-column :label="`已绑定${targetLabel}`" min-width="300">
         <template #default="{ row }">
           <div v-if="row.salesUsers.length" class="sales-tags">
-            <el-tag v-for="sales in row.salesUsers.slice(0, 3)" :key="sales.id" effect="plain">
+            <el-tag
+              v-for="sales in row.salesUsers"
+              :key="sales.id"
+              effect="plain"
+              :closable="isAdminMode"
+              @close="removeRelation(row, sales.id)"
+            >
               {{ sales.nickname }}
-            </el-tag>
-            <el-tag v-if="row.salesUsers.length > 3" type="info" effect="plain">
-              +{{ row.salesUsers.length - 3 }}
             </el-tag>
           </div>
           <span v-else class="empty-text">尚未配置</span>
@@ -400,6 +413,28 @@ const openBatchDrawer = async () => {
 
 const removeSelected = (id: number) => {
   selectedSalesIds.value = selectedSalesIds.value.filter((value) => value !== id)
+}
+
+const openBatchRemoveDrawer = async () => {
+  await openBatchDrawer()
+  saveMode.value = 'remove'
+}
+
+const removeRelation = async (row: AssignmentApi.AssignmentRelationVO, targetUserId: number) => {
+  if (!isAdminMode.value) return
+  saving.value = true
+  try {
+    await UserRelationApi.saveRelations({
+      sceneCode: sceneCode.value,
+      sourceUserIds: [row.id],
+      targetUserIds: [targetUserId],
+      mode: 'remove'
+    })
+    message.success('关系已删除')
+    await getList()
+  } finally {
+    saving.value = false
+  }
 }
 
 const submitRelations = async () => {

@@ -30,6 +30,7 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                 .likeIfPresent(NotifyMessageDO::getTemplateCode, reqVO.getTemplateCode())
                 .eqIfPresent(NotifyMessageDO::getTemplateType, reqVO.getTemplateType())
                 .betweenIfPresent(NotifyMessageDO::getCreateTime, reqVO.getCreateTime())
+                .orderByDesc(NotifyMessageDO::getCreateTime)
                 .orderByDesc(NotifyMessageDO::getId));
     }
 
@@ -39,6 +40,7 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                 .betweenIfPresent(NotifyMessageDO::getCreateTime, reqVO.getCreateTime())
                 .eq(NotifyMessageDO::getUserId, userId)
                 .eq(NotifyMessageDO::getUserType, userType)
+                .orderByDesc(NotifyMessageDO::getCreateTime)
                 .orderByDesc(NotifyMessageDO::getId));
     }
 
@@ -81,7 +83,7 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                 .eq("user_id", userId)
                 .eq("user_type", userType)
                 .eq("read_status", false)
-                .orderByDesc("id").limitN(size));
+                .orderByDesc("create_time").orderByDesc("id").limitN(size));
     }
 
     default Long selectUnreadCountByUserIdAndUserType(Long userId, Integer userType) {

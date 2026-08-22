@@ -26,6 +26,21 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
+    default List<ServiceRelationDO> selectActiveByContentDirector(Long userId) {
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    default List<ServiceRelationDO> selectActiveByContentDirectorAndPerson(Long userId, Long personId) {
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
     default List<ServiceRelationDO> selectActiveByCollaboratorAndPerson(Long userId, Long personId) {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
@@ -97,6 +112,15 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                                    @Param("leadId") Long leadId,
                                    @Param("tenantId") Long tenantId);
 
+    @Select("SELECT COUNT(1) FROM zsjos_service_relation sr "
+            + "JOIN zsjos_order o ON o.id=sr.order_id AND o.tenant_id=sr.tenant_id AND o.deleted=b'0' "
+            + "WHERE (sr.owner_user_id=#{userId} OR sr.content_director_user_id=#{userId} "
+            + "OR sr.career_planner_user_id=#{userId}) AND o.lead_id=#{leadId} "
+            + "AND sr.status='active' AND sr.tenant_id=#{tenantId} AND sr.deleted=b'0'")
+    long countActiveByParticipantAndLead(@Param("userId") Long userId,
+                                         @Param("leadId") Long leadId,
+                                         @Param("tenantId") Long tenantId);
+
     default boolean existsActiveByOwner(Long ownerUserId) {
         return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getOwnerUserId, ownerUserId)
@@ -118,5 +142,13 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    default List<ServiceRelationDO> selectActiveByPersonIds(Collection<Long> personIds) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .in(ServiceRelationDO::getPersonId, personIds)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .orderByDesc(ServiceRelationDO::getUpdateTime).orderByDesc(ServiceRelationDO::getId));
     }
 }

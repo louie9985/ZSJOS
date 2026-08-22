@@ -35,7 +35,7 @@ public class PartnerAuthServiceImpl implements PartnerAuthService {
             "zsjos:partner:self-query", "zsjos:lead:submit", "zsjos:lead:query-submitted",
             "zsjos:lead:submitter-supplement", "zsjos:lead:urge", "zsjos:lead-complaint:create",
             "zsjos:lead:appeal:create", "zsjos:cashback:my-query", "zsjos:withdrawal:my-query",
-            "zsjos:withdrawal:apply");
+            "zsjos:withdrawal:apply", "zsjos:positioning-card:student-confirm");
 
     @Resource private PartnerAccountService accountService;
     @Resource private PartnerMapper partnerMapper;

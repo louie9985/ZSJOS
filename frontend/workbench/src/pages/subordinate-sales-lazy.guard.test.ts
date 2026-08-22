@@ -29,4 +29,14 @@ describe('subordinate sales lazy-list contract', () => {
     expect(dispatchControlSource).toContain("color={status?.mode === 'accepting' ? 'success' : 'error'}")
     expect(dispatchControlSource).toContain("color={pageActive ? 'processing' : 'error'}")
   })
+
+  it('binds the pending Lead assignment entry to the accept permission', () => {
+    expect(mainSource).toContain("(info.permissions || []).includes('zsjos:lead:accept') && (")
+    expect(mainSource).toContain('aria-label="待接客资"')
+  })
+
+  it('does not render the redundant standalone theme switcher', () => {
+    expect(mainSource).not.toContain("import ThemeSwitcher from './components/Theme/ThemeSwitcher'")
+    expect(mainSource).not.toContain('<ThemeSwitcher/>')
+  })
 })

@@ -621,7 +621,11 @@ public class RegistrationServiceImpl implements RegistrationService {
     private void applyCompletionState(RegistrationCaseRespVO result, RegistrationCaseDO registrationCase, SalesOrderDO order) {
         String code = null;
         String reason = null;
-        if (order == null) {
+        if (STATUS_COMPLETED.equals(registrationCase.getStatus())) {
+            code = "already_completed"; reason = "报名履约已完成";
+        } else if (STATUS_CANCELLED.equals(registrationCase.getStatus())) {
+            code = "cancelled"; reason = "报名履约已取消";
+        } else if (order == null) {
             code = COMPLETION_BLOCK_ORDER_NOT_EFFECTIVE; reason = "关联订单不存在，暂时无法完成报名履约";
         } else if (STATUS_PENDING_APPROVAL.equals(order.getStatus())) {
             code = COMPLETION_BLOCK_FINANCE_PENDING; reason = "财务审核通过后才能完成报名履约";

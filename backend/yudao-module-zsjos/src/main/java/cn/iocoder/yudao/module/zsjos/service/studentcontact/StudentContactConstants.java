@@ -10,6 +10,13 @@ public interface StudentContactConstants {
     String ACTION_STUDY_PLAN = "OPEN_STUDENT_STUDY_PLAN";
     String ACTION_CONTACT = "OPEN_STUDENT_CONTACT";
     String ACTION_ASSISTANCE = "OPEN_STUDENT_CONTACT_ASSISTANCE";
+    String CONTEXT_ACTION_ACCEPT = "ACCEPT";
+    String CONTEXT_ACTION_FIRST_CONTACT = "FIRST_CONTACT";
+    String CONTEXT_ACTION_STUDY_PLAN = "STUDY_PLAN";
+    String CONTEXT_ACTION_FOLLOW_UP = "FOLLOW_UP";
+    String CONTEXT_ACTION_EDIT_BASIC_INFO = "EDIT_BASIC_INFO";
+    String CONTEXT_ACTION_ASSIGN_CONTENT_DIRECTOR = "ASSIGN_CONTENT_DIRECTOR";
+    String CONTEXT_ACTION_ASSIGN_CAREER_PLANNER = "ASSIGN_CAREER_PLANNER";
     String COLLABORATOR_DIRECTOR = "content_director";
     String COLLABORATOR_CAREER = "career_planner";
     String RELATION_REGISTRATION_MANAGER_PLANNER = "registration_manager_study_planner";
@@ -25,6 +32,12 @@ public interface StudentContactConstants {
     String PERMISSION_CONFIG = "zsjos:student-contact-config:update";
     String PERMISSION_EXTENSION_REVIEW = "zsjos:student-contact-extension:review";
     String PERMISSION_COLLABORATOR_CORRECT = "zsjos:student-collaborator:correct";
+    String PERMISSION_ACCEPT = "zsjos:student:accept";
+    String PERMISSION_UPDATE_BASIC_INFO = "zsjos:student:update-basic-info";
+    String PERMISSION_FIRST_CONTACT_SUBMIT = "zsjos:student-contact:first-submit";
+    String PERMISSION_STUDY_PLAN_SUBMIT = "zsjos:student-contact:study-plan-submit";
+    String PERMISSION_CONTACT_SUBMIT = "zsjos:student-contact:submit";
+    String PERMISSION_COLLABORATOR_ASSIGN = "zsjos:student-collaborator:assign";
     String NOTIFY_FIRST_CONTACT = "zsjos.student.first_contact_reminder";
     String NOTIFY_STUDY_PLAN = "zsjos.student.study_plan_reminder";
     String NOTIFY_CONTACT = "zsjos.student.contact_reminder";

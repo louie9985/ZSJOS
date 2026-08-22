@@ -221,6 +221,14 @@ the repository's actual relationship tables rather than assuming a one-to-one ma
 `zsjos.user.default-avatar` Infra configuration is only a presentation fallback and is never
 backfilled into user rows.
 
+Employee-avatar uploads use the dedicated `/infra/file/avatar/upload` contract. Infra validates
+the detected image content and approved `system/user/avatar` or `employee/avatar` directory,
+stores the object under an immutable content-derived name, and returns a stable
+`/infra/file/avatar/{fileId}` access URL. Personal and default-avatar records persist that stable
+backend URL; they must not persist private-bucket presigned URLs because those expire. The public
+avatar reader resolves the file through its original `infra_file.config_id`, rejects non-avatar
+directories and non-image records, and does not expose the generic attachment catalog.
+
 ```text
 personal System user avatar
   -> global default employee avatar
@@ -238,6 +246,9 @@ personal System user avatar
   notification and other business-object circles keep their domain-specific presentation.
 - Avatar changes become visible when permission or employee data is fetched again; there is no
   avatar-specific realtime push contract.
+- Historical URL-only avatars remain readable when their original URL is still valid. A new upload
+  replaces them with the stable avatar URL; missing or expired legacy URLs follow the normal
+  personal -> default -> nickname-initial presentation fallback without inventing a file mapping.
 
 ## ZSJOS authorization layers
 
@@ -474,4 +485,5 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - Feature permissions (`query-pool`, `update`, `complete`) and registration object checks are cumulative. Public-pool access is never inferred from role or department. The planner candidate query uses System public APIs and never reads System tables.
 - Completion atomically records checklist facts, one service relation for each order item, and Person identity `student`. My Students is scoped by active service relations plus selected tenant-matched route relations and grouped by Person. `leadNo` remains the only user-visible Lead identifier; for a user who directly owns an active service relation, internal `leadId` is derived from that relation's actual order and may be returned only as the technical link used to load the existing Lead detail. Another Lead that merely shares the Person is never used as a fallback.
 - An active student service owner has a read-only object relationship to the student's Lead. The relationship is checked from `zsjos_service_relation`, never from a role/post/display name, and grants no mutation. Which history tabs appear is independently controlled by the four `zsjos:lead-detail:*` role permissions; the workbench consumes only the server-projected `visibleTabs`.
+- The My Students detail reuses the same Lead detail shell as Lead management while applying a planner-specific projection. When a Person has multiple service relations, each relation resolves its own order-linked Lead and `leadNo`; the client must never use another relation's Lead as a fallback. The planner projection displays成交产品 from the selected order-item snapshot and uses only service-relation contact records for最近联系, contact history, next-contact time and task aging; it does not expose Lead sales follow-up data. The progress surface maps the existing first-contact, study-plan and recurring-contact tasks to首联、制定学习计划、督学, with考试 retained as a future stage until an authoritative exam task contract exists. Before acceptance, the server may project only `ACCEPT`; after acceptance it projects at most one of `FIRST_CONTACT`, `STUDY_PLAN`, or `FOLLOW_UP`, followed by separately authorized identity and collaborator actions. Planner identity updates write only the Person master and a PII-minimized business event, never Lead or order snapshots. Every command remains scoped to the selected `serviceRelationId`; Controller feature permission and object authorization remain cumulative.
 - Registration task creation publishes `zsjos.registration.task_created` through the System notification API. Recipients are the intersection of enabled users with `zsjos:registration:query-pool` and users in the configured registration approval department subtree; administrators outside that center are excluded. Study-planner assignment publishes `zsjos.registration.planner_assigned` directly to the selected planner and renders `leadNo`. Both persisted in-app messages and post-commit WebSocket hints are idempotent by their registration-case event keys. User interfaces consume Chinese label fields while retaining protocol codes internally.

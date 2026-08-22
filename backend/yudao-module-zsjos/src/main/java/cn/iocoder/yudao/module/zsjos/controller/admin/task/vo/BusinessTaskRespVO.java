@@ -20,4 +20,7 @@ public class BusinessTaskRespVO {
     private Boolean overdue;
     private String actionCode;
     private Boolean actionable;
+    private Long serviceRelationId;
+    private String targetTab;
+    private Long targetRecordId;
 }

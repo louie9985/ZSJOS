@@ -17,6 +17,7 @@ public class StudentContactContextRespVO {
     private Integer firstContactTimeoutMinutes;
     private Integer studyPlanTimeoutMinutes;
     private List<String> visibleTabs;
+    private List<String> availableActions;
     private Long contentDirectorUserId;
     private String contentDirectorUserName;
     private Long careerPlannerUserId;

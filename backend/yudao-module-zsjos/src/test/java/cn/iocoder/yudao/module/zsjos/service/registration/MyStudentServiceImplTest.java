@@ -1,7 +1,9 @@
 package cn.iocoder.yudao.module.zsjos.service.registration;
 
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.ZsjosProductCategoryPathNodeVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
@@ -13,6 +15,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +29,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,6 +41,7 @@ class MyStudentServiceImplTest {
     @Mock private LeadMapper leadMapper;
     @Mock private SalesOrderMapper orderMapper;
     @Mock private SalesOrderItemMapper orderItemMapper;
+    @Mock private MediaAccountMapper mediaAccountMapper;
 
     @Test
     void getMyStudentReturnsStructuredCourseRights() {
@@ -95,5 +100,42 @@ class MyStudentServiceImplTest {
         assertEquals("accepted", result.getServices().getFirst().getAcceptanceStatus());
         assertEquals(false, result.getServices().getFirst().getOwner());
         assertEquals(18L, result.getServices().getFirst().getContentDirectorUserId());
+    }
+
+    @Test
+    void getDirectorStudentUsesOnlyContentDirectorRelations() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(21L); relation.setPersonId(22L); relation.setOrderId(23L); relation.setOrderItemId(24L);
+        relation.setStatus("active"); relation.setAcceptanceStatus("pending");
+        relation.setActivatedAt(LocalDateTime.now()); relation.setContentDirectorUserId(28L);
+        PersonDO person = new PersonDO(); person.setId(22L); person.setName("编导负责学员");
+        SalesOrderDO order = new SalesOrderDO(); order.setId(23L); order.setOrderNo("OD202608200001");
+        SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(24L); item.setOrderId(23L);
+
+        when(relationMapper.selectActiveByContentDirectorAndPerson(28L, 22L)).thenReturn(List.of(relation));
+        when(mediaAccountMapper.selectByParticipantAndStudent(28L, 22L)).thenReturn(List.of());
+        when(personMapper.selectById(22L)).thenReturn(person);
+        when(orderMapper.selectBatchIds(Set.of(23L))).thenReturn(List.of(order));
+        when(orderItemMapper.selectBatchIds(Set.of(24L))).thenReturn(List.of(item));
+
+        MyStudentRespVO result = service.getDirectorStudent(28L, 22L);
+
+        assertEquals("编导负责学员", result.getName());
+        assertEquals(28L, result.getServices().getFirst().getContentDirectorUserId());
+        assertEquals("pending", result.getServices().getFirst().getAcceptanceStatus());
+    }
+
+    @Test
+    void getDirectorPageDoesNotTreatMissingAdvancedFilterAsNoMatches() {
+        MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20);
+        when(relationMapper.selectActiveByContentDirector(28L)).thenReturn(List.of());
+        when(mediaAccountMapper.selectParticipantStudentIds(28L)).thenReturn(List.of());
+        when(personMapper.selectStudentPage(reqVO, Set.of(), null)).thenReturn(PageResult.empty());
+
+        PageResult<MyStudentRespVO> result = service.getDirectorPage(28L, reqVO);
+
+        assertEquals(0, result.getTotal());
+        verify(personMapper).selectStudentPage(reqVO, Set.of(), null);
     }
 }

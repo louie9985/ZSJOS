@@ -69,4 +69,15 @@ class RegistrationNotifySceneProviderTest {
         assertEquals(null, variables.get("order.no"));
         assertEquals(null, variables.get("lead.no"));
     }
+
+    @Test
+    void resolvesLeadNumberForPlannerTemplate() {
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().tenantId(1L).bizId(7L)
+                .payload(Map.of("registrationCaseId", 7L, "leadNo", "KZ202608210001"))
+                .build();
+
+        Map<String, Object> variables = provider.resolveVariables(event, NotifyRecipientDTO.admin(241L));
+
+        assertEquals("KZ202608210001", variables.get("lead.no"));
+    }
 }

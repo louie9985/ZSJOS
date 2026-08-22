@@ -128,6 +128,13 @@ Rollback is forward-only: retire the menus/permissions and preserve business fac
 
 V074 follows V073 and adds the Chinese station-message template and enabled default in-app rule for a newly created registration fulfillment task. Delivery recipients are resolved from `zsjos:registration:query-pool` at event processing time, and the existing in-app channel emits its post-commit WebSocket refresh hint. The migration is repeatable, changes no role grants or business rows, and must not be executed without the normal existing-environment approval. Rollback disables untouched V074 rules while preserving notification history.
 
+## V112 registration planner notification template
+
+V112 repairs only the migration-owned `ZSJOS_REGISTRATION_PLANNER_ASSIGNED` template so its
+title, summary, content and parameter list use the registered `lead.no` variable. It preserves
+administrator-owned edits and does not rewrite delivered message snapshots. The migration is
+repeatable and forward-only; verify the exact template contract with `verify-bootstrap.sql`.
+
 ## V075 Lead-created default notification
 
 V075 follows V074 and inserts an enabled `zsjos.lead.created` in-app rule only for non-deleted tenants that have no existing rule for that scene. Its recipients are the Lead source user and the actual event operator, covering the selected new-media provider and submitting salesperson for a sales self-sourced Lead. It does not overwrite enabled or disabled administrator rules, does not create historical messages, and changes no Lead, account, role, permission, or template row. Reruns are idempotent. Rollback is forward-only: disable untouched V075 rules and preserve delivered message history.
@@ -270,3 +277,36 @@ An approved optional module adds its own manifest under
 dependencies. Enable it explicitly in `ZSJOS_DB_MODULES` and build a new application and migrator
 image; it never means rebuilding or clearing the existing database. Removing a
 module does not delete its tables or rows.
+
+## V101 student basic-information permission
+
+V101 follows V100 and adds only the System button permission `zsjos:student:update-basic-info` under
+My Students. On first installation it grants the button to enabled `system_administrator` and
+`study_planner` roles; later reruns do not restore an administrator-removed relation. Runtime access
+also requires the current accepted service owner through `student-service:update-basic-info` object
+authorization. The migration changes no Person, Lead, order, contact, task, event, or historical
+snapshot row. It is additive, repeatable, forward-only, and generated but not executed by this change.
+After separately approved execution, run `verify-bootstrap.sql`; recovery is performed through System
+role permission configuration while retaining the permission definition.
+# V103 new-media operator menu repair
+
+V103 removes menu `7022` (`/zsjos/media-students`) from `new_media_operator` roles. The menu remains
+exclusive to `content_director`; the planner-owned `/zsjos/my-students` menu is unchanged. The migration
+is repeatable and changes no business or audit rows. Applying V103 locally is recorded separately from
+formal/shared-environment rollout.
+
+## V113 media student center consolidation
+
+V113 follows V112 and retires the standalone third-party-account, content-production, and
+account-positioning page menus without deleting their business tables, records, APIs, or stable
+button permission strings. Their operation permissions are reparented beneath
+`/zsjos/media-students`, and enabled `new_media_operator` roles receive that page menu; runtime
+student and object scope remains enforced independently by service relations, account responsibility,
+and current task assignment.
+
+The migration adds versioned third-party-account field definitions, account field-value and label
+snapshot columns, media-student talk records, and the administrator-only field-configuration page.
+It seeds only the system defaults `uid` and `nickname` for enabled tenants, guards fixed menu IDs
+`73500`-`73502` against unrelated ownership, and changes no historical business value or snapshot.
+It is forward-only and repeatable. Applying it to an existing environment requires separate approval;
+after controlled execution, run `verify-bootstrap.sql` and require every V113 check to return `PASS`.

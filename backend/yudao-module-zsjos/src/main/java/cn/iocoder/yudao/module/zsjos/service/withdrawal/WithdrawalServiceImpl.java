@@ -146,7 +146,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
         if (Boolean.TRUE.equals(request.getSaveCard()) && selectedCard == null) saveCard(record);
         BpmProcessInstanceCreateReqDTO process = new BpmProcessInstanceCreateReqDTO();
         process.setProcessDefinitionKey(PROCESS_DEFINITION_KEY); process.setBusinessKey("withdrawal:" + record.getId());
-        process.setVariables(Map.of("withdrawalId", record.getId(), "applicationAmount", amount));
+        process.setVariables(new java.util.HashMap<>(Map.of("withdrawalId", record.getId(), "applicationAmount", amount)));
         process.setStartUserSelectAssignees(Map.of(TASK_DEFINITION_KEY, financeUsers));
         try {
             record.setProcessInstanceId(accountId == null

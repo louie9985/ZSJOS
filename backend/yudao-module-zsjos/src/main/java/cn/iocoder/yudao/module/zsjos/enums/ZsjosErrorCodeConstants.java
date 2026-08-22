@@ -239,4 +239,69 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode STUDENT_COLLABORATOR_ALREADY_ASSIGNED = new ErrorCode(1_900_010_034, "该类协作者已分配，学习规划师不能修改");
     ErrorCode STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED = new ErrorCode(1_900_010_035, "管理员纠正协作者时必须填写原因");
 
+    ErrorCode MEDIA_ACCOUNT_NOT_EXISTS = new ErrorCode(1_900_011_001, "第三方账号不存在");
+    ErrorCode MEDIA_ACCOUNT_STATE_INVALID = new ErrorCode(1_900_011_002, "当前第三方账号状态不允许该操作");
+    ErrorCode MEDIA_ACCOUNT_VERSION_CONFLICT = new ErrorCode(1_900_011_003, "第三方账号已被其他人修改，请刷新后重试");
+    ErrorCode MEDIA_ACCOUNT_PERMISSION_DENIED = new ErrorCode(1_900_011_004, "无权查看或操作该第三方账号");
+    ErrorCode MEDIA_ACCOUNT_STUDENT_INVALID = new ErrorCode(1_900_011_005, "绑定学员不存在或不属于当前租户");
+    ErrorCode MEDIA_ACCOUNT_STAGE_INVALID = new ErrorCode(1_900_011_006, "账号S阶段流转无效");
+    ErrorCode MEDIA_ACCOUNT_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_011_007, "账号操作幂等键已被其他请求使用");
+    ErrorCode MEDIA_ACCOUNT_STAGE_BASIS_REQUIRED = new ErrorCode(1_900_011_008, "请填写账号阶段判断依据");
+    ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_INVALID = new ErrorCode(1_900_011_009, "第三方账号字段配置或字段值无效");
+    ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_NOT_PUBLISHED = new ErrorCode(1_900_011_010, "第三方账号字段配置尚未发布");
+    ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_011_011, "第三方账号字段配置已变化，请刷新后重试");
+    ErrorCode MEDIA_REBIND_REVIEWER_INVALID = new ErrorCode(1_900_011_009, "账号换绑审批人未配置或不可用");
+    ErrorCode MEDIA_REBIND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_011_008, "账号换绑流程尚未部署或暂不可用");
+
+    ErrorCode CONTENT_NOT_EXISTS = new ErrorCode(1_900_012_001, "内容不存在");
+    ErrorCode CONTENT_STATE_INVALID = new ErrorCode(1_900_012_002, "当前内容状态不允许该操作");
+    ErrorCode CONTENT_VERSION_CONFLICT = new ErrorCode(1_900_012_003, "内容已被其他人修改，请刷新后重试");
+    ErrorCode CONTENT_PERMISSION_DENIED = new ErrorCode(1_900_012_004, "无权查看或操作该内容");
+    ErrorCode CONTENT_ACCOUNT_INVALID = new ErrorCode(1_900_012_005, "内容关联的第三方账号不存在或不属于当前租户");
+    ErrorCode CONTENT_VERSION_NOT_EXISTS = new ErrorCode(1_900_012_006, "内容版本不存在");
+    ErrorCode CONTENT_VERSION_STAGE_INVALID = new ErrorCode(1_900_012_007, "内容版本阶段不允许该操作");
+    ErrorCode CONTENT_VERSION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_012_008, "内容版本提交幂等键已被使用");
+    ErrorCode CONTENT_REJECT_REASON_REQUIRED = new ErrorCode(1_900_012_009, "内容验收退回原因不能为空且不能超过 500 个字符");
+
+    ErrorCode PRODUCTION_TICKET_NOT_EXISTS = new ErrorCode(1_900_013_001, "拍剪工单不存在");
+    ErrorCode PRODUCTION_TICKET_STATE_INVALID = new ErrorCode(1_900_013_002, "当前拍剪工单状态不允许该操作");
+    ErrorCode PRODUCTION_TICKET_VERSION_CONFLICT = new ErrorCode(1_900_013_003, "拍剪工单已被其他人修改，请刷新后重试");
+    ErrorCode PRODUCTION_TICKET_PERMISSION_DENIED = new ErrorCode(1_900_013_004, "无权查看或操作该拍剪工单");
+    ErrorCode PRODUCTION_TICKET_REVISION_LIMIT = new ErrorCode(1_900_013_005, "拍剪工单已达到最大返工次数");
+    ErrorCode PRODUCTION_TICKET_ENTITLEMENT_HANDLING_REQUIRED = new ErrorCode(1_900_013_006, "超权益工单必须选择审批、收费或学员自制");
+    ErrorCode PRODUCTION_TICKET_REFERENCE_INVALID = new ErrorCode(1_900_013_007, "拍剪工单关联账号或责任人不存在");
+    ErrorCode PRODUCTION_TICKET_REJECT_REASON_REQUIRED = new ErrorCode(1_900_013_008, "拍剪工单返工原因不能为空且不能超过 500 个字符");
+
+    ErrorCode POSITIONING_CARD_NOT_EXISTS = new ErrorCode(1_900_014_001, "定位卡不存在");
+    ErrorCode POSITIONING_CARD_STATE_INVALID = new ErrorCode(1_900_014_002, "当前定位卡状态不允许该操作");
+    ErrorCode POSITIONING_CARD_VERSION_CONFLICT = new ErrorCode(1_900_014_003, "定位卡已被其他人修改，请刷新后重试");
+    ErrorCode POSITIONING_CARD_PERMISSION_DENIED = new ErrorCode(1_900_014_004, "无权查看或操作该定位卡");
+    ErrorCode POSITIONING_IP_PROCESS_UNAVAILABLE = new ErrorCode(1_900_014_005, "IP专业审核流程尚未部署、无有效审批人或暂不可用");
+    ErrorCode POSITIONING_PARTNER_ACCOUNT_REQUIRED = new ErrorCode(1_900_014_006, "学员尚未开通兼职账号，无法推送定位确认");
+    ErrorCode PARTNER_STUDENT_LINK_CONFLICT = new ErrorCode(1_900_014_007, "兼职账号或学员已绑定其他身份");
+    ErrorCode POSITIONING_REFERENCE_INVALID = new ErrorCode(1_900_014_008, "定位卡关联账号或学员不存在或不属于当前租户");
+    ErrorCode PARTNER_STUDENT_REFERENCE_INVALID = new ErrorCode(1_900_014_009, "兼职主体或学员不存在或不属于当前租户");
+
+    ErrorCode MEDIA_CONFIG_INVALID = new ErrorCode(1_900_015_001, "新媒体工作流配置尚未正确发布");
+    ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
+    ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
+
+    ErrorCode HANDOVER_NOT_EXISTS = new ErrorCode(1_900_016_001, "交接单不存在");
+    ErrorCode HANDOVER_STATE_INVALID = new ErrorCode(1_900_016_002, "当前交接单状态不允许该操作");
+    ErrorCode HANDOVER_VERSION_CONFLICT = new ErrorCode(1_900_016_003, "交接单已被其他人修改，请刷新后重试");
+    ErrorCode HANDOVER_PERMISSION_DENIED = new ErrorCode(1_900_016_004, "无权查看或处理该交接单");
+    ErrorCode HANDOVER_SUPERVISOR_INVALID = new ErrorCode(1_900_016_005, "交接发起人直属部门负责人未配置、已停用或为本人");
+    ErrorCode MEDIA_REVIEW_NOT_EXISTS = new ErrorCode(1_900_017_001, "复盘报告不存在");
+    ErrorCode MEDIA_REVIEW_STATE_INVALID = new ErrorCode(1_900_017_002, "当前复盘状态不允许该操作");
+    ErrorCode MEDIA_REVIEW_VERSION_CONFLICT = new ErrorCode(1_900_017_003, "复盘报告已被其他人修改，请刷新后重试");
+    ErrorCode MEDIA_REVIEW_SUPERVISOR_INVALID = new ErrorCode(1_900_017_004, "复盘作者直属部门负责人未配置、已停用或为本人");
+    ErrorCode MEDIA_REVIEW_REASON_REQUIRED = new ErrorCode(1_900_017_005, "复盘退回原因不能为空且不能超过 500 个字符");
+    ErrorCode MEDIA_EXCEPTION_NOT_EXISTS = new ErrorCode(1_900_018_001, "异常工单不存在");
+    ErrorCode MEDIA_EXCEPTION_STATE_INVALID = new ErrorCode(1_900_018_002, "当前异常工单状态不允许该操作");
+    ErrorCode MEDIA_EXCEPTION_VERSION_CONFLICT = new ErrorCode(1_900_018_003, "异常工单已被其他人修改，请刷新后重试");
+    ErrorCode MEDIA_GRADUATION_PROCESS_UNAVAILABLE = new ErrorCode(1_900_018_004, "学员结业流程尚未部署或暂不可用");
+    ErrorCode MEDIA_GRADUATION_NOT_EXISTS = new ErrorCode(1_900_018_005, "学员结业申请不存在");
+    ErrorCode MEDIA_GRADUATION_STATE_INVALID = new ErrorCode(1_900_018_006, "当前结业申请状态不允许该操作");
+    ErrorCode MEDIA_GRADUATION_SUPERVISOR_INVALID = new ErrorCode(1_900_018_007, "学习规划师直属部门负责人未配置、已停用或为本人");
+
 }

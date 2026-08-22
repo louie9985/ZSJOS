@@ -77,8 +77,18 @@ SOURCE script/sql/mysql/migrations/V092__subordinate_sales_pause_all_permission.
 SOURCE script/sql/mysql/migrations/V093__sales_order_supervisor_notifications.sql;
 SOURCE script/sql/mysql/migrations/V094__student_contact_chain.sql;
 SOURCE script/sql/mysql/migrations/V095__student_contact_extension_bpm_form.sql;
+SOURCE script/sql/mysql/migrations/V096__new_media_content_workflow_schema.sql;
+SOURCE script/sql/mysql/migrations/V097__new_media_workflow_menu_permissions.sql;
+SOURCE script/sql/mysql/migrations/V098__partner_student_identity_link.sql;
+SOURCE script/sql/mysql/migrations/V099__positioning_student_confirm_permission.sql;
+SOURCE script/sql/mysql/migrations/V100__new_media_role_menu_permissions.sql;
+SOURCE script/sql/mysql/migrations/V101__student_basic_info_permission.sql;
+SOURCE script/sql/mysql/migrations/V102__new_media_business_notifications.sql;
+SOURCE script/sql/mysql/migrations/V103__repair_new_media_operator_director_menu.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
+SOURCE script/sql/mysql/migrations/V112__repair_registration_planner_notification_template.sql;
+SOURCE script/sql/mysql/migrations/V113__media_student_center_consolidation.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

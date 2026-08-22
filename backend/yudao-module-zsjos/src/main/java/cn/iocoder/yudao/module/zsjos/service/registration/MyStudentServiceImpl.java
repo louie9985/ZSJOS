@@ -15,7 +15,10 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
@@ -38,6 +41,8 @@ public class MyStudentServiceImpl implements MyStudentService {
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SalesOrderItemMapper orderItemMapper;
     @Resource private AdvancedFilterService advancedFilterService;
+    @Resource private AdminUserApi adminUserApi;
+    @Resource private MediaAccountMapper mediaAccountMapper;
 
     @Override
     public PageResult<MyStudentRespVO> getMyPage(Long userId, MyStudentPageReqVO reqVO) {
@@ -50,11 +55,49 @@ public class MyStudentServiceImpl implements MyStudentService {
     }
 
     @Override
+    public PageResult<MyStudentRespVO> getMediaPage(Long userId, MyStudentPageReqVO reqVO) {
+        Map<Long, ServiceRelationDO> visibleRelations = new LinkedHashMap<>();
+        relationMapper.selectActiveByContentDirector(userId).forEach(row -> visibleRelations.put(row.getId(), row));
+        relationMapper.selectActiveByPersonIds(mediaAccountMapper.selectParticipantStudentIds(userId))
+                .forEach(row -> visibleRelations.put(row.getId(), row));
+        Map<Long, List<ServiceRelationDO>> groups = visibleRelations.values().stream()
+                .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
+        PageResult<PersonDO> people = personMapper.selectStudentPage(reqVO, groups.keySet(), null);
+        return new PageResult<>(people.getList().stream()
+                .map(person -> convert(userId, person.getId(), groups.get(person.getId())))
+                .toList(), people.getTotal());
+    }
+
+    @Override
+    public PageResult<MyStudentRespVO> getDirectorPage(Long userId, MyStudentPageReqVO reqVO) {
+        return getMediaPage(userId, reqVO);
+    }
+
+    @Override
     @ZsjosPermission(bizType = "student", bizId = "#personId", action = "read")
     public MyStudentRespVO getMyStudent(Long userId, Long personId) {
         List<ServiceRelationDO> relations = selectAssignedRelationsForPerson(userId, personId);
         if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
         return convert(userId, personId, relations);
+    }
+
+    @Override
+    public MyStudentRespVO getMediaStudent(Long userId, Long personId) {
+        Map<Long, ServiceRelationDO> visibleRelations = new LinkedHashMap<>();
+        relationMapper.selectActiveByContentDirectorAndPerson(userId, personId)
+                .forEach(row -> visibleRelations.put(row.getId(), row));
+        if (!mediaAccountMapper.selectByParticipantAndStudent(userId, personId).isEmpty()) {
+            relationMapper.selectActiveByPersonIds(List.of(personId))
+                    .forEach(row -> visibleRelations.put(row.getId(), row));
+        }
+        List<ServiceRelationDO> relations = new ArrayList<>(visibleRelations.values());
+        if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
+        return convert(userId, personId, relations);
+    }
+
+    @Override
+    public MyStudentRespVO getDirectorStudent(Long userId, Long personId) {
+        return getMediaStudent(userId, personId);
     }
 
     @Override
@@ -96,6 +139,14 @@ public class MyStudentServiceImpl implements MyStudentService {
         Set<Long> itemIds = relations.stream().map(ServiceRelationDO::getOrderItemId).collect(Collectors.toSet());
         Map<Long, SalesOrderItemDO> items = orderItemMapper.selectBatchIds(itemIds).stream()
                 .collect(Collectors.toMap(SalesOrderItemDO::getId, Function.identity()));
+        Set<Long> collaboratorIds = relations.stream()
+                .flatMap(relation -> java.util.stream.Stream.of(relation.getContentDirectorUserId(), relation.getCareerPlannerUserId()))
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, AdminUserRespDTO> collaborators = collaboratorIds.isEmpty() || adminUserApi == null ? Map.of() : Optional.ofNullable(adminUserApi.getUserMap(collaboratorIds)).orElseGet(Map::of);
+        Set<Long> leadIds = orders.values().stream().map(SalesOrderDO::getLeadId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        Map<Long, LeadDO> leads = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
         MyStudentRespVO result = new MyStudentRespVO();
         result.setPersonId(personId);
         Long relatedLeadId = relations.stream().map(relation -> orders.get(relation.getOrderId()))
@@ -113,13 +164,20 @@ public class MyStudentServiceImpl implements MyStudentService {
             MyStudentRespVO.ServiceVO row = new MyStudentRespVO.ServiceVO();
             row.setServiceRelationId(relation.getId()); row.setOrderId(relation.getOrderId()); row.setOrderItemId(relation.getOrderItemId());
             SalesOrderDO order = orders.get(relation.getOrderId()); SalesOrderItemDO item = items.get(relation.getOrderItemId());
+            LeadDO serviceLead = order == null || order.getLeadId() == null ? null : leads.get(order.getLeadId());
+            row.setLeadId(serviceLead == null ? null : serviceLead.getId());
+            row.setLeadNo(serviceLead == null ? null : serviceLead.getLeadNo());
             row.setOrderNo(order == null ? null : order.getOrderNo());
             populateCourseRights(row, item == null ? relation.getServiceSnapshot() : item.getProductSnapshot());
             row.setStatus(relation.getStatus()); row.setActivatedAt(relation.getActivatedAt());
             row.setAcceptanceStatus(relation.getAcceptanceStatus()); row.setAcceptedAt(relation.getAcceptedAt());
             row.setVersion(relation.getVersion()); row.setOwner(Objects.equals(userId, relation.getOwnerUserId()));
             row.setContentDirectorUserId(relation.getContentDirectorUserId());
+            AdminUserRespDTO director = relation.getContentDirectorUserId() == null ? null : collaborators.get(relation.getContentDirectorUserId());
+            row.setContentDirectorUserName(director == null ? null : director.getNickname());
             row.setCareerPlannerUserId(relation.getCareerPlannerUserId());
+            AdminUserRespDTO planner = relation.getCareerPlannerUserId() == null ? null : collaborators.get(relation.getCareerPlannerUserId());
+            row.setCareerPlannerUserName(planner == null ? null : planner.getNickname());
             return row;
         }).toList());
         return result;

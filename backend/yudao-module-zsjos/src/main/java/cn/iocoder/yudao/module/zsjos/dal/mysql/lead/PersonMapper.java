@@ -3,7 +3,7 @@ package cn.iocoder.yudao.module.zsjos.dal.mysql.lead;
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
+import cn.iocoder.yudao.framework.mybatis.core.query.QueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentPageReqVO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -28,20 +28,32 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
 
     default PageResult<PersonDO> selectStudentPage(MyStudentPageReqVO reqVO, java.util.Collection<Long> visibleIds,
                                                    java.util.Collection<Long> matchedIds) {
-        LambdaQueryWrapperX<PersonDO> query = new LambdaQueryWrapperX<>();
-        if (visibleIds == null || visibleIds.isEmpty()) query.eq(PersonDO::getId, -1L);
-        else query.in(PersonDO::getId, visibleIds);
+        QueryWrapperX<PersonDO> query = new QueryWrapperX<>();
+        if (visibleIds == null || visibleIds.isEmpty()) query.eq("id", -1L);
+        else query.in("id", visibleIds);
         if (matchedIds != null) {
-            if (matchedIds.isEmpty()) query.eq(PersonDO::getId, -1L);
-            else query.in(PersonDO::getId, matchedIds);
+            if (matchedIds.isEmpty()) query.eq("id", -1L);
+            else query.in("id", matchedIds);
         }
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) {
             String keyword = reqVO.getKeyword().trim();
-            query.and(value -> value.like(PersonDO::getName, keyword).or().like(PersonDO::getMobile, keyword)
-                    .or().like(PersonDO::getWechatId, keyword)
+            query.and(value -> value.like("name", keyword).or().like("mobile", keyword)
+                    .or().like("wechat_id", keyword)
                     .or().apply("EXISTS (SELECT 1 FROM zsjos_lead sl WHERE sl.person_id=zsjos_person.id "
                             + "AND sl.deleted=b'0' AND sl.lead_no LIKE CONCAT('%',{0},'%'))", keyword));
         }
-        return selectPage(reqVO, query.orderByDesc(PersonDO::getId));
+        String lastActivity = "GREATEST(COALESCE(zsjos_person.update_time,'1970-01-01'),"
+                + "COALESCE((SELECT MAX(sr.update_time) FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
+                + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0'),'1970-01-01'),"
+                + "COALESCE((SELECT MAX(ma.update_time) FROM zsjos_media_account ma WHERE ma.student_person_id=zsjos_person.id "
+                + "AND ma.tenant_id=zsjos_person.tenant_id AND ma.deleted=b'0'),'1970-01-01'),"
+                + "COALESCE((SELECT MAX(mc.update_time) FROM zsjos_content mc JOIN zsjos_media_account ma2 ON ma2.id=mc.account_id "
+                + "AND ma2.tenant_id=mc.tenant_id AND ma2.deleted=b'0' WHERE ma2.student_person_id=zsjos_person.id "
+                + "AND mc.tenant_id=zsjos_person.tenant_id AND mc.deleted=b'0'),'1970-01-01'),"
+                + "COALESCE((SELECT MAX(pc.update_time) FROM zsjos_positioning_card pc WHERE pc.student_person_id=zsjos_person.id "
+                + "AND pc.tenant_id=zsjos_person.tenant_id AND pc.deleted=b'0'),'1970-01-01'),"
+                + "COALESCE((SELECT MAX(tr.update_time) FROM zsjos_media_student_talk_record tr WHERE tr.student_person_id=zsjos_person.id "
+                + "AND tr.tenant_id=zsjos_person.tenant_id AND tr.deleted=b'0'),'1970-01-01'))";
+        return selectPage(reqVO, query.orderByDesc(lastActivity).orderByDesc("id"));
     }
 }

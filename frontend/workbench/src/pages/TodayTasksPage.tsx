@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, App, Button, Empty, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Empty, Input, Modal, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type BpmTask, type BusinessTask, type BusinessTaskBucket, type PageResult } from '../services/api'
@@ -60,6 +60,13 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
     }
     if (task.actionCode === 'OPEN_SALES_ORDER_REVISION') {
       navigate(`${APP_ROUTES.MY_SALES_ORDERS}?orderId=${task.bizId}`)
+      return
+    }
+    if (task.actionCode?.startsWith('OPEN_STUDENT_') && task.serviceRelationId) {
+      navigate(APP_ROUTES.MY_STUDENTS, {
+        state: { serviceRelationId: task.serviceRelationId, openContactTask: true,
+          taskId: task.targetRecordId, taskType: task.taskType }
+      })
       return
     }
     if (task.actionCode === 'OPEN_WORK_PLAN_ITEM' || task.actionCode === 'REVIEW_WORK_PLAN_ITEM') {
@@ -173,6 +180,9 @@ function BpmTaskPanel() {
   const [page, setPage] = useState<PageResult<BpmTask>>({ list: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [decisionTask, setDecisionTask] = useState<BpmTask>()
+  const [decisionReason, setDecisionReason] = useState('')
+  const [deciding, setDeciding] = useState(false)
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -199,8 +209,27 @@ function BpmTaskPanel() {
       if (target.confirmationId) params.set('confirmationId', String(target.confirmationId))
       navigate(`${APP_ROUTES.SALES_ORDER_APPROVALS}?${params}`)
     } catch {
-      navigate(`${APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(task.id)}`)
-      message.warning('该任务暂不能在成交审批页定位，已打开通用审批页')
+      setDecisionTask(task)
+      setDecisionReason('')
+    }
+  }
+  const decide = async (approved: boolean) => {
+    if (!decisionTask || !decisionReason.trim()) {
+      message.warning('请填写审批意见')
+      return
+    }
+    setDeciding(true)
+    try {
+      if (approved) await api.approveBpmTask(decisionTask.id, decisionReason.trim())
+      else await api.rejectBpmTask(decisionTask.id, decisionReason.trim())
+      message.success(approved ? '审批已通过' : '审批已驳回')
+      setDecisionTask(undefined)
+      setDecisionReason('')
+      await load()
+    } catch (decisionError) {
+      message.error(errorText(decisionError, '审批失败'))
+    } finally {
+      setDeciding(false)
     }
   }
   return (
@@ -264,6 +293,21 @@ function BpmTaskPanel() {
           {page.total > PAGE_SIZE && <Pagination size="small" current={pageNo} pageSize={PAGE_SIZE} total={page.total} showSizeChanger={false} onChange={setPageNo} />}
         </>
       )}
+      <Modal
+        title={decisionTask?.processInstance?.name || decisionTask?.name || '流程审批'}
+        open={Boolean(decisionTask)}
+        onCancel={() => !deciding && setDecisionTask(undefined)}
+        footer={[
+          <Button key="reject" danger loading={deciding} onClick={() => void decide(false)}>驳回</Button>,
+          <Button key="approve" type="primary" loading={deciding} onClick={() => void decide(true)}>通过</Button>
+        ]}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Typography.Text type="secondary">当前节点：{decisionTask?.name || '-'}</Typography.Text>
+          <Input.TextArea value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)}
+            placeholder="请输入审批意见" autoSize={{ minRows: 3, maxRows: 6 }} maxLength={1000} showCount />
+        </Space>
+      </Modal>
     </section>
   )
 }

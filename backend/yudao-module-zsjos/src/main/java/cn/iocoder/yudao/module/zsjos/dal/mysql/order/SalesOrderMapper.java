@@ -79,7 +79,7 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (matchedOrderIds != null) {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
         }
-        query.orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId);
+        query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
         return selectPage(reqVO, query);
     }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
@@ -103,10 +103,10 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
         }
         if (cursorTime != null && cursorId != null) {
-            query.and(wrapper -> wrapper.lt(SalesOrderDO::getSubmittedAt, cursorTime)
-                    .or(nested -> nested.eq(SalesOrderDO::getSubmittedAt, cursorTime).lt(SalesOrderDO::getId, cursorId)));
+            query.and(wrapper -> wrapper.lt(SalesOrderDO::getUpdateTime, cursorTime)
+                    .or(nested -> nested.eq(SalesOrderDO::getUpdateTime, cursorTime).lt(SalesOrderDO::getId, cursorId)));
         }
-        return selectList(query.orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId)
+        return selectList(query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId)
                 .last("LIMIT " + limit));
     }
     default PageResult<SalesOrderDO> selectFinanceExportPage(FinanceOrderExportReqVO reqVO,

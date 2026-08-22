@@ -1,12 +1,14 @@
 package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 
 import cn.hutool.crypto.digest.DigestUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
@@ -21,15 +23,22 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentRelationDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
+import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -60,6 +69,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private BusinessTaskMapper taskMapper;
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private SalesOrderMapper orderMapper;
+    @Resource private LeadMapper leadMapper;
     @Resource private LeadAssignmentRelationMapper userRelationMapper;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
@@ -67,6 +77,10 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private DictDataApi dictDataApi;
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private FileApi fileApi;
+    @Resource private PersonMapper personMapper;
+    @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private BusinessEventMapper eventMapper;
+    @Resource private StudentContactNotifyPublisher studentContactNotifyPublisher;
 
     @Override
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
@@ -91,6 +105,44 @@ public class StudentContactServiceImpl implements StudentContactService {
             if (configured instanceof Collection<?> values) values.stream().map(String::valueOf).forEach(visible::add);
             result.setVisibleTabs(visible);
         }
+        List<String> availableActions = new ArrayList<>();
+        boolean accepted = "accepted".equals(relation.getAcceptanceStatus());
+        if (owner && !accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_ACCEPT)) {
+            availableActions.add(CONTEXT_ACTION_ACCEPT);
+        }
+        if (owner && accepted && task != null && "pending".equals(task.getStatus())) {
+            String permission = switch (task.getTaskType()) {
+                case TYPE_FIRST_CONTACT -> PERMISSION_FIRST_CONTACT_SUBMIT;
+                case TYPE_STUDY_PLAN -> PERMISSION_STUDY_PLAN_SUBMIT;
+                case TYPE_CONTACT -> PERMISSION_CONTACT_SUBMIT;
+                default -> null;
+            };
+            String action = switch (task.getTaskType()) {
+                case TYPE_FIRST_CONTACT -> CONTEXT_ACTION_FIRST_CONTACT;
+                case TYPE_STUDY_PLAN -> CONTEXT_ACTION_STUDY_PLAN;
+                case TYPE_CONTACT -> CONTEXT_ACTION_FOLLOW_UP;
+                default -> null;
+            };
+            if (permission != null && action != null && permissionApi.hasAnyPermissions(userId, permission)) {
+                availableActions.add(action);
+            }
+        }
+        if (owner && accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_BASIC_INFO)) {
+            availableActions.add(CONTEXT_ACTION_EDIT_BASIC_INFO);
+        }
+        boolean canAssign = accepted
+                && ((owner && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN))
+                || permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT));
+        boolean ownerCanAssign = owner && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
+        if (canAssign && (relation.getContentDirectorUserId() == null
+                || ownerCanAssign || permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT))) {
+            availableActions.add(CONTEXT_ACTION_ASSIGN_CONTENT_DIRECTOR);
+        }
+        if (canAssign && (relation.getCareerPlannerUserId() == null
+                || ownerCanAssign || permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT))) {
+            availableActions.add(CONTEXT_ACTION_ASSIGN_CAREER_PLANNER);
+        }
+        result.setAvailableActions(availableActions);
         if (task != null) {
             StudentContactContextRespVO.CurrentTaskVO row = new StudentContactContextRespVO.CurrentTaskVO();
             row.setId(task.getId()); row.setType(task.getTaskType()); row.setStatus(task.getStatus()); row.setDueAt(task.getDueAt());
@@ -137,6 +189,41 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         createTask(relation, TYPE_FIRST_CONTACT, now.plusMinutes(config.getFirstContactTimeoutMinutes()),
                 "student-contact:accept:" + relationId, config.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "update-basic-info")
+    public void updateBasicInfo(Long relationId, StudentBasicInfoUpdateReqVO request, Long userId) {
+        ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
+        String name = request.getName().trim();
+        String mobile = StrUtil.trimToNull(request.getMobile());
+        String wechatId = StrUtil.trimToNull(request.getWechatId());
+        if (mobile == null && wechatId == null) throw exception(LEAD_CONTACT_REQUIRED);
+        if (mobile != null && !ValidationUtils.isMobile(mobile)) throw exception(LEAD_MOBILE_INVALID);
+
+        PersonDO before = personMapper.selectById(relation.getPersonId());
+        if (before == null) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        List<String> changedFields = new ArrayList<>();
+        if (!Objects.equals(before.getName(), name)) changedFields.add("name");
+        if (!Objects.equals(before.getMobile(), mobile)) changedFields.add("mobile");
+        if (!Objects.equals(before.getWechatId(), wechatId)) changedFields.add("wechatId");
+        personIdentityWriteService.update(relation.getPersonId(), name, mobile, wechatId);
+
+        BusinessEventDO event = new BusinessEventDO();
+        event.setEventType("student_basic_info_updated");
+        event.setAggregateType(BIZ_TYPE);
+        event.setAggregateId(relationId);
+        event.setOperatorUserId(userId);
+        event.setReason(request.getReason().trim());
+        event.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of(
+                "serviceRelationId", relationId,
+                "personId", relation.getPersonId(),
+                "changedFields", changedFields)));
+        event.setOccurredAt(LocalDateTime.now());
+        event.setIdempotencyKey("student-basic-info:" + UUID.randomUUID());
+        eventMapper.insert(event);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -226,7 +313,8 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
-        if (!owner && !correction) throw exception(STUDENT_PERMISSION_DENIED);
+        boolean assign = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
+        if ((!owner || !assign) && !correction) throw exception(STUDENT_PERMISSION_DENIED);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String scene = scene(type);
         if (scene == null) throw exception(STUDENT_COLLABORATOR_INVALID);
@@ -246,7 +334,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
-        if (!owner && !correction || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
+        boolean assign = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
+        boolean ownerCanAssign = owner && assign;
+        if (!ownerCanAssign && !correction || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
         StudentCollaboratorAssignmentLogDO replay = assignmentLogMapper.selectByIdempotencyKey(request.getIdempotencyKey());
         if (replay != null) {
             if (!Objects.equals(replay.getServiceRelationId(), relationId)
@@ -257,7 +347,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         Long previous = COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())
                 ? relation.getContentDirectorUserId() : relation.getCareerPlannerUserId();
-        if (previous != null && !correction) throw exception(STUDENT_COLLABORATOR_ALREADY_ASSIGNED);
+        if (previous != null && !ownerCanAssign && !correction) throw exception(STUDENT_COLLABORATOR_ALREADY_ASSIGNED);
         if (previous != null && (request.getCorrectionReason() == null || request.getCorrectionReason().isBlank())) {
             throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
         }
@@ -272,6 +362,21 @@ public class StudentContactServiceImpl implements StudentContactService {
         log.setServiceRelationId(relationId); log.setCollaboratorType(request.getCollaboratorType());
         log.setPreviousUserId(previous); log.setAssignedUserId(request.getUserId()); log.setOperatorUserId(userId);
         log.setReason(request.getCorrectionReason()); log.setIdempotencyKey(request.getIdempotencyKey()); assignmentLogMapper.insert(log);
+        if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) {
+            SalesOrderDO order = orderMapper.selectById(relation.getOrderId());
+            LeadDO lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
+            PersonDO student = personMapper.selectById(relation.getPersonId());
+            Map<String, Object> context = new LinkedHashMap<>();
+            context.put("registrationCaseId", relation.getRegistrationCaseId());
+            context.put("orderNo", order == null ? "" : order.getOrderNo());
+            context.put("leadNo", lead == null || lead.getLeadNo() == null ? "" : lead.getLeadNo());
+            context.put("studentName", student == null || student.getName() == null ? "" : student.getName());
+            context.put("contentDirectorUserId", request.getUserId());
+            studentContactNotifyPublisher.publish(
+                    cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.NOTIFY_SCENE_DIRECTOR_ASSIGNED,
+                    relationId, "student-director-assigned:" + relationId + ":" + relation.getVersion()
+                            + ":" + request.getUserId(), null, LocalDateTime.now(), context);
+        }
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -368,7 +473,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         extension.setIdempotencyKey(idempotencyKey); extension.setVersion(0); extensionMapper.insert(extension);
         BpmProcessInstanceCreateReqDTO process = new BpmProcessInstanceCreateReqDTO();
         process.setProcessDefinitionKey(PROCESS_EXTENSION); process.setBusinessKey("student-contact-extension:" + extension.getId());
-        process.setVariables(Map.of(
+        process.setVariables(new java.util.HashMap<>(Map.of(
                 "extensionId", extension.getId(),
                 "serviceRelationId", relation.getId(),
                 "originalDueAt", originalDueAt.toString(),
@@ -378,7 +483,7 @@ public class StudentContactServiceImpl implements StudentContactService {
                 "description", extension.getDescription(),
                 "attachmentFileIds", extension.getAttachmentFileIdsJson(),
                 "applicantUserId", extension.getApplicantUserId(),
-                "submittedAt", extension.getSubmittedAt().toString()));
+                "submittedAt", extension.getSubmittedAt().toString())));
         process.setStartUserSelectAssignees(Map.of(TASK_EXTENSION_REVIEW, List.of(reviewer)));
         try { extension.setProcessInstanceId(processInstanceApi.createProcessInstance(applicant, process)); }
         catch (RuntimeException ex) {

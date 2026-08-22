@@ -53,6 +53,7 @@ public class RegistrationNotifyPublisher {
         payload.put("registrationCaseId", registrationCase.getId());
         payload.put("orderNo", order == null ? "" : order.getOrderNo());
         payload.put("leadNo", leadNo == null ? "" : leadNo);
+        payload.put("studentName", order == null || order.getStudentName() == null ? "" : order.getStudentName());
         payload.put("contentDirectorUserId", directorUserId);
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
                 .tenantId(TenantContextHolder.getRequiredTenantId())

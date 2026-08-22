@@ -1,5 +1,60 @@
 # Main Workstream
 
+## Delivery Entry 2026-08-21 18:08 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Repair `ZSJOS_REGISTRATION_PLANNER_ASSIGNED` so the notification template can render the Lead business number through `lead.no`.
+- Key decisions: Preserve the existing event-to-scene `leadNo` mapping; repair only the V082 migration-owned template when it is still owned by the known migration chain; standardize title, summary and content as `客资{{lead.no}}已分配给你。`; do not overwrite administrator edits or historical message snapshots; do not execute the migration against an existing database without separate confirmation.
+- Execution or analysis result: Added repeatable V112 template repair, bootstrap ordering, an exact read-only verification query, migration documentation, and focused regression coverage proving payload `leadNo` resolves to template variable `lead.no`.
+- Changed files: `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationNotifySceneProviderTest.java`; `script/sql/mysql/migrations/V112__repair_registration_planner_notification_template.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; this handoff file.
+- Verification evidence: `RegistrationNotifySceneProviderTest` and `RegistrationNotifyPublisherTest` passed 8/8 with Maven; bootstrap places V112 after the legacy V012/V013 compatibility entries; focused scans confirmed the exact `lead.no` contract; `git diff --check` passed with only pre-existing line-ending warnings.
+- Dependency or integration impact: No new dependency, permission, recipient, event, or runtime API change. Existing environments must apply V112 separately before the stored template changes; no database or service state was changed in this turn.
+- Remaining work: With separate confirmation, apply V112 to the intended local environment, run `verify-bootstrap.sql`, restart/reload the affected runtime if required, and trigger a new planner assignment to verify the rendered station message. Historical messages remain unchanged.
+
+## Active delivery: new-media content production workflow
+
+- Workstream ID: `main-new-media-content-workflow`
+- Goal: implement and continuously verify the confirmed new-media workflow from sales/approval/registration through study planner, content director, operator, filming editor and Partner H5, including the approved student-center consolidation, business tasks, notifications, data scope and audit evidence
+- Non-goals: social-platform synchronization, automatic CPL attribution, paid traffic, WeCom/SMS delivery, management dashboards, AI-generated interview processing, production/shared-environment changes, destructive test-data cleanup, branch/commit/push operations, or resolving real-world duplicate social-account ownership
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- Target branch: `main`
+- Ownership scope: additive ZSJOS media-account/content/production/positioning/handover/growth/config persistence and APIs; registration fulfillment configuration/completion guards; business-task target projection; user-relation removal behavior; focused reuse of business tasks, work plans, business events, System dictionaries/users/departments/notifications, and BPM public APIs; additive V096+ migrations and versioned BPM assets; Workbench student-center routes/services/pages/styles and Vue administrator configuration; Partner H5 positioning confirmation; authenticated localhost end-to-end test records; notification scenes, publishers, local tenant rules and delivery evidence; directly affected tests and architecture/API/navigation/migration documentation; this handoff record. Existing unrelated changes, including the active avatar-storage work, remain preserved.
+- Owner: Codex `/root`
+- Dependencies: existing Person/Partner identity, System dictionary/menu/permission/user/department APIs, ZSJOS object-permission/task/event/work-plan facilities, BPM public process/event boundary, Infra file API, React Workbench, Vue administration frontend, and Partner H5; no new library dependency planned
+- Integration order: schema and domain contracts -> versioned tenant configuration -> permissions/state machines/tasks/events -> BPM assets and listeners -> controllers/notifications -> menu/routes and employee UI -> Partner H5 confirmation -> documentation and end-to-end verification
+- Verification plan: authenticated role/menu baseline; real browser state transitions and message checks after every actionable/result transition; outbox, message, task, event and BPM evidence; migration syntax/repeatability/static checks; focused and full ZSJOS tests; Workbench/H5 tests, typecheck, build and desktop/mobile checks; server assembly; scoped diff and handoff delivery evidence
+- Confirmed business boundaries: third-party account, content and positioning work is entered through `/zsjos/media-students`; their standalone page menus are retired while stable APIs and operation permissions remain; both `content_director` and `new_media_operator` receive the student menu with relationship/task-scoped data; ordinary positioning goes directly from director co-creation to operator feasibility review; only professional risk starts IP BPM; third-party account to student is many-accounts-to-one-student with binding history; routes follow existing Workbench conventions rather than the PRD path strings; unresolved business questions stop implementation pending user confirmation.
+
+## Delivery Entry 2026-08-21 10:08 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue authenticated four-role workflow verification, repair the content-director My Students visibility defect, and keep role menus aligned with business ownership.
+- Key decisions: content-director visibility is based on active service-relation assignment regardless of study-planner acceptance status; missing advanced-filter input is represented as `null`, not an empty match set; `/zsjos/media-students` is exclusive to `content_director`; local V103 removes menu `7022` from `new_media_operator` without changing V100.
+- Execution result: fixed director page/detail query projection; added focused regression coverage; applied repeatable local V103 and verified operator menu count `0`, director menu count `1`, and V103 marker count `1`; evicted only local `menu_role_ids:1:7022` and `permission_menu_ids:zsjos:media-student:query-my` caches; restarted local backend as PID `30308` on port `48080`; refreshed browser and confirmed `biandao1` sees three assigned students including a pending-assignment relation; refreshed `xmtoneyunying1` and confirmed the director page is absent and direct navigation remains on the permitted task page.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/MyStudentServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/registration/ServiceRelationMapper.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/registration/MyStudentServiceImplTest.java`; `script/sql/mysql/migrations/V103__repair_new_media_operator_director_menu.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/architecture/zsjos-role-permission-matrix.md`; `docs/operations/database-migrations.md`; this handoff.
+- Verification evidence: focused `MyStudentServiceImplTest` passed 4/4; full yudao-server dependency-chain package passed; local V103 repeat execution deleted `0` additional rows; browser confirmed director list/detail success and operator menu exclusion; database role baseline confirmed `biandao1=content_director`, `xmtoneyunying1=new_media_operator`, `jianji1=filming_editor`, `guihua1=study_planner`.
+- Dependency/integration impact: no new dependency; local database permission/cache state changed only within the confirmed localhost test environment; no business rows, historical messages, shared roles, BPM definitions, Git state, or production artifacts were changed.
+- Remaining work: continue independent filming-editor and study-planner authenticated sessions where a fresh browser context is available; run remaining transition-by-transition message checks and capture BusinessEvent/BusinessTask/outbox evidence; execute final Workbench/H5/build/static SQL verification and append the final test report.
+
+## Delivery Entry 2026-08-21 10:14 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: remove implementation-oriented explanatory copy from new-media pages while continuing the real-role verification.
+- Key decisions: retain only user-facing business information, status, version and actionable controls; remove the non-business header subtitle and the “处理提示” implementation explanation from the shared media feature page.
+- Execution result:运营拍剪工单页面加载成功并显示空态；the removed copy no longer appears in the page source; no menu or API contract changed.
+- Changed files: `frontend/workbench/src/pages/MediaFeaturePage.tsx`; this handoff.
+- Verification evidence: Workbench `npm run typecheck` passed; focused media page guard tests passed 7/7; local runtime remained available on Workbench `5174`, H5 `10086`, backend `48080`.
+- Dependency/integration impact: None beyond the existing Workbench UI; no database or shared external state change.
+- Remaining work: continue the authenticated workflow/message matrix and final browser/build verification.
+
 ## Active delivery: authenticated partner full-chain verification
 
 - Workstream ID: `main-partner-e2e-verification`
@@ -792,3 +847,572 @@
 - Verification evidence: `python script/bpm/validate_manifest.py` passed with `Validated 5 versioned BPM assets`; Python XML parsing passed; scoped `git diff --check` passed with only line-ending conversion notices.
 - Dependency/integration impact: No dependency, database migration, BPM publication, service restart, branch, commit, or external state change. The asset still requires controlled Admin model creation/import and publication in each target environment.
 - Remaining work: Publish the model through Admin after confirming V094 and reviewer permissions; record Flowable definition ID/version, deployment time, and operator in the release record; execute a controlled extension request to verify the supervisor task.
+
+## Delivery 2026-08-20 10:38:17 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25` (uncommitted worktree changes; no commit created)
+- User goal: make the student contact extension BPM form mandatory and complete the form data flow.
+- Key decisions: added V095 repeatable per-tenant BPM form seed with stable marker `zsjos-system-form:student-contact-extension`; kept all extension snapshot fields read-only in the dynamic form; passed the complete snapshot as BPM process variables; kept approval opinion in the framework task `reason` field because BPM persists it separately and ZSJOS snapshots it as `decisionReason`.
+- Execution or analysis result: V095 is sourced by bootstrap and checked by `verify-bootstrap.sql`; release documentation now requires model `formType=流程表单` and binding the seeded `学员联系延期审批表单` instead of leaving `formId` empty.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`, `script/sql/mysql/migrations/V095__student_contact_extension_bpm_form.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/verify-bootstrap.sql`, `docs/operations/database-migrations.md`, `docs/operations/zsjos-bpm-versioned-assets.md`, and this handoff file.
+- Verification evidence: ZSJOS Maven compile passed; `python script/bpm/validate_manifest.py` passed with 5 assets; scoped `git diff --check` passed with line-ending notices only. SQL was reviewed statically and not executed.
+- Dependency/integration impact: no new dependency, no migration execution, no BPM publication, no service restart, branch, commit, or external state change. V095 must be applied before binding the form in Admin.
+- Remaining work: apply V095 in the target tenant, bind the seeded form to the BPM model, publish/activate the process, and run a controlled approval test verifying snapshot display and required task opinion.
+# Delivery Entry - 2026-08-20 13:28 Asia/Shanghai
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Execute the confirmed new-media content workflow plan; auto-generate account numbers.
+- Key decisions: account numbers are system-generated as `MAyyyyMMddHHmmss####`; account creation no longer accepts a caller-provided number. Existing Workbench route rules remain authoritative; content director is the only role for positioning.
+- Result: Added tenant-scoped daily counter and number service, account create/get/stage/bind/unbind endpoints, historical student-link updates, bootstrap inclusion for V096, and Workbench route constants/renderers for the seven一期 modules.
+- Changed files: `script/sql/mysql/migrations/V096__new_media_content_workflow_schema.sql`, `script/sql/mysql/bootstrap.sql`, ZSJOS account service/controller/VO/DO/mapper files, `frontend/workbench/src/constants.ts`, `frontend/workbench/src/layouts/RouteHost.tsx`, `frontend/workbench/src/pages/MediaWorkflowPage.tsx`.
+- Verification: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed; `npm run typecheck` in `frontend/workbench` passed.
+- Dependency/integration impact: V096 remains unapplied; no service restart, BPM publication, branch, commit, or external state change performed. Menu/button migration, full BPM assets, remaining APIs, and real data-backed page views remain.
+- Remaining work: complete positioning/content/production workflow APIs, menu and dictionary migration, BPM assets, H5 confirmation, data-backed Workbench pages, focused tests, and documentation synchronization.
+# Delivery Entry - 2026-08-20 13:32 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation of the confirmed new-media workflow.
+- Key decisions: ordinary positioning advances directly from co-creation to operator feasibility; professional risk uses the IP review state; the existing content-director role remains the sole positioning role.
+- Result: Added positioning-card create/get/advance service and controller with optimistic locking and state guards. Professional-risk cards enter `ip_review`; ordinary cards bypass it.
+- Changed files: positioning service/controller/VO/DO plus handoff.
+- Verification: Maven ZSJOS compile passed.
+- Dependency/integration impact: No migration execution, BPM deployment, restart, commit, or external-state mutation.
+- Remaining work: BPM start/listener integration, content/ticket endpoints, menu/dictionary migration, H5 confirmation, data-backed pages, tests.
+# Delivery Entry - 2026-08-20 13:35 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation of the confirmed new-media workflow.
+- Key decisions: content and production ticket lifecycles use the documented state machines; caller-provided business numbers are not accepted.
+- Result: Added content and production-ticket create/get/transition VOs, services, and controllers with generated business numbers, permission annotations, optimistic locking, and revision-limit enforcement.
+- Changed files: content/production controller, VO, and service files plus handoff.
+- Verification: Maven ZSJOS compile passed.
+- Dependency/integration impact: No migration execution, BPM deployment, restart, commit, or external-state mutation.
+- Remaining work: menu/button migration, BPM assets and events, H5 confirmation, real list APIs/pages, focused tests and docs.
+# Delivery Entry - 2026-08-20 13:39 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation of the confirmed new-media workflow.
+- Key decisions: navigation uses existing Workbench route rules and server-owned menu permissions; no role grants are invented in the migration.
+- Result: Added repeatable V097 menu/button permission metadata for accounts, content, production tickets, positioning, handovers, student operations, and reviews; added V097 to bootstrap.
+- Changed files: `script/sql/mysql/migrations/V097__new_media_workflow_menu_permissions.sql`, `script/sql/mysql/bootstrap.sql`, handoff.
+- Verification: SQL reviewed for stable IDs, parent relationships, repeatability, and non-destructive scope. Migration was not executed.
+- Dependency/integration impact: Existing roles require administrator-managed grants after review; no external state changed.
+- Remaining work: BPM assets, H5 confirmation, real list APIs/pages, role grants/dictionaries, focused tests and documentation.
+# Delivery Entry - 2026-08-20 13:41 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation and verification.
+- Key decisions: Tests lock the documented content/ticket transitions and existing Workbench route registry.
+- Result: Added media workflow constant tests and updated route coverage assertions for seven new pages.
+- Changed files: `MediaWorkflowConstantsTest.java`, `frontend/workbench/src/services/menu.test.ts`, handoff.
+- Verification: 2 backend tests passed; 14 focused Workbench tests passed.
+- Dependency/integration impact: None.
+- Remaining work: BPM/H5/list APIs and full UI integration.
+# Delivery Entry - 2026-08-20 13:44 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: synchronize the API contract and menu coverage with the confirmed existing-route design and content-director terminology.
+- Result: Documented new-media account/content/production/positioning endpoints, generated-number contract, ordinary/professional positioning branches, and seven Workbench menu mappings.
+- Changed files: `frontend/workbench/docs/api-contract.md`, `docs/frontend/zsjos-menu-coverage.md`, handoff.
+- Verification: Documentation-only synchronization; prior backend and frontend checks remain green.
+- Dependency/integration impact: None; migrations and BPM remain unapplied/unpublished.
+- Remaining work: complete BPM/H5/list APIs and real data-backed pages.
+# Delivery Entry - 2026-08-20 13:48 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation without stopping at a phase boundary.
+- Key decisions: Workbench consumes typed ZSJOS APIs directly; server permissions and business state remain authoritative.
+- Result: Added typed Workbench service contracts for media accounts, content, production tickets, and positioning cards, including create/get/bind/transition operations.
+- Changed files: `frontend/workbench/src/services/api.ts`, handoff.
+- Verification: `npm run typecheck` passed.
+- Dependency/integration impact: No new dependency; no migration/BPM/runtime operation.
+- Remaining work: connect page controls to these services, add paged list APIs, H5 confirmation and BPM integration.
+# Delivery Entry - 2026-08-20 13:47 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation continuously.
+- Key decisions: account台账 list uses server-side paging, keyword and S-stage filters; no client-side mock data.
+- Result: Added account page request contract, mapper paging query, service/controller page endpoint, typed frontend API, and a loading/error/empty/table view for `/zsjos/accounts`.
+- Changed files: account page VO/mapper/service/controller, `frontend/workbench/src/services/api.ts`, `MediaWorkflowPage.tsx`, handoff.
+- Verification: Maven ZSJOS compile and Workbench typecheck passed.
+- Dependency/integration impact: No new dependencies or external state changes; migration/BPM remain unapplied/unpublished.
+- Remaining work: content/ticket/positioning paged lists, H5 confirmation, BPM integration, richer page actions.
+# Delivery Entry - 2026-08-20 13:50 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue without stopping between phases.
+- Key decisions: content and ticket list queries are server-paged and status-filterable; no frontend mock records.
+- Result: Added content and production-ticket page request contracts, mapper paging methods, services, and content page endpoint; backend compiles successfully.
+- Changed files: content/production page VO/mapper/service files and content controller, handoff.
+- Verification: Maven ZSJOS compile passed.
+- Dependency/integration impact: None; no migration/BPM/runtime operation.
+- Remaining work: production-ticket page controller, Workbench content/ticket table bindings, positioning/H5/BPM.
+# Delivery Entry - 2026-08-20 13:52 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: production-ticket paging follows the same server-owned query pattern as account/content; no client-side record fabrication.
+- Result: Added production-ticket `/page` controller endpoint and typed Workbench `productionTicket.page` API; content and ticket page query contracts compile with existing mapper conventions.
+- Changed files: production controller, `frontend/workbench/src/services/api.ts`, related page VO/mapper/service files, handoff.
+- Verification: Maven ZSJOS compile passed.
+- Dependency/integration impact: None; no migration/BPM/runtime operation.
+- Remaining work: bind content/ticket APIs into page tables, positioning/H5/BPM integration.
+# Delivery Entry - 2026-08-20 13:56 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: Workbench list pages consume server APIs and expose loading, empty, error, and retry states.
+- Result: Connected accounts, content, and production-ticket routes in `MediaWorkflowPage` to typed paged services and real tables. Added content and production ticket typed page services.
+- Changed files: `MediaWorkflowPage.tsx`, `frontend/workbench/src/services/api.ts`, handoff.
+- Verification: `npm run typecheck` passed after fixing typed page service and table data union.
+- Dependency/integration impact: None; no runtime or database operation.
+- Remaining work: positioning list/H5 confirmation, BPM integration, richer actions and role grants.
+# Delivery Entry - 2026-08-20 13:57 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: positioning-card paging is status-filterable and follows server-owned visibility.
+- Result: Added positioning-card page VO/mapper/service/controller and typed Workbench page API.
+- Changed files: positioning page files, `frontend/workbench/src/services/api.ts`, handoff.
+- Verification: Maven ZSJOS compile passed.
+- Dependency/integration impact: None; no migration/BPM/runtime operation.
+- Remaining work: bind positioning page API, H5 confirmation, BPM integration.
+# Delivery Entry - 2026-08-20 14:00 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: H5 positioning confirmation is exposed as a separate app contract; partner-account eligibility remains a server-side prerequisite before actual push.
+- Result: Added app positioning confirmation detail/confirm/reject controller and compiled it with the ZSJOS module.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/positioning/PositioningConfirmationController.java`, handoff.
+- Verification: Maven ZSJOS compile passed.
+- Dependency/integration impact: No runtime or database operation. BPM start and partner-account eligibility integration remain to be wired into the service layer before production use.
+- Remaining work: implement eligibility-aware confirmation service, BPM event integration, H5 frontend, and final end-to-end tests.
+# Correction Entry - 2026-08-20 14:02 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Preserve confirmed business behavior and stop on new business ambiguity.
+- Key decisions: Do not retain an H5 reject endpoint until the student-rejection target state and responsible handler are confirmed.
+- Result: Removed the incomplete app positioning confirmation controller recorded immediately above; no H5 endpoint remains active.
+- Changed files: removed `PositioningConfirmationController.java`; appended this correction.
+- Verification: Source removal only; the previously completed positioning paging build remains valid.
+- Dependency/integration impact: None.
+- Remaining work: obtain the H5 rejection decision, then implement authenticated partner/student ownership checks and confirmation transitions.
+# Delivery Entry - 2026-08-20 14:12 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation after confirming partner/student binding and student rejection behavior.
+- Key decisions: optional one-to-one partner/student link; H5 rejection returns `student_confirm -> co_creating` for the original content director; confirmation requires active partner identity ownership.
+- Result: Added V098 partner-student link schema and bind/unbind APIs, V099 student-confirm permission, ownership-aware positioning confirmation service/controller, H5 positioning confirmation API/page/router.
+- Changed files: V098/V099 migrations and bootstrap, partner/student link DO/mapper/service/controller, positioning confirmation service/controller/VO, H5 API/page/router, handoff.
+- Verification: `npm run build` in `frontend/h5` passed; prior ZSJOS compile passed before final permission/migration edits and should be rerun in the next verification cycle.
+- Dependency/integration impact: migrations remain unapplied; no BPM publication or runtime restart. Role grants remain administrator-managed.
+- Remaining work: rerun backend compile, add H5 no-linked-account pending state, wire positioning Workbench table, BPM event/listener integration, end-to-end tests.
+# Delivery Entry - 2026-08-20 14:50 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: no active partner/student link returns `pending_partner_account`; H5 must show a waiting state and hide confirmation actions.
+- Result: Added H5 response state contract and pending UI, while preserving ready-state ownership checks and confirm/reject actions.
+- Changed files: positioning confirmation response/service/controller, H5 positioning API/page, handoff.
+- Verification: `frontend/h5 npm run build` passed; ZSJOS Maven compile passed after correcting the service helper call.
+- Dependency/integration impact: V098/V099 remain unapplied; no runtime restart or BPM publication.
+- Remaining work: wire positioning Workbench list/actions, integrate BPM events, add H5 contract tests and migration verification.
+# Delivery Entry - 2026-08-20 14:54 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: positioning list is server-paged and status/risk values are rendered from returned records.
+- Result: Connected `/zsjos/positioning` Workbench route to `api.positioningCard.page` with loading, error, retry, empty, and risk/status table states.
+- Changed files: `frontend/workbench/src/pages/MediaWorkflowPage.tsx`, handoff.
+- Verification: `npm run typecheck` passed.
+- Dependency/integration impact: None; migrations remain unapplied.
+- Remaining work: BPM start/status events, confirmation deep-link generation, and full E2E tests.
+# Delivery Entry - 2026-08-20 15:00 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: only professional-risk positioning creates the IP BPM process; ordinary positioning bypasses BPM. BPM owns approval execution while ZSJOS stores the process reference and state.
+- Result: Added BPM process start through the public `BpmProcessInstanceApi` during professional-risk positioning creation, storing process ID and setting `ip_review`; ordinary cards remain on the direct operator-feasibility path.
+- Changed files: `PositioningCardService.java`, handoff.
+- Verification: ZSJOS Maven compile passed before the final status assignment adjustment; rerun compile in the next cycle.
+- Dependency/integration impact: BPM process definition `zsjos_media_positioning_ip` must be deployed before professional-risk creation is enabled; no deployment or runtime restart performed.
+- Remaining work: BPM status event listener, deployed-process verification, H5 deep-link notification, full tests.
+# Delivery Entry - 2026-08-20 15:18 Asia/Shanghai
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- User goal: Continue implementation.
+- Key decisions: approved IP review advances to operator feasibility; rejected IP review returns to co-creation for the existing content director; unrelated/non-final events do nothing.
+- Result: Added process-ID lookup, positioning IP BPM status listener, and idempotent state mapping for approved/rejected results.
+- Changed files: `PositioningCardMapper.java`, `PositioningCardService.java`, `PositioningIpProcessStatusListener.java`, handoff.
+- Verification: ZSJOS Maven compile passed.
+- Dependency/integration impact: Requires deployed `zsjos_media_positioning_ip`; no deployment or external state change performed.
+- Remaining work: BPMN asset, H5 deep-link notification, tests, SQL verification and UI production build.
+# Delivery Entry - 2026-08-20 15:46 +08:00
+- Branch: `main`; Worktree: `D:\\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Continue the approved new-media workflow implementation and close the existing main-chain contracts.
+- Key decisions: replaced controller DO exposure with dedicated RespVO snapshots and server-projected `availableActions`; split content and production-ticket generic transitions into explicit commands and button permissions; ordinary positioning starts no BPM, while professional-risk review starts `zsjos_media_positioning_ip` only on submit; all three confirmed rejection paths return to `co_creating`; department and query-all scope use System public permission APIs; active partner/student identity links are database-unique on both sides.
+- Execution result: added account/content/ticket/positioning response contracts, explicit service/controller commands, responsibility/dept paging filters, tenant-scoped Person/Partner/account/user validation, active-link concurrency protection, H5 `pending_student_link` state and card snapshot, versioned positioning BPMN asset plus manifest entry, V097 permission metadata expansion, V098 uniqueness upgrade, bootstrap verification checks, API documentation, and positioning state-machine tests.
+- Changed files: ZSJOS media services/controllers/mappers/VOs/providers/constants/errors; `MediaDataScopeService`; partner-student link service; focused positioning tests; Workbench typed API; H5 positioning API/page; `script/bpm/manifest.json` and `zsjos_media_positioning_ip/1.0.0/process.bpmn20.xml`; V097/V098 migration drafts; `verify-bootstrap.sql`; Workbench API contract; this handoff.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed; focused Maven tests (`PositioningCardServiceTest`, `MediaWorkflowConstantsTest`) passed 5/5; `frontend/workbench npm run typecheck` passed; `frontend/h5 npm run build` passed; `python script/bpm/validate_manifest.py` validated 6 assets; `git diff --check` reported no whitespace errors (only existing line-ending warnings).
+- Dependency/integration impact: no new dependency; no migration execution, BPM publication, role grant change, service restart, branch, commit, push, or release. Professional-risk creation remains unavailable until the BPM process is deployed; administrator role grants remain external configuration.
+- Remaining work: content/ticket/positioning detail forms and full一期 modules (versions, handover, reviews, notifications, task/event providers), real browser checks, full ZSJOS test suite, SQL execution review, and deployment/authorization operations still require separate delivery/approval.
+# Correction / Verification Note - 2026-08-20 15:56 +08:00
+- The account stage endpoint was subsequently split into explicit `advance-stage` and `rollback-stage` commands with separate permission identifiers; Workbench API and V097 metadata were synchronized.
+- The final affected-source verification passed: ZSJOS compile and Workbench typecheck passed. The previously attempted full reactor test remains blocked by unrelated `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch` failure; no Infra files were changed by this workstream.
+# Delivery Entry - 2026-08-20 16:20 +08:00
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Implement the confirmed new-media workflow completion plan.
+- Key decisions: content version idempotency is stored as a dedicated business field; production tickets support multiple tenant-scoped content items; four additional BPM definitions are generated and registered but remain unpublished.
+- Execution result: added content version list/create/review service and endpoints, dedicated idempotency column/unique key in the V096 draft, production ticket item list/add/remove service and endpoints, four BPMN drafts (`reposition`, `rebind`, `over_entitlement`, `graduation`), manifest metadata and checksums, and API contract documentation.
+- Changed files: ZSJOS content version and production item controllers/services/VOs/mappers/DO/error codes; V096 draft; `script/bpm/manifest.json` and four BPMN assets; Workbench API contract; this handoff.
+- Verification evidence: `mvn -q -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed; `python script/bpm/validate_manifest.py` validated 10 versioned BPM assets. Full reactor test remains affected by the unrelated Infra failure recorded above.
+- Dependency/integration impact: no new dependency; migrations, BPM publication, permission changes, service restart, commit, push, and release were not performed. New BPM processes require separate deployment approval before activation.
+- Remaining work: handover/student-ops/review services, notification providers, full versioned positioning/trial execution card flows, UI detail/forms and browser checks, and broader focused tests remain.
+# Delivery Entry - 2026-08-20 17:10 +08:00
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Implement all modules in the unified new-media workflow plan in one execution round.
+- Key decisions: retained `content_director`, existing Workbench routes, server-driven actions, ordinary positioning without BPM, and no external state operations.
+- Execution result: added atomic content-version progression, handover creation/accept/reject, review report submission/archive, student cooperation assessment and exception resolution, positioning interview import/confirmation, positioning version history, three-party execution-card signatures, notification scene provider, Workbench API/page coverage for all seven routes, and supporting SQL/API documentation updates.
+- Changed files: ZSJOS handover/review/studentops/positioning services, DOs, mappers, VOs, controllers and permission providers; content version mapper/service; media notification provider; Workbench API and MediaWorkflowPage; V096 draft; API contract; handoff.
+- Verification evidence: ZSJOS Maven compile passed; Workbench typecheck passed; H5 production build passed; BPM manifest validated 10 assets. Full reactor remains subject to the unrelated Infra test failure.
+- Dependency/integration impact: no new dependency; no migration execution, BPM publication, real authorization changes, service restart, commit, push, or artifact release. New menu/button permissions and BPM processes remain deployment-time external gates.
+- Remaining work: browser automation against a running environment, richer forms/detail drawers, full notification publication wiring from every command, entitlement BPM callback implementation, and comprehensive focused tests for all new state machines.
+# Delivery Entry - 2026-08-20 16:56 +08:00
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Execute the unified new-media workflow plan in one round.
+- Key decisions: kept all confirmed routing and role semantics; added server-owned permissions for new operations; preserved migration/BPM/restart/Git external gates.
+- Execution result: completed account edit/diagnosis/rescue/rebind request APIs, atomic content-version progression and idempotent replay, handover partial/full acceptance, review and student-ops services, positioning interview/version/execution-card flows, event/task/notification infrastructure, all-seven-route Workbench loading/actions, and SQL verification coverage.
+- Changed files: ZSJOS account/content/production/positioning/handover/studentops/review/media-event services, DOs/mappers/VOs/controllers/providers; Workbench API/page; V096/V097/verify-bootstrap; API contract; handoff.
+- Verification evidence: ZSJOS compile passed; focused `PositioningCardServiceTest` and `MediaWorkflowConstantsTest` passed; Workbench 54 files/317 tests passed, typecheck passed, production build passed; H5 production build passed; BPM manifest validated 10 assets; `git diff --check` passed with only existing line-ending warnings.
+- Dependency/integration impact: no new dependency; no migration execution, BPM publication, real permission grant, service restart, commit, push, or release. Full reactor remains out of scope due to unrelated Infra `CodegenEngineUniappTest.testExecute_treeSearch` failure.
+- Remaining work: browser checks against a running authenticated environment, end-to-end notification recipient verification, entitlement/graduation BPM callback implementations, richer form/detail UX, and full state-machine/permission test expansion.
+# Delivery Entry - 2026-08-20 18:05 +08:00
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Separate the content director's student page from the study planner's page and prepare role menu permissions.
+- Key decisions: planner keeps `/zsjos/my-students` with `zsjos:student:query-my`; content director uses `/zsjos/media-students` with `zsjos:media-student:query-my`; V083's incorrect content-director relation to menu `73020` is removed by the V100 draft.
+- Execution result: added `MediaStudentController`, `MediaStudentsPage`, Workbench API/route/renderer registration, V100 menu and role-permission migration draft for `new_media_operator`, `content_director`, and `filming_editor`, bootstrap and verify checks, and menu coverage documentation.
+- Changed files: `MediaStudentController.java`, `MediaStudentsPage.tsx`, Workbench constants/RouteHost/API/menu test, V100 migration, bootstrap/verify SQL, menu coverage docs, handoff.
+- Verification evidence: ZSJOS compile passed; BPM manifest validation and `git diff --check` passed. Workbench menu test requires the updated 48-route expectation; a pre-existing unrelated `LeadDetail.tsx` TypeScript error remains in the current worktree.
+- Dependency/integration impact: V100 is a draft only; no database migration or real role authorization was executed. The migration removes only the incorrect `content_director` relation to planner menu `73020` and adds the dedicated menu relation.
+- Remaining work: run V100 after separate authorization, refresh login/menu cache, then browser-check planner and content-director accounts side by side.
+# Delivery Entry - 2026-08-20 18:12 +08:00
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Configure the newly added role menu permissions.
+- Key decisions: use V100 as the single additive role-menu migration; keep `/zsjos/my-students` planner-only; use `/zsjos/media-students` for content directors; grant new-media operator, content director, and filming editor only their defined menu sets.
+- Execution result: inspected the migration and environment; no local MySQL client, datasource configuration, or target database connection was available, so no real permission state was changed. V100 remains the executable configuration artifact.
+- Changed files: None in this turn; V100 and related route/menu files were created in the preceding implementation turn and remain unexecuted.
+- Verification evidence: V100 SQL inspected; environment has no `mysql` executable or DB connection variables. Real database verification is therefore unperformed.
+- Dependency/integration impact: applying V100 requires the target environment's prior migrations and a separate approved database execution; users must refresh login/menu cache afterward.
+- Remaining work: execute V100 in the approved target database, verify role-menu rows and planner/director page separation, then perform browser checks with representative accounts.
+
+# Delivery Entry - 2026-08-20 17:40:08 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Fix the Admin irreversible-operation confirmation popover that flashed briefly and closed immediately.
+- Key decisions: retained click-triggered internal visibility for uncontrolled callers; controlled callers now pass an empty Element Plus trigger list so validation-driven `visible` state is the only visibility authority. No business page, API, permission, or confirmation copy changed.
+- Execution or analysis result: removed the competing Popover click toggle in controlled mode while preserving cancel, confirm, and uncontrolled-click behavior.
+- Changed files: `frontend/admin/src/views/zsjos/components/ZsjosPopconfirm.vue`; `handoff/main.md`.
+- Verification evidence: scoped Prettier and ESLint passed; Admin `build:local` passed with the existing LightningCSS `*zoom` warning; full `ts:check` no longer reports this component and remains blocked by 16 existing diagnostics in unrelated BPM, CRM, EAM, MES, System User, Export Task, and My Sales Order files; `git diff --check` passed for the changed component and handoff entry.
+- Dependency or integration impact: None; no dependency, backend, schema, permission, route, external service, Git branch, commit, or publication change.
+- Remaining work: Authenticated browser interaction at desktop and mobile widths remains unverified because no running Admin session was used in this turn.
+
+## Active Workstream
+
+- Workstream ID: my-students-unified-detail
+- Goal: Maintain the planner My Students contract, place planner lifecycle operations in the overview toolbar, add owner-only Person basic-info editing, and keep the content-director My Students page as a dedicated new-media master-detail workspace.
+- Non-goals: no database migration execution, real permission grants, Lead/order snapshot rewriting, sales Lead behavior changes, branch/worktree operations, commit, push, or unrelated page redesign.
+- Branch: main
+- Worktree: D:\\ZSJ-OS
+- Base commit: c1017b49f37c4d262e269658d04a396754c7e91a
+- Target branch: main
+- Ownership scope: Workbench planner/director My Students pages and student toolbar/modals/API types; student contact context, owner-only Person identity update endpoint, object-permission provider, focused tests; V101/bootstrap/verification SQL and directly affected documentation.
+- Owner: Codex / root
+- Dependencies: existing Lead, follow-up, order, student-service and contact APIs; no new dependency.
+- Integration order: preserve planner/detail projections -> extend backend action/basic-info contract -> move actions into the overview toolbar -> add V101 and bootstrap verification -> update tests/docs -> run focused frontend/backend checks.
+- Verification plan: focused ZSJOS service/permission tests and module compile; Workbench focused/full tests, typecheck and production build; SQL repeatability/static verification and diff checks; desktop/mobile browser checks when an authenticated runtime session is available.
+
+## Delivery Entry - 2026-08-20 (confirmed implementation started)
+
+- Workstream ID: `my-students-unified-detail`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: In planner `/zsjos/my-students`, show成交产品 and最近联系, use planner task progress, isolate planner contact data, and expose contact/collaborator operations.
+- Key decisions: retain `careerPlannerUserId`, `career_planner` protocol, existing permissions and APIs; add a student-context presentation branch to shared Lead detail so sales views remain unchanged; use service-relation contact records and current task data.
+- Non-goals: no role rename, schema migration, database execution, real permission grant, branch/commit/push, or sales Lead follow-up behavior change.
+- Ownership scope: Workbench student detail/API types and directly affected student-facing documentation; existing backend student-contact contracts remain authoritative.
+- Verification plan: Workbench focused tests, typecheck, build, scoped diff check; backend compile only if backend files become necessary; authenticated desktop/mobile browser checks when available.
+
+## Delivery Entry - 2026-08-20 18:46 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Restore the confirmed `/zsjos/my-students` contract: use the same Lead detail surface as `/zsjos/leads/manage` and add student service/contact information.
+- Key decisions: `LeadDetail` now accepts optional context and extra tabs without changing sales callers; My Students uses `LeadDetail` in `student-readonly` mode and appends service overview and student contact capabilities; each service relation returns its own order-linked `leadId`/`leadNo`; user-visible identifiers remain `leadNo` only; no migrations or real permission changes were executed.
+- Execution or analysis result: replaced the active independent student detail route with the previously approved unified Lead detail composition, added current-service selection and student contact tab, extended the My Student response mapping to avoid cross-service Lead fallback, and synchronized the affected API, permission-flow, menu-coverage, and handoff documentation.
+- Changed files: `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/student-sales-history.guard.test.ts`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/vo/MyStudentRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/MyStudentServiceImpl.java`; `docs/api/registration-fulfillment-api.md`; `docs/architecture/data-and-permission-flow.md`; `docs/frontend/zsjos-menu-coverage.md`; `handoff/main.md`.
+- Verification evidence: Workbench `npm run typecheck` passed; focused Workbench tests passed 10/10; Workbench `npm run build` passed with the existing large-chunk advisory; ZSJOS dependency-chain compile passed; `MyStudentServiceImplTest` passed with `-Dsurefire.failIfNoSpecifiedTests=false`; scoped `git diff --check` reported no whitespace errors, only existing line-ending notices. Authenticated desktop/mobile browser verification remains unverified because no signed-in browser session was available.
+- Dependency or integration impact: no new dependency, schema/migration execution, role grant, service restart, branch, commit, push, or publication. Backend/frontend deployment is required before runtime behavior is visible.
+- Remaining work: add full runtime browser verification with planner/director accounts; expand backend fixtures for multiple services mapped to different Leads; consider splitting `RegistrationPages.tsx` student code into dedicated files in a follow-up cleanup.
+
+### Correction / Verification Note - 2026-08-20 18:58 +08:00
+
+- Extended the read-only student sales-history object check to active service participants (owner, content director, or career planner) while retaining the existing owner query for compatibility. No Lead mutation permission is granted.
+- Additional changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/registration/ServiceRelationMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionService.java`.
+- Verification: ZSJOS dependency-chain compile and Workbench typecheck passed after the authorization extension.
+
+## Delivery Entry - 2026-08-20 20:01 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Execute the confirmed repair plan from the new-media workflow code review.
+- Key decisions: positioning versions advance with the positioning-card optimistic version; interview data is restricted to responsible account users; execution-card employee signatures derive party from the authenticated user and use separate director/operator commands; H5 remains the only student confirmation path; handover creation validates initiator, users, and supported business objects; partial handovers can be rejected; rebind BPM writes a transactional STARTING claim before process creation.
+- Execution or analysis result: applied the review repairs without migrations, BPM publication, real permission changes, service restart, branch operations, commit, push, or release.
+- Changed files: positioning card mapper/service/workspace/controller, execution-card mapper/provider, handover service/controller, account mapper/service, Workbench workflow page, and this handoff entry.
+- Verification evidence: ZSJOS dependency-chain compile passed; focused positioning/constants tests passed; Workbench typecheck passed; Workbench tests passed 54 files/317 tests; `git diff --check` reported no whitespace errors and only existing line-ending notices. The attempted `npm test -- --runInBand` was invalid for Vitest; the corrected `npm test` passed.
+- Dependency or integration impact: no new dependency; migration drafts and BPM assets remain unexecuted/unpublished. Runtime browser checks and full Maven reactor remain unverified; the known unrelated Infra test failure remains outside scope.
+- Remaining work: strengthen persisted per-party signature snapshots, add dedicated repair tests for execution-card authorization and handover validation, and complete the reliable post-commit notification/outbox boundary.
+
+## Delivery Entry - 2026-08-20 20:44:03 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Remove the meaningless content-director My Students explanation and rebuild the page according to `frontend/workbench/docs/ui-guidelines.md`.
+- Key decisions: the director list uses only accepted active service relations whose `contentDirectorUserId` is the current user; the detail is a read-only domain projection over that director's student-bound accounts, positioning cards, content and production tickets; planner contact/study-plan commands remain exclusive to the planner page; both planner and director menus may display `我的学员` because their server-owned routes and permissions remain distinct.
+- Execution or analysis result: replaced the temporary `Card + List` skeleton with a paged master-detail workspace, removed the explanatory copy and role suffix, added the responsive 9:3 detail grid and complete loading/empty/error/retry/unauthorized states, and added the director-only detail API and object relation checks.
+- Changed files: `MediaStudentController.java`; `MediaStudentDetailRespVO.java`; `MediaStudentService.java`; `MyStudentService.java`; `MyStudentServiceImpl.java`; account/content/positioning/production/service-relation mappers; `MyStudentServiceImplTest.java`; `MediaStudentServiceTest.java`; `MediaStudentsPage.tsx`; `media-students.guard.test.ts`; Workbench API types, style registration/guards/overrides and `media-students.css`; V100 menu label draft; registration API and menu-coverage docs; this handoff.
+- Verification evidence: ZSJOS dependency-chain compile passed; focused `MyStudentServiceImplTest` and `MediaStudentServiceTest` passed; Workbench typecheck passed; full Workbench test suite passed 55 files/322 tests; Workbench production build passed with the existing large-chunk advisory; focused page/style tests passed 21/21; scoped `git diff --check` passed with only line-ending notices. Browser navigation reached the local Workbench but redirected to login because the session was expired, so authenticated desktop/mobile data rendering remains unverified.
+- Dependency or integration impact: no new dependency, schema execution, role grant, service restart, branch, commit, push or publication. V100 remains an unexecuted draft; the running local Vite server is development-only at `http://127.0.0.1:5174/`.
+- Remaining work: after backend/frontend deployment and V100 application are separately approved, log in as a representative content director and verify desktop/mobile rendering with real student, account, positioning, content and ticket data.
+
+## Delivery Entry - 2026-08-20 20:55 Asia/Shanghai
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Rebuild the seven new-media Workbench routes instead of leaving them on the temporary table skeleton.
+- Key decisions: retain all existing routes and APIs; register independent page entry functions for accounts, content, production tickets, positioning, handovers, student ops and reviews; share only a parameterized master-detail shell; continue deriving actions from server `availableActions`; do not execute migrations, role grants, service operations or Git publication.
+- Execution or analysis result: replaced RouteHost's single `MediaWorkflowPage` route branch with seven explicit page registrations, added paged/searchable list panes, responsive 9:3 detail panes, loading/empty/error/retry/unauthorized states, localized action labels, optimistic-version conflict messaging and refresh-after-action behavior.
+- Changed files: `frontend/workbench/src/pages/MediaFeaturePage.tsx`; `frontend/workbench/src/pages/media-feature.guard.test.ts`; `frontend/workbench/src/layouts/RouteHost.tsx`; Workbench API page query types; `frontend/workbench/src/styles/pages/media-feature.css`; style index, overrides and guards; this handoff.
+- Verification evidence: Workbench typecheck passed; full Workbench test suite passed 56 files/325 tests; Workbench production build passed with the existing large-chunk advisory; the content and production-ticket mappers now apply keyword filters; scoped diff check remains to be run.
+- Dependency or integration impact: no new dependency; backend contracts and external gates unchanged.
+- Remaining work: authenticated browser data checks remain dependent on a valid session; handover/review/student-ops APIs still expose list-only contracts and therefore their detail panes show the selected list snapshot until dedicated detail endpoints are added.
+
+## Delivery Entry - 2026-08-20 20:30 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Adjust planner `/zsjos/my-students` to show成交产品 and最近联系, replace sales status with首联 -> 制定学习计划 -> 督学 -> 考试 progress, isolate planner contact data, expose联系/分配编导/分配职业规划师 actions, and show next-contact task aging.
+- Key decisions: retained `careerPlannerUserId` and `career_planner`; planner contact surfaces use only the selected `serviceRelationId`; sales Lead follow-up tabs, next-follow-up data, alerts and charts are excluded from student mode;成交产品 comes from the selected order-item service snapshot; backend `availableActions` combines feature permission, ownership, acceptance and current-task state;考试 is a future progress stage because no authoritative exam task contract currently exists.
+- Execution or analysis result: added student-specific Lead overview rendering, latest service contact, contact deadline/overdue progress, planner task pipeline, permission-projected commands, student-only contact history, backend action projection, authorized/unauthorized tests, and synchronized API/architecture documentation.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/vo/StudentContactContextRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImplTest.java`; `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/pages/student-sales-history.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `docs/api/registration-fulfillment-api.md`; `docs/architecture/data-and-permission-flow.md`; `handoff/main.md`.
+- Verification evidence: ZSJOS dependency-chain compile passed; focused `StudentContactServiceImplTest` passed 2/2 authorized and unauthorized cases; Workbench typecheck passed; Workbench full suite passed 54 files/319 tests; Workbench production build passed with the existing large-chunk advisory; scoped `git diff --check` passed with only existing line-ending warnings; browser reached the local URL but runtime feature verification was blocked at the login page because no authenticated session was available.
+- Dependency or integration impact: no new dependency, schema/migration, database execution, real permission grant, service start/stop/reconfiguration, branch/worktree operation, commit, push or publication. Backend and Workbench must be deployed together because `contact-context.availableActions` is additive to the API response.
+- Remaining work: authenticated desktop/mobile browser verification with a planner account; define and implement an authoritative exam task/status contract before the考试 stage can become active or completed from real data.
+
+## Delivery Entry - 2026-08-20 21:21 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Implement the confirmed planner overview workflow so actions sit above the progress bar and advance from acceptance through first contact, study-plan creation, and ordinary follow-up, while allowing accepted-service owners to edit limited Person identity fields and assign collaborators.
+- Key decisions: unaccepted services project only `ACCEPT`; accepted services project exactly one current-stage command plus eligible edit/assignment commands; planner-facing ordinary follow-up remains isolated in `student_contact`; basic-info edits update Person name/mobile/WeChat only, require a reason and at least one contact method, preserve Lead/order snapshots, and audit changed field names without contact values; the existing `careerPlannerUserId` and `career_planner` protocol remain unchanged and are presented as职业规划师.
+- Execution or analysis result: completed backend action projection, owner/object authorization, Person update endpoint and audit event; added the planner overview toolbar, confirmation and stage/contact modals, collaborator selection, Person-over-Lead presentation, and read-only contact-history tab; added the repeatable V101 permission migration draft and synchronized bootstrap verification and affected API/permission/migration documentation; repaired the expanded backend test import and completed final verification.
+- Changed files: student-contact controller/VO/constants/service/object-permission provider and focused tests under `backend/yudao-module-zsjos`; planner detail, registration page, Workbench API types and guard tests under `frontend/workbench`; `script/sql/mysql/migrations/V101__student_basic_info_permission.sql`, bootstrap, verification SQL and migration README; registration API, permission-flow and database-migration documentation; this handoff entry.
+- Verification evidence: focused Maven tests passed 15/15 (`StudentContactServiceImplTest` 10, `PersonIdentityWriteServiceTest` 5); ZSJOS dependency-chain compile passed; Workbench full suite passed 56 files/326 tests, typecheck passed, and production build passed with only the existing large-chunk advisory; V101 static structure/repeatability review passed and no migration was executed; scoped `git diff --check` passed with only line-ending notices; local `/zsjos/my-students` returned HTTP 200 but the available browser session stopped at login.
+- Dependency or integration impact: no new dependency, database execution, real role/menu permission change, service restart/reconfiguration, branch/worktree operation, commit, push, or publication. Backend, Workbench, and V101 must be deployed/applied through the normal controlled release process for the new permission and endpoint to become active.
+- Remaining work: authenticated desktop and mobile browser verification with a representative learning-planner account remains unverified because no signed-in browser session was available; verify toolbar overflow, immediate post-accept transition, all stage/basic-info/collaborator modals, Person refresh, and unauthorized states after deployment. The考试 stage remains display-only until a separate authoritative exam task contract is defined.
+
+## Delivery Entry - 2026-08-20 22:57 Asia/Shanghai
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: Make planner-assigned students visible to the content director on `/zsjos/my-students`, show persistent collaborator assignments, and allow assignment changes.
+- Key decisions: retain accepted-service collaborator visibility and existing object/feature permission layers; service owners with `zsjos:student-collaborator:assign` may replace an existing collaborator, while replacement still requires a correction reason and writes the existing assignment audit log; collaborator names are resolved through `AdminUserApi`, never inferred from role names or static lists.
+- Execution or analysis result: added collaborator name fields to `MyStudentRespVO.ServiceVO`, populated them in the student projection, updated Workbench service types and detail/assignment UI, preselected the current collaborator in the change dialog, and adjusted owner reassignment authorization/action projection.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/vo/MyStudentRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/MyStudentServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImplTest.java`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/RegistrationPages.tsx`; this handoff.
+- Verification evidence: ZSJOS dependency-chain compile passed; focused Maven tests passed 13/13 (`MyStudentServiceImplTest` 3 and `StudentContactServiceImplTest` 10); Workbench `npm run typecheck` passed; scoped `git diff --check` passed with only existing LF/CRLF notices. Authenticated browser verification remains unrun because no valid signed-in session was available.
+- Dependency or integration impact: no new dependency, migration execution, real menu/role permission change, service restart, branch/commit/push, or publication. Backend and Workbench must be deployed together for the additive name fields and reassignment behavior.
+- Remaining work: verify with a real planner and content-director account that the relation is `active` + `accepted`, the assigned director appears in `/zsjos/my-students`, names are shown, and replacement succeeds with a reason; if assignment is made before service acceptance, it will remain intentionally hidden until acceptance under the current business contract.
+
+## Delivery Entry - 2026-08-20 23:35 Asia/Shanghai
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: bind the `待接客资` header entry to the existing `接客资` permission and remove the redundant `主题设置` button.
+- Key decisions: reuse the server-owned `zsjos:lead:accept` permission already used by `LeadAssignmentHost`; hide the header entry when the permission is absent; remove only the standalone `ThemeSwitcher` header entry while retaining theme context and the settings drawer; no backend permission or schema changes.
+- Execution or analysis result: updated Workbench header rendering and removed the now-unused mobile theme-action override; added guard coverage for permission binding and theme-switcher removal.
+- Changed files: `frontend/workbench/src/main.tsx`; `frontend/workbench/src/styles/layout.css`; `frontend/workbench/src/pages/subordinate-sales-lazy.guard.test.ts`; this handoff.
+- Verification evidence: focused guard test passed 5/5; Workbench full suite passed 56 files/328 tests; `npm run typecheck` passed; `npm run build` passed with the existing large-chunk advisory; local browser checks passed at desktop `1440x900` and mobile `390x844` on the login page, where both entries were absent as expected without a signed-in permission response. Authenticated click-through remains unverified because no valid browser session was available; viewport override was reset afterward.
+- Dependency or integration impact: no new dependency, migration, database execution, real permission grant, service reconfiguration, branch/worktree operation, commit, push, or publication. The existing server menu/permission configuration remains authoritative.
+- Remaining work: verify the visible `待接客资` entry and assignment drawer with a signed-in user holding `zsjos:lead:accept` after deployment.
+
+## Delivery Entry - 2026-08-21 10:41 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue four-role new-media workflow testing, repair ordinary technical defects automatically, and make the empty media pages capable of creating the first real business record from the UI.
+- Key decisions: creation controls are driven by the server-returned permission identifiers; account platform and content class are loaded from administrator-maintained dictionaries and their labels are snapshotted on create; related accounts, students, and users are loaded from authoritative APIs; forbidden optional candidate APIs do not block the rest of the form; no test data was inserted by database bypass.
+- Execution or analysis result: replaced the media feature placeholder-only page implementation with permission-aware create modals for accounts, content, production tickets, and positioning cards; preserved master-detail layout, server `availableActions`, optimistic-version actions, deep-link query handling, loading/empty/error/retry states, and added handover deep-link coverage. Updated `RouteHost` to pass server permissions into the four creation-capable pages.
+- Changed files: `frontend/workbench/src/pages/MediaFeaturePage.tsx`; `frontend/workbench/src/layouts/RouteHost.tsx`; this handoff entry.
+- Verification evidence: Workbench typecheck passed; `media-feature.guard.test.ts` passed 4/4 after preserving action/deep-link contracts; production build passed with only the existing large-chunk advisory; browser inspection confirmed `/zsjos/accounts` shows the permission-controlled 新增 button and opens the form, while direct `/zsjos/media-students` access for the current operator session does not render the director student page.
+- Dependency or integration impact: no new dependency, migration execution, role/menu change, database write, service restart, branch/worktree operation, commit, push, or publication. Existing dirty changes were preserved.
+- Remaining work: the local tenant has no `zsjos_media_platform` or `zsjos_media_content_class` dictionary entries, so the account/content create forms correctly remain disabled for those required selectors; this is an administrator business configuration decision, not a safe value to invent. Until those dictionary entries are configured, the UI cannot create the first account/content record and the downstream message-flow test remains blocked at test-data creation. Optional full browser role-by-role replay and message evidence remain pending.
+
+## Delivery Entry - 2026-08-21 10:43 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: synchronize the newly implemented creation-form contract with the Workbench API documentation.
+- Key decisions: document the permission-driven “新增” entry, authoritative candidate sources, dictionary value/label snapshots, and the explicit disabled state when required tenant dictionaries are not configured.
+- Execution or analysis result: appended the creation-form contract to the existing Workbench API contract document; no runtime behavior changed.
+- Changed files: `frontend/workbench/docs/api-contract.md`; this handoff entry.
+- Verification evidence: prior Workbench typecheck, full test suite (56 files/334 tests), focused media guard (4/4), and production build remain valid; documentation-only change was reviewed for consistency.
+- Dependency or integration impact: none; no dependency, migration, database execution, permission change, service restart, commit, push, or publication.
+- Remaining work: configure the tenant’s media platform/content-class dictionary values through the approved administrator path before creating real media test objects and resuming message-closed-loop replay.
+
+## Delivery Entry - 2026-08-21 10:56 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: directly configure the missing new-media dictionaries and continue the real page test.
+- Key decisions: use the document-confirmed dictionary contracts `zsjos_account_platform` and `zsjos_content_class`; configure platform values `douyin`/`xiaohongshu`/`shipinhao` with labels 抖音/小红书/视频号, and content-class values `first_batch`/`priority`/`exception`/`daily` with labels 首批/重点/异常/日常. Existing dictionary rows are preserved by guarded inserts.
+- Execution or analysis result: added and applied local forward migration V104; verified one type and the expected 3/4 active entries, and reran the migration successfully without duplicates. Browser form now loads the platform/content-class options. Created local test account `MA202608211052190001` and content `CT-6e2aa3111b9c46ed` through the real Workbench page; progressed content through topic, script, in-production, acceptance, and published.
+- Changed files: `frontend/workbench/src/pages/MediaFeaturePage.tsx`; `frontend/workbench/docs/api-contract.md`; `script/sql/mysql/migrations/V104__new_media_business_dictionary.sql`; `script/sql/mysql/migrations/README.md`; this handoff entry.
+- Verification evidence: real browser creation succeeded; content state-change events exist for all four transitions; pending-acceptance and approved notification outbox rows are `succeeded`; persisted messages contain business number `CT-6e2aa3111b9c46ed`, deep link `/zsjos/content?contentId=1`, and unique source event keys. Migration repeat execution preserved counts. A repository-wide `zsjos_db.py check` remains blocked by the pre-existing Java/Core schema mapping gap for the newly added media tables, unrelated to V104 SQL execution.
+- Dependency or integration impact: local database dictionary and test business rows changed; no deletes, role/menu authorization changes, new dependency, shared/production environment change, service restart, branch/worktree operation, commit, push, or publication.
+- Remaining work: continue message-closed-loop testing for positioning, production tickets, handovers, H5 confirmation, and role-specific data scope. Account stage/binding commands still require their dedicated parameter forms; the page now avoids routing those actions to an unrelated review API and reports that parameters are required.
+
+## Delivery Entry - 2026-08-21 11:48 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue four-role real workflow testing, repair ordinary technical defects automatically, and verify messages at each business transition.
+- Key decisions: optional filming-editor assignment is validated only when present; the current single Workbench deadline supplies the persisted expected-delivery timestamp; optional positioning students are accepted; unfilled positioning JSON layers are stored as `{}`; local V105 makes the legacy expected-delivery column nullable to match the deployed form contract. No production/shared permissions, BPM publication, Git operation, or data deletion was performed.
+- Execution or analysis result: fixed and tested production-ticket creation; applied local V105; rebuilt and restarted the localhost backend using the Maven development runner so the installed ZSJOS module is loaded. Created and completed ticket `PT-f6f2c20440e64ef9` through pending_accept -> accepted -> in_production -> submitted -> checking -> completed. Created ordinary positioning card `PC-82207ee2dc2d4880`, submitted it to operator_feasibility, and approved it to student_confirm; because no student/partner was bound, no H5 push was created. Created professional-risk card `PC-0890e8d138bf4fb9`; submit-review returned the stable unavailable-process error and left it at co_creating.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/production/ProductionTicketService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/production/ProductionTicketServiceTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardServiceTest.java`; `frontend/workbench/src/pages/MediaFeaturePage.tsx`; `script/sql/mysql/migrations/V105__production_ticket_delivery_time_compatibility.sql`; this handoff.
+- Verification evidence: focused Maven tests passed 6/6 (5 positioning, 1 production-ticket). Production-ticket database evidence contains five state events, completed accept/check tasks, succeeded outbox keys `ticket-accept:1`, `ticket-check:1:3`, `ticket-result:1:4:completed`, and persisted messages for pending_accept, pending_check, and approved with business number `PT-f6f2c20440e64ef9` and deep link `/zsjos/production-tickets?ticketId=1`. Ordinary positioning has `co_creating->operator_feasibility`, BPM null, succeeded `positioning-operator-review:1:0:ordinary`, and one operator-review message to user 230. Professional-risk unavailable path preserved `PC-0890e8d138bf4fb9` at `co_creating`, version 0, BPM null, with no outbox row. Local migration V105 altered only `expected_delivered_at` nullability and inserted schema markers; no business rows were deleted.
+- Dependency or integration impact: local database schema and test business rows changed; backend localhost process was restarted and is now running via `mvn -pl yudao-server spring-boot:run` (PID 30348). Workbench remained on port 5174. No new dependency, shared environment change, role grant, BPM publication, commit, push, or artifact release.
+- Remaining work: continue H5 confirmation with a bound partner/student, positioning rejection/re-submit, professional-risk BPM after deployment decision, handover and review center flows, and role-specific login/data-scope checks. The server JAR packaging path still embedded an older module during this local run; Maven development runner is being used for accurate source verification and should be documented before any release packaging.
+
+## Delivery Entry - 2026-08-21 11:56 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: keep progressing the real workflow test and automatically repair technical defects.
+- Key decisions: positioning `studentPersonId` remains optional; empty positioning JSON layers are normalized to `{}`; V105 is the local forward migration for the legacy delivery timestamp mismatch. No external/shared environment action was taken.
+- Execution or analysis result: added positioning creation regression coverage and validated ordinary and professional-risk positioning behavior. The local backend now runs from the Maven development runner after module installation. Inspected `/zsjos/media-students` and `/zsjos/handovers`; the current operator session has no director-student data or handover create entry, so those page scenarios remain unverified without changing permissions or bypassing UI.
+- Changed files: `script/sql/mysql/migrations/README.md`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardServiceTest.java`; this handoff.
+- Verification evidence: positioning and production focused Maven tests passed 6/6; Workbench `npm run typecheck` passed. Ordinary positioning had no BPM and produced only the operator-review message when no student/partner was bound. Professional-risk submission returned the stable unavailable-process error and preserved status/version.
+- Dependency or integration impact: local V105 was applied and recorded; localhost backend PID 30348 is running via Maven; Workbench remains on 5174. No role changes, BPM publication, deletes, Git commit/push, or artifact publication.
+- Remaining work: bind a real student/partner for H5 confirmation, run rejection/re-submit and student-confirm paths, verify handover creation/receipt, and continue role-by-role login/object-scope/message checks. These require available business data or configured page permissions, not a new business-rule decision yet.
+## Active delivery: FMS dictionary encoding repair
+
+- Workstream ID: `main-fms-dictionary-encoding-repair`
+- Goal: repair the confirmed FMS dictionary mojibake in the local MySQL database and correct the same source text in V058 for later controlled HRM/FMS initialization
+- Non-goals: adding a new migration, changing dictionary types/values/status/order, changing permissions or business rows, repairing historical label snapshots, modifying other migrations, branch/commit/push operations, or touching production/shared databases
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V058__hrm_fms_metadata_and_data_cleanup.sql`; exact active FMS dictionary `name`/`label` rows in the local `yudao-mysql` database; this handoff record. All unrelated dirty work remains preserved.
+- Owner: Codex `/root`
+- Dependencies: existing System dictionary tables, applied local V058 metadata, and authoritative FMS enum/constants for decoded labels; no new dependency
+- Integration order: capture exact pre-update values -> correct V058 source literals -> apply guarded local database updates -> verify exact repaired values and idempotent no-op -> append delivery evidence
+- Verification plan: assert the pre-update 13 type-name and 55 data-label mojibake counts; validate all 68 decoded mappings; update only exact active rows keyed by `type` or `dict_type + value` plus old label; assert zero known mojibake, 17/75 FMS totals unchanged, all expected Chinese values present, rerun guarded updates with zero affected rows, run SQL/static diff checks, and review the dictionary query projection
+
+## Delivery Entry - 2026-08-21 11:35 +08:00
+
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: directly repair FMS dictionary mojibake in the local database and correct V058 itself for later production initialization, without adding a new migration.
+- Key decisions: followed the user-confirmed exception to the repository rule against rewriting an applied migration; changed only the 13 known FMS type names and 55 known FMS data labels; guarded the database update by stable keys plus exact old mojibake values; preserved dictionary types, values, order, status, permissions, business rows, and historical snapshots.
+- Execution or analysis result: corrected all 68 malformed UTF-8/Windows-1252 round-trip literals in V058 and committed the corresponding guarded updates to the local `yudao-mysql` database; no new migration was created.
+- Changed files: `script/sql/mysql/migrations/V058__hrm_fms_metadata_and_data_cleanup.sql`; this handoff record.
+- Verification evidence: database precheck and update both matched exactly 13 type rows and 55 data rows; post-update checks found 0 old type names, 0 old labels, 13 expected repaired type names, and 55 expected repaired labels; FMS totals remained 17 types and 75 data rows; V058 version count remained 1; protected rerun found zero old-value matches; the modified V058 replayed successfully with its existing-version guard; static inspection found 0 decodable mojibake literals and exactly 68 changed V058 lines with unchanged line count; scoped `git diff --check` passed with only line-ending notices.
+- Dependency or integration impact: local database dictionary display metadata changed; future environments that execute the corrected V058 receive readable FMS names. Existing environments that already executed the old V058 still require the same explicit database repair because no forward migration exists. No dependency, permission, service, branch, commit, push, or production/shared database change occurred.
+- Remaining work: production initialization must use this corrected V058 file. If any target database already has V058 recorded, run a separately reviewed guarded update there; historical business snapshot labels were intentionally not inventoried or rewritten.
+
+## Active delivery - 2026-08-21 media workflow completion
+
+- Workstream ID: `main-media-workflow-completion`
+- Goal: complete the remaining local learning-planner, content-director, operator, filming-editor, partner-H5, handover, review, notification, authorization, and failure-path workflow verification; repair reproducible technical defects and replay them.
+- Non-goals: deleting test or business data; publishing BPM; changing shared or production permissions; adding dependencies; Git branch, commit, push, merge, or artifact publication operations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `c1017b49f37c4d262e269658d04a396754c7e91a`
+- Target branch: `main`
+- Ownership scope: new-media and student-contact code under `backend/yudao-module-zsjos`; related Workbench and H5 pages/services/styles/tests; forward local SQL migrations and verification documentation when required; directly affected API, navigation, BPM, migration, and delivery documentation; this handoff record. Existing unrelated Infra/avatar and FMS changes remain out of scope and preserved.
+- Owner: Codex `/root`
+- Dependencies: current local MySQL/Redis, running localhost backend/Workbench/H5 as available, existing System/BPM/notification public APIs, and server-owned menu/dictionary/user data.
+- Integration order: capture runtime and database baseline -> replay each real page transition -> verify state/event/task/BPM/outbox/message/audit -> add focused regression coverage for each defect -> apply minimal owner-boundary repair -> compile/build/restart affected localhost service -> replay with a new record -> continue remaining independent scenarios.
+- Verification plan: focused Maven tests and ZSJOS compile; authorized/unauthorized real requests; Workbench/H5 tests, typecheck, production builds, desktop/mobile browser states; SQL syntax/repeatability and controlled local execution for forward migrations; per-transition business state, version, ownership, event, task, BPM, Outbox, persisted message, recipient, business number, deep link, and idempotency evidence.
+
+## Delivery Entry - 2026-08-21 13:18 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue all unfinished four-role workflow links and verify every transition's message closure, repairing technical defects locally.
+- Key decisions: retained `content_director` as the director role; used server-owned collaborator candidates and existing notification scenes; no deletion, BPM publication, shared permission change, Git operation, or production action.
+- Execution or analysis result: completed the real ticket rework loop for `PT-64888ed9dc3a439e` (reaccept -> produce -> submit -> operator check -> completed), verified version 10, revision count 1, unique second-round check task/outbox/message, and business deep links. Completed planner service relation 2 acceptance, first contact, study plan, follow-up, and director correction/reassignment with history and version changes. Fixed the planner datetime field by replacing the unstable native datetime-local input with Ant DatePicker and converting its value to the server millisecond timestamp contract. Verified the director-specific menu `/zsjos/media-students` and that `biandao1` sees the assigned student. Added director-assignment notification publishing and student-name snapshot variable mapping; local backend was rebuilt/installed and restarted, then the assignment was replayed and restored to director user 248. Started H5 on local port 5175.
+- Changed files: `frontend/workbench/src/pages/RegistrationPages.tsx`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationNotifyPublisher.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationNotifySceneProvider.java`; this handoff entry.
+- Verification evidence: Workbench typecheck passed; H5 production build passed; focused Maven `StudentContactServiceImplTest` and `RegistrationNotifyPublisherTest` passed 12/12; Maven reactor install for ZSJOS dependencies passed. Database evidence: ticket 7 status `completed`, version 10, revision count 1, accept/check tasks closed, second check outbox and approved message succeeded; service relation 2 version 4 with director 248, contact records persisted for first contact/study plan/follow-up, and assignment history retained. Director page browser evidence shows the distinct `我的学员（编导）` menu and student `全链路业务审批验收0817`.
+- Dependency or integration impact: local backend restarted from Maven development runner; Workbench 5174 remained running; H5 dev server started on 5175. Existing test records remain. The director-assignment event was emitted through the shared notification API, but local outbox inspection did not show a new `zsjos.registration.director_assigned` row after replay; this notification rule/provider wiring remains an unresolved local verification item and must be investigated before claiming that node complete.
+- Remaining work: verify/fix the director-assignment outbox/message end-to-end, then continue positioning rejection/re-submit and partner-H5 confirmation (pending link, ownership error, confirm/reject/version conflict), content rejection/version history, handover create/receive/return, review submissions, account edit/stage/binding, sales/order approval branches, unauthorized/cross-scope checks, and final full builds/SQL/BPM static verification.
+
+## Delivery Entry - 2026-08-21 14:01 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue the remaining local workflow verification and repair technical defects encountered in partner H5 positioning confirmation.
+- Key decisions: kept the partner H5 API under the server-owned `/part-api` prefix by placing its controller below `controller.app.partner`; retained the independent Partner identity boundary rather than applying admin-only `@ss` permission lookup to partner requests; no data deletion, BPM publication, shared authorization mutation, Git operation, or production action.
+- Execution or analysis result: fixed the H5 Vite development proxy from the stale `192.168.2.38:48080` target to `localhost:48080`; added the positioning-confirm permission to the partner portal permission contract; moved the positioning confirmation controller into the partner controller package and removed the incompatible admin permission annotation. Direct local login and positioning confirmation API now return `state=pending_student_link` for card 1, and the partner permission-info response includes `zsjos:positioning-card:student-confirm`.
+- Changed files: `frontend/h5/vite.config.ts`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/personnel/PartnerAuthServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/personnel/PartnerAuthServiceImplTest.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/app/partner/positioning/PositioningConfirmationController.java`; deleted old `controller/app/positioning/PositioningConfirmationController.java`; this handoff entry.
+- Verification evidence: ZSJOS reactor install succeeded; focused PartnerAuthServiceImplTest passed 4/4; new-media/content/positioning/production focused tests passed 22/22; H5 production build passed. Direct HTTP through both `48080` and H5 proxy `5176` confirmed partner login and `/part-api/zsjos/positioning-confirmation/1` returned HTTP 200 with `pending_student_link`. H5 dev servers ran on 5175 and 5176; backend runner restarted on 48080.
+- Dependency or integration impact: partner H5 endpoint routing and permission behavior now align with `WebProperties.partnerApi` and the independent PARTNER token type. No schema or dependency changes. The browser H5 confirmation page still rendered its generic load-error state during one stale-session replay even though the fresh direct/proxy contract returned the expected pending payload; this remains a UI-session reproduction item, not a claimed completion of the browser confirmation branch.
+- Remaining work: continue fresh-browser verification of pending/ownership/confirm/reject/version-conflict H5 states, positioning reject/resubmit and message closure, content rejection/version history, handover and review flows, account and order branches, unauthorized/cross-scope checks, and final full-build/static SQL/BPM verification.
+
+## Delivery Entry - 2026-08-21 14:06 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue the local workflow test and repair the H5 positioning confirmation page.
+- Key decisions: preserve the server response contract and normalize both raw Axios responses and already-unwrapped response bodies; keep pending-link behavior explicit instead of treating it as a generic failure. No data deletion or external publication.
+- Execution or analysis result: fixed the H5 positioning API unwrapping bug. The response interceptor already returns `{card:null,state:'pending_student_link'}`, but the feature-level `unwrap` returned `undefined` when no `data` property remained. The page now renders the pending-student-link state correctly. Added a distinct error message for genuinely malformed responses.
+- Changed files: `frontend/h5/src/api/positioning.ts`; `frontend/h5/src/pages/positioning/confirmation.vue`; this handoff entry.
+- Verification evidence: Fresh browser session on H5 `5176` now shows `兼职账号尚未绑定学员，请联系工作人员补充后再确认`; direct and proxied HTTP responses remain HTTP 200 with `pending_student_link`; H5 production build passed (`vue-tsc -b && vite build`).
+- Dependency or integration impact: none beyond H5 positioning confirmation rendering; no database, BPM, permission, dependency, or shared service changes.
+- Remaining work: continue linked-partner ownership/confirm/reject/version-conflict browser cases, positioning re-submit and notification evidence, then content, handover, review, account, order, and authorization failure branches.
+
+## Delivery Entry - 2026-08-21 15:18 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue the complete local media workflow validation, configure required role permissions, and verify message closure for each transition.
+- Key decisions: applied local V106 after correcting its menu-ID collision and schema-version column contract; added V107 operation grants for the four working roles and V108 supervisor grants for department/delivery managers. No permissions were removed, no accounts were created, and no BPM was published.
+- Execution or analysis result: V106 applied and rerun idempotently; V107 and V108 applied and rerun idempotently. Backend module was installed to the local Maven repository and localhost backend restarted so runtime uses current ZSJOS classes. Created real handover records `HO-f362a2e3dd064243` and `HO-64223cf6ab274d7c`; verified accept, reject, arbitration request, supervisor arbitration, tasks, events, Outbox, messages, and idempotency. Created real review records `RV-cc10f47049bc4db7`, `RV-8ae955c6c7cd46a4`, and `RV-bbfa852a795345d6`; verified submit, supervisor approval, archive, rejection, resubmission, task replacement, messages, and duplicate-submit version conflict. Graduation creation returned stable undeployed-BPM error `1900018004` with no persisted application/event/Outbox.
+- Changed files: `script/sql/mysql/migrations/V106__media_handover_review_graduation_closure.sql`; `script/sql/mysql/migrations/V107__new_media_role_operation_permissions.sql`; `script/sql/mysql/migrations/V108__new_media_supervisor_review_permissions.sql`; `script/sql/mysql/migrations/README.md`; this handoff entry.
+- Verification evidence: V106 schema/menu/template/rule counts are 5/4/1/3/6/6 and remain unchanged after rerun; V107/V108 role grants are present; ZSJOS focused tests passed 6/6; ZSJOS reactor install passed; handover and review database evidence shows unique event/task/outbox/message keys and correct recipients (director 248, operator 230, supervisor 232/250); browser page checks reached login-expired state after the authorized backend restart, so post-restart browser button replay remains unverified.
+- Dependency or integration impact: local database schema, tenant-1 role-menu grants, notification templates/rules, and retained test business rows changed; localhost backend restarted. No production/shared environment action, BPM publication, data deletion, Git commit/push, or artifact release.
+- Remaining work: relogin in browser and replay role-specific page buttons; continue linked-partner H5 confirm/reject/version-conflict, positioning reject/resubmit, account stage/diagnosis/rescue/rebind, sales/order approval and repurchase, cross-scope/tenant/disabled-user negatives, and final full frontend/backend/SQL/BPM verification. `xmtonemanager1` is absent locally; actual manager accounts are `xmtonezhuguan` and `jiaofumanager1`.
+
+## Delivery Entry - 2026-08-21 15:22 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: complete the permission/message validation tranche after V107/V108 and synchronize the role matrix documentation.
+- Key decisions: preserve existing grants, use server-owned role/menu relations, and document supervisor responsibility as `dept_manager` arbitration plus `delivery_manager` review/graduation approval. No permission removals or account creation.
+- Execution or analysis result: verified planner `/zsjos/student/my-page` returns three in-scope students while other roles receive 403; director `/zsjos/media-students/page` returns three assigned records while planner/operator/filming roles receive 403. Confirmed H5/workbench build contracts remain intact. The local H5 package has no `typecheck` script; its required `npm run build` passed.
+- Changed files: `docs/architecture/zsjos-role-permission-matrix.md`; this handoff entry.
+- Verification evidence: Workbench production build passed; H5 `vue-tsc -b && vite build` passed; backend focused tests passed 6/6; scoped `git diff --check` passed. Full browser role replay is unverified after the authorized backend restart because the existing browser session expired and requires a fresh login.
+- Dependency or integration impact: documentation only in this entry; local role/schema/message changes are recorded in the preceding entry. No external publication or Git operation.
+- Remaining work: fresh browser login and page-button replay, partner-H5 bound/ownership/confirm/reject/version-conflict branches, positioning resubmission, account/order branches, and final authorization/message matrix.
+
+## Delivery Entry - 2026-08-21 16:16 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: continue complete local workflow verification, repair technical issues automatically, and validate account operations, BPM startup, and message-related state without deleting data.
+- Key decisions: kept `content_director` as the director role; added a server-owned tenant-scoped student candidate endpoint for account binding; used the requester's direct department leader for account rebind approval; kept all local BPM and SQL changes within the authorized environment.
+- Execution or analysis result: real Workbench replay completed account S0->S1 with required judgment basis, binding to Person 40, rescue `in_progress`, weekly diagnosis using published config version 1, and rebind submission. Rebind created process `95beba3f-9d38-11f1-99ad-8c32236cc8cf` with active `managerReviewer` task assigned to user 232; account version is 4 and `rebind_process_instance_id` is persisted. A failed replay exposed and was repaired for missing stage basis, rescue object authorization, empty student candidates, and immutable BPM variable maps. BPM variable-map repair was applied to rebind, positioning IP, graduation, student-contact extension, withdrawal, and account-related startup paths.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountService.java`; `MediaAccountObjectPermissionProvider.java`; `MediaAccountController.java`; `MediaAccountStudentCandidateRespVO.java`; `MediaWorkflowConstants.java`; `ZsjosErrorCodeConstants.java`; `frontend/workbench/src/pages/MediaFeaturePage.tsx`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/media-feature.guard.test.ts`; `frontend/workbench/docs/api-contract.md`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountObjectPermissionProviderTest.java`; related BPM variable startup services; this handoff entry.
+- Verification evidence: Workbench typecheck passed; media feature guard tests passed 4/4; account object authorization test passed 1/1; ZSJOS reactor install passed after all changes; local backend restarted on port 48080; browser confirmed user-facing account actions and successful alerts; database confirmed account stage/version/rescue/diagnosis/rebind fields and active BPM task. No passwords, tokens, cookies, or complete sensitive payloads were written to logs or this handoff.
+- Dependency or integration impact: local backend PID changed to 19000 after restart; Workbench 5174 remained available; local account 1 is now bound to Person 40 and has an active rebind process targeting Person 45, so this record is intentionally not treated as a completed final business outcome until supervisor callback is tested. No deletion, shared/production permission change, Git commit/push, or artifact publication.
+- Remaining work: BPM supervisor approval/callback for rebind; partner-H5 formal partner-student binding and normal/ownership/error/confirm/reject/version-conflict browser cases; professional-risk positioning IP approval/rejection and resubmit; content and order branches; cross-department/tenant/disabled-user/no-button negatives; final notification/outbox/audit evidence and complete role replay.
+
+## Delivery Entry - 2026-08-21 17:40 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: verify the newly configured IP teacher and complete the remaining professional-risk positioning approval, rejection, resubmission, callback, notification, task, and audit evidence.
+- Key decisions: resolved the IP reviewer from the server-owned `ip_teacher` post and enabled System users instead of inferring a reviewer from a username or role label; retained `content_director` as the positioning director; preserved all existing test data and unrelated dirty-worktree changes.
+- Execution or analysis result: added IP reviewer resolution and BPM assignee variables, persisted the reviewer snapshot, and verified the configured user 254 as the actual `ipReviewer` task assignee. Card `PC-1c809196d379496e` completed the approve path. Card `PC-85512f52beea48da` completed reject to `co_creating`, director resubmission to a new BPM instance, and browser approval by the IP teacher to `operator_feasibility`; its version advanced to 4 and the original director remained user 248. The browser task page showed the real IP-review task and approval controls. IP rejection, IP approval, and next operator-review messages were persisted once with succeeded Outbox rows and responsibility-derived recipients. Rebind, partner-H5, content reject/resubmit, first-purchase dual approval, repurchase, and negative authorization evidence from the same verification run were also reconciled against retained database records.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/positioning/PositioningCardMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/MediaWorkflowConstants.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardServiceTest.java`; formatting-only adjustment in `frontend/workbench/src/pages/MediaFeaturePage.tsx`; this handoff entry.
+- Verification evidence: real browser login as the configured IP teacher showed `新媒体定位专业风险审核` assigned at task key `ipReviewer`; browser approval completed successfully. BPM history records user 254 as assignee for approve, reject, and resubmitted processes; card 9 events record `ip_review -> co_creating -> ip_review -> operator_feasibility`; Outbox rows 250, 256, and 257 succeeded, with messages delivered to director 248 and operator 230. Focused Maven `PositioningCardServiceTest` and `ContentServiceTest` passed 7/7; the earlier Workbench suite passed 335/335, Workbench typecheck/build and H5 build passed; scoped `git diff --check` passed.
+- Dependency or integration impact: localhost backend is running the updated reviewer-resolution implementation; retained local BPM instances, business records, Outbox rows, messages, and audit evidence were advanced by authorized test operations. No data deletion, production/shared permission change, Git commit/push, or artifact publication occurred.
+- Remaining work: the two older failed positioning processes created before reviewer resolution remain as retained failure evidence and should not be treated as actionable tasks. Repurchase order 14 generated the configured approval-recipient submission message and sales-owner effective message; no submitter companion message was generated because repurchase has no lead submitter in the current ownership model. Full Maven reactor remains subject to the pre-existing unrelated Infra test risk documented elsewhere.
+
+## Delivery Entry - 2026-08-21 19:55 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `c1017b49f37c4d262e269658d04a396754c7e91a` (no commit created)
+- User goal: implement the approved integrated repair plan for registration fulfillment, stable inbox ordering, exact planner-task deep links, third-party-account field configuration, media-student-center consolidation, media object authorization, and user-relation removal.
+- Key decisions: retired only the three standalone page menus while preserving their business tables, APIs, and stable button permissions; made `/zsjos/media-students` the shared director/operator entry with backend object scope; used versioned administrator-owned account field definitions and persisted value/label snapshots; preserved sales contact records and added a separate media talk-record domain; added only forward V113 migration artifacts and did not execute them.
+- Execution or analysis result: completed registration configuration validation and post-completion locking; standardized backend update-time/ID ordering; added controlled task and notification targets; implemented the five-tab media student center, dynamic third-party-account creation/details, positioning/content actions, talk records, operation/task projections, director/operator data scope, and media object authorization; added the Admin account-field configuration page and optimistic version handling; retired account/content/positioning routes and menus; added single and batch relationship removal; synchronized user-visible terminology and directly affected documentation. V113 now includes fixed-menu ownership protection and six read-only bootstrap checks.
+- Changed files: ZSJOS account/content/positioning/production/media/registration/student-contact/task/user-relation controllers, VOs, services, data objects, mappers, permissions, error codes, and tests under `backend/yudao-module-zsjos`; System notification ordering mapper; Workbench media student, registration, today-task, inbox, route, notification, API, style, and guard files; Admin relationship and media-account-field configuration files; `script/sql/mysql/migrations/V113__media_student_center_consolidation.sql`, bootstrap/migration/verification documentation and SQL; directly affected API, navigation, permission, and operations documents; this handoff entry.
+- Verification evidence: focused backend media/account/student tests passed 15/15; account field configuration copy/version/snapshot tests passed 4/4; full `yudao-module-zsjos` tests passed 474/474; Workbench tests passed 335/335, typecheck passed, and production build passed; Admin new files passed scoped ESLint and Stylelint and `build:local` passed; Admin full `ts:check` remains blocked by pre-existing BPM/EAM/CRM/export/user type errors, and full lint remains blocked by pre-existing style errors outside this new page; Maven `-am test` reached 210 dependency tests but stopped on the unrelated existing `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch` assertion before ZSJOS, which was then tested independently; V113 static prepare/execute/deallocate counts match, bootstrap order is V113 after V112, six V113 verifier checks exist, and `git diff --check` reported only line-ending notices.
+- Dependency or integration impact: V113 must be applied through the reviewed migration process before deploying code that queries the new field-config/talk tables; it grants the existing media-student page to enabled operator roles and retires three page menus while retaining operation permissions. No dependency, database execution, data deletion, service restart, branch/commit/push, BPM publication, or shared/production permission change occurred in this turn.
+- Remaining work: obtain separate approval to apply V113 in a controlled environment, run `verify-bootstrap.sql`, then perform authorized/unauthorized desktop and mobile browser checks for retired menus, five tabs, dynamic account fields, exact task/message deep links, stable list ordering, completion-button lockout, and relationship removal. Resolve unrelated Admin type/lint debt and the Infra UniApp codegen test separately if a completely green repository-wide pipeline is required.

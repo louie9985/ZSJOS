@@ -242,3 +242,88 @@ later administrator removal. The runtime command derives its entire target set f
 manager hierarchy and stable `sales_specialist` post, including disabled accounts; the migration
 itself changes no account, dispatch preference, Lead, presence, or audit data. It is additive,
 repeatable, and forward-only. Existing-environment execution remains a separate approved action.
+
+### V101 student basic-information permission
+
+Adds the `zsjos:student:update-basic-info` button permission under My Students and grants it to
+enabled `system_administrator` and `study_planner` roles only on the first successful V101 install.
+Reruns preserve later administrator removal of a role grant. The runtime command remains cumulative
+with owner-only student-service object authorization and accepted-service state. The migration changes
+no Person, Lead, order, contact, task, event, or historical snapshot row. It is additive, repeatable,
+forward-only, and must not be applied to an existing environment without separate approval.
+
+### V102 new-media business notifications
+
+Adds system-owned in-app templates and, only when a scene has no existing rule, one enabled default
+rule per active tenant for the confirmed new-media pending-action, return, and final-result nodes.
+Recipients come from persisted object responsibility or Partner binding snapshots supplied by the
+business event; the migration does not infer recipients from role names. Message copy displays the
+business number snapshot rather than an internal ID. Reruns do not duplicate templates or rules,
+administrator-created scene rules are preserved, and historical messages are not backfilled. Recovery
+is forward-only: disable V102-created rules and retain delivered messages and outbox history.
+
+### V103 new-media operator director-menu repair
+
+Removes the content-director-only `/zsjos/media-students` menu (`7022`) from every
+`new_media_operator` role after V100 granted it as part of the operator menu set. The migration leaves
+the dedicated `content_director` grant and the planner-owned `/zsjos/my-students` menu unchanged. It is
+repeatable, changes no business or audit rows, and records both schema-version markers. Recovery is an
+explicit re-grant through System role management if the business permission contract later changes.
+
+### V104 new-media business dictionaries
+
+Adds the confirmed system dictionary types `zsjos_account_platform` (抖音、小红书、视频号) and
+`zsjos_content_class` (首批、重点、异常、日常). Inserts are guarded by type/value and preserve
+existing administrator entries. The migration changes dictionary metadata and options only; it does
+not alter media accounts, content, snapshots, notifications, or permissions. It is repeatable and
+forward-only; historical records retain their stored label snapshots.
+
+### V105 production-ticket delivery time compatibility
+
+Makes `zsjos_production_ticket.expected_delivered_at` nullable to match the current
+Workbench form, which collects a single delivery deadline. The migration is forward-only,
+repeatable, and changes no existing business rows; tightening the column again requires
+an explicit backfill and separate schema decision.
+
+### V106 media handover, review, and graduation closure
+
+Adds handover-arbitration and review-approval columns, the graduation-application table,
+three server-owned button permissions, and the in-app templates/rules for arbitration,
+review, and graduation result scenes. The migration is additive, repeatable, and
+forward-only. It grants no role permissions, publishes no BPM model, and changes no
+existing business row; recovery preserves delivered messages and disables the new rules
+or permissions instead of dropping populated schema objects.
+
+### V107 new-media role operation permissions
+
+Adds missing operation permissions to the existing tenant-1 study planner, content director,
+new-media operator, and filming editor roles. The migration is additive and repeatable: it
+does not remove existing role grants, create accounts, or change business rows. Service-level
+object authorization and responsibility checks remain authoritative.
+
+### V108 new-media supervisor review permissions
+
+Adds handover arbitration to `dept_manager`, and review approval plus graduation initiation
+to `delivery_manager`. It is additive, repeatable, and limited to existing roles; it does
+not create users, publish BPM, or change business rows.
+
+### V109 local media BPM publisher permission
+
+Adds the existing BPM model create/import/update/deploy buttons to the tenant-1
+`dept_manager` role so the confirmed local media BPM assets can be published through the
+standard BPM public API. It is additive and repeatable and does not create accounts,
+remove permissions, or deploy a model by itself.
+
+### V112 registration planner notification template
+
+Repairs only the migration-owned `ZSJOS_REGISTRATION_PLANNER_ASSIGNED` template so its
+title, summary, content and parameter list use the registered `lead.no` variable. It
+preserves administrator-owned edits and delivered message snapshots, and is repeatable
+and forward-only.
+
+### V113 media student center consolidation
+
+Moves third-party account, content and positioning operation permissions beneath the media-student
+page, retires their standalone page menus, grants the scoped student page to the media operator,
+and adds versioned account-field configuration plus media-student talk records. The migration is
+repeatable and preserves all business rows and stable permission strings.

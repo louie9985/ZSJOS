@@ -1,6 +1,6 @@
 <template>
   <el-popover
-    trigger="click"
+    :trigger="trigger"
     placement="top"
     width="280"
     :visible="resolvedVisible"
@@ -34,6 +34,8 @@ const emit = defineEmits<{
 
 const internalVisible = ref(false)
 const resolvedVisible = computed(() => props.visible ?? internalVisible.value)
+// Controlled callers open the confirmation after validation; avoid Popover's click toggle racing that state update.
+const trigger = computed(() => (props.visible === undefined ? ('click' as const) : []))
 
 const handleVisibleChange = (nextVisible: boolean) => {
   if (props.visible === undefined) internalVisible.value = nextVisible

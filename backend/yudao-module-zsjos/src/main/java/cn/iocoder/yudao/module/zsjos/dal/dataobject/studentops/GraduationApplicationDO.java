@@ -1,0 +1,4 @@
+package cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO; import com.baomidou.mybatisplus.annotation.*; import lombok.*; import java.time.LocalDateTime;
+@Data @EqualsAndHashCode(callSuper=true) @TableName("zsjos_graduation_application") @KeySequence("zsjos_graduation_application_seq")
+public class GraduationApplicationDO extends TenantBaseDO { @TableId private Long id; private String applicationNo; private Long serviceRelationId; private Long studentPersonId; private Long plannerUserId; private Long reviewerUserId; private Long directorUserId; private Long operatorUserId; private String reason; private String snapshotJson; private String status; private String processInstanceId; private String resultReason; private LocalDateTime submittedAt; private LocalDateTime completedAt; private Integer version; }

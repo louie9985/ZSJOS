@@ -75,6 +75,7 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
         result.put("order.id", payload.get("orderId"));
         result.put("order.no", payload.get("orderNo"));
         result.put("lead.no", payload.get("leadNo"));
+        result.put("student.name", payload.get("studentName"));
         return result;
     }
 }

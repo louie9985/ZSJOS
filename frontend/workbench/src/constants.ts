@@ -94,6 +94,11 @@ export const APP_ROUTES = {
   NOTIFY_RULE: '/messages/notify/notify-rule',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
+  ,MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets'
+  ,MEDIA_HANDOVERS: '/zsjos/handovers'
+  ,MEDIA_STUDENT_OPS: '/zsjos/student-ops'
+  ,MEDIA_REVIEWS: '/zsjos/reviews'
+  ,MEDIA_STUDENTS: '/zsjos/media-students'
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
@@ -137,6 +142,11 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.NOTIFY_RULE,
   APP_ROUTES.ALL_MESSAGES,
   APP_ROUTES.UNREAD_MESSAGES
+  ,APP_ROUTES.MEDIA_PRODUCTION_TICKETS
+  ,APP_ROUTES.MEDIA_HANDOVERS
+  ,APP_ROUTES.MEDIA_STUDENT_OPS
+  ,APP_ROUTES.MEDIA_REVIEWS
+  ,APP_ROUTES.MEDIA_STUDENTS
 ])
 
 // ========== Dictionaries ==========

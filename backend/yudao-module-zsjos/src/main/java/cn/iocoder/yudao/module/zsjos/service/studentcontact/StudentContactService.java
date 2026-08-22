@@ -12,6 +12,7 @@ public interface StudentContactService {
     StudentContactContextRespVO getContext(Long relationId, Long userId);
     PageResult<StudentContactRecordRespVO> getRecords(Long relationId, PageParam page, Long userId);
     void accept(Long relationId, StudentServiceAcceptReqVO request, Long userId);
+    void updateBasicInfo(Long relationId, StudentBasicInfoUpdateReqVO request, Long userId);
     Long submitFirstContact(Long relationId, StudentFirstContactSubmitReqVO request, Long userId);
     Long submitStudyPlan(Long relationId, StudentStudyPlanSubmitReqVO request, Long userId);
     Long submitContact(Long relationId, StudentContactSubmitReqVO request, Long userId);

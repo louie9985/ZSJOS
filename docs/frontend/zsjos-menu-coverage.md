@@ -46,8 +46,14 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 38 | 我的学员 | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
 | 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
 | 40 | 异常情况处理 | `/zsjos/student-contact-exceptions` | `StudentContactExceptionsPage` | `zsjos/studentContactExceptions/index` |
+| 41 | 拍剪工单 | `/zsjos/production-tickets` | `MediaWorkflowPage` | `zsjos-workbench/MediaProductionTicketsPage` |
+| 42 | 交接单 | `/zsjos/handovers` | `MediaWorkflowPage` | `zsjos-workbench/MediaHandoversPage` |
+| 43 | 学员运营 | `/zsjos/student-ops` | `MediaWorkflowPage` | `zsjos-workbench/MediaStudentOpsPage` |
+| 44 | 复盘与诊断 | `/zsjos/reviews` | `MediaWorkflowPage` | `zsjos-workbench/MediaReviewsPage` |
+| 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
+| 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
 
-“我的学员”按 Person 聚合并按服务关系切换。学习规划师确认接收后，在概览中可随时选择性分配编导或职业规划师；两项均不创建任务且不阻塞联系链。后三个教务标签由服务端发布配置决定协作者只读可见性，前端仅渲染服务端返回的 `visibleTabs`。
+“我的学员”按 Person 聚合并按服务关系切换。详情复用 `/zsjos/leads/manage` 的统一 `LeadDetail`，以只读模式展示客资概览、销售跟进记录和订单记录，并在同一详情壳中追加当前课程服务、首次联系、学习计划和学员联系记录。每个服务关系使用其真实订单关联的 Lead，不能用同一 Person 的其他 Lead 回退。学习规划师确认接收后，在概览中可随时选择性分配编导或职业规划师；两项均不创建任务且不阻塞联系链。教务标签由服务端发布配置决定，前端仅渲染服务端返回的 `visibleTabs`。
 
 Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落地为 `src/views/zsjos/registration-pool.vue` 和 `src/views/zsjos/my-students.vue`，与服务端菜单的 `component` 值直接对应。
 
@@ -59,4 +65,13 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - 订单、学员、审批和业务通知可深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={overview|follow-ups|orders|appeals|complaints|flow-history}`；省略或传入非法 `tab` 时进入概览。该入口只加载指定详情，不扩大客资列表。通知按场景选择跟进、申诉、投诉或概览页签，当前不自动改投流转记录；前端只会激活服务端 `visibleTabs` 中的目标页签，不可见时回退概览。五个业务标签权限在 System 角色权限管理中独立配置，`flow-history` 对应 `zsjos:lead-detail:flow-read`，不得由角色名或前端 mode 推断。
 - 历史 `/zsjos/sales-order-supervisor-confirmations` 仅由 React 重定向到 `/zsjos/sales-order-approvals`，服务端不再发布独立主管确认页面菜单。
 - 新增或修改页面菜单时，必须同步服务端菜单种子、React `APP_ROUTES`/`RENDERABLE_APP_ROUTES`/`RouteHost`、Vue `component` 文件和本矩阵。
+- `/zsjos/my-students` 仅属于 `study_planner`；`content_director` 和 `new_media_operator` 共用 `/zsjos/media-students` 与 `zsjos:media-student:query-my`，后端分别按服务关系、账号责任关系和本人任务限制学员范围。
+- `/zsjos/accounts`、`/zsjos/content`、`/zsjos/positioning` 的页面菜单由 V113 退役。稳定的查询和操作权限字符串保留，并调整到学员菜单下；账号、内容和定位只能从具体学员的相应标签进入。
 The subordinate-sales left pane uses the shared 20-row append lazy-loading pattern with a scroll-root sentinel, stable server ordering, deduplication, stale-request rejection, and retryable load-more failure. The `一键下班` command is rendered only from `zsjos:subordinate-sales:pause-all`; its scope is entirely server-owned. The home page and header consume one dispatch-status provider so mode, heartbeat, page-offline state, retry, and eligibility remain synchronized without duplicate polling.
+
+### Media student center
+
+- `/zsjos/media-students` is rendered by `MediaStudentsPage` and requires `zsjos:media-student:query-my`.
+- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its five fixed tabs are overview, third-party platform accounts, positioning history, content production history, and talk records.
+- Directors see their service-relation or account responsibility scope. Operators see only students related to accounts, content, positioning, or tasks they currently own. Each detail and command is re-authorized independently by the backend.
+- Account, content, and positioning notifications deep-link to the student center with `personId`, `tab`, and the relevant record ID. Historical records without a student binding show an explicit unavailable target instead of opening a retired route.

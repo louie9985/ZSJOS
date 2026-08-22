@@ -50,6 +50,14 @@ public class StudentContactController {
         return success(true);
     }
 
+    @PutMapping("/{relationId}/basic-info")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:update-basic-info')")
+    public CommonResult<Boolean> updateBasicInfo(@PathVariable Long relationId,
+                                                  @Valid @RequestBody StudentBasicInfoUpdateReqVO request) {
+        service.updateBasicInfo(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
     @PostMapping("/{relationId}/first-contact")
     @PreAuthorize("@ss.hasPermission('zsjos:student-contact:first-submit')")
     public CommonResult<Long> submitFirstContact(@PathVariable Long relationId,

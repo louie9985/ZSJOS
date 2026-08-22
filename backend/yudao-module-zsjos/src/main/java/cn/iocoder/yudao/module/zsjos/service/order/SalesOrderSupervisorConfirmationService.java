@@ -233,7 +233,7 @@ public class SalesOrderSupervisorConfirmationService {
     }
 
     private String encodeCursor(SalesOrderSupervisorConfirmationDO row, Long userId, Boolean handled, int fingerprint) {
-        String raw = row.getRequestedAt() + "|" + row.getId() + "|" + userId + "|" + handled + "|" + fingerprint;
+        String raw = row.getUpdateTime() + "|" + row.getId() + "|" + userId + "|" + handled + "|" + fingerprint;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
     private Cursor decodeCursor(String value, Long userId, Boolean handled, int fingerprint) {

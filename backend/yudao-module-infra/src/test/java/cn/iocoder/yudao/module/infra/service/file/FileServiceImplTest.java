@@ -24,8 +24,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import static cn.iocoder.yudao.framework.common.util.date.LocalDateTimeUtils.buildTime;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.*;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_PATH_INVALID;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.same;
 import static org.mockito.Mockito.*;
@@ -201,6 +200,54 @@ public class FileServiceImplTest extends BaseDbUnitTest {
         byte[] result = fileService.getFileContent(configId, path);
         // 断言
         assertSame(result, content);
+    }
+
+    @Test
+    public void testCreateAvatarFile_successUsesApprovedDirectoryAndDetectedType() throws Exception {
+        byte[] content = ResourceUtil.readBytes("file/erweima.jpg");
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getMasterFileClient()).thenReturn(client);
+        when(client.getId()).thenReturn(24L);
+        when(client.upload(same(content), argThat(path -> path.matches(
+                "system/user/avatar/\\d{8}/\\d+/[a-f0-9]{64}\\.jpg")), eq("image/jpeg")))
+                .thenReturn("https://signed.example/avatar");
+
+        FileDO avatar = fileService.createAvatarFile(content, "system/user/avatar");
+
+        assertEquals(24L, avatar.getConfigId());
+        assertEquals("image/jpeg", avatar.getType());
+        assertTrue(avatar.getPath().startsWith("system/user/avatar/"));
+        verify(client).upload(same(content), anyString(), eq("image/jpeg"));
+    }
+
+    @Test
+    public void testCreateAvatarFile_rejectsInvalidDirectoryTypeAndSize() {
+        byte[] image = ResourceUtil.readBytes("file/erweima.jpg");
+        assertServiceException(() -> fileService.createAvatarFile(image, "zsjos/lead"),
+                FILE_AVATAR_DIRECTORY_INVALID);
+        assertServiceException(() -> fileService.createAvatarFile("not-an-image".getBytes(), "employee/avatar"),
+                FILE_AVATAR_TYPE_INVALID);
+        assertServiceException(() -> fileService.createAvatarFile(new byte[(int) FileServiceImpl.AVATAR_MAX_SIZE + 1],
+                "employee/avatar"), FILE_AVATAR_SIZE_EXCEEDED);
+        verifyNoInteractions(fileConfigService);
+    }
+
+    @Test
+    public void testGetAvatarFileContent_usesOriginalConfigAndRejectsOtherFiles() throws Exception {
+        FileDO avatar = randomPojo(FileDO.class, file -> file.setConfigId(24L)
+                .setPath("employee/avatar/20260820/avatar.jpg").setType("image/jpeg"));
+        fileMapper.insert(avatar);
+        FileClient client = mock(FileClient.class);
+        when(fileConfigService.getFileClient(24L)).thenReturn(client);
+        byte[] content = ResourceUtil.readBytes("file/erweima.jpg");
+        when(client.getContent(avatar.getPath())).thenReturn(content);
+
+        assertArrayEquals(content, fileService.getAvatarFileContent(avatar.getId()));
+
+        FileDO other = randomPojo(FileDO.class, file -> file.setConfigId(24L)
+                .setPath("zsjos/lead/document.jpg").setType("image/jpeg"));
+        fileMapper.insert(other);
+        assertServiceException(() -> fileService.getAvatarFile(other.getId()), FILE_AVATAR_NOT_EXISTS);
     }
 
     @Test

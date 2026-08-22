@@ -118,12 +118,16 @@ describe('spacing and sizing anchors', () => {
       /\.subordinate-sales-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.business-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.registration-page,.registration-config-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.media-students-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.media-accounts-page[^}]*padding:\s*var\(--crm-page-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.sales-order-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.work-plan-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.subordinate-sales-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
-      /\.business-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
+      /\.business-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
+      /\.media-students-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
+      ,/\.media-feature-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
     ]
     expect(anchors.filter(re => !re.test(joined)).map(re => re.source)).toEqual([])
   })
@@ -138,7 +142,9 @@ describe('spacing and sizing anchors', () => {
       'work-plan-layout',
       'subordinate-inbox-layout',
       'aging-pool-layout',
-      'business-inbox-layout'
+      'business-inbox-layout',
+      'media-students-inbox-layout'
+      ,'media-feature-inbox-layout'
     ]
     const offenders = layouts.filter(name => {
       const body = joined.split(`.${name} {`)[1]?.split('}')[0] ?? ''

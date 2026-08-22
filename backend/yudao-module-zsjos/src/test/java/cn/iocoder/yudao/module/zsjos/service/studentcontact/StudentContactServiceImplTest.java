@@ -1,0 +1,230 @@
+package cn.iocoder.yudao.module.zsjos.service.studentcontact;
+
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactContextRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentBasicInfoUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactConfigVersionDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactConfigVersionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.HashMap;
+
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
+import org.springframework.test.util.ReflectionTestUtils;
+
+@ExtendWith(MockitoExtension.class)
+class StudentContactServiceImplTest {
+
+    @InjectMocks private StudentContactServiceImpl service;
+    @Mock private ServiceRelationMapper relationMapper;
+    @Mock private StudentContactConfigVersionMapper configMapper;
+    @Mock private BusinessTaskMapper taskMapper;
+    @Mock private PermissionApi permissionApi;
+    @Mock private AdminUserApi adminUserApi;
+    @Mock private StudentContactConfigService configService;
+    @Mock private PersonMapper personMapper;
+    @Mock private PersonIdentityWriteService personIdentityWriteService;
+    @Mock private BusinessEventMapper eventMapper;
+
+    @AfterEach
+    void clearTenant() {
+        TenantContextHolder.clear();
+    }
+
+    @Test
+    void getContextProjectsOnlyAuthorizedOwnerActions() {
+        prepareContext();
+        when(permissionApi.hasAnyPermissions(7L, PERMISSION_FIRST_CONTACT_SUBMIT)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(7L, PERMISSION_UPDATE_BASIC_INFO)).thenReturn(true);
+        lenient().when(permissionApi.hasAnyPermissions(7L, PERMISSION_COLLABORATOR_ASSIGN)).thenReturn(true);
+
+        StudentContactContextRespVO result = service.getContext(10L, 7L);
+
+        assertEquals(List.of(CONTEXT_ACTION_FIRST_CONTACT, CONTEXT_ACTION_EDIT_BASIC_INFO,
+                        CONTEXT_ACTION_ASSIGN_CONTENT_DIRECTOR, CONTEXT_ACTION_ASSIGN_CAREER_PLANNER),
+                result.getAvailableActions());
+    }
+
+    @Test
+    void getContextOmitsActionsWithoutFeaturePermissions() {
+        prepareContext();
+
+        StudentContactContextRespVO result = service.getContext(10L, 7L);
+
+        assertEquals(List.of(), result.getAvailableActions());
+    }
+
+    @Test
+    void getContextBeforeAcceptanceProjectsOnlyAccept() {
+        ServiceRelationDO relation = relation("pending");
+        lenient().when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(configService.requirePublished()).thenReturn(config());
+        when(permissionApi.hasAnyPermissions(7L, PERMISSION_ACCEPT)).thenReturn(true);
+        lenient().when(adminUserApi.getUserMap(List.of(-1L, -1L))).thenReturn(new HashMap<>());
+
+        StudentContactContextRespVO result = service.getContext(10L, 7L);
+
+        assertEquals(List.of(CONTEXT_ACTION_ACCEPT), result.getAvailableActions());
+    }
+
+    @Test
+    void getContextProjectsStageSpecificAction() {
+        prepareContext(TYPE_STUDY_PLAN);
+        when(permissionApi.hasAnyPermissions(7L, PERMISSION_STUDY_PLAN_SUBMIT)).thenReturn(true);
+
+        assertEquals(List.of(CONTEXT_ACTION_STUDY_PLAN), service.getContext(10L, 7L).getAvailableActions());
+    }
+
+    @Test
+    void getContextProjectsFollowUpAndHidesAssignedCollaborators() {
+        prepareContext(TYPE_CONTACT);
+        when(permissionApi.hasAnyPermissions(7L, PERMISSION_CONTACT_SUBMIT)).thenReturn(true);
+        lenient().when(permissionApi.hasAnyPermissions(7L, PERMISSION_COLLABORATOR_ASSIGN)).thenReturn(true);
+        ServiceRelationDO relation = relation("accepted");
+        relation.setContentDirectorUserId(51L); relation.setCareerPlannerUserId(52L);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(adminUserApi.getUserMap(List.of(51L, 52L))).thenReturn(new HashMap<>());
+
+        assertEquals(List.of(CONTEXT_ACTION_FOLLOW_UP, CONTEXT_ACTION_ASSIGN_CONTENT_DIRECTOR,
+                CONTEXT_ACTION_ASSIGN_CAREER_PLANNER), service.getContext(10L, 7L).getAvailableActions());
+    }
+
+    @Test
+    void nextTaskTypeKeepsFailuresAndAdvancesSuccesses() {
+        assertEquals(TYPE_FIRST_CONTACT, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_FIRST_CONTACT, false));
+        assertEquals(TYPE_STUDY_PLAN, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_FIRST_CONTACT, true));
+        assertEquals(TYPE_STUDY_PLAN, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_STUDY_PLAN, false));
+        assertEquals(TYPE_CONTACT, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_STUDY_PLAN, true));
+        assertEquals(TYPE_CONTACT, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_CONTACT, true));
+    }
+
+    @Test
+    void updateBasicInfoWritesPersonAndPiiFreeEvent() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted");
+        relation.setPersonId(100L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+        PersonDO before = new PersonDO();
+        before.setId(100L); before.setName("旧姓名"); before.setMobile("13800000000"); before.setWechatId("old-wechat");
+        when(personMapper.selectById(100L)).thenReturn(before);
+        StudentBasicInfoUpdateReqVO request = new StudentBasicInfoUpdateReqVO();
+        request.setName("新姓名"); request.setMobile("13900000000"); request.setWechatId("new-wechat"); request.setReason("学员要求更正");
+
+        service.updateBasicInfo(10L, request, 7L);
+
+        verify(personIdentityWriteService).update(100L, "新姓名", "13900000000", "new-wechat");
+        ArgumentCaptor<BusinessEventDO> captor = ArgumentCaptor.forClass(BusinessEventDO.class);
+        verify(eventMapper).insert(captor.capture());
+        BusinessEventDO event = captor.getValue();
+        assertEquals("student_basic_info_updated", event.getEventType());
+        assertEquals("student_service", event.getAggregateType());
+        assertEquals(10L, event.getAggregateId());
+        assertFalse(event.getRelatedObjectRefs().contains("13900000000"));
+        assertFalse(event.getRelatedObjectRefs().contains("new-wechat"));
+    }
+
+    @Test
+    void updateBasicInfoRejectsUnacceptedService() {
+        TenantContextHolder.setTenantId(1L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation("pending"));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.updateBasicInfo(10L, basicInfoRequest("13800000000"), 7L));
+
+        assertEquals(STUDENT_SERVICE_NOT_ACCEPTED.getCode(), error.getCode());
+        verifyNoInteractions(personIdentityWriteService, eventMapper);
+    }
+
+    @Test
+    void updateBasicInfoRejectsNonOwner() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted"); relation.setOwnerUserId(8L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.updateBasicInfo(10L, basicInfoRequest("13800000000"), 7L));
+
+        assertEquals(STUDENT_PERMISSION_DENIED.getCode(), error.getCode());
+        verifyNoInteractions(personIdentityWriteService, eventMapper);
+    }
+
+    @Test
+    void updateBasicInfoRejectsInvalidMobile() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted"); relation.setPersonId(100L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.updateBasicInfo(10L, basicInfoRequest("123"), 7L));
+
+        assertEquals(LEAD_MOBILE_INVALID.getCode(), error.getCode());
+        verifyNoInteractions(personIdentityWriteService, eventMapper);
+    }
+
+    private void prepareContext() {
+        prepareContext(TYPE_FIRST_CONTACT);
+    }
+
+    private void prepareContext(String taskType) {
+        ServiceRelationDO relation = relation("accepted");
+        lenient().when(relationMapper.selectById(10L)).thenReturn(relation);
+
+        BusinessTaskDO task = new BusinessTaskDO();
+        task.setId(20L);
+        task.setTaskType(taskType);
+        task.setStatus("pending");
+        task.setDueAt(LocalDateTime.now().plusHours(1));
+        task.setPayload("{\"configVersionId\":30}");
+        when(taskMapper.selectPendingByRelationAndType(eq(10L), anyString()))
+                .thenAnswer(invocation -> taskType.equals(invocation.getArgument(1)) ? task : null);
+
+        when(configMapper.selectById(30L)).thenReturn(config());
+        lenient().when(adminUserApi.getUserMap(List.of(-1L, -1L))).thenReturn(new HashMap<>());
+    }
+
+    private ServiceRelationDO relation(String acceptanceStatus) {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(7L); relation.setStatus("active");
+        relation.setAcceptanceStatus(acceptanceStatus); relation.setVersion(2);
+        return relation;
+    }
+
+    private StudentContactConfigVersionDO config() {
+        StudentContactConfigVersionDO config = new StudentContactConfigVersionDO();
+        config.setId(30L); config.setChecklistJson("[]"); config.setQuickNotesJson("[]");
+        config.setCollaboratorTabsJson("{}"); config.setFirstContactTimeoutMinutes(120);
+        config.setStudyPlanTimeoutMinutes(1440);
+        return config;
+    }
+
+    private StudentBasicInfoUpdateReqVO basicInfoRequest(String mobile) {
+        StudentBasicInfoUpdateReqVO request = new StudentBasicInfoUpdateReqVO();
+        request.setName("学员"); request.setMobile(mobile); request.setReason("更正");
+        return request;
+    }
+}

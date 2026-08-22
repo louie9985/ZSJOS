@@ -24,11 +24,11 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/part-api': {
-        target: 'http://192.168.2.38:48080',
+        target: 'http://localhost:48080',
         changeOrigin: true
       },
       '/app-api': {
-        target: 'http://192.168.2.38:48080',
+        target: 'http://localhost:48080',
         changeOrigin: true
       }
     }

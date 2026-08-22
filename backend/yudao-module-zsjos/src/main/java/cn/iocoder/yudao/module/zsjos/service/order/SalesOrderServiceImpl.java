@@ -328,7 +328,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<SalesOrderListItemRespVO> result = list.stream()
                 .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList();
         String next = hasMore && !list.isEmpty()
-                ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getSubmittedAt(), list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
+                ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getUpdateTime(), list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
         return new CursorPageResult<>(result, next, hasMore);
     }
 

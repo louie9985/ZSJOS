@@ -39,6 +39,8 @@ import {
   WorkPlanConfigPage
 } from '../pages/ConfigurationPages'
 import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
+import { ProductionTicketsPage, HandoversPage, StudentOpsPage, ReviewsPage } from '../pages/MediaFeaturePage'
+import MediaStudentsPage from '../pages/MediaStudentsPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -95,10 +97,15 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage/>
+  if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
+  if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MEDIA_HANDOVERS) return <HandoversPage/>
+  if (menu?.path === APP_ROUTES.MEDIA_STUDENT_OPS) return <StudentOpsPage/>
+  if (menu?.path === APP_ROUTES.MEDIA_REVIEWS) return <ReviewsPage/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
     <Result status="info" title="页面尚未迁移" subTitle="该菜单已由统一权限系统下发，前端页面尚未迁移。"/>
     <Typography.Paragraph type="secondary">路径：{menu?.path || location.pathname}　组件：{menu?.component || '未配置'}</Typography.Paragraph>

@@ -112,8 +112,9 @@ public class LeadObjectPermissionService {
     }
 
     public boolean canReadStudentSalesHistory(LeadDO lead, Long userId) {
-        return serviceRelationMapper.countActiveByOwnerAndLead(userId, lead.getId(),
-                TenantContextHolder.getRequiredTenantId()) > 0;
+        long tenantId = TenantContextHolder.getRequiredTenantId();
+        return serviceRelationMapper.countActiveByOwnerAndLead(userId, lead.getId(), tenantId) > 0
+                || serviceRelationMapper.countActiveByParticipantAndLead(userId, lead.getId(), tenantId) > 0;
     }
 
     public boolean canReadAsOwnerOrManager(LeadDO lead, Long userId) {

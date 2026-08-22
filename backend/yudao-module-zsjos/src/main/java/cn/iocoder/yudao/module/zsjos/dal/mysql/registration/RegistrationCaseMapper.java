@@ -33,7 +33,7 @@ public interface RegistrationCaseMapper extends BaseMapperX<RegistrationCaseDO> 
             else query.in(RegistrationCaseDO::getId, caseIds);
         }
         return selectPage(pageParam, query
-                .orderByAsc(RegistrationCaseDO::getRegistrationApprovedAt)
-                .orderByAsc(RegistrationCaseDO::getId));
+                .orderByDesc(RegistrationCaseDO::getUpdateTime)
+                .orderByDesc(RegistrationCaseDO::getId));
     }
 }

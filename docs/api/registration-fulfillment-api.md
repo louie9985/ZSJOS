@@ -74,6 +74,9 @@ in-app message and the standard post-commit WebSocket hint for that director.
 - `GET /zsjos/student/my-page`
 - `POST /zsjos/student/my/search-page`
 - `GET /zsjos/student/my/{personId}`
+- `GET /zsjos/student/my/by-service/{relationId}`
+
+“我的学员”响应按 Person 聚合，但 `services` 中每一项同时返回该服务真实订单所关联的 `leadId`（仅内部技术链接）和 `leadNo`（用户可见业务编号）。Workbench 使用当前服务项的 Lead 复用统一 `LeadDetail`，不得以 Person 下其他服务或其他 Lead 作为回退。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。
 
 Results are read-only, grouped by Person, scoped to active service relationships directly owned by or
 routed to the current user, and aggregate order/course services without exposing sales actions. Both
@@ -104,6 +107,14 @@ For databases where V085 was already applied, V087 forward-repairs missing regis
 
 Each active service relation is accepted independently through `/zsjos/student/service/{serviceRelationId}/accept`. Acceptance creates the first-contact task. First contact, study plan, and recurring contact use separate read/submit contracts; successful first contact advances to study plan, successful study plan advances to recurring contact, while failed first/study submissions repeat their current task type. Every submission stores an immutable record and requires a future next-contact time and remark. Failure additionally requires `zsjos_student_contact_unsuccessful_reason`; a next time beyond the published first-contact or study-plan interval requires `zsjos_student_contact_extension_reason`, description, and BPM approval under process key `zsjos_student_contact_extension`.
 
+`PUT /zsjos/student/service/{serviceRelationId}/basic-info` accepts `name`, `mobile`, `wechatId`, and required `reason`. It requires `zsjos:student:update-basic-info`, an accepted active service, and the current service owner. Mobile and WeChat cannot both be blank; Person contact uniqueness and mobile format are revalidated. The command updates only the Person identity master and writes a `student_basic_info_updated` event containing changed field names, operator, reason, and Person/service references without full contact values. Lead submissions, intended products, regions, categories, orders, and historical snapshots are not rewritten.
+
 Contact-record and extension-history reads use the standard `pageNo`/`pageSize` contract. Extension history also accepts `statusScope=pending|history|all`, with deterministic `submittedAt,id` ordering. Attachment uploads are scoped to `/zsjos/student/service/{serviceRelationId}/attachments`; submitted file references must have been created by the same operator in that service relation's upload namespace. Contact submissions and configuration copy, update, and publish commands require an idempotency key; replays must match the original immutable request fingerprint as well as the relation/task or configuration identity and expected version. Existing tasks continue to render and validate against their captured configuration version rather than the latest published configuration.
 
 The overview exposes optional one-time content-director and career-planner assignments only after acceptance. Candidates come exclusively from the corresponding `/system/user-relation` scene. These assignments create no task and do not gate contact work. Contact tabs and records remain scoped to the selected service relation; collaborator visibility is projected by the published tenant configuration.
+
+## Content director students
+
+- `GET /zsjos/media-students/page` returns the current director or operator scope. Directors are resolved from active service relations and account responsibility; operators are resolved only from accounts and media workflow tasks they participate in.
+- `GET /zsjos/media-students/{personId}` returns course services plus third-party accounts, positioning history, content production history, talk records, the media operation timeline, and the positioning-to-operation-to-graduation task line.
+- Both endpoints require `zsjos:media-student:query-my`. Page visibility never grants object access: detail and command endpoints recheck the current service relation, account responsibility, or task assignment.

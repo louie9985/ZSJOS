@@ -1,6 +1,59 @@
 -- Read-only verification. Every row should report PASS on a usable installation.
 SET NAMES utf8mb4;
 
+SELECT 'new_media_workflow_schema' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+           AND table_name IN ('zsjos_media_account','zsjos_content','zsjos_content_version','zsjos_production_ticket',
+                              'zsjos_production_ticket_item','zsjos_positioning_card','zsjos_positioning_card_version',
+                              'zsjos_positioning_exec_card','zsjos_interview_record','zsjos_handover_sheet',
+                              'zsjos_cooperation_assessment','zsjos_review_report','zsjos_exception_ticket',
+                              'zsjos_workbench_capacity','zsjos_partner_student_link'))=15
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V096'), 'PASS','FAIL') AS result;
+SELECT 'new_media_version_and_signature_contract' AS check_name,
+       IF(EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+                  AND table_name='zsjos_content_version' AND index_name='uk_tenant_content_version_idempotency')
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                  AND table_name='zsjos_positioning_exec_card' AND column_name='signature_snapshot_json')
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+                  AND table_name='zsjos_positioning_exec_card' AND column_name='effective_at'), 'PASS','FAIL') AS result;
+SELECT 'new_media_workflow_permissions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V097')
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN
+             ('zsjos:content:advance','zsjos:production-ticket:transition','zsjos:positioning-card:advance') AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:content:acceptance-review' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'partner_student_active_unique_keys' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V098')
+          AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
+               AND table_name='zsjos_partner_student_link' AND non_unique=0
+               AND index_name IN ('uk_tenant_active_partner','uk_tenant_active_student'))=2,
+          'PASS','FAIL') AS result;
+SELECT 'positioning_student_confirm_permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V099')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:student-confirm' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'new_media_role_menu_permissions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V103')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=7022 AND permission='zsjos:media-student:query-my' AND path='/zsjos/media-students' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id WHERE r.code='content_director' AND rm.menu_id=73020 AND rm.deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role r JOIN system_role_menu rm ON rm.role_id=r.id AND rm.tenant_id=r.tenant_id WHERE r.code='new_media_operator' AND rm.menu_id=7022 AND rm.deleted=b'0'), 'PASS','FAIL') AS result;
+SELECT 'student_basic_info_permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V101')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V101')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73427
+                      AND permission='zsjos:student:update-basic-info' AND parent_id=73020
+                      AND type=3 AND status=0 AND deleted=b'0'), 'PASS','FAIL') AS result;
+SELECT 'new_media_business_notifications' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V102')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V102')
+          AND (SELECT COUNT(DISTINCT scene_code) FROM system_notify_template
+               WHERE scene_code LIKE 'media.%' AND creator='migration-V102' AND deleted=b'0')=17
+          AND NOT EXISTS (SELECT 1 FROM system_tenant tenant
+               WHERE tenant.deleted=b'0' AND (SELECT COUNT(DISTINCT rule_row.scene_code)
+                    FROM system_notify_rule rule_row
+                    WHERE rule_row.tenant_id=tenant.id AND rule_row.scene_code LIKE 'media.%'
+                      AND rule_row.deleted=b'0')<17), 'PASS','FAIL') AS result;
+
 SELECT 'schema_version' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_schema_version'), 'PASS', 'FAIL') AS result;
 SELECT 'employee_birthday_care_migration' AS check_name,
@@ -24,8 +77,13 @@ SELECT 'content_director_my_students_menu' AS check_name,
        IF(NOT EXISTS (SELECT 1 FROM system_role role_row
             WHERE role_row.code='content_director' AND role_row.status=0 AND role_row.deleted=b'0'
               AND NOT EXISTS (SELECT 1 FROM system_role_menu relation_row
-                   WHERE relation_row.role_id=role_row.id AND relation_row.menu_id=73020
-                     AND relation_row.tenant_id=role_row.tenant_id AND relation_row.deleted=b'0')),
+                   WHERE relation_row.role_id=role_row.id AND relation_row.menu_id=7022
+                     AND relation_row.tenant_id=role_row.tenant_id AND relation_row.deleted=b'0'))
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+            JOIN system_role_menu relation_row ON relation_row.role_id=role_row.id
+                 AND relation_row.tenant_id=role_row.tenant_id AND relation_row.deleted=b'0'
+            WHERE role_row.code='content_director' AND role_row.deleted=b'0'
+              AND relation_row.menu_id=73020),
           'PASS','FAIL') AS result;
 SELECT 'employee_birthday_care_job' AS check_name,
        IF((SELECT COUNT(*) FROM infra_job WHERE handler_name='employeeBirthdayCareJob' AND deleted=b'0')=1, 'PASS', 'FAIL') AS result;
@@ -899,6 +957,42 @@ SELECT 'V082 planner notification rules' AS check_name,
              WHERE scene_code='zsjos.registration.planner_assigned'
                AND creator='migration-V082' AND deleted=b'0')=
           (SELECT COUNT(*) FROM system_tenant WHERE deleted=b'0'),'PASS','FAIL') AS result;
+SELECT 'V112 planner template lead.no contract' AS check_name,
+       IF((SELECT COUNT(*) FROM system_notify_template
+             WHERE code='ZSJOS_REGISTRATION_PLANNER_ASSIGNED'
+               AND scene_code='zsjos.registration.planner_assigned'
+               AND creator='migration-V082' AND deleted=b'0'
+               AND params='["registration.caseId","lead.no"]'
+               AND content='客资{{lead.no}}已分配给你。')=1,'PASS','FAIL') AS result;
+SELECT 'V113 media student center version' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V113'
+                    AND checksum='media-student-center-v2'),'PASS','FAIL') AS result;
+SELECT 'V113 media account field and talk tables' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name IN ('zsjos_media_account_field_config','zsjos_media_student_talk_record'))=2,
+          'PASS','FAIL') AS result;
+SELECT 'V113 media account detail snapshot columns' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
+             AND table_name='zsjos_media_account'
+             AND column_name IN ('detail_config_version_id','detail_values_json','detail_snapshot_json'))=3,
+          'PASS','FAIL') AS result;
+SELECT 'V113 retired standalone media menus' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE id IN (6970,6974,6980) AND deleted=b'0')=0,
+          'PASS','FAIL') AS result;
+SELECT 'V113 account field configuration menus' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND permission IN (
+             'zsjos:media-account-field-config:query','zsjos:media-account-field-config:update',
+             'zsjos:media-account-field-config:publish'))=3,'PASS','FAIL') AS result;
+SELECT 'V113 operator media student menu grant' AS check_name,
+       IF(NOT EXISTS (
+         SELECT 1 FROM system_role role_row
+          WHERE role_row.code='new_media_operator' AND role_row.status=0 AND role_row.deleted=b'0'
+            AND NOT EXISTS (
+              SELECT 1 FROM system_role_menu rm JOIN system_menu menu_row ON menu_row.id=rm.menu_id
+               WHERE rm.role_id=role_row.id AND rm.tenant_id=role_row.tenant_id AND rm.deleted=b'0'
+                 AND menu_row.permission='zsjos:media-student:query-my' AND menu_row.deleted=b'0'
+            )
+       ),'PASS','FAIL') AS result;
 SELECT 'V075 Lead-created notification coverage' AS check_name,
        IF(NOT EXISTS (
          SELECT 1 FROM system_tenant tenant

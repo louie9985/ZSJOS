@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Tabs, Typography, message } from 'antd'
 import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
-import { api, type DictData, type LeadAppealEvidence, type ManagedLead } from '../services/api'
+import { api, type DictData, type LeadAppealEvidence, type ManagedLead, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
 import { applyInvalidRemarkTemplate } from '../services/leadManagement'
 import { DICT_TYPE } from '../constants'
 import { defaultLeadDetailTab, detailTabsFromProjection, resolveLeadDetailTab, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
@@ -21,7 +21,11 @@ import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import FollowUpModal from './FollowUpModal'
 import { formatTimestamp } from '../services/time'
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, onDirtyChange, onChanged }: {
+export type LeadDetailExtraTab = { key: string; label: string; children: ReactNode; forceRender?: boolean }
+
+export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
+
+export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, onDirtyChange, onChanged, extraTabs = [], contextHeader, studentContext, studentToolbarActions = [] }: {
   lead: ManagedLead
   categories: DictData[]
   categoryLabel: (value?: string) => string
@@ -31,9 +35,13 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   initialTab?: LeadDetailTab
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
+  extraTabs?: LeadDetailExtraTab[]
+  contextHeader?: ReactNode
+  studentContext?: StudentLeadContext
+  studentToolbarActions?: ToolbarAction[]
 }) {
   const readOnly = mode === 'manager-readonly' || mode === 'student-readonly'
-  const visibleTabs = detailTabsFromProjection(lead.visibleTabs)
+  const visibleTabs = detailTabsFromProjection(lead.visibleTabs).filter(tab => mode !== 'student-readonly' || tab !== 'follow-ups')
   const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
   const visibleTabKey = visibleTabs.join(',')
   const [activeTab, setActiveTab] = useState<LeadDetailTab>(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
@@ -147,26 +155,33 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     actions.has('SUBMITTER_URGE') && { key: 'submitter-urge', icon: <BellOutlined/>, label: '催促', onClick: () => setUrgeOpen(true) },
     actions.has('SUBMITTER_COMPLAINT') && { key: 'submitter-complaint', icon: <WarningOutlined/>, label: '投诉', danger: true, onClick: () => setComplaintOpen(true) },
     actions.has('ENTER_REPURCHASE') && { key: 'enter-repurchase', icon: <FileAddOutlined/>, label: '录入复购', disabled: !actions.get('ENTER_REPURCHASE')?.enabled, onClick: () => setRepurchaseOpen(true) },
+    ...studentToolbarActions,
   ].filter(Boolean) as ToolbarAction[]
 
-  const tabItems = visibleTabs.map(tab => {
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content"><LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined}/></div> }
+  const tabItems: LeadDetailExtraTab[] = visibleTabs.map<LeadDetailExtraTab>(tab => {
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content"><LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext}/></div> }
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
     if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id}/></div> }
     return { key: tab, label: `订单记录${orderTotal === undefined ? '' : ` (${orderTotal})`}`, children: <div className="lead-detail-tab-content"><LeadCustomerOrders leadId={lead.id} onCount={setOrderTotal}/></div> }
-  })
+  }); tabItems.push(...extraTabs)
 
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
       <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
-      {visibleTabs.includes('follow-ups') && lead.nextFollowUpAt && <div className="lead-hero-next-followup">
+      {!studentContext && visibleTabs.includes('follow-ups') && lead.nextFollowUpAt && <div className="lead-hero-next-followup">
         <ClockCircleOutlined />
         <span className="lead-hero-next-label">下次跟进</span>
         <span className="lead-hero-next-time">{formatTimestamp(lead.nextFollowUpAt)}</span>
       </div>}
+      {studentContext?.contactContext.currentTask?.dueAt && <div className="lead-hero-next-followup">
+        <ClockCircleOutlined />
+        <span className="lead-hero-next-label">下次联系</span>
+        <span className="lead-hero-next-time">{formatTimestamp(new Date(studentContext.contactContext.currentTask.dueAt).getTime())}</span>
+      </div>}
     </div>
+    {contextHeader}
     <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => setActiveTab(key as LeadDetailTab)} items={tabItems}/>
     {!readOnly && <>
       <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为无效`} danger open={invalidConfirmOpen} onOpenChange={setInvalidConfirmOpen} onConfirm={judgeInvalid}><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={prepareJudgeInvalid}>确认判无效</Button></IrreversiblePopconfirm></Space>}>

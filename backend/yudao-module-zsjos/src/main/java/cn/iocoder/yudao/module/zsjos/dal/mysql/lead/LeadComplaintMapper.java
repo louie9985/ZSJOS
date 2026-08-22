@@ -9,13 +9,16 @@ import org.apache.ibatis.annotations.*;
     default LeadComplaintDO selectByCreateKey(String key) { return selectOne(LeadComplaintDO::getCreateIdempotencyKey, key); }
     default LeadComplaintDO selectByDecisionKey(String key) { return selectOne(LeadComplaintDO::getDecisionIdempotencyKey, key); }
     default PageResult<LeadComplaintDO> selectPage(LeadComplaintPageReqVO req) { return selectPage(req,
-            new LambdaQueryWrapperX<LeadComplaintDO>().eqIfPresent(LeadComplaintDO::getStatus, req.getStatus()).orderByAsc(LeadComplaintDO::getId)); }
+            new LambdaQueryWrapperX<LeadComplaintDO>().eqIfPresent(LeadComplaintDO::getStatus, req.getStatus())
+                    .orderByDesc(LeadComplaintDO::getUpdateTime).orderByDesc(LeadComplaintDO::getId)); }
     default PageResult<LeadComplaintDO> selectMyPage(LeadComplaintPageReqVO req, Long userId) { return selectPage(req,
             new LambdaQueryWrapperX<LeadComplaintDO>().eq(LeadComplaintDO::getComplainantUserId, userId)
-                    .eqIfPresent(LeadComplaintDO::getStatus, req.getStatus()).orderByDesc(LeadComplaintDO::getId)); }
+                    .eqIfPresent(LeadComplaintDO::getStatus, req.getStatus())
+                    .orderByDesc(LeadComplaintDO::getUpdateTime).orderByDesc(LeadComplaintDO::getId)); }
     default PageResult<LeadComplaintDO> selectPartnerPage(LeadComplaintPageReqVO req, Long partnerId) { return selectPage(req,
             new LambdaQueryWrapperX<LeadComplaintDO>().eq(LeadComplaintDO::getPartnerId, partnerId)
-                    .eqIfPresent(LeadComplaintDO::getStatus, req.getStatus()).orderByDesc(LeadComplaintDO::getId)); }
+                    .eqIfPresent(LeadComplaintDO::getStatus, req.getStatus())
+                    .orderByDesc(LeadComplaintDO::getUpdateTime).orderByDesc(LeadComplaintDO::getId)); }
     default java.util.List<LeadComplaintDO> selectListByLeadId(Long leadId) { return selectList(
             new LambdaQueryWrapperX<LeadComplaintDO>().eq(LeadComplaintDO::getLeadId, leadId)
                     .orderByDesc(LeadComplaintDO::getId)); }

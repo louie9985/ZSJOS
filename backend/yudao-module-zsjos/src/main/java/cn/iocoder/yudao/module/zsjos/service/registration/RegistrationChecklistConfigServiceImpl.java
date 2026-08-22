@@ -93,6 +93,17 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
         if (plannerCount != 1 || planner == null || !Boolean.TRUE.equals(planner.getEnabled())) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
+        if (reqVO.getItems().isEmpty() || reqVO.getItems().stream()
+                .anyMatch(item -> item.getTitle() == null || item.getTitle().isBlank())) {
+            throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
+        }
+        Set<String> requestedItemKeys = reqVO.getItems().stream()
+                .map(RegistrationChecklistDraftSaveReqVO.ItemReqVO::getItemKey)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        long suppliedItemKeyCount = reqVO.getItems().stream().filter(item -> item.getItemKey() != null).count();
+        if (requestedItemKeys.size() != suppliedItemKeyCount) {
+            throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
+        }
         if (reqVO.getRouteOptions() == null || reqVO.getRouteOptions().stream().noneMatch(item -> Boolean.TRUE.equals(item.getEnabled()))) {
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
@@ -168,6 +179,7 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
     private RegistrationChecklistTemplateDO lockTemplate(Integer expectedVersion) {
         RegistrationChecklistTemplateDO current = requireTemplate();
         RegistrationChecklistTemplateDO locked = templateMapper.selectByIdForUpdate(current.getId(), TenantContextHolder.getRequiredTenantId());
+        if (locked == null) throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         if (!Objects.equals(locked.getVersion(), expectedVersion)) throw exception(REGISTRATION_VERSION_CONFLICT);
         return locked;
     }

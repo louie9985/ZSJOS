@@ -16,7 +16,7 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 
 @Component
 public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermissionProvider {
-    private static final Set<String> OWNER_ACTIONS = Set.of("read", "accept", "contact", "assign");
+    private static final Set<String> OWNER_ACTIONS = Set.of("read", "accept", "contact", "assign", "update-basic-info");
 
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private PermissionApi permissionApi;

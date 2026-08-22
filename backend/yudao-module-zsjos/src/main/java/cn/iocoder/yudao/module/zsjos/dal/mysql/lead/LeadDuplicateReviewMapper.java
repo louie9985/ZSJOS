@@ -24,8 +24,8 @@ public interface LeadDuplicateReviewMapper extends BaseMapperX<LeadDuplicateRevi
             else query.in(LeadDuplicateReviewDO::getId, matchedIds);
         }
         return selectPage(page, query
-                .orderByAsc(LeadDuplicateReviewDO::getCreateTime)
-                .orderByAsc(LeadDuplicateReviewDO::getId));
+                .orderByDesc(LeadDuplicateReviewDO::getUpdateTime)
+                .orderByDesc(LeadDuplicateReviewDO::getId));
     }
 
     @Select("SELECT * FROM zsjos_lead_duplicate_review WHERE id=#{id} AND tenant_id=#{tenantId} " +

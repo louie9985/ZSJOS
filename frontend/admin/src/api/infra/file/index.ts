@@ -44,3 +44,8 @@ export const createFile = (data: any) => {
 export const updateFile = (data: any, onUploadProgress?: Function) => {
   return request.upload({ url: '/infra/file/upload', data, onUploadProgress })
 }
+
+// 上传员工头像并返回稳定访问地址
+export const uploadAvatar = (data: any, onUploadProgress?: Function) => {
+  return request.upload({ url: '/infra/file/avatar/upload', data, onUploadProgress })
+}

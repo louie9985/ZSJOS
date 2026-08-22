@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Alert,
   Badge,
   Button,
   Checkbox,
+  DatePicker,
   Empty,
   Form,
   Input,
+  Modal,
   Pagination,
   Radio,
   Select,
@@ -20,10 +22,11 @@ import {
   Upload,
   message,
 } from "antd";
-import { DeleteOutlined, DownOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined } from "@ant-design/icons";
+import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
 import { NameAvatar } from "../components/LeadDetailOverview";
 import LeadDetail from "../components/LeadDetail";
+import type { ToolbarAction } from "../components/OverflowToolbar";
 import {
   api,
   type DictData,
@@ -456,14 +459,12 @@ export function RegistrationPoolPage() {
         </div>
       </section>
       <div className="registration-detail-actions">
-        <Button
+        {selected.status !== "completed" && selected.status !== "cancelled" ? <Button
           type="primary"
-          disabled={!selected.completable}
+          disabled={!selected.completable || completing}
           loading={completing}
           onClick={() => void complete()}
-        >
-          完成报名履约
-        </Button>
+        >完成报名履约</Button> : null}
       </div>
     </div>
   ) : (
@@ -564,10 +565,16 @@ export function RegistrationPoolPage() {
   );
 }
 
-function LegacyMyStudentsPage() {
+export function MyStudentsPage() {
+  const location = useLocation();
+  const taskTarget = location.state as { serviceRelationId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
+  const requestedServiceId = Number(taskTarget?.serviceRelationId) || undefined;
   const [rows, setRows] = useState<MyStudent[]>([]),
     [selected, setSelected] = useState<MyStudent>();
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
+  const [selectedServiceId, setSelectedServiceId] = useState<number>();
+  const [studentContactContext, setStudentContactContext] = useState<import("../services/api").StudentContactContext>();
+  const [studentContactRecords, setStudentContactRecords] = useState<import("../services/api").StudentContactRecord[]>([]);
   const [categories, setCategories] = useState<DictData[]>([]);
   const [channels, setChannels] = useState<DictData[]>([]);
   const [categoryError, setCategoryError] = useState(false);
@@ -584,7 +591,7 @@ function LegacyMyStudentsPage() {
   const detailGeneration = useRef(0);
   const dictionaryGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
-  const loadStudent = useCallback(async (personId: number) => {
+  const loadStudent = useCallback(async (personId: number, preferredServiceId?: number) => {
     const generation = ++detailGeneration.current;
     setDetailLoading(true);
     setDetailError("");
@@ -592,16 +599,38 @@ function LegacyMyStudentsPage() {
       const student = await api.myStudent(personId);
       if (generation !== detailGeneration.current) return;
       setSelected(student);
-      const lead = student.leadId ? await api.managedLead(student.leadId) : undefined;
-      if (generation === detailGeneration.current) setLeadDetail(lead);
+      const service = student.services.find(item => item.serviceRelationId === (preferredServiceId || selectedServiceId)) || student.services[0];
+      setSelectedServiceId(service?.serviceRelationId);
+      const leadId = service?.leadId || student.leadId;
+      const [lead, context, records] = await Promise.all([
+        leadId ? api.managedLead(leadId) : Promise.resolve(undefined),
+        service ? api.studentContactContext(service.serviceRelationId) : Promise.resolve(undefined),
+        service ? api.studentContactRecords(service.serviceRelationId, 1, 100) : Promise.resolve({ list: [], total: 0 }),
+      ]);
+      if (generation === detailGeneration.current) {
+        setLeadDetail(lead);
+        setStudentContactContext(context);
+        setStudentContactRecords(records.list);
+      }
     } catch (requestError) {
       if (generation !== detailGeneration.current) return;
       setLeadDetail(undefined);
+      setStudentContactContext(undefined);
+      setStudentContactRecords([]);
       setDetailError(errorMessage(requestError));
     } finally {
       if (generation === detailGeneration.current) setDetailLoading(false);
     }
-  }, []);
+  }, [selectedServiceId]);
+  const taskTargetHandled = useRef(false);
+  useEffect(() => {
+    if (!requestedServiceId || taskTargetHandled.current) return;
+    taskTargetHandled.current = true;
+    void api.myStudentByService(requestedServiceId).then(student => {
+      setSelectedServiceId(requestedServiceId);
+      return loadStudent(student.personId, requestedServiceId);
+    }).catch(requestError => setDetailError(errorMessage(requestError)));
+  }, [loadStudent, requestedServiceId]);
   const loadDictionaries = useCallback(async () => {
     const generation = ++dictionaryGeneration.current;
     const [categoryResult, channelResult] = await Promise.allSettled([
@@ -653,6 +682,24 @@ function LegacyMyStudentsPage() {
   useEffect(() => {
     void load(1);
   }, [advancedFilter, keyword]);
+  const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
+  const selectService = async (relationId: number) => {
+    const service = selected?.services.find(item => item.serviceRelationId === relationId);
+    if (!service) return;
+    setSelectedServiceId(relationId);
+    setDetailLoading(true);
+    setDetailError("");
+    try {
+      const [lead, context, records] = await Promise.all([
+        service.leadId ? api.managedLead(service.leadId) : Promise.resolve(undefined),
+        api.studentContactContext(service.serviceRelationId),
+        api.studentContactRecords(service.serviceRelationId, 1, 100),
+      ]);
+      setLeadDetail(lead); setStudentContactContext(context); setStudentContactRecords(records.list);
+    }
+    catch (requestError) { setLeadDetail(undefined); setStudentContactContext(undefined); setStudentContactRecords([]); setDetailError(errorMessage(requestError)); }
+    finally { setDetailLoading(false); }
+  };
   const detailContent = detailLoading ? (
     <Skeleton active paragraph={{ rows: 10 }} />
   ) : detailError ? (
@@ -660,9 +707,23 @@ function LegacyMyStudentsPage() {
       error={detailError}
       retry={() => selected?.personId && void loadStudent(selected.personId)}
     />
-  ) : selected && leadDetail ? (
-    <LeadDetail
-      lead={leadDetail}
+  ) : selected && leadDetail && selectedService && studentContactContext ? (
+    <StudentPlannerOperations
+      key={selectedService.serviceRelationId}
+      student={selected}
+      service={selectedService}
+      context={studentContactContext}
+      openTaskId={taskTarget?.openContactTask ? taskTarget.taskId : undefined}
+      openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
+      onRefresh={async () => { await load(pageNo); }}
+    >
+      {(studentToolbarActions) => <LeadDetail
+      lead={{
+        ...leadDetail,
+        submittedName: selected.name ?? leadDetail.submittedName,
+        submittedMobile: selected.mobile ?? leadDetail.submittedMobile,
+        submittedWechatId: selected.wechatId ?? leadDetail.submittedWechatId,
+      }}
       categories={categories}
       categoryLabel={(value) => dictionaryDisplayLabel(categories, value, categoryError)}
       channelLabel={(value) => dictionaryDisplayLabel(channels, value, channelError)}
@@ -670,7 +731,15 @@ function LegacyMyStudentsPage() {
       autoExpandFollowUp={false}
       onDirtyChange={() => undefined}
       onChanged={() => void loadStudent(selected.personId)}
-    />
+      studentToolbarActions={studentToolbarActions}
+      contextHeader={selectedService ? <div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div> : undefined}
+      studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }}
+      extraTabs={[
+        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} />{selectedService.attributeValues?.length ? <Space wrap style={{ marginTop: 12 }}>{selectedService.attributeValues.map(value => <Tag key={value}>{value}</Tag>)}</Space> : null}</section> },
+        { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> }
+      ]}
+    />}
+    </StudentPlannerOperations>
   ) : selected ? (
     <div className="registration-detail">
       <div className="registration-detail-hero">
@@ -819,7 +888,7 @@ function StudentContactForm({
   relationId,
   context,
   onDone,
-}: { relationId: number; context: import("../services/api").StudentContactContext; onDone: () => void }) {
+}: { relationId: number; context: import("../services/api").StudentContactContext; onDone: () => void | Promise<void> }) {
   const [form] = Form.useForm();
   const [reasons, setReasons] = useState<DictData[]>([]);
   const [submitting, setSubmitting] = useState(false);
@@ -835,17 +904,20 @@ function StudentContactForm({
     }
     setSubmitting(true);
     try {
-      const next = new Date(String(values.nextContactAt));
+      const nextContactAt = typeof values.nextContactAt === "object" && values.nextContactAt !== null
+        ? Number((values.nextContactAt as { valueOf: () => number }).valueOf())
+        : new Date(String(values.nextContactAt)).getTime();
+      const next = new Date(nextContactAt);
       const successful = values.successful === true;
       const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact";
       const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0;
       const extensionRequired = Boolean(timeout && next.getTime() > Date.now() + timeout * 60000);
       const attachmentFileIds = attachmentUploads.map(item => item.fileId as number);
-      const payload = { ...values, taskId: context.currentTask!.id, idempotencyKey: key(), attachmentFileIds, extensionAttachmentFileIds: extensionRequired ? attachmentFileIds : [], extensionReasonValue: extensionRequired ? values.extensionReasonValue : undefined, extensionDescription: extensionRequired ? values.extensionDescription : undefined };
+      const payload = { ...values, nextContactAt, taskId: context.currentTask!.id, idempotencyKey: key(), attachmentFileIds, extensionAttachmentFileIds: extensionRequired ? attachmentFileIds : [], extensionReasonValue: extensionRequired ? values.extensionReasonValue : undefined, extensionDescription: extensionRequired ? values.extensionDescription : undefined };
       if (taskType === "student_first_contact") await api.studentFirstContact(relationId, payload);
       else if (taskType === "student_study_plan") await api.studentStudyPlan(relationId, payload);
       else await api.studentContact(relationId, payload);
-      message.success("任务已提交"); form.resetFields(); setAttachmentUploads([]); onDone();
+      message.success("任务已提交"); form.resetFields(); setAttachmentUploads([]); await onDone();
     } catch (error) { message.error(errorMessage(error)); }
     finally { setSubmitting(false); }
   };
@@ -855,41 +927,164 @@ function StudentContactForm({
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => taskType === "student_first_contact" && getFieldValue("successful") === true ? <Form.Item name="completedChecklistKeys" label="首联任务清单" rules={[{ required: true, type: "array", min: 1 }]}><Checkbox.Group options={context.firstContactChecklist.map(item => ({ label: item.title, value: item.key }))} /></Form.Item> : null}</Form.Item>
     {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => form.setFieldValue("remark", `${form.getFieldValue("remark") || ""}${note}`)}>{note}</Button>)}</Space></Form.Item>}
     <Form.Item name="remark" label="备注" rules={[{ required: true }]}><Input.TextArea rows={4} maxLength={2000} showCount /></Form.Item>
-    <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><Input type="datetime-local" /></Form.Item>
+    <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => { const value = getFieldValue("nextContactAt"); const successful = getFieldValue("successful") === true; const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact"; const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0; const extended = Boolean(value && timeout && new Date(String(value)).getTime() > Date.now() + timeout * 60000); return extended ? <><Alert type="warning" showIcon title={`超过允许时限（${timeout} 分钟），将发起延期审批`} /><Form.Item name="extensionReasonValue" label="延期原因" rules={[{ required: true }]}><Select options={extensionReasons.map(row => ({ label: row.label, value: row.value }))} /></Form.Item><Form.Item name="extensionDescription" label="延期说明" rules={[{ required: true }]}><Input.TextArea rows={3} maxLength={1000} /></Form.Item></> : null; }}</Form.Item>
     <Space wrap><Upload multiple fileList={attachmentUploads} beforeUpload={async file => { setAttachmentUploads(items => [...items.filter(item => item.uid !== file.uid), { uid: file.uid, name: file.name, status: "uploading" }]); try { const uploaded = await api.studentContactUpload(relationId, file); setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); } catch (error) { setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); } return false; }} onRemove={file => { setAttachmentUploads(items => items.filter(item => item.uid !== file.uid)); return true; }}><Button icon={<UploadOutlined />}>添加附件</Button></Upload>{attachmentUploads.length > 0 && <Tag>{attachmentUploads.length} 个附件</Tag>}</Space>
-    <Space><Button type="primary" htmlType="submit" loading={submitting} disabled={attachmentUploads.some(item => item.status !== "done")}>提交{taskType === "student_first_contact" ? "首次联系" : taskType === "student_study_plan" ? "学习计划" : "联系记录"}</Button></Space>
+    <Space><Button type="primary" htmlType="submit" loading={submitting} disabled={attachmentUploads.some(item => item.status !== "done")}>提交{taskType === "student_first_contact" ? "首联" : taskType === "student_study_plan" ? "学习计划" : "普通跟进"}</Button></Space>
   </Form>;
 }
 
-function StudentContactDetail({ student, service, onRefresh }: { student: MyStudent; service: MyStudent["services"][number]; onRefresh: () => void }) {
+function StudentPlannerOperations({ student, service, context, openTaskId, openTaskType, onRefresh, children }: {
+  student: MyStudent;
+  service: MyStudent["services"][number];
+  context: import("../services/api").StudentContactContext;
+  openTaskId?: number;
+  openTaskType?: string;
+  onRefresh: () => Promise<void>;
+  children: (actions: ToolbarAction[]) => ReactNode;
+}) {
+  const [contactOpen, setContactOpen] = useState(false);
+  const [basicInfoOpen, setBasicInfoOpen] = useState(false);
+  const [basicInfoSaving, setBasicInfoSaving] = useState(false);
+  const [basicInfoForm] = Form.useForm();
+  const [assignmentType, setAssignmentType] = useState<"content_director" | "career_planner">();
+  const [candidates, setCandidates] = useState<StudyPlanner[]>([]);
+  const [candidateLoading, setCandidateLoading] = useState(false);
+  const [candidateError, setCandidateError] = useState("");
+  const [candidateUserId, setCandidateUserId] = useState<number>();
+  const [correctionReason, setCorrectionReason] = useState("");
+  const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const available = context.availableActions || [];
+  const stageAction = available.find(action => ["FIRST_CONTACT", "STUDY_PLAN", "FOLLOW_UP"].includes(action));
+  const stageLabel = stageAction === "FIRST_CONTACT" ? "首联" : stageAction === "STUDY_PLAN" ? "制定学习计划" : "普通跟进";
+  const taskOpened = useRef(false);
+  useEffect(() => {
+    if (taskOpened.current || !openTaskId || !context.currentTask) return;
+    taskOpened.current = true;
+    if (context.currentTask.id === openTaskId
+        && (!openTaskType || context.currentTask.type === openTaskType) && stageAction) {
+      setContactOpen(true);
+    } else {
+      message.warning("该待办已变化，请按当前学员任务状态处理");
+    }
+  }, [context.currentTask, openTaskId, openTaskType, stageAction]);
+
+  const accept = () => Modal.confirm({
+    title: "确认接收学员",
+    content: "接收后将立即生成首联任务。",
+    okText: "接收",
+    cancelText: "取消",
+    onOk: async () => {
+      try {
+        await api.studentAccept(service.serviceRelationId, context.version, key());
+        message.success("已接收，首联任务已生成");
+        await onRefresh();
+      } catch (error) {
+        message.error(errorMessage(error));
+        throw error;
+      }
+    },
+  });
+  const openBasicInfo = () => {
+    basicInfoForm.setFieldsValue({ name: student.name, mobile: student.mobile, wechatId: student.wechatId, reason: "" });
+    setBasicInfoOpen(true);
+  };
+  const saveBasicInfo = async (values: { name: string; mobile?: string; wechatId?: string; reason: string }) => {
+    if (!values.mobile?.trim() && !values.wechatId?.trim()) {
+      message.warning("手机号和微信号至少填写一个");
+      return;
+    }
+    setBasicInfoSaving(true);
+    try {
+      await api.studentUpdateBasicInfo(service.serviceRelationId, {
+        name: values.name.trim(), mobile: values.mobile?.trim() || undefined,
+        wechatId: values.wechatId?.trim() || undefined, reason: values.reason.trim(),
+      });
+      message.success("学员基础信息已更新");
+      setBasicInfoOpen(false);
+      await onRefresh();
+    } catch (error) {
+      message.error(errorMessage(error));
+    } finally {
+      setBasicInfoSaving(false);
+    }
+  };
+  const loadCandidates = async (type: "content_director" | "career_planner") => {
+    setCandidateLoading(true); setCandidateError("");
+    try { setCandidates(await api.studentCollaboratorCandidates(service.serviceRelationId, type)); }
+    catch (error) { setCandidates([]); setCandidateError(errorMessage(error)); }
+    finally { setCandidateLoading(false); }
+  };
+  const openAssignment = (type: "content_director" | "career_planner") => {
+    setAssignmentType(type);
+    setCandidateUserId(type === "content_director" ? service.contentDirectorUserId : service.careerPlannerUserId);
+    setCorrectionReason("");
+    void loadCandidates(type);
+  };
+  const assignedUserId = assignmentType === "content_director" ? context.contentDirectorUserId : context.careerPlannerUserId;
+  const assign = async () => {
+    if (!assignmentType || !candidateUserId) { message.warning("请选择协作者"); return; }
+    if (assignedUserId && !correctionReason.trim()) { message.warning("纠正分配时请填写原因"); return; }
+    setAssignmentSaving(true);
+    try {
+      await api.studentAssignCollaborator(service.serviceRelationId, {
+        collaboratorType: assignmentType, userId: candidateUserId, version: context.version,
+        idempotencyKey: key(), correctionReason: assignedUserId ? correctionReason.trim() : undefined,
+      });
+      message.success("协作者已分配"); setAssignmentType(undefined); await onRefresh();
+    } catch (error) { message.error(errorMessage(error)); }
+    finally { setAssignmentSaving(false); }
+  };
+
+  const toolbarActions: ToolbarAction[] = [
+    available.includes("ACCEPT") && { key: "student-accept", icon: <CheckOutlined />, label: "接收", onClick: accept },
+    stageAction && { key: `student-${stageAction.toLowerCase()}`, icon: <PhoneOutlined />, label: stageLabel, onClick: () => setContactOpen(true) },
+    available.includes("EDIT_BASIC_INFO") && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
+    available.includes("ASSIGN_CONTENT_DIRECTOR") && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
+    available.includes("ASSIGN_CAREER_PLANNER") && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
+  ].filter(Boolean) as ToolbarAction[];
+
+  return <>
+    {children(toolbarActions)}
+    <Modal title={stageLabel} open={contactOpen} footer={null} destroyOnHidden onCancel={() => setContactOpen(false)}>
+      <StudentContactForm relationId={service.serviceRelationId} context={context} onDone={async () => { setContactOpen(false); await onRefresh(); }} />
+    </Modal>
+    <Modal title="修改学员信息" open={basicInfoOpen} confirmLoading={basicInfoSaving} okText="保存" onCancel={() => setBasicInfoOpen(false)} onOk={() => basicInfoForm.submit()} destroyOnHidden>
+      <Form form={basicInfoForm} layout="vertical" onFinish={saveBasicInfo}>
+        <Form.Item name="name" label="姓名" rules={[{ required: true, whitespace: true, max: 100 }]}><Input /></Form.Item>
+        <Form.Item name="mobile" label="手机号" rules={[{ pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号" }]}><Input maxLength={32} /></Form.Item>
+        <Form.Item name="wechatId" label="微信号" rules={[{ max: 64 }]}><Input /></Form.Item>
+        <Form.Item name="reason" label="修改原因" rules={[{ required: true, whitespace: true, max: 500 }]}><Input.TextArea rows={3} showCount maxLength={500} /></Form.Item>
+      </Form>
+    </Modal>
+    <Modal title={assignmentType === "content_director" ? "分配编导" : "分配职业规划师"} open={Boolean(assignmentType)} confirmLoading={assignmentSaving} okText="确认分配" onCancel={() => setAssignmentType(undefined)} onOk={() => void assign()} destroyOnHidden>
+      <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+        {candidateError && <Alert type="error" showIcon title={candidateError} action={<Button size="small" onClick={() => assignmentType && void loadCandidates(assignmentType)}>重试</Button>} />}
+        <Select showSearch optionFilterProp="label" loading={candidateLoading} disabled={Boolean(candidateError)} value={candidateUserId} onChange={setCandidateUserId} placeholder="选择协作者" options={candidates.map(item => ({ value: item.id, label: item.nickname }))} style={{ width: "100%" }} />
+        {assignedUserId && <>
+          <Alert type="info" showIcon title={`当前${assignmentType === "content_director" ? "编导" : "职业规划师"}：${assignmentType === "content_director" ? service.contentDirectorUserName || "已分配（姓名未返回）" : service.careerPlannerUserName || "已分配（姓名未返回）"}`} />
+          <Form.Item label="修改原因" required style={{ marginBottom: 0 }}><Input.TextArea value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} rows={3} maxLength={500} showCount /></Form.Item>
+        </>}
+      </Space>
+    </Modal>
+  </>;
+}
+
+function StudentContactDetail({ service }: { service: MyStudent["services"][number] }) {
   const [context, setContext] = useState<import("../services/api").StudentContactContext>();
   const [records, setRecords] = useState<import("../services/api").StudentContactRecord[]>([]);
   const [recordPage, setRecordPage] = useState(1);
   const [recordTotal, setRecordTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [candidates, setCandidates] = useState<Record<string, StudyPlanner[]>>({});
   const load = useCallback(async (page = 1) => { setLoading(true); try { const [next, history] = await Promise.all([api.studentContactContext(service.serviceRelationId), api.studentContactRecords(service.serviceRelationId, page, PAGE_SIZE)]); setContext(next); setRecords(history.list); setRecordPage(page); setRecordTotal(history.total); } catch (error) { message.error(errorMessage(error)); } finally { setLoading(false); } }, [service.serviceRelationId]);
   useEffect(() => { void load(1); }, [load]);
   if (loading || !context) return <Skeleton active paragraph={{ rows: 10 }} />;
-  const assign = async (type: "content_director" | "career_planner") => { const list = await api.studentCollaboratorCandidates(service.serviceRelationId, type); setCandidates(value => ({ ...value, [type]: list })); };
-  const doAssign = async (type: "content_director" | "career_planner", userId: number) => { try { await api.studentAssignCollaborator(service.serviceRelationId, { collaboratorType: type, userId, version: context.version, idempotencyKey: key() }); message.success("协作者已分配"); await load(); onRefresh(); } catch (error) { message.error(errorMessage(error)); } };
-  const accept = async () => { try { await api.studentAccept(service.serviceRelationId, context.version, key()); message.success("已确认接收"); await load(); onRefresh(); } catch (error) { message.error(errorMessage(error)); } };
-  const overview = <Space direction="vertical" style={{ width: "100%" }} size="large"><section className="registration-summary-card"><DetailFieldGrid items={[{ key: "mobile", label: "手机号", value: student.mobile }, { key: "wechat", label: "微信号", value: student.wechatId }, { key: "course", label: "课程", value: service.courseName || service.skuName }, { key: "order", label: "订单号", value: service.orderNo }]} /><Space wrap><Tag color={service.acceptanceStatus === "accepted" ? "success" : "warning"}>{service.acceptanceStatus === "accepted" ? "已接收" : "待接收"}</Tag>{service.owner && service.acceptanceStatus !== "accepted" && <Button type="primary" onClick={() => void accept()}>确认接收</Button>}</Space></section><section className="registration-summary-card"><Typography.Title level={5}>可选协作者</Typography.Title><Space wrap><Button disabled={service.acceptanceStatus !== "accepted" || Boolean(service.contentDirectorUserId)} onClick={() => void assign("content_director")}>分配编导</Button><Button disabled={service.acceptanceStatus !== "accepted" || Boolean(service.careerPlannerUserId)} onClick={() => void assign("career_planner")}>分配职业规划师</Button></Space>{(["content_director", "career_planner"] as const).map(type => <div key={type}>{(candidates[type] || []).map(item => <Button key={item.id} size="small" onClick={() => void doAssign(type, item.id)}>{item.nickname}</Button>)}</div>)}</section></Space>;
-  const contactForm = <StudentContactForm relationId={service.serviceRelationId} context={context} onDone={async () => { await load(); onRefresh(); }} />;
   const history = records.length ? <Space direction="vertical" style={{ width: "100%" }}>{records.map(row => <section className="registration-summary-card" key={row.id}><Space wrap><Tag>{row.contactType}</Tag><Tag color={row.successful ? "success" : "warning"}>{row.successful ? "已联系" : row.unsuccessfulReasonLabel || "未联系"}</Tag><span>{row.nextContactAt}</span></Space><Typography.Paragraph>{row.remark}</Typography.Paragraph></section>)}{recordTotal > PAGE_SIZE && <Pagination current={recordPage} pageSize={PAGE_SIZE} total={recordTotal} showSizeChanger={false} onChange={page => void load(page)} />}</Space> : <Empty description="暂无联系记录" />;
-  const tabs = [{ key: "overview", label: "概览", children: overview }, { key: "first-contact", label: "首次联系", children: context.currentTask?.type === "student_first_contact" ? contactForm : <Alert type="info" title="当前任务不是首次联系" /> }, { key: "study-plan", label: "学习计划", children: context.currentTask?.type === "student_study_plan" ? contactForm : <Alert type="info" title="当前任务不是制定学习计划" /> }, { key: "contacts", label: "联系记录", children: <Space direction="vertical" style={{ width: "100%" }}>{context.currentTask?.type === "student_contact" && contactForm}{history}</Space> }].filter(tab => context.visibleTabs?.includes(tab.key));
-  return <div className="registration-detail"><div className="registration-detail-hero"><div><Typography.Title level={4}>{student.name || "未填写姓名"}</Typography.Title><Typography.Text type="secondary">{student.leadNo || service.orderNo || "暂无客资编号"}</Typography.Text></div></div><Tabs items={tabs} defaultActiveKey="overview" /></div>;
-}
-
-export function MyStudentsPage() {
-  const location = useLocation();
-  const targetRelationId = (location.state as { serviceRelationId?: number } | null)?.serviceRelationId;
-  const [rows, setRows] = useState<MyStudent[]>([]); const [selected, setSelected] = useState<MyStudent>(); const [serviceId, setServiceId] = useState<number>(); const [loading, setLoading] = useState(false); const [error, setError] = useState(""); const [keyword, setKeyword] = useState("");
-  const load = useCallback(async () => { setLoading(true); try { if (targetRelationId) { const target = await api.myStudentByService(targetRelationId); setRows([target]); setSelected(target); setServiceId(targetRelationId); return; } const page = await api.myStudents({ pageNo: 1, pageSize: PAGE_SIZE, keyword: keyword || undefined }); setRows(page.list); const first = selected && page.list.find(row => row.personId === selected.personId) || page.list[0]; setSelected(first); setServiceId(value => value && first?.services.some(service => service.serviceRelationId === value) ? value : first?.services[0]?.serviceRelationId); } catch (requestError) { setError(errorMessage(requestError)); } finally { setLoading(false); } }, [keyword, selected, targetRelationId]);
-  useEffect(() => { void load(); }, [keyword]);
-  const currentService = selected?.services.find(service => service.serviceRelationId === serviceId);
-  return <section className="workspace-page registration-page"><header className="registration-filter-shell"><div><Typography.Title level={4}>我的学员</Typography.Title><Typography.Text type="secondary">按服务项目管理接收、首联、学习计划与联系记录</Typography.Text></div><Button icon={<ReloadOutlined />} onClick={() => void load()}>刷新</Button></header><div className="lead-inbox-layout"><aside className="lead-inbox-list-pane"><Input.Search value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索姓名、手机号或客资编号" allowClear />{error ? <LoadState error={error} retry={() => void load()} /> : loading ? <Skeleton active paragraph={{ rows: 8 }} /> : rows.length ? rows.map(row => <button type="button" key={row.personId} className={`lead-inbox-item${selected?.personId === row.personId ? " active" : ""}`} onClick={() => { setSelected(row); setServiceId(row.services[0]?.serviceRelationId); }}><div className="lead-inbox-item-main"><NameAvatar name={row.name || "学员"} size={36} /><div className="lead-inbox-item-copy"><strong>{row.name || "未填写姓名"}</strong><span>{row.leadNo || "暂无客资编号"}</span><span>{row.services.length} 个服务项目</span></div></div></button>) : <Empty description="当前筛选下暂无学员" />}</aside><main className="lead-inbox-detail-pane">{selected && currentService ? <><Select value={serviceId} onChange={setServiceId} style={{ width: "100%", marginBottom: 12 }} options={selected.services.map(service => ({ label: `${service.courseName || service.skuName || "课程服务"} · ${service.orderNo || service.orderId}`, value: service.serviceRelationId }))} /><StudentContactDetail student={selected} service={currentService} onRefresh={() => void load()} /></> : <Empty description="从左侧选择一名学员" />}</main></div></section>;
+  const taskLabel = context.currentTask?.type === "student_first_contact" ? "首联" : context.currentTask?.type === "student_study_plan" ? "制定学习计划" : context.currentTask?.type === "student_contact" ? "普通跟进" : "暂无待办";
+  return <Space direction="vertical" size="middle" style={{ width: "100%" }}>
+    <Alert type={context.currentTask?.overdue ? "warning" : "info"} showIcon title={`当前任务：${taskLabel}`} description={context.currentTask?.dueAt ? `截止时间：${formatTimestamp(new Date(context.currentTask.dueAt).getTime())}` : undefined} />
+    {history}
+  </Space>;
 }
 
 export function StudentContactConfigPage() {

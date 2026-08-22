@@ -41,6 +41,16 @@ public interface FileService {
     FileDO createFileInfo(@NotEmpty(message = "文件内容不能为空") byte[] content,
                           String name, String directory, String type);
 
+    /** Creates an immutable employee-avatar object in an approved avatar directory. */
+    FileDO createAvatarFile(@NotEmpty(message = "文件内容不能为空") byte[] content,
+                            String directory);
+
+    /** Returns an approved employee-avatar record, or fails closed for any other file. */
+    FileDO getAvatarFile(Long id);
+
+    /** Reads an approved employee-avatar object through its original storage configuration. */
+    byte[] getAvatarFileContent(Long id) throws Exception;
+
     /**
      * 生成文件预签名地址信息，用于上传
      *

@@ -53,7 +53,6 @@ import { SalesDispatchStatusProvider } from './components/SalesDispatchStatusPro
 import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
 import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import ThemeProvider from './components/Theme/ThemeProvider'
-import ThemeSwitcher from './components/Theme/ThemeSwitcher'
 import SettingsDrawer from './components/SettingsDrawer'
 import TabBar from './components/TabBar'
 import { useTheme } from './components/Theme/ThemeContext'
@@ -393,11 +392,12 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         )}
         <Space size={8} className="header-actions">
           <SalesDispatchStatusControl/>
-          <span className="theme-action"><ThemeSwitcher/></span>
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
           <MessageCenter/>
-          <Tooltip title="待接客资"><Badge count={pendingAssignmentCount}><Button type="text" aria-label="待接客资" icon={<InboxOutlined/>} onClick={() => setOpenAssignmentRequest(value => value + 1)}/></Badge></Tooltip>
+          {(info.permissions || []).includes('zsjos:lead:accept') && (
+            <Tooltip title="待接客资"><Badge count={pendingAssignmentCount}><Button type="text" aria-label="待接客资" icon={<InboxOutlined/>} onClick={() => setOpenAssignmentRequest(value => value + 1)}/></Badge></Tooltip>
+          )}
           <Dropdown menu={{ items: [
             { key: 'user', label: info.user?.nickname || info.user?.username || '当前用户', disabled: true },
             { type: 'divider' },

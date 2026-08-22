@@ -89,6 +89,27 @@ const syncReadStatusBestEffort = async (detail: NotifyMessage, deps: NotifyMessa
   }
 }
 
+const isStudentMediaBusiness = (detail: NotifyMessage) => isPositiveId(detail.bizId)
+  && ['media-account', 'content', 'positioning-card'].includes(detail.bizType || '')
+const legacyMediaRoute = (detail: NotifyMessage) => {
+  if (!isPositiveId(detail.bizId)) return null
+  if (detail.bizType === 'production-ticket') return `${APP_ROUTES.MEDIA_PRODUCTION_TICKETS}?ticketId=${detail.bizId}`
+  if (detail.bizType === 'handover') return `${APP_ROUTES.MEDIA_HANDOVERS}?handoverId=${detail.bizId}`
+  return null
+}
+
+export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
+  detail.actionType !== 'none' && (
+    isNotifyLeadActionCandidate(detail)
+    || detail.sceneCode === 'zsjos.registration.task_created'
+    || detail.sceneCode === 'zsjos.lead.public_pool'
+    || detail.sceneCode === 'zsjos.lead.qualification_released'
+    || (detail.bizType === 'sales_order' && isPositiveId(detail.bizId))
+    || (detail.bizType === 'student_service' && isPositiveId(detail.bizId))
+    || isStudentMediaBusiness(detail)
+    || Boolean(legacyMediaRoute(detail))
+  )
+
 const hasPendingAppeal = async (leadId: number) => {
   const pageSize = 100
   for (let pageNo = 1; ; pageNo += 1) {
@@ -157,6 +178,21 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
   }
   if (detail.bizType === 'student_service' && isPositiveId(detail.bizId)) {
     deps.navigate(APP_ROUTES.MY_STUDENTS, { state: { serviceRelationId: detail.bizId } })
+    return
+  }
+  if (isStudentMediaBusiness(detail)) {
+    try {
+      const target = await api.mediaStudents.target(detail.bizType!, detail.bizId!)
+      const recordKey = target.targetTab === 'accounts' ? 'accountId' : target.targetTab === 'content' ? 'contentId' : 'positioningCardId'
+      deps.navigate(`${APP_ROUTES.MEDIA_STUDENTS}?personId=${target.personId}&tab=${target.targetTab}&${recordKey}=${target.recordId}`)
+    } catch {
+      deps.warn('关联记录尚未绑定到当前可访问的学员')
+    }
+    return
+  }
+  const mediaRoute = legacyMediaRoute(detail)
+  if (mediaRoute) {
+    deps.navigate(mediaRoute)
     return
   }
   if (detail.sceneCode === 'zsjos.lead.appeal_submitted' && isPositiveId(detail.bizId)) {

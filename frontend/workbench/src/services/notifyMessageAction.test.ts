@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, type NotifyMessage } from './api'
 import {
   executeNotifyMessageAction,
+  isNotifyBusinessActionCandidate,
   isNotifyLeadActionCandidate,
   leadManagementDeepLink,
   leadTabForNotifyScene,
@@ -153,6 +154,36 @@ describe('notify message business actions', () => {
       navigate, warn: vi.fn(), refreshUnreadCount: vi.fn().mockResolvedValue(undefined)
     })
     expect(navigate).toHaveBeenCalledWith(expect.any(String), { state: { serviceRelationId: 41 } })
+  })
+
+  it('exposes media business detail messages as actionable', () => {
+    expect(isNotifyBusinessActionCandidate(message({ bizType: 'production-ticket', bizId: 41,
+      sceneCode: 'media.ticket.pending_accept' }))).toBe(true)
+    expect(isNotifyBusinessActionCandidate(message({ actionType: 'none', bizType: 'production-ticket', bizId: 41 }))).toBe(false)
+  })
+
+  it.each([
+    ['production-ticket', '/zsjos/production-tickets?ticketId=41'],
+    ['handover', '/zsjos/handovers?handoverId=41']
+  ])('opens %s notifications at the existing Workbench route', async (bizType, expected) => {
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType, bizId: 41, sceneCode: `media.${bizType}.updated` }), {
+      navigate, warn: vi.fn(), refreshUnreadCount: vi.fn().mockResolvedValue(undefined)
+    })
+    expect(navigate).toHaveBeenCalledWith(expected)
+  })
+
+  it.each([
+    ['media-account', 'accounts', 'accountId'],
+    ['content', 'content', 'contentId'],
+    ['positioning-card', 'positioning', 'positioningCardId']
+  ])('opens %s notifications in the student center', async (bizType, targetTab, recordKey) => {
+    vi.spyOn(api.mediaStudents, 'target').mockResolvedValue({ personId: 29, targetTab, recordId: 41 })
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType, bizId: 41, sceneCode: `media.${bizType}.updated` }), {
+      navigate, warn: vi.fn(), refreshUnreadCount: vi.fn().mockResolvedValue(undefined)
+    })
+    expect(navigate).toHaveBeenCalledWith(`/zsjos/media-students?personId=29&tab=${targetTab}&${recordKey}=41`)
   })
 
   it('falls back to overview when the server does not expose the requested tab', async () => {
