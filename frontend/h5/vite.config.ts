@@ -24,7 +24,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/app-api': {
-        target: 'http://192.168.2.38:48080',
+        target: 'http://192.168.2.17:48080',
         changeOrigin: true
       }
     }

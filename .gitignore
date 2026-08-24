@@ -62,3 +62,4 @@ application-my.yaml
 **/.DS_Store
 
 .codex/
+/frontend/h5/node_modules/

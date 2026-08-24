@@ -35,7 +35,7 @@
 - Key decisions: bind the local Vite server to the IPv6 unspecified address so Windows provides dual-stack access; disable Baidu analytics only in local mode; leave backend, port, proxy and business behavior unchanged
 - Execution or analysis result: Vite automatically reloaded its existing PID 20220 after the configuration change and now listens on `[::]:80`; localhost no longer incurs IPv6-to-IPv4 fallback; local pages no longer inject the Baidu analytics script
 - Changed files: frontend/admin/vite.config.ts; frontend/admin/.env.local; handoff/main.md
-- Verification evidence: actual port 80 returned HTTP 200 for localhost, 127.0.0.1 and 192.168.2.38 with 0.0004-0.0005 second connect times and about 0.010-0.012 second totals; browser loaded the Zhongshijian login page to complete state with no hm.baidu.com script; `pnpm build:local` PASS in 24.78 seconds; `git diff --check` PASS; `pnpm ts:check` remains blocked by eight existing errors outside the changed files; `pnpm lint` remains blocked by existing style errors outside the changed files
+- Verification evidence: actual port 80 returned HTTP 200 for localhost, 127.0.0.1 and 192.168.2.17 with 0.0004-0.0005 second connect times and about 0.010-0.012 second totals; browser loaded the Zhongshijian login page to complete state with no hm.baidu.com script; `pnpm build:local` PASS in 24.78 seconds; `git diff --check` PASS; `pnpm ts:check` remains blocked by eight existing errors outside the changed files; `pnpm lint` remains blocked by existing style errors outside the changed files
 - Dependency or integration impact: no dependency, backend, API, proxy, port or production analytics configuration changes; local Vite development now accepts IPv4, IPv6 and LAN access
 - Remaining work: unrelated existing admin typecheck and lint failures remain; the independent partner-account runtime refactor from the prior delivery is still pending
 
@@ -116,3 +116,16 @@
 - Verification evidence: MyBatis configuration test PASS 1/1; typed OAuth2 revocation tests PASS 3/3; partner account/auth tests PASS 11/11; H5 `npm run build` PASS; browser check on `localhost:10086` confirmed the login page renders without console errors and unauthenticated `/profile` preserves `/profile` as the return target; server dependency graph compiled all 28 modules and package PASS with `spring-boot.repackage.skip=true`; scoped `git diff --check` PASS. The complete `yudao-module-zsjos -am test` reactor remains blocked before System/BPM/ZSJOS by the unrelated existing `CodegenEngineUniappTest.testExecute_treeSearch` failure in Infra. Standard executable-JAR repackage compiled all modules but could not rename the currently running locked `yudao-server.jar`.
 - Dependency or integration impact: no dependency, database schema/data, migration, account permission, branch, or shared-service state changed; deployment requires replacing/restarting the backend before the new interceptor and revocation implementation are active
 - Remaining work: after an approved backend deployment/restart and with a non-sensitive partner test account, run real HTTP/mobile regressions for login version increment, valid/expired/repeated logout, wrong subject type, refresh success/failure, network failure, and active-logout no-return-target behavior; resolve the unrelated Infra codegen test baseline separately
+
+## Delivery 2026-08-20 18:32:09 +08:00
+
+- Branch: main
+- Worktree: /Users/louie/Documents/ChatGPT/ZSJOS 2
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: exclude the H5 `node_modules` directory after it was accidentally tracked by Git
+- Key decisions: preserve the existing ignore rules and local dependency directory; remove only `frontend/h5/node_modules` from the Git index with no file deletion or unrelated cleanup
+- Execution or analysis result: removed all 10,848 historical `frontend/h5/node_modules` paths from the index; local files remain available and future changes are ignored
+- Changed files: Git index entries under `frontend/h5/node_modules`; handoff/main.md
+- Verification evidence: `git ls-files 'frontend/h5/node_modules/**'` returns 0; `git check-ignore` passes for a local dependency file; local `frontend/h5/node_modules/.bin/vite` remains present
+- Dependency or integration impact: no source, dependency manifest, database, service, branch, or external state changed; existing unrelated worktree changes were preserved
+- Remaining work: None
