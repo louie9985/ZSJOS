@@ -98,6 +98,10 @@ V062 registers the ungranted `zsjos:export:finance-order` child permission under
 
 V063 creates the tenant-scoped `part_time_partner` role and app-api permissions, backfills enabled/disabled partners, and keeps finance review ungranted for manual assignment. It fills missing first-level category defaults with 10.00 and 0.1000; lead source/category options remain administrator-maintained dictionaries.
 
+### V122 - repair partner Lead source accounts and cashback defaults
+
+Repairs active partner Leads whose `source_user_id` is null only when the same tenant and partner have exactly one enabled non-deleted partner account; ambiguous or invalid rows are left for manual review. It fills missing first-level product-category cashback defaults with 10.00 and 0.1000 without overwriting configured values. The migration is non-destructive, tenant-scoped, repeatable, records both schema registries, and must be applied through the normal controlled migration process. Rollback is forward-only; retain repaired provenance and financial snapshots.
+
 V068 repairs the V063 partner-permission menu-ID collision without rewriting the applied migration. It logically removes only accidental `zsjos:work-plan*` grants from `part_time_partner`, resolves the eleven H5 permissions by permission code, creates the missing self-profile permission when necessary, and grants no finance-review capability. Reruns preserve administrator-managed menus and business data; rollback should restore grants only from a reviewed pre-migration role snapshot.
 
 V069 logically removes the invalid `ZsjosPartnerPortal` admin menu created by V063/V068. The partner portal is served by the app-api/H5 surface and has no matching admin Vue component; retaining the malformed `partner-portal` route causes Vue Router 5 navigation to fail after login. The migration changes only the menu and any role-menu rows referencing that route, preserves all partner permissions and business data, and is repeatable. Rollback is forward-only and must retain the retired menu if a replacement administrator-owned route references it.
@@ -173,6 +177,13 @@ enabled sales managers receive follow-up query permission. List and object reads
 managed departments and child departments; writes remain action-scoped. No Lead, task, user,
 role, or history row is deleted. Reruns are idempotent. Recovery is forward-only and requires a
 reviewed role-menu snapshot before restoring any tenant-wide grant.
+
+### V121 retire standalone Lead qualification exception menu
+
+Hides and clears the route/component metadata for menu `6800` (`异常客资`) so the
+Workbench has only the unified `客资管理` page. Qualification query/manage permissions
+and the backend disposition APIs remain active; no Lead or role data is changed. The
+migration is repeatable and forward-only.
 
 ### V080 Lead-source provider notification
 

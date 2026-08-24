@@ -25,6 +25,8 @@ The independent partner frontend uses `/part-api/zsjos/**`; only an enabled ordi
 
 Feature permissions, list scope and `withdrawal` object checks are cumulative. The weekly reminder defaults to Thursday 10:30, uses the configured overdue-day threshold (default 7), resolves recipients from the review permission, and skips while maintenance mode is active. V052 does not deploy BPM or grant roles; deployment must publish the exact process and task keys before applications are enabled.
 
+The partner start subject is external, but `zsjos_partner_withdrawal` may use the BPM `START_USER_SELECT` strategy when the request supplies the configured internal finance reviewer IDs for `financeReview`. BPM validates those IDs against enabled System users before creating the instance. Strategies that depend on the external starter's own user, department, or department leaders remain unsupported for partner-subject starts.
+
 The Vue withdrawal list exposes direct asynchronous export only when the user has both `zsjos:export:withdrawal` and full withdrawal-list visibility. It exports all rows matching the current status filter, retains masked card numbers, creates an asynchronous task without polling the business page, and links to the existing export-task center.
 
 Only `GET /{id}/finance-detail` returns the full card and payout finance fields, including bank transaction number, proof, payout remark, payout operator and payout time. Ordinary list/detail projections never generate proof pre-signed URLs.

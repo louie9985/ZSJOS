@@ -9,7 +9,6 @@ const targetSurfaces = [
   ['pages/LeadManagementPage.tsx', 'lead'],
   ['pages/LeadClaimPoolPage.tsx', 'lead'],
   ['pages/LeadAgingPoolPage.tsx', 'lead'],
-  ['pages/LeadQualificationExceptionPage.tsx', 'lead'],
   ['pages/MySalesOrderPage.tsx', 'order'],
   ['pages/SalesOrderApprovalPage.tsx', 'order'],
   ['components/SalesOrderSupervisorInbox.tsx', 'order'],

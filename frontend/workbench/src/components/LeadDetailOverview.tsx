@@ -383,6 +383,14 @@ function AsideAlerts({ lead }: { lead: ManagedLead }) {
       detail: '当前只能查看，需由销售主管恢复、转派、回收或释放。'
     })
   }
+  if (lead.assignmentStatus === 'recycle_pending') {
+    alerts.push({
+      tone: 'warning',
+      icon: <PauseCircleOutlined />,
+      title: '客资待回收处理',
+      detail: '当前等待销售主管恢复、转派、回收或释放。'
+    })
+  }
   if (lead.status === 'invalid') {
     alerts.push({
       tone: 'danger',

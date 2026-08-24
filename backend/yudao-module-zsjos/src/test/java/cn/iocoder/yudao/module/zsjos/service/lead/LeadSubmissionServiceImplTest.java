@@ -16,6 +16,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDuplicateReviewDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRuleDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductCatalogPort;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
@@ -71,6 +73,7 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadDuplicateReviewService duplicateReviewService;
     @Mock private ZsjosProductSkuService productSkuService;
     @Mock private LeadCategorySnapshotService categorySnapshotService;
+    @Mock private PartnerAccountMapper partnerAccountMapper;
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {
@@ -102,6 +105,8 @@ class LeadSubmissionServiceImplTest {
     @Test
     void partnerCannotReplayAnotherPartnersIdempotencyKey() {
         LeadCreateReqVO req = baseRequest();
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L)
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
         LeadDO existing = new LeadDO().setId(100L).setPartnerId(99L)
                 .setSubmissionIdempotencyKey(req.getIdempotencyKey());
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
@@ -111,6 +116,28 @@ class LeadSubmissionServiceImplTest {
 
         assertEquals(LEAD_SUBMISSION_DUPLICATE.getCode(), error.getCode());
         verify(activationMapper, never()).selectByIdempotencyKey(any());
+    }
+
+    @Test
+    void partnerSubmissionRejectsAccountFromAnotherPartner() {
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(99L)
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "validatePartnerSubmissionAccount", 20L, 10L));
+
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void partnerSubmissionRejectsDisabledAccount() {
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L)
+                .setStatus(CommonStatusEnum.DISABLE.getStatus()));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "validatePartnerSubmissionAccount", 20L, 10L));
+
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_ACCOUNT_DISABLED.getCode(), error.getCode());
     }
 
     @Test

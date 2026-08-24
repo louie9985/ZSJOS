@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 
 const inboxSources = [
   'MessageInboxPage.tsx',
-  'LeadQualificationExceptionPage.tsx',
   'LeadAppealPage.tsx',
   'LeadComplaintPage.tsx',
   'SalesOrderApprovalPage.tsx'
@@ -26,7 +25,7 @@ describe('business inbox alignment', () => {
   })
 
   it('keeps list-and-detail pages out of table mode', () => {
-    for (const file of ['LeadQualificationExceptionPage.tsx', 'LeadComplaintPage.tsx']) {
+    for (const file of ['LeadComplaintPage.tsx']) {
       const source = readFileSync(`src/pages/${file}`, 'utf8')
       expect(source, file).not.toContain('<Table')
       expect(source, file).not.toContain('workspace-page-heading')

@@ -1597,7 +1597,7 @@ INSERT IGNORE INTO `system_menu` (`id`, `name`,`permission`,`type`,`sort`,`paren
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6800,'异常客资','zsjos:lead:qualification:query',2,17,6735,'leads/qualification-exceptions','ep:warning-filled','zsjos/leadQualification/index','ZsjosLeadQualification',0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
+(6800,'异常客资','zsjos:lead:qualification:query',2,17,6735,'','','',NULL,0,b'0',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
 (6801,'判定客资有效性','zsjos:lead:qualify',3,12,6770,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
 (6802,'处置异常客资','zsjos:lead:qualification:manage',3,1,6800,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0'),
 (6803,'处置全部异常客资','zsjos:lead:qualification:manage-all',3,2,6800,'','','',NULL,0,b'1',b'1',b'1','1',NOW(),'1',NOW(),b'0');

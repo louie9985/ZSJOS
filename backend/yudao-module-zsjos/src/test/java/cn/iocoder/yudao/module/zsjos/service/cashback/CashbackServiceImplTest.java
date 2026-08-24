@@ -95,6 +95,21 @@ class CashbackServiceImplTest {
         }
     }
 
+    @Test void validCashbackUsesSystemDefaultsWhenProductAndCategoryRulesAreEmpty() {
+        eligibleLead();
+        when(intendedMapper.selectPrimaryByLeadId(1L)).thenReturn(new LeadIntendedProductDO()
+                .setProductRef("P1").setProductNameSnapshot("课程"));
+        when(productMapper.selectByProductRef("P1")).thenReturn(new ZsjosProductDO().setId(4L)
+                .setProductRef("P1").setCategoryId(5L));
+        when(categoryMapper.selectById(5L)).thenReturn(new ZsjosProductCategoryDO().setId(5L).setParentId(0L));
+        doAnswer(invocation -> { invocation.<CashbackDO>getArgument(0).setId(12L); return 1; })
+                .when(mapper).insert(any(CashbackDO.class));
+
+        assertEquals(12L, service.ensureValidCashback(1L));
+        verify(mapper).insert(argThat((CashbackDO row) -> new BigDecimal("10.00").equals(row.getAmount())
+                && row.getRuleSnapshotJson().contains("system_default")));
+    }
+
     @Test void pageProjectsLeadNumber() {
         CashbackDO cashback = new CashbackDO().setId(10L).setLeadId(1L);
         when(mapper.selectPage(any(CashbackPageReqVO.class), isNull(Long.class)))

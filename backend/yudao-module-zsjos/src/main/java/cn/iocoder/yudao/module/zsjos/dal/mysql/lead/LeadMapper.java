@@ -227,7 +227,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                     if (hasSourceScope) wrapper.in(LeadDO::getSourceUserId, visibleSourceUserIds);
                     if (hasOwnerScope) {
                         if (hasSourceScope) wrapper.or();
-                        wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds);
+                        wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds)
+                                .or().in(LeadDO::getRecycleSourceOwnerUserId, visibleOwnerUserIds);
                     }
                 });
             }

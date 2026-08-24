@@ -24,7 +24,6 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 16 | 下属销售 | `/zsjos/subordinate-sales` | `SubordinateSalesPage` | `zsjos/subordinateSales/index` |
 | 17 | 今日待办 | `/zsjos/tasks/today` | `TodayTasksPage` | `zsjos/todayTask/index` |
 | 18 | 工作计划 | `/zsjos/work-plans` | `WorkPlanPage` | `zsjos/workPlan/index` |
-| 19 | 异常客资 | `/zsjos/leads/qualification-exceptions` | `LeadQualificationExceptionPage` | `zsjos/leadQualification/index` |
 | 20 | 申诉处理 | `/zsjos/appeals` | `LeadAppealPage` | `zsjos/leadAppeal/index` |
 | 21 | 我的订单 | `/zsjos/sales-orders/my` | `MySalesOrderPage` | `zsjos/mySalesOrder/index` |
 | 22 | 成交订单审批 | `/zsjos/sales-order-approvals` | `SalesOrderApprovalPage` | `zsjos/salesOrderApproval/index` |

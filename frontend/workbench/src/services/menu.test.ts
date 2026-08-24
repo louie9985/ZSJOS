@@ -114,12 +114,13 @@ describe('workbench menu conversion', () => {
   })
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
-    expect(RENDERABLE_APP_ROUTES.size).toBe(44)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(43)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/accounts')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/content')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/positioning')
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/appeals')).toBe(true)
+    expect([...RENDERABLE_APP_ROUTES] as string[]).not.toContain('/zsjos/leads/qualification-exceptions')
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-aging-pool')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/opportunity-public-sea')

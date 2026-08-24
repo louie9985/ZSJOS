@@ -28,6 +28,7 @@ import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -48,9 +49,12 @@ import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STA
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
+@Slf4j
 public class CashbackServiceImpl implements CashbackService {
     static final String OBSERVATION_DAYS_KEY = "zsjos.cashback.observation-days";
     static final int DEFAULT_OBSERVATION_DAYS = 7;
+    static final BigDecimal DEFAULT_VALID_CASHBACK_AMOUNT = new BigDecimal("10.00");
+    static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
     @Resource private CashbackMapper mapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
@@ -73,6 +77,9 @@ public class CashbackServiceImpl implements CashbackService {
         LeadIntendedProductDO primary = intendedProductMapper.selectPrimaryByLeadId(leadId);
         if (primary == null || primary.getProductRef() == null) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
         Rule rule = resolveRule(primary.getProductRef());
+        log.info("valid cashback rule resolved leadId={}, leadNo={}, sourceType={}, sourceUserId={}, partnerId={}, productRef={}, ruleSource={}",
+                lead.getId(), lead.getLeadNo(), lead.getSourceType(), lead.getSourceUserId(), lead.getPartnerId(),
+                primary.getProductRef(), rule.snapshot().get("validAmountSource") + "/" + rule.snapshot().get("dealRateSource"));
         LocalDateTime now = LocalDateTime.now();
         int observationDays = observationDays();
         CashbackDO cashback = base(businessKey, TYPE_VALID, eligible, primary.getProductRef(),
@@ -299,17 +306,21 @@ public class CashbackServiceImpl implements CashbackService {
             category = categoryMapper.selectById(category.getParentId());
         }
         BigDecimal amount = product.getValidCashbackAmount() != null ? product.getValidCashbackAmount()
-                : category == null ? null : category.getDefaultValidCashbackAmount();
+                : category != null && category.getDefaultValidCashbackAmount() != null
+                ? category.getDefaultValidCashbackAmount() : DEFAULT_VALID_CASHBACK_AMOUNT;
         BigDecimal rate = product.getDealCashbackRate() != null ? product.getDealCashbackRate()
-                : category == null ? null : category.getDefaultDealCashbackRate();
+                : category != null && category.getDefaultDealCashbackRate() != null
+                ? category.getDefaultDealCashbackRate() : DEFAULT_DEAL_CASHBACK_RATE;
         if (amount == null || amount.signum() < 0 || rate == null || rate.signum() < 0
                 || rate.compareTo(BigDecimal.ONE) > 0) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("productId", product.getId()); snapshot.put("productRef", productRef);
         snapshot.put("level1CategoryId", category == null ? null : category.getId());
         snapshot.put("validCashbackAmount", amount); snapshot.put("dealCashbackRate", rate);
-        snapshot.put("validAmountSource", product.getValidCashbackAmount() == null ? "level1_category" : "product");
-        snapshot.put("dealRateSource", product.getDealCashbackRate() == null ? "level1_category" : "product");
+        snapshot.put("validAmountSource", product.getValidCashbackAmount() != null ? "product"
+                : category != null && category.getDefaultValidCashbackAmount() != null ? "level1_category" : "system_default");
+        snapshot.put("dealRateSource", product.getDealCashbackRate() != null ? "product"
+                : category != null && category.getDefaultDealCashbackRate() != null ? "level1_category" : "system_default");
         return new Rule(amount.setScale(2, RoundingMode.HALF_UP), rate, snapshot);
     }
 

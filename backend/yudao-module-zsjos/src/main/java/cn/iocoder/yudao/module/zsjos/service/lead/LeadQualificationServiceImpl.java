@@ -81,6 +81,8 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         opportunity.setLostAt(null); opportunity.setLostReason(null);
         if (createOpportunity) opportunityMapper.insert(opportunity); else opportunityMapper.updateById(opportunity);
         lead.setStatus(STATUS_VALID); lead.setAssignmentStatus(ASSIGNMENT_OWNED);
+        // A lead can reach re-qualification from a suspended state; valid leads must not retain stale suspension.
+        lead.setSuspendedAt(null);
         lead.setQualifiedByUserId(userId);
         lead.setQualifiedAt(now);
         lead.setConvertedAt(now);
@@ -202,6 +204,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         LocalDateTime now = LocalDateTime.now();
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管恢复并重启判定");
         lead.setStatus(STATUS_SUBMITTED);
+        lead.setSuspendedAt(null);
         lifecycleTaskService.createQualificationTask(lead, lead.getOwnerUserId(), now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_RESTORED, lead, userId, STATUS_SUSPENDED, STATUS_SUBMITTED,
@@ -233,6 +236,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
                 reqVO.getSalesUserId(), userId, reqVO.getReason(), now);
         lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
+        lead.setSuspendedAt(null);
         lead.setOwnerUserId(reqVO.getSalesUserId());
         lead.setRecycleSourceOwnerUserId(null);
         lead.setCurrentAssignmentHistoryId(history.getId());

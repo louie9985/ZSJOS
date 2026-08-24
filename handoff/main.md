@@ -1,5 +1,106 @@
 # Main Workstream
 
+## Active delivery: repair partner lead qualification cashback chain
+
+- Workstream ID: `main-partner-lead-cashback-repair`
+- Goal: persist the independent partner account on new partner Leads, provide the confirmed 10.00/10% cashback defaults, and add repeatable repair/audit coverage for affected data.
+- Non-goals: change cashback observation/settlement, BPM, permissions, or execute production database mutations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: current `main` HEAD plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: ZSJOS Lead submission, cashback rule resolution, focused tests, migration/audit SQL, and directly affected docs.
+- Owner: Codex `/root`
+- Dependencies: existing PartnerAccountMapper, product/category rule fields, MyBatis tenant scoping; no new dependency.
+- Integration order: source identity fix -> cashback defaults -> tests -> guarded migration/audit -> compile/test.
+- Verification plan: focused ZSJOS tests, module compile, SQL static review, scoped diff review.
+
+## Delivery Entry - 2026-08-24 10:54:00 +08:00
+
+- Workstream ID: `main-partner-lead-cashback-repair`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: current `main` HEAD (no commit created)
+- User goal: repair independent-partner Lead qualification failures caused by missing source-account provenance and absent cashback defaults.
+- Key decisions: persist `PartnerAccount.id` as Lead `source_user_id`; reject missing/mismatched/disabled partner accounts; resolve cashback values with product -> level-one category -> system default precedence; use 10.00 valid cashback and 0.1000 deal rate defaults; leave ambiguous historical rows for manual review.
+- Execution or analysis result: fixed `createForPartner()` to validate and persist the partner account; added runtime cashback defaults and per-value rule-source snapshots; added structured rule-resolution logging without sensitive fields; created repeatable V122 migration to repair uniquely attributable Lead source accounts and fill missing root category defaults; synchronized cashback API and migration documentation.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmissionServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/cashback/CashbackServiceImpl.java`; focused Lead/Cashback tests; `script/sql/mysql/migrations/V122__repair_partner_lead_source_and_cashback_defaults.sql`; `script/sql/mysql/migrations/README.md`; `docs/api/cashback.md`; this handoff record.
+- Verification evidence: focused Maven reactor tests passed 25/25 (`CashbackServiceImplTest` 9/9, `LeadSubmissionServiceImplTest` 16/16); ZSJOS dependency-reactor compile passed; `git diff --check` passed with existing LF/CRLF warnings only.
+- Dependency or integration impact: no new dependency, permission, BPM, frontend, branch, commit, or deployment. V122 must be applied through the normal controlled migration process; backend must be rebuilt/restarted before runtime requests use the code fix.
+- Remaining work: apply V122 after reviewed backup/preflight, verify target tenant rows for `KZ202608241040140033` and the earlier affected Lead, restart/redeploy backend, then perform one authenticated partner submission and `judge-valid` request and verify Lead/Opportunity/Cashback rows.
+
+## Active delivery: consolidate lead qualification exceptions into lead management
+
+- Workstream ID: `main-lead-qualification-consolidation`
+- Goal: remove the standalone qualification-exceptions workbench route and expose supervisor exception disposition actions in the unified lead management detail alert area.
+- Non-goals: remove backend qualification APIs or permission identifiers, change domain disposition rules, alter unrelated dirty worktree changes, branches, commits, deployment, or database execution.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: current `main` HEAD plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: unified lead action contract, Workbench lead detail and route/menu wiring, menu migration/documentation/tests, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing LeadQualificationService APIs, Lead management visibility, server menu permissions; no new dependency.
+- Integration order: backend action projection -> Workbench detail actions -> route/menu/docs -> focused verification.
+- Verification plan: Workbench tests, typecheck, build, backend focused test/compile, scoped diff review.
+
+## Delivery Entry - 2026-08-24 10:04:00 +08:00
+
+- Workstream ID: `main-lead-qualification-consolidation`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: current `main` HEAD (no commit created)
+- User goal: remove the standalone sales-manager qualification-exceptions route and place restore, transfer, recycle, and release operations in unified Lead management detail alerts.
+- Key decisions: retain backend qualification APIs and permission identifiers; expose four `QUALIFICATION_*` actions through server-owned `availableActions`; include recycle-source owner visibility for managed scopes; retire menu 6800 as a hidden, non-routable page.
+- Execution or analysis result: added backend action projection and exception-detail visibility, migrated the four existing disposition dialogs into `LeadDetail`, rendered actions under `lead-alert-left`, removed the standalone Workbench page/route wiring, added V121 menu migration, and synchronized API/architecture/menu documentation.
+- Changed files: backend Lead constants, management/permission services, Lead mapper; Workbench Lead detail/overview/API/constants/route and guard tests; V121 SQL migration and bootstrap menu seed; API/frontend/architecture docs; `handoff/main.md`.
+- Verification evidence: Workbench `npm run typecheck` passed; `npm test -- --run` passed 56 files/334 tests; `npm run build` passed with the existing chunk-size warning; `git diff --check` passed with existing line-ending warnings. Backend reactor compile reached ZSJOS compilation but failed on an existing unrelated MediaAccount/Lombok source mismatch; one duplicate field introduced during this turn was removed before reporting.
+- Dependency or integration impact: no new dependency, no database execution, no permission grant, no branch/worktree operation, no commit or deployment. V121 must be applied in the normal migration order before the hidden menu state is synchronized in deployed environments.
+- Remaining work: rebuild/restart backend and apply V121 through controlled deployment, then browser-verify authorized/unauthorized supervisor actions against live tenant data; add focused backend action projection tests if backend test fixtures are extended.
+
+## Delivery Entry - 2026-08-24 10:08:00 +08:00
+
+- Workstream ID: `main-lead-qualification-consolidation`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: current `main` HEAD (no commit created)
+- User goal: correct the placement of qualification disposition controls from the alert strip to the existing `lead-action-toolbar` component.
+- Key decisions: keep the same server-owned action contract and disposition dialogs; render the four actions as `ToolbarAction` entries so `OverflowToolbar` owns layout and overflow behavior; keep `lead-alert-left` informational only.
+- Execution or analysis result: removed the alert-action prop and alert-specific styling, appended qualification actions to the unified detail toolbar, and corrected affected documentation.
+- Changed files: `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/styles/components/lead-detail-v2.css`; API/architecture documentation; this handoff file.
+- Verification evidence: typecheck run after correction passed; full frontend tests/build from the preceding implementation remained green. No backend or database execution.
+- Dependency or integration impact: none beyond the existing unified Lead detail implementation; no new dependency, permission, schema, branch, commit, or deployment.
+- Remaining work: browser verification after backend rebuild/restart and V121 application remains pending.
+
+## Active delivery: allow partner withdrawal BPM startup with internal reviewers
+
+- Workstream ID: `main-partner-withdrawal-bpm-start`
+- Goal: allow the independent partner withdrawal request to start its deployed BPM process when the workflow uses an explicitly supplied internal finance reviewer, while preserving rejection of organization-dependent starter strategies.
+- Non-goals: change process definitions, reviewer permissions, roles, users, financial rows, migrations, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `058013f634fa5098f3dd860bc1d850b4f42063cc` plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: BPM external process-start validation, focused BPM tests, directly affected withdrawal/BPM documentation, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing BPM public API, `AdminUserApi`, deployed process key `zsjos_partner_withdrawal`, and current ZSJOS withdrawal service; no new dependency.
+- Integration order: external candidate validation -> focused tests -> documentation -> module verification.
+- Verification plan: BPM focused tests and compile, ZSJOS withdrawal focused test/compile if time permits, scoped diff review; no runtime deployment or database mutation.
+
+## Delivery Entry - 2026-08-24 09:37:46 +08:00
+
+- Workstream ID: `main-partner-withdrawal-bpm-start`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `058013f634fa5098f3dd860bc1d850b4f42063cc` (no commit created)
+- User goal: make the independent partner withdrawal request start its deployed BPM approval process instead of being rejected as an undeployed/unavailable process.
+- Key decisions: permit only the BPM `START_USER_SELECT` strategy for external subjects when every configured task node has supplied enabled internal System-user reviewers; retain rejection for starter/dept-dependent strategies and unknown assignee-map keys; preserve the existing BPM public API and withdrawal reviewer permission resolution.
+- Execution or analysis result: external partner startup validation now accepts the withdrawal flow's `financeReview` reviewer map and rejects missing, disabled, nonexistent, or structurally unsupported candidates before process creation. The withdrawal service and process definition were not changed.
+- Changed files: `backend/yudao-module-bpm/src/main/java/cn/iocoder/yudao/module/bpm/service/task/BpmProcessInstanceServiceImpl.java`; `backend/yudao-module-bpm/src/test/java/cn/iocoder/yudao/module/bpm/api/task/BpmProcessInstanceApiImplPartnerTest.java`; `docs/api/withdrawal-and-offline-payout.md`; this handoff file.
+- Verification evidence: BPM partner-start focused test passed 5/5; ZSJOS `WithdrawalServiceImplTest` passed 7/7 with the 21-project dependency reactor; scoped `git diff --check` passed with only pre-existing LF/CRLF warnings.
+- Dependency or integration impact: no new dependency, schema or permission change, database mutation, branch/worktree operation, commit, deployment, or service restart. A rebuilt/restarted BPM service is required before runtime requests use the fix.
+- Remaining work: deploy/restart the rebuilt backend and submit one controlled partner withdrawal request to verify the `zsjos_partner_withdrawal` instance and `financeReview` task in the target environment; this runtime check was not performed in the local workspace.
+
 ## Active delivery: registration checklist draft pointer repair
 
 - Workstream ID: `main-registration-checklist-draft-pointer`
@@ -1926,3 +2027,16 @@
 - Verification evidence: mvn -pl yudao-module-zsjos '-Dtest=RegistrationNotifySceneProviderTest' '-Dsurefire.failIfNoSpecifiedTests=false' test passed, 8 tests; module compilation passed as part of the earlier reactor run. No database execution or external service changes.
 - Dependency or integration impact: reused existing approval-config mapper, System department API, and System user API; no new dependencies, migrations, permission grants, branch/worktree operations, commits, or publication.
 - Remaining work: deploy/restart through the normal controlled process before runtime verification; confirm tenant approval configuration and department membership data in the target environment.
+
+## Delivery Entry - 2026-08-24 11:10:14 +08:00
+
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: dd265c1f540832a980df7edd4c36e53ab7d1eadd (no commit created)
+- User goal: fix lead recovery/disposition state so a lead restored or transferred from suspension can later enter a sales order.
+- Key decisions: clear stale suspendedAt when a lead is restored, transferred, or judged valid; preserve existing status, assignment, owner, and lifecycle-task transitions; leave recycle and release paths unchanged because they already use clearCurrentAssignment().
+- Execution or analysis result: implemented suspension-field cleanup and added regression coverage for valid judgment, restore, and transfer paths.
+- Changed files: backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadQualificationServiceImpl.java; backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadQualificationServiceImplTest.java; handoff/main.md.
+- Verification evidence: `mvn -pl yudao-module-zsjos '-Dtest=LeadQualificationServiceImplTest' '-Dsurefire.failIfNoSpecifiedTests=false' test` passed, 9 tests; `git diff --check` reported only existing line-ending conversion warnings. Runtime retest against the shared backend was not performed because no service restart was requested.
+- Dependency or integration impact: no new dependencies, migrations, permissions, database execution, branch/worktree operations, commit, or publication.
+- Remaining work: redeploy/restart the backend through the normal controlled process, then verify lead 38 has `status=valid` and `suspended_at IS NULL` before retrying sales-order submission.

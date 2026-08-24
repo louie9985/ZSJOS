@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Tabs, Typography, message } from 'antd'
-import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, EditOutlined, FileAddOutlined, PlusOutlined, WarningOutlined } from '@ant-design/icons'
-import { api, type DictData, type LeadAppealEvidence, type ManagedLead, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
+import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, EditOutlined, ExportOutlined, FileAddOutlined, PlusOutlined, RollbackOutlined, SwapOutlined, WarningOutlined } from '@ant-design/icons'
+import { api, type AssignmentUser, type DictData, type LeadAppealEvidence, type ManagedLead, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
 import { applyInvalidRemarkTemplate } from '../services/leadManagement'
 import { DICT_TYPE } from '../constants'
 import { defaultLeadDetailTab, detailTabsFromProjection, resolveLeadDetailTab, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
@@ -20,6 +20,9 @@ import SalesOrderEntryModal from './SalesOrderEntryModal'
 import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import FollowUpModal from './FollowUpModal'
 import { formatTimestamp } from '../services/time'
+import EmployeeSelect from './EmployeeSelect'
+
+type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release'
 
 export type LeadDetailExtraTab = { key: string; label: string; children: ReactNode; forceRender?: boolean }
 
@@ -83,6 +86,13 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [submitterActionSaving, setSubmitterActionSaving] = useState(false)
   const [validConfirmOpen, setValidConfirmOpen] = useState(false)
   const [repurchaseOpen, setRepurchaseOpen] = useState(false)
+  const [qualificationAction, setQualificationAction] = useState<QualificationAction>()
+  const [qualificationReason, setQualificationReason] = useState('')
+  const [qualificationSalesUserId, setQualificationSalesUserId] = useState<number>()
+  const [qualificationCandidates, setQualificationCandidates] = useState<AssignmentUser[]>([])
+  const [qualificationConfirmOpen, setQualificationConfirmOpen] = useState(false)
+  const [qualificationCandidatesLoading, setQualificationCandidatesLoading] = useState(false)
+  const { submitting: dispositionSaving, run: runDisposition, resetIntent: resetDispositionIntent } = useSubmissionGuard()
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
   const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
@@ -149,6 +159,51 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     onChanged()
   }
 
+  const closeQualificationAction = () => {
+    setQualificationConfirmOpen(false)
+    setQualificationAction(undefined)
+  }
+  const openQualificationAction = async (action: QualificationAction) => {
+    resetDispositionIntent()
+    setQualificationAction(action)
+    setQualificationReason('')
+    setQualificationSalesUserId(undefined)
+    setQualificationCandidates([])
+    if (action !== 'transfer') return
+    setQualificationCandidatesLoading(true)
+    try { setQualificationCandidates(await api.leadTransferCandidates(lead.id)) }
+    catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
+    finally { setQualificationCandidatesLoading(false) }
+  }
+  const prepareQualificationAction = () => {
+    if (!qualificationReason.trim()) { message.warning('请填写处置理由'); return }
+    if (qualificationAction === 'transfer' && !qualificationSalesUserId) { message.warning('请选择目标销售'); return }
+    setQualificationConfirmOpen(true)
+  }
+  const submitQualificationAction = async () => {
+    setQualificationConfirmOpen(false)
+    const action = qualificationAction
+    if (!action) return
+    await runDisposition(async ({ idempotencyKey, complete }) => {
+      const command = { reason: qualificationReason.trim(), idempotencyKey }
+      if (action === 'restore') await api.restoreLead(lead.id, command)
+      if (action === 'transfer') await api.transferLead(lead.id, { ...command, salesUserId: qualificationSalesUserId! })
+      if (action === 'recycle') await api.recycleLead(lead.id, command)
+      if (action === 'release') await api.releaseLeadToClaimPool(lead.id, command)
+      complete()
+      message.success('客资已处理')
+      closeQualificationAction()
+      onChanged()
+    }).catch(error => message.error(error instanceof Error ? error.message : '客资处理失败'))
+  }
+
+  const qualificationAlertActions: ToolbarAction[] = [
+    actions.has('QUALIFICATION_RESTORE') && { key: 'qualification-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('QUALIFICATION_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore') },
+    actions.has('QUALIFICATION_TRANSFER') && { key: 'qualification-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('QUALIFICATION_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
+    actions.has('QUALIFICATION_RECYCLE') && { key: 'qualification-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('QUALIFICATION_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
+    actions.has('QUALIFICATION_RELEASE') && { key: 'qualification-release', icon: <ExportOutlined/>, label: '释放', danger: true, disabled: !actions.get('QUALIFICATION_RELEASE')?.enabled, onClick: () => void openQualificationAction('release') },
+  ].filter(Boolean) as ToolbarAction[]
+
   const toolbarActions: ToolbarAction[] = [
     actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpModalOpen(true) },
     actions.has('JUDGE_VALID') && { key: 'judge-valid', icon: <CheckOutlined/>, label: '判有效', onClick: () => void openValid() },
@@ -160,6 +215,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     actions.has('SUBMITTER_URGE') && { key: 'submitter-urge', icon: <BellOutlined/>, label: '催促', onClick: () => setUrgeOpen(true) },
     actions.has('SUBMITTER_COMPLAINT') && { key: 'submitter-complaint', icon: <WarningOutlined/>, label: '投诉', danger: true, onClick: () => setComplaintOpen(true) },
     actions.has('ENTER_REPURCHASE') && { key: 'enter-repurchase', icon: <FileAddOutlined/>, label: '录入复购', disabled: !actions.get('ENTER_REPURCHASE')?.enabled, onClick: () => setRepurchaseOpen(true) },
+    ...qualificationAlertActions,
     ...studentToolbarActions,
   ].filter(Boolean) as ToolbarAction[]
 
@@ -213,6 +269,12 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined} open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)} onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
       <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)} onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
       <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={handleStandaloneFollowUpSuccess}/>
+      <Modal open={Boolean(qualificationAction)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' }[qualificationAction || 'restore']} onCancel={closeQualificationAction} footer={<Space><Button onClick={closeQualificationAction}>取消</Button><IrreversiblePopconfirm action={`处理客资「${lead.submittedName}」`} danger={qualificationAction === 'recycle' || qualificationAction === 'release'} open={qualificationConfirmOpen} onOpenChange={setQualificationConfirmOpen} onConfirm={submitQualificationAction}><Button type="primary" danger={qualificationAction === 'recycle' || qualificationAction === 'release'} loading={dispositionSaving} onClick={prepareQualificationAction}>确认处理</Button></IrreversiblePopconfirm></Space>}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          {qualificationAction === 'transfer' && <Form.Item label="目标销售" required><EmployeeSelect users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder={qualificationCandidatesLoading ? '正在加载可转派销售' : qualificationCandidates.length ? '选择目标销售' : '暂无可转派销售'} style={{ width: '100%' }}/></Form.Item>}
+          <Form.Item label="处置理由" required><Input.TextArea value={qualificationReason} onChange={event => setQualificationReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/></Form.Item>
+        </Space>
+      </Modal>
     </>}
   </div>
 }

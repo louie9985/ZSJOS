@@ -7,6 +7,7 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.lang.Assert;
 import cn.hutool.core.util.*;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.date.DateUtils;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.ObjectUtils;
@@ -805,10 +806,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         if (definition.isSuspended()) throw exception(PROCESS_DEFINITION_IS_SUSPENDED);
         BpmProcessDefinitionInfoDO definitionInfo = processDefinitionService.getProcessDefinitionInfo(definition.getId());
         if (definitionInfo == null) throw exception(PROCESS_DEFINITION_NOT_EXISTS);
-        validateExternalCandidateStrategies(definition.getId());
-        if (CollUtil.isNotEmpty(reqDTO.getStartUserSelectAssignees())) {
-            throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
-        }
+        validateExternalCandidateStrategies(definition.getId(), reqDTO.getStartUserSelectAssignees());
         Map<String, Object> variables = reqDTO.getVariables() == null
                 ? new HashMap<>() : new HashMap<>(reqDTO.getVariables());
         FlowableUtils.filterProcessInstanceFormVariable(variables);
@@ -827,15 +825,44 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         return builder.start().getId();
     }
 
-    private void validateExternalCandidateStrategies(String definitionId) {
-        Set<Integer> forbidden = Set.of(BpmTaskCandidateStrategyEnum.START_USER_SELECT.getStrategy(),
-                BpmTaskCandidateStrategyEnum.START_USER.getStrategy(),
+    private void validateExternalCandidateStrategies(String definitionId,
+                                                     Map<String, List<Long>> startUserSelectAssignees) {
+        Set<Integer> forbidden = Set.of(BpmTaskCandidateStrategyEnum.START_USER.getStrategy(),
                 BpmTaskCandidateStrategyEnum.START_USER_DEPT_LEADER.getStrategy(),
                 BpmTaskCandidateStrategyEnum.START_USER_DEPT_LEADER_MULTI.getStrategy());
-        boolean unsupported = BpmnModelUtils.getBpmnModelElements(modelService.getBpmnModelByDefinitionId(definitionId),
-                        UserTask.class).stream()
-                .map(BpmnModelUtils::parseCandidateStrategy).anyMatch(forbidden::contains);
+        List<UserTask> userTasks = BpmnModelUtils.getBpmnModelElements(
+                modelService.getBpmnModelByDefinitionId(definitionId), UserTask.class);
+        boolean unsupported = userTasks.stream().map(BpmnModelUtils::parseCandidateStrategy)
+                .anyMatch(forbidden::contains);
         if (unsupported) throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
+
+        Map<String, UserTask> startUserSelectTasks = userTasks.stream()
+                .filter(task -> Objects.equals(BpmTaskCandidateStrategyEnum.START_USER_SELECT.getStrategy(),
+                        BpmnModelUtils.parseCandidateStrategy(task)))
+                .collect(java.util.stream.Collectors.toMap(UserTask::getId, task -> task, (left, right) -> left));
+        if (startUserSelectTasks.isEmpty()) {
+            if (CollUtil.isNotEmpty(startUserSelectAssignees)) {
+                throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
+            }
+            return;
+        }
+        for (UserTask task : startUserSelectTasks.values()) {
+            List<Long> assignees = startUserSelectAssignees == null ? null : startUserSelectAssignees.get(task.getId());
+            if (CollUtil.isEmpty(assignees)) {
+                throw exception(PROCESS_INSTANCE_START_USER_SELECT_ASSIGNEES_NOT_CONFIG, task.getName());
+            }
+            Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(assignees);
+            for (Long assignee : assignees) {
+                AdminUserRespDTO user = userMap.get(assignee);
+                if (user == null || !CommonStatusEnum.isEnable(user.getStatus())) {
+                    throw exception(PROCESS_INSTANCE_START_USER_SELECT_ASSIGNEES_NOT_EXISTS, task.getName(), assignee);
+                }
+            }
+        }
+        if (startUserSelectAssignees != null && startUserSelectAssignees.keySet().stream()
+                .anyMatch(key -> !startUserSelectTasks.containsKey(key))) {
+            throw exception(PROCESS_INSTANCE_EXTERNAL_CANDIDATE_UNSUPPORTED);
+        }
     }
 
     private String requireExternalSubject(BpmStartSubjectDTO subject) {

@@ -80,7 +80,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead-follow-up-rule/get` | `zsjos:lead-follow-up-rule:query` |
 | `PUT /zsjos/lead-follow-up-rule/update` | `zsjos:lead-follow-up-rule:update` |
 | `GET /zsjos/lead-follow-up-rule/runtime-setting` | 已登录用户；只返回当前租户消息浮窗时长 |
-| `GET /zsjos/lead/qualification-exception/page` | `zsjos:lead:qualification:query` + 部门范围或全租户处置权限 |
+| `GET /zsjos/lead/qualification-exception/page` | 后端兼容查询接口；Workbench 不再提供独立异常客资路由 |
 | `POST /zsjos/lead/qualification-exception/search-page` | 同异常客资固定范围，组合关键词与高级条件 |
 | `POST /zsjos/lead/search-page` | 通用客资管理范围内组合关键词与高级条件 |
 | `POST /zsjos/lead/aging-pool/search-page` | 商机公海固定范围内组合关键词与高级条件 |
@@ -93,6 +93,10 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `POST /zsjos/lead/{id}/transfer` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
 | `POST /zsjos/lead/{id}/recycle` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
 | `POST /zsjos/lead/{id}/release-to-claim-pool` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
+
+统一客资详情的 `availableActions` 在满足同一权限与对象范围时返回 `QUALIFICATION_RESTORE`、
+`QUALIFICATION_TRANSFER`、`QUALIFICATION_RECYCLE` 和 `QUALIFICATION_RELEASE`；Workbench 将这些动作
+渲染在客资详情的 `lead-action-toolbar` 操作集合中。前端不得依据角色或状态自行补齐动作。
 
 规则参数范围为接单超时 10–3600 秒、最大尝试 1–20 次。修改只影响之后提交的客资，进行中客资继续使用提交时规则快照。
 

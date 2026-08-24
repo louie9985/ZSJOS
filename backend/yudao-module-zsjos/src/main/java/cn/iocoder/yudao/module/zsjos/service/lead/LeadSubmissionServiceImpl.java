@@ -18,6 +18,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
 import jakarta.annotation.Resource;
@@ -62,6 +64,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadNumberService leadNumberService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private LeadCategorySnapshotService categorySnapshotService;
+    @Resource private PartnerAccountMapper partnerAccountMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -74,12 +77,23 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO createForPartner(LeadCreateReqVO reqVO, Long accountId, Long partnerId) {
+        validatePartnerSubmissionAccount(accountId, partnerId);
         reqVO.setDispatchMode(DISPATCH_AUTO);
         reqVO.setSpecifiedSalesUserId(null);
         LeadSubmissionIdentityService.Resolution identity = new LeadSubmissionIdentityService.Resolution(
                 LeadSubmissionIdentityService.Identity.PARTNER, partnerId);
         validateOrdinaryDispatch(reqVO, null, identity.identity());
-        return create(reqVO, accountId, null, identity, false);
+        return create(reqVO, accountId, accountId, identity, false);
+    }
+
+    private void validatePartnerSubmissionAccount(Long accountId, Long partnerId) {
+        PartnerAccountDO account = accountId == null ? null : partnerAccountMapper.selectById(accountId);
+        if (account == null || !Objects.equals(account.getPartnerId(), partnerId)) {
+            throw exception(LEAD_SUBMITTER_IDENTITY_INVALID);
+        }
+        if (!CommonStatusEnum.ENABLE.getStatus().equals(account.getStatus())) {
+            throw exception(PARTNER_ACCOUNT_DISABLED);
+        }
     }
 
     @Override

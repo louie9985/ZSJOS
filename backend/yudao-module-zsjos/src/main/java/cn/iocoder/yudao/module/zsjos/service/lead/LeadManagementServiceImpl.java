@@ -494,6 +494,19 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                                                 Long currentUserId) {
         LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
+        boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus())
+                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
+        boolean recyclePending = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus());
+        boolean canManageQualification = securityFrameworkService.hasPermission("zsjos:lead:qualification:manage")
+                && leadObjectPermissionService.canManageQualificationException(lead, currentUserId);
+        if (canManageQualification && (suspended || recyclePending)) {
+            if (suspended) {
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RESTORE, true));
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RECYCLE, true));
+            }
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
+        }
         if (Objects.equals(lead.getSourceUserId(), currentUserId)
                 && lead.getStatus() != null
                 && !Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {

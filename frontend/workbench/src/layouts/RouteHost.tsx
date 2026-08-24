@@ -12,7 +12,6 @@ import LeadDuplicateReviewPage from '../pages/LeadDuplicateReviewPage'
 import LeadComplaintPage from '../pages/LeadComplaintPage'
 import TodayTasksPage from '../pages/TodayTasksPage'
 import WorkPlanPage from '../pages/WorkPlanPage'
-import LeadQualificationExceptionPage from '../pages/LeadQualificationExceptionPage'
 import MessageInboxPage from '../pages/MessageInboxPage'
 import LeadAppealPage from '../pages/LeadAppealPage'
 import SalesOrderApprovalPage from '../pages/SalesOrderApprovalPage'
@@ -74,7 +73,6 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage permissions={permissions} onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.QUALIFICATION_EXCEPTIONS) return <LeadQualificationExceptionPage/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>

@@ -105,6 +105,8 @@ public class LeadObjectPermissionService {
         if (hasQueryAll() || Objects.equals(userId, lead.getSourceUserId())
                 || Objects.equals(userId, lead.getOwnerUserId())
                 || managesUserDepartment(userId, lead.getOwnerUserId())
+                || securityFrameworkService.hasPermission("zsjos:lead:qualification:manage")
+                    && canManageQualificationException(lead, userId)
                 || canReadAgingPool(lead.getId(), userId)
                 || canReadManualPublicSea(lead, userId) || canReadStudentSalesHistory(lead, userId)
                 || canReadMediaStudentLead(lead, userId)) {
