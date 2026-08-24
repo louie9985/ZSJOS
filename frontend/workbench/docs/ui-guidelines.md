@@ -187,6 +187,10 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 }
 ```
 
+`/zsjos/sales-orders/my` 是已确认的紧凑页面例外：保留页面右、下侧的
+`--crm-page-pad`，上侧和起始侧使用 `--crm-sp-1`；该主从页使用 `max-width: none`
+铺满导航右侧内容区，且顶部不显示页面标题或描述文案，状态标签与刷新操作共用一行。
+
 **别忘：** 新主从页须在 `styles.guard.test.ts` 的锚点列表里注册 `.<feature>-page` 和 `.<feature>-detail-pane`。
 
 ### 3.2 列表/表格页

@@ -112,6 +112,11 @@ public class BusinessTaskServiceImpl implements BusinessTaskService {
         String actionCode = firstNonBlank(task.getActionCode(), display == null ? null : display.actionCode(), null);
         result.setActionCode(actionCode);
         result.setActionable("pending".equals(task.getStatus()) && actionCode != null);
+        if ("student_service".equals(task.getBizType())) {
+            result.setServiceRelationId(task.getBizId());
+            result.setTargetTab("overview");
+            result.setTargetRecordId(task.getId());
+        }
         return result;
     }
 

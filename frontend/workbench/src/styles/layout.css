@@ -182,9 +182,6 @@
     justify-content: flex-end;
   }
 
-  .theme-action {
-    display: none!important;
-  }
 }
 
 .crm-shell {

@@ -30,6 +30,8 @@ TABLE_PATTERN = re.compile(
     r"CREATE\s+TABLE(?:\s+IF\s+NOT\s+EXISTS)?\s+`([^`]+)`\s*\((.*?)\)\s*ENGINE\s*=",
     re.IGNORECASE | re.DOTALL,
 )
+DYNAMIC_SIGNAL_PATTERN = re.compile(r"['\"]\s*SIGNAL\s+SQLSTATE\b", re.IGNORECASE)
+PROCEDURAL_SIGNAL_GUARD_START_VERSION = 113
 
 
 class CommandError(RuntimeError):
@@ -581,6 +583,14 @@ def static_check() -> None:
             )
         if not migrations:
             fail(f"Module {code} has no migrations")
+        for migration in migrations:
+            migration_text = migration.path.read_text(encoding="utf-8")
+            if (migration.number >= PROCEDURAL_SIGNAL_GUARD_START_VERSION
+                    and DYNAMIC_SIGNAL_PATTERN.search(migration_text)):
+                fail(
+                    f"Migration {migration.path.name} dynamically prepares SIGNAL; "
+                    "use IF ... SIGNAL inside a stored procedure"
+                )
 
     core = manifests["core"]
     schema_text = resolve_sql_path(core["schema"]).read_text(encoding="utf-8")

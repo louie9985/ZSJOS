@@ -14,6 +14,7 @@ import jakarta.validation.constraints.Min;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import static cn.iocoder.yudao.framework.common.util.date.DateUtils.FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND;
+import static cn.iocoder.yudao.module.zsjos.service.lead.LeadSimpleStatusQuery.VALIDATION_PATTERN;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -28,6 +29,9 @@ public class LeadManagementPageReqVO extends PageParam {
 
     @Pattern(regexp = "all|submitted|owned", message = "客资关系范围不正确")
     private String relationScope;
+
+    @Pattern(regexp = VALIDATION_PATTERN, message = "客资简单状态不正确")
+    private String simpleStatus;
 
     @Pattern(regexp = "[a-z][a-z0-9_]{1,63}", message = "客资收件箱分组不正确")
     private String inboxGroup;

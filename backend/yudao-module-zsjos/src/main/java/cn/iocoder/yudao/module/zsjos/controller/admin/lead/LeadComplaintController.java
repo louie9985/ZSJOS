@@ -16,7 +16,7 @@ public class LeadComplaintController {
     @GetMapping("/page") @PreAuthorize("@ss.hasPermission('zsjos:lead-complaint:handle')")
     public CommonResult<PageResult<LeadComplaintRespVO>> page(@Valid LeadComplaintPageReqVO req){return success(service.page(req));}
     @GetMapping("/lead/{leadId}/list")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-complaint:create','zsjos:lead-complaint:handle','zsjos:subordinate-sales:query')")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead-detail:complaint-read')")
     public CommonResult<java.util.List<LeadComplaintRespVO>> leadList(@PathVariable Long leadId) {
         return success(service.getLeadComplaints(leadId, getLoginUserId()));
     }

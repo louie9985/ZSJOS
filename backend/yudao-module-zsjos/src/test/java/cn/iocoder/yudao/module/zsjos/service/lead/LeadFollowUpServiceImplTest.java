@@ -20,7 +20,6 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpImageMapp
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
@@ -57,12 +56,7 @@ class LeadFollowUpServiceImplTest {
     @Mock private OpportunityMapper opportunityMapper;
     @Mock private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Mock private OpportunityFollowUpImageMapper opportunityImageMapper;
-    @Mock private LeadAgingPoolService agingPoolService;
-
-    @BeforeEach
-    void setUp() {
-        lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
-    }
+    @Mock private LeadCollaborationService collaborationService;
 
     @Test
     void createRejectsLeadOutsideOwnedSubmittedCycle() {

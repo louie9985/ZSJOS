@@ -8,17 +8,46 @@
   flex-direction: column;
 }
 
-.lead-management-scope-shell {
-  flex: none;
-  margin-bottom: var(--crm-sp-3);
-}
-
 .lead-inbox-filter-shell {
   flex: none;
   border: none;
   border-radius: 0;
   border-bottom: 1px solid var(--crm-border);
   background: transparent;
+}
+
+.lead-simple-status-shell {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  gap: var(--crm-sp-1);
+  margin-bottom: var(--crm-sp-3);
+  padding-bottom: var(--crm-sp-2);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.lead-simple-status-shell button {
+  min-height: 30px;
+  flex: none;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--crm-radius-sm);
+  background: transparent;
+  color: var(--crm-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.lead-simple-status-shell button:hover,
+.lead-simple-status-shell button.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.lead-simple-status-shell button:focus-visible {
+  outline: 2px solid var(--crm-color-primary);
+  outline-offset: 1px;
 }
 
 .lead-inbox-group-tabs .ant-tabs-nav {
@@ -486,4 +515,8 @@
 
 [data-crm-preset="illustration"] .lead-inbox-filter-shell {
   border-bottom-width: 3px;
+}
+.lead-management-detail-only .lead-inbox-detail-pane {
+  min-width: 0;
+  width: 100%;
 }

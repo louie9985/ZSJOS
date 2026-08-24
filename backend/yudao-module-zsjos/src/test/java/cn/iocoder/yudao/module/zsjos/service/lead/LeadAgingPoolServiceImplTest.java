@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
@@ -54,6 +55,7 @@ class LeadAgingPoolServiceImplTest {
     @Mock private DeptApi deptApi;
     @Mock private SecurityFrameworkService securityFrameworkService;
     @Mock private AdvancedFilterService advancedFilterService;
+    @Mock private LeadPublicSeaRecordMapper publicSeaRecordMapper;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -146,6 +148,21 @@ class LeadAgingPoolServiceImplTest {
         assertEquals(ASSIGNMENT_PUBLIC_POOL, lead.getAssignmentStatus());
         assertNull(lead.getOwnerUserId());
         verify(assignmentHistoryMapper).insert(org.mockito.ArgumentMatchers.any(LeadAssignmentHistoryDO.class));
+    }
+
+    @Test
+    void dueLeadDoesNotEnterAgingPoolWhileManualPublicSeaIsActive() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 19, 9, 0);
+        LeadFollowUpRuleDO rule = new LeadFollowUpRuleDO(); rule.setAgingPoolTimeoutDays(7);
+        LeadDO lead = new LeadDO(); lead.setId(1L);
+        when(ruleService.requireEnabledRule()).thenReturn(rule);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(publicSeaRecordMapper.selectByLeadIdForUpdate(1L, 1L))
+                .thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadPublicSeaRecordDO());
+
+        assertFalse(service.tryEnterDueLead(1L, now));
+
+        verify(cycleMapper, never()).insert(org.mockito.ArgumentMatchers.any(LeadAgingPoolCycleDO.class));
     }
 
     private static LeadAgingPoolCycleDO cycle(String status, Long collaboratorUserId) {

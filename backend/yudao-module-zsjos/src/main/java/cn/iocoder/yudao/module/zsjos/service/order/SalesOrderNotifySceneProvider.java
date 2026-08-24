@@ -44,20 +44,21 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
 
     @Override
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
+        Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Set<NotifyRecipientDTO> result = new LinkedHashSet<>();
-        if (recipientRoles.contains(ROLE_REVIEWERS)) addIds(result, event.getPayload().get("reviewerUserIds"));
-        if (recipientRoles.contains(ROLE_SUBMITTER)) addId(result, event.getPayload().get("submitterUserId"));
-        if (recipientRoles.contains(ROLE_RESULT_ACTORS)) addIds(result, event.getPayload().get("resultUserIds"));
+        if (recipientRoles.contains(ROLE_REVIEWERS)) addIds(result, payload.get("reviewerUserIds"));
+        if (recipientRoles.contains(ROLE_SUBMITTER)) addId(result, payload.get("submitterUserId"));
+        if (recipientRoles.contains(ROLE_RESULT_ACTORS)) addIds(result, payload.get("resultUserIds"));
         if (recipientRoles.contains(ROLE_LEAD_SUBMITTER)) {
-            if (event.getPayload().get("partnerId") instanceof Number number) {
+            if (payload.get("partnerId") instanceof Number number) {
                 PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(number.longValue());
                 if (account != null) result.add(NotifyRecipientDTO.partner(account.getId()));
             } else {
-                addId(result, event.getPayload().get("leadSubmitterUserId"));
+                addId(result, payload.get("leadSubmitterUserId"));
             }
         }
-        if (recipientRoles.contains(ROLE_SUPERVISOR)) addId(result, event.getPayload().get("supervisorUserId"));
-        if (recipientRoles.contains(ROLE_REQUESTER)) addId(result, event.getPayload().get("requesterUserId"));
+        if (recipientRoles.contains(ROLE_SUPERVISOR)) addId(result, payload.get("supervisorUserId"));
+        if (recipientRoles.contains(ROLE_REQUESTER)) addId(result, payload.get("requesterUserId"));
         return result;
     }
 
@@ -65,21 +66,24 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
     public Map<String, Object> resolveVariables(NotifyBusinessEvent event, NotifyRecipientDTO recipient) {
         SalesOrderDO order = orderMapper.selectById(event.getBizId());
         if (order == null) return Map.of();
+        Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("order.id", order.getId()); values.put("order.no", order.getOrderNo());
-        values.put("order.studentName", order.getStudentName()); values.put("order.amount", order.getTotalAmount());
+        values.put("order.amount", order.getTotalAmount());
         values.put("order.status", order.getStatus()); values.put("order.submittedAt", order.getSubmittedAt());
-        values.put("order.approvalDepartments", event.getPayload().get("approvalDepartments"));
-        values.put("order.decisionReason", event.getPayload().get("decisionReason"));
-        Long leadSubmitterUserId = event.getPayload().get("leadSubmitterUserId") instanceof Number number
+        values.put("order.approvalDepartments", payload.get("approvalDepartments"));
+        values.put("order.decisionReason", payload.get("decisionReason"));
+        Long leadSubmitterUserId = payload.get("leadSubmitterUserId") instanceof Number number
                 ? number.longValue() : null;
-        Long partnerId = event.getPayload().get("partnerId") instanceof Number number ? number.longValue() : null;
+        Long partnerId = payload.get("partnerId") instanceof Number number ? number.longValue() : null;
         if (SUBMITTER_EFFECTIVE.equals(event.getSceneCode())) {
             values.put("order.cashbackTotal", partnerId != null
                     ? cashbackService.getPartnerOrderCashbackTotal(order.getId(), partnerId)
                     : cashbackService.getOrderCashbackTotal(order.getId(), leadSubmitterUserId));
         }
-        values.put("order.supervisorReason", event.getPayload().get("supervisorReason"));
+        values.put("order.supervisorReason", payload.get("supervisorReason"));
+        values.put("order.supervisorDecision", payload.get("supervisorDecision"));
+        values.put("order.supervisorCenter", centerLabel(payload.get("taskDefinitionKey")));
         return values;
     }
 
@@ -87,16 +91,23 @@ public class SalesOrderNotifySceneProvider implements NotifySceneProvider {
         return new NotifySceneRespDTO(code, name, List.of(
                 new NotifySceneVariableRespDTO("order.id", "订单编号", false),
                 new NotifySceneVariableRespDTO("order.no", "订单号", false),
-                new NotifySceneVariableRespDTO("order.studentName", "学员姓名", true),
                 new NotifySceneVariableRespDTO("order.amount", "成交金额", false),
                 new NotifySceneVariableRespDTO("order.status", "订单状态", false),
                 new NotifySceneVariableRespDTO("order.submittedAt", "提交时间", false),
                 new NotifySceneVariableRespDTO("order.approvalDepartments", "审批部门", false),
                 new NotifySceneVariableRespDTO("order.decisionReason", "审批理由", false),
                 new NotifySceneVariableRespDTO("order.cashbackTotal", "订单返现合计", false),
-                new NotifySceneVariableRespDTO("order.supervisorReason", "主管确认原因或意见", false)),
+                new NotifySceneVariableRespDTO("order.supervisorReason", "主管确认原因或意见", false),
+                new NotifySceneVariableRespDTO("order.supervisorDecision", "主管确认结果", false),
+                new NotifySceneVariableRespDTO("order.supervisorCenter", "申请加签中心", false)),
                 java.util.Arrays.stream(roles).map(role -> new NotifySceneRoleRespDTO(role, roleLabel(role))).toList(),
                 List.of(NotifyActionType.NONE, NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false);
+    }
+
+    private String centerLabel(Object taskDefinitionKey) {
+        if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.TASK_REGISTRATION.equals(taskDefinitionKey)) return "报名履约中心";
+        if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.TASK_FINANCE.equals(taskDefinitionKey)) return "财务中心";
+        return "成交审批";
     }
 
     private String roleLabel(String role) {

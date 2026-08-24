@@ -8,7 +8,9 @@
           height="120px"
           borderradius="50%"
           directory="system/user/avatar"
+          is-avatar
           :file-size="2"
+          :file-type="['image/jpeg', 'image/png', 'image/webp']"
           :is-show-tip="false"
           :disabled="!canUpdate"
         />

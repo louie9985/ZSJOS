@@ -1,13 +1,17 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadComplaintDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadComplaintMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.LeadComplaintDecisionReqVO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -17,10 +21,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_FOUNDED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_UNFOUNDED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class LeadComplaintServiceTest {
@@ -33,6 +39,16 @@ class LeadComplaintServiceTest {
     @Mock private LeadSubmissionIdentityService identityService;
     @Mock private AdminUserApi adminUserApi;
     @Mock private FileApi fileApi;
+
+    @BeforeEach
+    void setUp() {
+        TenantContextHolder.setTenantId(1L);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContextHolder.clear();
+    }
 
     @Test
     void leadHistoryReturnsOnlyRequestedLeadWithNamesAndSignedEvidence() throws Exception {
@@ -63,6 +79,37 @@ class LeadComplaintServiceTest {
                 .getMethod("getLeadComplaints", Long.class, Long.class).getAnnotation(ZsjosPermission.class);
         assertNotNull(permission);
         assertEquals("read", permission.action());
+    }
+
+    @Test
+    void foundedDecisionNotifiesActualComplainantAndSalesContext() {
+        assertDecisionNotification("founded", COMPLAINT_FOUNDED, 10L, null);
+    }
+
+    @Test
+    void unfoundedPartnerDecisionStillNotifiesActualComplainant() {
+        assertDecisionNotification("unfounded", COMPLAINT_UNFOUNDED, null, 70L);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void assertDecisionNotification(String result, String sceneCode, Long complainantUserId, Long partnerId) {
+        LeadComplaintDO row = new LeadComplaintDO();
+        row.setId(11L); row.setLeadId(1L); row.setComplainantUserId(complainantUserId); row.setPartnerId(partnerId);
+        row.setSalesUserId(20L); row.setStatus("pending");
+        when(complaintMapper.selectByIdForUpdate(11L, 1L)).thenReturn(row);
+        when(attachmentService.validateReferences(anyList(), eq(30L))).thenReturn(Map.of());
+        LeadComplaintDecisionReqVO request = new LeadComplaintDecisionReqVO();
+        request.setResult(result); request.setOpinion("处理意见"); request.setIdempotencyKey("decision-key");
+
+        service.decide(11L, 30L, request);
+
+        org.mockito.ArgumentCaptor<Map<String, Object>> context = org.mockito.ArgumentCaptor.forClass(Map.class);
+        verify(notifyPublisher).publish(eq(sceneCode), eq(1L), eq("lead-complaint-" + result + ":11"),
+                eq(30L), any(), context.capture());
+        assertEquals(result, context.getValue().get("complaint.result"));
+        assertEquals("处理意见", context.getValue().get("complaint.handlerOpinion"));
+        assertEquals(complainantUserId, context.getValue().get("complaint.complainantUserId"));
+        assertEquals(partnerId, context.getValue().get("complaint.partnerId"));
     }
 
     private static AdminUserRespDTO user(Long id, String name) {

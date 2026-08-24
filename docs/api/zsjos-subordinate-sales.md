@@ -24,6 +24,7 @@ Selecting an in-scope Lead reuses the Workbench owned-Lead detail in `manager-re
 
 - `PUT /{salesUserId}/account-status`: permission `zsjos:subordinate-sales:account-status`; body `{status, reason}`. System owns the status mutation and revokes tokens on disable.
 - `PUT /{salesUserId}/dispatch-mode`: permission `zsjos:subordinate-sales:dispatch-mode`; body `{accepting, reason}`.
+- `PUT /dispatch-mode/pause-all`: permission `zsjos:subordinate-sales:pause-all`; no request body. The server resolves every currently managed user holding the stable `sales_specialist` post, including disabled accounts, and persists `accepting=false`. It returns `{totalCount, changedCount, alreadyPausedCount}` and writes one `dispatch_mode_bulk_pause` audit row with reason `主管一键下班` only for each actual `accepting -> paused` change. It does not disable accounts, force page presence offline, transfer Leads, or affect existing assignments.
 - `POST /leads/batch-transfer`: permission `zsjos:subordinate-sales:batch-transfer`; body `{leadIds, targetUserId, reason}`.
 - `POST /leads/batch-public-sea`: permission `zsjos:subordinate-sales:batch-public-sea`; body `{leadIds, collaboratorUserId?, reason}`.
 

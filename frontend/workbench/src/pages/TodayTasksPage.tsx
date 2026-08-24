@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Alert, Button, Empty, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, App, Button, Empty, Input, Modal, Pagination, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { CheckCircleOutlined, ClockCircleOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type BpmTask, type BusinessTask, type BusinessTaskBucket, type PageResult } from '../services/api'
@@ -54,7 +54,7 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
     }
     if (task.actionCode === 'OPEN_LEAD_FOLLOW_UP') {
       navigate(APP_ROUTES.LEAD_MANAGEMENT, {
-        state: { leadId: task.bizId, openFollowUp: true, relationScope: 'owned' }
+        state: { leadId: task.bizId, openFollowUp: true }
       })
       return
     }
@@ -62,8 +62,24 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
       navigate(`${APP_ROUTES.MY_SALES_ORDERS}?orderId=${task.bizId}`)
       return
     }
+    if (task.actionCode?.startsWith('OPEN_STUDENT_') && task.serviceRelationId) {
+      navigate(APP_ROUTES.MY_STUDENTS, {
+        state: { serviceRelationId: task.serviceRelationId, openContactTask: true,
+          taskId: task.targetRecordId, taskType: task.taskType }
+      })
+      return
+    }
     if (task.actionCode === 'OPEN_WORK_PLAN_ITEM' || task.actionCode === 'REVIEW_WORK_PLAN_ITEM') {
       navigate(`${APP_ROUTES.WORK_PLANS}?itemId=${task.bizId}`)
+    }
+  }
+
+  const completeBirthdayCare = async (task: BusinessTask) => {
+    try {
+      await api.completeBirthdayCare(task.id)
+      await load()
+    } catch (error) {
+      setError(errorText(error, '生日关怀完成失败'))
     }
   }
 
@@ -138,7 +154,11 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
                       <Typography.Text type="secondary">{formatTimestamp(task.dueAt || task.completedAt || task.cancelledAt, '无时间')}</Typography.Text>
                     </Space>
                   </div>
-                  {task.actionable && view === 'pending' && <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />}
+                  {task.actionCode === 'COMPLETE_BIRTHDAY_CARE' && view === 'pending' ? (
+                    <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成生日关怀" onClick={() => void completeBirthdayCare(task)} />
+                  ) : task.actionable && view === 'pending' ? (
+                    <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />
+                  ) : null}
                 </div>
               ))
             ) : (
@@ -154,11 +174,15 @@ function BusinessTaskPanel({ onOpenAssignment }: { onOpenAssignment: () => void 
 
 function BpmTaskPanel() {
   const navigate = useNavigate()
+  const { message } = App.useApp()
   const [view, setView] = useState<TaskView>('pending')
   const [pageNo, setPageNo] = useState(1)
   const [page, setPage] = useState<PageResult<BpmTask>>({ list: [], total: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [decisionTask, setDecisionTask] = useState<BpmTask>()
+  const [decisionReason, setDecisionReason] = useState('')
+  const [deciding, setDeciding] = useState(false)
   const load = useCallback(async () => {
     setLoading(true)
     setError('')
@@ -178,6 +202,36 @@ function BpmTaskPanel() {
   useEffect(() => {
     void load()
   }, [load])
+  const openTask = async (task: BpmTask) => {
+    try {
+      const target = await api.salesOrderApprovalTaskTarget(task.id)
+      const params = new URLSearchParams({ workType: target.workType, orderId: String(target.orderId), taskId: target.taskId })
+      if (target.confirmationId) params.set('confirmationId', String(target.confirmationId))
+      navigate(`${APP_ROUTES.SALES_ORDER_APPROVALS}?${params}`)
+    } catch {
+      setDecisionTask(task)
+      setDecisionReason('')
+    }
+  }
+  const decide = async (approved: boolean) => {
+    if (!decisionTask || !decisionReason.trim()) {
+      message.warning('请填写审批意见')
+      return
+    }
+    setDeciding(true)
+    try {
+      if (approved) await api.approveBpmTask(decisionTask.id, decisionReason.trim())
+      else await api.rejectBpmTask(decisionTask.id, decisionReason.trim())
+      message.success(approved ? '审批已通过' : '审批已驳回')
+      setDecisionTask(undefined)
+      setDecisionReason('')
+      await load()
+    } catch (decisionError) {
+      message.error(errorText(decisionError, '审批失败'))
+    } finally {
+      setDeciding(false)
+    }
+  }
   return (
     <section className="task-center-panel" aria-label="审批任务">
       <header className="task-panel-header">
@@ -229,7 +283,7 @@ function BpmTaskPanel() {
                       <Typography.Text type="secondary">{formatTimestamp(task.endTime || task.createTime)}</Typography.Text>
                     </Space>
                   </div>
-                  {view === 'pending' && <Button type="text" icon={<RightOutlined />} aria-label="查看审批" onClick={() => navigate(`${APP_ROUTES.BPM_TODO}?taskId=${encodeURIComponent(task.id)}`)} />}
+                  {view === 'pending' && <Button type="text" icon={<RightOutlined />} aria-label="查看审批" onClick={() => void openTask(task)} />}
                 </div>
               ))
             ) : (
@@ -239,6 +293,21 @@ function BpmTaskPanel() {
           {page.total > PAGE_SIZE && <Pagination size="small" current={pageNo} pageSize={PAGE_SIZE} total={page.total} showSizeChanger={false} onChange={setPageNo} />}
         </>
       )}
+      <Modal
+        title={decisionTask?.processInstance?.name || decisionTask?.name || '流程审批'}
+        open={Boolean(decisionTask)}
+        onCancel={() => !deciding && setDecisionTask(undefined)}
+        footer={[
+          <Button key="reject" danger loading={deciding} onClick={() => void decide(false)}>驳回</Button>,
+          <Button key="approve" type="primary" loading={deciding} onClick={() => void decide(true)}>通过</Button>
+        ]}
+      >
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
+          <Typography.Text type="secondary">当前节点：{decisionTask?.name || '-'}</Typography.Text>
+          <Input.TextArea value={decisionReason} onChange={(event) => setDecisionReason(event.target.value)}
+            placeholder="请输入审批意见" autoSize={{ minRows: 3, maxRows: 6 }} maxLength={1000} showCount />
+        </Space>
+      </Modal>
     </section>
   )
 }

@@ -7,6 +7,8 @@ import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
@@ -61,6 +63,20 @@ public class SalesDispatchStatusServiceImpl implements SalesDispatchStatusServic
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public boolean pausePreferenceByManager(Long userId) {
+        SalesDispatchPreferenceDO preference = preferenceMapper.selectByUserId(userId);
+        boolean changed = preference != null && Boolean.TRUE.equals(preference.getAcceptingEnabled());
+        if (changed) {
+            preference.setAcceptingEnabled(false);
+            preferenceMapper.updateById(preference);
+        }
+        restoreAcceptingCacheOnRollback(userId, changed);
+        redisRepository.cacheMode(userId, false);
+        return changed;
+    }
+
+    @Override
     public SalesDispatchStatusRespVO offline(Long userId) {
         boolean eligible = isEligible(userId);
         boolean accepting = eligible && isAccepting(userId);
@@ -100,6 +116,18 @@ public class SalesDispatchStatusServiceImpl implements SalesDispatchStatusServic
         if (!isEligible(userId)) {
             throw exception(LEAD_PERMISSION_DENIED);
         }
+    }
+
+    private void restoreAcceptingCacheOnRollback(Long userId, boolean changed) {
+        if (!changed || !TransactionSynchronizationManager.isActualTransactionActive()) return;
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                    redisRepository.cacheMode(userId, true);
+                }
+            }
+        });
     }
 
     private SalesDispatchStatusRespVO buildStatus(Long userId, boolean eligible, boolean accepting) {

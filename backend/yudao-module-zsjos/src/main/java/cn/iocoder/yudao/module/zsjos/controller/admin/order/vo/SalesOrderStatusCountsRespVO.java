@@ -10,4 +10,5 @@ public class SalesOrderStatusCountsRespVO {
     private Long pendingApproval;
     private Long revisionRequired;
     private Long effective;
+    private Long superseded;
 }

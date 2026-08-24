@@ -3,7 +3,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePageList } from '@/composables/usePageList'
 import { getMyLeadPage, type LeadListItem } from '@/api/lead'
-import { formatDateTime, formatLeadNo } from '@/utils/format'
+import { formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
 
 defineOptions({ name: 'LeadList' })
 
@@ -14,7 +14,8 @@ const statusTabs = [
   { key: 'all', label: '全部' },
   { key: 'submitted', label: '已提交' },
   { key: 'valid', label: '有效' },
-  { key: 'invalid', label: '无效' }
+  { key: 'invalid', label: '无效' },
+  { key: 'won', label: '已成交' }
 ]
 
 const filterParams = computed(() => {
@@ -42,13 +43,14 @@ function goSubmit() {
   router.push('/lead/submit')
 }
 
-const statusMap: Record<string, { text: string; type: string }> = {
-  submitted: { text: '已提交', type: 'primary' },
-  valid: { text: '有效', type: 'success' },
-  invalid: { text: '无效', type: 'danger' },
-  suspended: { text: '已挂起', type: 'warning' },
-  converted: { text: '已转化', type: 'primary' },
-  closed: { text: '已关闭', type: 'default' }
+const statusType: Record<string, string> = {
+  submitted: 'primary',
+  valid: 'success',
+  invalid: 'danger',
+  suspended: 'warning',
+  won: 'success',
+  converted: 'primary',
+  closed: 'default'
 }
 </script>
 
@@ -76,8 +78,8 @@ const statusMap: Record<string, { text: string; type: string }> = {
           @click="goDetail(item.id)"
         >
           <template #value>
-            <van-tag :type="(statusMap[item.status]?.type as any) || 'default'" plain>
-              {{ statusMap[item.status]?.text || item.status }}
+            <van-tag :type="(statusType[item.status] as any) || 'default'" plain>
+              {{ formatLeadStatus(item.status) }}
             </van-tag>
           </template>
         </van-cell>

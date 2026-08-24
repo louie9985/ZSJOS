@@ -8,10 +8,14 @@ import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportPrevi
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetImportBatchDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetImportRowDO;
+import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetHandoverDO;
+import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetVerificationDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetImportBatchMapper;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetImportRowMapper;
+import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetHandoverMapper;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
+import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetVerificationMapper;
 import cn.iocoder.yudao.module.eam.enums.asset.EamChangeTypeEnum;
 import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
@@ -51,6 +55,10 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
     private EamAssetImportBatchMapper batchMapper;
     @Resource
     private EamAssetImportRowMapper importRowMapper;
+    @Resource
+    private EamAssetVerificationMapper verificationMapper;
+    @Resource
+    private EamAssetHandoverMapper handoverMapper;
     @Resource
     private EamCodeRuleService codeRuleService;
     @Resource
@@ -120,6 +128,7 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
             source.setAssetCode(asset.getAssetCode());
             source.setImportAction(importAction);
             importRowMapper.insert(source);
+            writeHistory(item, asset, batch.getId());
         }
         response.setBatchId(batch.getId());
         return response;
@@ -159,10 +168,9 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
                         source.rootCategoryName(), source.leafCategoryName());
             }
             List<String> warnings = new ArrayList<>(source.warnings());
-            AdminUserRespDTO matchedUser = matchUser(source.sourceUserName(), usersByNickname, warnings);
-            if (source.extFields().containsKey("source_attachment_names")) {
-                warnings.add("附件列仅保留原文件名，未写入附件地址");
-            }
+            AdminUserRespDTO matchedUser = matchUser(source.useUserName(), usersByNickname, warnings, "使用人");
+            AdminUserRespDTO matchedSupervisor = matchUser(source.supervisorName(), usersByNickname, warnings, "上级");
+            AdminUserRespDTO matchedVerifier = matchUser(source.verifierName(), usersByNickname, warnings, "行政核对人");
             EamAssetDO existing = StrUtil.isBlank(source.assetCode())
                     ? null : assetsByCode.get(source.assetCode());
             String action = importedRows.containsKey(source.rowNum()) ? "SKIP_SAME_FILE"
@@ -180,12 +188,15 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
             EamAssetImportPreviewRespVO.Row previewRow = EamAssetImportPreviewRespVO.Row.builder()
                     .rowNum(source.rowNum()).assetCode(source.assetCode()).name(source.assetName())
                     .categoryName(source.rootCategoryName() + " / " + source.leafCategoryName())
-                    .managementMode(managementMode).quantity(quantity).sourceUserName(source.sourceUserName())
+                    .managementMode(managementMode).quantity(quantity).useUserName(source.useUserName())
+                    .supervisorName(source.supervisorName())
                     .matchedUserName(matchedUser != null ? matchedUser.getNickname() : null)
-                    .action(action).sourceFields(source.sourceFields()).defaultedFields(defaultedFields)
+                    .matchedSupervisorName(matchedSupervisor != null ? matchedSupervisor.getNickname() : null)
+                    .action(action).mappedFields(source.mappedFields()).defaultedFields(defaultedFields)
                     .warnings(warnings).build();
             responseRows.add(previewRow);
-            preparedRows.add(new PreparedRow(source, category, matchedUser, existing, previewRow));
+            preparedRows.add(new PreparedRow(source, category, matchedUser, matchedSupervisor, matchedVerifier,
+                    existing, previewRow));
         }
         return new PreparedImport(buildResponse(fileHash, responseRows), preparedRows);
     }
@@ -204,26 +215,62 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
         asset.setQuantity(EamManagementModeEnum.isBatch(managementMode) ? row.quantity() : 1);
         asset.setUnit(StrUtil.blankToDefault(category.getUnit(), "个"));
         asset.setBrand(StrUtil.emptyToNull(row.brand()));
+        asset.setBarcode(StrUtil.emptyToNull(row.barcode()));
         asset.setSn(StrUtil.emptyToNull(row.sn()));
         asset.setPurchaseDate(row.purchaseDate());
         asset.setLocation(StrUtil.emptyToNull(row.location()));
         asset.setRemark(StrUtil.emptyToNull(row.remark()));
+        asset.setUseUserNameSnapshot(StrUtil.emptyToNull(row.useUserName()));
+        asset.setSupervisorNameSnapshot(StrUtil.emptyToNull(row.supervisorName()));
+        asset.setJoinDate(row.joinDate());
+        asset.setCommitmentAccepted(row.commitmentAccepted());
+        asset.setCommitmentDate(row.commitmentDate());
         if (item.matchedUser() != null) {
             asset.setUseUserId(item.matchedUser().getId());
             asset.setUseDeptId(item.matchedUser().getDeptId());
+        }
+        if (item.matchedSupervisor() != null) {
+            asset.setSupervisorUserId(item.matchedSupervisor().getId());
         }
         asset.setExtFields(categoryFieldService.validateAndNormalizeExtFields(category.getId(), row.extFields()));
         return asset;
     }
 
-    private static AdminUserRespDTO matchUser(String sourceName, Map<String, List<AdminUserRespDTO>> users,
-                                              List<String> warnings) {
-        if (StrUtil.isBlank(sourceName)) return null;
-        List<AdminUserRespDTO> matches = users.getOrDefault(sourceName.trim(), List.of());
+    private static AdminUserRespDTO matchUser(String name, Map<String, List<AdminUserRespDTO>> users,
+                                              List<String> warnings, String label) {
+        if (StrUtil.isBlank(name)) return null;
+        List<AdminUserRespDTO> matches = users.getOrDefault(name.trim(), List.of());
         if (matches.size() == 1) return matches.get(0);
-        warnings.add(matches.isEmpty() ? "使用人未匹配系统用户，已保留原表姓名"
-                : "使用人存在重名，未自动关联系统用户");
+        warnings.add(matches.isEmpty() ? label + "未匹配系统用户，已保留姓名快照"
+                : label + "存在重名，未自动关联系统用户");
         return null;
+    }
+
+    private void writeHistory(PreparedRow item, EamAssetDO asset, Long batchId) {
+        EamAssetLedgerParser.LedgerRow row = item.source();
+        if (StrUtil.isNotBlank(row.verificationResult()) || StrUtil.isNotBlank(row.verifierName())) {
+            EamAssetVerificationDO verification = new EamAssetVerificationDO();
+            verification.setAssetId(asset.getId());
+            verification.setResult(row.verificationResult());
+            verification.setLabelStatus(null);
+            verification.setVerifierUserId(item.matchedVerifier() != null ? item.matchedVerifier().getId() : null);
+            verification.setVerifierNameSnapshot(row.verifierName());
+            verification.setVerifiedAt(java.time.LocalDateTime.now());
+            verification.setImportBatchId(batchId);
+            verificationMapper.insert(verification);
+        }
+        if (StrUtil.isNotBlank(row.handoverRecord())) {
+            EamAssetHandoverDO handover = new EamAssetHandoverDO();
+            handover.setAssetId(asset.getId());
+            handover.setContent(row.handoverRecord());
+            // The workbook handover text does not identify two users reliably; keep the
+            // auditable content and leave relational endpoints unset rather than inventing links.
+            handover.setFromUserId(null);
+            handover.setToUserId(null);
+            handover.setHandoverTime(java.time.LocalDateTime.now());
+            handover.setImportBatchId(batchId);
+            handoverMapper.insert(handover);
+        }
     }
 
     private static EamAssetImportPreviewRespVO buildResponse(String fileHash,
@@ -241,7 +288,8 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
     }
 
     private record PreparedRow(EamAssetLedgerParser.LedgerRow source, EamCategoryDO category,
-                               AdminUserRespDTO matchedUser, EamAssetDO existingAsset,
+                               AdminUserRespDTO matchedUser, AdminUserRespDTO matchedSupervisor,
+                               AdminUserRespDTO matchedVerifier, EamAssetDO existingAsset,
                                EamAssetImportPreviewRespVO.Row previewRow) {}
     private record PreparedImport(EamAssetImportPreviewRespVO response, List<PreparedRow> rows) {}
 

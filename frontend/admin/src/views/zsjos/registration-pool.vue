@@ -69,7 +69,9 @@
       <template v-else-if="detail">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="订单编号">{{ detail.orderNo }}</el-descriptions-item>
-          <el-descriptions-item label="订单状态">{{ detail.orderStatusLabel || '未知状态' }}</el-descriptions-item>
+          <el-descriptions-item label="订单状态">{{
+            detail.orderStatusLabel || '未知状态'
+          }}</el-descriptions-item>
           <el-descriptions-item label="学员姓名">{{ detail.studentName }}</el-descriptions-item>
           <el-descriptions-item label="手机号">{{
             detail.studentMobile || '-'
@@ -91,6 +93,44 @@
           class="mt-16px"
         />
 
+        <div class="section-heading">学员流转</div>
+        <div class="checklist">
+          <div v-for="route in detail.routes" :key="route.id" class="checklist-item">
+            <el-checkbox
+              :model-value="route.selected"
+              :disabled="!canUpdate || !isEditable(detail.status) || routeSaving"
+              @change="(checked) => changeRouteSelection(route, Boolean(checked))"
+              >{{ route.departmentName }}</el-checkbox
+            >
+            <el-select
+              v-if="route.selected"
+              :model-value="route.assigneeUserId"
+              filterable
+              :placeholder="`请选择${route.assigneeTypeLabel}`"
+              :loading="routeSaving"
+              :disabled="!canUpdate || !isEditable(detail.status) || routeSaving"
+              @visible-change="(visible) => visible && loadRouteCandidates(route)"
+              @change="(value) => changeRouteAssignee(route, Number(value))"
+            >
+              <el-option
+                v-for="candidate in routeCandidates[route.id] ||
+                (route.assigneeUserId
+                  ? [
+                      {
+                        id: route.assigneeUserId,
+                        nickname: route.assigneeUserName || '已分配负责人'
+                      }
+                    ]
+                  : [])"
+                :key="candidate.id"
+                :label="candidate.nickname"
+                :value="candidate.id"
+              />
+            </el-select>
+            <span v-else class="checklist-meta">未选择</span>
+          </div>
+        </div>
+
         <div class="section-heading">履约清单</div>
         <el-alert
           v-if="!canUpdate && isEditable(detail.status)"
@@ -110,34 +150,41 @@
               </div>
             </div>
             <el-switch
-              v-if="item.itemType !== 'study_planner'"
+              v-if="item.itemType === 'checkbox'"
               :model-value="item.checked"
               :loading="savingItemId === item.id"
               :disabled="!canUpdate || !isEditable(detail.status) || savingItemId === item.id"
               @change="(checked) => changeItem(item, Boolean(checked))"
             />
+            <div v-else-if="item.itemType === 'attachment'" class="attachment-actions">
+              <div v-for="attachment in item.attachments" :key="attachment.id"
+                ><el-link :href="attachment.fileUrl" target="_blank" type="primary">{{
+                  attachment.originalName
+                }}</el-link
+                ><el-button
+                  link
+                  type="danger"
+                  :disabled="savingItemId === item.id"
+                  @click="deleteAttachment(item.id, attachment.id)"
+                  >删除</el-button
+                ></div
+              >
+              <el-upload
+                :show-file-list="false"
+                :http-request="(options) => uploadAttachment(item, options.file as File)"
+                accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx,.xls,.xlsx"
+                :disabled="
+                  !canUpdate ||
+                  !isEditable(detail.status) ||
+                  savingItemId === item.id ||
+                  (item.attachments?.length || 0) >= 9
+                "
+                ><el-button :loading="savingItemId === item.id">上传附件</el-button></el-upload
+              >
+            </div>
             <el-tag v-else type="info">系统固定项</el-tag>
           </div>
         </div>
-
-        <div class="section-heading">学业规划师</div>
-        <el-select
-          :model-value="detail.studyPlannerUserId"
-          filterable
-          clearable
-          class="w-100%"
-          placeholder="请选择学业规划师"
-          :loading="plannerLoading || plannerSaving"
-          :disabled="!canUpdate || !isEditable(detail.status) || plannerSaving"
-          @change="changePlanner"
-        >
-          <el-option
-            v-for="planner in planners"
-            :key="planner.id"
-            :label="planner.nickname"
-            :value="planner.id"
-          />
-        </el-select>
       </template>
     </div>
     <template #footer>
@@ -173,9 +220,8 @@ const detailLoading = ref(false)
 const detailError = ref('')
 const detail = ref<RegistrationApi.RegistrationCase>()
 const detailId = ref<number>()
-const planners = ref<RegistrationApi.StudyPlanner[]>([])
-const plannerLoading = ref(false)
-const plannerSaving = ref(false)
+const routeCandidates = ref<Record<number, RegistrationApi.StudyPlanner[]>>({})
+const routeSaving = ref(false)
 const savingItemId = ref<number>()
 const completing = ref(false)
 
@@ -219,17 +265,6 @@ const resetQuery = () => {
   query.status = undefined
   void load()
 }
-const loadPlanners = async () => {
-  if (!canUpdate.value || planners.value.length) return
-  plannerLoading.value = true
-  try {
-    planners.value = await RegistrationApi.getStudyPlannerCandidates()
-  } catch (cause: any) {
-    message.error(cause?.msg || cause?.message || '学业规划师加载失败')
-  } finally {
-    plannerLoading.value = false
-  }
-}
 const openDetail = async (id: number) => {
   detailId.value = id
   detailOpen.value = true
@@ -237,7 +272,6 @@ const openDetail = async (id: number) => {
   detailError.value = ''
   try {
     detail.value = await RegistrationApi.getRegistrationCase(id)
-    await loadPlanners()
   } catch (cause: any) {
     detail.value = undefined
     detailError.value = cause?.msg || cause?.message || '报名履约详情加载失败'
@@ -259,10 +293,17 @@ const changeItem = async (item: RegistrationApi.RegistrationChecklistItem, check
     ...previous,
     status: 'processing',
     statusLabel: '办理中',
-    items: previous.items.map((current) => current.id === item.id ? { ...current, checked } : current)
+    items: previous.items.map((current) =>
+      current.id === item.id ? { ...current, checked } : current
+    )
   }
   try {
-    detail.value = await RegistrationApi.updateRegistrationItem(id, item.id, checked, previous.version)
+    detail.value = await RegistrationApi.updateRegistrationItem(
+      id,
+      item.id,
+      checked,
+      previous.version
+    )
     void load()
   } catch (cause: any) {
     detail.value = previous
@@ -272,22 +313,104 @@ const changeItem = async (item: RegistrationApi.RegistrationChecklistItem, check
     savingItemId.value = undefined
   }
 }
-const changePlanner = async (studyPlannerUserId?: number) => {
-  if (!detail.value || !studyPlannerUserId) return
-  plannerSaving.value = true
-  const id = detail.value.id
-  const previous = detail.value
-  const planner = planners.value.find((item) => item.id === studyPlannerUserId)
-  detail.value = { ...previous, status: 'processing', statusLabel: '办理中', studyPlannerUserId, studyPlannerUserName: planner?.nickname }
+const loadRouteCandidates = async (route: RegistrationApi.RegistrationRoute) => {
+  if (!detail.value || routeCandidates.value[route.id]) return
   try {
-    detail.value = await RegistrationApi.updateStudyPlanner(id, studyPlannerUserId, previous.version)
+    routeCandidates.value[route.id] = await RegistrationApi.getRouteCandidates(
+      detail.value.id,
+      route.id
+    )
+  } catch (cause: any) {
+    message.error(cause?.msg || cause?.message || '负责人加载失败')
+  }
+}
+const saveRoutes = async (
+  routes: RegistrationApi.RegistrationRoute[],
+  previous: RegistrationApi.RegistrationCase
+) => {
+  routeSaving.value = true
+  detail.value = { ...previous, routes }
+  try {
+    detail.value = await RegistrationApi.updateRegistrationRoutes(
+      previous.id,
+      routes.map((route) => ({
+        routeId: route.id,
+        selected: route.selected,
+        assigneeUserId: route.assigneeUserId
+      })),
+      previous.version
+    )
     void load()
   } catch (cause: any) {
     detail.value = previous
-    message.error(cause?.msg || cause?.message || '学业规划师更新失败')
-    if ((cause?.msg || cause?.message || '').includes('其他人员修改')) await openDetail(id)
+    message.error(cause?.msg || cause?.message || '流转配置更新失败')
+    if ((cause?.msg || cause?.message || '').includes('其他人员修改')) await openDetail(previous.id)
   } finally {
-    plannerSaving.value = false
+    routeSaving.value = false
+  }
+}
+const changeRouteSelection = async (
+  route: RegistrationApi.RegistrationRoute,
+  selected: boolean
+) => {
+  if (!detail.value) return
+  const previous = detail.value
+  const routes = previous.routes.map((item) =>
+    item.id === route.id
+      ? { ...item, selected, assigneeUserId: selected ? item.assigneeUserId : undefined }
+      : item
+  )
+  if (selected) {
+    detail.value = { ...previous, routes }
+    await loadRouteCandidates(route)
+    return
+  }
+  await saveRoutes(routes, previous)
+}
+const changeRouteAssignee = async (
+  route: RegistrationApi.RegistrationRoute,
+  assigneeUserId: number
+) => {
+  if (!detail.value) return
+  await saveRoutes(
+    detail.value.routes.map((item) =>
+      item.id === route.id ? { ...item, selected: true, assigneeUserId } : item
+    ),
+    detail.value
+  )
+}
+const uploadAttachment = async (item: RegistrationApi.RegistrationChecklistItem, file: File) => {
+  if (!detail.value) return
+  if (file.size > 20 * 1024 * 1024) return message.error('单个附件不能超过 20 MB')
+  savingItemId.value = item.id
+  try {
+    await RegistrationApi.uploadRegistrationAttachment(
+      detail.value.id,
+      item.id,
+      file,
+      detail.value.version
+    )
+    await openDetail(detail.value.id)
+  } catch (cause: any) {
+    message.error(cause?.msg || cause?.message || '附件上传失败')
+  } finally {
+    savingItemId.value = undefined
+  }
+}
+const deleteAttachment = async (itemId: number, attachmentId: number) => {
+  if (!detail.value) return
+  savingItemId.value = itemId
+  try {
+    detail.value = await RegistrationApi.deleteRegistrationAttachment(
+      detail.value.id,
+      itemId,
+      attachmentId,
+      detail.value.version
+    )
+  } catch (cause: any) {
+    message.error(cause?.msg || cause?.message || '附件删除失败')
+  } finally {
+    savingItemId.value = undefined
   }
 }
 const complete = async () => {
@@ -346,5 +469,12 @@ onMounted(load)
   margin-top: 4px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.attachment-actions {
+  display: flex;
+  align-items: flex-end;
+  flex-direction: column;
+  gap: 6px;
 }
 </style>

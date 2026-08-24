@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class BusinessTaskNotifyStageDO extends TenantBaseDO {
     @TableId private Long id;
     private Long taskId;
+    private Integer taskVersion;
     private Long notifyRuleId;
     private String stage;
     private LocalDateTime emittedAt;

@@ -30,6 +30,13 @@ public class LeadDuplicateReviewController {
         return success(service.getPage(request));
     }
 
+    @PostMapping("/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead-duplicate-review:query')")
+    public CommonResult<PageResult<LeadDuplicateReviewRespVO>> searchPage(
+            @Valid @RequestBody LeadDuplicateReviewPageReqVO request) {
+        return success(service.getPage(request));
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-duplicate-review:query')")
     public CommonResult<LeadDuplicateReviewRespVO> get(@PathVariable Long id) { return success(service.get(id)); }

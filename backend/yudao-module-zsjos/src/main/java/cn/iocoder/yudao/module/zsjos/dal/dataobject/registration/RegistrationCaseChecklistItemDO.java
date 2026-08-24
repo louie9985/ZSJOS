@@ -21,6 +21,7 @@ public class RegistrationCaseChecklistItemDO extends TenantBaseDO {
     private String itemType;
     private String titleSnapshot;
     private Integer sort;
+    private Boolean attachmentRequired;
     private Boolean checked;
     private Long checkedByUserId;
     private LocalDateTime checkedAt;

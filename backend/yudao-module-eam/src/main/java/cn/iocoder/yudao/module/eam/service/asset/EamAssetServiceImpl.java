@@ -19,6 +19,8 @@ import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.coderule.EamCodeRuleService;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,6 +57,8 @@ public class EamAssetServiceImpl implements EamAssetService {
     private EamCodeRuleService codeRuleService;
     @Resource
     private EamAssetChangeLogService changeLogService;
+    @Resource
+    private AdminUserApi adminUserApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -67,6 +71,7 @@ public class EamAssetServiceImpl implements EamAssetService {
         // 2. 组装资产，新建资产一律以「闲置」入账，归属由后续流转单驱动
         EamAssetDO asset = BeanUtils.toBean(reqVO, EamAssetDO.class);
         asset.setExtFields(extFields);
+        applyUserSnapshots(asset);
         asset.setStatus(EamAssetStatusEnum.IDLE.getStatus());
         applyManagementSnapshot(asset, category, reqVO.getQuantity());
         // 3. 导入可沿用已有标签；普通建档仍由编号规则生成
@@ -98,6 +103,7 @@ public class EamAssetServiceImpl implements EamAssetService {
         // 状态与资产编号不通过编辑表单变更：状态归状态机，编号归编号规则
         EamAssetDO updateObj = BeanUtils.toBean(reqVO, EamAssetDO.class);
         updateObj.setExtFields(extFields);
+        applyUserSnapshots(updateObj);
         applyManagementSnapshot(updateObj, category, reqVO.getQuantity());
         updateObj.setStatus(null);
         updateObj.setAssetCode(null);
@@ -303,6 +309,25 @@ public class EamAssetServiceImpl implements EamAssetService {
         asset.setManagementMode(mode);
         asset.setUnit(StrUtil.blankToDefault(category.getUnit(), "个"));
         asset.setQuantity(EamManagementModeEnum.isBatch(mode) && quantity != null && quantity > 0 ? quantity : 1);
+    }
+
+    /** User names are authoritative system data; never accept client-provided snapshots. */
+    private void applyUserSnapshots(EamAssetDO asset) {
+        if (asset.getUseUserId() != null) {
+            adminUserApi.validateUser(asset.getUseUserId());
+            AdminUserRespDTO user = adminUserApi.getUser(asset.getUseUserId());
+            asset.setUseUserNameSnapshot(user == null ? null : user.getNickname());
+            if (asset.getUseDeptId() == null && user != null) asset.setUseDeptId(user.getDeptId());
+        } else {
+            asset.setUseUserNameSnapshot(null);
+        }
+        if (asset.getSupervisorUserId() != null) {
+            adminUserApi.validateUser(asset.getSupervisorUserId());
+            AdminUserRespDTO supervisor = adminUserApi.getUser(asset.getSupervisorUserId());
+            asset.setSupervisorNameSnapshot(supervisor == null ? null : supervisor.getNickname());
+        } else {
+            asset.setSupervisorNameSnapshot(null);
+        }
     }
 
     /**

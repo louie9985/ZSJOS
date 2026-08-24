@@ -15,21 +15,53 @@ export type RawMenu = { id: number; name: string; path?: string; icon?: string; 
 export type WorkbenchMenu = Omit<RawMenu, 'children' | 'path'> & { path: string; hidden: boolean; noCache: boolean; alwaysShow: boolean; children: WorkbenchMenu[] }
 export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; defaultAvatar?: string }
 export type DictData = { label: string; value: string; dictType: string; colorType?: string; cssClass?: string }
+export type MediaAccountDetailSnapshot = { key: string; label: string; type: string; value: unknown; displayValue?: string; dictType?: string }
+export type MediaAccountField = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multi_select' | 'boolean'; required: boolean; enabled: boolean; sort: number; dictType?: string; searchable: boolean }
+export type MediaAccountFieldConfig = { id: number; versionNo: number; version: number; fields: MediaAccountField[] }
+export type MediaAccount = { id: number; accountNo: string; nickname: string; platformValue: string; platformLabelSnapshot: string; platformAccountId?: string; leadDirection?: string; studentPersonId?: number; directorUserId?: number; detailConfigVersionId?: number; detailValues?: Record<string, unknown>; detailSnapshots?: MediaAccountDetailSnapshot[]; accountGradeValue?: string; accountGradeLabelSnapshot?: string; healthStatusValue?: string; healthStatusLabelSnapshot?: string; riskLevelValue?: string; riskLevelLabelSnapshot?: string; healthJson?: string; rescueStatus?: string; rebindProcessInstanceId?: string; sStage: string; status?: string; version: number; availableActions: string[] }
+export type MediaContent = { id: number; contentNo: string; accountId: number; title: string; status: string; version: number; availableActions: string[] }
+export type MediaException = { id: number; exceptionNo: string; accountId: number; categoryLabelSnapshot: string; description: string; status: string; version: number; availableActions: string[] }
+export type MediaReview = { id: number; reviewNo: string; reviewType: string; subjectType: string; subjectId: number; reviewerUserId?: number; rejectReason?: string; status: string; version: number; availableActions: string[] }
+export type GraduationApplication = { id: number; applicationNo: string; serviceRelationId: number; studentPersonId: number; plannerUserId: number; reviewerUserId: number; status: string; processInstanceId?: string; resultReason?: string; version: number }
+export type ProductionTicket = { id: number; ticketNo: string; accountId: number; status: string; version: number; expectedDeliveredAt?: Timestamp; deadlineAt?: Timestamp; availableActions: string[] }
+export type PositioningCard = { id: number; cardNo: string; accountId: number; status: string; professionalRisk?: boolean; version: number; availableActions: string[] }
 export type SalesUser = { id: number; nickname: string; maskedMobile?: string; deptName?: string; avatar?: string }
 export type AssignmentUser = SalesUser & { deptId?: number; status: number }
 export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]; validSalesCount: number; invalidSalesCount: number; updateTime?: Timestamp }
 export type AssignmentLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
 export type PageResult<T> = { list: T[]; total: number }
 export type CursorPageResult<T> = { list: T[]; nextCursor?: string; hasMore: boolean }
-export type RegistrationCase = { id: number; orderId: number; orderNo?: string; orderStatus?: string; orderStatusLabel?: string; studentName?: string; studentMobile?: string; leadNo?: string; status: string; statusLabel?: string; studyPlannerUserId?: number; studyPlannerUserName?: string; registrationApprovedAt?: Timestamp; version: number; completable?: boolean; completionBlockCode?: string; completionBlockReason?: string; items?: Array<{ id: number; itemKey: string; itemType: string; title: string; sort: number; checked?: boolean; checkedByUserName?: string; checkedAt?: Timestamp }> }
+export type RegistrationAttachment = { id: number; infraFileId: number; fileUrl: string; originalName: string; contentType?: string; fileSize: number; uploadedByUserId: number; uploadedByUserName?: string; uploadedAt?: Timestamp }
+export type RegistrationRoute = { id: number; optionKey: string; departmentId: number; departmentName: string; assigneeType: 'study_planner' | 'content_director'; assigneeTypeLabel: string; selected: boolean; assigneeUserId?: number; assigneeUserName?: string; sort: number }
+export type RegistrationCase = { id: number; orderId: number; orderNo?: string; orderStatus?: string; orderStatusLabel?: string; studentName?: string; studentMobile?: string; leadNo?: string; status: string; statusLabel?: string; studyPlannerUserId?: number; studyPlannerUserName?: string; registrationApprovedAt?: Timestamp; version: number; completable?: boolean; completionBlockCode?: string; completionBlockReason?: string; items?: Array<{ id: number; itemKey: string; itemType: string; title: string; sort: number; checked?: boolean; checkedByUserName?: string; checkedAt?: Timestamp; attachmentRequired?: boolean; attachments?: RegistrationAttachment[] }>; routes?: RegistrationRoute[] }
 export type StudyPlanner = { id: number; nickname: string }
-export type RegistrationChecklistConfig = { templateId: number; templateVersion: number; published?: { id: number; versionNo: number; status: string; items: RegistrationChecklistItem[] }; draft?: { id: number; versionNo: number; status: string; items: RegistrationChecklistItem[] } }
-export type RegistrationChecklistItem = { id: number; itemKey: string; itemType: string; title: string; sort: number; enabled: boolean; systemRequired: boolean }
-export type MyStudent = { personId: number; leadNo?: string; name?: string; mobile?: string; wechatId?: string; activatedAt?: string; services: Array<{ serviceRelationId: number; orderId?: number; orderNo?: string; courseName?: string; skuName?: string; categoryPath?: string[]; attributeValues?: string[]; productSnapshot?: string; status: string; activatedAt?: string }> }
+export type RegistrationRouteOption = { id: number; optionKey: string; departmentId: number; departmentName: string; assigneeType: 'study_planner' | 'content_director'; assigneeTypeLabel: string; sort: number; enabled: boolean; systemRequired: boolean }
+export type RegistrationChecklistConfig = { templateId: number; templateVersion: number; published?: { id: number; versionNo: number; status: string; items: RegistrationChecklistItem[]; routeOptions: RegistrationRouteOption[] }; draft?: { id: number; versionNo: number; status: string; items: RegistrationChecklistItem[]; routeOptions: RegistrationRouteOption[] } }
+export type RegistrationChecklistItem = { id: number; itemKey: string; itemType: 'checkbox' | 'attachment' | 'study_planner'; title: string; sort: number; enabled: boolean; systemRequired: boolean; attachmentRequired?: boolean }
+export type MyStudent = { personId: number; personNo?: string; leadId?: number; leadNo?: string; name?: string; mobile?: string; wechatId?: string; activatedAt?: Timestamp; services: Array<{ serviceRelationId: number; leadId?: number; leadNo?: string; orderId?: number; orderNo?: string; courseName?: string; skuName?: string; categoryPath?: string[]; attributeValues?: string[]; productSnapshot?: string; status: string; activatedAt?: Timestamp; acceptanceStatus?: string; acceptedAt?: Timestamp; version?: number; owner?: boolean; contentDirectorUserId?: number; contentDirectorUserName?: string; careerPlannerUserId?: number; careerPlannerUserName?: string }> }
+export type MediaStudentDetail = {
+  student: MyStudent
+  accounts: Array<{ id: number; accountNo: string; nickname?: string; platformLabel?: string; stage?: string; runStatus?: string; version: number; lastActivityAt?: Timestamp; availableActions: string[]; detailSnapshots: MediaAccountDetailSnapshot[] }>
+  positioningCards: Array<{ id: number; accountId: number; cardNo: string; status: string; versionNo?: number; professionalRisk?: boolean; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
+  contents: Array<{ id: number; accountId: number; contentNo: string; title?: string; status: string; currentVersionNo?: number; publishedAt?: Timestamp; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
+  productionTickets: Array<{ id: number; accountId: number; ticketNo: string; status: string; deadlineAt?: Timestamp; revisionCount?: number; lastActivityAt?: Timestamp }>
+  operationTimeline: Array<{ key: string; type: string; title: string; detail?: string; operatorName?: string; occurredAt: Timestamp }>
+  taskLine: Array<{ key: 'positioning' | 'operation' | 'graduation'; label: string; status: 'done' | 'current' | 'pending'; detail: string }>
+  pendingStats: { accountCount: number; positioningCount: number; contentCount: number; productionCount: number }
+}
+export type MediaStudentTalkRecord = { id: number; accountId?: number; operatorUserId: number; operatorUserName?: string; content: string; attachmentFileIds: number[]; occurredAt: Timestamp }
+export type StudentContactChecklistItem = { key: string; title: string; type: string; enabled?: boolean; attachmentRequired?: boolean; sort?: number }
+export type StudentContactConfig = { published?: { id: number; versionNo: number; version: number; firstContactTimeoutMinutes: number; studyPlanTimeoutMinutes: number; checklist: StudentContactChecklistItem[]; quickNotes: string[]; collaboratorTabs: Record<string, string[]> }; draft?: { id: number; versionNo: number; version: number; firstContactTimeoutMinutes: number; studyPlanTimeoutMinutes: number; checklist: StudentContactChecklistItem[]; quickNotes: string[]; collaboratorTabs: Record<string, string[]> } }
+export type StudentContactAction = 'ACCEPT' | 'FIRST_CONTACT' | 'STUDY_PLAN' | 'FOLLOW_UP' | 'EDIT_BASIC_INFO' | 'ASSIGN_CONTENT_DIRECTOR' | 'ASSIGN_CAREER_PLANNER'
+export type StudentDeliveryStage = { code: string; label: string; status: string; current?: boolean; available?: boolean }
+export type StudentContactContext = { serviceRelationId: number; acceptanceStatus?: string; acceptedAt?: string; version: number; firstContactChecklist: StudentContactChecklistItem[]; quickNotes: string[]; firstContactTimeoutMinutes?: number; studyPlanTimeoutMinutes?: number; visibleTabs: string[]; availableActions: StudentContactAction[]; currentTask?: { id: number; type: string; status: string; dueAt?: string; overdue?: boolean }; contentDirectorUserId?: number; contentDirectorUserName?: string; careerPlannerUserId?: number; careerPlannerUserName?: string; deliveryStage?: string; deliveryStageLabel?: string; deliveryStages?: StudentDeliveryStage[] }
+export type StudentContactRecord = { id: number; contactType: string; successful: boolean; unsuccessfulReasonValue?: string; unsuccessfulReasonLabel?: string; remark: string; attachmentFileIds: number[]; completedChecklistKeys: string[]; nextContactAt: string; operatorUserId: number; operatorUserName?: string; submittedAt: string; deliveryStage?: string; deliveryData?: string }
+export type StudentContactExtension = { id: number; serviceRelationId: number; taskId: number; status: string; originalDueAt: string; requestedDueAt: string; reasonValue: string; reasonLabel?: string; description: string; attachmentFileIds: number[]; applicantUserId: number; reviewerUserId: number; processInstanceId?: string; decisionReason?: string; submittedAt: string; resolvedAt?: string; version: number }
 export type AdvancedFilterCondition = { fieldKey: string; operator: string; value?: unknown; valueFrom?: unknown; valueTo?: unknown }
 export type AdvancedFilterGroup = { logic: 'AND' | 'OR'; conditions: AdvancedFilterCondition[]; groups: AdvancedFilterGroup[] }
+export type AdvancedFilterScene = 'lead' | 'order' | 'lead_appeal' | 'duplicate_review' | 'registration' | 'student' | 'subordinate_sales'
 export type AdvancedFilterField = { fieldKey: string; group: string; label: string; valueType: 'text' | 'select' | 'number' | 'date'; operators: string[]; optionSource?: string; options: Array<{ value: string | number; label: string }>; optionsLoading?: boolean; optionsError?: boolean; retryOptions?: () => void }
-export type AdvancedFilterCatalog = { fields: AdvancedFilterField[] }
+export type AdvancedFilterCatalog = { fields: AdvancedFilterField[]; relativeDateOptions: Array<{ value: string; label: string }> }
 export type AreaNode = {
   id: number
   name: string
@@ -89,26 +121,29 @@ export type ManagedLeadProduct = {
 export type ManagedLeadAttachment = { id: number; fileUrl: string; originalName: string; contentType: string; fileSize: number }
 export type ManagedLead = {
   id: number; leadNo: string; personId: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
-  sourceType: string; sourceUserId?: number; sourceUserName?: string; sourceChannel?: string
-  provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string; leadCategory?: string
+  sourceType: string; sourceLabel?: string; sourceUserId?: number; sourceUserName?: string; sourceChannel?: string
+  provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string; leadCategory?: string; leadCategoryLabelSnapshot?: string
   remark?: string; status: string; assignmentStatus: string; handlingStage: string
   qualificationStatus: 'pending' | 'valid' | 'invalid'
   followUpStatus?: 'first_follow_pending' | 'following' | 'deal_pending_approval' | 'won'
   operationalStatus: 'active' | 'suspended'; dispatchMode?: string
   ownerUserId?: number; ownerUserName?: string; pendingAssigneeUserId?: number; pendingAssigneeUserName?: string
   pendingExpiresAt?: Timestamp; assignmentAttemptCount?: number; publicPoolAt?: Timestamp; submittedAt: Timestamp
+  nextFollowUpAt?: Timestamp
   currentAssignmentFirstFollowUpAt?: Timestamp; currentAssignmentFirstFollowUpDeadlineAt?: Timestamp
   qualificationStartedAt?: Timestamp; qualificationDeadlineAt?: Timestamp; suspendedAt?: Timestamp
   qualifiedByUserId?: number; qualifiedByUserName?: string; qualifiedAt?: Timestamp; validDescription?: string
-  convertedAt?: Timestamp; invalidReason?: string; invalidReasonLabelSnapshot?: string; invalidDescription?: string
+  convertedAt?: Timestamp; salesOrderSubmittedAt?: Timestamp
+  invalidReason?: string; invalidReasonLabelSnapshot?: string; invalidDescription?: string
   invalidEvidence?: LeadAppealEvidence[]
   recycleSourceOwnerUserId?: number; recycleSourceOwnerUserName?: string
   appealDeadlineAt?: Timestamp; closedAt?: Timestamp; closeReason?: string
-  createTime: Timestamp; updateTime: Timestamp; lastActivityAt?: Timestamp; relationTypes: Array<'submitter' | 'owner'>
+  createTime: Timestamp; updateTime: Timestamp; lastActivityAt?: Timestamp; relationTypes: Array<'submitter' | 'owner' | 'student_service_owner'>
+  overviewVisible?: boolean; visibleTabs?: LeadDetailTab[]; identityMaskMode?: 'counterparty_masked' | 'full'
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
-  opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp }
+  opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp; wonAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT'; enabled: boolean }>
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT' | 'QUALIFICATION_RESTORE' | 'QUALIFICATION_TRANSFER' | 'QUALIFICATION_RECYCLE' | 'QUALIFICATION_RELEASE'; enabled: boolean }>
 }
 export type LeadComplaintEvidence = { infraFileId: number; fileUrl: string; originalName?: string; contentType?: string; fileSize?: number }
 export type LeadComplaint = {
@@ -128,6 +163,8 @@ export type LeadInboxFilterOption = { key: string; label: string }
 export type LeadInboxFilterSection = { key: string; label: string; options: LeadInboxFilterOption[] }
 export type LeadInboxFilterGroup = { key: string; label: string; sections: LeadInboxFilterSection[] }
 export type LeadInboxFilterProfile = { groups: LeadInboxFilterGroup[] }
+export type LeadSimpleStatus = 'first_follow_pending' | 'qualification_pending' | 'following'
+  | 'deal_pending_approval' | 'won' | 'invalid' | 'closed' | 'suspended'
 export type ManagedLeadPageParams = {
   pageNo: number
   pageSize: number
@@ -136,7 +173,20 @@ export type ManagedLeadPageParams = {
   inboxGroup?: string
   inboxStage?: string
   relationScope?: 'all' | 'submitted' | 'owned'
+  simpleStatus?: LeadSimpleStatus
   advancedFilter?: AdvancedFilterGroup
+}
+export type LeadDetailTab = 'overview' | 'follow-ups' | 'orders' | 'appeals' | 'complaints' | 'flow-history'
+export type LeadFlowAttachment = {
+  infraFileId?: number; originalName?: string; contentType?: string; previewUrl?: string
+  previewable: boolean; available: boolean
+}
+export type LeadFlowHistory = {
+  id: string; occurredAt: Timestamp; businessObject: string; flowNode: string; source: string
+  operator?: string; fromOwner?: string; toOwner?: string
+  leadStatusBefore?: string; leadStatusAfter?: string
+  assignmentStatusBefore?: string; assignmentStatusAfter?: string
+  reason?: string; remark?: string; attachments: LeadFlowAttachment[]
 }
 export type LeadFollowUpImage = { infraFileId: number; originalName: string; contentType: string; fileSize: number; sort: number; url?: string }
 export type LeadFollowUp = {
@@ -175,11 +225,12 @@ export type SalesOrderSubmitRequest = {
 }
 export type SalesOrder = {
   id: number; orderNo: string; leadId?: number; opportunityId?: number; personId: number; orderType: 'first_purchase' | 'repurchase'
-  status: 'pending_approval' | 'revision_required' | 'effective' | 'terminated'
+  supersedesOrderId?: number; supersededByOrderId?: number
+  status: 'pending_approval' | 'revision_required' | 'effective' | 'superseded' | 'terminated'
   submitterUserId: number; formalSalesUserId?: number; buyerName: string; studentName: string; studentNature: string
   studentMobile?: string; studentWechatId?: string; provinceCode: string; provinceName: string; cityCode: string; cityName: string
-  agreedExamTime?: string; classType?: string; servicePeriod: string; studentSource: string; totalAmount: number
-  customerPaidAt: Timestamp; feeMode: string; paymentMethod: string; remark?: string
+  agreedExamTime?: string; classType?: string; servicePeriod: string; servicePeriodLabelSnapshot?: string; studentSource: string; studentSourceLabelSnapshot?: string; studentNatureLabelSnapshot?: string; totalAmount: number
+  customerPaidAt: Timestamp; feeMode: string; feeModeLabelSnapshot?: string; paymentMethod: string; paymentMethodLabelSnapshot?: string; remark?: string
   studentSpecialRequirements?: string; materialDeliveryContact?: string
   items: Array<{ id: number; productRef: string; skuRef: string; productName: string; skuName: string; categoryPath: string[]; attrValues: Record<string, string>; actualAmount: number }>
   paymentVouchers: SalesOrderVoucher[]; approvalRoundNo: number; approvalRoundStatus: string
@@ -188,10 +239,16 @@ export type SalesOrder = {
   version: number; currentApprovalRoundId: number; approvalRoundVersion: number; repurchaseReason?: string; terminationReason?: string
   canRequestSupervisorConfirmation?: boolean
   submittedAt: Timestamp; effectiveAt?: Timestamp
+  leadProfile?: {
+    leadNo: string; submittedName: string; submittedMobile?: string; submittedWechatId?: string
+    sourceType?: string; sourceLabel?: string; sourceUserName?: string; sourceChannel?: string; sourceChannelLabelSnapshot?: string
+    provinceName?: string; cityName?: string; leadCategory?: string; leadCategoryLabelSnapshot?: string; dispatchMode?: string; ownerUserName?: string
+  }
   registrationApproval?: SalesOrderApprovalStatus
   financeApproval?: SalesOrderApprovalStatus
   registrationSupervisorConfirmation?: SalesOrderSupervisorConfirmation
   financeSupervisorConfirmation?: SalesOrderSupervisorConfirmation
+  supervisorApproval?: SalesOrderSupervisorApproval
 }
 export type SalesOrderSupervisorConfirmation = {
   id: number; status: 'pending' | 'confirmed' | 'rejected' | 'cancelled'; requesterUserId: number
@@ -214,24 +271,37 @@ export type SalesOrderSupervisorInboxItem = {
   status: 'pending' | 'confirmed' | 'rejected' | 'cancelled'; requestedAt?: Timestamp; decidedAt?: Timestamp
   version: number; orderVersion: number; roundVersion: number
 }
-export type SalesOrderStatusCounts = { total: number; pendingApproval: number; revisionRequired: number; effective: number }
+export type SalesOrderStatusCounts = { total: number; pendingApproval: number; revisionRequired: number; effective: number; superseded: number }
 export type SalesOrderApprovalFilterOption = { key: string; label: string; count: number }
 export type SalesOrderApprovalFilterSection = { key: string; label: string; options: SalesOrderApprovalFilterOption[] }
 export type SalesOrderApprovalFilterGroup = { key: string; label: string; count: number; sections: SalesOrderApprovalFilterSection[] }
 export type SalesOrderApprovalCenter = { key: 'registration' | 'finance'; label: string }
 export type SalesOrderApprovalFilterProfile = { groups: SalesOrderApprovalFilterGroup[]; centers: SalesOrderApprovalCenter[] }
+export type SalesOrderApprovalTaskTarget = {
+  workType: 'approval' | 'supervisor'; orderId: number; taskId: string
+  taskDefinitionKey: 'registrationReview' | 'financeReview'; center: 'registration' | 'finance'
+  confirmationId?: number; status: string
+}
 export type BusinessTaskBucket = 'unscheduled' | 'overdue' | 'today' | 'future'
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>
 export type BusinessTask = {
   id: number; taskType: string; bizType: string; bizId: number; title: string; summary?: string
   status: 'pending' | 'completed' | 'cancelled'; dueAt?: Timestamp; remindAt?: Timestamp
   completedAt?: Timestamp; cancelledAt?: Timestamp; createTime: Timestamp; overdue: boolean
-  actionCode?: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP' | 'OPEN_WORK_PLAN_ITEM' | 'REVIEW_WORK_PLAN_ITEM' | 'OPEN_SALES_ORDER_REVISION'
+  actionCode?: 'OPEN_LEAD_ASSIGNMENT' | 'OPEN_LEAD_FOLLOW_UP' | 'OPEN_WORK_PLAN_ITEM' | 'REVIEW_WORK_PLAN_ITEM' | 'OPEN_SALES_ORDER_REVISION' | 'COMPLETE_BIRTHDAY_CARE' | 'OPEN_STUDENT_FIRST_CONTACT' | 'OPEN_STUDENT_STUDY_PLAN' | 'OPEN_STUDENT_CONTACT' | 'OPEN_STUDENT_CONTACT_ASSISTANCE'
+  serviceRelationId?: number
+  targetTab?: string
+  targetRecordId?: number
   actionable: boolean
 }
 export type BpmTask = {
   id: string; name: string; createTime: Timestamp; endTime?: Timestamp; status: number; reason?: string
-  processInstanceId: string; processInstance?: { id: string; name: string; createTime: Timestamp; startUser?: { id: number; nickname: string } }
+  processInstanceId: string; taskDefinitionKey?: string; parentTaskId?: string
+  processInstance?: { id: string; name: string; createTime: Timestamp; startUser?: { id: number; nickname: string } }
+}
+export type SalesOrderSupervisorApproval = SalesOrderSupervisorConfirmation & {
+  taskDefinitionKey: 'registrationReview' | 'financeReview'; center: 'registration' | 'finance'
+  supervisorUserId: number; supervisorUserName?: string
 }
 export type ExportTask = {
   id: number; taskNo: string; exportType: 'lead' | 'order' | 'finance_order' | 'cashback' | 'withdrawal'
@@ -317,6 +387,7 @@ export type LeadAgingPoolItem = {
 export type SubordinateTask = { id: number; taskType: string; leadId: number; leadNo: string; leadName?: string; dueAt?: Timestamp; overdue: boolean }
 export type SubordinateBatchItem = { leadId: number; leadNo?: string; success: boolean; code: string; message: string }
 export type SubordinateBatchResult = { successCount: number; failureCount: number; items: SubordinateBatchItem[] }
+export type SubordinatePauseAllResult = { totalCount: number; changedCount: number; alreadyPausedCount: number }
 export type NotifyMessage = {
   id: number
   templateNickname: string
@@ -332,6 +403,7 @@ export type NotifyMessage = {
   actionType?: 'none' | 'message_detail' | 'business_detail'
   bizType?: string
   bizId?: number
+  sourceEventKey?: string
 }
 
 export type NotifyMessagePageParams = {
@@ -445,6 +517,8 @@ http.interceptors.response.use(async response => {
   return retryAfterRefresh(original, error)
 })
 
+let dictDataRequest: Promise<DictData[]> | undefined
+
 export const unwrap = <T,>(response: { data: any }): T => {
   const payload = response.data
   if (payload && typeof payload.code === 'number') {
@@ -524,15 +598,20 @@ export const api = {
   updateUserPassword: async (oldPassword: string, newPassword: string) => unwrap<boolean>(await http.put('/system/user/profile/update-password', { oldPassword, newPassword })),
   uploadAvatar: async (file: File) => {
     const data = new FormData(); data.append('file', file); data.append('directory', 'employee/avatar')
-    return unwrap<string>(await http.post('/infra/file/upload', data))
+    return unwrap<string>(await http.post('/infra/file/avatar/upload', data))
   },
   boundSocialUsers: async () => unwrap<SocialUser[]>(await http.get('/system/social-user/get-bind-list')),
   socialAuthRedirect: async (type: number, redirectUri: string) => unwrap<string>(await http.get('/system/auth/social-auth-redirect', { params: { type, redirectUri } })),
   bindSocialUser: async (type: number, code: string, state: string) => unwrap<boolean>(await http.post('/system/social-user/bind', { type, code, state })),
   unbindSocialUser: async (type: number, openid: string) => unwrap<boolean>(await http.delete('/system/social-user/unbind', { data: { type, openid } })),
   dictDataByType: async (dictType: string) => {
-    const dictData = unwrap<DictData[]>(await http.get('/system/dict-data/simple-list'))
-    return dictData.filter(item => item.dictType === dictType)
+    const request = dictDataRequest ?? (dictDataRequest = http.get('/system/dict-data/simple-list')
+      .then(response => unwrap<DictData[]>(response))
+      .catch((error: unknown) => {
+        dictDataRequest = undefined
+        throw error
+      }))
+    return request.then(dictData => dictData.filter(item => item.dictType === dictType))
   },
   areaTree: async () => unwrap<AreaNode[]>(await http.get('/system/area/tree')),
   leadCatalog: async () => unwrap<LeadCatalog>(await http.get('/zsjos/lead/product/catalog')),
@@ -543,8 +622,79 @@ export const api = {
   createLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/create', data)),
   createSelfSourcedLead: async (data: LeadCreateRequest) => unwrap<LeadCreateResult>(await http.post('/zsjos/lead/self-sourced/create', data)),
   newMediaProviders: async () => unwrap<SalesUser[]>(await http.get('/zsjos/lead/self-sourced/new-media-providers')),
-  duplicateReviewPage: async (status: 'pending' | 'completed') =>
-    unwrap<PageResult<LeadDuplicateReview>>(await http.get('/zsjos/lead-duplicate-review/page', { params: { status, pageNo: 1, pageSize: 100 } })),
+  mediaAccount: {
+    create: async (data: { studentPersonId: number; platformValue: string; platformLabelSnapshot: string; detailValues: Record<string, unknown> }) => unwrap<number>(await http.post('/zsjos/media-account/create', data)),
+    publishedFieldConfig: async () => unwrap<MediaAccountFieldConfig>(await http.get('/zsjos/media-account-field-config/published')),
+    get: async (id: number) => unwrap<MediaAccount>(await http.get('/zsjos/media-account/get', { params: { id } })),
+    page: async (params: { pageNo: number; pageSize: number; keyword?: string; sStage?: string }) => unwrap<PageResult<MediaAccount>>(await http.get('/zsjos/media-account/page', { params })),
+    studentCandidates: async (keyword?: string) => unwrap<Array<{ personId: number; name?: string }>>(await http.get('/zsjos/media-account/student-candidates', { params: { keyword } })),
+    bindStudent: async (id: number, studentPersonId: number, reason?: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/bind-student`, null, { params: { studentPersonId, reason } })),
+    unbindStudent: async (id: number, reason?: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/unbind-student`, null, { params: { reason } })),
+    advanceStage: async (id: number, toStage: string, version: number, basis: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/advance-stage`, null, { params: { toStage, version, basis, criteriaSnapshotJson: JSON.stringify({ basis }) } })),
+    rollbackStage: async (id: number, toStage: string, version: number, basis: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/rollback-stage`, null, { params: { toStage, version, basis, criteriaSnapshotJson: JSON.stringify({ basis }) } })),
+    update: async (id: number, data: Partial<MediaAccount> & { version: number; nickname: string }) => unwrap<boolean>(await http.put(`/zsjos/media-account/${id}`, data)),
+    diagnose: async (id: number, data: { weekNo: string; statStart: string; statEnd: string; basicJson: string; productionFunnelJson: string; platformDataJson: string; contentPerfJson: string; leadFunnelJson: string; rootCauseJson: string; nextWeekPlanJson: string; suggestedGrade?: string; configVersionId: number }) => unwrap<number>(await http.post(`/zsjos/media-account/${id}/diagnoses`, data)),
+    publishedDiagnosisConfig: async () => unwrap<number>(await http.get('/zsjos/media-account/diagnosis-config/published')),
+    rescue: async (id: number, version: number, status: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/rescue`, null, { params: { version, status } })),
+    requestRebind: async (id: number, targetStudentId: number, version: number) => unwrap<string>(await http.post(`/zsjos/media-account/${id}/request-rebind`, null, { params: { targetStudentId, version } }))
+  },
+  mediaContent: {
+    create: async (data: { accountId: number; title: string; topic?: string; contentClassValue: string; contentClassLabelSnapshot: string }) => unwrap<number>(await http.post('/zsjos/content/create', data)),
+    get: async (id: number) => unwrap<MediaContent>(await http.get('/zsjos/content/get', { params: { id } })),
+    page: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string }) => unwrap<PageResult<MediaContent>>(await http.get('/zsjos/content/page', { params })),
+    completeTopic: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/complete-topic`, null, { params: { version } })),
+    submitProduction: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/submit-production`, null, { params: { version } })),
+    submitAcceptance: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/submit-acceptance`, null, { params: { version } })),
+    approveAcceptance: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/approve-acceptance`, null, { params: { version } })),
+    rejectAcceptance: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/reject-acceptance`, null, { params: { version, reason } })),
+    startRevision: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/start-revision`, null, { params: { version } })),
+    resubmitProduction: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/content/${id}/resubmit-production`, null, { params: { version } })),
+    versions: async (contentId: number) => unwrap<unknown[]>(await http.get('/zsjos/content/version/list', { params: { contentId } }))
+  },
+  productionTicket: {
+    create: async (data: { accountId: number; reviewerUserId: number; assigneeFilmingEditorUserId?: number; scriptText?: string; expectedDeliveredAt?: Timestamp; deadlineAt?: Timestamp; maxRevisionCount?: number }) => unwrap<number>(await http.post('/zsjos/production-ticket/create', data)),
+    get: async (id: number) => unwrap<ProductionTicket>(await http.get('/zsjos/production-ticket/get', { params: { id } })),
+    page: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string }) => unwrap<PageResult<ProductionTicket>>(await http.get('/zsjos/production-ticket/page', { params })),
+    accept: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/accept`, null, { params: { version } })),
+    startProduction: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/start-production`, null, { params: { version } })),
+    submit: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/submit`, null, { params: { version } })),
+    startCheck: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/start-check`, null, { params: { version } })),
+    approve: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/approve`, null, { params: { version } })),
+    reject: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/reject`, null, { params: { version, reason } })),
+    reaccept: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/reaccept`, null, { params: { version } }))
+  },
+  positioningCard: {
+    create: async (data: { accountId: number; studentPersonId?: number; professionalRisk?: boolean; layer1Json?: string; layer2Json?: string; formulaJson?: string; feasibilityJson?: string; contentFormJson?: string; complianceJson?: string }) => unwrap<number>(await http.post('/zsjos/positioning-card/create', data)),
+    get: async (id: number) => unwrap<PositioningCard>(await http.get('/zsjos/positioning-card/get', { params: { id } })),
+    page: async (params: { pageNo: number; pageSize: number; status?: string }) => unwrap<PageResult<PositioningCard>>(await http.get('/zsjos/positioning-card/page', { params })),
+    submitReview: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/submit-review`, null, { params: { version } })),
+    operatorApprove: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/operator-approve`, null, { params: { version } })),
+    operatorReject: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/operator-reject`, null, { params: { version } })),
+    confirmTrial: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/confirm-trial`, null, { params: { version } })),
+    archive: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/archive`, null, { params: { version } })),
+    versions: async (cardId: number) => unwrap<unknown[]>(await http.get('/zsjos/positioning/workspace/versions', { params: { cardId } })),
+    execCard: async (cardId: number) => unwrap<unknown>(await http.get('/zsjos/positioning/workspace/exec-card', { params: { cardId } }))
+  },
+  studentOps: {
+    exceptions: async () => unwrap<MediaException[]>(await http.get('/zsjos/student-ops/exceptions')),
+    createException: async (data: Record<string, unknown>) => unwrap<number>(await http.post('/zsjos/student-ops/exceptions/create', data)),
+    resolve: async (id: number, version: number, resolution: string) => unwrap<boolean>(await http.post(`/zsjos/student-ops/exceptions/${id}/resolve`, null, { params: { version, resolution } })),
+    assess: async (data: Record<string, unknown>) => unwrap<number>(await http.post('/zsjos/student-ops/assessments/create', data)),
+    graduations: async () => unwrap<GraduationApplication[]>(await http.get('/zsjos/student-ops/graduations')),
+    graduate: async (data: { serviceRelationId: number; reason: string; snapshotJson: string }) => unwrap<number>(await http.post('/zsjos/student-ops/graduations/create', data))
+  },
+  mediaReview: {
+    list: async () => unwrap<MediaReview[]>(await http.get('/zsjos/reviews/list')),
+    create: async (data: { reviewType: string; subjectType: string; subjectId: number; reportJson: string; evidenceRefsJson?: string }) => unwrap<number>(await http.post('/zsjos/reviews/create', data)),
+    submit: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/reviews/${id}/submit`, null, { params: { version } })),
+    approve: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/reviews/${id}/approve`, null, { params: { version } })),
+    reject: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/reviews/${id}/reject`, null, { params: { version, reason } })),
+    archive: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/reviews/${id}/archive`, null, { params: { version } }))
+  },
+  duplicateReviewPage: async (params: { status: 'pending' | 'completed'; pageNo: number; pageSize: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter || params.keyword
+      ? unwrap<PageResult<LeadDuplicateReview>>(await http.post('/zsjos/lead-duplicate-review/search-page', params))
+      : unwrap<PageResult<LeadDuplicateReview>>(await http.get('/zsjos/lead-duplicate-review/page', { params })),
   duplicateReviewSalesCandidates: async () =>
     unwrap<AssignmentUser[]>(await http.get('/zsjos/lead-duplicate-review/sales-candidates')),
   uploadDuplicateReviewAttachment: async (file: File) => {
@@ -573,6 +723,7 @@ export const api = {
     params.advancedFilter ? unwrap<CursorPageResult<ManagedLead>>(await http.post(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/search-cursor`, params))
       : unwrap<CursorPageResult<ManagedLead>>(await http.get(`/zsjos/lead/inbox/${audience === 'submitter' ? 'submitted' : 'owned'}/cursor`, { params })),
   managedLead: async (id: number) => unwrap<ManagedLead>(await http.get('/zsjos/lead/get', { params: { id } })),
+  leadFlowHistory: async (id: number) => unwrap<LeadFlowHistory[]>(await http.get(`/zsjos/lead/${id}/flow-history`)),
   allLeadPage: async (params: ManagedLeadPageParams) =>
     params.advancedFilter ? unwrap<PageResult<ManagedLead>>(await http.post('/zsjos/lead/search-page', params))
       : unwrap<PageResult<ManagedLead>>(await http.get('/zsjos/lead/page', { params })),
@@ -612,8 +763,8 @@ export const api = {
   createLeadComplaint: async (id: number, reason: string, evidenceFileIds: number[]) => unwrap<number>(
     await http.post(`/zsjos/lead-complaint/lead/${id}`, { reason, evidenceFileIds, idempotencyKey: createIdempotencyKey() })
   ),
-  leadComplaintPage: async (status: 'pending' | 'handled') => unwrap<PageResult<LeadComplaint>>(
-    await http.get('/zsjos/lead-complaint/page', { params: { status, pageNo: 1, pageSize: 100 } })
+  leadComplaintPage: async (params: { status: 'pending' | 'handled'; pageNo: number; pageSize: number }) => unwrap<PageResult<LeadComplaint>>(
+    await http.get('/zsjos/lead-complaint/page', { params })
   ),
   leadComplaints: async (leadId: number) => unwrap<LeadComplaint[]>(
     await http.get(`/zsjos/lead-complaint/lead/${leadId}/list`)
@@ -648,10 +799,14 @@ export const api = {
     unwrap<LeadAppeal[]>(await http.get(`/zsjos/lead/appeal/lead/${leadId}/list`)),
   submitLeadAppeal: async (leadId: number, data: { reason: string; attachments: Array<{ infraFileId: number }>; idempotencyKey: string }) =>
     unwrap<number>(await http.post(`/zsjos/lead/appeal/lead/${leadId}/submit`, data)),
-  leadAppealInboxPage: async (handled: boolean, params: { pageNo: number; pageSize: number }) =>
-    unwrap<PageResult<LeadAppeal>>(await http.get('/zsjos/lead/appeal/inbox-page', { params: { handled, ...params } })),
-  leadAppealInboxCursor: async (handled: boolean, params: { cursor?: string; limit?: number }) =>
-    unwrap<CursorPageResult<LeadAppeal>>(await http.get('/zsjos/lead/appeal/inbox-cursor', { params: { handled, ...params } })),
+  leadAppealInboxPage: async (handled: boolean, params: { pageNo: number; pageSize: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter || params.keyword
+      ? unwrap<PageResult<LeadAppeal>>(await http.post('/zsjos/lead/appeal/inbox/search-page', { handled, ...params }))
+      : unwrap<PageResult<LeadAppeal>>(await http.get('/zsjos/lead/appeal/inbox-page', { params: { handled, ...params } })),
+  leadAppealInboxCursor: async (handled: boolean, params: { cursor?: string; limit?: number; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter || params.keyword
+      ? unwrap<CursorPageResult<LeadAppeal>>(await http.post('/zsjos/lead/appeal/inbox/search-cursor', { handled, ...params }))
+      : unwrap<CursorPageResult<LeadAppeal>>(await http.get('/zsjos/lead/appeal/inbox-cursor', { params: { handled, ...params } })),
   decideLeadAppeal: async (appealId: number, decision: 'overturn' | 'uphold', data: { taskId: string; reason: string; attachments: Array<{ infraFileId: number }>; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/lead/appeal/${appealId}/${decision}`, data)),
   uploadLeadAppealImage: async (file: File) => {
@@ -665,11 +820,13 @@ export const api = {
     unwrap<number>(await http.post(`/zsjos/sales-order/lead/${leadId}/repurchase`, { repurchaseReason, order })),
   submitExternalRepurchase: async (data: { customerName: string; customerMobile?: string; customerWechatId?: string; repurchaseReason: string; order: SalesOrderSubmitRequest }) =>
     unwrap<number>(await http.post('/zsjos/sales-order/external-repurchase', data)),
+  submitStudentRepurchase: async (personId: number, data: { customerName?: string; customerMobile?: string; customerWechatId?: string; repurchaseReason: string; order: SalesOrderSubmitRequest }) =>
+    unwrap<number>(await http.post(`/zsjos/sales-order/student/${personId}/repurchase`, data)),
   customerSalesOrders: async (leadId: number) => unwrap<SalesOrderListItem[]>(await http.get(`/zsjos/sales-order/lead/${leadId}/customer-orders`)),
   customerSalesOrder: async (leadId: number, orderId: number) =>
     unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/lead/${leadId}/customer-orders/${orderId}`)),
   resubmitSalesOrder: async (orderId: number, data: SalesOrderSubmitRequest) =>
-    unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
+    unwrap<number>(await http.put(`/zsjos/sales-order/${orderId}/resubmit`, data)),
   salesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/${orderId}`)),
   mySalesOrder: async (orderId: number) => unwrap<SalesOrder>(await http.get(`/zsjos/sales-order/my/${orderId}`)),
   mySalesOrderPage: async (params: { pageNo: number; pageSize: number; status?: SalesOrder['status']; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
@@ -681,22 +838,30 @@ export const api = {
   mySalesOrderStatusCounts: async () =>
     unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
   salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
+  salesOrderApprovalTaskTarget: async (taskId: string) => unwrap<SalesOrderApprovalTaskTarget>(
+    await http.get('/zsjos/sales-order/approval/task-target', { params: { taskId } })),
+  salesOrderApprovalNotificationTarget: async (orderId: number, sceneCode: string, sourceEventKey?: string) => unwrap<SalesOrderApprovalTaskTarget>(
+    await http.get('/zsjos/sales-order/approval/notification-target', { params: { orderId, sceneCode, sourceEventKey } })),
   salesOrderApprovalInbox: async (params: { pageNo: number; pageSize: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<PageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/approval/search-page', params))
       : unwrap<PageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-page', { params })),
   salesOrderApprovalCursor: async (params: { cursor?: string; limit?: number; center?: 'registration' | 'finance'; groupKey?: string; optionKey?: string; keyword?: string; handled?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<CursorPageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/approval/search-cursor', params))
       : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/approval/inbox-cursor', { params })),
-  advancedFilterCatalog: async (scene: 'lead' | 'order') =>
+  advancedFilterCatalog: async (scene: AdvancedFilterScene) =>
     unwrap<AdvancedFilterCatalog>(await http.get('/zsjos/advanced-filter/catalog', { params: { scene } })),
   decideSalesOrder: async (orderId: number, decision: 'approve' | 'reject', data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/${decision}`, data)),
   requestSalesOrderSupervisor: async (orderId: number, data: { taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/supervisor-confirmation/request`, data)),
-  salesOrderSupervisorInbox: async (params: { pageNo: number; pageSize: number; handled: boolean; keyword?: string }) =>
-    unwrap<PageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-page', { params })),
-  salesOrderSupervisorCursor: async (params: { cursor?: string; limit?: number; handled: boolean; keyword?: string }) =>
-    unwrap<CursorPageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-cursor', { params })),
+  salesOrderSupervisorInbox: async (params: { pageNo: number; pageSize: number; handled: boolean; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<SalesOrderSupervisorInboxItem>>(await http.post('/zsjos/sales-order/supervisor-confirmation/search-page', params))
+      : unwrap<PageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-page', { params })),
+  salesOrderSupervisorCursor: async (params: { cursor?: string; limit?: number; handled: boolean; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<CursorPageResult<SalesOrderSupervisorInboxItem>>(await http.post('/zsjos/sales-order/supervisor-confirmation/search-cursor', params))
+      : unwrap<CursorPageResult<SalesOrderSupervisorInboxItem>>(await http.get('/zsjos/sales-order/supervisor-confirmation/inbox-cursor', { params })),
+  salesOrderSupervisorConfirmation: async (confirmationId: number) => unwrap<SalesOrderSupervisorInboxItem>(
+    await http.get(`/zsjos/sales-order/supervisor-confirmation/${confirmationId}`)),
   decideSalesOrderSupervisor: async (orderId: number, decision: 'confirm' | 'reject', data: { confirmationId: number; taskId: string; reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; confirmationVersion: number; idempotencyKey: string }) =>
     unwrap<boolean>(await http.put(`/zsjos/sales-order/${orderId}/supervisor-confirmation/${decision}`, data)),
   terminateSalesOrder: async (orderId: number, data: { reason: string; approvalRoundId: number; orderVersion: number; roundVersion: number; idempotencyKey: string }) =>
@@ -710,6 +875,8 @@ export const api = {
     unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-page', { params: { bucket, ...params } })),
   businessTaskList: async (params: { status: 'pending' | 'done'; bucket?: BusinessTaskBucket; pageNo: number; pageSize: number }) =>
     unwrap<PageResult<BusinessTask>>(await http.get('/zsjos/business-task/my-task-page', { params })),
+  completeBirthdayCare: async (id: number) =>
+    unwrap<boolean>(await http.post(`/zsjos/business-task/${id}/complete-birthday-care`)),
   createExportTask: async (exportType: ExportTask['exportType'], filter: unknown) =>
     unwrap<number>(await http.post('/zsjos/export-task', { exportType, filterJson: JSON.stringify(filter || {}) })),
   exportTaskPage: async (params: { pageNo: number; pageSize: number; exportType?: ExportTask['exportType'] }) =>
@@ -718,6 +885,10 @@ export const api = {
   exportDownloadUrl: async (id: number) => unwrap<string>(await http.get(`/zsjos/export-task/${id}/download-url`)),
   bpmTaskPage: async (view: 'todo' | 'done', params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<BpmTask>>(await http.get(`/bpm/task/${view}-page`, { params })),
+  approveBpmTask: async (id: string, reason: string) =>
+    unwrap<boolean>(await http.put('/bpm/task/approve', { id, reason, variables: {} })),
+  rejectBpmTask: async (id: string, reason: string) =>
+    unwrap<boolean>(await http.put('/bpm/task/reject', { id, reason })),
   simpleUsers: async () => unwrap<SimpleUser[]>(await http.get('/system/user/simple-list')),
   simpleDepartments: async () => unwrap<SimpleDept[]>(await http.get('/system/dept/simple-list')),
   workPlanPage: async (params: { pageNo: number; pageSize: number; periodType?: WorkPlan['periodType']; status?: string; startDate?: string; endDate?: string }) =>
@@ -779,8 +950,9 @@ export const api = {
   saveProductAttributes: async (spuId: number, attrs: ProductAttribute[]) => unwrap<boolean>(await http.put('/zsjos/product/sku/attrs', { spuId, attrs })),
   createWorkPlanTemplate: async (data: WorkPlanTemplateSaveRequest) => unwrap<number>(await http.post('/zsjos/work-plan-config/templates', data)),
   updateWorkPlanTemplate: async (id: number, data: WorkPlanTemplateSaveRequest) => unwrap<boolean>(await http.put(`/zsjos/work-plan-config/templates/${id}`, data)),
-  subordinateSalesPage: async (params: { pageNo: number; pageSize: number; keyword?: string; accountStatus?: number; presence?: string; accepting?: boolean }) =>
-    unwrap<PageResult<SubordinateSales>>(await http.get('/zsjos/subordinate-sales/page', { params })),
+  subordinateSalesPage: async (params: { pageNo: number; pageSize: number; keyword?: string; accountStatus?: number; presence?: string; accepting?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<PageResult<SubordinateSales>>(await http.post('/zsjos/subordinate-sales/search-page', params))
+      : unwrap<PageResult<SubordinateSales>>(await http.get('/zsjos/subordinate-sales/page', { params })),
   subordinateSalesOverview: async (salesUserId: number) =>
     unwrap<SubordinateSales>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/overview`)),
   subordinateSalesLeads: async (salesUserId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string; advancedFilter?: AdvancedFilterGroup }) =>
@@ -794,6 +966,8 @@ export const api = {
     unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/account-status`, { status, reason })),
   updateSubordinateDispatchMode: async (salesUserId: number, accepting: boolean, reason: string) =>
     unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/dispatch-mode`, { accepting, reason })),
+  pauseAllSubordinateDispatch: async () =>
+    unwrap<SubordinatePauseAllResult>(await http.put('/zsjos/subordinate-sales/dispatch-mode/pause-all')),
   batchTransferSubordinateLeads: async (leadIds: number[], targetUserId: number, reason: string) =>
     unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-transfer', { leadIds, targetUserId, reason })),
   batchReleaseSubordinateLeads: async (leadIds: number[], collaboratorUserId: number | undefined, reason: string) =>
@@ -820,16 +994,53 @@ export const api = {
     unwrap<boolean>(await http.put('/zsjos/lead-assignment/relation/save', data)),
   assignmentLogPage: async (params: { pageNo: number; pageSize: number }) =>
     unwrap<PageResult<AssignmentLog>>(await http.get('/zsjos/lead-assignment/log/page', { params })),
-  registrationPoolPage: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string }) => unwrap<PageResult<RegistrationCase>>(await http.get('/zsjos/registration/pool-page', { params })),
+  registrationPoolPage: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+    ? unwrap<PageResult<RegistrationCase>>(await http.post('/zsjos/registration/pool/search-page', params))
+    : unwrap<PageResult<RegistrationCase>>(await http.get('/zsjos/registration/pool-page', { params })),
   registrationCase: async (id: number) => unwrap<RegistrationCase>(await http.get(`/zsjos/registration/${id}`)),
   registrationPlannerCandidates: async () => unwrap<StudyPlanner[]>(await http.get('/zsjos/registration/study-planner-candidates')),
+  registrationRouteCandidates: async (id: number, routeId: number) => unwrap<StudyPlanner[]>(await http.get(`/zsjos/registration/${id}/routes/${routeId}/candidates`)),
   updateRegistrationItem: async (id: number, itemId: number, data: { checked: boolean; version: number; idempotencyKey: string }) => unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/items/${itemId}`, data)),
   updateRegistrationPlanner: async (id: number, data: { studyPlannerUserId: number; version: number; idempotencyKey: string }) => unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/study-planner`, data)),
+  updateRegistrationRoutes: async (id: number, data: { version: number; idempotencyKey: string; routes: Array<{ routeId: number; selected: boolean; assigneeUserId?: number }> }) => unwrap<RegistrationCase>(await http.put(`/zsjos/registration/${id}/routes`, data)),
+  uploadRegistrationAttachment: async (id: number, itemId: number, file: File, version: number) => {
+    const data = new FormData(); data.append('file', file)
+    return unwrap<{ id: number; infraFileId: number; fileUrl: string; originalName: string; contentType?: string; fileSize: number; version: number }>(await http.post(`/zsjos/registration/${id}/items/${itemId}/attachments`, data, { params: { version, idempotencyKey: createIdempotencyKey() } }))
+  },
+  deleteRegistrationAttachment: async (id: number, itemId: number, attachmentId: number, data: { version: number; idempotencyKey: string }) => unwrap<RegistrationCase>(await http.delete(`/zsjos/registration/${id}/items/${itemId}/attachments/${attachmentId}`, { data })),
   completeRegistration: async (id: number, data: { version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post(`/zsjos/registration/${id}/complete`, data)),
-  myStudents: async (params: { pageNo: number; pageSize: number; keyword?: string }) => unwrap<PageResult<MyStudent>>(await http.get('/zsjos/student/my-page', { params })),
+  myStudents: async (params: { pageNo: number; pageSize: number; keyword?: string; serviceStatus?: 'active' | 'paused' | 'completed'; advancedFilter?: AdvancedFilterGroup }) => params.advancedFilter
+    ? unwrap<PageResult<MyStudent>>(await http.post('/zsjos/student/my/search-page', params))
+    : unwrap<PageResult<MyStudent>>(await http.get('/zsjos/student/my-page', { params })),
+  mediaStudents: {
+    page: async (params: { pageNo: number; pageSize: number; keyword?: string }) => unwrap<PageResult<MyStudent>>(await http.get('/zsjos/media-students/page', { params })),
+    get: async (personId: number) => unwrap<MediaStudentDetail>(await http.get(`/zsjos/media-students/${personId}`)),
+    target: async (bizType: string, bizId: number) => unwrap<{ personId: number; targetTab: string; recordId: number }>(await http.get('/zsjos/media-students/target', { params: { bizType, bizId } })),
+    talks: async (personId: number) => unwrap<MediaStudentTalkRecord[]>(await http.get(`/zsjos/media-students/${personId}/talk-records`)),
+    createTalk: async (personId: number, data: { accountId?: number; content: string; attachmentFileIds?: number[] }) => unwrap<number>(await http.post(`/zsjos/media-students/${personId}/talk-records`, data))
+  },
   myStudent: async (personId: number) => unwrap<MyStudent>(await http.get(`/zsjos/student/my/${personId}`)),
+  myStudentByService: async (relationId: number) => unwrap<MyStudent>(await http.get(`/zsjos/student/my/by-service/${relationId}`)),
+  studentContactContext: async (relationId: number) => unwrap<StudentContactContext>(await http.get(`/zsjos/student/service/${relationId}/contact-context`)),
+  studentContactRecords: async (relationId: number, pageNo = 1, pageSize = 100) => unwrap<PageResult<StudentContactRecord>>(await http.get(`/zsjos/student/service/${relationId}/contact-records`, { params: { pageNo, pageSize } })),
+  studentAccept: async (relationId: number, version: number, idempotencyKey: string) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/accept`, { version, idempotencyKey })),
+  studentUpdateBasicInfo: async (relationId: number, data: { name: string; mobile?: string; wechatId?: string; reason: string }) => unwrap<boolean>(await http.put(`/zsjos/student/service/${relationId}/basic-info`, data)),
+  studentFirstContact: async (relationId: number, data: Record<string, unknown>) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/first-contact`, data)),
+  studentStudyPlan: async (relationId: number, data: Record<string, unknown>) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/study-plan`, data)),
+  studentContact: async (relationId: number, data: Record<string, unknown>) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/contacts`, data)),
+  studentDeliveryStage: async (relationId: number, data: { stage: string; successful: boolean; remark: string; attachmentFileIds?: number[]; data?: Record<string, unknown>; idempotencyKey: string }) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/delivery-stage`, data)),
+  studentCollaboratorCandidates: async (relationId: number, type: 'content_director' | 'career_planner') => unwrap<StudyPlanner[]>(await http.get(`/zsjos/student/service/${relationId}/collaborator-candidates`, { params: { type } })),
+  studentAssignCollaborator: async (relationId: number, data: { collaboratorType: string; userId: number; version: number; idempotencyKey: string; correctionReason?: string }) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/collaborators`, data)),
+  studentContactUpload: async (relationId: number, file: File) => { const data = new FormData(); data.append('file', file); return unwrap<{ fileId: number; name: string; url: string; contentType?: string; size: number }>(await http.post(`/zsjos/student/service/${relationId}/attachments`, data)) },
+  studentContactExtensions: async (pageNo = 1, pageSize = 20, statusScope = 'all') => unwrap<PageResult<StudentContactExtension>>(await http.get('/zsjos/student/service/extensions', { params: { pageNo, pageSize, statusScope } })),
+  studentWithdrawExtension: async (extensionId: number, version: number, reason: string, idempotencyKey: string) => unwrap<boolean>(await http.post(`/zsjos/student/service/extensions/${extensionId}/withdraw`, { version, reason, idempotencyKey })),
+  studentCompleteAssistance: async (taskId: number, remark: string) => unwrap<boolean>(await http.post(`/zsjos/student/service/assistance/${taskId}/complete`, { remark })),
+  studentContactConfig: async () => unwrap<StudentContactConfig>(await http.get('/zsjos/student-contact-config')),
+  copyStudentContactConfigDraft: async (publishedId: number, publishedVersion: number, idempotencyKey: string) => unwrap<number>(await http.post('/zsjos/student-contact-config/draft/copy', { publishedId, publishedVersion, idempotencyKey })),
+  saveStudentContactConfigDraft: async (data: Record<string, unknown>) => unwrap<boolean>(await http.put('/zsjos/student-contact-config/draft', data)),
+  publishStudentContactConfig: async (id: number, version: number, idempotencyKey: string) => unwrap<boolean>(await http.post('/zsjos/student-contact-config/publish', { id, version, idempotencyKey })),
   registrationChecklistConfig: async () => unwrap<RegistrationChecklistConfig>(await http.get('/zsjos/registration-checklist-config')),
   copyRegistrationChecklistDraft: async (version: number) => unwrap<number>(await http.post('/zsjos/registration-checklist-config/draft/copy', { version, idempotencyKey: crypto.randomUUID() })),
-  saveRegistrationChecklistDraft: async (data: { templateVersion: number; items: Array<{ id?: number; itemKey?: string; title: string; sort: number; enabled: boolean; systemRequired?: boolean }>; idempotencyKey: string }) => unwrap<boolean>(await http.put('/zsjos/registration-checklist-config/draft', data)),
+  saveRegistrationChecklistDraft: async (data: { templateVersion: number; items: Array<{ id?: number; itemKey?: string; itemType: string; title: string; sort: number; enabled: boolean; systemRequired?: boolean; attachmentRequired?: boolean }>; routeOptions: Array<{ id?: number; optionKey: string; departmentId: number; assigneeType: string; sort: number; enabled: boolean; systemRequired?: boolean }>; idempotencyKey: string }) => unwrap<boolean>(await http.put('/zsjos/registration-checklist-config/draft', data)),
   publishRegistrationChecklist: async (version: number) => unwrap<boolean>(await http.post('/zsjos/registration-checklist-config/publish', { version, idempotencyKey: crypto.randomUUID() }))
 }

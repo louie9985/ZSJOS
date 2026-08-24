@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react'
 import { Alert, Button, Empty, Form, Image, Input, Modal, Skeleton, Space, Tag, Timeline, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type LeadAppeal, type LeadAppealEvidence, type ManagedLead } from '../services/api'
-import type { LeadDetailMode } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
 import LeadAppealEvidenceUpload from './LeadAppealEvidenceUpload'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
@@ -22,9 +21,16 @@ function Evidence({ items }: { items?: LeadAppealEvidence[] }) {
     <Image key={item.infraFileId} src={item.fileUrl} alt={item.originalName}/>)}</div></Image.PreviewGroup>
 }
 
-export default function LeadAppealPanel({ lead, audience, onChanged }: {
+export function canSubmitLeadAppeal(
+  lead: Pick<ManagedLead, 'relationTypes' | 'status'>,
+  latest?: Pick<LeadAppeal, 'roundNo' | 'status'>
+) {
+  return lead.relationTypes.includes('submitter') && lead.status === 'invalid'
+    && (!latest || (latest.status === 'upheld' && latest.roundNo < 3))
+}
+
+export default function LeadAppealPanel({ lead, onChanged }: {
   lead: ManagedLead
-  audience: LeadDetailMode
   onChanged: () => void
 }) {
   const [items, setItems] = useState<LeadAppeal[]>([])
@@ -45,8 +51,7 @@ export default function LeadAppealPanel({ lead, audience, onChanged }: {
   useEffect(() => { void load() }, [load])
 
   const latest = items.at(-1)
-  const canSubmit = audience === 'submitter' && lead.relationTypes.includes('submitter') && lead.status === 'invalid'
-    && (!latest || (latest.status === 'upheld' && latest.roundNo < 3))
+  const canSubmit = canSubmitLeadAppeal(lead, latest)
   const nextRound = latest ? latest.roundNo + 1 : 1
 
   const openAppeal = () => { resetIntent(); setConfirmOpen(false); setOpen(true) }

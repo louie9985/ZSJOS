@@ -32,6 +32,7 @@ public interface SalesOrderConstants {
     String ORDER_TYPE_REPURCHASE = "repurchase";
     String ORDER_TYPE_DIRECT_SALE = ORDER_TYPE_FIRST_PURCHASE;
     String SUBMITTER_CENTER_SALES = "sales_conversion";
+    String SUBMITTER_CENTER_STUDENT_DELIVERY = "student_delivery";
 
     String PERMISSION_CREATE = "zsjos:sales-order:create";
     String PERMISSION_QUERY = "zsjos:sales-order:query";

@@ -12,7 +12,7 @@ import jakarta.validation.Valid;
 @EqualsAndHashCode(callSuper = true)
 public class SalesOrderMyPageReqVO extends PageParam {
 
-    @Pattern(regexp = "pending_approval|revision_required|effective", message = "订单状态不正确")
+    @Pattern(regexp = "pending_approval|revision_required|effective|superseded", message = "订单状态不正确")
     private String status;
 
     @Size(max = 100, message = "搜索关键字不能超过 100 个字符")

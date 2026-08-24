@@ -27,10 +27,11 @@ import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static cn.hutool.core.date.DatePattern.PURE_DATE_PATTERN;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EXISTS;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.*;
 
 /**
  * 文件 Service 实现类
@@ -39,6 +40,10 @@ import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.FILE_NOT_EX
  */
 @Service
 public class FileServiceImpl implements FileService {
+
+    static final Set<String> AVATAR_DIRECTORIES = Set.of("system/user/avatar", "employee/avatar");
+    static final Set<String> AVATAR_CONTENT_TYPES = Set.of("image/jpeg", "image/png", "image/webp");
+    static final long AVATAR_MAX_SIZE = 5L * 1024 * 1024;
 
     /**
      * 上传文件的前缀，是否包含日期（yyyyMMdd）
@@ -113,6 +118,40 @@ public class FileServiceImpl implements FileService {
                 .setType(type).setSize((long) content.length);
         fileMapper.insert(file);
         return file;
+    }
+
+    @Override
+    public FileDO createAvatarFile(byte[] content, String directory) {
+        if (!AVATAR_DIRECTORIES.contains(directory)) {
+            throw exception(FILE_AVATAR_DIRECTORY_INVALID);
+        }
+        if (content.length > AVATAR_MAX_SIZE) {
+            throw exception(FILE_AVATAR_SIZE_EXCEEDED);
+        }
+        String contentType = FileTypeUtils.getMineType(content);
+        if (!AVATAR_CONTENT_TYPES.contains(contentType)) {
+            throw exception(FILE_AVATAR_TYPE_INVALID);
+        }
+        String extension = FileTypeUtils.getExtension(contentType);
+        String immutableName = DigestUtil.sha256Hex(content) + (extension == null ? "" : extension);
+        return createFileInfo(content, immutableName, directory, contentType);
+    }
+
+    @Override
+    public FileDO getAvatarFile(Long id) {
+        FileDO file = validateFileExists(id);
+        boolean avatarDirectory = AVATAR_DIRECTORIES.stream()
+                .anyMatch(directory -> StrUtil.startWith(file.getPath(), directory + "/"));
+        if (!avatarDirectory || !AVATAR_CONTENT_TYPES.contains(file.getType())) {
+            throw exception(FILE_AVATAR_NOT_EXISTS);
+        }
+        return file;
+    }
+
+    @Override
+    public byte[] getAvatarFileContent(Long id) throws Exception {
+        FileDO file = getAvatarFile(id);
+        return getFileContent(file.getConfigId(), file.getPath());
     }
 
     @VisibleForTesting

@@ -46,7 +46,7 @@ public class NotifyTemplateServiceImplTest extends BaseDbUnitTest {
     public void testCreateNotifyTemplate_success() {
         // 准备参数
         NotifyTemplateSaveReqVO reqVO = randomPojo(NotifyTemplateSaveReqVO.class,
-                o -> { o.setStatus(randomCommonStatus()); o.setSceneCode(null); })
+                o -> { o.setStatus(randomCommonStatus()); o.setSceneCode(null); o.setChannelCode("in_app"); })
                 .setId(null); // 防止 id 被赋值
 
         // 调用
@@ -68,6 +68,7 @@ public class NotifyTemplateServiceImplTest extends BaseDbUnitTest {
             o.setId(dbNotifyTemplate.getId()); // 设置更新的 ID
             o.setStatus(randomCommonStatus());
             o.setSceneCode(null);
+            o.setChannelCode("in_app");
         });
 
         // 调用

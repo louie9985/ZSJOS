@@ -1,7 +1,6 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.registration;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.*;
@@ -13,6 +12,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.io.IOException;
+import org.springframework.web.multipart.MultipartFile;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 
@@ -24,10 +25,15 @@ public class RegistrationController {
 
     @GetMapping("/pool-page")
     @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
-    public CommonResult<PageResult<RegistrationCaseRespVO>> getPoolPage(@Valid PageParam pageParam,
-                                                                         @RequestParam(required = false) String status,
-                                                                         @RequestParam(required = false) String keyword) {
-        return success(registrationService.getPoolPage(pageParam, status, keyword));
+    public CommonResult<PageResult<RegistrationCaseRespVO>> getPoolPage(@Valid RegistrationPoolPageReqVO reqVO) {
+        return success(registrationService.getPoolPage(reqVO));
+    }
+
+    @PostMapping("/pool/search-page")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
+    public CommonResult<PageResult<RegistrationCaseRespVO>> searchPoolPage(
+            @Valid @RequestBody RegistrationPoolPageReqVO reqVO) {
+        return success(registrationService.getPoolPage(reqVO));
     }
 
     @GetMapping("/{id}")
@@ -36,7 +42,15 @@ public class RegistrationController {
 
     @GetMapping("/study-planner-candidates")
     @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
-    public CommonResult<List<StudyPlannerSimpleRespVO>> candidates() { return success(registrationService.getStudyPlannerCandidates()); }
+    public CommonResult<List<StudyPlannerSimpleRespVO>> candidates() {
+        return success(registrationService.getStudyPlannerCandidates(SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/{id}/routes/{routeId}/candidates")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
+    public CommonResult<List<StudyPlannerSimpleRespVO>> routeCandidates(@PathVariable Long id, @PathVariable Long routeId) {
+        return success(registrationService.getRouteCandidates(id, routeId, SecurityFrameworkUtils.getLoginUserId()));
+    }
 
     @PutMapping("/{id}/items/{itemId}")
     @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
@@ -50,6 +64,32 @@ public class RegistrationController {
     public CommonResult<RegistrationCaseRespVO> updatePlanner(@PathVariable Long id,
                                                 @Valid @RequestBody RegistrationPlannerUpdateReqVO reqVO) {
         return success(registrationService.updateStudyPlanner(id, SecurityFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
+    @PutMapping("/{id}/routes")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
+    public CommonResult<RegistrationCaseRespVO> updateRoutes(@PathVariable Long id,
+                                                @Valid @RequestBody RegistrationRoutesUpdateReqVO reqVO) {
+        return success(registrationService.updateRoutes(id, SecurityFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
+    @PostMapping("/{id}/items/{itemId}/attachments")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
+    public CommonResult<RegistrationAttachmentUploadRespVO> uploadAttachment(
+            @PathVariable Long id, @PathVariable Long itemId,
+            @RequestParam Integer version, @NotBlankIdempotency @RequestParam String idempotencyKey,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        return success(registrationService.uploadAttachment(id, itemId, SecurityFrameworkUtils.getLoginUserId(),
+                version, idempotencyKey, file));
+    }
+
+    @DeleteMapping("/{id}/items/{itemId}/attachments/{attachmentId}")
+    @PreAuthorize("@ss.hasPermission('zsjos:registration:update')")
+    public CommonResult<RegistrationCaseRespVO> deleteAttachment(
+            @PathVariable Long id, @PathVariable Long itemId, @PathVariable Long attachmentId,
+            @Valid @RequestBody RegistrationAttachmentDeleteReqVO reqVO) {
+        return success(registrationService.deleteAttachment(id, itemId, attachmentId,
+                SecurityFrameworkUtils.getLoginUserId(), reqVO));
     }
 
     @PostMapping("/{id}/complete")

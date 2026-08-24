@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.LinkedHashSet;
+import java.util.Collection;
 
 @Component
 public class NotifySceneRegistry {
@@ -36,5 +39,19 @@ public class NotifySceneRegistry {
 
     public NotifySceneProvider getProvider(String sceneCode) {
         return providers.get(sceneCode);
+    }
+
+    /** Returns template parameters that are not part of the current scene contract. */
+    public Set<String> findInvalidTemplateParams(String sceneCode, Collection<String> params) {
+        NotifySceneRespDTO scene = getScene(sceneCode);
+        Set<String> available = new LinkedHashSet<>();
+        if (scene != null && scene.getVariables() != null) {
+            scene.getVariables().forEach(variable -> available.add(variable.getKey()));
+        }
+        Set<String> invalid = new LinkedHashSet<>();
+        if (params != null) {
+            params.stream().filter(param -> !available.contains(param)).forEach(invalid::add);
+        }
+        return invalid;
     }
 }

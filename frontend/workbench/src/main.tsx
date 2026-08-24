@@ -31,6 +31,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from
 import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, type PermissionInfo } from './services/api'
 import {
   buildTwoLevelNavigation,
+  canOpenLeadDetailDeepLink,
   filterRenderableMenus,
   findMenuByPath,
   findPageByPath,
@@ -48,9 +49,10 @@ import { RealtimeProvider } from './components/RealtimeProvider'
 import { NotifyMessageProvider } from './components/NotifyMessageProvider'
 import MessageCenter from './components/MessageCenter'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
+import { SalesDispatchStatusProvider } from './components/SalesDispatchStatusProvider'
+import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
 import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import ThemeProvider from './components/Theme/ThemeProvider'
-import ThemeSwitcher from './components/Theme/ThemeSwitcher'
 import SettingsDrawer from './components/SettingsDrawer'
 import TabBar from './components/TabBar'
 import { useTheme } from './components/Theme/ThemeContext'
@@ -60,6 +62,7 @@ import RouteHost from './layouts/RouteHost'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
+import LeadManagementPage from './pages/LeadManagementPage'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from './services/impersonation'
 // 聚合样式表；内部 @import 顺序即层叠优先级，tokens.css 在最前
 import './styles/index.css'
@@ -150,9 +153,12 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   )
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
+  const leadDetailDeepLink = useMemo(() => {
+    return canOpenLeadDetailDeepLink(location.pathname, location.search, info.permissions || [])
+  }, [info.permissions, location.pathname, location.search])
   const inaccessiblePathFallback = useMemo(
-    () => getInaccessiblePathFallback(navigation, location.pathname, menus),
-    [navigation, location.pathname, menus]
+    () => leadDetailDeepLink ? undefined : getInaccessiblePathFallback(navigation, location.pathname, menus),
+    [leadDetailDeepLink, navigation, location.pathname, menus]
   )
   const activePrimary = useMemo(
     () => findPrimaryByPath(navigation, location.pathname),
@@ -385,12 +391,13 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
           />
         )}
         <Space size={8} className="header-actions">
-          <SalesDispatchStatusControl canAccept={(info.permissions || []).includes('zsjos:lead:accept')}/>
-          <span className="theme-action"><ThemeSwitcher/></span>
+          <SalesDispatchStatusControl/>
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
           <MessageCenter/>
-          <Tooltip title="待接客资"><Badge count={pendingAssignmentCount}><Button type="text" aria-label="待接客资" icon={<InboxOutlined/>} onClick={() => setOpenAssignmentRequest(value => value + 1)}/></Badge></Tooltip>
+          {(info.permissions || []).includes('zsjos:lead:accept') && (
+            <Tooltip title="待接客资"><Badge count={pendingAssignmentCount}><Button type="text" aria-label="待接客资" icon={<InboxOutlined/>} onClick={() => setOpenAssignmentRequest(value => value + 1)}/></Badge></Tooltip>
+          )}
           <Dropdown menu={{ items: [
             { key: 'user', label: info.user?.nickname || info.user?.username || '当前用户', disabled: true },
             { type: 'divider' },
@@ -409,11 +416,17 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         banner
         message={`只读借视图：当前以 ${impersonation.targetNameSnapshot} 的数据权限查看，所有 ZSJOS 写操作均会被服务端拒绝。`}
       />}
+      <SalesDispatchStatusAlert />
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle}/>}
       <Layout className="content-layout">
         <Content>
           <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
+            <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
+              ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
+              : leadDetailDeepLink
+                ? <LeadManagementPage permissions={info.permissions || []} detailOnly/>
+                : <Result status="403" title="无权查看客资详情"/>}/>
             <Route path={APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS} element={<Navigate to={APP_ROUTES.SALES_ORDER_APPROVALS} replace/>}/>
             <Route path="/" element={initialTarget ? <Navigate to={initialTarget} replace/> : <NoAccessibleMenu hasMenus={navigation.length > 0}/>}/>
             <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
@@ -425,12 +438,12 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   </Layout>
   )
 
-  return <RealtimeProvider><NotifyMessageProvider>
+  return <RealtimeProvider><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
     {showWatermark
       ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
       : <div className="crm-watermark-wrapper">{shellContent}</div>
     }
-  </NotifyMessageProvider></RealtimeProvider>
+  </NotifyMessageProvider></SalesDispatchStatusProvider></RealtimeProvider>
 }
 
 function Root() {

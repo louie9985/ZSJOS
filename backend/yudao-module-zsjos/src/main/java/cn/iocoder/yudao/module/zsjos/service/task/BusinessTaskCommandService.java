@@ -7,6 +7,12 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.BUSINESS_TASK_COMPLETE_FORBIDDEN;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.BUSINESS_TASK_NOT_EXISTS;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ASSIGNEE_TYPE_USER;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_STATUS_PENDING;
@@ -69,6 +75,21 @@ public class BusinessTaskCommandService {
 
     public BusinessTaskDO getByIdempotencyKey(String idempotencyKey) {
         return taskMapper.selectByIdempotencyKey(idempotencyKey);
+    }
+
+    public int reassignPending(Collection<String> taskTypes, Long bizId, Long assigneeId) {
+        return taskMapper.reassignPending(taskTypes, bizId, assigneeId);
+    }
+
+    public boolean completeBirthdayCare(Long taskId, Long userId, LocalDateTime completedAt) {
+        BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
+        if (task == null) throw exception(BUSINESS_TASK_NOT_EXISTS);
+        if (!"EMPLOYEE_BIRTHDAY_CARE".equals(task.getTaskType()) || !userId.equals(task.getAssigneeId())) {
+            throw exception(BUSINESS_TASK_COMPLETE_FORBIDDEN);
+        }
+        if ("completed".equals(task.getStatus())) return true;
+        if (!"pending".equals(task.getStatus())) throw exception(BUSINESS_TASK_COMPLETE_FORBIDDEN);
+        return taskMapper.completeBirthdayCare(taskId, userId, completedAt) > 0;
     }
 
 }

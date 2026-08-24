@@ -16,12 +16,16 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.advancedfilter.vo.Advanced
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
@@ -35,6 +39,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
@@ -82,10 +87,16 @@ class LeadManagementServiceImplTest {
     private AdvancedFilterService advancedFilterService;
     @Mock
     private SalesOrderObjectPermissionService salesOrderPermissionService;
+    @Mock
+    private PartnerMapper partnerMapper;
+    @Mock
+    private BusinessTaskMapper businessTaskMapper;
 
     @BeforeEach
     void setUp() {
         org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null);
+        org.mockito.Mockito.lenient().when(securityFrameworkService.hasPermission(
+                org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
         org.mockito.Mockito.lenient().when(agingPoolService.canOperate(
                         org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.nullable(Long.class),
                         org.mockito.ArgumentMatchers.anyLong()))
@@ -137,7 +148,7 @@ class LeadManagementServiceImplTest {
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, user));
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
-        when(leadObjectPermissionService.canRead(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
 
         LeadManagementRespVO result = service.getLead(1L, 10L);
 
@@ -146,16 +157,46 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void detailUsesEffectiveOpportunityTimeForConversionAndOrderSubmissionForDealEntry() {
+        LeadDO lead = actionLead("valid", "owned", true);
+        LocalDateTime legacyConversionTime = LocalDateTime.of(2026, 8, 17, 23, 10);
+        lead.setConvertedAt(legacyConversionTime);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L);
+        opportunity.setStatus("won");
+        opportunity.setWonAt(LocalDateTime.of(2026, 8, 18, 9, 30));
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(40L);
+        order.setOrderType("first_purchase");
+        order.setStatus("effective");
+        order.setSubmittedAt(LocalDateTime.of(2026, 8, 18, 8, 45));
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(salesOrderMapper.selectLatestFirstPurchaseByLeadId(1L)).thenReturn(order);
+
+        LeadManagementRespVO result = service.getLead(1L, 10L);
+
+        assertEquals(opportunity.getWonAt(), result.getConvertedAt());
+        assertEquals(order.getSubmittedAt(), result.getSalesOrderSubmittedAt());
+        assertEquals(opportunity.getWonAt(), result.getOpportunity().getWonAt());
+    }
+
+    @Test
     void detailBlindsSubmitterAndOwnerIdentitiesForOrdinaryCounterpart() {
         LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setDispatchMode("auto");
         AdminUserRespDTO submitter = user(10L, 0); submitter.setNickname("提交销售");
         AdminUserRespDTO owner = user(20L, 0); owner.setNickname("负责销售");
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter, 20L, owner));
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
-        when(leadObjectPermissionService.canRead(lead, 10L)).thenReturn(true);
-        when(leadObjectPermissionService.canViewUnmaskedIdentity(10L, 20L)).thenReturn(false);
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.canViewUnmaskedIdentity(10L, lead)).thenReturn(false);
 
         LeadManagementRespVO result = service.getLead(1L, 10L);
 
@@ -163,6 +204,30 @@ class LeadManagementServiceImplTest {
         assertEquals(10L, result.getSourceUserId());
         assertNotEquals("负责销售", result.getOwnerUserName());
         assertEquals(null, result.getOwnerUserId());
+    }
+
+    @Test
+    void detailKeepsBothIdentitiesVisibleForSpecifiedAssignmentCounterparts() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setDispatchMode("specified");
+        AdminUserRespDTO submitter = user(10L, 0); submitter.setNickname("新媒体提交人");
+        AdminUserRespDTO owner = user(20L, 0); owner.setNickname("指定销售");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter, 20L, owner));
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 20L)).thenReturn(true);
+
+        LeadManagementRespVO submitterView = service.getLead(1L, 10L);
+        LeadManagementRespVO ownerView = service.getLead(1L, 20L);
+
+        assertEquals("指定销售", submitterView.getOwnerUserName());
+        assertEquals(20L, submitterView.getOwnerUserId());
+        assertEquals("新媒体提交人", ownerView.getSourceUserName());
+        assertEquals(10L, ownerView.getSourceUserId());
+        assertEquals("full", submitterView.getIdentityMaskMode());
+        assertEquals("full", ownerView.getIdentityMaskMode());
     }
 
     @Test
@@ -174,14 +239,137 @@ class LeadManagementServiceImplTest {
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, submitter, 20L, owner));
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
-        when(leadObjectPermissionService.canRead(lead, 30L)).thenReturn(true);
-        when(leadObjectPermissionService.canViewUnmaskedIdentity(30L, 20L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+        when(leadObjectPermissionService.canViewUnmaskedIdentity(30L, lead)).thenReturn(true);
 
         LeadManagementRespVO result = service.getLead(1L, 30L);
 
         assertEquals("提交销售", result.getSourceUserName());
         assertEquals("负责销售", result.getOwnerUserName());
         assertEquals(20L, result.getOwnerUserId());
+    }
+
+    @Test
+    void detailProjectsAppealTabForSubmitterWithoutAppealReadPermission() {
+        LeadDO lead = actionLead("invalid", "owned", false);
+        lead.setNextFollowUpAt(LocalDateTime.of(2026, 8, 20, 10, 30));
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        LeadManagementRespVO result = service.getLead(1L, 10L);
+
+        assertEquals(List.of("overview", "appeals"), result.getVisibleTabs());
+        assertEquals(null, result.getNextFollowUpAt());
+    }
+
+    @Test
+    void detailMasksPartnerNameForOwnerButNeverExposesPartnerInternalId() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setSourceType("partner");
+        lead.setPartnerId(80L);
+        PartnerDO partner = new PartnerDO();
+        partner.setId(80L);
+        partner.setName("张三");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 20L)).thenReturn(true);
+        when(leadObjectPermissionService.canViewUnmaskedIdentity(20L, lead)).thenReturn(false);
+        when(partnerMapper.selectById(80L)).thenReturn(partner);
+
+        LeadManagementRespVO result = service.getLead(1L, 20L);
+
+        assertEquals("兼职提交", result.getSourceLabel());
+        assertNotEquals("张三", result.getSourceUserName());
+        assertEquals(null, result.getSourceUserId());
+        assertEquals("counterparty_masked", result.getIdentityMaskMode());
+    }
+
+    @Test
+    void detailShowsFullPartnerNameToOtherBusinessReaderAndProjectsConfiguredTabs() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        LocalDateTime nextFollowUpAt = LocalDateTime.of(2026, 8, 20, 10, 30);
+        lead.setNextFollowUpAt(nextFollowUpAt);
+        lead.setSourceType("partner");
+        lead.setPartnerId(80L);
+        PartnerDO partner = new PartnerDO();
+        partner.setId(80L);
+        partner.setName("张三");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+        when(partnerMapper.selectById(80L)).thenReturn(partner);
+        when(securityFrameworkService.hasPermission("zsjos:lead-detail:follow-up-read")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead-detail:order-read")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead-detail:flow-read")).thenReturn(true);
+        BusinessTaskDO pendingReminder = new BusinessTaskDO();
+        pendingReminder.setDueAt(nextFollowUpAt);
+        when(businessTaskMapper.selectPendingFollowUpReminderByLeadId(1L)).thenReturn(pendingReminder);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals("张三", result.getSourceUserName());
+        assertEquals(null, result.getSourceUserId());
+        assertEquals("full", result.getIdentityMaskMode());
+        assertEquals(List.of("overview", "follow-ups", "orders", "flow-history"), result.getVisibleTabs());
+        assertEquals(nextFollowUpAt, result.getNextFollowUpAt());
+    }
+
+    @Test
+    void detailHidesNextFollowUpWhenReminderTaskWasCancelled() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setNextFollowUpAt(LocalDateTime.of(2026, 8, 20, 10, 30));
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:lead-detail:follow-up-read")).thenReturn(true);
+        when(businessTaskMapper.selectPendingFollowUpReminderByLeadId(1L)).thenReturn(null);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals(null, result.getNextFollowUpAt());
+    }
+
+    @Test
+    void detailShowsSelectedProviderForSalesSelfSourcedLead() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setSourceType("sales_self_sourced");
+        lead.setSourceProviderUserId(10L);
+        lead.setSourceProviderRecorded(true);
+        AdminUserRespDTO provider = user(10L, 0);
+        provider.setNickname("新媒体提供方");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(10L, provider));
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals("销售自拓录", result.getSourceLabel());
+        assertEquals("新媒体提供方", result.getSourceUserName());
+    }
+
+    @Test
+    void detailHidesSubmitterForNewSalesSelfSourcedLeadWithoutProvider() {
+        LeadDO lead = actionLead("submitted", "owned", true);
+        lead.setSourceType("sales_self_sourced");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals(null, result.getSourceUserName());
     }
 
     @Test
@@ -232,7 +420,7 @@ class LeadManagementServiceImplTest {
     void detailNeverProjectsWriteActionsForNonOwnerViewer() {
         LeadDO lead = actionLead("submitted", "owned", true);
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(leadObjectPermissionService.canRead(lead, 99L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 99L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
@@ -251,7 +439,7 @@ class LeadManagementServiceImplTest {
         when(agingPoolService.getActiveCycle(1L)).thenReturn(cycle);
         when(agingPoolService.canOperate(1L, 20L, 30L)).thenReturn(true);
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(leadObjectPermissionService.canRead(lead, 30L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
@@ -270,7 +458,7 @@ class LeadManagementServiceImplTest {
     @Test
     void detailRejectsUnrelatedUserWithoutQueryAll() {
         when(leadMapper.selectById(1L)).thenReturn(lead(1L, 10L, 20L));
-        when(leadObjectPermissionService.canRead(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(30L))).thenReturn(false);
+        when(leadObjectPermissionService.canReadDetail(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(30L))).thenReturn(false);
 
         ServiceException error = assertThrows(ServiceException.class, () -> service.getLead(1L, 30L));
 
@@ -285,12 +473,29 @@ class LeadManagementServiceImplTest {
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
-        when(leadObjectPermissionService.canRead(lead, 30L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
 
         LeadManagementRespVO result = service.getLead(1L, 30L);
 
         assertEquals(1L, result.getId());
         assertEquals(List.of(), result.getRelationTypes());
+    }
+
+    @Test
+    void detailMarksStudentServiceOwnerRelationship() {
+        LeadDO lead = lead(1L, 10L, 20L);
+        lead.setPersonId(40L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 30L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadStudentSalesHistory(lead, 30L)).thenReturn(true);
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+
+        LeadManagementRespVO result = service.getLead(1L, 30L);
+
+        assertEquals(List.of("student_service_owner"), result.getRelationTypes());
+        assertEquals(List.of(), result.getAvailableActions());
     }
 
     @Test
@@ -309,7 +514,7 @@ class LeadManagementServiceImplTest {
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of(attachment));
         when(fileApi.presignGetUrls(List.of(40L), 600)).thenReturn(Map.of(40L, "https://signed.test/image"));
-        when(leadObjectPermissionService.canRead(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
 
         LeadManagementRespVO result = service.getLead(1L, 10L);
 
@@ -327,7 +532,7 @@ class LeadManagementServiceImplTest {
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(fileApi.presignGetUrls(List.of(41L), 600)).thenReturn(Map.of(41L, "https://signed.test/evidence"));
-        when(leadObjectPermissionService.canRead(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
 
         LeadManagementRespVO result = service.getLead(1L, 10L);
 
@@ -393,23 +598,15 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
-    void pageUsesOwnerAudienceEvenForQueryAllUser() {
+    void pageUsesAllScopeForQueryAllUser() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
-        reqVO.setAudience("owner");
-        reqVO.setInboxGroup("all");
-        LeadInboxFilterConfigVO config = filterConfig();
-        when(securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)).thenReturn(true);
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
-        when(leadObjectPermissionService.getRelatedAndManagedUserIds(99L)).thenReturn(Set.of(99L));
-        when(inboxFilterConfigService.getPublishedConfig("owner")).thenReturn(config);
-        when(inboxFilterConfigService.resolveQuery(config, "all", null))
-                .thenReturn(new LeadInboxFilterQuery(java.util.Set.of(), java.util.Set.of(), false));
-        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(99L), false,
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(), true,
                 List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
 
         service.getLeadPage(reqVO, 99L);
 
-        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(99L), false,
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(), true,
                 List.of(), List.of(), List.of(), false, null);
     }
 
@@ -550,7 +747,7 @@ class LeadManagementServiceImplTest {
     private LeadManagementRespVO assertActions(LeadDO lead, OpportunityDO opportunity,
                                                 SalesOrderDO activeOrder, String... expected) {
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(leadObjectPermissionService.canRead(lead, 20L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 20L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
@@ -571,7 +768,7 @@ class LeadManagementServiceImplTest {
     private void assertProjection(LeadDO lead, OpportunityDO opportunity, String qualification,
                                   String followUp, String operational) {
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(leadObjectPermissionService.canRead(lead, 20L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 20L)).thenReturn(true);
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
         when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());

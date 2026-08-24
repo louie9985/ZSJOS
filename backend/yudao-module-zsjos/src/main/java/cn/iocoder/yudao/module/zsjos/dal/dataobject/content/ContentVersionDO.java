@@ -1,0 +1,31 @@
+package cn.iocoder.yudao.module.zsjos.dal.dataobject.content;
+
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
+import com.baomidou.mybatisplus.annotation.KeySequence;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+import java.time.LocalDateTime;
+
+@TableName("zsjos_content_version")
+@KeySequence("zsjos_content_version_seq")
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class ContentVersionDO extends TenantBaseDO {
+    @TableId private Long id;
+    private Long contentId;
+    private Integer versionNo;
+    private String stage;
+    private String materialRefsJson;
+    private String deliverableUrl;
+    private String scriptText;
+    private Long submittedByUserId;
+    private LocalDateTime submittedAt;
+    private String reviewDecision;
+    private String reviewComment;
+    private Long reviewedByUserId;
+    private LocalDateTime reviewedAt;
+    private String idempotencyKey;
+}

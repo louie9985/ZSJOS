@@ -9,19 +9,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SubordinateLeadReadPermissionContractTest {
 
     @Test
-    void subordinateQueryPermissionIsAcceptedByEveryReadEndpoint() throws Exception {
-        assertSubordinatePermission(LeadManagementController.class, "getLead", Long.class);
-        assertSubordinatePermission(LeadFollowUpController.class, "getPage", Long.class, int.class, int.class);
-        assertSubordinatePermission(LeadAppealController.class, "getList", Long.class);
-        assertSubordinatePermission(LeadComplaintController.class, "leadList", Long.class);
-        assertSubordinatePermission(SalesOrderController.class, "getCustomerOrders", Long.class);
-        assertSubordinatePermission(SalesOrderController.class, "getCustomerOrder", Long.class, Long.class);
+    void historyEndpointsUseDedicatedFeaturePermissions() throws Exception {
+        assertPermission(LeadManagementController.class, "getLead", "zsjos:subordinate-sales:query", Long.class);
+        assertPermission(LeadFollowUpController.class, "getPage", "zsjos:lead-detail:follow-up-read",
+                Long.class, int.class, int.class);
+        assertPermission(LeadAppealController.class, "getList", "zsjos:lead-detail:appeal-read", Long.class);
+        assertPermission(LeadComplaintController.class, "leadList", "zsjos:lead-detail:complaint-read", Long.class);
+        assertPermission(SalesOrderController.class, "getCustomerOrders", "zsjos:lead-detail:order-read", Long.class);
+        assertPermission(SalesOrderController.class, "getCustomerOrder", "zsjos:lead-detail:order-read",
+                Long.class, Long.class);
     }
 
-    private static void assertSubordinatePermission(Class<?> type, String method, Class<?>... parameterTypes)
-            throws Exception {
+    private static void assertPermission(Class<?> type, String method, String permission,
+                                         Class<?>... parameterTypes) throws Exception {
         PreAuthorize authorization = type.getMethod(method, parameterTypes).getAnnotation(PreAuthorize.class);
-        assertTrue(authorization.value().contains("zsjos:subordinate-sales:query"),
-                () -> type.getSimpleName() + "." + method + " must accept subordinate-sales query permission");
+        assertTrue(authorization.value().contains(permission),
+                () -> type.getSimpleName() + "." + method + " must require " + permission);
     }
 }

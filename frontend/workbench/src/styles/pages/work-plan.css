@@ -1,8 +1,18 @@
 /* Work plan page: list pane, detail pane, plan/task forms. */
 
 .work-plan-page {
+  display: flex;
+  max-width: none;
   height: 100%;
   min-height: 0;
+  padding: var(--crm-page-pad);
+  flex-direction: column;
+}
+
+.work-plan-page-content {
+  width: 100%;
+  min-height: 0;
+  flex: 1;
 }
 
 /* 高度不再用 calc(100% - 48px)：那个 48px 是为已删除的 .work-plan-page-header
@@ -29,6 +39,10 @@
   padding-top: 8px;
 }
 
+.work-plan-list-item {
+  cursor: pointer;
+}
+
 .work-plan-detail-pane {
   min-width: 0;
   min-height: 0;
@@ -37,6 +51,22 @@
   border: 1px solid var(--crm-border);
   border-radius: 6px;
   background: var(--crm-bg-container);
+}
+
+.work-plan-summary-card {
+  padding: var(--crm-card-pad);
+}
+
+.work-plan-summary-card h4 {
+  margin-top: 0;
+}
+
+.work-plan-detail-actions {
+  margin: var(--crm-sp-4) 0;
+}
+
+.work-plan-task-list {
+  min-width: 0;
 }
 
 .work-plan-form-grid {

@@ -8,14 +8,6 @@
           <div class="mt-1 text-3xl font-semibold">{{ data.totalCount ?? 0 }}</div>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="12">
-        <el-card shadow="never">
-          <div class="text-sm text-gray-500">资产原值合计</div>
-          <div class="mt-1 text-3xl font-semibold">
-            ¥{{ formatMoney(data.totalOriginalValue) }}
-          </div>
-        </el-card>
-      </el-col>
     </el-row>
 
     <el-row :gutter="16">
@@ -46,16 +38,6 @@ defineOptions({ name: 'EamStatistics' })
 
 const loading = ref(false)
 const data = ref<Partial<StatisticsApi.StatisticsVO>>({})
-
-const formatMoney = (value?: number) => {
-  if (value == null) {
-    return '0.00'
-  }
-  return Number(value).toLocaleString('zh-CN', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })
-}
 
 const getData = async () => {
   loading.value = true

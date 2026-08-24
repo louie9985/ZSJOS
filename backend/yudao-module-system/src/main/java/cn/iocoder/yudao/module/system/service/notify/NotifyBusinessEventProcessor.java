@@ -78,6 +78,8 @@ public class NotifyBusinessEventProcessor {
                 || template.getChannelCode() != null && !channelCode.equals(template.getChannelCode())) {
             return NotifySendResult.failure("NOTIFY_TEMPLATE_INVALID", "通知模板与规则不匹配", false);
         }
+        NotifySendResult contractFailure = validateTemplateContract(event, template);
+        if (contractFailure != null) return contractFailure;
         Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
         rule.getSpecifiedUserIds().stream().map(NotifyRecipientDTO::admin).forEach(recipients::add);
         recipients.addAll(provider.resolveRecipients(event, new LinkedHashSet<>(rule.getRecipientRoles())));
@@ -140,6 +142,11 @@ public class NotifyBusinessEventProcessor {
                         && !websocketUsesInAppTemplate)) {
                     continue;
                 }
+                if (hasInvalidTemplateContract(event, template)) {
+                    log.error("[processInTenant][scene({}) template({}) violates scene variable contract]",
+                            event.getSceneCode(), template.getCode());
+                    continue;
+                }
                 for (NotifyRecipientDTO recipient : recipients) {
                     // WebSocket is bound to the durable in-app message lifecycle.
                     // The AFTER_COMMIT listener pushes it when the recipient is online.
@@ -154,6 +161,25 @@ public class NotifyBusinessEventProcessor {
                         event.getSceneCode(), rule.getId(), exception);
             }
         }
+    }
+
+    private NotifySendResult validateTemplateContract(NotifyBusinessEvent event, NotifyTemplateDO template) {
+        Set<String> invalid = invalidTemplateParams(event, template);
+        if (invalid.isEmpty()) return null;
+        return NotifySendResult.failure("NOTIFY_TEMPLATE_PARAM_INVALID",
+                "通知模板包含不属于业务场景的变量", false);
+    }
+
+    private boolean hasInvalidTemplateContract(NotifyBusinessEvent event, NotifyTemplateDO template) {
+        return !invalidTemplateParams(event, template).isEmpty();
+    }
+
+    private Set<String> invalidTemplateParams(NotifyBusinessEvent event, NotifyTemplateDO template) {
+        List<String> params = new java.util.ArrayList<>(template.getParams() == null
+                ? List.of() : template.getParams());
+        params.addAll(notifyTemplateService.parseTemplateParams(template.getTitle(), template.getSummary(),
+                template.getContent()));
+        return sceneRegistry.findInvalidTemplateParams(event.getSceneCode(), params);
     }
 
     private void sendExternalBestEffort(NotifyBusinessEvent event, NotifySceneProvider provider,

@@ -3,8 +3,14 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
+import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
@@ -34,7 +40,12 @@ public class LeadObjectPermissionService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
     @Resource private LeadAgingPoolCycleMapper agingPoolCycleMapper;
-    @Resource private LeadAssignmentService leadAssignmentService;
+    @Resource private ServiceRelationMapper serviceRelationMapper;
+    @Resource private LeadPublicSeaRecordMapper publicSeaRecordMapper;
+    @Resource private SalesOrderMapper salesOrderMapper;
+    @Resource private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
+    @Resource private LeadAgingPoolService leadAgingPoolService;
+    @Resource private MediaAccountMapper mediaAccountMapper;
 
     public void check(Long leadId, String action) {
         LeadDO lead = leadMapper.selectById(leadId);
@@ -43,12 +54,13 @@ public class LeadObjectPermissionService {
         }
         Long userId = getLoginUserId();
         boolean allowed = switch (action) {
-            case "read", "follow-up-read" -> canRead(lead, userId) || canReadAgingPool(lead.getId(), userId);
+            case "read", "follow-up-read", "flow-read" -> canReadDetail(lead, userId);
             case "pending-read", "accept", "reject" -> ASSIGNMENT_PENDING.equals(lead.getAssignmentStatus())
                     && Objects.equals(userId, lead.getPendingAssigneeUserId());
             case "owner-read" -> Objects.equals(userId, lead.getOwnerUserId());
             case "owner-or-manager-read" -> canReadAsOwnerOrManager(lead, userId);
-            case "follow-up-create" -> Objects.equals(userId, effectiveSalesUserId(lead))
+            case "sales-history-read" -> canReadDetail(lead, userId);
+            case "follow-up-create" -> canOperateAsSales(lead, userId)
                     && (STATUS_INVALID.equals(lead.getStatus())
                     || STATUS_VALID.equals(lead.getStatus())
                     || ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && STATUS_SUBMITTED.equals(lead.getStatus()));
@@ -56,7 +68,7 @@ public class LeadObjectPermissionService {
                     && Objects.equals(userId, lead.getOwnerUserId())
                     && (ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
                     || STATUS_VALID.equals(lead.getStatus()));
-            case "enter-deal" -> Objects.equals(userId, effectiveSalesUserId(lead));
+            case "enter-deal" -> canOperateAsSales(lead, userId);
             case "basic-info-update" -> agingPoolCycleMapper.selectActiveByLeadId(lead.getId()) == null
                     && Objects.equals(userId, lead.getOwnerUserId());
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
@@ -85,6 +97,36 @@ public class LeadObjectPermissionService {
         return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION);
     }
 
+    /**
+     * Unified Lead detail visibility. List scope remains owned by the individual business inboxes.
+     */
+    public boolean canReadDetail(LeadDO lead, Long userId) {
+        if (userId == null) return false;
+        if (hasQueryAll() || Objects.equals(userId, lead.getSourceUserId())
+                || Objects.equals(userId, lead.getOwnerUserId())
+                || managesUserDepartment(userId, lead.getOwnerUserId())
+                || securityFrameworkService.hasPermission("zsjos:lead:qualification:manage")
+                    && canManageQualificationException(lead, userId)
+                || canReadAgingPool(lead.getId(), userId)
+                || canReadManualPublicSea(lead, userId) || canReadStudentSalesHistory(lead, userId)
+                || canReadMediaStudentLead(lead, userId)) {
+            return true;
+        }
+        return salesOrderMapper.selectByLeadId(lead.getId()).stream()
+                .anyMatch(order -> salesOrderObjectPermissionService.canRead(order, userId));
+    }
+
+    public boolean canReadStudentSalesHistory(LeadDO lead, Long userId) {
+        long tenantId = TenantContextHolder.getRequiredTenantId();
+        return serviceRelationMapper.countActiveByOwnerAndLead(userId, lead.getId(), tenantId) > 0
+                || serviceRelationMapper.countActiveByParticipantAndLead(userId, lead.getId(), tenantId) > 0;
+    }
+
+    public boolean canReadMediaStudentLead(LeadDO lead, Long userId) {
+        long tenantId = TenantContextHolder.getRequiredTenantId();
+        return mediaAccountMapper.countParticipantByLead(userId, lead.getId(), tenantId) > 0;
+    }
+
     public boolean canReadAsOwnerOrManager(LeadDO lead, Long userId) {
         return Objects.equals(userId, lead.getOwnerUserId())
                 || hasQueryAll()
@@ -99,31 +141,30 @@ public class LeadObjectPermissionService {
     }
 
     public boolean canViewUnmaskedIdentity(Long userId, LeadDO lead) {
-        return hasQueryAll() || managesUserDepartment(userId, lead.getSourceUserId())
-                || managesUserDepartment(userId, lead.getOwnerUserId());
+        return canViewUnmaskedIdentity(userId, lead.getOwnerUserId());
     }
 
-    private Long effectiveSalesUserId(LeadDO lead) {
+    private boolean canOperateAsSales(LeadDO lead, Long userId) {
         LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
-        if (cycle == null) return lead.getOwnerUserId();
-        return Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())
-                ? cycle.getCollaboratorUserId() : null;
+        if (cycle != null) {
+            return Set.of(AGING_POOL_ASSIGNED, AGING_POOL_DEAL_PENDING).contains(cycle.getStatus())
+                    && (Objects.equals(userId, lead.getOwnerUserId())
+                    || Objects.equals(userId, cycle.getCollaboratorUserId()));
+        }
+        var manual = publicSeaRecordMapper.selectByLeadId(lead.getId());
+        return Objects.equals(userId, lead.getOwnerUserId()) || manual != null
+                && Objects.equals(userId, manual.getCollaboratorUserId());
     }
 
     private boolean canReadAgingPool(Long leadId, Long userId) {
-        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(leadId);
-        if (cycle == null) return false;
-        if (securityFrameworkService.hasPermission(PERMISSION_AGING_POOL_MANAGE_ALL)
-                || Objects.equals(userId, cycle.getOriginalOwnerUserId())
-                || Objects.equals(userId, cycle.getCollaboratorUserId())) return true;
-        AdminUserRespDTO user = adminUserApi.getUser(userId);
-        boolean eligibleSales = leadAssignmentService.getEligibleSalesUsers().stream()
-                .anyMatch(candidate -> Objects.equals(candidate.getId(), userId));
-        AdminUserRespDTO owner = adminUserApi.getUser(cycle.getOriginalOwnerUserId());
-        Long ownerDeptId = owner == null ? null : owner.getDeptId();
-        if (user != null && eligibleSales && Objects.equals(user.getDeptId(), ownerDeptId)) return true;
-        DeptRespDTO dept = ownerDeptId == null ? null : deptApi.getDept(ownerDeptId);
-        return dept != null && Objects.equals(dept.getLeaderUserId(), userId);
+        return leadAgingPoolService.canRead(leadId, userId);
+    }
+
+    private boolean canReadManualPublicSea(LeadDO lead, Long userId) {
+        var record = publicSeaRecordMapper.selectByLeadId(lead.getId());
+        return record != null && (Objects.equals(userId, record.getOwnerUserId())
+                || Objects.equals(userId, record.getCollaboratorUserId())
+                || managesUserDepartment(userId, record.getOwnerUserId()));
     }
 
     private boolean managesUserDepartment(Long userId, Long relatedUserId) {

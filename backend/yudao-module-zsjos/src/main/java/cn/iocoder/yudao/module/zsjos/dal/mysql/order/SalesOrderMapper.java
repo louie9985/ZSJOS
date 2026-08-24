@@ -18,10 +18,19 @@ import java.util.Collection;
 import java.util.List;
 import java.time.LocalDateTime;
 
+import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ORDER_TYPE_FIRST_PURCHASE;
+
 import static cn.hutool.core.util.StrUtil.isNotBlank;
 
 @Mapper
 public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
+    default SalesOrderDO selectLatestFirstPurchaseByLeadId(Long leadId) {
+        return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
+                .eq(SalesOrderDO::getOrderType, ORDER_TYPE_FIRST_PURCHASE)
+                .orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId)
+                .last("LIMIT 1"));
+    }
+
     default SalesOrderDO selectActiveByLeadId(Long leadId, Collection<String> statuses) {
         return selectOne(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
                 .in(SalesOrderDO::getStatus, statuses).orderByDesc(SalesOrderDO::getId).last("LIMIT 1"));
@@ -70,11 +79,15 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
         if (matchedOrderIds != null) {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
         }
-        query.orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId);
+        query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
         return selectPage(reqVO, query);
     }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
         return selectMyPage(userId, reqVO, null);
+    }
+    default List<SalesOrderDO> selectByLeadId(Long leadId) {
+        return selectList(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)
+                .orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId));
     }
     default List<SalesOrderDO> selectMyCursor(Long userId, String status, String keyword, List<Long> matchedOrderIds,
                                                LocalDateTime cursorTime, Long cursorId, int limit) {
@@ -90,10 +103,10 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
             if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L); else query.in(SalesOrderDO::getId, matchedOrderIds);
         }
         if (cursorTime != null && cursorId != null) {
-            query.and(wrapper -> wrapper.lt(SalesOrderDO::getSubmittedAt, cursorTime)
-                    .or(nested -> nested.eq(SalesOrderDO::getSubmittedAt, cursorTime).lt(SalesOrderDO::getId, cursorId)));
+            query.and(wrapper -> wrapper.lt(SalesOrderDO::getUpdateTime, cursorTime)
+                    .or(nested -> nested.eq(SalesOrderDO::getUpdateTime, cursorTime).lt(SalesOrderDO::getId, cursorId)));
         }
-        return selectList(query.orderByDesc(SalesOrderDO::getSubmittedAt).orderByDesc(SalesOrderDO::getId)
+        return selectList(query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId)
                 .last("LIMIT " + limit));
     }
     default PageResult<SalesOrderDO> selectFinanceExportPage(FinanceOrderExportReqVO reqVO,

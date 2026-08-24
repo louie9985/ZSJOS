@@ -22,6 +22,9 @@ public class LeadDO extends TenantBaseDO {
     private String submittedWechatId;
     private String sourceType;
     private Long sourceUserId;
+    /** 销售自拓时明确关联的新媒体提供方；为空表示未关联。 */
+    private Long sourceProviderUserId;
+    private Boolean sourceProviderRecorded;
     private Long sourceDeptId;
     private Long partnerId;
     private String sourceChannelId;
@@ -30,6 +33,7 @@ public class LeadDO extends TenantBaseDO {
     private String cityCode;
     private String cityName;
     private String leadCategory;
+    private String leadCategoryLabelSnapshot;
     private String remark;
     private String status;
     private String assignmentStatus;

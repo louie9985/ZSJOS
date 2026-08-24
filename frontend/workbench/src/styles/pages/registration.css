@@ -45,12 +45,43 @@
   flex: none;
 }
 
+.registration-summary-card,
 .registration-checklist-card {
   padding: var(--crm-card-pad);
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-md);
   background: var(--crm-bg-container);
-  box-shadow: var(--crm-shadow);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.student-contact-history {
+  gap: var(--crm-sp-3) !important;
+}
+
+.student-contact-record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.student-contact-record-header,
+.student-contact-record-meta,
+.student-contact-record-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  flex-wrap: wrap;
+}
+
+.student-contact-record-meta,
+.student-contact-record-footer {
+  justify-content: flex-start;
+}
+
+.student-contact-record-remark {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
 }
 
 .registration-checklist-card h5 {
@@ -123,7 +154,104 @@
 }
 
 .registration-config-item {
-  padding: var(--crm-sp-2) 0;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 160px auto auto;
+  align-items: center;
+  gap: var(--crm-gap);
+  padding: var(--crm-sp-2);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-container);
+}
+
+.registration-config-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  margin-top: var(--crm-sp-4);
+}
+
+.registration-config-section-heading h5 {
+  margin: 0;
+}
+
+.registration-config-route {
+  grid-template-columns: minmax(220px, 1fr) 160px auto auto;
+}
+
+.registration-attachment-row {
+  align-items: flex-start;
+}
+
+.registration-attachment-list {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.registration-attachment-entry,
+.registration-attachment-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+.registration-attachment-entry {
+  justify-content: space-between;
+  padding: var(--crm-sp-1) var(--crm-sp-2);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.registration-attachment-item {
+  flex: 1;
+}
+
+.registration-attachment-thumbnail {
+  flex: none;
+  border-radius: var(--crm-radius-sm);
+  object-fit: cover;
+}
+
+.registration-attachment-icon {
+  flex: none;
+  color: var(--crm-color-primary);
+  font-size: var(--crm-font-display);
+}
+
+.registration-attachment-meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.registration-pdf-preview {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: min(68vh, 680px);
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.registration-pdf-preview iframe {
+  width: 100%;
+  height: min(68vh, 680px);
+  border: 0;
+  background: var(--crm-bg-container);
+}
+
+.registration-pdf-preview iframe.loading {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {
@@ -143,5 +271,10 @@
 
   .registration-checklist-row .ant-select {
     width: 100%;
+  }
+
+  .registration-config-item,
+  .registration-config-route {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

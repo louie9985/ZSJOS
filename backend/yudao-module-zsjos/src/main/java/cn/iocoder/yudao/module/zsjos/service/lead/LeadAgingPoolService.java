@@ -29,6 +29,8 @@ public interface LeadAgingPoolService {
     void handleOrderRejected(Long leadId, LocalDateTime now);
     void completeConversion(Long leadId, Long salesUserId, LocalDateTime now);
     void terminateForOwnerTransfer(Long leadId, Long newOwnerUserId, Long operatorUserId, LocalDateTime now);
+    void terminateForOwnerTransfer(Long leadId, Long newOwnerUserId, Long operatorUserId,
+                                   LocalDateTime now, String reason);
     boolean canRead(Long leadId, Long userId);
     boolean canRead(LeadAgingPoolCycleDO cycle, Long userId);
 }

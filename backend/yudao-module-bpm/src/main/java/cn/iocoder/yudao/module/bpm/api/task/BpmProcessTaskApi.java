@@ -42,4 +42,6 @@ public interface BpmProcessTaskApi {
 
     String createBeforeSignTask(Long userId, BpmTaskSignReqDTO reqDTO);
 
+    String createParallelSignTask(Long userId, BpmTaskSignReqDTO reqDTO);
+
 }

@@ -7,20 +7,24 @@ typed `NotifyBusinessEvent` values through `NotifyBusinessEventApi`. Administrat
 tenant rules against that catalog; arbitrary request interception and executable expressions are
 not supported.
 
-The ZSJOS catalog contains 20 lead scenes: created/activated, assigned/reassigned,
-accepted/rejected, acceptance expired, public-pool entry, claimed, administrator transfer,
-follow-up recorded, category changed, qualification suspension and its four disposition results,
-plus appeal submission, overturn, and uphold. The scene response is the source of truth for
-available variables, recipient roles, sensitive markers, and actions.
+The ZSJOS catalog contains 40 lead scenes covering creation, dispatch and ownership, follow-up,
+qualification, appeal, complaint, public-pool, duplicate, and transfer workflows. Complaint
+decisions use distinct `zsjos.lead.complaint_founded` and `zsjos.lead.complaint_unfounded` scenes.
+Both resolve the complaint record's actual employee or partner complainant; the founded scene also
+retains the snapshotted owner and current direct-leader recipients. The scene response is the source
+of truth for available variables, recipient roles, sensitive markers, and actions.
 
 Fresh environments and migration V016 provide one enabled global template for every registered
-scene. Templates do not send messages by themselves. Notification rules remain tenant-owned, with
-one system default exception: new tenants and V075 receive an enabled `zsjos.lead.created` in-app
-rule when that tenant has no rule for the scene. It notifies the Lead source user and the actual
-operator, which are respectively the selected new-media provider and submitting salesperson for a
-sales self-sourced Lead. V075 does not overwrite an existing enabled or disabled administrator rule
-and does not backfill historical messages. V016 inserts only a missing active template code and
-never overwrites an administrator-created or modified template.
+scene. Templates do not send messages by themselves. Notification rules remain tenant-owned. V075
+creates the initial `zsjos.lead.created` rule only when a tenant has no rule for that scene. V080
+splits an untouched V075 default into an operator-only submission-success rule and a separate
+`new_media_provider` rule. The latter is resolved only when a salesperson submits a self-sourced
+Lead with an explicitly selected new-media provider, and renders
+`{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`.
+Without that selection, no provider notification is produced. Ordinary new-media submissions also
+do not resolve this recipient role. V080 preserves enabled, disabled, or edited administrator rules
+and does not backfill historical messages. V016 and V080 insert only missing active template codes
+and never overwrite administrator-created or modified templates.
 
 `in_app` rules use `system_notify_business_outbox` and join the publishing business transaction.
 The unique boundary is tenant + source event key + target rule. Workers claim rows with a unique
@@ -56,8 +60,14 @@ scene's published catalog.
 ## Actions and realtime delivery
 
 Allowed action codes are `message_detail`, `business_detail`, and `none`. In the current scene
-catalog they mean message details, authorized lead details, and close-only respectively; no URL is
-stored or executed.
+catalog they mean message details, an authorized business action, and close-only respectively; no
+URL is stored or executed. Workbench derives the Lead destination from the registered `sceneCode`
+and internal business ID. Appeal scenes target `tab=appeals`, complaint result scenes target
+`tab=complaints`, follow-up and reminder scenes target `tab=follow-ups`, and other Lead scenes target
+`tab=overview`. The resulting route is
+`/zsjos/leads/manage?leadId={internalLeadId}&tab={overview|follow-ups|orders|appeals|complaints}`.
+`zsjos.lead.appeal_submitted` keeps its reviewer-inbox action when that task is available and uses
+the Lead appeal tab only as its authorized fallback.
 
 The backend persists the rendered title, summary, full content, rule, scene, business identity,
 action, and source event key. After commit it emits:
@@ -67,9 +77,17 @@ action, and source event key. After commit it emits:
 ```
 
 Clients treat this as an invalidation hint, fetch `/system/notify-message/my-get`, deduplicate by
-message ID, and display title plus summary at the bottom right. Clicking marks the message read and
-refreshes the bell. A lead action verifies the real business API first; absent menu or object access
-falls back to message details with a `Message` explanation.
+message ID, and display title plus summary at the bottom right. Realtime cards, the bell popup, and
+the full message center all execute the same persisted-message action resolver. Clicking marks the
+message read and refreshes the bell. A Lead action verifies the real business API first and consumes
+its server-projected `visibleTabs`; a requested hidden tab falls back to the overview rather than
+bypassing permission. Absent menu or object access falls back to message details with a `Message`
+explanation.
+
+V090 adds separate founded and unfounded complaint-result templates and, for each non-deleted
+tenant lacking an equivalent rule, one enabled `in_app`/`business_detail` rule addressed to
+`complainant`. It uses `lead.no` and `complaint.handlerOpinion`, preserves existing rules and
+historical messages, and does not itself execute against an existing environment.
 
 The bottom-right popup duration is tenant-configured through the lead follow-up rule and defaults
 to five minutes; the accepted range is 1 to 30 minutes. This does not control the pending-assignment
@@ -88,3 +106,8 @@ WebSocket Upgrade and Connection headers. `/infra/ws` is not under `/admin-api`.
 must confirm a `101 Switching Protocols` response and delivery across backend nodes when a shared
 sender is configured. Browser clients authenticate the handshake with the current OAuth access
 token in the `token` query parameter; refresh tokens are only used by the HTTP token-refresh flow.
+Business notification templates for ZSJOS Lead, sales-order and registration scenes must use business identifiers rather than customer or student names. Lead scenes expose `lead.no`; sales-order scenes expose `order.no`; registration scenes expose `lead.no` and/or `order.no` according to their business relation. The scene registry rejects the former `lead.name`, `order.studentName` and `student.name` variables, and delivery fails closed for stale templates until they are migrated.
+
+Sales-order supervisor confirmation adds two tenant-scoped scenes: `zsjos.sales_order.supervisor_requested` (recipient role `supervisor`) and `zsjos.sales_order.supervisor_decided` (recipient role `requester`). Their payload includes `order.no`, request center, requester/supervisor names, separate request and decision reasons, decision, confirmation ID and controlled task identifiers. Message clicks resolve those identifiers through the ZSJOS notification-target API, which rechecks the persisted recipient relationship and order object permission before returning a relative approval target. The first scene links the designated supervisor to the supervisor-confirmation view; the second links only the requester to the ordinary approval view. V093 creates a default only when the tenant has no rule for that scene, preserving administrator rules and avoiding duplicate delivery by confirmation event key.
+
+Applied V085 databases are repaired only by forward migration V087; V085 is not rewritten. V087 also covers logically deleted message snapshots, restores the missing registration business-number parameter, and fails closed when the stored JSON or tenant-scoped business relation cannot be resolved safely. It does not infer a removed name or expose an internal Lead ID.

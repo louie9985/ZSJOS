@@ -3,7 +3,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showToast, showConfirmDialog } from 'vant'
 import { getLeadDetail, urgeLead, type LeadListItem } from '@/api/lead'
-import { formatDateTime, formatLeadNo, maskMobile } from '@/utils/format'
+import { formatDateTime, formatLeadNo, formatLeadStatus, maskMobile } from '@/utils/format'
 
 defineOptions({ name: 'LeadDetail' })
 
@@ -34,13 +34,14 @@ const actions = computed(() => new Set(
   (lead.value?.availableActions || []).filter(action => action.enabled).map(action => action.code)
 ))
 
-const statusMap: Record<string, { text: string; color: string }> = {
-  submitted: { text: '已提交', color: 'var(--h5-info)' },
-  valid: { text: '有效', color: 'var(--h5-success)' },
-  invalid: { text: '无效', color: 'var(--h5-danger)' },
-  suspended: { text: '已挂起', color: 'var(--h5-warning)' },
-  converted: { text: '已转化', color: 'var(--h5-primary)' },
-  closed: { text: '已关闭', color: 'var(--h5-text-secondary)' }
+const statusColor: Record<string, string> = {
+  submitted: 'var(--h5-info)',
+  valid: 'var(--h5-success)',
+  invalid: 'var(--h5-danger)',
+  suspended: 'var(--h5-warning)',
+  won: 'var(--h5-success)',
+  converted: 'var(--h5-primary)',
+  closed: 'var(--h5-text-secondary)'
 }
 
 const assignmentMap: Record<string, string> = {
@@ -97,9 +98,9 @@ function goAppeal() {
           <div class="status-card__main">
             <span
               class="status-card__badge"
-              :style="{ backgroundColor: statusMap[lead.status]?.color || 'var(--h5-info)' }"
+              :style="{ backgroundColor: statusColor[lead.status] || 'var(--h5-info)' }"
             >
-              {{ statusMap[lead.status]?.text || lead.status }}
+              {{ formatLeadStatus(lead.status) }}
             </span>
             <span class="status-card__assignment">{{ assignmentMap[lead.assignmentStatus] || lead.assignmentStatus }}</span>
           </div>

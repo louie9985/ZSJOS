@@ -20,6 +20,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_C
 public class PersonIdentityWriteService {
     @Resource private PersonMapper personMapper;
     @Resource private PersonContactClaimMapper claimMapper;
+    @Resource private PersonNumberService personNumberService;
 
     @Transactional(rollbackFor = Exception.class)
     public PersonDO createNew(String name, String mobile, String wechatId, String identityStatus) {
@@ -80,7 +81,7 @@ public class PersonIdentityWriteService {
     private PersonDO newPerson(String name, String mobile, String wechatId, String identityStatus) {
         LocalDateTime now = LocalDateTime.now();
         PersonDO person = new PersonDO();
-        person.setPersonNo("P" + UUID.randomUUID().toString().replace("-", "").toUpperCase(Locale.ROOT));
+        person.setPersonNo(personNumberService.next());
         person.setName(name); person.setMobile(normalize(mobile)); person.setWechatId(normalize(wechatId));
         person.setIdentityStatus(identityStatus); person.setFirstSeenAt(now); person.setLastSeenAt(now); person.setVersion(0);
         return person;

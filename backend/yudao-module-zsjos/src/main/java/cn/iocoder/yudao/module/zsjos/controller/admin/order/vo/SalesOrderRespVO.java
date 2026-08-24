@@ -23,6 +23,7 @@ public class SalesOrderRespVO {
     private String buyerName;
     private String studentName;
     private String studentNature;
+    private String studentNatureLabelSnapshot;
     private String studentMobile;
     private String studentWechatId;
     private String provinceCode;
@@ -32,11 +33,15 @@ public class SalesOrderRespVO {
     private String agreedExamTime;
     private String classType;
     private String servicePeriod;
+    private String servicePeriodLabelSnapshot;
     private String studentSource;
+    private String studentSourceLabelSnapshot;
     private BigDecimal totalAmount;
     private LocalDateTime customerPaidAt;
     private String feeMode;
+    private String feeModeLabelSnapshot;
     private String paymentMethod;
+    private String paymentMethodLabelSnapshot;
     private String remark;
     private String studentSpecialRequirements;
     private String materialDeliveryContact;
@@ -62,10 +67,31 @@ public class SalesOrderRespVO {
     private Boolean canRequestSupervisorConfirmation;
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
+    private LeadProfileVO leadProfile;
     private ApprovalStatusVO registrationApproval;
     private ApprovalStatusVO financeApproval;
     private SupervisorConfirmationVO registrationSupervisorConfirmation;
     private SupervisorConfirmationVO financeSupervisorConfirmation;
+    private SupervisorApprovalVO supervisorApproval;
+
+    @Data
+    public static class LeadProfileVO {
+        private String leadNo;
+        private String submittedName;
+        private String submittedMobile;
+        private String submittedWechatId;
+        private String sourceType;
+        private String sourceLabel;
+        private String sourceUserName;
+        private String sourceChannel;
+        private String sourceChannelLabelSnapshot;
+        private String provinceName;
+        private String cityName;
+        private String leadCategory;
+        private String leadCategoryLabelSnapshot;
+        private String dispatchMode;
+        private String ownerUserName;
+    }
 
     @Data
     public static class SupervisorConfirmationVO {
@@ -73,6 +99,22 @@ public class SalesOrderRespVO {
         private String status;
         private Long requesterUserId;
         private String requesterUserName;
+        private String requestReason;
+        private String decisionReason;
+        private LocalDateTime requestedAt;
+        private LocalDateTime decidedAt;
+    }
+
+    @Data
+    public static class SupervisorApprovalVO {
+        private Long id;
+        private String status;
+        private String taskDefinitionKey;
+        private String center;
+        private Long requesterUserId;
+        private String requesterUserName;
+        private Long supervisorUserId;
+        private String supervisorUserName;
         private String requestReason;
         private String decisionReason;
         private LocalDateTime requestedAt;

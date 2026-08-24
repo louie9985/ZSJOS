@@ -22,19 +22,19 @@
 | # | 角色编码 | ZSJOS 目标 |
 |---:|---|---|
 | 1 | `center_head` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 2 | `dept_manager` | 保持已批准的提交方和组织范围能力，不按名称追加销售、财务或管理员权限 |
-| 3 | `content_director` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 4 | `new_media_operator` | 通过 `query-submitted` 查看本人提交客资；部门主管关系可将同一权限范围扩到当前所管部门及子部门员工，不按角色名称扩权 |
-| 5 | `filming_editor` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 6 | `sales_manager` | 通过 `query-owned` 查看本人及当前所管部门、子部门销售负责的客资，并具备跟进记录只读能力；不得持有 `query-all` |
+| 2 | `dept_manager` | 直属部门范围能力；对象权限仍要求本人是对应业务责任人 |
+| 3 | `content_director` | `/zsjos/media-students`、第三方账号/内容/定位操作（仅本人服务关系或账号责任对象） |
+| 4 | `new_media_operator` | `/zsjos/media-students`、第三方账号、内容生产、拍剪核对、账号定位复核、学员运营和复盘审核；学员范围仅限本人负责账号、内容、定位或任务关联对象 |
+| 5 | `filming_editor` | 仅分配给本人的拍剪工单及内容项操作；不包含编导专属学员页面 |
+| 6 | `sales_manager` | 通过 `query-owned` 查看本人及当前所管部门、子部门销售负责的客资，并具备跟进记录、流转记录只读能力及下属销售一键暂停接单能力；不得持有 `query-all` |
 | 7 | `sales_specialist` | 通过 `query-owned` 查看本人负责的客资，保留接单/抢单、跟进判定、自拓、建单、本人订单、公海申请和本人工作计划能力；不得持有 `query-all` |
 | 8 | `enrollment_manager` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 9 | `enrollment_specialist` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 10 | `finance_manager` | V071 精确 11 项完整财务权限 |
 | 11 | `finance_specialist` | 与财务主管完全相同的 V071 精确 11 项 |
-| 12 | `study_planner` | 零 ZSJOS 菜单，当前没有已落地职责 |
+| 12 | `study_planner` | `/zsjos/my-students`、学习规划师联系/交付操作、复盘提交/归档、专用学员复购和本人订单；不默认授予新媒体“学员运营”，不授予通用订单录入或外部历史客户复购，仅本人负责的服务关系 |
 | 13 | `academic_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
-| 14 | `delivery_manager` | 零 ZSJOS 菜单，当前没有已落地职责 |
+| 14 | `delivery_manager` | 直属交付部门复盘审核和结业审批；对象责任关系由服务端动态解析 |
 | 15 | `exam_manager` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 16 | `exam_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 17 | `career_planner` | 零 ZSJOS 菜单，当前没有已落地职责 |
@@ -63,7 +63,10 @@
 - 每个租户的兼职角色必须恰好拥有上述 10 个有效权限，两个财务角色必须各自恰好拥有相同 11 项。
 - 同一租户、角色和 permission 最多一个有效 `system_role_menu` 关系；权限按钮不得指向已删除父菜单。
 - `system_administrator` 必须有提现只读和客资导出，且不得有常规财务审核、提现审核/打款或资金导出。
-- V073 后 `study_planner` 仅新增 `zsjos:student:query-my`；其余原零菜单角色仍不得存在任何有效 `zsjos:%` 权限。
+- V073 后 `study_planner` 使用 `zsjos:student:query-my`。V113 后 `content_director` 与 `new_media_operator` 共用 `zsjos:media-student:query-my` 和 `/zsjos/media-students`，但服务端分别按服务关系、账号责任关系和本人任务收敛数据范围。第三方账号、内容生产和账号定位的独立页面菜单退役，原稳定按钮权限移到学员菜单下。所有菜单按钮授权都不替代对象权限、数据范围和状态校验。
+- V086 增加 `zsjos:lead-detail:follow-up-read`、`appeal-read`、`complaint-read`、`order-read` 四个独立只读权限。迁移只按原有效可见权限做兼容授权，后续由 System 角色权限管理分别配置；任何一个标签权限都不能替代 Lead 对象关系校验。
 - V071 只改变菜单元数据和角色菜单关系，不改变真实账号、用户角色关系、BPM 或业务数据；应用现有数据库需要单独确认。
 
-V073 grants `system_administrator` only the registration-checklist query/update/publish permissions and grants `study_planner` only My Students. Registration public-pool permissions are intentionally unassigned and must be configured by an administrator; role names and departments never imply them.
+V073 grants `system_administrator` only the registration-checklist query/update/publish permissions and grants `study_planner` My Students. V107 adds the confirmed planner-side student operations, review submission, and graduation initiation buttons. V118 removes the accidental new-media `zsjos:student-ops:*` default grants from `study_planner`; those independent menu/button nodes remain available for explicit administrator assignment. V120 restores the shared `/zsjos/media-students` page grant for enabled `new_media_operator` roles after V103's historical director-only cleanup. Registration public-pool permissions remain intentionally separate; role names and departments never imply them.
+
+V083 grants `content_director` only My Students. Runtime route candidates use the stable content-director post code and the persisted department subtree; this menu grant does not change candidate eligibility or public-pool access.

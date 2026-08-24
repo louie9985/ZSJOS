@@ -191,7 +191,7 @@ export default function LeadAssignmentHost({ canAccept, onCountChange, openReque
         {ordered.length > 1 && <Tag bordered={false} color="blue">共 {ordered.length} 条</Tag>}
       </span>}
       closable={false}
-      maskClosable={false}
+      mask={{ closable: false }}
       keyboard={false}
       destroyOnHidden
       footer={current && <div className="lead-assignment-actions">

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:flowable="http://flowable.org/bpmn" targetNamespace="https://zsjos.com/bpm">
+  <process id="zsjos_media_reposition" name="新媒体重新定位" isExecutable="true">
+    <startEvent id="StartEvent" name="提交重新定位"/>
+    <sequenceFlow id="flow_start_review" sourceRef="StartEvent" targetRef="operatorReviewer"/>
+    <userTask id="operatorReviewer" name="运营复核" flowable:assignee="${assignee}"><extensionElements><flowable:candidateStrategy>35</flowable:candidateStrategy><flowable:collection>${coll_userList}</flowable:collection></extensionElements></userTask>
+    <sequenceFlow id="flow_review_end" sourceRef="operatorReviewer" targetRef="EndEvent"/>
+    <endEvent id="EndEvent" name="完成"/>
+  </process>
+  <bpmndi:BPMNDiagram xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"><bpmndi:BPMNPlane id="Plane" bpmnElement="zsjos_media_reposition"><bpmndi:BPMNShape id="StartShape" bpmnElement="StartEvent"><omgdc:Bounds x="100" y="100" width="36" height="36"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="TaskShape" bpmnElement="operatorReviewer"><omgdc:Bounds x="200" y="80" width="120" height="80"/></bpmndi:BPMNShape><bpmndi:BPMNShape id="EndShape" bpmnElement="EndEvent"><omgdc:Bounds x="400" y="100" width="36" height="36"/></bpmndi:BPMNShape></bpmndi:BPMNPlane></bpmndi:BPMNDiagram>
+</definitions>

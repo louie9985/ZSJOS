@@ -2,7 +2,6 @@ import {
   EnvironmentOutlined,
   PhoneOutlined,
   PictureOutlined,
-  ReloadOutlined,
   WechatOutlined
 } from '@ant-design/icons'
 import { Alert, App, Button, Card, Empty, Image, Skeleton, Spin, Tag, Typography } from 'antd'
@@ -180,7 +179,6 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
   return <section className="workspace-page claim-pool-page">
     <div className="claim-pool-toolbar">
       <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
-      <Button icon={<ReloadOutlined />} loading={loading && !items.length} onClick={refresh}>刷新</Button>
     </div>
     <div className="claim-pool-container">{content}</div>
   </section>

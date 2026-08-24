@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { formatCurrency, receiveStatusLabel, summarizeBatchResult, todayStatusLabel } from './subordinateSales'
+import { appendSubordinateSalesRows, formatCurrency, receiveStatusLabel, summarizeBatchResult, todayStatusLabel } from './subordinateSales'
+import type { SubordinateSales } from './api'
 
 describe('subordinate sales display helpers', () => {
   it('keeps receive and today statuses binary', () => {
@@ -15,5 +16,13 @@ describe('subordinate sales display helpers', () => {
 
   it('formats deal amount as CNY', () => {
     expect(formatCurrency(1234.5)).toContain('1,234.50')
+  })
+
+  it('appends lazy pages without duplicating sales users', () => {
+    const row = (userId: number, name: string) => ({ userId, name } as SubordinateSales)
+    expect(appendSubordinateSalesRows(
+      [row(1, '销售甲'), row(2, '旧名称')],
+      [row(2, '销售乙'), row(3, '销售丙')]
+    )).toEqual([row(1, '销售甲'), row(2, '销售乙'), row(3, '销售丙')])
   })
 })

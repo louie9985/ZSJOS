@@ -17,19 +17,109 @@
 ## Current Task Registration
 
 - Workstream ID: `20260810-main-existing`
-- Goal: Reuse the owned-Lead right-side detail in subordinate-sales management and provide sales managers a read-only overview, follow-up, appeal, complaint, and customer-order history for in-scope subordinate Leads.
-- Non-goals: Business write actions from the manager detail; changes to transfer/public-sea behavior; role-name inference; database migrations; dependency additions; shared layout/theme redesign; branches, commits, pushes, or service lifecycle changes.
+- Goal: Fix application startup by removing the `@Resource` by-name collision between the student-contact configuration mapper field and Infra's `configMapper` Bean.
+- Non-goals: Changing MyBatis scanning, Spring proxy mode, global injection behavior, student-contact business logic, database schema/data, dependencies, external services, branches, commits, pushes, or unrelated dirty-worktree changes.
 - Branch: `main`
 - Worktree: `D:\ZSJ-OS`
-- Base commit: `84474ae6083a64343f5b39b397e5143b233523ae`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
 - Target branch: `main`
-- Ownership scope: Workbench shared Lead detail, subordinate-sales page, complaint panel, typed Lead APIs and focused tests; ZSJOS Lead detail/follow-up/appeal/complaint/customer-order read authorization, complaint response contract and focused tests; directly affected subordinate-sales and permission-flow documentation; this handoff file. Existing overlapping partner, registration, notification, EAM, SQL, framework, and unrelated frontend changes are preserved.
+- Ownership scope: `StudentContactServiceImpl` mapper injection field and its references; this handoff file. Existing overlapping ZSJOS, frontend, SQL, framework, documentation, and unrelated changes are preserved.
 - Owner: Codex `/root`
-- Dependencies: Existing `LeadDetailOverview`, `LeadFollowUpPanel`, `LeadAppealPanel`, `LeadCustomerOrders`, Lead object-permission hierarchy, System department-leader APIs, and current typed HTTP client. No new dependency.
-- Integration order: Register scope -> extract shared read/write-aware Lead detail -> replace subordinate duplicate detail -> add complaint history contract/panel -> extend feature and object read checks -> focused backend/frontend tests -> documentation -> full proportional verification and browser checks -> append delivery entry.
-- Verification plan: Focused authorization and service tests for manager/in-scope/out-of-scope/owner/submitter/query-all behavior; Workbench component/service tests, typecheck and production build; ZSJOS focused Maven tests and module compile; desktop/mobile authenticated browser checks when available; scoped `git diff --check`.
+- Dependencies: Existing MyBatis Mapper registration and Spring `@Resource` injection behavior only. No new dependency.
+- Integration order: Register scope -> rename the mapper field and reference -> scan for residual collisions -> compile ZSJOS -> verify server dependency-graph packaging when available -> append delivery entry.
+- Verification plan: Static source scan; ZSJOS compile; `yudao-server` dependency-graph package if the existing runtime does not block repackaging; scoped diff and whitespace validation. No service lifecycle action is authorized.
 
 ## Entries
+
+### Workstream scope update: 2026-08-18 14:45:09 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Complete server-side advanced filtering for Workbench business inboxes covering Leads, orders, appeals, duplicate reviews, registration fulfillment, students, and subordinate sales, while presenting only user-facing business field names.
+- Non-goals: Message inbox, work plans, Today Tasks, Admin/H5, client-side current-page filtering, saved/shared filter profiles, database migrations, new dependencies, permission-model changes, service restarts, branch/commit/push operations, or external-state changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: ZSJOS advanced-filter catalog/query services and focused tests; target inbox request VOs/controllers/services/mappers where required; Workbench shared advanced-filter component, API contracts, target inbox pages/styles/guards/tests; directly affected API documentation; this handoff file. Existing registration routing/attachment, Lead simple-status, inbox visual, notification, EAM/HRM, SQL, and unrelated dirty-worktree changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing ZSJOS/System public APIs, MyBatis/Yudao query facilities, React, Ant Design, Workbench tokens and current typed HTTP client. No new dependency.
+- Integration order: Register scope -> extend whitelist catalog/operators and per-scene query contracts -> wire page/cursor services -> change filter editor to explicit apply -> connect target inboxes -> add focused tests/guards/docs -> run backend/frontend/browser/port verification -> append delivery evidence.
+- Verification plan: Advanced-filter unit and request-flow tests including invalid/unauthorized/empty/relative-date and pagination behavior; ZSJOS focused Maven tests and module compile; Workbench tests/typecheck/build; desktop/mobile browser checks where the current account and runtime permit; scoped `git diff --check`; confirm no development listener remains outside ports 80, 5174 and 48080.
+
+### Workstream scope update: 2026-08-18 13:05:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Re-review and repair the previously excluded EAM, HRM, and Lead changes identified by Open Code Review.
+- Non-goals: No registration-fulfillment changes, database execution, account/permission mutation, service restart, dependency addition, branch/commit/push operation, or rollback of unrelated user work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Changed EAM/HRM/Lead backend, Admin/Workbench, SQL and directly affected tests/docs discovered by the focused OCR review, plus this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing Yudao System/Infra public APIs and current module/frontend dependencies. No new dependency.
+- Integration order: Focused OCR and source verification -> bounded fixes/tests -> backend/frontend/SQL verification -> append delivery evidence.
+- Verification plan: Run focused module tests/compile, affected frontend checks, SQL static/schema checks where available, and scoped `git diff --check`.
+
+### Workstream scope update: 2026-08-18 12:20:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Repair confirmed registration-review findings for notification recipient scope, Lead identifier exposure, attachment idempotency validation, planner reassignment notification deduplication, and My Students detail query scope.
+- Non-goals: No database migration execution, account/permission mutation, service restart, dependency change, branch/commit/push operation, or unrelated EAM/HRM/Lead changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Registration notification provider/publisher, registration upload Controller contract, My Student response/service/API types, focused tests, and this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing System permission/user APIs, Infra file API, ZSJOS registration relation mappers, and current React/Vue typed clients. No new dependency.
+- Integration order: Narrow notification recipients -> validate upload idempotency -> remove internal Lead identifier from student contract -> scope student detail query -> add focused regression tests -> run backend/frontend checks and append delivery evidence.
+- Verification plan: Focused ZSJOS notification/student tests, module compile, Workbench tests/typecheck/build, Admin task-file typecheck/build where available, and scoped `git diff --check`.
+
+### Workstream registration: 2026-08-17 20:51:02 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Restore compact simple-status filtering on unified Lead management without restoring the submitted/owned relation switch.
+- Non-goals: Changing Lead visibility relationships, restoring separate submitter/owner pages, altering order/appeal authorization, adding filter counts, changing administrator-managed inbox schemes, database migrations, dependencies, branches, commits, pushes, or external service state.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: ZSJOS unified Lead page request validation/service/DAL simple-status filtering and focused tests; Workbench Lead management status-tag UI, typed API and focused tests; correction of the Workbench `AGENTS.md` UI-guideline path; directly affected Lead API, state and permission-flow documentation; this handoff file. Existing V078/V079/V080 and unrelated dirty-worktree changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing Lead/Opportunity lifecycle fields, unified relation visibility, React Workbench Lead page, Ant Design, and current typed Lead APIs. No new dependency.
+- Integration order: Register scope -> add relation-independent simple-status contract -> apply scoped DAL filters -> restore compact status tags -> add focused tests and docs -> backend/frontend/browser verification -> append delivery evidence.
+- Verification plan: Focused service and mapper-contract tests for every simple status plus unchanged visibility scope; Workbench focused/full tests, typecheck and production build; desktop/mobile authenticated browser checks for selection, overflow, loading, empty, error/retry and combination with keyword/advanced filters where the environment permits; scoped `git diff --check`.
+
+### Workstream registration: 2026-08-17 20:31:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Remove the obsolete Lead relation-scope tabs and align owner order history and submitter appeal history with the authorized Lead detail read relationship.
+- Non-goals: Changing Lead ownership, broadening tenant-wide Lead visibility, changing business records, altering unrelated order/appeal review permissions, or modifying concurrent unrelated work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Workbench Lead management relation-scope presentation, Lead object read authorization for order/appeal history, focused tests, directly affected documentation, and this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing LeadObjectPermissionService, sales-order and appeal APIs, unified Lead management page, and current permission contracts.
+- Integration order: Remove obsolete relation tabs -> align child-history authorization -> add focused tests and docs -> frontend/backend verification -> append delivery record.
+- Verification plan: Backend focused tests, frontend typecheck/tests, ZSJOS package, and scoped diff check; verify no unauthorized Lead detail/order/appeal access is introduced.
+
+### Workstream registration: 2026-08-17 20:14:11 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Give the selected new-media provider a dedicated Lead-source association message while retaining the salesperson's generic Lead-submission success message, and synchronize the approved V080 behavior to local tenant 1.
+- Non-goals: Historical-message backfill; changing Lead ownership, source attribution, permissions, accounts, unrelated notification scenes or external channels; creating test Leads; branch, commit, push, or service lifecycle changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Lead-created event provider context, Lead notification scene role resolution and focused tests, Lead notification tenant defaults, one new system-owned provider template, V080 forward migration, bootstrap/verification wiring, directly affected Lead notification/submission/migration documentation, approved local tenant-1 V080 synchronization, and this handoff file. Existing unrelated Lead management, registration, partner, EAM, frontend, framework, and SQL changes remain outside scope.
+- Owner: Codex `/root`
+- Dependencies: Existing V075 default Lead-created rule, `ZSJOS_LEAD_CREATED` sales template, `operator.name` and `lead.no` notification variables, System `NotifyRuleApi`, and the Lead-created event. No new dependency.
+- Integration order: Register scope -> add explicit provider event context and recipient role -> split new-tenant defaults -> add V080 template/rule migration -> wire bootstrap/verification/docs -> focused tests and package -> approved local V080 execution and verification -> append delivery record.
+- Verification plan: Focused Lead submission, notification-recipient, and tenant-initializer tests; ZSJOS compile/package; SQL syntax, ordering, repeatability, administrator-preservation, no-provider, and local tenant-1 checks; no historical outbox/message creation; scoped `git diff --check`.
 
 ### Workstream registration: 2026-08-17 16:03:39 +08:00
 
@@ -2085,3 +2175,769 @@
 - Verification evidence: Workbench final Vitest passed 41 files/213 tests; `npm run typecheck` passed; production build passed with 5,100 modules and only the existing large-chunk warning. `python script/sql/mysql/tools/zsjos_db.py check` passed manifests, migration order, desired schema, Java mappings, baseline versions and verification consistency. Scoped `git diff --check` passed with line-ending notices only. Browser navigation reached the local login page, but no authenticated session was available. Backend Maven compile/test execution was attempted and is blocked by the pre-existing unrelated `PartnerAuthServiceImpl.java:89` error (`String` cannot be converted to `Long`); direct test compilation then lacked other main classes because that compile did not complete, so focused backend tests remain unexecuted in this worktree.
 - Dependency or integration impact: No dependency, real database execution, real role/account/permission mutation, service start/stop, branch operation, commit, push or publication. Deployment requires applying V078 after V077 in a separately approved controlled database workflow and refreshing affected permission sessions. Part-time Partner H5 remains separate.
 - Remaining work: Resolve the unrelated Partner compile failure, then run focused Lead management, object-permission, appeal and subordinate-sales tests plus the ZSJOS module suite. In a separately authorized disposable MySQL environment, execute V078 twice and require all V078 verification checks to pass before production. After authenticated new-media operator/leader, sales specialist/leader and unauthorized peer accounts are available, verify desktop/mobile loading, success, empty, retry and unauthorized states, legacy redirects, team list/detail/follow-up/appeal access, and unchanged write actions.
+
+### 2026-08-17 20:16:18 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Restore the visible, authorized unified Lead management page after users could no longer find "客资管理".
+- Key decisions: `system_menu.visible` is authoritative for Workbench navigation and is mapped as `hidden: !menu.visible`; therefore menu 6770 must be visible. Because V078 may already be installed in an existing database, add repeatable V079 instead of relying on editing an applied migration. Grant the single page to holders of any active Lead query permission while retaining submitted/owned/all permissions as scope controls.
+- Execution or analysis result: Changed V078 and fresh bootstrap to use `visible=b'1'`, updated verification expectations, broadened V078 page-grant repair, and added V079 to repair already-migrated environments. Added a Workbench regression test proving visible 6770 appears in navigation.
+- Changed files: `script/sql/mysql/migrations/V078__unified_lead_management_scope.sql`, `script/sql/mysql/migrations/V079__repair_lead_management_visibility.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/01-bootstrap-system-seed.sql`, `script/sql/mysql/verify-bootstrap.sql`, `frontend/workbench/src/services/menu.test.ts`, and this handoff file.
+- Verification evidence: Workbench Vitest passed 41 files/214 tests; `npm run typecheck` passed; production build passed with 5,100 modules and only the existing large-chunk warning; `python script/sql/mysql/tools/zsjos_db.py check` passed; scoped `git diff --check` passed with existing line-ending notices. No database migration was executed and no authenticated browser session was available.
+- Dependency or integration impact: No new dependency, role/account mutation, business-data change, service restart, branch operation, commit, push, or publication. Existing environments must apply V079 after V078 through the approved migration process and refresh permission/menu sessions.
+- Remaining work: Apply V079 in a controlled environment, run `verify-bootstrap.sql`, then verify authenticated sales/new-media users and managers see the unified page and receive the expected submitted/owned/all data scopes. The unrelated `PartnerAuthServiceImpl.java:89` backend compile error remains outside this fix.
+
+### 2026-08-17 20:26:17 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Notify the explicitly linked new-media employee when sales submits a self-sourced Lead, using the confirmed message `{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`, and synchronize the corrected V080 migration locally.
+- Key decisions: Keep the salesperson's generic operator-only submission-success notification and add a separate `new_media_provider` rule. Publish provider context only for `sales_self_sourced` when the selected source user differs from the actual operator; no provider notification is resolved without a selection or for an ordinary new-media submission. Migrate only enabled, untouched V075 defaults; preserve disabled, edited, and administrator-created rules and do not backfill history. Use V080, superseding the user's earlier V090 instruction before any V090 migration was executed.
+- Execution or analysis result: Added the provider recipient role and event context, split new-tenant defaults, added the exact provider template and repeatable V080 rule migration, wired bootstrap and verification, updated directly affected documentation, and applied only V080 to the local Docker MySQL database after confirming V076-V079 and the exact tenant-1 target. Tenant 1 now has one operator-only sales rule and one provider-only rule; rerunning V080 created no duplicates.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/LeadNotifySceneConstants.java`, `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotificationTenantInitializer.java`, `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java`, `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmissionServiceImpl.java`, their three focused test files, `script/sql/mysql/migrations/V080__lead_source_provider_notification.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/verify-bootstrap.sql`, `script/sql/mysql/migrations/README.md`, `docs/api/system-business-notifications.md`, `docs/api/zsjos-lead-submission-dispatch.md`, `docs/architecture/data-and-permission-flow.md`, `docs/operations/database-migrations.md`, and this handoff file.
+- Verification evidence: Focused Maven tests passed 23 tests with zero failures; the ZSJOS reactor package build passed; `python script/sql/mysql/tools/zsjos_db.py check` passed migration order, schema, Java mapping, baseline, and verification consistency; scoped `git diff --check` passed with line-ending notices only. Local V075/V080 database checks all passed, exact template text and variables matched, both version registries contain one V080 row, and a second execution retained one provider template, two tenant-1 scene rules, and one provider rule. Lead-created Outbox remained 1 and messages remained 2 before and after both executions, proving no historical backfill. Full bootstrap verification also reported unrelated existing failures for business dictionary emptiness, filter data, V043 contact completeness, the default follow-up rule, and V071 role-permission state.
+- Dependency or integration impact: No new code dependency, Lead/account/role/permission mutation, historical message creation, service restart, branch operation, commit, push, or publication. The approved local database mutation was limited to the global V080 template/version metadata and tenant 1's untouched V075 default plus its dedicated provider rule. Concurrent V078/V079, bootstrap seed, Workbench test, and shared verification edits from another task were preserved.
+- Remaining work: Deploy the application and V080 together in each target environment through the controlled migration process, then submit a real sales self-sourced Lead with a selected provider to verify the rendered employee notification end to end. No synthetic Lead was created in this turn. Resolve the unrelated full-bootstrap data discrepancies in their owning workstreams.
+
+### 2026-08-17 20:44:55 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Remove the obsolete unified Lead relation-scope switch, restore order-history visibility for the Lead owner, and restore appeal-history visibility for the Lead submitter.
+- Key decisions: The unified page always requests backend-authorized `relationScope=all`; it no longer exposes `all/submitted/owned` as mutually exclusive UI modes. In unified detail mode, child-history tabs are derived from the Lead's server-provided `relationTypes`: `owner` enables order history and `submitter` enables appeal history. Existing backend object authorization remains authoritative for both endpoints.
+- Execution or analysis result: Removed the `全部 / 我提交的 / 我负责的` segmented control and its route/navigation state, retained legacy route redirects to the canonical management page, and removed obsolete inbox filter-profile state from the unified page. Updated shared Lead detail tab selection so an owner sees orders and a submitter sees appeals, including a user who has both relations. Synchronized the directly affected Lead API and permission-flow documentation.
+- Changed files: `frontend/workbench/src/pages/LeadManagementPage.tsx`, `frontend/workbench/src/layouts/RouteHost.tsx`, `frontend/workbench/src/pages/TodayTasksPage.tsx`, `frontend/workbench/src/components/NotifyMessageProvider.tsx`, `frontend/workbench/src/services/leadFollowUp.ts`, `frontend/workbench/src/components/LeadDetail.tsx`, `frontend/workbench/src/pages/lead-management-unified.guard.test.ts`, `frontend/workbench/src/services/leadFollowUp.test.ts`, `docs/api/zsjos-lead-submission-dispatch.md`, `docs/architecture/data-and-permission-flow.md`, and this handoff file.
+- Verification evidence: Workbench Vitest passed 41 files/214 tests; `npm run typecheck` passed; the production build passed with 5,100 modules and only the existing large-chunk warning. Focused backend `LeadAppealServiceImplTest` and `SalesOrderServiceImplTest` passed 39 tests with zero failures. Scoped `git diff --check` passed with line-ending notices only. Authenticated browser checks at 1280x720 and 390x844 confirmed no relation-scope shell or segmented control and no horizontal page overflow; the current account/selected Lead had neither owner nor submitter relation, so relation-specific tabs were covered by unit tests rather than exercised against live data. A wider pre-existing backend test group remains red because of unrelated Mockito strict-stubbing fixture mismatches; no backend production code was changed in this turn.
+- Dependency or integration impact: No dependency, database change, account/role/permission mutation, backend authorization expansion, external service change, branch operation, commit, push, or publication. Existing V078/V079/V080 and unrelated dirty-worktree changes were preserved.
+- Remaining work: After deployment, exercise the unified detail with authenticated owner-only, submitter-only, and dual-relation Leads to confirm live order/appeal data and unauthorized endpoint behavior. Repair the unrelated strict-stubbing test fixtures in their owning workstream if the wider backend group is required to pass.
+
+### 2026-08-17 21:09:56 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Restore compact status filtering on unified Lead management while keeping the submitted/owned relation switch removed, exclude assignment-flow states, and correct the Workbench UI-guideline path in `AGENTS.md`.
+- Key decisions: Keep `relationScope=all` as the sole visibility scope and add an independent, validated `simpleStatus` protocol. Expose exactly `全部 / 待首跟 / 待跟进 / 待判定 / 成交待审核 / 已成交 / 已判无效 / 已关闭 / 已挂起`; do not expose 待分配、待接单 or 抢单池 because they are assignment-flow states. Simple status intersects keyword and advanced filters without changing relation authorization. `following` means a valid Lead whose initial Opportunity is not in deal approval or won; handling stages continue to distinguish first-follow and qualification by the current assignment deadline projection.
+- Execution or analysis result: Added the typed request field, validation, canonical backend resolver, scoped Lead/Opportunity DAL conditions and cursor-context binding. Restored one accessible compact status-tag row with desktop wrapping space and mobile horizontal scrolling while retaining the unified page and relationship-derived order/appeal tabs. Corrected `frontend/workbench/AGENTS.md` from the ambiguous root-relative `docs/ui-guidelines.md` to `frontend/workbench/docs/ui-guidelines.md` and read the actual document before styling. Synchronized the directly affected API, permission-flow and Lead state contracts.
+- Changed files: `frontend/workbench/AGENTS.md`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/management/LeadManagementPageReqVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; new `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSimpleStatusQuery.java` and focused test; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/LeadManagementPage.tsx`; its CSS and unified-route guard test; `docs/api/zsjos-lead-submission-dispatch.md`; `docs/architecture/data-and-permission-flow.md`; `docs/business/lead-order-state-machine.md`; and this handoff file.
+- Verification evidence: Workbench Vitest passed 41 files/215 tests, including style guards and the final 3-test unified Lead guard; typecheck passed before and after the final label-order correction; production build passed with 5,100 modules and only the existing large-chunk warning. Authenticated browser checks at 1280x720 and 390x844 showed the exact nine labels in confirmed order, one active label, no relation switch, no page horizontal overflow, and a horizontally scrollable mobile label row. The four changed Java main files and focused test source compiled independently with Lombok processing, and an executed status-protocol assertion covered all accepted keys, rejected `unassigned`, and verified following/deal/first-follow/qualification mappings. Scoped `git diff --check` passed with line-ending notices only. The focused Maven command remains blocked during main compilation by the unrelated existing `PartnerAuthServiceImpl.java:89` `String`-to-`Long` error, before tests can start.
+- Dependency or integration impact: No dependency, schema or migration change, database execution, account/role/permission mutation, service reconfiguration, branch operation, commit, push or publication. Existing V078/V079/V080 and unrelated dirty-worktree changes were preserved. The local running backend was not rebuilt or restarted, so browser verification covered final UI behavior but not live execution of the new `simpleStatus` SQL.
+- Remaining work: Resolve the unrelated Partner compile error, then run `LeadSimpleStatusQueryTest`, `LeadManagementServiceImplTest` and the ZSJOS module suite through Maven. After deploying the backend change, verify each `simpleStatus` against controlled Lead/Opportunity fixtures, including ordinary relation scope, query-all, empty results, invalid values, keyword/advanced-filter intersection, cursor switching and unauthorized access.
+
+### Workstream registration: 2026-08-17 21:25:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Reconcile the EAM implementation with the actual 54-column in-service asset workbook and the two initial design documents, then import workbook rows into a normalized EAM model with Excel-derived categories, common responsibility fields, category-specific fields, verification history and handover history.
+- Non-goals: No import of office-supply circulation or student-textbook fulfillment sheets; no credential/password persistence; no role/account mutation; no database execution; no service lifecycle change; no dependency, branch, commit, push or publication operation.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: `backend/yudao-module-eam`; `frontend/admin/src/api/eam`; `frontend/admin/src/views/eam`; EAM SQL schema/migration/configuration; EAM import and category documentation; focused EAM tests; this handoff file. Existing unrelated worktree changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing EAM code-rule service, System user/department APIs, EAM file upload, Apache POI/FastExcel and Vue/Element Plus; no new third-party dependency.
+- Integration order: Register scope -> update asset/category persistence and history model -> replace source-field parser mappings -> regenerate category/field configuration SQL and templates -> update admin forms and import preview -> add focused tests -> run EAM/backend/frontend/SQL verification -> append delivery evidence.
+- Verification plan: Workbook header/category/missing-value tests; credential exclusion; user and supervisor snapshot tests; verification/handover history tests; category inheritance and field configuration checks; EAM module tests/compile; targeted frontend lint/build/typecheck; SQL static/repeatability verification; scoped `git diff --check`; authenticated browser checks only when an existing session is available. Do not execute migrations or start/restart services.
+
+### 2026-08-17 22:16:30 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Implement the confirmed EAM initial asset ledger model and two-stage import using common fields, Excel-derived categories, non-credential custom fields, and independent verification/handover history.
+- Key decisions: Excel asset tags are business codes; obsolete new-asset-number and credential columns are ignored; user/supervisor names are matched only when unique and snapshots are retained; administrative verification and handover remain separate history records; all management fields are optional; legacy finance columns remain physically for compatibility but are removed from Java/API/admin surfaces.
+- Execution or analysis result: Normalized parser and import service now map the first workbook sheet, default missing quantity/status/commitment values, preserve warnings, enforce same-file idempotency and explicit existing-code updates, and write verification/handover history. Admin form/detail/list/import preview were aligned to common responsibility, commitment, remark and actual-upload fields. Added repeatable V005 schema migration, desired-schema history tables, and V006 baseline root categories plus representative non-credential field definitions.
+- Changed files: EAM asset DO/VO/mapper/service/parser/statistics files; import/history DOs and mappers; EAM focused tests; `frontend/admin/src/api/eam/asset/index.ts`; EAM asset form/detail/list/import/statistics views; `script/sql/mysql/schema/eam.sql`; new `script/sql/mysql/migrations/eam/V005__eam_normalized_asset_fields.sql` and `V006__eam_category_baseline.sql`; this handoff file. Unrelated dirty-worktree files were preserved.
+- Verification evidence: `mvn -pl yudao-module-eam -am -DskipTests compile` passed. Focused `EamAssetLedgerParserTest` and `EamAssetLedgerImportServiceImplTest` passed 5 tests. `git diff --check` reported only existing line-ending notices. Admin `pnpm ts:check` remains red on pre-existing unrelated files; no errors were reported from the changed EAM asset files.
+- Dependency or integration impact: No new dependency, migration execution, asset-row import, account/permission mutation, service restart, branch operation, commit or push. V005/V006 are static migration artifacts only. The checked-in category workbook template still needs a dedicated spreadsheet regeneration to remove legacy source-field example rows; its complete Excel-derived leaf list is available for import through the category configuration workflow.
+- Remaining work: Regenerate and render the category configuration workbook with only normalized field definitions, then run frontend lint/build and live browser import checks after deployment.
+
+### 2026-08-18 09:34:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Make category import precheck visibly report category/leaf/field counts and legacy-field, credential-field, and optionality checks.
+- Key decisions: Keep the existing detailed row table and add explicit summary metrics and alerts; credential and legacy detection returns counts only in the summary, while field row details remain available for inspection.
+- Execution or analysis result: Added category count, child-category count, field count, legacy-field count, credential-field count, and management-optionality fields to the preview response and rendered them in the category import dialog. Valid child rows are marked for child-category counting.
+- Changed files: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/category/vo/EamCategoryImportRespVO.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; `frontend/admin/src/api/eam/category/index.ts`; `frontend/admin/src/views/eam/category/CategoryImportForm.vue`; this handoff file.
+- Verification evidence: `mvn -pl yudao-module-eam -am -DskipTests compile` passed; `git diff --check` passed with line-ending notices only.
+- Dependency or integration impact: No database execution, service restart, permission mutation, dependency, branch, commit, or push.
+- Remaining work: Refresh the admin frontend and run a real category-template preview to confirm the new summary values against the regenerated template.
+
+### Workstream registration: 2026-08-18 09:00:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Implement configurable employee birthday care reminders for current HRM employees, including per-recipient in-app/WebSocket notification, ZSJOS business todos, and manual completion.
+- Non-goals: No SMS/WeCom/email, BPM approval process, automatic account/role permission mutation, historical notification backfill, database execution, service restart, branch, commit, push, or publication.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: HRM birthday-care configuration/query and tests; ZSJOS birthday-care orchestration, task completion, notification scene and tests; Workbench task API/UI; next numbered migration/bootstrap/verification and directly affected documentation; existing unrelated dirty files are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing System user/department/permission/notification APIs, HRM employee service, ZSJOS business-task service; one-way internal `yudao-module-zsjos` to `yudao-module-hrm` dependency; no third-party dependency.
+- Integration order: Register scope -> implement HRM config and read boundary -> implement ZSJOS scheduler/notification/task completion -> add frontend and SQL wiring -> focused tests, compile and static migration checks -> append delivery evidence.
+- Verification plan: Focused HRM/ZSJOS tests, module compile, Workbench tests/typecheck/build, SQL repeatability/static checks and scoped diff check; no migration execution or shared account mutation.
+
+### 2026-08-18 09:43:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Implement configurable employee birthday care reminders for current HRM employees, with per-recipient in-app/WebSocket notification, ZSJOS business todos, and manual completion.
+- Key decisions: Birthday source is HRM employee `birthday`; default is disabled, one day before at Beijing 09:00; recipients are administrator-selected departments with optional child expansion; one task and one notification per employee/recipient/year; no cross-day backfill or permission mutation.
+- Execution or analysis result: Added HRM config/read boundary and admin API/UI, ZSJOS one-way HRM API dependency, tenant Quartz job, notification and business-task scenes, idempotent task creation and guarded completion endpoint, Workbench completion action, V081 migration/bootstrap/verification wiring, and API/operations documentation. Job uses Asia/Shanghai and isolates per-recipient failures for same-day retry.
+- Changed files: New HRM birthday-care API/service/controller/VO files; HRM config enum and employee mapper; new ZSJOS birthday-care constants/providers/job; business-task mapper/service/controller/error codes; ZSJOS pom; admin birthday-care API/view; Workbench API/page/type; V081 migration plus bootstrap, verification, migration README; `docs/api/hrm-birthday-care.md`; this handoff file. Existing unrelated EAM/Lead/Workbench changes were preserved.
+- Verification evidence: `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed; `python script/sql/mysql/tools/zsjos_db.py check` passed; Workbench `npx tsc --noEmit` passed; Admin `pnpm ts:check` remains red on pre-existing unrelated type errors; `git diff --check` reported line-ending notices only. Database migration and live/browser checks were not executed.
+- Dependency or integration impact: Added only the existing internal HRM module and Quartz starter dependencies; System notification API remains the WebSocket integration boundary. No migration execution, role/account changes, service restart, branch operation, commit, push, or third-party dependency.
+- Remaining work: Add/run focused HRM/ZSJOS birthday-care unit tests and run Admin/workbench production builds and authenticated desktop/mobile browser checks in an environment with approved dependency build scripts and services.
+
+### Workstream registration: 2026-08-18 10:00:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Add a planner-assignment in-app/WebSocket notification and restrict registration-task notifications to enabled users in the configured registration center subtree who also hold the public-pool permission.
+- Non-goals: No account, role, menu, permission, department, historical-message, or business-record mutation; no third-party dependency; no branch, commit, push, or publication operation.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: ZSJOS registration notification provider/publisher/service/tests; next numbered notification migration; directly affected registration API/operations documentation; this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing System notification, permission, user, and department public APIs; existing ZSJOS order approval configuration; no new dependency.
+- Integration order: Narrow recipient resolution -> add planner-assignment scene and publisher call -> add repeatable V082 template/rule -> focused tests and module compile -> static migration checks and delivery evidence.
+- Verification plan: Registration notification provider/publisher/service tests, ZSJOS compile, migration repeatability/static checks, scoped `git diff --check`; live database migration and WebSocket/browser rerun only after the approved local runtime step.
+
+### Workstream scope expansion: 2026-08-18 10:04:18 +08:00
+
+- Reason: The newly assembled server cannot start because the concurrent HRM birthday-care service injects the removed Jackson 2 `ObjectMapper`, while the repository runtime and framework auto-configuration expose Jackson 3.
+- Added ownership scope: `backend/yudao-module-hrm/src/main/java/cn/iocoder/yudao/module/hrm/service/birthdaycare/HrmBirthdayCareServiceImpl.java` solely for Jackson 3 alignment, plus server startup and live registration-notification acceptance. Existing birthday-care rules and all other HRM changes remain unchanged.
+- Dependencies and integration order: No dependency change. Align the existing mapper import -> run focused HRM/ZSJOS tests and full server package -> restart the local server -> verify planner and registration-pool in-app/WebSocket delivery -> inspect runtime errors -> append delivery evidence.
+- Verification plan: HRM module compile and birthday-care focused tests when present; registration notification focused tests; complete server package and startup; authenticated live assignment and new-task notification checks including recipient exclusion and WebSocket delivery; scoped `git diff --check`.
+
+### 2026-08-18 10:17:58 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Notify a study planner when a registration case is assigned, restrict new registration-task notifications to enabled public-pool users inside the configured registration-center subtree, then rerun the real new-media-to-planner acceptance chain including in-app messages and WebSocket delivery.
+- Key decisions: Use `leadNo` in the planner-facing message; resolve registration-task recipients as the intersection of the configured department subtree and enabled users holding `zsjos:registration:query-pool`; preserve durable in-app messages as the WebSocket source; align the concurrent HRM birthday-care service with the repository's Jackson 3 runtime without changing its business rules.
+- Execution or analysis result: Added and migrated the planner-assignment scene and restricted registration recipient resolution. Repaired the Jackson startup blocker, rebuilt and started the complete server, then created a new local synthetic Lead through the new-media submission path, assigned and accepted it by Sales, recorded the first follow-up, judged it valid, submitted a sales order, completed registration and finance BPM approvals, created registration case 3, and assigned planner user 241. The registration-task event created exactly one message for `baoming1`; the planner-assignment event created exactly one message for `guihua1`, rendered the requested text with business Lead number `KZ202608181013210019`, and both events produced matching `notify-message-new` WebSocket message IDs. Department-external administrators received no message for the new registration event.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationConstants.java`; `RegistrationNotifySceneProvider.java`; `RegistrationNotifyPublisher.java`; `RegistrationServiceImpl.java`; registration provider/publisher focused tests; `backend/yudao-module-hrm/src/main/java/cn/iocoder/yudao/module/hrm/service/birthdaycare/HrmBirthdayCareServiceImpl.java`; `script/sql/mysql/migrations/V082__registration_planner_notifications.sql`; bootstrap/verification/migration README; registration API and permission-flow documentation; this handoff file.
+- Verification evidence: Registration notification tests passed 3/3; HRM dependency compile passed; complete `yudao-server` reactor package passed; the rebuilt server started and served authenticated requests on port 48080; V082 is registered in the local schema; `zsjos_db.py check` passed; scoped `git diff --check` reported line-ending notices only. Live HTTP, read-only database, in-app and WebSocket evidence confirmed order `OD202608181014090007` effective, registration case 3 pending, message 291 delivered only to `baoming1`, and message 294 delivered only to `guihua1` with matching WebSocket events. Runtime log review found only the two expected rejected test attempts (completed-case mutation and invalid region input), followed by successful execution and no notification/startup errors.
+- Dependency or integration impact: No new dependency, account/role/menu/permission/department mutation, branch/worktree operation, commit, push or publication. The approved local test generated one synthetic Lead, one opportunity, one payment-voucher file, one effective order, one registration case and their normal tasks/messages; no destructive cleanup was performed. The backend remains running on port 48080.
+- Remaining work: This new run did not repeat the already accepted independent Partner H5 submission, cashback, bank-card or withdrawal-zero-balance paths. Registration checklist completion and the planner's resulting student/service relation were not executed because the requested endpoint was planner assignment. Rejection, revision, supervisor-confirmation, duplicate-review, timeout/offline-retry and multi-recipient registration-center branches remain untested in this run. Browser rendering was not repeated because the available in-app browser had no authenticated session; HTTP, database and live WebSocket contracts were exercised directly.
+
+### Workstream registration: 2026-08-18 10:23:32 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Refactor every Workbench inbox-style master-detail surface to the documented visual system and remove Ant Design `Descriptions` from inbox details in favor of a shared semantic field grid.
+- Non-goals: Changing backend APIs, data contracts, permissions, business behavior, database state, frontend/admin, non-inbox `Descriptions` usage, dependencies, branches, commits, pushes, or external services.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Workbench inbox detail components/pages, their page/component styles and style imports, focused inbox/style guard tests, and this handoff file. Existing simple-status edits in `lead-management.css` and all unrelated dirty-worktree changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing React, Ant Design, workbench tokens, inbox layouts, `lead-card` recipe, and current typed business APIs. No new dependency.
+- Integration order: Register scope -> add semantic detail field grid -> replace inbox `Descriptions` usages -> harmonize inbox skeleton/card styles -> add guards and focused tests -> run tests/typecheck/build -> desktop/mobile browser checks where available -> append delivery evidence.
+- Verification plan: Focused field-grid and source guards, full Workbench Vitest, TypeScript typecheck, production build, scoped `git diff --check`, and authenticated desktop/mobile browser checks for representative inbox pages when the local environment permits.
+
+### 2026-08-18 10:36:33 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Refactor all Workbench inbox-style interfaces to the documented visual system and prohibit Ant Design `Descriptions` in inbox details.
+- Key decisions: Limit the prohibition to Workbench inbox surfaces; use one semantic `dl/dt/dd` field-grid component; keep existing API, permission, loading, error, selection, pagination, infinite-scroll and action behavior; retain `leadNo` for every user-visible Lead identifier; preserve concurrent simple-status and other dirty-worktree changes.
+- Execution or analysis result: Added a reusable responsive detail field grid and replaced inbox detail `Descriptions` in sales orders, registration cases, students, aging-pool Leads, duplicate review and work plans. Message and appeal metadata now use the same grid. Updated inbox/card styling, workspace roots, aging-pool column width, work-plan structure and mobile behavior. Added a source guard that prevents future inbox `Descriptions` use and extended style guards for the shared grid and layout anchors.
+- Changed files: New `DetailFieldGrid` component/test/style and inbox guard test; sales-order detail, registration, aging-pool, duplicate-review, work-plan, message and appeal pages; message, sales-order, registration, aging-pool and work-plan styles; style imports/guards; this handoff file.
+- Verification evidence: Workbench `npm test` passed 43 files and 230 tests; `npm run typecheck` passed; `npm run build` passed with the existing large-chunk warning; scoped `git diff --check` passed with line-ending notices only. Authenticated browser checks at 1440x900 confirmed the message and appeal inboxes use a 320px list column, semantic two-column detail fields and no horizontal overflow; the sales-order supervisor inbox retained its desktop detail pane and unified list width. At 390x844, the message desktop detail pane was hidden, the mobile detail drawer opened from a list selection, the field grid collapsed to one column and no page overflow occurred.
+- Dependency or integration impact: No API, backend, database, permission, dependency, branch, commit, push or shared-service change. A separate Workbench dev server was started on `http://127.0.0.1:5175/` for inspection; the existing backend and port 5174 processes were not changed.
+- Remaining work: The current authenticated account redirects registration pool, work plans, aging pool, duplicate review and my-orders direct routes because those menus are not granted, so their live data/detail states were verified by typecheck/tests/build but not visually exercised in this session. A role with those server-issued menus should repeat desktop/mobile data-state checks before release.
+
+### Workstream registration: 2026-08-18 11:09:47 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Complete registration checklist administration and add configurable multi-department student routing, planner/director assignment, per-item attachments, and My Students visibility for both assigned study planners and content directors.
+- Non-goals: No historical registration backfill; no automatic role/account/department mutation; no migration execution; no shared-service restart; no third-party dependency; no branch, commit, push or publication operation.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: System public department/post/user APIs only where required for authoritative candidate resolution; ZSJOS registration checklist, routing, attachment, completion, student-query and notification APIs/services/persistence/tests; Workbench registration configuration/public-pool/My Students pages, services and styles; Vue Admin registration configuration/My Students pages and APIs; V083 migration/bootstrap/schema/verification metadata; directly affected registration, permission, state-machine, menu and deployment documentation; this handoff file. Existing overlapping V082 and Workbench visual changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing System department, role, post and user public APIs; Infra File public API; existing registration notification and service-relation model; React/Ant Design and Vue/Element Plus upload controls. No new dependency.
+- Integration order: Extend versioned checklist and route-option persistence -> seed exact-name department mappings once and store department IDs -> add authoritative candidate and attachment contracts -> enforce route/assignee/attachment completion gates transactionally -> expose planner/director My Students -> complete React/Vue configuration and task UI -> update migrations/docs/tests -> run focused backend/frontend/SQL verification and browser checks where the deployed runtime supports them.
+- Verification plan: Focused checklist versioning, exact/ambiguous/missing department seed, planner/director eligibility, route multi-select, attachment reference/limit, completion atomicity and My Students isolation tests; ZSJOS/System module compile; Workbench tests/typecheck/build; Admin targeted lint/typecheck/build; V083 static/repeatability/schema checks; scoped `git diff --check`; desktop/mobile browser checks without executing migrations or restarting shared services.
+- Confirmed exception: Repository guidance normally forbids deriving departments from display names. The user explicitly requires the two defaults to match existing departments named `学生交付与服务中心` and `新媒体`; V083/tenant initialization may resolve those exact names once only when the match is unique, persist the System department ID, and fail visibly on missing or ambiguous matches. Runtime routing never infers departments from names.
+
+### Workstream scope update: 2026-08-18 11:20:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Add V084 as a forward-only repair for V081 birthday-care menu IDs that collide with V058 FMS menu IDs.
+- Non-goals: Do not rewrite applied V081/V083, delete or renumber FMS menus, grant birthday-care permissions to ordinary roles, execute migrations, restart services, or perform Git branch/commit/push operations.
+- Ownership scope update: Add `script/sql/mysql/migrations/V084__repair_employee_birthday_care_menu.sql`; update bootstrap order, bootstrap verification, migration README, and this handoff record only.
+- Key decision: Use repository-unused IDs `602100-602102`, resolve child parent IDs from the repaired page, and attach the three menus only to existing enabled `super_admin` roles per tenant.
+- Verification plan: Run the SQL manifest/order/static checker, confirm all new IDs are unique across repository SQL, and run scoped `git diff --check`; do not execute V084 against a database.
+
+### 2026-08-18 11:57:50 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Make registration checklist administration fully configurable, route students to one or more System departments with study-planner/content-director assignees, support attachment checklist items, snapshot department/assignee facts on completion, and expose assigned students to both planners and directors.
+- Key decisions: Resolve the existing exact unique System department names `学生服务与交付中心` and `新媒体与客资中心` only in V083 and persist IDs; runtime never infers departments by labels. Planner candidates require stable role code `study_planner`; director candidates require stable post code `content_director`; both are filtered to the selected department subtree and enabled accounts. At least one route is required, every selected route must have a valid assignee, required attachment items require a file, and optional empty attachment items do not create completion facts. The existing service owner remains the selected planner when present and otherwise the first selected route assignee, while all route assignees receive My Students visibility through the case-route relationship.
+- Execution or analysis result: Added versioned route configuration, case route and assignee snapshots, attachment metadata and file commands, route-specific candidate APIs, completion gates, director completion notification, and planner/director My Students union/object authorization. Workbench and Vue Admin now both support checklist add/delete/reorder/enable/type/required settings and department-route configuration; both registration handling surfaces support multi-route assignment and checklist attachments. V083 seeds the two exact department mappings, snapshots pending/processing cases, grants only My Students to `content_director`, and adds the director in-app/WebSocket rule. Directly affected API, permission, state-machine, menu and migration documents were synchronized.
+- Changed files: ZSJOS registration controllers/VOs, registration persistence mappers/DOs, configuration/fulfillment/student permission and notification services and focused tests; Workbench `RegistrationPages.tsx`, registration API types and styles; Vue Admin registration/config APIs and pages; `V083__registration_routes_and_attachments.sql`, bootstrap/baseline/schema/verification files and migration README; registration API, permission-flow, role-matrix, state-machine, menu-coverage and operations documentation; this handoff file.
+- Verification evidence: ZSJOS focused reactor tests passed 12/12 and compiled all 569 module sources; Workbench passed 230/230 tests, typecheck and production build (existing large-chunk warning only); Vue Admin full typecheck passed after the feature edits, targeted ESLint/Stylelint/Prettier checks passed, and `build:local` succeeded with an existing Lightning CSS warning. A later repo-wide Admin typecheck is blocked by unrelated concurrent errors in BPM designer, CRM, EAM, MES, System and export/order pages; no task file appears in that failure list. `zsjos_db.py check` passed migration order, desired schema/baseline equality, Java mappings and verification consistency. Scoped `git diff --check` passed with line-ending notices only.
+- Dependency or integration impact: No npm/Maven dependency, branch/worktree, commit, push, database execution, real role/account/department mutation, shared-service restart or destructive file operation. The existing V082 planner notification changes were preserved. V083 must be applied after V082 and before V084; missing or ambiguous default department names produce a verification failure instead of a guessed mapping.
+- Remaining work: V083 was not executed and the shared backend was not restarted, so live authorized/unauthorized HTTP, station-message/WebSocket, file storage, desktop/mobile browser and migration-repeatability acceptance remain unverified. Run those only after separately approving migration execution and shared-service restart. The latest repository-wide Admin typecheck and lint also remain red on unrelated pre-existing/concurrent files even though task-file checks and the earlier full feature typecheck passed.
+
+### 2026-08-18 11:23:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Repair the V081 birthday-care menu ID collision using V084 because V083 is reserved by registration work.
+- Key decisions: Preserve applied V081 and all V058 FMS menu rows; use repository-unused IDs `602100-602102`; resolve permission children from the repaired page; grant the repaired menu only to enabled `super_admin` roles and leave ordinary-role authorization unchanged.
+- Execution or analysis result: Added repeatable forward migration V084, added it to bootstrap, replaced the invalid V081 menu verification with repaired parent/child and super-admin relation checks, and documented the repair.
+- Changed files: `script/sql/mysql/migrations/V084__repair_employee_birthday_care_menu.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; this handoff file.
+- Verification evidence: Repository search confirmed `602100-602102` have no other SQL/code ownership; scoped `git diff --check` passed with line-ending notices only. `zsjos_db.py check` correctly remains blocked because the separately reserved V083 migration file is not yet present in this worktree, so current versions are `V001-V082,V084`.
+- Dependency or integration impact: V084 changes only menu metadata and enabled super-admin menu relations when executed. No FMS row, ordinary-role permission, account, business data, dependency, service, branch, commit, or push was changed; the migration was not executed.
+- Remaining work: Land the separately owned V083 migration and place its bootstrap source before V084, then rerun `python script/sql/mysql/tools/zsjos_db.py check` and controlled migration verification.
+
+### 2026-08-18 12:57:31 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Execute fixes from the registration fulfillment code review and verify interface compatibility.
+- Key decisions: Public-pool notifications now target every enabled user with the public-pool permission, independent of department. Planner assignment notification keys include the registration-case version so A -> B -> A reassignment emits a new event while retries remain idempotent. Attachment uploads use the existing non-blank idempotency constraint. My Students no longer exposes internal `leadId`, and detail relations are filtered in the database by user and Person.
+- Execution or analysis result: Applied the five confirmed fixes, updated the focused regression tests and registration API documentation, and preserved all unrelated dirty-worktree changes.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/RegistrationController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/vo/MyStudentRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/registration/ServiceRelationMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/MyStudentServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationNotifyPublisher.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/RegistrationNotifySceneProvider.java`; three focused registration tests; `frontend/admin/src/api/zsjos/registration/index.ts`; `docs/api/registration-fulfillment-api.md`; this handoff file.
+- Verification evidence: ZSJOS reactor focused tests passed 12/12 and compiled 569 module sources. Workbench tests passed 230/230, typecheck passed, and production build passed with only the existing large-chunk warning. Admin registration API ESLint passed and `pnpm build:local` passed with the existing Lightning CSS warning. Full Admin `pnpm ts:check` remains blocked by unrelated existing errors in BPM/CRM/EAM/MES/System/export/order files; no changed registration API file is listed. `git diff --check` passed with existing line-ending notices only.
+- Dependency or integration impact: No new dependency, migration execution, account/permission mutation, service restart, branch, commit, push, or publication. The runtime must be rebuilt/restarted before live API and notification acceptance; no shared service was changed in this turn.
+- Remaining work: Live authorized/unauthorized HTTP, station-message/WebSocket delivery, attachment storage, and browser acceptance remain unverified because the backend was not restarted and the migration was not executed.
+
+### 2026-08-18 13:11:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: List and uniformly repair OCR findings outside registration fulfillment, specifically EAM, HRM and Lead changes.
+- Key decisions: Treat user and supervisor names as server-owned EAM snapshots; ordinary save requests accept only user IDs and validate enabled System users. Apply the canonical Lead simple-status filter to partner pagination as well as the main management query. HRM birthday-care implementation was reviewed end-to-end and no additional deterministic defect was confirmed.
+- Execution or analysis result: Removed client-writable EAM snapshot fields, generated snapshots from System user data during create/update, added department fallback from the selected user when absent, and synchronized Lead management tests with the current object-based identity permission contract and all-scope query-all behavior.
+- Changed files: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/asset/vo/EamAssetSaveReqVO.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadMapper.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; this handoff file.
+- Verification evidence: EAM parser/import focused tests passed 5/5. ZSJOS focused Lead management/submission tests passed 39/39 with `-am`. Cross-module EAM/HRM/ZSJOS compile passed. `git diff --check` passed with repository line-ending notices only. No migration, service restart, permission mutation, branch operation, commit or push was performed.
+- Dependency or integration impact: No new dependency. EAM now depends only on the existing System public user API already available to the module. Import snapshots remain compatible for unmatched historical names. Existing HRM birthday-care and registration changes were preserved.
+- Remaining work: Full OCR re-review and live API/browser acceptance remain unverified; HRM has no confirmed code change from this pass. Existing unrelated full Admin typecheck failures remain outside this scope.
+
+### 2026-08-18 15:31:55 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Implement neutral, user-visible, server-side advanced filtering across the Workbench business inboxes and remove their persistent refresh buttons.
+- Key decisions: Keep internal scene and field keys out of visible grouping; whitelist all SQL expressions and operators; calculate relative dates in Beijing natural days; preserve fixed authorization/tab scope outside the filter tree; merge positive AND predicates for the same related record; use `leadNo` as the only visible Lead number; apply filters before paging/cursor assembly; hydrate personnel options from the current Lead visibility scope and never fall back to the unscoped System simple-user list; retain error-state and option-load retry actions while removing persistent refresh commands.
+- Execution or analysis result: Added the seven-scene catalog and query adapters; wired Lead, order, appeal, duplicate-review, registration, student and subordinate-sales request flows and Workbench inbox surfaces; converted the editor to searchable grouped draft/apply behavior with relative dates and removable summaries; added component/static guards; removed the target pages' persistent refresh buttons; documented the affected API contracts and permission semantics. No client-side current-page pseudo-filter was added.
+- Changed files: ZSJOS advanced-filter Controller/VO/service/mapper and focused test; affected Lead appeal/duplicate/subordinate, order/supervisor, registration/student controllers, request VOs, services and mappers; Workbench `AdvancedFilter` component/tests/styles, typed API, target Lead/order/appeal/duplicate/registration/student/subordinate pages and `inbox-advanced-filter.guard.test.ts`; `docs/api/zsjos-lead-submission-dispatch.md`, `docs/api/zsjos-sales-order.md`, `docs/api/registration-fulfillment-api.md`; this handoff file.
+- Verification evidence: Workbench passed 44 test files and 264 tests, `npm run typecheck`, and `npm run build`; build emitted only the existing large-chunk warning. ZSJOS focused reactor tests passed 73/73, including 11 advanced-filter tests, and the reactor compile passed all 570 ZSJOS source files. Scoped `git diff --check` passed with line-ending notices only. Static scanning confirms target pages have no persistent `刷新` button and the advanced-filter component no longer calls `api.simpleUsers()`. Development listeners are limited to ports `80`, `5174`, and `48080`. Browser navigation at `1440x900` reached only the login page; no authenticated browser session was available, so desktop/mobile interaction acceptance was not claimed.
+- Dependency or integration impact: No npm/Maven dependency, database migration or execution, account/role/permission mutation, service lifecycle change, new port, branch/worktree operation, commit, push, or publication. Existing unrelated EAM, HRM, Admin, H5, registration-routing, notification and SQL worktree changes were preserved.
+- Remaining work: Run authenticated browser acceptance at `1440x900` and `390x844` against the rebuilt/restarted runtime to verify apply/cancel/reset, page/cursor continuity, empty/error/unauthorized states, personnel option scope and mobile drawers. The current listeners still serve the pre-restart backend artifact, so live HTTP behavior for this source revision remains unverified.
+
+### Workstream scope update: 2026-08-18 15:53:29 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Align qualification exceptions, sales-order approvals, appeals, Lead complaints and personnel management with the compact `leads/manage` master-detail inbox skeleton and remove excess top/left spacing.
+- Non-goals: Backend/API/schema/permission changes; new advanced-filter scenes for complaints or personnel; changing approval, complaint, qualification or personnel-state business behavior; dependency additions; service restarts; branch/commit/push operations; unrelated page redesign.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Workbench shared business-inbox CSS and style guards; qualification-exception, sales-order-approval/supervisor, appeal, complaint and personnel page markup/state; typed frontend complaint pagination contract where needed; mobile detail Drawer guards; directly affected UI documentation if required; this handoff file. Existing advanced-filter/detail-grid and unrelated dirty-worktree changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing `leads/manage` layout recipe, Workbench `--crm-*` tokens, Ant Design, existing page APIs and current mobile Drawer pattern. No new dependency.
+- Integration order: Register scope -> add neutral inbox skeleton -> migrate pages without changing commands -> add mobile/detail states and guards -> frontend tests/typecheck/build -> authenticated browser checks when available -> port/diff verification -> append delivery evidence.
+- Verification plan: Focused/full Workbench tests, typecheck and production build; static guards for root/pane padding, unified column width, mobile-only Drawer opening, no obsolete heading or persistent refresh button; desktop `1440x900` and mobile `390x844` browser checks when authenticated; scoped `git diff --check`; verify development listeners remain limited to ports `80`, `5174`, and `48080`.
+
+### 2026-08-18 16:11:20 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Align qualification exceptions, sales-order approvals, appeals, Lead complaints and personnel management with the compact `leads/manage` inbox layout, remove excess top/left spacing, and keep persistent refresh controls removed.
+- Key decisions: Reuse one neutral `business-inbox-*` skeleton with tokenized full-width page padding, stable list column and independently scrolling detail pane; keep fixed approval/status scopes outside advanced filters; keep complaint pagination on the existing server API; keep personnel search over the authoritative complete System simple-user source; move complaint, qualification and personnel actions into detail; open detail Drawers only at the mobile breakpoint.
+- Execution or analysis result: Migrated all five requested routes and the embedded supervisor worklist to the shared master-detail geometry. Qualification and complaint table surfaces are now selectable lists with semantic detail fields; appeals use the same compact geometry; order approval and supervisor modes no longer add nested wrappers or double padding; personnel management now has a searchable account list and right-side state detail. Added mobile Drawers, preserved loading/empty/error/retry/action flows, removed persistent refresh buttons, and added regression guards for layout, table regressions, refresh actions and Drawer breakpoints.
+- Changed files: `frontend/workbench/src/styles/components/business-inbox.css`; `frontend/workbench/src/styles/index.css`; `frontend/workbench/src/styles/antd-overrides.css`; `frontend/workbench/src/styles/pages/sales-order.css`; `frontend/workbench/src/pages/LeadQualificationExceptionPage.tsx`; `frontend/workbench/src/pages/LeadAppealPage.tsx`; `frontend/workbench/src/pages/LeadComplaintPage.tsx`; `frontend/workbench/src/pages/SalesOrderApprovalPage.tsx`; `frontend/workbench/src/components/SalesOrderSupervisorInbox.tsx`; Personnel section of `frontend/workbench/src/pages/ManagementPages.tsx`; complaint pagination signature in `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/business-inbox-alignment.guard.test.ts`; `frontend/workbench/src/pages/desktop-detail-drawer.guard.test.ts`; `frontend/workbench/src/pages/sales-order-approval-unified.guard.test.ts`; `frontend/workbench/src/styles/styles.guard.test.ts`; this handoff file.
+- Verification evidence: Workbench passed 45 test files and 272 tests, `npm run typecheck`, and the final `npm run build`; build emitted only the existing large-chunk warning. Scoped `git diff --check` passed with line-ending notices only. Browser navigation reached the Workbench login page, but the in-app browser had no authenticated session and no external Chrome control connection was available. Port inspection identified Vite preview PID `41476` on `4180`; it was stopped, and the retained development listeners are exactly `80`, `5174`, and `48080`.
+- Dependency or integration impact: No dependency, backend behavior, database/schema, permission, account, branch/worktree, commit, push or publication change. The extra local Vite preview on `4180` was terminated under the user's explicit port-cleanup request; the retained frontend/backend services were not restarted. Existing unrelated dirty-worktree changes were preserved.
+- Remaining work: Authenticated browser acceptance at `1440x900` and `390x844` remains unverified, including real data selection, long content, action modals, authorization/error states and mobile Drawer rendering. The running backend was not rebuilt or restarted in this turn.
+
+### Workstream scope update: 2026-08-18 16:27:36 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Migrate the Workbench message center to the shared compact inbox skeleton, prevent long message content from overflowing list/detail containers, and align message metadata labels left with values right.
+- Non-goals: Message API, backend payload, permission, realtime/read-state behavior, notification popup styling, duplicate-review redesign, dependency additions, service restart, branch/commit/push operations, or unrelated UI changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/MessageInboxPage.tsx`; message-center-specific rules in `frontend/workbench/src/styles/pages/message-inbox.css`; inbox alignment/style guards and tests; this handoff file. Existing shared-worktree changes are preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing `business-inbox-*` skeleton, `DetailFieldGrid`, Ant Design typography/Drawer, `--crm-*` tokens and current message APIs. No new dependency.
+- Integration order: Register scope -> migrate message-center markup -> add overflow/alignment constraints -> extend guards -> Workbench tests/typecheck/build -> browser check when authenticated -> port/diff verification -> append delivery evidence.
+- Verification plan: Workbench full tests, typecheck and production build; static checks for shared inbox classes, no persistent refresh action, two-line breakable summary, detail wrapping, left `dt`/right `dd`, and mobile-only Drawer; authenticated desktop/mobile browser check when available; scoped `git diff --check`; confirm listeners remain `80`, `5174`, and `48080`.
+
+### Workstream scope update: 2026-08-18 16:45:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Enforce business identifiers instead of customer/student names in ZSJOS notifications, rewrite affected historical snapshots through V085, and reuse the WebSocket notification action for Message Center Lead navigation.
+- Non-goals: New API/database columns, notification action protocols, dependencies, customer-name guessing in arbitrary free text, real migration execution, service restart, branch/commit/push operations, or unrelated UI/business changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: System notify template/send validation; ZSJOS Lead/order/registration notification providers and publisher; MySQL V085/template and history migration plus bootstrap/verification/docs; Workbench shared notification action and MessageInbox detail action/tests; this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing scene registry, notification event processor, Lead/order/registration tables and APIs, `business-inbox`/`DetailFieldGrid` UI, current WebSocket action behavior. No new dependency.
+- Integration order: Register scope -> change scene variables/publishers -> add fail-closed template validation -> add V085 and SQL documentation -> extract shared frontend action and Message Center button -> add focused tests/static guards -> run Workbench and backend verification -> append delivery evidence.
+- Verification plan: Focused System/ZSJOS notification tests, Workbench tests/typecheck/build, SQL static/repeatability checks, `git diff --check`, authenticated desktop/mobile notification navigation when available, and confirm listeners remain limited to `80`, `5174`, and `48080`.
+
+### 2026-08-18 16:33:09 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Convert the Workbench message center to the unified inbox style, prevent long messages from overflowing their cards, and left-align metadata labels while right-aligning metadata values.
+- Key decisions: Reuse the existing `business-inbox-*` full-width master-detail skeleton; preserve message API, realtime, read-state, cursor and authorization behavior; keep titles on one ellipsized line; clamp summaries to two breakable lines; allow detail text and metadata values to break anywhere; scope `dt`/`dd` alignment to message metadata so other `DetailFieldGrid` consumers are unchanged; retain error-state retry while removing the persistent refresh action.
+- Execution or analysis result: Migrated `MessageInboxPage` to the shared scope bar, list, item, detail pane and mobile Drawer classes. Converted message detail content to shared hero/cards, added robust overflow containment for titles, summaries,正文 and metadata, made metadata `dt` left-aligned and `dd` right-aligned, and extended the inbox alignment guard with message-specific layout, refresh, wrapping and alignment assertions.
+- Changed files: `frontend/workbench/src/pages/MessageInboxPage.tsx`; message-center-specific rules in `frontend/workbench/src/styles/pages/message-inbox.css`; `frontend/workbench/src/pages/business-inbox-alignment.guard.test.ts`; this handoff file.
+- Verification evidence: Workbench passed 46 test files and 276 tests, `npm run typecheck`, and `npm run build`; build emitted only the existing large-chunk warning. Scoped `git diff --check` passed with line-ending notices only. Static checks confirm shared inbox classes, no persistent refresh button, two-line breakable summaries, breakable detail text, and message metadata left/right alignment. Browser acceptance remains unavailable because the available browser session is unauthenticated. A reappeared Workbench Vite preview PID `41888` on port `4180` was identified and stopped; listeners now remain exactly `80`, `5174`, and `48080`.
+- Dependency or integration impact: No dependency, backend/API/schema, permission, account, realtime/read-state behavior, branch/worktree, commit, push or publication change. No retained service was restarted. Existing duplicate-review use of legacy message-inbox selectors and unrelated shared-worktree changes were preserved.
+- Remaining work: Authenticated desktop/mobile browser acceptance with real long messages remains unverified, including exact line clamping, active/unread visuals, detail scrolling and Drawer rendering at `1440x900` and `390x844`.
+
+### 2026-08-18 16:35:18 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Fix the message-center list cards being vertically compressed so their content was clipped.
+- Key decisions: Keep message card height content-driven and set only the message-center item to `flex: none`; do not introduce a fixed height or change message data/loading behavior. Preserve the existing scroll container so a full page of cards remains scrollable.
+- Execution or analysis result: Added the non-shrink constraint to `.message-center-item` and a static guard assertion that prevents regression.
+- Changed files: `frontend/workbench/src/styles/pages/message-inbox.css`; `frontend/workbench/src/pages/business-inbox-alignment.guard.test.ts`; this handoff file.
+- Verification evidence: The focused business-inbox guard passed 4/4 tests, `npm run typecheck` passed, and `npm run build` passed with only the existing large-chunk warning. Scoped `git diff --check` passed with line-ending notices only. Listeners remain exactly `80`, `5174`, and `48080`.
+- Dependency or integration impact: No dependency, backend/API/schema, permission, account, service restart, branch/worktree, commit, push or publication change.
+- Remaining work: Authenticated browser verification of the real message list remains unverified because no browser login session is available.
+
+### 2026-08-18 17:14:50 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Replace customer-facing names in business notifications with `leadNo`/`orderNo`, migrate historical structured messages through V085, and add permission-aware Lead navigation to the Workbench Message Center using the shared WebSocket action executor.
+- Key decisions: Removed Lead/customer, order student, and registration student name variables from scene catalogs and publishers; retained employee/operator names; added fail-closed template parameter validation; created a repeatable V085 migration with relationship-based identifier replacement and no free-text name guessing; reused existing notification action priority and APIs for desktop, mobile Drawer, and WebSocket actions; did not execute the real migration or restart services.
+- Execution or analysis result: Backend notification providers, publisher, system validation, migration/bootstrap/verification/docs, shared Workbench action service, Message Center Lead action, and focused tests were implemented. The only test correction was supplying an empty event payload in the new order provider test to match the production event contract.
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notify/NotifyBusinessEventProcessor.java`; `NotifySceneRegistry.java`; `NotifyTemplateService.java`; `NotifyTemplateServiceImpl.java`; related System tests; ZSJOS Lead/order/registration providers and publisher plus tests; `script/sql/mysql/migrations/V085__remove_customer_names_from_business_notifications.sql`; bootstrap/verify/README; notification API docs; `frontend/workbench/src/services/notifyMessageAction.ts` and tests; `NotifyMessageProvider.tsx`; `MessageInboxPage.tsx`; this handoff file.
+- Verification evidence: Workbench `npm test` passed (47 files, 280 tests), `npm run typecheck` passed, and `npm run build` passed with only the existing chunk-size warning. ZSJOS focused notification tests passed (16 tests). Backend reactor install/compile passed. `zsjos_db.py check` passed. `git diff --check` reported only existing line-ending notices. No 4180/4173 preview listener remains; required listeners 80, 5174, and 48080 remain. Authenticated browser acceptance and real MySQL execution remain unverified/not performed.
+- Dependency or integration impact: No new dependency, API/database column, notification action protocol, permission model, branch/worktree, commit, push, or service restart. V085 must be reviewed/backed up and explicitly approved before production execution.
+- Remaining work: Run V085 against a controlled backed-up database after explicit confirmation; perform authenticated desktop/mobile browser acceptance for message selection, long text, Lead action visibility, permission failure, and realtime click behavior.
+
+### 2026-08-18 17:22:16 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Make Lead lifecycle wording match the confirmed business facts: qualification only creates an opportunity, order submission enters deal approval, and conversion occurs only after the order becomes effective.
+- Key decisions: Preserve the legacy database `converted_at` write and avoid migrations; project customer-facing `convertedAt` from `Opportunity.wonAt`; add the latest first-purchase order submission timestamp for “录入成交”; split the Workbench pipeline into qualification, deal entry, and effective conversion; preserve unrelated dirty-worktree changes.
+- Execution or analysis result: Added backend Lead detail projection fields, latest first-purchase lookup, Workbench lifecycle timeline/pipeline rendering, focused backend/frontend regressions, and synchronized business/API documentation.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/order/SalesOrderMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/management/LeadManagementRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/components/LeadDetailOverview.lifecycle.test.ts`; `docs/api/zsjos-lead-submission-dispatch.md`; `docs/business/lead-order-state-machine.md`; this handoff file.
+- Verification evidence: ZSJOS `LeadManagementServiceImplTest` passed 27/27; Workbench lifecycle tests passed 2/2; Workbench typecheck passed; Workbench production build passed with only the existing chunk-size warning; browser opened the local Workbench login page, but authenticated detail verification was unavailable; `git diff --check` reported line-ending notices only.
+- Dependency or integration impact: No new dependency, schema/migration, permission, account, external state, branch, commit, push, or service restart. Existing API consumers receive additive fields; `convertedAt` now has the documented customer-facing won-time projection.
+- Remaining work: Authenticated desktop/mobile browser acceptance remains unverified because no logged-in browser session was available.
+
+### 2026-08-18 18:04:55 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Fix the lifecycle-stage regression where any historical submitted first-purchase order kept a Lead in the current “录入成交” stage after cancellation or termination.
+- Key decisions: Keep `salesOrderSubmittedAt` as a historical timeline event; drive the current pipeline from `followUpStatus`, `status`, and active order status; treat pending/revision-required orders as deal entry, won as conversion, and terminated historical orders as no longer in deal entry.
+- Execution or analysis result: Updated `pipelineStepIndex` and added regression coverage for pending approval, revision required, terminated, and won states. No backend, schema, order workflow, or API projection changes were needed.
+- Changed files: `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/components/LeadDetailOverview.lifecycle.test.ts`; this handoff file.
+- Verification evidence: Focused lifecycle tests passed 2/2; Workbench typecheck passed; production build passed with only the existing chunk-size warning; scoped `git diff --check` reported line-ending notices only.
+- Dependency or integration impact: No new dependency, database/migration, permission, account, external state, branch, commit, push, or service restart.
+- Remaining work: Authenticated desktop/mobile browser acceptance remains unverified because no logged-in browser session was available.
+### Workstream scope update: 2026-08-18 17:24:19 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Unify cross-business Lead overview access, role-configurable detail tabs, source/submitter/owner presentation, and ownership transfer when a designated public-sea collaborator submits an order.
+- Non-goals: Expand the Lead management list, rewrite historical orders or applied migrations, alter claim-pool ownership rules, add dependencies, execute migrations, restart shared services, or perform branch/commit/push operations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: ZSJOS Lead detail authorization/projection and tab read permissions; aging/manual public-sea collaborator access and submit-time ownership transfer; sales-order submission integration; Workbench Lead detail/deep-link presentation; forward MySQL permission migration/bootstrap verification; focused tests and directly affected API/architecture/business/frontend documentation; this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing System role/menu permission management, ZSJOS object-permission AOP, Lead/Opportunity/order/student-service relations, BusinessTask command boundary, React/Ant Design Workbench, and current dirty-worktree changes. No new dependency.
+- Integration order: Preserve overlapping edits -> unify detail access and tab projection -> enforce tab APIs -> implement two-pool collaborator resolution and submit-time transfer -> add deep-link/detail fields -> add forward permission migration and docs -> run focused/full verification -> append delivery evidence.
+- Verification plan: Focused Lead permission/management, public-sea and sales-order tests; Workbench focused/full tests, typecheck and build; SQL ordering/repeatability/static checks and bootstrap difference check; authenticated desktop/mobile browser checks when available; scoped `git diff --check`.
+
+### 2026-08-18 17:57:02 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Implement unified cross-business Lead overview access, independently configurable history tabs, source/submitter/owner presentation, and permanent formal-owner transfer when an aging-pool or manual-public-sea collaborator submits an order.
+- Key decisions: Keep the Lead management list scope unchanged and expose cross-business access only through `leadId` detail deep links; derive overview access from concrete Lead, public-sea, readable-order and active-student-service object relations; project tab visibility exclusively on the server from four System role permissions while retaining object checks on every history API; preserve the existing sales/submitter Chinese-name masking but show full submitter identity to other authorized business readers; resolve partner submitters to partner names; transfer both Lead and Opportunity ownership in the order-submission transaction, freeze the new formal sales user on the order, retain the actual submitter, preserve history/progress, rebind pending sales tasks, and never roll ownership back after order failure.
+- Execution or analysis result: Added unified Lead detail authorization and response projections (`overviewVisible`, `visibleTabs`, `sourceLabel`, `sourceUserName`, `ownerUserName`, `identityMaskMode`); added independent follow-up, appeal, complaint and order read permissions and endpoint enforcement; added source/submitter/owner fields and permission-driven tabs to the Workbench; added detail-only links from order, approval and student contexts; implemented aging/manual public-sea submit-time ownership transfer with row locks, history and task reassignment; added repeatable V086 compatibility grants; synchronized permission, API, lifecycle, public-sea and migration documentation. Final review also fixed deep-link routing so an object-authorized user can still open the overview when all four history tabs are hidden.
+- Changed files: Lead detail controllers/VOs, Lead/order/registration mappers and object-permission services under `backend/yudao-module-zsjos/src/main/java`; new `LeadCollaborationService.java` and `LeadObjectPermissionProvider.java`; focused Lead collaboration/permission/management/order contract tests; `frontend/workbench/src/components/LeadDetail.tsx`; `LeadDetailOverview.tsx`; `frontend/workbench/src/pages/LeadManagementPage.tsx`; order/approval/student entry pages; Lead API/service/menu helpers and tests; `script/sql/mysql/migrations/V086__lead_detail_tab_permissions.sql`; bootstrap/verification/migration manifests; directly affected architecture, API, business, frontend and operations documents; `backend/yudao-module-zsjos/AGENTS.md`; this handoff file.
+- Verification evidence: Final focused ZSJOS run passed 94/94 tests across collaboration, order, object-permission, Lead management, appeal and permission-contract suites; ZSJOS compile passed. Workbench passed 48 test files and 283/283 tests, `npm run typecheck`, and `npm run build`; build emitted only the existing large-chunk warning. `python script/sql/mysql/tools/zsjos_db.py check` passed migration ordering, manifests, desired schema, Java mappings, baseline versions and verification consistency. Scoped `git diff --check` reported line-ending notices only; searches found no legacy client tab inference or stale non-transfer wording. A full Maven reactor attempt stopped in unrelated Infra `CodegenEngineUniappTest.testExecute_treeSearch`; no Infra files were changed for this task.
+- Dependency or integration impact: No new dependency, branch/worktree operation, commit, push, service restart, account/role mutation, migration execution or publication. V086 adds four System permission nodes and compatibility role grants when explicitly applied; administrators can then adjust each tab through existing role management. Existing unrelated dirty-worktree changes were preserved.
+- Remaining work: V086 has not been executed and requires reviewed, explicitly approved deployment. Authenticated browser acceptance at desktop and mobile widths remains unverified because the only available browser session reached the Workbench login page and no reusable authenticated browser was available; real-data deep links, fields, tab combinations and unauthorized/error states should be exercised after deployment or with an authenticated local session.
+
+### Workstream scope update: 2026-08-18 18:32:34 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Correct advanced-filter personnel options so each scene uses a verified object scope and no scene inherits Lead-wide user visibility by default.
+- Non-goals: Change Lead overview/list/tab/public-sea behavior, invent order/appeal/registration personnel scope SQL, add dependencies, execute migrations, restart services, or perform branch/commit/push operations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Advanced-filter catalog controller/service and a focused scene user-scope resolver; active student-service lookup reuse; focused tests; this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Existing System AdminUser API, Lead object hierarchy scope, active student service relations, and AdvancedFilter catalog contracts. No new dependency.
+- Integration order: Add scene scope resolver -> remove user fields for unsupported scenes -> wire controller -> add focused tests -> compile/test/diff verification -> append delivery evidence.
+- Verification plan: Focused advanced-filter scope/catalog tests, ZSJOS compile, relevant module tests, and scoped `git diff --check`.
+
+### Workstream scope expansion: 2026-08-18 18:35:30 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Added ownership scope: `docs/api/zsjos-lead-submission-dispatch.md`, because the personnel-option fallback contract changes from empty options to omission when no authoritative scene scope exists.
+- Coordination impact: None; this is the directly affected advanced-filter API contract document.
+
+### Workstream scope update: 2026-08-18 18:20:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Repair the applied V085 notification identifier migration through forward-only V087, and fix the reviewed backend/frontend notification reliability defects.
+- Non-goals: Modify applied V085, reuse occupied V086, execute V087 against a real database, guess names after structured values were removed, overwrite unverifiable historical bodies, add dependencies/API/schema columns, restart services, or perform branch/commit/push operations.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Forward-only MySQL V087 plus bootstrap/verification/migration docs; System/ZSJOS notification provider and publisher reliability/tests; Workbench shared notification action, Message Center probe state/tests; directly affected notification documentation; this handoff file.
+- Owner: Codex `/root`
+- Dependencies: Applied V085 historical state, occupied V086 Lead-detail permission migration, existing System notification scene API, ZSJOS Lead/order/registration relationships, Workbench typed API and existing message routes. No new dependency.
+- Integration order: Register scope -> harden backend payload and publication -> repair frontend action/probe behavior -> add V087 and static verification -> focused/full tests and builds -> append delivery evidence.
+- Verification plan: Workbench focused/full tests, typecheck and production build; System/ZSJOS focused tests and module compile; MySQL migration ordering, manifest, repeatability and static assertions; scoped `git diff --check`; authenticated browser checks only if a reusable login session is available. V087 real execution remains separately approval-gated.
+
+### 2026-08-18 18:27:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Apply the reviewed notification fixes through forward-only V087 because V085 is already applied and V086 is occupied, while preserving customer-facing `leadNo`/`orderNo` rules and Message Center Lead navigation.
+- Key decisions: Kept V085 and V086 immutable; created V087 as a fail-closed, tenant-matched repair for active and logically deleted notification history; rejected invalid JSON, unsafe relations, non-string legacy values, non-string or conflicting business identifiers, and unresolved visible numbers; never substituted an internal Lead ID or guessed a removed name; made notification payload handling null-safe; removed registration notification N+1 Lead lookup; made Message Center read synchronization best-effort, paginated appeal lookup, permission probing message-scoped and transient failures retryable; did not execute V087 or restart services.
+- Execution or analysis result: Completed System/ZSJOS notification hardening, Workbench shared action/probe fixes, V087 plus bootstrap/verification/manifests and directly affected API/operations documentation. Final SQL review added explicit JSON string validation for stored business numbers and fully parenthesized registration backfill predicates.
+- Changed files: System notification processor/registry/template service and focused fixtures/tests under `backend/yudao-module-system`; Lead/order/registration notification scene providers, registration publisher/service and focused tests under `backend/yudao-module-zsjos`; `frontend/workbench/src/services/notifyMessageAction.ts` and test; `NotifyMessageProvider.tsx`; `MessageInboxPage.tsx`; `script/sql/mysql/migrations/V087__repair_business_notification_identifiers.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; migration README; notification, registration, sales-order and database-migration documentation; this handoff file.
+- Verification evidence: Workbench focused action tests passed 9/9; full `npm test` passed 48 files and 288 tests; `npm run typecheck` passed; `npm run build` passed with only the existing large-chunk warning. System focused notification tests passed 13/13; ZSJOS focused notification/registration tests passed 23/23. `mvn -f backend/pom.xml -pl yudao-module-zsjos -am "-DskipTests" package` completed all 21 reactor modules with `BUILD SUCCESS`. `python script/sql/mysql/tools/zsjos_db.py check` passed migration order, manifests, desired schema, Java mappings, baseline versions and verification consistency. Tracked and untracked scoped whitespace checks passed with line-ending notices only. Existing listeners on `80`, `5174`, and `48080` remain; no preview service was started. Browser access reached the Workbench login page, but no reusable authenticated session was available.
+- Dependency or integration impact: No dependency, API/schema column, permission model, account, branch/worktree, commit, push, service restart or real database change. V087 follows V085 and occupied V086 in bootstrap and must be separately reviewed, backed up and approved before execution.
+- Remaining work: V087 has not been executed or runtime-validated by MySQL in a disposable/real schema; production application requires separate explicit confirmation and a backup. Authenticated desktop/mobile Message Center acceptance remains unverified. A pre-V085 backup is still required to prove or repair rendered bodies whose old structured customer-name key was already removed by V085; V087 intentionally does not guess those names.
+
+### 2026-08-18 20:12:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Correct the V087 MySQL procedure creation failure reported during controlled execution.
+- Key decisions: Removed the unused top-level `repair` compound-statement label, which the target MySQL parser reported at `repair: BEGIN`; retained the required internal `template_loop` label. No migration numbering, data scope, transaction, validation or identifier behavior changed.
+- Execution or analysis result: The reported run dropped the procedure after creation failed at the parser stage; `CALL` therefore failed because the procedure did not exist. No V087 transaction or notification-row update was reached. The SQL now uses an unlabeled procedure body and remains forward-only after V085/V086.
+- Changed files: `script/sql/mysql/migrations/V087__repair_business_notification_identifiers.sql`; this handoff file.
+- Verification evidence: `python script/sql/mysql/tools/zsjos_db.py check` passed after the edit; scoped `git diff --check` passed with line-ending notices only. No real database rerun was performed by Codex.
+- Dependency or integration impact: None. V085 and V086 remain unchanged; no service restart, branch, commit, push or additional port was used.
+- Remaining work: Re-run V087 in the controlled database. MySQL runtime execution after this syntax correction remains pending; retain the required backup and review the migration output before production use.
+
+### 2026-08-18 20:16:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Address the SQL client safety warning raised while running V087.
+- Key decisions: Kept the idempotent `DROP PROCEDURE IF EXISTS` behavior; added an explicit `WHERE repair_row.message_id IS NOT NULL` to the bounded temporary-table `UPDATE ... JOIN` so SQL clients recognize its scope. Removed an accidental no-op follow-up update before validation.
+- Execution or analysis result: The reported missing-procedure message is normal after the failed create and cleanup. The safety warning was for the single message-repair UPDATE lacking an explicit WHERE; it was bounded by the temporary-table join but is now explicit. No database execution was performed by Codex in this turn.
+- Changed files: `script/sql/mysql/migrations/V087__repair_business_notification_identifiers.sql`; this handoff file.
+- Verification evidence: `python script/sql/mysql/tools/zsjos_db.py check` passed; scoped whitespace check passed with no errors.
+- Dependency or integration impact: No changes to V085/V086, migration order, data scope, services, ports or external state.
+- Remaining work: Re-run V087 in the controlled database with the reviewed backup. Confirm the client accepts all statements and inspect the final version rows and postflight assertions.
+
+### 2026-08-18 20:23:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Resolve the SQL client's second V087 safety rejection that classified the explicit UPDATE predicate as always true.
+- Key decisions: Replaced the temporary-table primary-key non-null predicate with a state-based JSON predicate requiring the legacy parameter path to still exist. This makes the update materially selective and strengthens rerun idempotency rather than merely satisfying syntax.
+- Execution or analysis result: The message snapshot replacement now updates only joined rows whose current `template_params` still contains `old_param_key`. The client's prior always-true classification no longer applies. No database execution was performed by Codex.
+- Changed files: `script/sql/mysql/migrations/V087__repair_business_notification_identifiers.sql`; this handoff file.
+- Verification evidence: `python script/sql/mysql/tools/zsjos_db.py check` passed; scoped whitespace check passed.
+- Dependency or integration impact: No migration-number, V085/V086, data-scope, service, port or dependency change.
+- Remaining work: Re-run the latest V087 in the controlled database and report any subsequent server or client validation output.
+
+### 2026-08-18 20:38:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Perform a complete V087 failure review and provide one consolidated repair after the runtime `targeted notification parameter JSON is invalid` assertion.
+- Key decisions: Treated the runtime evidence as a migration-scope defect rather than an execution error. Isolated historical message snapshots whose `template_params` are not JSON objects; continued to block malformed raw values that still expose a forbidden customer-name key; routed every subsequent message JSON operation through a temporary valid-object target set; limited missing-relation failures to rows that actually need replacement/backfill; retained fail-closed validation for structured rows with unsafe relations, missing visible identifiers, non-string values or conflicts. Replaced JSON checks that relied on boolean short-circuit evaluation with guarded `IF` expressions.
+- Execution or analysis result: The target MySQL server had already accepted procedure creation, delimiter handling, cursor/handler declarations and the five UPDATE statements; the CALL failed only at the overly broad first data assertion. V087 now leaves unrelated malformed legacy snapshots unverifiably unchanged, repairs valid structured snapshots, and preserves all privacy and Lead-number boundaries. Migration and operations documentation now describes this isolation behavior.
+- Changed files: `script/sql/mysql/migrations/V087__repair_business_notification_identifiers.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; this handoff file.
+- Verification evidence: `python script/sql/mysql/tools/zsjos_db.py check` passed migration order, manifests, desired schema, Java mappings, baseline versions and verification consistency. Scoped `git diff --check` passed with line-ending notices only. A static statement audit confirmed all five UPDATE statements contain explicit non-constant WHERE predicates. Searches confirmed the obsolete broad invalid-JSON error, reserved outer label and always-true predicate are absent.
+- Dependency or integration impact: No change to V085/V086, migration number/order, dependencies, schema columns, services, ports, accounts, branch, commit or push. V087 remains forward-only and repeatable.
+- Remaining work: Re-run the latest V087 in the controlled database. Any future `V087 blocked:` result now represents a specifically identified unsafe data condition rather than generic malformed legacy JSON and should be investigated without bypassing the assertion.
+
+### 2026-08-18 20:48:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Fix the V087 runtime `Illegal mix of collations` failure comprehensively rather than patch only the reported expression.
+- Key decisions: Converted all cross-source template and business-number equality comparisons to `CAST(... AS BINARY)` for exact collation-independent semantics; explicitly created the temporary message-repair table as `utf8mb4_unicode_ci` to match notification text columns used by `REPLACE` and `LOCATE`; retained ordinary column/literal comparisons where MySQL coercibility is deterministic. V085/V086 remain immutable.
+- Execution or analysis result: The reported target server accepted procedure creation and all preflight phases, then failed at the first `<=>` between notification-template columns and procedure variables inheriting `utf8mb4_0900_ai_ci`. The migration now removes that dependency and also covers the later JSON-unquoted business-number comparisons and temporary-table text operations. The stored procedure exception handler rolled back the failed transaction, and the client subsequently dropped the procedure, so no partial V087 data or version record should remain.
+- Changed files: `script/sql/mysql/migrations/V087__repair_business_notification_identifiers.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; this handoff file.
+- Verification evidence: `python script/sql/mysql/tools/zsjos_db.py check` passed; scoped whitespace checks passed; all four `<=>` operands are now binary casts; all JSON/business-number comparisons are binary; the temporary repair table has explicit `utf8mb4_unicode_ci`; all five UPDATE statements retain explicit WHERE predicates.
+- Dependency or integration impact: No dependency, migration number/order, schema-column, service, port, account, branch, commit or push change.
+- Remaining work: Re-run the latest V087 in the controlled database and confirm `CALL` completes plus both V087 schema-version rows exist. Codex did not execute the real database migration.
+
+### 2026-08-18 18:38:54 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Apply the open-code-review fix so advanced-filter personnel options no longer reuse Lead visibility for unrelated business scenes or expose all enabled employee names through Lead `query-all`.
+- Key decisions: Resolve personnel options only from an authoritative scope owned by the requested scene; use Lead hierarchy for `lead`, manager-controlled users for `subordinate_sales`, and the current enabled service owner only when an active service relation exists for `student`; omit personnel fields entirely for `order`, `lead_appeal`, `duplicate_review`, and `registration` until their services expose authoritative personnel scopes; never fall back to Lead scope or the System-wide user list.
+- Execution or analysis result: Added a scene-aware personnel-scope resolver, removed the unconditional Lead-visible-user lookup from the catalog controller, added a catalog path that omits unsupported personnel fields, added an efficient active-service existence query, documented the fail-closed catalog contract, and covered enabled, disabled, empty, query-all, managed-user, student-relation, and unsupported-scene behavior.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/advancedfilter/AdvancedFilterController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AdvancedFilterService.java`; new `AdvancedFilterVisibleUserService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/registration/ServiceRelationMapper.java`; focused advanced-filter service/resolver tests; `docs/api/zsjos-lead-submission-dispatch.md`; this handoff file.
+- Verification evidence: Focused advanced-filter tests passed 17/17 after the disabled-student-owner case was added; broader advanced-filter, Lead-management and student-service regression run passed 48/48; related frontend advanced-filter tests passed 30/30 across 2 files; the 21-module backend dependency reactor compiled successfully; tracked and untracked scoped `git diff --check` reported line-ending notices only and no whitespace errors.
+- Dependency or integration impact: No new dependency, schema/migration, API route, frontend fallback, account/role mutation, external state, branch/worktree operation, commit, push, or service restart. Existing frontend consumers automatically omit personnel filters absent from the server catalog.
+- Remaining work: Order, appeal, duplicate-review, and registration personnel filters remain intentionally unavailable until each business service provides an authoritative object-scoped personnel API; no browser check was required because this correction changes only the server-provided catalog and existing frontend catalog rendering already has focused regression coverage.
+
+### Workstream scope update: 2026-08-19 09:31:48 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Implement the confirmed ZSJOS logic repair covering Lead/student authorization, advanced-filter semantics and validation, registration attachment idempotency and MIME validation, collaboration-pool mutual exclusion, and study-planner notification idempotency.
+- Non-goals: Changing supervisor parallel-approval behavior; physically deleting Infra files when a registration attachment reference is removed; rewriting historical migrations; automatically repairing historical Leads present in both collaboration pools; unrelated refactors, dependencies, frontend changes, external services, database execution, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Focused ZSJOS authorization, advanced-filter, registration, Lead collaboration services/mappers/data objects/error constants and tests; forward-only `V089` plus baseline/bootstrap/static verification artifacts; directly affected permission, filtering, registration and migration documentation; this handoff file. Existing overlapping user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing Yudao tenant, BPM, file API, MyBatis and ZSJOS Lead/order/registration boundaries only. No new dependency.
+- Integration order: Register scope -> repair permission relationships and student routes -> normalize filter validation/negative operators -> persist exact attachment replay result and harden uploads -> enforce collaboration-pool exclusion -> add V089/schema/docs -> run focused/full module, server assembly, SQL consistency and whitespace verification -> append delivery evidence.
+- Verification plan: Focused authorization/filter/registration/collaboration unit tests including tenant, inactive, invalid, replay and overlap cases; full ZSJOS module tests; `yudao-server` dependency-graph package; `python script/sql/mysql/tools/zsjos_db.py check`; scoped `git diff --check`. Real MySQL migration execution remains separately approval-gated.
+
+### 2026-08-19 09:58:00 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Implement the complete repair for the reviewed ZSJOS logic defects across Lead/student authorization, advanced-filter semantics, registration attachment idempotency and validation, collaboration-pool exclusion, and study-planner notification idempotency.
+- Key decisions: Bound student access to active, tenant-matched service relations and the requested Lead's actual order; treat relation-backed negative filters as `NOT EXISTS` over a positive predicate and reject malformed operands/groups; persist and replay the exact registration result attachment, compensate newly uploaded Infra files only when business persistence fails, and retain user-requested attachment deletion as reference-only; reject new aging/manual-public-sea overlap while failing closed on historical overlap; keep supervisor parallel approval unchanged and do not auto-repair historical overlap rows.
+- Execution or analysis result: Completed the confirmed source, test, forward-only V089, fresh-schema, bootstrap, read-only overlap verification, and directly affected documentation repairs. The final full-module run additionally found and corrected the existing `LeadFollowUpServiceImplTest` fixture so it injects the unified `LeadCollaborationService` dependency used by production code. Open Code Review CLI and configured LLM connectivity were confirmed.
+- Changed files: Focused ZSJOS registration/student, Lead permission/collaboration/aging/subordinate-command, sales-order mapper, advanced-filter, registration command/error-code source and regression tests under `backend/yudao-module-zsjos`; `script/sql/mysql/migrations/V089__registration_attachment_idempotency_result.sql`; `script/sql/mysql/verify-collaboration-pool-overlap.sql`; core schema/bootstrap/verification/migration manifest files; directly affected registration, Lead dispatch, permission-flow and migration documentation; this handoff file. Existing overlapping user changes were preserved.
+- Verification evidence: Focused seven-class repair suite passed 57/57 tests. `LeadFollowUpServiceImplTest` passed 6/6 after fixture correction. Full ZSJOS-only module test passed 400/400 with no failures, errors or skips. `python script/sql/mysql/tools/zsjos_db.py check` passed manifests, migration order, desired schema, Java mappings, baseline versions and verification consistency. Core schema files have identical SHA-256 `9B7C5D1656BEF551C28E388259839F9A99D2243BD40A92B2F63B300256B3DF4D`. Scoped `git diff --check` reported line-ending notices only; static searches found no old `selectByOwnerAndPerson`, exactly one V089 bootstrap reference, and one `Optional modules` heading. The dependency-reactor test remains blocked before ZSJOS by the unrelated persistent Infra failure `CodegenEngineUniappTest.testExecute_treeSearch`; the isolated Infra test reproduced it. Server dependency packaging compiled all 27 modules but final executable repackaging could not rename the currently locked `yudao-server.jar`.
+- Dependency or integration impact: No new dependency, branch/worktree operation, commit, push, service stop/restart, account/permission mutation, destructive cleanup or real database execution. V089 adds `result_attachment_id` only when explicitly applied; the overlap SQL is read-only.
+- Remaining work: Review and explicitly approve V089 before controlled database execution. Re-run full reactor tests after the unrelated Infra assertion is repaired. Re-run final server repackaging after the process holding `yudao-server.jar` is intentionally stopped or releases the file; no process was stopped in this task.
+
+### Workstream scope update: 2026-08-19 15:16:18 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Restore the Lead detail hero's permission-scoped next-follow-up summary using the authoritative Lead projection and keep it current after follow-up submission.
+- Non-goals: Changing follow-up scheduling rules, database schema or data, role/menu assignments, object visibility, the lower recent-follow-up card, unrelated Lead detail layout, dependencies, external services, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- Target branch: `main`
+- Ownership scope: Lead management detail response projection/service and focused tests; Workbench managed-Lead type, Lead detail hero component and focused tests; directly affected Lead API documentation; this handoff file. Existing overlapping user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing Lead `next_follow_up_at`, Yudao permission service, current Workbench Ant Design/icon/time helpers only. No new dependency.
+- Integration order: Register scope -> preserve and inspect overlapping diffs -> add permission-scoped detail projection -> render responsive hero summary -> add focused backend/frontend tests -> update API documentation -> run focused tests, typecheck/build and authenticated desktop/mobile browser verification -> append delivery evidence.
+- Verification plan: Backend focused service tests for authorized and unauthorized detail projection; focused Workbench component tests; Workbench typecheck and production build; authenticated sales-account browser checks at desktop and mobile widths; scoped whitespace review. No business-data mutation is required.
+
+### 2026-08-19 15:20:12 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Restore the missing next-follow-up time in the right side of the Lead detail title bar.
+- Key decisions: Project the authoritative Lead `next_follow_up_at` as a top-level detail field only when the server-authoritative `visibleTabs` includes `follow-ups`; render it with the existing responsive hero styles and shared timestamp formatter; do not infer access from role names or Opportunity state.
+- Execution or analysis result: Added the permission-scoped backend response field, Workbench contract and title-bar rendering, focused authorized/unauthorized regression coverage, and the directly affected API contract. Existing overlapping Lead detail and permission-projection changes were preserved.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/vo/management/LeadManagementRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/pages/lead-management-unified.guard.test.ts`; `docs/api/zsjos-lead-submission-dispatch.md`; this handoff file.
+- Verification evidence: Focused backend `LeadManagementServiceImplTest` passed 33/33; focused Workbench guard passed 7/7; full Workbench suite passed 315/315; `npm run typecheck` passed; production build passed with the existing large-chunk warning; scoped `git diff --check` passed with line-ending notices only.
+- Dependency or integration impact: No new dependency, schema/data, role/menu assignment, object-visibility expansion, external state, branch, commit, or push. The currently running backend must load the updated module before the live page can receive the new field.
+- Remaining work: After separate approval, stop the local Java process serving port 48080, rebuild/restart the local backend, then verify the title-bar value with the authorized sales account at desktop and mobile widths. Until that restart, live browser behavior remains unverified against the updated backend.
+
+### 2026-08-19 15:23:00 +08:00 (correction append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Correct the title-bar next-follow-up source so it reflects the active task rather than historical follow-up data.
+- Key decisions: Read only the pending `lead_follow_up_reminder` BusinessTask for the Lead and expose its `dueAt`; completed/cancelled tasks yield `null`, while historical follow-up records retain their own historical next-follow-up display. The existing permission projection remains required.
+- Execution or analysis result: Updated the task DAL query, detail projection, regression test coverage and API contract. No task status or Lead data was changed.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/task/BusinessTaskMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `docs/api/zsjos-lead-submission-dispatch.md`; this handoff file.
+- Verification evidence: Pending after this correction; rerun focused backend tests, Workbench tests/typecheck/build, whitespace checks and authorized browser verification after local backend restart.
+- Dependency or integration impact: No new dependency, schema/data, role/menu assignment, branch, commit or push. Existing frontend rendering remains valid because the response field name is unchanged.
+- Remaining work: Complete the correction verification and update the prior delivery evidence with final results.
+
+### 2026-08-19 15:31:08 +08:00 (correction delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Ensure the title-bar next-follow-up value disappears when the reminder task is completed or cancelled, including after invalid qualification.
+- Key decisions: Added a tenant-scoped BusinessTask mapper query for pending `lead_follow_up_reminder` tasks by Lead; detail `nextFollowUpAt` now uses that task `dueAt` only when follow-up-read is projected. Historical follow-up record timestamps remain available only in the history/timeline views.
+- Execution or analysis result: Corrected the prior Lead timestamp implementation. The invalid-qualification path already cancels reminder tasks, so the title-bar projection now follows that state rather than stale Lead/history data.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/task/BusinessTaskMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `docs/api/zsjos-lead-submission-dispatch.md`; this handoff file.
+- Verification evidence: `LeadManagementServiceImplTest` passed 34/34; Workbench focused guard passed 7/7; Workbench typecheck passed; scoped `git diff --check` passed with line-ending notices only. The earlier full Workbench suite (315/315) and production build remain valid because no frontend source changed in this correction.
+- Dependency or integration impact: No new dependency, schema/data, task mutation, role/menu assignment, branch, commit or push. The running Java process still serves the pre-correction executable and must be restarted before live browser verification.
+- Remaining work: Restart the local backend only after separate approval, then verify a pending reminder displays its due time and an invalid/cancelled reminder displays no title-bar time. No business-data mutation is required.
+
+### 2026-08-20 09:45:35 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25`
+- User goal: Fix the application startup failure where Spring injected Infra's `configMapper` JDK proxy into the student-contact configuration mapper field.
+- Key decisions: Rename the `@Resource` field to the unique default Bean name `studentContactConfigVersionMapper`; retain standard MyBatis JDK proxies and existing mapper scanning; do not change global proxy or injection configuration.
+- Execution or analysis result: Removed the by-name collision in `StudentContactServiceImpl` and updated its only mapper reference. The pre-existing untracked source file was otherwise preserved.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`; this handoff file.
+- Verification evidence: Static scans found the renamed field/reference and no remaining ZSJOS `@Resource ...ConfigMapper configMapper` declarations; the 21-module ZSJOS dependency-chain compile passed; the 28-module `yudao-server` dependency-graph package passed and produced the executable JAR; scoped whitespace validation passed before this append.
+- Dependency or integration impact: No new dependency, schema/data, permissions, proxy configuration, mapper scan, branch, commit, push, or service lifecycle action. The server artifact was rebuilt but not started.
+- Remaining work: Restart or rerun the application through the user's normal local workflow to verify the live Spring context; report any next deepest startup exception separately. Runtime startup was not performed because service lifecycle changes require separate confirmation.
+
+### Workstream scope update: 2026-08-24 11:52:55 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Add registration-attachment preview, make completed planner-assignment notifications open the assigned student, and retire the learning-planner group/handoff delivery stage.
+- Non-goals: Office document rendering, rewriting immutable historical migrations or contact-record snapshots, changing notification administration or permissions, executing a real database migration, restarting services, adding dependencies, unrelated refactors, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Registration notification publication and focused tests; student-contact stage constants, service behavior and tests; Workbench registration attachment preview, My Students notification targeting, notify action tests and registration styles; forward-only Core `V123`, bootstrap/verification/migration documentation; directly affected registration, permission-flow and state-machine documentation; this handoff file. Existing overlapping user changes in Registration pages/styles remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing Yudao System notification/WebSocket and Infra file facilities, ZSJOS registration/student services, React/Ant Design primitives, and current SQL migration tooling only. No new dependency.
+- Integration order: Register scope -> retire runtime group/handoff stage -> move planner notification after service creation -> add student notification navigation -> add attachment previews -> add V123 and documentation -> run focused/full backend, frontend, SQL, browser and whitespace verification -> append delivery evidence.
+- Verification plan: Focused registration notification/completion and student-contact tests; full ZSJOS module tests and server dependency package; focused Workbench tests plus full test/typecheck/build; desktop/mobile browser checks for registration attachments and student targeting when a compatible authenticated runtime is available; SQL consistency/checksum/repeatability review and `zsjos_db.py check`; scoped `git diff --check`. No real migration or service lifecycle action.
+
+### Workstream scope update: 2026-08-24 12:16:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Correct planner-assignment notification terminology/number display and make notification deep links select the exact student without requiring a My Students page refresh.
+- Non-goals: Changing notification recipients, historical message snapshots, student visibility rules, route permissions, database business rows, dependencies, services, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Registration planner notification payload/scene/template migration and tests; My Students response/type/deep-link loading and notification action tests; directly affected API/docs and this handoff file. Existing user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing `PersonDO.personNo`, notification scene/template APIs, React Router state, and current Workbench API module only. No new dependency.
+- Integration order: Register scope -> update student number contract -> isolate deep-link detail loading from list state -> update focused tests/docs -> run backend/frontend checks and browser availability check -> append delivery evidence.
+- Verification plan: Focused notification scene/publisher and My Students tests; full ZSJOS and Workbench tests where feasible; typecheck/build; static migration and whitespace checks; authenticated desktop/mobile browser verification if a compatible runtime is available. No real migration or service lifecycle action.
+
+### 2026-08-24 13:08:26 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- User goal: Make planner assignment notifications identify the student and show the student number, and make WebSocket/message navigation select the exact student without requiring a My Students refresh.
+- Key decisions: Use authoritative `PersonDO.personNo` as `student.no`; planner notifications no longer expose `lead.no`, while director notifications retain their independent Lead contract; add forward-only V124 that updates only the migration-owned planner template and preserves delivered snapshots; use a fresh React Router location key for each notification navigation and prevent the list fetch from auto-selecting or clearing a deep-linked target.
+- Execution or analysis result: Added `personNo` to My Students responses and Workbench types, passed student name/number through the planner notification scene, updated the migration-owned template to `学员{{student.name}}（{{student.no}}）已分配给你。`, updated verification/docs, and fixed target detail loading when the page is already mounted. Existing user changes and unrelated files were preserved.
+- Changed files: My Student response/service and registration notification publisher/scene plus focused tests; Workbench API type, My Students page and notification action test; V124 migration, bootstrap, verification script and migration README; directly affected API/permission-flow docs; this handoff file. Generated `frontend/workbench/tsconfig.tsbuildinfo` changes from existing verification runs remain untouched.
+- Verification evidence: Focused backend suite passed 27/27; full ZSJOS module suite passed 520/520. Workbench notification test passed 19/19, full Workbench suite passed 341/341, typecheck passed, production build passed with the existing large-chunk warning. Static checks confirmed planner scenes/templates use `student.name` and `student.no`, V124 is bootstrapped and verified, and `git diff --check` reported line-ending notices only. No compatible authenticated Workbench browser instance was available for live desktop/mobile verification.
+- Dependency or integration impact: No new dependency, branch/worktree operation, commit, push, real database migration, service restart, permission change, or business-data mutation. V124 must be applied through the controlled migration workflow before the new template is active in an existing environment; historical messages remain unchanged.
+- Remaining work: Apply V124 only after explicit database migration approval, restart/redeploy the application, and verify same-page WebSocket clicks plus message-list clicks at desktop/mobile widths. Existing SQL schema-check and dependency-reactor baseline issues from the prior delivery remain unchanged.
+
+### 2026-08-24 12:14:08 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- User goal: Add in-app registration-attachment preview, make completed study-planner assignment notifications open the exact student, and remove the planner group/handoff delivery stage.
+- Key decisions: Preview images with Ant Design Image and PDFs in a responsive modal/iframe while keeping Office and unsupported files openable/downloadable; publish one planner event only after completion creates service relations, using `bizType=student` and `bizId=personId`; handle repeated same-route notification navigation by target identity; advance study-plan success directly to supervision; retain immutable historical contact snapshots and V114 while forward-migrating only current `group_handoff` projections through repeatable V123.
+- Execution or analysis result: Implemented the backend notification timing and target contract, Workbench notification deep link and direct student loading/error retry behavior, attachment classification/preview/fallback UI, retired-stage runtime removal, V123/bootstrap/verification wiring, focused regression coverage, and directly affected documentation. Existing overlapping Registration page/style edits were preserved.
+- Changed files: Registration notification/service and student-contact constants/service source plus focused tests under `backend/yudao-module-zsjos`; `frontend/workbench/src/components/RegistrationAttachmentPreview.tsx` and its test; Workbench Registration page, notification action/test, registration styles and generated `tsconfig.tsbuildinfo`; `script/sql/mysql/migrations/V123__retire_student_group_handoff_stage.sql`, bootstrap, verification and migration README; registration API, permission-flow and Lead/order state-machine documentation; this handoff file. Pre-existing unrelated `frontend/h5/vite.config.ts` and `handoff/main-student-contact-card.md` changes were not modified.
+- Verification evidence: Focused backend suite passed 30/30 and full ZSJOS-only module suite passed 520/520. Focused Workbench suite passed 25/25, full Workbench suite passed 341/341, typecheck passed, and production build passed with the existing large-chunk warning. Server dependency packaging compiled all 28 modules and built the ordinary server JAR, but final Spring Boot repackaging could not rename the currently locked `yudao-server.jar`. V123 static checks confirmed the exact non-deleted retired-stage predicate, supervision target, current-fact clearing, version increment, no DELETE, and both version registrations; static runtime/current-doc scans found no retired constant, label or fact fields outside compatibility/history locations. `git diff --check` reported line-ending notices only. `zsjos_db.py check` reached repository consistency validation but failed on pre-existing Core-schema Java mapping gaps unrelated to V123; the dependency-reactor test was likewise blocked before ZSJOS by the existing Infra `CodegenEngineUniappTest.testExecute_treeSearch` failure. No compatible running Workbench existed for authenticated desktop/mobile browser verification.
+- Dependency or integration impact: No new dependency, branch/worktree operation, commit, push, permission/data mutation, real database execution, or service lifecycle action. V123 changes only matching service-relation current projections when separately applied; historical contact records remain unchanged.
+- Remaining work: Review and explicitly approve controlled V123 database execution, then restart/redeploy through the normal service workflow and verify image/PDF rendering plus WebSocket/message clicks at desktop and mobile widths. Re-run `zsjos_db.py check` after the existing Core-schema mapping baseline is reconciled, rerun dependency-reactor tests after the unrelated Infra assertion is repaired, and rerun executable server repackaging after the process holding `yudao-server.jar` intentionally releases it.
+
+### Workstream scope update: 2026-08-24 14:00:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Change newly generated student numbers from `P + UUID` to `XYyyyyMMddHHmmss` plus a tenant-daily four-digit sequence, preserving existing student numbers.
+- Non-goals: Renumbering existing Person rows, changing Person IDs or relationships, changing notification targets/templates, executing V125 against a real database, restarting services, adding dependencies, branches, commits, pushes, or unrelated refactors.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Person number generation and daily counter DAL/service/tests; Person counter schema in Core/bootstrap and V125; SQL verification and migration documentation; directly affected student/registration API, architecture and state-machine documentation; this handoff file. Existing user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing ZSJOS transaction, tenant, MyBatis and Beijing-time conventions; no new npm or Maven dependency.
+- Integration order: Register scope -> add Person counter and runtime generation -> add V125/bootstrap/verification -> update tests and documentation -> run backend and SQL static checks -> append delivery evidence.
+- Verification plan: Person identity focused tests, ZSJOS module tests, server dependency compile where feasible, V125 syntax/repeatability/static checks, format scans, and `git diff --check`; no real migration or service lifecycle action.
+
+### 2026-08-24 13:35:55 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- User goal: Change newly generated student numbers to `XYyyyyMMddHHmmss0001`, with a tenant-and-Beijing-date daily sequence that resets at `0001`, wraps after `9999`, and preserves historical `P + UUID` numbers.
+- Key decisions: Allocate the number only when creating a new `Person`; reuse the existing number on identity resolution; use a database-atomic tenant/date counter and `Asia/Shanghai`; keep the existing tenant-scoped `person_no` uniqueness constraint; add forward-only V125 without backfilling or modifying business rows.
+- Execution or analysis result: Added the daily counter DO/Mapper/service, switched `PersonIdentityWriteService` to the new format, added focused regression tests, added the counter table to Core/fresh bootstrap and V125 migration/registries/checks, and synchronized the affected student/registration/architecture documentation. Existing workspace changes were preserved.
+- Changed files: `PersonIdentityWriteService` and new Person number counter source/tests under `backend/yudao-module-zsjos`; `script/sql/mysql/00-bootstrap-schema.sql`, `script/sql/mysql/schema/core.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/migrations/V125__student_business_number.sql`, `script/sql/mysql/migrations/README.md`, `script/sql/mysql/verify-bootstrap.sql`; directly affected docs; this handoff file.
+- Verification evidence: Person-focused Maven tests passed 9/9; the full ZSJOS module suite passed 523/523; server dependency packaging compiled all 28 modules, while the ordinary Spring Boot repackage was blocked by the existing locked `yudao-server.jar` and the repackage-skipped package completed successfully; V125 static checks passed for no delete/update, counter table, tenant/date unique key, version registries, bootstrap inclusion, and Core/bootstrap presence; `git diff --check` reported only Windows line-ending notices.
+- Dependency or integration impact: No new npm/Maven dependency, branch/worktree operation, commit, push, real database migration, service restart, permission change, or business-data mutation. V125 must be applied through the controlled migration workflow before existing environments create numbers using the new counter table.
+- Remaining work: Obtain explicit approval before applying V125 to a real database; restart/redeploy through the normal service workflow; verify concurrent production behavior and the live student-number display. Existing locked-JAR repackage limitation remains an environment issue.

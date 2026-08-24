@@ -9,6 +9,8 @@ import jakarta.validation.Validation;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -67,6 +69,25 @@ public class S3FileClientTest {
         assertTrue(result.contains("/yudao/avatar/%E4%B8%AD%E6%96%87%20100%25"));
         assertTrue(result.contains("%E6%96%87%E4%BB%B6.jpg"));
         assertFalse(result.contains("%25E4%25B8%25AD"));
+    }
+
+    @Test
+    public void testPresignGetUrl_tencentVirtualHost_doesNotRepeatBucketInPath() {
+        S3FileClientConfig config = new S3FileClientConfig();
+        config.setAccessKey("test-access-key");
+        config.setAccessSecret("test-access-secret");
+        config.setBucket("employee-avatar-123456");
+        config.setDomain(null);
+        config.setEndpoint("https://cos.ap-guangzhou.myqcloud.com");
+        config.setEnablePathStyleAccess(false);
+        config.setEnablePublicAccess(false);
+        S3FileClient client = new S3FileClient(0L, config);
+        client.init();
+
+        URI result = URI.create(client.presignGetUrl("system/user/avatar/logo.png", 300));
+
+        assertEquals("employee-avatar-123456.cos.ap-guangzhou.myqcloud.com", result.getHost());
+        assertEquals("/system/user/avatar/logo.png", result.getPath());
     }
 
     @Test

@@ -13,12 +13,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -47,11 +45,6 @@ public class EamStatisticsServiceImpl implements EamStatisticsService {
 
         EamStatisticsRespVO resp = new EamStatisticsRespVO();
         resp.setTotalCount((long) assets.size());
-        resp.setTotalOriginalValue(assets.stream()
-                .map(EamAssetDO::getOriginalValue)
-                .filter(Objects::nonNull)
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
-
         resp.setStatusStats(buildStatusStats(assets));
         resp.setCategoryStats(buildCategoryStats(assets));
         resp.setDeptStats(buildDeptStats(assets));

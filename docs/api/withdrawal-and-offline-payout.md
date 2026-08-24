@@ -1,6 +1,6 @@
 # Withdrawal and offline payout API
 
-The independent partner frontend uses `/app-api/zsjos/**`; only an enabled ordinary partner may apply. Admin/workbench review APIs remain under `/admin-api/zsjos/**`. The server locks selected `available` cashback rows in ascending ID order, snapshots the full bank account, creates one Withdrawal and item rows, changes cashback to `withdrawing`, and starts BPM process `zsjos_partner_withdrawal` with the single task key `financeReview`. Reviewers are enabled System users who currently have `zsjos:withdrawal:review`; V063 creates the permission but intentionally assigns no finance user.
+The independent partner frontend uses `/part-api/zsjos/**`; only an enabled ordinary partner may apply. Admin/workbench review APIs remain under `/admin-api/zsjos/**`. The server locks selected `available` cashback rows in ascending ID order, snapshots the full bank account, creates one Withdrawal and item rows, changes cashback to `withdrawing`, and starts BPM process `zsjos_partner_withdrawal` with the single task key `financeReview`. Reviewers are enabled System users who currently have `zsjos:withdrawal:review`; V063 creates the permission but intentionally assigns no finance user.
 
 ## State contract
 
@@ -24,6 +24,8 @@ The independent partner frontend uses `/app-api/zsjos/**`; only an enabled ordin
 | `POST /proof/upload`, `PUT /{id}/payout` | `zsjos:withdrawal:payout` | Private proof and immutable offline payout |
 
 Feature permissions, list scope and `withdrawal` object checks are cumulative. The weekly reminder defaults to Thursday 10:30, uses the configured overdue-day threshold (default 7), resolves recipients from the review permission, and skips while maintenance mode is active. V052 does not deploy BPM or grant roles; deployment must publish the exact process and task keys before applications are enabled.
+
+The partner start subject is external, but `zsjos_partner_withdrawal` may use the BPM `START_USER_SELECT` strategy when the request supplies the configured internal finance reviewer IDs for `financeReview`. BPM validates those IDs against enabled System users before creating the instance. Strategies that depend on the external starter's own user, department, or department leaders remain unsupported for partner-subject starts.
 
 The Vue withdrawal list exposes direct asynchronous export only when the user has both `zsjos:export:withdrawal` and full withdrawal-list visibility. It exports all rows matching the current status filter, retains masked card numbers, creates an asynchronous task without polling the business page, and links to the existing export-task center.
 

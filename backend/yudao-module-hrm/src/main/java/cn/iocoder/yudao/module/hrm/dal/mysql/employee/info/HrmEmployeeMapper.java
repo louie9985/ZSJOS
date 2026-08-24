@@ -73,6 +73,17 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
                 .orderByDesc(HrmEmployeeDO::getId));
     }
 
+    default List<HrmEmployeeDO> selectBirthdayList(Collection<Integer> entryStatuses, LocalDate birthday) {
+        LambdaQueryWrapperX<HrmEmployeeDO> query = new LambdaQueryWrapperX<>();
+        query.in(HrmEmployeeDO::getEntryStatus, entryStatuses)
+                .isNotNull(HrmEmployeeDO::getBirthday)
+                .apply("MONTH(birthday) = {0}", birthday.getMonthValue())
+                .apply("DAYOFMONTH(birthday) = {0}", birthday.getDayOfMonth())
+                .orderByAsc(HrmEmployeeDO::getName)
+                .orderByAsc(HrmEmployeeDO::getId);
+        return selectList(query);
+    }
+
     default List<HrmEmployeeDO> selectListByLeaderEmployeeId(Long leaderEmployeeId) {
         return selectList(new LambdaQueryWrapperX<HrmEmployeeDO>()
                 .eq(HrmEmployeeDO::getLeaderEmployeeId, leaderEmployeeId)

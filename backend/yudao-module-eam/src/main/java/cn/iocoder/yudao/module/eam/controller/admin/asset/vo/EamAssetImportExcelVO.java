@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.math.BigDecimal;
 import java.time.LocalDate;
 
 /**
@@ -32,17 +31,9 @@ public class EamAssetImportExcelVO {
 
     private String barcode;
 
-    private BigDecimal originalValue;
-
-    private BigDecimal netValue;
-
     private LocalDate purchaseDate;
 
-    private LocalDate warrantyDate;
-
     private String location;
-
-    private Integer expectedLife;
 
     private String remark;
 

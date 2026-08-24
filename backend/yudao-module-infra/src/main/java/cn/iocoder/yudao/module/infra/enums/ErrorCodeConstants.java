@@ -35,6 +35,10 @@ public interface ErrorCodeConstants {
     ErrorCode FILE_NOT_EXISTS = new ErrorCode(1_001_003_001, "文件不存在");
     ErrorCode FILE_IS_EMPTY = new ErrorCode(1_001_003_002, "文件为空");
     ErrorCode FILE_PATH_INVALID = new ErrorCode(1_001_003_003, "文件路径不正确");
+    ErrorCode FILE_AVATAR_DIRECTORY_INVALID = new ErrorCode(1_001_003_004, "头像目录不正确");
+    ErrorCode FILE_AVATAR_TYPE_INVALID = new ErrorCode(1_001_003_005, "头像仅支持 JPG、PNG、WebP 图片");
+    ErrorCode FILE_AVATAR_SIZE_EXCEEDED = new ErrorCode(1_001_003_006, "头像不能超过 5MB");
+    ErrorCode FILE_AVATAR_NOT_EXISTS = new ErrorCode(1_001_003_007, "头像文件不存在");
 
     // ========== 代码生成器 1-001-004-000 ==========
     ErrorCode CODEGEN_TABLE_EXISTS = new ErrorCode(1_001_004_002, "表定义已经存在");

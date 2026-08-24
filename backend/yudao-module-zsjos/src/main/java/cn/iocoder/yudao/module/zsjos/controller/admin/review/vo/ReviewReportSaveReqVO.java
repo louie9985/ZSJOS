@@ -1,0 +1,1 @@
+package cn.iocoder.yudao.module.zsjos.controller.admin.review.vo; import jakarta.validation.constraints.*; import lombok.Data; @Data public class ReviewReportSaveReqVO { @NotBlank private String reviewType; @NotBlank private String subjectType; @NotNull private Long subjectId; @NotBlank private String reportJson; private String evidenceRefsJson; private Long configVersionId; }

@@ -8,7 +8,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import jakarta.servlet.http.HttpServletRequest;
 
 /**
- * 过滤 /admin-api、/app-api 等 API 请求的过滤器
+ * 过滤 /admin-api、/app-api、/part-api 等 API 请求的过滤器
  *
  * @author 芋道源码
  */
@@ -21,7 +21,8 @@ public abstract class ApiRequestFilter extends OncePerRequestFilter {
     protected boolean shouldNotFilter(HttpServletRequest request) {
         // 只过滤 API 请求的地址
         String apiUri = request.getRequestURI().substring(request.getContextPath().length());
-        return !StrUtil.startWithAny(apiUri, webProperties.getAdminApi().getPrefix(), webProperties.getAppApi().getPrefix());
+        return !StrUtil.startWithAny(apiUri, webProperties.getAdminApi().getPrefix(),
+                webProperties.getAppApi().getPrefix(), webProperties.getPartnerApi().getPrefix());
     }
 
 }

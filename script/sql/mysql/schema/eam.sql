@@ -72,6 +72,12 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   `warranty_date`   date                   DEFAULT NULL    COMMENT '保修到期日',
   `use_dept_id`     bigint                 DEFAULT NULL    COMMENT '使用部门编号，引用 system_dept',
   `use_user_id`     bigint                 DEFAULT NULL    COMMENT '使用人编号，引用 system_users',
+  `use_user_name_snapshot` varchar(100)       DEFAULT NULL    COMMENT '使用人姓名快照',
+  `supervisor_user_id` bigint                 DEFAULT NULL    COMMENT '直属上级用户编号',
+  `supervisor_name_snapshot` varchar(100)     DEFAULT NULL    COMMENT '直属上级姓名快照',
+  `join_date`       date                      DEFAULT NULL    COMMENT '使用人入司日期',
+  `commitment_accepted` bit(1)                DEFAULT NULL    COMMENT '使用人承诺是否确认',
+  `commitment_date` date                      DEFAULT NULL    COMMENT '承诺日期',
   `location`        varchar(255)           DEFAULT NULL    COMMENT '存放地点',
   `expected_life`   int                    DEFAULT NULL    COMMENT '预计使用年限，单位月',
   `remark`          varchar(500)           DEFAULT NULL    COMMENT '备注',
@@ -111,6 +117,25 @@ CREATE TABLE IF NOT EXISTS `eam_asset_import_row` (
   PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_asset_import_source` (`tenant_id`,`file_hash`,`sheet_name`,`row_num`,`deleted`),
   KEY `idx_eam_asset_import_row_batch` (`tenant_id`,`batch_id`), KEY `idx_eam_asset_import_row_asset` (`tenant_id`,`asset_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 资产导入行来源';
+
+CREATE TABLE IF NOT EXISTS `eam_asset_verification` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `asset_id` bigint NOT NULL, `result` varchar(100) DEFAULT NULL,
+  `label_status` varchar(20) DEFAULT NULL, `verifier_user_id` bigint DEFAULT NULL,
+  `verifier_name_snapshot` varchar(100) DEFAULT NULL, `verified_at` datetime DEFAULT NULL, `remark` varchar(500) DEFAULT NULL,
+  `import_batch_id` bigint DEFAULT NULL, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
+  KEY `idx_eam_asset_verification_asset` (`tenant_id`,`asset_id`,`verified_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 资产行政核对历史';
+
+CREATE TABLE IF NOT EXISTS `eam_asset_handover` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `asset_id` bigint NOT NULL, `content` varchar(500) DEFAULT NULL,
+  `from_user_id` bigint DEFAULT NULL, `to_user_id` bigint DEFAULT NULL, `handover_time` datetime DEFAULT NULL,
+  `remark` varchar(500) DEFAULT NULL, `import_batch_id` bigint DEFAULT NULL, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`), KEY `idx_eam_asset_handover_asset` (`tenant_id`,`asset_id`,`handover_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 资产交接历史';
 
 CREATE TABLE IF NOT EXISTS `eam_asset_change_log` (
   `id`             bigint       NOT NULL AUTO_INCREMENT COMMENT '记录编号',

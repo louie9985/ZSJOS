@@ -14,6 +14,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,10 +46,13 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     @Resource private LeadNotifyEventPublisher notifyEventPublisher;
     @Resource private SecurityFrameworkService securityFrameworkService;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private LeadCategorySnapshotService categorySnapshotService;
+    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     public PageResult<LeadDuplicateReviewRespVO> getPage(LeadDuplicateReviewPageReqVO request) {
-        PageResult<LeadDuplicateReviewDO> page = reviewMapper.selectPage(request, request.getStatus());
+        List<Long> matchedIds = advancedFilterService.matchDuplicateReviewIds(request.getKeyword(), request.getAdvancedFilter());
+        PageResult<LeadDuplicateReviewDO> page = reviewMapper.selectPage(request, request.getStatus(), matchedIds);
         return new PageResult<>(page.getList().stream().map(this::toResponse).toList(), page.getTotal());
     }
 
@@ -91,7 +95,8 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         switch (request.getResultType()) {
             case "new_person" -> {
                 LeadCreateRespVO result = submissionService.createApprovedFromReview(submission,
-                        review.getSubmitterUserId(), null, review.getSubmissionSourceType(), review.getSubmissionPartnerId());
+                        review.getSubmitterUserId(), null, review.getSubmissionSourceType(), review.getSubmissionPartnerId(),
+                        review.getLeadCategoryLabelSnapshot());
                 after.put("personId", leadMapper.selectById(result.getLeadId()).getPersonId());
                 after.put("leadId", result.getLeadId());
             }
@@ -99,12 +104,14 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
                 PersonDO person = requirePersonWithoutLead(request.getMatchedPersonId());
                 before.put("person", person);
                 LeadCreateRespVO result = submissionService.createApprovedFromReview(submission,
-                        review.getSubmitterUserId(), person.getId(), review.getSubmissionSourceType(), review.getSubmissionPartnerId());
+                        review.getSubmitterUserId(), person.getId(), review.getSubmissionSourceType(), review.getSubmissionPartnerId(),
+                        review.getLeadCategoryLabelSnapshot());
                 after.put("person", personMapper.selectById(person.getId()));
                 after.put("leadId", result.getLeadId());
             }
-            case "reactivate_lead" -> reactivate(request, submission, review.getSubmitterUserId(), reviewerUserId,
-                    now, before, after);
+            case "reactivate_lead" -> reactivate(request, submission,
+                    resolveCategoryLabelSnapshot(submission, review.getLeadCategoryLabelSnapshot()),
+                    review.getSubmitterUserId(), reviewerUserId, now, before, after);
             case "notify_owner" -> notifyOwner(request, reviewerUserId, now, before, after);
             default -> throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
@@ -153,7 +160,9 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         Map<String, Object> after = new LinkedHashMap<>();
         LocalDateTime now = LocalDateTime.now();
         if (reactivatable) {
-            reactivateLocked(request, submission, review.getSubmitterUserId(), actorUserId, now,
+            reactivateLocked(request, submission,
+                    resolveCategoryLabelSnapshot(submission, review.getLeadCategoryLabelSnapshot()),
+                    review.getSubmitterUserId(), actorUserId, now,
                     before, after, matchedLead);
         } else {
             notifyOwnerLocked(request, actorUserId, now, before, after, matchedLead);
@@ -206,6 +215,7 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
     }
 
     private void reactivate(LeadDuplicateReviewDecisionReqVO request, LeadCreateReqVO submission,
+                            String leadCategoryLabelSnapshot,
                             Long submitterUserId, Long reviewerUserId, LocalDateTime now, Map<String, Object> before,
                             Map<String, Object> after) {
         if (request.getMatchedLeadId() == null) {
@@ -216,10 +226,12 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
             throw exception(LEAD_DUPLICATE_REVIEW_SALES_INVALID);
         }
         LeadDO lead = leadMapper.selectByIdForUpdate(request.getMatchedLeadId(), TenantContextHolder.getRequiredTenantId());
-        reactivateLocked(request, submission, submitterUserId, reviewerUserId, now, before, after, lead);
+        reactivateLocked(request, submission, leadCategoryLabelSnapshot,
+                submitterUserId, reviewerUserId, now, before, after, lead);
     }
 
     private void reactivateLocked(LeadDuplicateReviewDecisionReqVO request, LeadCreateReqVO submission,
+                                  String leadCategoryLabelSnapshot,
                                   Long submitterUserId, Long reviewerUserId, LocalDateTime now,
                                   Map<String, Object> before, Map<String, Object> after, LeadDO lead) {
         if (lead == null || !Set.of(STATUS_INVALID, STATUS_CLOSED).contains(lead.getStatus())) {
@@ -240,6 +252,7 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         lead.setSubmittedName(submission.getName().trim()); lead.setSubmittedMobile(submission.getMobile());
         lead.setSubmittedWechatId(submission.getWechatId()); lead.setProvinceCode(submission.getProvinceCode());
         lead.setCityCode(submission.getCityCode()); lead.setLeadCategory(submission.getLeadCategory());
+        lead.setLeadCategoryLabelSnapshot(leadCategoryLabelSnapshot);
         lead.setRemark(submission.getRemark()); lead.setStatus(STATUS_SUBMITTED);
         lead.setAssignmentStatus(targetOwnerUserId == null ? ASSIGNMENT_PUBLIC_POOL : ASSIGNMENT_OWNED);
         lead.setOwnerUserId(targetOwnerUserId); lead.setOwnershipStartedAt(targetOwnerUserId == null ? null : now);
@@ -282,6 +295,11 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
         notifyEventPublisher.publish(DUPLICATE_REACTIVATED, lead.getId(),
                 "duplicate-review-reactivated:" + lead.getId() + ":" + now, reviewerUserId, now, notification);
         after.put("person", personMapper.selectById(person.getId())); after.put("lead", leadMapper.selectById(lead.getId()));
+    }
+
+    private String resolveCategoryLabelSnapshot(LeadCreateReqVO submission, String snapshot) {
+        return snapshot != null ? snapshot
+                : categorySnapshotService.requireEnabled(submission.getLeadCategory()).labelSnapshot();
     }
 
     private Object deepSnapshot(Object value) {

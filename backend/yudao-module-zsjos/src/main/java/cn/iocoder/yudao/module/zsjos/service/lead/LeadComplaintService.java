@@ -36,6 +36,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_WON;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ATTACHMENT_URL_EXPIRATION_SECONDS;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_FOUNDED;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_UNFOUNDED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
@@ -154,10 +155,16 @@ public class LeadComplaintService {
         row.setHandledAt(now);
         row.setDecisionIdempotencyKey(req.getIdempotencyKey());
         complaintMapper.updateById(row);
-        if ("founded".equals(row.getResult())) {
-            notifyPublisher.publish(COMPLAINT_FOUNDED, row.getLeadId(), "lead-complaint-founded:" + row.getId(),
-                    handler, now, Map.of("ownerUserId", row.getSalesUserId(), "complaint.handlerUserId", handler));
-        }
+        String sceneCode = "founded".equals(row.getResult()) ? COMPLAINT_FOUNDED : COMPLAINT_UNFOUNDED;
+        Map<String, Object> context = new java.util.LinkedHashMap<>();
+        if (row.getComplainantUserId() != null) context.put("complaint.complainantUserId", row.getComplainantUserId());
+        if (row.getPartnerId() != null) context.put("complaint.partnerId", row.getPartnerId());
+        if (row.getSalesUserId() != null) context.put("ownerUserId", row.getSalesUserId());
+        context.put("complaint.result", row.getResult());
+        context.put("complaint.handlerUserId", handler);
+        context.put("complaint.handlerOpinion", row.getHandlerOpinion());
+        notifyPublisher.publish(sceneCode, row.getLeadId(), "lead-complaint-" + row.getResult() + ":" + row.getId(),
+                handler, now, context);
     }
 
     private List<LeadAttachmentReqVO> attachments(List<Long> ids) {

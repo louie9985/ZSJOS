@@ -1,0 +1,3 @@
+package cn.iocoder.yudao.module.zsjos.service.positioning;
+import cn.iocoder.yudao.module.bpm.api.event.*; import jakarta.annotation.Resource; import org.springframework.stereotype.Component; import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.PROCESS_KEY_POSITIONING_IP;
+@Component public class PositioningIpProcessStatusListener extends BpmProcessInstanceStatusEventListener { @Resource private PositioningCardService service; @Override protected String getProcessDefinitionKey(){return PROCESS_KEY_POSITIONING_IP;} @Override protected void onEvent(BpmProcessInstanceStatusEvent event){service.handleIpProcessResult(event.getId(),event.getStatus(),event.getReason());} }

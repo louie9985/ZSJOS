@@ -64,7 +64,7 @@
             <div class="px-4 py-2">
               <el-descriptions :column="2" border size="small">
                 <el-descriptions-item
-                  v-for="(value, key) in row.sourceFields"
+                  v-for="(value, key) in row.mappedFields"
                   :key="key"
                   :label="String(key)"
                 >
@@ -102,7 +102,7 @@
         </el-table-column>
         <el-table-column label="人员匹配" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">
-            {{ row.matchedUserName || row.sourceUserName || '-' }}
+            {{ row.matchedUserName || row.useUserName || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="处理" width="100" align="center">

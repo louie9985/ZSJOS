@@ -2,6 +2,71 @@
   "schemaVersion": 1,
   "assets": [
     {
+      "processKey": "zsjos_media_reposition",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["operatorReviewer"],
+      "businessVariables": ["positioningCardId", "accountId", "reason"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["positioningCardId", "accountId", "reason"],
+      "businessKeyFormat": "media-reposition:{positioningCardId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_reposition/1.0.0/process.bpmn20.xml",
+      "sha256": "793a7028856d160fed8de7ae5045ce6569cd65f7a87e4c86b6e5d565bbb68c41"
+    },
+    {
+      "processKey": "zsjos_media_rebind",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["managerReviewer"],
+      "businessVariables": ["accountId", "fromStudentId", "toStudentId"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["accountId", "fromStudentId", "toStudentId"],
+      "businessKeyFormat": "media-rebind:{accountId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_rebind/1.0.0/process.bpmn20.xml",
+      "sha256": "a3f75b44f25638629cdc986f288d624178833a4c5bf2240ef3d5b4eaf23dcd63"
+    },
+    {
+      "processKey": "zsjos_media_over_entitlement",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["entitlementReviewer"],
+      "businessVariables": ["ticketId", "remainingCount", "handling"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["ticketId", "remainingCount", "handling"],
+      "businessKeyFormat": "media-over-entitlement:{ticketId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_over_entitlement/1.0.0/process.bpmn20.xml",
+      "sha256": "034066e1730a6f8a2f8ad75e93ead6ab5512a67411b2a2f625d645148861193c"
+    },
+    {
+      "processKey": "zsjos_media_graduation",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["graduationReviewer"],
+      "businessVariables": ["studentPersonId", "graduationReason"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["studentPersonId", "graduationReason"],
+      "businessKeyFormat": "media-graduation:{studentPersonId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_graduation/1.0.0/process.bpmn20.xml",
+      "sha256": "207645ebf220938f948c7d88ef03ec97f5b2f69731d46f6c1d0424705b3938c7"
+    },
+    {
+      "processKey": "zsjos_media_positioning_ip",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["ipReviewer"],
+      "businessVariables": ["positioningCardId", "accountId"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["positioningCardId", "accountId"],
+      "businessKeyFormat": "positioning-card:{positioningCardId}:v{versionNo}",
+      "minimumMigration": "V096",
+      "path": "zsjos_media_positioning_ip/1.0.0/process.bpmn20.xml",
+      "sha256": "b90033a64d0bf86d94ca3afcd8f1c8c1a549ff2efe737eb9438fba5484fea1d1"
+    },
+    {
       "processKey": "zsjos_sales_order_dual_approval",
       "assetVersion": "1.0.0",
       "recommended": true,
@@ -52,6 +117,19 @@
       "minimumMigration": "V052",
       "path": "zsjos_partner_withdrawal/1.0.0/process.bpmn20.xml",
       "sha256": "ef4d0834672dcddc727b56935e31dfbc801ed0d2f8460de56241fb828029d5bc"
+    },
+    {
+      "processKey": "zsjos_student_contact_extension",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["deliverySupervisorReview"],
+      "businessVariables": ["extensionId", "serviceRelationId", "requestedDueAt"],
+      "assigneeVariables": ["coll_userList", "assignee"],
+      "runtimeOnlyVariables": ["extensionId", "serviceRelationId", "requestedDueAt"],
+      "businessKeyFormat": "student-contact-extension:{extensionId}",
+      "minimumMigration": "V094",
+      "path": "zsjos_student_contact_extension/1.0.0/process.bpmn20.xml",
+      "sha256": "0f86f6fb459d56cab490b46e9ff983571089a88ecccf988c586908c95ad6d4ec"
     }
   ]
 }

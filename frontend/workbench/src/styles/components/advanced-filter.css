@@ -3,7 +3,7 @@
 .advanced-filter-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--crm-gap-sm);
 }
 
 .advanced-filter-toolbar>.ant-input-affix-wrapper {
@@ -19,8 +19,8 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px;
-  padding: 6px 0;
+  gap: var(--crm-gap-sm);
+  padding: var(--crm-gap-sm) 0;
 }
 
 .advanced-filter-tags .ant-tag {
@@ -30,14 +30,14 @@
 .advanced-filter-group {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 8px;
+  gap: var(--crm-gap);
+  padding: var(--crm-pane-pad);
+  border-radius: var(--crm-radius-md);
   background: var(--crm-fill-secondary);
 }
 
 .advanced-filter-group.depth-1 {
-  margin-left: 18px;
+  margin-left: var(--crm-pane-pad);
   background: var(--crm-fill-tertiary);
 }
 
@@ -45,14 +45,25 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: var(--crm-gap-sm);
 }
 
 .advanced-filter-condition {
   display: grid;
   grid-template-columns: minmax(150px,1.2fr) 110px minmax(130px,1fr) 34px;
   align-items: center;
-  gap: 8px;
+  gap: var(--crm-gap-sm);
+}
+
+.advanced-filter-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap-sm);
+}
+
+.advanced-filter-drawer .ant-drawer-content-wrapper {
+  max-width: 100vw;
 }
 
 .advanced-filter-condition>div,
@@ -72,6 +83,6 @@
   }
 
   .advanced-filter-group.depth-1 {
-    margin-left: 8px;
+    margin-left: var(--crm-gap-sm);
   }
 }

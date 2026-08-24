@@ -30,7 +30,4 @@ public class EamAssetPageReqVO extends PageParam {
     @Schema(description = "使用人编号", example = "1")
     private Long useUserId;
 
-    @Schema(description = "来源", example = "1")
-    private Integer source;
-
 }

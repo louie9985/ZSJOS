@@ -77,6 +77,9 @@ public interface NotifyTemplateService {
      */
     List<NotifyTemplateDO> getNotifyTemplateListByStatus(Integer status);
 
+    /** Extracts both supported placeholder syntaxes from template text. */
+    List<String> parseTemplateParams(String... contents);
+
     /**
      * 格式化站内信内容
      *

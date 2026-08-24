@@ -96,3 +96,34 @@ backend/yudao-server/pom.xml    需增加 yudao-module-eam 依赖
 ## Status
 
 `in-progress` — 代码完成，验证全部待补。**不可在未编译验证前合入。**
+
+## 2026-08-17 EAM JSON attachment mapping continuation
+
+- **Workstream ID**: eam-asset-management
+- **Goal**: 修复 `eam_asset.file_urls` JSON 列在空附件列表写入时收到空字符串的问题。
+- **Non-goals**: 不修改公共 `StringListTypeHandler`；不执行数据库迁移；不修改 EAM 之外的业务行为。
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **Base commit**: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- **Target branch**: main
+- **Ownership scope**: `EamAssetDO.java`、对应聚焦测试、本 workstream handoff 文件。
+- **Owner**: Codex（当前任务）
+- **Dependencies**: MyBatis-Plus 内置 `JacksonTypeHandler`；不新增依赖。
+- **Integration order**: 实体映射 -> 聚焦测试 -> EAM 模块编译。
+- **Verification plan**: 验证字段映射使用 JSON handler、空列表序列化为合法 JSON，并运行 EAM 聚焦测试及 Maven compile。
+- **Status**: in-progress
+
+### Delivery entry: 2026-08-17 21:18:00 +08:00
+
+- **Beijing time**: 2026-08-17 21:18:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- **User goal**: 修复新建 EAM 资产时空附件列表写入 MySQL JSON 列失败的问题。
+- **Key decisions**: 仅将 `EamAssetDO.fileUrls` 从面向 varchar 的 `StringListTypeHandler` 切换为 `JacksonTypeHandler`；不改公共处理器，不执行数据库变更。
+- **Execution or analysis result**: `fileUrls` 现在按 JSON 数组持久化，空列表不再转换为空字符串；新增字段映射回归测试。
+- **Changed files**: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/dal/dataobject/asset/EamAssetDO.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/dal/dataobject/asset/EamAssetDOTest.java`; `handoff/eam-asset-management.md`.
+- **Verification evidence**: `mvn -pl yudao-module-eam -Dtest=EamAssetDOTest test` 通过，1 个测试、0 失败；`mvn -pl yudao-module-eam test` 通过，39 个测试、0 失败；`git diff --check` 通过。
+- **Dependency or integration impact**: 不新增依赖；不影响 EAM 外模块；无需数据库迁移。
+- **Remaining work**: 未连接实际 MySQL 重放创建请求；部署更新后的后端后需用无附件和有附件资产各做一次 API 冒烟验证。
+- **Turn status**: completed

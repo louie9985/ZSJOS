@@ -36,9 +36,10 @@ export type SalesOrderEntryLead = {
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
 
-export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, open, onClose, onSubmitted }: {
+export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, studentRepurchase, open, onClose, onSubmitted }: {
   lead: SalesOrderEntryLead; orderId?: number; repurchase?: boolean
   externalCustomer?: { customerName: string; customerMobile?: string; customerWechatId?: string }
+  studentRepurchase?: boolean
   open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
@@ -139,15 +140,20 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
         if (repurchase) {
           const repurchaseReason = values.repurchaseReason!.trim()
-          const submittedOrderId = externalCustomer
-            ? await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason: repurchaseReason.trim(), order: request })
-            : await api.submitSystemRepurchase(lead.id, repurchaseReason.trim(), request)
-          message.success('复购订单已提交双中心审批')
+          let submittedOrderId: number
+          if (externalCustomer) {
+            submittedOrderId = await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason, order: request })
+          } else if (studentRepurchase) {
+            submittedOrderId = await api.submitStudentRepurchase(lead.id, { customerName: request.studentName, customerMobile: request.studentMobile, customerWechatId: request.studentWechatId, repurchaseReason, order: request })
+          } else {
+            submittedOrderId = await api.submitSystemRepurchase(lead.id, repurchaseReason, request)
+          }
+          message.success('复购订单已提交审批')
           onSubmitted(submittedOrderId)
         } else if (orderId) {
-          await api.resubmitSalesOrder(orderId, request)
+          const submittedOrderId = await api.resubmitSalesOrder(orderId, request)
           message.success('成交订单已补正并重新提交')
-          onSubmitted(orderId)
+          onSubmitted(submittedOrderId)
         } else {
           const submittedOrderId = await api.submitSalesOrder(lead.id, request)
           message.success('成交订单已提交')
@@ -208,7 +214,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
             <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false} maxCount={6}/>
           </Form.Item></Col>
         </Row>
-        <Space><IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」会签` : `提交「${lead.submittedName}」的成交订单会签`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交会签' : '提交会签'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
+        <Space><IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>
   </Modal>

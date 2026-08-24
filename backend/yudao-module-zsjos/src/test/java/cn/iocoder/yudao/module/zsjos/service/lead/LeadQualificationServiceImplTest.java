@@ -52,13 +52,23 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private CashbackService cashbackService;
+    @Mock private LeadCategorySnapshotService categorySnapshotService;
 
     @org.junit.jupiter.api.BeforeEach
-    void setUpAdvancedFilter() { lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
+    void setUpAdvancedFilter() {
+        lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null);
+        lenient().when(categorySnapshotService.requireEnabled(any()))
+                .thenReturn(new LeadCategorySnapshotService.Selection(null, null));
+    }
 
     @Test
     void judgeValidCompletesCurrentQualificationRound() {
         LeadDO lead = pendingLead();
+        lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
+        lead.setLeadCategory("high_intent");
+        lead.setLeadCategoryLabelSnapshot("提交时分类");
+        when(categorySnapshotService.requireEnabled(any()))
+                .thenReturn(new LeadCategorySnapshotService.Selection("high_intent", "当前字典名称"));
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-qualification:request-1")).thenReturn(null);
         doAnswer(invocation -> {
@@ -69,9 +79,11 @@ class LeadQualificationServiceImplTest {
         withTenant(() -> service.judgeValid(1L, 20L, command("request-1")));
 
         assertEquals("valid", lead.getStatus());
+        assertNull(lead.getSuspendedAt());
         assertEquals("owned", lead.getAssignmentStatus());
         assertEquals("已确认有明确学习意向", lead.getValidDescription());
         assertEquals(20L, lead.getQualifiedByUserId());
+        assertEquals("提交时分类", lead.getLeadCategoryLabelSnapshot());
         assertNotNull(lead.getQualifiedAt());
         verify(opportunityMapper).insert(argThat((OpportunityDO opportunity) ->
                 "initial_conversion".equals(opportunity.getType())
@@ -176,6 +188,7 @@ class LeadQualificationServiceImplTest {
     void restoreStartsNewQualificationRoundAndPublishesDisposition() {
         LeadDO lead = pendingLead();
         lead.setStatus("suspended");
+        lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-disposition:request-3")).thenReturn(null);
         when(permissionService.hasQualificationManageAll()).thenReturn(true);
@@ -186,9 +199,33 @@ class LeadQualificationServiceImplTest {
         withTenant(() -> service.restore(1L, 99L, request));
 
         assertEquals("submitted", lead.getStatus());
+        assertNull(lead.getSuspendedAt());
         verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
         verify(notifyEventPublisher).publish(eq(QUALIFICATION_RESTORED), eq(1L), anyString(),
                 eq(99L), any(LocalDateTime.class), anyMap());
+    }
+
+    @Test
+    void transferClearsStaleSuspensionBeforeRequalification() {
+        LeadDO lead = pendingLead();
+        lead.setStatus("suspended");
+        lead.setSuspendedAt(LocalDateTime.now().minusHours(1));
+        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
+        when(eventMapper.selectByIdempotencyKey("lead-disposition:request-transfer")).thenReturn(null);
+        when(permissionService.hasQualificationManageAll()).thenReturn(true);
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(candidate(30L)));
+        doAnswer(invocation -> {
+            invocation.<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO>getArgument(0).setId(77L);
+            return 1;
+        }).when(historyMapper).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+        var transfer = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.qualification.LeadTransferReqVO();
+        transfer.setIdempotencyKey("request-transfer"); transfer.setReason("主管转派"); transfer.setSalesUserId(30L);
+
+        withTenant(() -> service.transfer(1L, 99L, transfer));
+
+        assertEquals("submitted", lead.getStatus());
+        assertNull(lead.getSuspendedAt());
+        assertEquals("owned", lead.getAssignmentStatus());
     }
 
     @Test

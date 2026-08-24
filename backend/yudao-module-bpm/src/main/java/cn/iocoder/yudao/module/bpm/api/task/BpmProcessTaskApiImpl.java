@@ -203,6 +203,14 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         return taskIds.get(0);
     }
 
+    @Override
+    public String createParallelSignTask(Long userId, BpmTaskSignReqDTO reqDTO) {
+        List<String> taskIds = bpmTaskService.createSignTask(userId, new BpmTaskSignCreateReqVO()
+                .setId(reqDTO.getTaskId()).setUserIds(Set.of(reqDTO.getAssigneeUserId()))
+                .setType(BpmTaskSignTypeEnum.PARALLEL.getType()).setReason(reqDTO.getReason()));
+        return taskIds.get(0);
+    }
+
     private BpmTaskPageReqVO toPageReq(BpmTaskPageReqDTO reqDTO) {
         BpmTaskPageReqVO result = new BpmTaskPageReqVO();
         result.setPageNo(reqDTO.getPageNo()); result.setPageSize(reqDTO.getPageSize());

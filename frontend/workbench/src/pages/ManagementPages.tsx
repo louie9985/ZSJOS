@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Alert, Button, Descriptions, Empty, Form, Input, InputNumber, Modal, Popconfirm, Radio,
+  Alert, Avatar, Button, Descriptions, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Radio,
   Select, Space, Spin, Switch, Table, Tabs, Tag, Typography, Upload, message
 } from 'antd'
 import {
@@ -16,6 +16,7 @@ import {
 import type { SimpleDept, SimpleUser } from '../services/api'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT, storeImpersonation } from '../services/impersonation'
 import { availableAuditTabs, canUpdateMaintenance, hasPermission, withdrawalDetailScope } from '../services/managementAccess'
+import DetailFieldGrid from '../components/DetailFieldGrid'
 
 const errorText = (error: unknown, fallback: string) => error instanceof Error ? error.message : fallback
 const money = (value?: number) => value == null ? '-' : `¥${Number(value).toFixed(2)}`
@@ -28,21 +29,36 @@ function LoadError({ error, retry }: { error: string; retry: () => void }) {
 }
 
 export function PersonnelPage({ permissions }: { permissions: string[] }) {
-  const [users, setUsers] = useState<SimpleUser[]>([]), [selected, setSelected] = useState<number>()
-  const [state, setState] = useState<PersonnelState>(), [loading, setLoading] = useState(false), [error, setError] = useState('')
+  const [users, setUsers] = useState<SimpleUser[]>([]), [selected, setSelected] = useState<number>(), [keyword, setKeyword] = useState('')
+  const [state, setState] = useState<PersonnelState>(), [loading, setLoading] = useState(false), [detailLoading, setDetailLoading] = useState(false), [error, setError] = useState('')
   const [change, setChange] = useState<PersonnelState['state']>(), [reason, setReason] = useState('')
+  const [drawerOpen, setDrawerOpen] = useState(false), [saving, setSaving] = useState(false)
   const stateRequest = useRef(0)
-  const loadUsers = useCallback(async () => { setLoading(true); setError(''); try { setUsers(await managementApi.users()) } catch (e) { setError(errorText(e, '人员列表加载失败')) } finally { setLoading(false) } }, [])
-  const loadState = useCallback(async (userId = selected) => { if (!userId) return; const request = ++stateRequest.current; setLoading(true); setError(''); try { const result = await managementApi.personnelState(userId); if (request === stateRequest.current) setState(result) } catch (e) { if (request === stateRequest.current) { setState(undefined); setError(errorText(e, '人员状态加载失败')) } } finally { if (request === stateRequest.current) setLoading(false) } }, [selected])
+  const loadUsers = useCallback(async () => { setLoading(true); setError(''); try { const result = await managementApi.users(); setUsers(result); setSelected(current => current && result.some(user => user.id === current) ? current : result[0]?.id) } catch (e) { setUsers([]); setSelected(undefined); setError(errorText(e, '人员列表加载失败')) } finally { setLoading(false) } }, [])
+  const loadState = useCallback(async (userId: number) => { const request = ++stateRequest.current; setDetailLoading(true); setState(undefined); setError(''); try { const result = await managementApi.personnelState(userId); if (request === stateRequest.current) setState(result) } catch (e) { if (request === stateRequest.current) { setState(undefined); setError(errorText(e, '人员状态加载失败')) } } finally { if (request === stateRequest.current) setDetailLoading(false) } }, [])
   useEffect(() => { void loadUsers() }, [loadUsers])
-  const submit = async () => { if (!selected || !change || !reason.trim()) return; try { await managementApi.updatePersonnelState(selected, change, reason.trim()); message.success('人员状态已更新'); setChange(undefined); setReason(''); await loadState(selected) } catch (e) { message.error(errorText(e, '人员状态更新失败')) } }
+  useEffect(() => { if (selected) void loadState(selected); else setState(undefined) }, [loadState, selected])
+  const submit = async () => { if (!selected || !change || !reason.trim()) return; setSaving(true); try { await managementApi.updatePersonnelState(selected, change, reason.trim()); message.success('人员状态已更新'); setChange(undefined); setReason(''); await loadState(selected) } catch (e) { message.error(errorText(e, '人员状态更新失败')) } finally { setSaving(false) } }
   const labels = { enabled: '启用', disabled: '停用', departed: '离职' }
-  return <section className="workspace-page management-page">{pageTitle('人员管理', '查询并维护人员业务状态')}
-    <section className="management-panel"><Space wrap><Select showSearch optionFilterProp="label" value={selected} placeholder="选择人员账号" loading={loading} className="management-wide-control" options={users.map(user => ({ value: user.id, label: `${user.nickname}${user.username ? ` (${user.username})` : ''}` }))} onChange={id => { setSelected(id); void loadState(id) }}/><Button icon={<ReloadOutlined/>} onClick={() => void (selected ? loadState() : loadUsers())}>刷新</Button></Space>
-      {error && <LoadError error={error} retry={() => void (selected ? loadState() : loadUsers())}/>} {!selected && !loading && !error && <Empty description="请选择人员"/>}
-      {loading && <div className="management-loading"><Spin/></div>}{state && <><Descriptions bordered column={{ xs: 1, sm: 2 }} items={[{ key: 'state', label: '业务状态', children: <Tag>{labels[state.state]}</Tag> }, { key: 'time', label: '变更时间', children: formatTimestamp(state.changedAt) }, { key: 'reason', label: '最近原因', span: 2, children: state.reason || '无' }]}/>
-        {hasPermission(permissions, 'zsjos:personnel:update-state') && <Space wrap className="management-actions"><Button icon={<CheckOutlined/>} onClick={() => setChange('enabled')}>启用</Button><Button icon={<StopOutlined/>} onClick={() => setChange('disabled')}>停用</Button><Button danger icon={<CloseOutlined/>} onClick={() => setChange('departed')}>离职</Button></Space>}</>}
-    </section><Modal title="变更人员状态" open={Boolean(change)} onCancel={() => setChange(undefined)} onOk={() => void submit()} okButtonProps={{ disabled: !reason.trim() }}><Input.TextArea rows={4} maxLength={500} showCount value={reason} onChange={e => setReason(e.target.value)} placeholder="填写变更原因（必填）"/></Modal></section>
+  const visibleUsers = useMemo(() => { const term = keyword.trim().toLowerCase(); return term ? users.filter(user => [user.nickname, user.username, user.deptName].some(value => value?.toLowerCase().includes(term))) : users }, [keyword, users])
+  const selectedUser = useMemo(() => users.find(user => user.id === selected), [selected, users])
+  const detailContent = detailLoading ? <Spin/> : error && selected ? <LoadError error={error} retry={() => void loadState(selected)}/> : selectedUser && state ? <div className="business-inbox-detail">
+    <header className="business-inbox-detail-hero"><div className="business-inbox-detail-heading"><Avatar src={selectedUser.avatar}>{selectedUser.nickname.slice(0, 1)}</Avatar><div><Typography.Title level={4}>{selectedUser.nickname}</Typography.Title><Typography.Text type="secondary">{selectedUser.username || '未设置账号'}</Typography.Text></div></div><Tag color={state.state === 'enabled' ? 'success' : state.state === 'disabled' ? 'warning' : 'default'}>{labels[state.state]}</Tag></header>
+    <section className="business-inbox-card"><Typography.Title level={5}>账号与业务状态</Typography.Title><DetailFieldGrid items={[
+      { key: 'nickname', label: '姓名', value: selectedUser.nickname }, { key: 'username', label: '账号', value: selectedUser.username },
+      { key: 'department', label: '部门', value: selectedUser.deptName }, { key: 'accountState', label: '账号状态', value: selectedUser.status === 0 ? '启用' : selectedUser.status === 1 ? '停用' : undefined },
+      { key: 'businessState', label: '业务状态', value: <Tag>{labels[state.state]}</Tag> }, { key: 'changedAt', label: '变更时间', value: formatTimestamp(state.changedAt) },
+      { key: 'reason', label: '最近原因', value: state.reason, span: 2 }
+    ]}/></section>
+    {hasPermission(permissions, 'zsjos:personnel:update-state') && <section className="business-inbox-card"><Typography.Title level={5}>状态操作</Typography.Title><Space wrap className="business-inbox-detail-actions"><Button icon={<CheckOutlined/>} onClick={() => setChange('enabled')}>启用</Button><Button icon={<StopOutlined/>} onClick={() => setChange('disabled')}>停用</Button><Button danger icon={<CloseOutlined/>} onClick={() => setChange('departed')}>离职</Button></Space></section>}
+  </div> : <Empty description="从左侧选择一名人员"/>
+  return <section className="workspace-page business-inbox-page personnel-page">
+    <div className="business-inbox-layout"><aside className="business-inbox-list-pane"><div className="business-inbox-toolbar"><Input.Search allowClear value={keyword} onChange={event => setKeyword(event.target.value)} placeholder="搜索姓名 / 账号 / 部门"/></div>
+      {error && !selected && <LoadError error={error} retry={() => void loadUsers()}/>}<div className="business-inbox-scroll">{loading ? <Spin/> : !visibleUsers.length && !error ? <Empty description="暂无人员"/> : visibleUsers.map(user => <button key={user.id} type="button" className={`business-inbox-item${user.id === selected ? ' active' : ''}`} onClick={() => { setSelected(user.id); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}><div className="business-inbox-item-main"><Avatar src={user.avatar}>{user.nickname.slice(0, 1)}</Avatar><div className="business-inbox-item-copy"><div className="business-inbox-item-title"><strong>{user.nickname}</strong>{user.id === selected && state && <Tag color={state.state === 'enabled' ? 'success' : 'default'}>{labels[state.state]}</Tag>}</div><span>{user.username || '未设置账号'}</span><span>{user.deptName || '未设置部门'}</span></div></div></button>)}</div>
+    </aside><main className="business-inbox-detail-pane">{detailContent}</main></div>
+    <Drawer className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="人员详情" width="100%">{detailContent}</Drawer>
+    <Modal title="变更人员状态" open={Boolean(change)} confirmLoading={saving} onCancel={() => { setChange(undefined); setReason('') }} onOk={() => void submit()} okButtonProps={{ disabled: !reason.trim() }}><Input.TextArea rows={4} maxLength={500} showCount value={reason} onChange={e => setReason(e.target.value)} placeholder="填写变更原因（必填）"/></Modal>
+  </section>
 }
 
 export function PartnerPage({ permissions }: { permissions: string[] }) {

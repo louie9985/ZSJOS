@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, protocolDisplayLabel, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, pinLeadFirst, prioritizeLeads, protocolDisplayLabel, resolveLeadSelection, resolvedDisplayLabel, snapshotDisplayLabel, snapshotOrDictionaryDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -26,6 +26,41 @@ describe('lead management paging helpers', () => {
       .toEqual([lead(1, '新名称'), lead(2, '客户二')])
   })
 
+  it('keeps the just-changed lead selected after activity sorting moves it', () => {
+    const reordered = [lead(2, '刚跟进的客资'), lead(1, '其他客资')]
+
+    expect(resolveLeadSelection(reordered, { preferredId: 2, currentId: 1 })).toBe(2)
+  })
+
+  it('preserves a deep-linked selection even when lazy page one does not contain it', () => {
+    expect(resolveLeadSelection([lead(1, '第一页客资')], {
+      requestedId: 42, preserveRequestedId: true
+    })).toBe(42)
+  })
+
+  it('pins a hydrated deep-linked lead into the left list', () => {
+    expect(pinLeadFirst([lead(1, '第一页客资')], lead(42, '通知客资')).map(item => item.id)).toEqual([42, 1])
+  })
+
+  it('puts the newest unseen action leads first while preserving backend order otherwise', () => {
+    expect(prioritizeLeads([lead(1, '普通'), lead(2, '旧动作'), lead(3, '新动作')], [2, 3]).map(item => item.id))
+      .toEqual([2, 3, 1])
+    expect(prioritizeLeads([lead(1, '普通'), lead(2, '旧动作'), lead(3, '新动作')], [3, 2]).map(item => item.id))
+      .toEqual([3, 2, 1])
+  })
+
+  it('falls back to the first lead when the changed lead leaves the filtered result', () => {
+    const filtered = [lead(1, '当前第一条'), lead(3, '其他客资')]
+
+    expect(resolveLeadSelection(filtered, { preferredId: 2, currentId: 2 })).toBe(1)
+  })
+
+  it('preserves a manual selection instead of restoring a stale route request', () => {
+    const rows = [lead(1, '路由客资'), lead(2, '手工选择客资')]
+
+    expect(resolveLeadSelection(rows, { currentId: 2, requestedId: 1 })).toBe(2)
+  })
+
   it('sums server status counts', () => {
     expect(sumStatusCounts({ submitted: 3, won: 2 })).toBe(5)
   })
@@ -43,6 +78,15 @@ describe('lead management paging helpers', () => {
     expect(resolvedDisplayLabel('抖音', 'douyin')).toBe('抖音')
     expect(resolvedDisplayLabel(undefined, 'douyin')).toBe('标签未配置')
     expect(resolvedDisplayLabel(undefined, undefined)).toBe('-')
+  })
+
+  it('keeps the persisted Lead category label after dictionary labels change', () => {
+    const current = [{ value: 'high_intent', label: '当前分类名称' }]
+
+    expect(snapshotOrDictionaryDisplayLabel('提交时分类名称', current, 'high_intent'))
+      .toBe('提交时分类名称')
+    expect(snapshotOrDictionaryDisplayLabel(undefined, current, 'high_intent'))
+      .toBe('当前分类名称')
   })
 
   it('does not expose unknown protocol keys as user-facing statuses', () => {

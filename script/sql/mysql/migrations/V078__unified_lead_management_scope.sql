@@ -30,7 +30,7 @@ START TRANSACTION;
 UPDATE `system_menu`
 SET `name`='客资管理',`type`=2,`sort`=15,`parent_id`=6735,`path`='leads/manage',
     `icon`='ep:user-filled',`component`='zsjos/lead/index',`component_name`='ZsjosLeadManagement',
-    `visible`=b'0',`keep_alive`=b'1',`always_show`=b'1',
+    `visible`=b'1',`keep_alive`=b'1',`always_show`=b'1',
     `updater`='migration-V078',`update_time`=NOW()
 WHERE `id`=6770 AND `permission`='zsjos:lead:query' AND `deleted`=b'0';
 
@@ -44,12 +44,16 @@ UPDATE `system_menu`
 SET `parent_id`=6770,`updater`='migration-V078',`update_time`=NOW()
 WHERE `id` IN (6845,6846,6847) AND `deleted`=b'0';
 
--- Every relation-scope permission holder needs the single routable page.
+-- Every Lead query permission holder needs the single routable page.
 UPDATE `system_role_menu` target
 JOIN (
   SELECT DISTINCT rm.role_id,rm.tenant_id
   FROM `system_role_menu` rm
-  WHERE rm.menu_id IN (6778,6779) AND rm.deleted=b'0'
+  JOIN `system_menu` menu ON menu.id=rm.menu_id
+    AND menu.permission IN ('zsjos:lead:query','zsjos:lead:query-all',
+                            'zsjos:lead:query-submitted','zsjos:lead:query-owned')
+    AND menu.deleted=b'0'
+  WHERE rm.deleted=b'0'
 ) holder ON holder.role_id=target.role_id AND holder.tenant_id=target.tenant_id
 SET target.deleted=b'0',target.updater='migration-V078',target.update_time=NOW()
 WHERE target.menu_id=6770 AND target.deleted=b'1';
@@ -60,7 +64,11 @@ SELECT holder.role_id,6770,'migration-V078',NOW(),'migration-V078',NOW(),b'0',ho
 FROM (
   SELECT DISTINCT rm.role_id,rm.tenant_id
   FROM `system_role_menu` rm
-  WHERE rm.menu_id IN (6778,6779) AND rm.deleted=b'0'
+  JOIN `system_menu` menu ON menu.id=rm.menu_id
+    AND menu.permission IN ('zsjos:lead:query','zsjos:lead:query-all',
+                            'zsjos:lead:query-submitted','zsjos:lead:query-owned')
+    AND menu.deleted=b'0'
+  WHERE rm.deleted=b'0'
 ) holder
 WHERE NOT EXISTS (
   SELECT 1 FROM `system_role_menu` existing

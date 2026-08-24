@@ -32,6 +32,14 @@ public class SubordinateSalesController {
         return success(service.getPage(reqVO, getLoginUserId()));
     }
 
+    @PostMapping("/search-page")
+    @Operation(summary = "筛选下属销售分页")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
+    public CommonResult<PageResult<SubordinateSalesRespVO>> searchPage(
+            @Valid @RequestBody SubordinateSalesPageReqVO reqVO) {
+        return success(service.getPage(reqVO, getLoginUserId()));
+    }
+
     @GetMapping("/{salesUserId}/overview")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
     public CommonResult<SubordinateSalesRespVO> getOverview(@PathVariable Long salesUserId) {
@@ -77,6 +85,13 @@ public class SubordinateSalesController {
     public CommonResult<Boolean> updateDispatchMode(@PathVariable Long salesUserId,
                                                      @Valid @RequestBody SubordinateDispatchModeReqVO reqVO) {
         service.updateDispatchMode(salesUserId, reqVO, getLoginUserId()); return success(true);
+    }
+
+    @PutMapping("/dispatch-mode/pause-all")
+    @Operation(summary = "暂停全部下属销售接单")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:pause-all')")
+    public CommonResult<SubordinatePauseAllRespVO> pauseAllDispatch() {
+        return success(service.pauseAllDispatch(getLoginUserId()));
     }
 
     @PostMapping("/leads/batch-transfer")

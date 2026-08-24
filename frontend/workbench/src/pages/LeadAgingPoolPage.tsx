@@ -4,7 +4,6 @@ import {
   Avatar,
   Button,
   Card,
-  Descriptions,
   Empty,
   Form,
   Input,
@@ -21,9 +20,9 @@ import {
 import {
   FileAddOutlined,
   PlusOutlined,
-  ReloadOutlined,
   UserSwitchOutlined,
 } from "@ant-design/icons";
+import DetailFieldGrid from "../components/DetailFieldGrid";
 import {
   api,
   type LeadAgingPoolItem,
@@ -255,7 +254,6 @@ export default function LeadAgingPoolPage() {
         </Space>}
         <Space>
           <AdvancedFilterToolbar scene="lead" placeholder="姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
-          <Button icon={<ReloadOutlined />} onClick={() => void load()} />
         </Space>
       </div>
       {error && (
@@ -391,35 +389,19 @@ export default function LeadAgingPoolPage() {
                   )}
                 </Space>
               </div>
-              <Descriptions column={{ xs: 1, md: 2 }} bordered size="small">
-                <Descriptions.Item label="手机号">
-                  {detail.submittedMobile || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="微信号">
-                  {detail.submittedWechatId || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="原归属销售A">
-                  {selected.originalOwnerUserName || "-"}
-                </Descriptions.Item>
-                <Descriptions.Item label="协同销售B">
-                  {selected.collaboratorUserName || "待指派"}
-                </Descriptions.Item>
-                <Descriptions.Item label="持有起点">
-                  {formatTimestamp(selected.ownershipStartedAt)}
-                </Descriptions.Item>
-                <Descriptions.Item label="进入公海">
-                  {formatTimestamp(selected.enteredAt)}
-                </Descriptions.Item>
-                <Descriptions.Item label="最近跟进">
-                  {formatTimestamp(selected.lastFollowUpAt)}
-                </Descriptions.Item>
-                <Descriptions.Item label="下次跟进">
-                  {formatTimestamp(selected.nextFollowUpAt)}
-                </Descriptions.Item>
-                <Descriptions.Item label="备注" span={2}>
-                  {detail.remark || "-"}
-                </Descriptions.Item>
-              </Descriptions>
+              <section className="aging-pool-summary-card">
+                <DetailFieldGrid items={[
+                  { key: "mobile", label: "手机号", value: detail.submittedMobile },
+                  { key: "wechat", label: "微信号", value: detail.submittedWechatId },
+                  { key: "owner", label: "原归属销售A", value: selected.originalOwnerUserName },
+                  { key: "collaborator", label: "协同销售B", value: selected.collaboratorUserName || "待指派" },
+                  { key: "ownershipStartedAt", label: "持有起点", value: formatTimestamp(selected.ownershipStartedAt) },
+                  { key: "enteredAt", label: "进入公海", value: formatTimestamp(selected.enteredAt) },
+                  { key: "lastFollowUpAt", label: "最近跟进", value: formatTimestamp(selected.lastFollowUpAt) },
+                  { key: "nextFollowUpAt", label: "下次跟进", value: formatTimestamp(selected.nextFollowUpAt) },
+                  { key: "remark", label: "备注", value: detail.remark, span: 2 },
+                ]}/>
+              </section>
               <LeadFollowUpPanel
                 lead={detail}
                 open={followOpen}

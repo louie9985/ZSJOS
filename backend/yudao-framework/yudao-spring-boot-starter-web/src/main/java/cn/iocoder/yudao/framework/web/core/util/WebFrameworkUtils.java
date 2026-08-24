@@ -111,6 +111,9 @@ public class WebFrameworkUtils {
         if (request.getServletPath().startsWith(properties.getAdminApi().getPrefix())) {
             return UserTypeEnum.ADMIN.getValue();
         }
+        if (request.getServletPath().startsWith(properties.getPartnerApi().getPrefix())) {
+            return UserTypeEnum.PARTNER.getValue();
+        }
         if (request.getServletPath().startsWith(properties.getAppApi().getPrefix())) {
             String appPath = request.getServletPath().substring(properties.getAppApi().getPrefix().length());
             for (var entry : properties.getAppApiUserTypePrefixes().entrySet()) {

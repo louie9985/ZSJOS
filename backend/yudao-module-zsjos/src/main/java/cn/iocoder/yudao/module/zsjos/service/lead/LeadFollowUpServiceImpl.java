@@ -56,7 +56,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private OpportunityFollowUpRecordMapper opportunityRecordMapper;
     @Resource private OpportunityFollowUpImageMapper opportunityImageMapper;
-    @Resource private LeadAgingPoolService agingPoolService;
+    @Resource private LeadCollaborationService collaborationService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -64,7 +64,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         LocalDateTime occurredAt = LocalDateTime.now();
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
-        agingPoolService.requireCanOperateForUpdate(leadId, lead.getOwnerUserId(), operatorUserId);
+        collaborationService.requireCanOperateForUpdate(lead, operatorUserId);
         if (!canFollow(lead)) {
             throw exception(LEAD_FOLLOW_UP_STATE_INVALID);
         }
@@ -144,6 +144,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             notifyEventPublisher.publish(CATEGORY_CHANGED, leadId, categoryEvent.getIdempotencyKey(), operatorUserId,
                     occurredAt, categoryContext);
             lead.setLeadCategory(categoryAfter);
+            lead.setLeadCategoryLabelSnapshot(labelOf(afterCategory, categoryAfter));
         }
         boolean first = lifecycleTaskService.completeFirstFollowUpTask(
                 lead.getCurrentAssignmentHistoryId(), occurredAt);
@@ -240,7 +241,11 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             image.setOriginalName(file.getName()); image.setContentType(file.getType());
             image.setFileSize(file.getSize()); image.setSort(i); opportunityImageMapper.insert(image);
         }
-        lead.setLeadCategory(categoryAfter); lead.setLastFollowUpAt(occurredAt); lead.setLastActivityAt(occurredAt);
+        lead.setLeadCategory(categoryAfter);
+        if (!Objects.equals(record.getCategoryBefore(), categoryAfter)) {
+            lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
+        }
+        lead.setLastFollowUpAt(occurredAt); lead.setLastActivityAt(occurredAt);
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
         leadMapper.updateById(lead);

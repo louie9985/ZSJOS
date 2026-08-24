@@ -16,6 +16,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDuplicateReviewDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRuleDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductCatalogPort;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
@@ -38,6 +40,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_R
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -69,11 +72,15 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadFollowUpRuleService followUpRuleService;
     @Mock private LeadDuplicateReviewService duplicateReviewService;
     @Mock private ZsjosProductSkuService productSkuService;
+    @Mock private LeadCategorySnapshotService categorySnapshotService;
+    @Mock private PartnerAccountMapper partnerAccountMapper;
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {
         org.mockito.Mockito.lenient().when(identityService.requireOrdinarySubmitter(1L)).thenReturn(
                 new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
+        org.mockito.Mockito.lenient().when(categorySnapshotService.requireEnabled(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new LeadCategorySnapshotService.Selection("test", "提交时分类"));
     }
 
     @Test
@@ -98,6 +105,8 @@ class LeadSubmissionServiceImplTest {
     @Test
     void partnerCannotReplayAnotherPartnersIdempotencyKey() {
         LeadCreateReqVO req = baseRequest();
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L)
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
         LeadDO existing = new LeadDO().setId(100L).setPartnerId(99L)
                 .setSubmissionIdempotencyKey(req.getIdempotencyKey());
         when(leadMapper.selectByIdempotencyKey(req.getIdempotencyKey())).thenReturn(existing);
@@ -107,6 +116,28 @@ class LeadSubmissionServiceImplTest {
 
         assertEquals(LEAD_SUBMISSION_DUPLICATE.getCode(), error.getCode());
         verify(activationMapper, never()).selectByIdempotencyKey(any());
+    }
+
+    @Test
+    void partnerSubmissionRejectsAccountFromAnotherPartner() {
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(99L)
+                .setStatus(CommonStatusEnum.ENABLE.getStatus()));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "validatePartnerSubmissionAccount", 20L, 10L));
+
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void partnerSubmissionRejectsDisabledAccount() {
+        when(partnerAccountMapper.selectById(20L)).thenReturn(new PartnerAccountDO().setId(20L).setPartnerId(10L)
+                .setStatus(CommonStatusEnum.DISABLE.getStatus()));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "validatePartnerSubmissionAccount", 20L, 10L));
+
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_ACCOUNT_DISABLED.getCode(), error.getCode());
     }
 
     @Test
@@ -205,6 +236,8 @@ class LeadSubmissionServiceImplTest {
 
         assertEquals("review_pending", result.getOutcome());
         assertEquals(99L, result.getReviewId());
+        verify(duplicateReviewMapper).insert(org.mockito.ArgumentMatchers.argThat(
+                (LeadDuplicateReviewDO review) -> "提交时分类".equals(review.getLeadCategoryLabelSnapshot())));
         verify(duplicateReviewService, never()).resolveAutomatically(any(), any(), any());
     }
 
@@ -236,6 +269,22 @@ class LeadSubmissionServiceImplTest {
     void selfSourcedSourceFallsBackToSubmittingSales() {
         assertEquals(10L, LeadSubmissionServiceImpl.selfSourcedSourceUserId(null, 10L));
         assertEquals(20L, LeadSubmissionServiceImpl.selfSourcedSourceUserId(20L, 10L));
+    }
+
+    @Test
+    void leadCreatedContextIncludesOnlyExplicitSelfSourcedProvider() {
+        LeadDO linked = new LeadDO().setSourceType("sales_self_sourced").setSourceUserId(20L);
+        Map<String, Object> linkedContext = ReflectionTestUtils.invokeMethod(service, "eventContext", linked, 10L);
+        assertEquals(20L, linkedContext.get("newMediaProviderUserId"));
+
+        LeadDO fallback = new LeadDO().setSourceType("sales_self_sourced").setSourceUserId(10L);
+        Map<String, Object> fallbackContext = ReflectionTestUtils.invokeMethod(service, "eventContext", fallback, 10L);
+        assertFalse(fallbackContext.containsKey("newMediaProviderUserId"));
+
+        LeadDO newMediaSubmission = new LeadDO().setSourceType("internal_new_media").setSourceUserId(20L);
+        Map<String, Object> newMediaContext = ReflectionTestUtils.invokeMethod(
+                service, "eventContext", newMediaSubmission, 20L);
+        assertFalse(newMediaContext.containsKey("newMediaProviderUserId"));
     }
 
     @Test

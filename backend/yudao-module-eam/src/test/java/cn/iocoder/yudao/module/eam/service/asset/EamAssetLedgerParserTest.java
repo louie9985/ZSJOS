@@ -48,7 +48,7 @@ class EamAssetLedgerParserTest {
         assertTrue(actual.defaultedFields().contains("数量为空，默认按 1 导入"));
         assertTrue(actual.defaultedFields().contains("使用状态为空，默认按闲置导入"));
         assertFalse(actual.extFields().toString().contains("TOP_SECRET_PASSWORD"));
-        assertFalse(actual.sourceFields().toString().contains("TOP_SECRET_PASSWORD"));
+        assertFalse(actual.mappedFields().toString().contains("TOP_SECRET_PASSWORD"));
         assertFalse(actual.extFields().containsKey("wechat_password"));
     }
 

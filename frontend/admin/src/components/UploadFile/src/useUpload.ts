@@ -13,11 +13,11 @@ export const getUploadUrl = (): string => {
   return import.meta.env.VITE_BASE_URL + import.meta.env.VITE_API_URL + '/infra/file/upload'
 }
 
-export const useUpload = (directory?: string) => {
+export const useUpload = (directory?: string, isAvatar = false) => {
   // 后端上传地址
   const uploadUrl = getUploadUrl()
   // 是否使用前端直连上传
-  const isClientUpload = UPLOAD_TYPE.CLIENT === import.meta.env.VITE_UPLOAD_TYPE
+  const isClientUpload = !isAvatar && UPLOAD_TYPE.CLIENT === import.meta.env.VITE_UPLOAD_TYPE
   // 重写ElUpload上传方法
   const httpRequest = async (options: UploadRequestOptions) => {
     // 文件上传进度监听
@@ -51,7 +51,8 @@ export const useUpload = (directory?: string) => {
       // 模式二：后端上传
       // 重写 el-upload httpRequest 文件上传成功会走成功的钩子，失败走失败的钩子
       return new Promise((resolve, reject) => {
-        FileApi.updateFile({ file: options.file, directory }, uploadProgressHandler)
+        const uploadRequest = isAvatar ? FileApi.uploadAvatar : FileApi.updateFile
+        uploadRequest({ file: options.file, directory }, uploadProgressHandler)
           .then((res) => {
             if (res.code === 0) {
               resolve(res)

@@ -8,5 +8,6 @@ public interface SalesDispatchStatusService {
     SalesDispatchStatusRespVO updateMode(Long userId, boolean accepting);
     SalesDispatchStatusRespVO getStatus(Long userId);
     SalesDispatchStatusRespVO updateModeByManager(Long userId, boolean accepting);
+    boolean pausePreferenceByManager(Long userId);
     SalesDispatchStatusRespVO offline(Long userId);
 }

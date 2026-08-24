@@ -28,6 +28,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.enums.LeadConstants;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -66,10 +67,12 @@ class LeadAppealServiceImplTest {
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private CashbackService cashbackService;
     @Mock private LeadObjectPermissionService leadObjectPermissionService;
+    @Mock private AdvancedFilterService advancedFilterService;
 
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(advancedFilterService.matchAppealIds(isNull(), isNull())).thenReturn(null);
     }
 
     @Test
@@ -98,7 +101,23 @@ class LeadAppealServiceImplTest {
         LeadDO lead = new LeadDO().setId(8L);
         lead.setLeadNo("KZ202608170001");
         when(leadMapper.selectById(8L)).thenReturn(lead);
-        when(leadObjectPermissionService.canRead(lead, 40L)).thenReturn(true);
+        when(leadObjectPermissionService.canReadDetail(lead, 40L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(eq(40L),
+                eq(LeadConstants.PERMISSION_DETAIL_APPEAL_READ),
+                eq(LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER),
+                eq(LeadConstants.PERMISSION_APPEAL_REVIEW_QUALITY),
+                eq(LeadConstants.PERMISSION_APPEAL_REVIEW_CHAIRMAN))).thenReturn(true);
+        when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
+
+        assertTrue(service.getLeadAppeals(8L, 40L).isEmpty());
+    }
+
+    @Test
+    void submitterCanReadOwnLeadAppealHistoryWithoutAppealReadPermission() {
+        LeadDO lead = new LeadDO().setId(8L);
+        lead.setSourceUserId(40L);
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 40L)).thenReturn(true);
         when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
 
         assertTrue(service.getLeadAppeals(8L, 40L).isEmpty());
@@ -108,7 +127,22 @@ class LeadAppealServiceImplTest {
     void leadAppealsRejectOutOfScopeUser() {
         LeadDO lead = new LeadDO().setId(8L);
         when(leadMapper.selectById(8L)).thenReturn(lead);
-        when(leadObjectPermissionService.canRead(lead, 50L)).thenReturn(false);
+        when(leadObjectPermissionService.canReadDetail(lead, 50L)).thenReturn(false);
+
+        assertThrows(ServiceException.class, () -> service.getLeadAppeals(8L, 50L));
+        verify(appealMapper, never()).selectListByLeadId(anyLong());
+    }
+
+    @Test
+    void unrelatedLeadReaderWithoutAppealCapabilityCannotReadAppealHistory() {
+        LeadDO lead = new LeadDO().setId(8L).setSourceUserId(40L);
+        when(leadMapper.selectById(8L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 50L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(eq(50L),
+                eq(LeadConstants.PERMISSION_DETAIL_APPEAL_READ),
+                eq(LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER),
+                eq(LeadConstants.PERMISSION_APPEAL_REVIEW_QUALITY),
+                eq(LeadConstants.PERMISSION_APPEAL_REVIEW_CHAIRMAN))).thenReturn(false);
 
         assertThrows(ServiceException.class, () -> service.getLeadAppeals(8L, 50L));
         verify(appealMapper, never()).selectListByLeadId(anyLong());

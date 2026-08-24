@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
-  addFollowUpDays, appendQuickNote, chunkSnakeRows, defaultLeadDetailTab, detailTabsForMode, filterFollowUps,
+  addFollowUpDays, appendQuickNote, chunkSnakeRows, defaultLeadDetailTab, detailTabsFromProjection, filterFollowUps,
+  parseLeadDetailTab, resolveLeadDetailTab,
   shouldBlockLeadSwitch, shouldShowLeadOrderTab, snakeColumnsForWidth, snakeRowReversed
 } from './leadFollowUp'
 
@@ -25,19 +26,32 @@ describe('lead follow-up form logic', () => {
     expect(defaultLeadDetailTab(true)).toBe('follow-ups')
   })
 
-  it('shows customer orders to the owner and read-only subordinate manager', () => {
-    expect(shouldShowLeadOrderTab('owner')).toBe(true)
-    expect(shouldShowLeadOrderTab('submitter')).toBe(false)
-    expect(shouldShowLeadOrderTab('all')).toBe(false)
-    expect(shouldShowLeadOrderTab('manager-readonly')).toBe(true)
+  it('parses and authorizes Lead detail deep-link tabs', () => {
+    expect(parseLeadDetailTab('appeals')).toBe('appeals')
+    expect(parseLeadDetailTab('flow-history')).toBe('flow-history')
+    expect(parseLeadDetailTab('unknown')).toBeUndefined()
+    expect(resolveLeadDetailTab(['overview', 'flow-history'], 'flow-history')).toBe('flow-history')
+    expect(resolveLeadDetailTab(['overview', 'appeals'], 'appeals')).toBe('appeals')
+    expect(resolveLeadDetailTab(['overview'], 'complaints')).toBe('overview')
   })
 
-  it('shows the complete read-only history to a subordinate sales manager', () => {
-    expect(detailTabsForMode('manager-readonly')).toEqual([
+  it('shows customer orders only when the server projects the order tab', () => {
+    expect(shouldShowLeadOrderTab(['overview', 'orders'])).toBe(true)
+    expect(shouldShowLeadOrderTab(['overview', 'follow-ups'])).toBe(false)
+    expect(shouldShowLeadOrderTab([])).toBe(false)
+    expect(shouldShowLeadOrderTab()).toBe(false)
+  })
+
+  it('uses the server tab projection without deriving access from detail mode', () => {
+    expect(detailTabsFromProjection([
       'overview', 'follow-ups', 'appeals', 'complaints', 'orders'
-    ])
-    expect(detailTabsForMode('owner')).toEqual(['overview', 'follow-ups', 'orders'])
-    expect(detailTabsForMode('submitter')).toEqual(['overview', 'follow-ups', 'appeals'])
+    ])).toEqual(['overview', 'follow-ups', 'appeals', 'complaints', 'orders'])
+    expect(detailTabsFromProjection(['overview', 'follow-ups', 'orders']))
+      .toEqual(['overview', 'follow-ups', 'orders'])
+    expect(detailTabsFromProjection(['overview', 'orders', 'orders']))
+      .toEqual(['overview', 'orders'])
+    expect(detailTabsFromProjection([])).toEqual(['overview'])
+    expect(detailTabsFromProjection()).toEqual(['overview'])
   })
 })
 

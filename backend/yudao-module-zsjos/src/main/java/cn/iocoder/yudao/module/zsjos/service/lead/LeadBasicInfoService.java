@@ -6,7 +6,6 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
@@ -37,11 +36,11 @@ public class LeadBasicInfoService {
     @Resource private LeadIntendedProductMapper productMapper;
     @Resource private OpportunityMapper opportunityMapper;
     @Resource private AreaApi areaApi;
-    @Resource private DictDataApi dictDataApi;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadDuplicateMatcher duplicateMatcher;
     @Resource private PersonIdentityWriteService personIdentityWriteService;
+    @Resource private LeadCategorySnapshotService categorySnapshotService;
 
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "basic-info-update")
@@ -61,7 +60,7 @@ public class LeadBasicInfoService {
         checkIdentityConflict(lead, req, mobile, wechat);
         Region region = validateRegion(req.getProvinceCode(), req.getCityCode());
         String category = StrUtil.trimToNull(req.getLeadCategory());
-        if (category != null) dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(category));
+        LeadCategorySnapshotService.Selection categorySelection = categorySnapshotService.requireEnabled(category);
         List<LeadProductSnapshot> snapshots = validateProducts(req.getIntendedProducts());
 
         PersonDO person = personMapper.selectById(lead.getPersonId());
@@ -76,7 +75,11 @@ public class LeadBasicInfoService {
         personIdentityWriteService.update(person.getId(), req.getName().trim(), mobile, wechat);
         lead.setSubmittedName(req.getName().trim()); lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechat);
         lead.setProvinceCode(region.provinceCode()); lead.setProvinceName(region.provinceName());
-        lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName()); lead.setLeadCategory(category);
+        lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName());
+        if (!Objects.equals(lead.getLeadCategory(), categorySelection.value())) {
+            lead.setLeadCategory(categorySelection.value());
+            lead.setLeadCategoryLabelSnapshot(categorySelection.labelSnapshot());
+        }
         leadMapper.updateById(lead);
         productMapper.deleteByLeadId(leadId);
         insertProducts(leadId, req.getIntendedProducts(), snapshots);

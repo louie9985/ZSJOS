@@ -11,6 +11,8 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSub
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadUrgeReqVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmitterActionService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadFlowHistoryService;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.flow.LeadFlowHistoryRespVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -43,6 +45,7 @@ public class LeadManagementController {
     @Resource
     private LeadManagementService leadManagementService;
     @Resource private LeadSubmitterActionService submitterActionService;
+    @Resource private LeadFlowHistoryService leadFlowHistoryService;
 
     @GetMapping("/page")
     @Operation(summary = "获得客资分页")
@@ -130,9 +133,16 @@ public class LeadManagementController {
     @GetMapping("/get")
     @Operation(summary = "获得客资详情")
     @Parameter(name = "id", description = "内部客资ID", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query','zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query','zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read','zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
     public CommonResult<LeadManagementRespVO> getLead(@RequestParam("id") Long id) {
         return success(leadManagementService.getLead(id, getLoginUserId()));
+    }
+
+    @GetMapping("/{id}/flow-history")
+    @Operation(summary = "获得客资流转记录")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead-detail:flow-read')")
+    public CommonResult<List<LeadFlowHistoryRespVO>> getFlowHistory(@PathVariable("id") Long id) {
+        return success(leadFlowHistoryService.getHistory(id));
     }
 
     @PutMapping("/{id}/basic-info")

@@ -35,6 +35,7 @@ public interface LeadNotifySceneConstants {
     String AGING_POOL_EXITED_NOTICE = "zsjos.lead.aging_pool_exited";
     String SUBMITTER_URGED = "zsjos.lead.submitter_urged";
     String COMPLAINT_FOUNDED = "zsjos.lead.complaint_founded";
+    String COMPLAINT_UNFOUNDED = "zsjos.lead.complaint_unfounded";
     String DUPLICATE_REACTIVATED = "zsjos.lead.duplicate_reactivated";
     String DUPLICATE_OWNER_REMINDER = "zsjos.lead.duplicate_owner_reminder";
     String TRANSFER_REQUESTED = "zsjos.lead.transfer_requested";
@@ -43,6 +44,7 @@ public interface LeadNotifySceneConstants {
     String TRANSFER_REQUEST_INVALIDATED = "zsjos.lead.transfer_invalidated";
 
     String ROLE_SUBMITTER = "submitter";
+    String ROLE_NEW_MEDIA_PROVIDER = "new_media_provider";
     String ROLE_PENDING_SALES = "pending_sales";
     String ROLE_OWNER = "owner";
     String ROLE_OPERATOR = "operator";
@@ -57,4 +59,5 @@ public interface LeadNotifySceneConstants {
     String ROLE_FROZEN_DEPT_LEADER = "frozen_dept_leader";
     String ROLE_TRANSFER_REVIEWER = "transfer_reviewer";
     String ROLE_REQUESTER = "requester";
+    String ROLE_COMPLAINANT = "complainant";
 }

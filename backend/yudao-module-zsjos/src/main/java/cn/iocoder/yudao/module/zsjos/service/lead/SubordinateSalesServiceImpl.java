@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +38,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     private static final ZoneId BEIJING = ZoneId.of("Asia/Shanghai");
+    private static final String PAUSE_ALL_REASON = "主管一键下班";
 
     @Resource private AdminUserApi adminUserApi;
     @Resource private DictDataApi dictDataApi;
@@ -49,6 +51,7 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     @Resource private BusinessTaskMapper taskMapper;
     @Resource private SalesOrderMapper orderMapper;
     @Resource private SubordinateSalesCommandService commandService;
+    @Resource private AdvancedFilterService advancedFilterService;
 
     @Override
     public PageResult<SubordinateSalesRespVO> getPage(SubordinateSalesPageReqVO reqVO, Long managerUserId) {
@@ -60,12 +63,36 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
                 .filter(row -> reqVO.getAccountStatus() == null || Objects.equals(row.getAccountStatus(), reqVO.getAccountStatus()))
                 .filter(row -> reqVO.getPresence() == null || Objects.equals(row.getPresence(), reqVO.getPresence()))
                 .filter(row -> reqVO.getAccepting() == null || Objects.equals(row.getAccepting(), reqVO.getAccepting()))
+                .filter(row -> advancedFilterService.matches("subordinate_sales", reqVO.getAdvancedFilter(),
+                        key -> subordinateFilterValue(row, key)))
                 .sorted(Comparator.comparing(SubordinateSalesRespVO::getName,
                         Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)).thenComparing(SubordinateSalesRespVO::getUserId))
                 .toList();
         int from = Math.min((reqVO.getPageNo() - 1) * reqVO.getPageSize(), rows.size());
         int to = Math.min(from + reqVO.getPageSize(), rows.size());
         return new PageResult<>(rows.subList(from, to), (long) rows.size());
+    }
+
+    private Object subordinateFilterValue(SubordinateSalesRespVO row, String key) {
+        return switch (key) {
+            case "subordinate.name" -> row.getName();
+            case "subordinate.username" -> row.getUsername();
+            case "subordinate.mobile" -> row.getMobile();
+            case "subordinate.accountStatus" -> row.getAccountStatus();
+            case "subordinate.presence" -> row.getPresence();
+            case "subordinate.accepting" -> row.getAccepting();
+            case "subordinate.eligible" -> row.getEligible();
+            case "subordinate.newcomerPoolStatus" -> row.getNewcomerPoolStatus();
+            case "subordinate.todayPendingCount" -> row.getTodayPendingCount();
+            case "subordinate.todayFollowUpStatus" -> row.getTodayFollowUpStatus();
+            case "subordinate.firstFollowTimeoutCount" -> row.getFirstFollowTimeoutCount();
+            case "subordinate.suspendedLeadCount" -> row.getSuspendedLeadCount();
+            case "subordinate.validLeadCount" -> row.getValidLeadCount();
+            case "subordinate.convertedLeadCount" -> row.getConvertedLeadCount();
+            case "subordinate.effectiveOrderCount" -> row.getEffectiveOrderCount();
+            case "subordinate.effectiveOrderAmount" -> row.getEffectiveOrderAmount();
+            default -> null;
+        };
     }
 
     @Override
@@ -137,6 +164,22 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
         SalesDispatchStatusRespVO after = dispatchStatusService.updateModeByManager(salesUserId, reqVO.getAccepting());
         commandService.addAudit("dispatch_mode", managerUserId, salesUserId, null,
                 before.getMode(), after.getMode(), reason);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public SubordinatePauseAllRespVO pauseAllDispatch(Long managerUserId) {
+        List<AdminUserRespDTO> subordinates = salesSubordinates(managerUserId);
+        int changed = 0;
+        for (AdminUserRespDTO subordinate : subordinates) {
+            if (!dispatchStatusService.pausePreferenceByManager(subordinate.getId())) {
+                continue;
+            }
+            changed++;
+            commandService.addAudit("dispatch_mode_bulk_pause", managerUserId, subordinate.getId(), null,
+                    "accepting", "paused", PAUSE_ALL_REASON);
+        }
+        return new SubordinatePauseAllRespVO(subordinates.size(), changed, subordinates.size() - changed);
     }
 
     @Override

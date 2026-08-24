@@ -70,11 +70,12 @@ export const APP_ROUTES = {
   REGISTRATION_POOL: '/zsjos/registration-pool',
   REGISTRATION_CHECKLIST_CONFIG: '/zsjos/registration-checklist-config',
   MY_STUDENTS: '/zsjos/my-students',
+  STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
+  STUDENT_CONTACT_EXCEPTIONS: '/zsjos/student-contact-exceptions',
   SUBORDINATE_SALES: '/zsjos/subordinate-sales',
   TODAY_TASKS: '/zsjos/tasks/today',
   WORK_PLANS: '/zsjos/work-plans',
   BPM_TODO: '/bpm/task/todo',
-  QUALIFICATION_EXCEPTIONS: '/zsjos/leads/qualification-exceptions',
   LEAD_APPEALS: '/zsjos/appeals',
   MY_SALES_ORDERS: '/zsjos/sales-orders/my',
   SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
@@ -92,6 +93,10 @@ export const APP_ROUTES = {
   NOTIFY_RULE: '/messages/notify/notify-rule',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
+  ,MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets'
+  ,MEDIA_STUDENT_OPS: '/zsjos/student-ops'
+  ,MEDIA_REVIEWS: '/zsjos/reviews'
+  ,MEDIA_STUDENTS: '/zsjos/media-students'
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
@@ -113,10 +118,11 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.REGISTRATION_POOL,
   APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG,
   APP_ROUTES.MY_STUDENTS,
+  APP_ROUTES.STUDENT_CONTACT_CONFIG,
+  APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS,
   APP_ROUTES.TODAY_TASKS,
   APP_ROUTES.WORK_PLANS,
   APP_ROUTES.SUBORDINATE_SALES,
-  APP_ROUTES.QUALIFICATION_EXCEPTIONS,
   APP_ROUTES.LEAD_APPEALS,
   APP_ROUTES.MY_SALES_ORDERS,
   APP_ROUTES.SALES_ORDER_APPROVALS,
@@ -133,6 +139,10 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.NOTIFY_RULE,
   APP_ROUTES.ALL_MESSAGES,
   APP_ROUTES.UNREAD_MESSAGES
+  ,APP_ROUTES.MEDIA_PRODUCTION_TICKETS
+  ,APP_ROUTES.MEDIA_STUDENT_OPS
+  ,APP_ROUTES.MEDIA_REVIEWS
+  ,APP_ROUTES.MEDIA_STUDENTS
 ])
 
 // ========== Dictionaries ==========
@@ -151,6 +161,8 @@ export const DICT_TYPE = {
   ,ORDER_STUDENT_SOURCE: 'zsjos_order_student_source'
   ,ORDER_FEE_MODE: 'zsjos_order_fee_mode'
   ,ORDER_PAYMENT_METHOD: 'zsjos_order_payment_method'
+  ,STUDENT_CONTACT_UNSUCCESSFUL_REASON: 'zsjos_student_contact_unsuccessful_reason'
+  ,STUDENT_CONTACT_EXTENSION_REASON: 'zsjos_student_contact_extension_reason'
 } as const
 
 // ========== Lead Management ==========

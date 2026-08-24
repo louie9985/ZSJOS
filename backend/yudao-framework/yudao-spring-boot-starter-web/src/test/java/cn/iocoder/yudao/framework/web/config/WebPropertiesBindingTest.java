@@ -14,18 +14,18 @@ import java.nio.charset.StandardCharsets;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.boot.context.properties.source.ConfigurationPropertySources.from;
 
 class WebPropertiesBindingTest {
 
     @Test
-    void bindsSlashDelimitedAppApiUserTypePrefixFromYaml() throws Exception {
+    void bindsIndependentPartnerApiFromDefaults() throws Exception {
         String yaml = """
                 yudao:
                   web:
-                    app-api-user-type-prefixes:
-                      "[/zsjos/]": 3
+                    partner-api:
+                      prefix: /part-api
+                      controller: "**.controller.app.partner.**"
                 """;
         MutablePropertySources propertySources = new MutablePropertySources();
         new YamlPropertySourceLoader().load("test", new ByteArrayResource(
@@ -35,13 +35,12 @@ class WebPropertiesBindingTest {
                 .bind("yudao.web", Bindable.of(WebProperties.class))
                 .orElseThrow(() -> new IllegalStateException("Web properties were not bound"));
 
-        assertEquals(Map.of("/zsjos/", UserTypeEnum.PARTNER.getValue()),
-                properties.getAppApiUserTypePrefixes());
-        assertTrue(properties.isAppApiUserTypePrefixesValid());
+        assertEquals("/part-api", properties.getPartnerApi().getPrefix());
+        assertEquals("**.controller.app.partner.**", properties.getPartnerApi().getController());
 
         new WebFrameworkUtils(properties);
         MockHttpServletRequest request = new MockHttpServletRequest();
-        request.setServletPath("/app-api/zsjos/partner/me");
+        request.setServletPath("/part-api/zsjos/partner/me");
         assertEquals(UserTypeEnum.PARTNER.getValue(), WebFrameworkUtils.getLoginUserType(request));
     }
 

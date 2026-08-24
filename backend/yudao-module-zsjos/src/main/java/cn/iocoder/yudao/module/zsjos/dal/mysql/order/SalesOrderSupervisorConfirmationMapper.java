@@ -14,6 +14,16 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderSupervi
 
 @Mapper
 public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<SalesOrderSupervisorConfirmationDO> {
+    default SalesOrderSupervisorConfirmationDO selectBySupervisorTaskId(String taskId) {
+        return selectOne(SalesOrderSupervisorConfirmationDO::getSupervisorTaskId, taskId);
+    }
+    default SalesOrderSupervisorConfirmationDO selectLatestByOrderId(Long orderId) {
+        return selectOne(new LambdaQueryWrapperX<SalesOrderSupervisorConfirmationDO>()
+                .eq(SalesOrderSupervisorConfirmationDO::getOrderId, orderId)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getId)
+                .last("LIMIT 1"));
+    }
     default SalesOrderSupervisorConfirmationDO selectByRoundAndTaskKey(Long roundId, String taskKey) {
         return selectOne(new LambdaQueryWrapperX<SalesOrderSupervisorConfirmationDO>()
                 .eq(SalesOrderSupervisorConfirmationDO::getApprovalRoundId, roundId)
@@ -28,7 +38,8 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
         return selectList(new LambdaQueryWrapperX<SalesOrderSupervisorConfirmationDO>()
                 .eq(SalesOrderSupervisorConfirmationDO::getSupervisorUserId, userId)
                 .eqIfPresent(SalesOrderSupervisorConfirmationDO::getStatus, status)
-                .orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt));
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getUpdateTime)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getId));
     }
 
     default PageResult<SalesOrderSupervisorConfirmationDO> selectPageBySupervisor(
@@ -41,7 +52,8 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
             if (orderIds.isEmpty()) query.eq(SalesOrderSupervisorConfirmationDO::getOrderId, -1L);
             else query.in(SalesOrderSupervisorConfirmationDO::getOrderId, orderIds);
         }
-        query.orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt);
+        query.orderByDesc(SalesOrderSupervisorConfirmationDO::getUpdateTime)
+                .orderByDesc(SalesOrderSupervisorConfirmationDO::getId);
         return selectPage(reqVO, query);
     }
     default List<SalesOrderSupervisorConfirmationDO> selectCursorBySupervisor(Long userId, Boolean handled,
@@ -56,11 +68,11 @@ public interface SalesOrderSupervisorConfirmationMapper extends BaseMapperX<Sale
             else query.in(SalesOrderSupervisorConfirmationDO::getOrderId, orderIds);
         }
         if (cursorTime != null && cursorId != null) {
-            query.and(wrapper -> wrapper.lt(SalesOrderSupervisorConfirmationDO::getRequestedAt, cursorTime)
-                    .or(nested -> nested.eq(SalesOrderSupervisorConfirmationDO::getRequestedAt, cursorTime)
+            query.and(wrapper -> wrapper.lt(SalesOrderSupervisorConfirmationDO::getUpdateTime, cursorTime)
+                    .or(nested -> nested.eq(SalesOrderSupervisorConfirmationDO::getUpdateTime, cursorTime)
                             .lt(SalesOrderSupervisorConfirmationDO::getId, cursorId)));
         }
-        return selectList(query.orderByDesc(SalesOrderSupervisorConfirmationDO::getRequestedAt)
+        return selectList(query.orderByDesc(SalesOrderSupervisorConfirmationDO::getUpdateTime)
                 .orderByDesc(SalesOrderSupervisorConfirmationDO::getId).last("LIMIT " + limit));
     }
 

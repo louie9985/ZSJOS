@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.cashback;
 
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
@@ -12,6 +13,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.cashback.CashbackMapper;
@@ -19,12 +21,14 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductCategoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductMapper;
 import jakarta.annotation.Resource;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -45,13 +49,17 @@ import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STA
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
+@Slf4j
 public class CashbackServiceImpl implements CashbackService {
     static final String OBSERVATION_DAYS_KEY = "zsjos.cashback.observation-days";
     static final int DEFAULT_OBSERVATION_DAYS = 7;
+    static final BigDecimal DEFAULT_VALID_CASHBACK_AMOUNT = new BigDecimal("10.00");
+    static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
     @Resource private CashbackMapper mapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private PartnerMapper partnerMapper;
+    @Resource private PartnerAccountMapper partnerAccountMapper;
     @Resource private ZsjosProductMapper productMapper;
     @Resource private ZsjosProductCategoryMapper categoryMapper;
     @Resource private SalesOrderMapper orderMapper;
@@ -63,14 +71,18 @@ public class CashbackServiceImpl implements CashbackService {
         String businessKey = "valid:" + leadId;
         CashbackDO existing = mapper.selectByBusinessKey(businessKey);
         if (existing != null) return reuseOrRestore(existing);
-        LeadDO lead = eligibleLead(leadId);
-        if (lead == null) return null;
+        EligibleLead eligible = eligibleLead(leadId);
+        if (eligible == null) return null;
+        LeadDO lead = eligible.lead();
         LeadIntendedProductDO primary = intendedProductMapper.selectPrimaryByLeadId(leadId);
         if (primary == null || primary.getProductRef() == null) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
         Rule rule = resolveRule(primary.getProductRef());
+        log.info("valid cashback rule resolved leadId={}, leadNo={}, sourceType={}, sourceUserId={}, partnerId={}, productRef={}, ruleSource={}",
+                lead.getId(), lead.getLeadNo(), lead.getSourceType(), lead.getSourceUserId(), lead.getPartnerId(),
+                primary.getProductRef(), rule.snapshot().get("validAmountSource") + "/" + rule.snapshot().get("dealRateSource"));
         LocalDateTime now = LocalDateTime.now();
         int observationDays = observationDays();
-        CashbackDO cashback = base(businessKey, TYPE_VALID, lead, primary.getProductRef(),
+        CashbackDO cashback = base(businessKey, TYPE_VALID, eligible, primary.getProductRef(),
                 primary.getProductNameSnapshot(), now, observationDays)
                 .setBaseAmount(null).setRateSnapshot(null).setAmount(rule.validAmount())
                 .setRuleSnapshotJson(JsonUtils.toJsonString(rule.snapshot()));
@@ -87,13 +99,14 @@ public class CashbackServiceImpl implements CashbackService {
         String key = "deal:" + command.orderItemId();
         CashbackDO existing = mapper.selectByBusinessKey(key);
         if (existing != null) return existing.getId();
-        LeadDO lead = eligibleLead(command.leadId());
-        if (lead == null) return null;
+        EligibleLead eligible = eligibleLead(command.leadId());
+        if (eligible == null) return null;
+        LeadDO lead = eligible.lead();
         LocalDateTime now = LocalDateTime.now();
         int observationDays = observationDays();
         BigDecimal amount = command.actualAmount().multiply(command.rateSnapshot())
                 .setScale(2, RoundingMode.HALF_UP);
-        CashbackDO cashback = base(key, TYPE_DEAL, lead, command.productRef(), command.productName(),
+        CashbackDO cashback = base(key, TYPE_DEAL, eligible, command.productRef(), command.productName(),
                 now, observationDays).setOrderId(command.orderId()).setOrderItemId(command.orderItemId())
                 .setBaseAmount(command.actualAmount().setScale(2, RoundingMode.HALF_UP))
                 .setRateSnapshot(command.rateSnapshot()).setAmount(amount)
@@ -242,11 +255,12 @@ public class CashbackServiceImpl implements CashbackService {
         return existing.getId();
     }
 
-    private CashbackDO base(String businessKey, String type, LeadDO lead, String productRef,
+    private CashbackDO base(String businessKey, String type, EligibleLead eligible, String productRef,
                             String productName, LocalDateTime now, int observationDays) {
+        LeadDO lead = eligible.lead();
         return new CashbackDO().setCashbackNo("CB" + UUID.randomUUID().toString().replace("-", "")
                 .substring(0, 20).toUpperCase()).setBusinessKey(businessKey).setType(type).setStatus(STATUS_PENDING)
-                .setBeneficiaryUserId(lead.getSourceUserId()).setPartnerId(lead.getPartnerId()).setLeadId(lead.getId())
+                .setBeneficiaryUserId(eligible.legacyBeneficiaryUserId()).setPartnerId(lead.getPartnerId()).setLeadId(lead.getId())
                 .setProductRefSnapshot(productRef).setProductNameSnapshot(productName)
                 .setObservationDaysSnapshot(observationDays).setGeneratedAt(now)
                 .setAvailableAt(now.plusDays(observationDays)).setVersion(0);
@@ -263,18 +277,25 @@ public class CashbackServiceImpl implements CashbackService {
         }
     }
 
-    private LeadDO eligibleLead(Long leadId) {
+    private EligibleLead eligibleLead(Long leadId) {
         LeadDO lead = leadId == null ? null : leadMapper.selectById(leadId);
         if (lead == null) throw exception(CASHBACK_SOURCE_INVALID);
         if (!SOURCE_PARTNER.equals(lead.getSourceType())) return null;
         if (lead.getSourceUserId() == null || lead.getPartnerId() == null) throw exception(CASHBACK_SOURCE_INVALID);
         PartnerDO partner = partnerMapper.selectById(lead.getPartnerId());
-        if (partner == null || !Objects.equals(partner.getBoundSystemUserId(), lead.getSourceUserId())) {
-            throw exception(CASHBACK_SOURCE_INVALID);
-        }
+        if (partner == null) throw exception(CASHBACK_SOURCE_INVALID);
         if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())
                 || partner.getEnabledAt() == null || partner.getDisabledAt() != null) return null;
-        return lead;
+        PartnerAccountDO account = partnerAccountMapper.selectById(lead.getSourceUserId());
+        if (account != null && Objects.equals(account.getPartnerId(), lead.getPartnerId())) {
+            if (!CommonStatusEnum.ENABLE.getStatus().equals(account.getStatus())) return null;
+            return new EligibleLead(lead, null);
+        }
+        // Leads submitted before V072 retain the former System-user source identifier.
+        if (Objects.equals(partner.getBoundSystemUserId(), lead.getSourceUserId())) {
+            return new EligibleLead(lead, lead.getSourceUserId());
+        }
+        throw exception(CASHBACK_SOURCE_INVALID);
     }
 
     private Rule resolveRule(String productRef) {
@@ -285,17 +306,21 @@ public class CashbackServiceImpl implements CashbackService {
             category = categoryMapper.selectById(category.getParentId());
         }
         BigDecimal amount = product.getValidCashbackAmount() != null ? product.getValidCashbackAmount()
-                : category == null ? null : category.getDefaultValidCashbackAmount();
+                : category != null && category.getDefaultValidCashbackAmount() != null
+                ? category.getDefaultValidCashbackAmount() : DEFAULT_VALID_CASHBACK_AMOUNT;
         BigDecimal rate = product.getDealCashbackRate() != null ? product.getDealCashbackRate()
-                : category == null ? null : category.getDefaultDealCashbackRate();
+                : category != null && category.getDefaultDealCashbackRate() != null
+                ? category.getDefaultDealCashbackRate() : DEFAULT_DEAL_CASHBACK_RATE;
         if (amount == null || amount.signum() < 0 || rate == null || rate.signum() < 0
                 || rate.compareTo(BigDecimal.ONE) > 0) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("productId", product.getId()); snapshot.put("productRef", productRef);
         snapshot.put("level1CategoryId", category == null ? null : category.getId());
         snapshot.put("validCashbackAmount", amount); snapshot.put("dealCashbackRate", rate);
-        snapshot.put("validAmountSource", product.getValidCashbackAmount() == null ? "level1_category" : "product");
-        snapshot.put("dealRateSource", product.getDealCashbackRate() == null ? "level1_category" : "product");
+        snapshot.put("validAmountSource", product.getValidCashbackAmount() != null ? "product"
+                : category != null && category.getDefaultValidCashbackAmount() != null ? "level1_category" : "system_default");
+        snapshot.put("dealRateSource", product.getDealCashbackRate() != null ? "product"
+                : category != null && category.getDefaultDealCashbackRate() != null ? "level1_category" : "system_default");
         return new Rule(amount.setScale(2, RoundingMode.HALF_UP), rate, snapshot);
     }
 
@@ -311,4 +336,6 @@ public class CashbackServiceImpl implements CashbackService {
     }
 
     private record Rule(BigDecimal validAmount, BigDecimal dealRate, Map<String, Object> snapshot) {}
+
+    private record EligibleLead(LeadDO lead, Long legacyBeneficiaryUserId) {}
 }

@@ -3,7 +3,6 @@ package cn.iocoder.yudao.module.eam.controller.admin.statistics.vo;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Schema(description = "管理后台 - EAM 资产统计概览 Response VO")
@@ -12,9 +11,6 @@ public class EamStatisticsRespVO {
 
     @Schema(description = "资产总数", requiredMode = Schema.RequiredMode.REQUIRED, example = "320")
     private Long totalCount;
-
-    @Schema(description = "资产原值合计", example = "1250000.00")
-    private BigDecimal totalOriginalValue;
 
     @Schema(description = "按状态分布")
     private List<Item> statusStats;

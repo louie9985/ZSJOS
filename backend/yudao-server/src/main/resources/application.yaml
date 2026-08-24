@@ -265,9 +265,10 @@ yudao:
   web:
     admin-ui:
       url: http://dashboard.yudao.iocoder.cn # Admin 管理后台 UI 的地址
-    # ZSJOS Partner endpoints use the independent PARTNER identity; other app routes remain MEMBER.
-    app-api-user-type-prefixes:
-      "[/zsjos/]": 3
+    # ZSJOS Partner endpoints use the independent PARTNER identity and /part-api prefix.
+    partner-api:
+      prefix: /part-api
+      controller: "**.controller.app.partner.**"
   xss:
     enable: false
     exclude-urls: # 如下两个 url，仅仅是为了演示，去掉配置也没关系

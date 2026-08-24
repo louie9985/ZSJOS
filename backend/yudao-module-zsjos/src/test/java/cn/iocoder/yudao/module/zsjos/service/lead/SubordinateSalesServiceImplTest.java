@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.dept.PostApi;
+import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchResultVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchTransferReqVO;
@@ -116,8 +117,53 @@ class SubordinateSalesServiceImplTest {
         verify(leadMapper, never()).selectBatchIds(org.mockito.ArgumentMatchers.anyCollection());
     }
 
+    @Test
+    void pauseAllDispatchIncludesDisabledSalesAndAuditsOnlyChanges() {
+        PostRespDTO salesPost = new PostRespDTO();
+        salesPost.setId(5L);
+        AdminUserRespDTO enabled = subordinate(20L, 0, 5L);
+        AdminUserRespDTO disabled = subordinate(30L, 1, 5L);
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L, 30L, 40L));
+        when(postApi.getPostByCode("sales_specialist")).thenReturn(salesPost);
+        when(adminUserApi.getUserList(Set.of(20L, 30L, 40L))).thenReturn(List.of(enabled, disabled));
+        when(dispatchStatusService.pausePreferenceByManager(20L)).thenReturn(true);
+        when(dispatchStatusService.pausePreferenceByManager(30L)).thenReturn(false);
+
+        var result = service.pauseAllDispatch(10L);
+
+        assertEquals(2, result.getTotalCount());
+        assertEquals(1, result.getChangedCount());
+        assertEquals(1, result.getAlreadyPausedCount());
+        verify(dispatchStatusService).pausePreferenceByManager(20L);
+        verify(dispatchStatusService).pausePreferenceByManager(30L);
+        verify(commandService).addAudit("dispatch_mode_bulk_pause", 10L, 20L, null,
+                "accepting", "paused", "主管一键下班");
+        verify(commandService, never()).addAudit("dispatch_mode_bulk_pause", 10L, 30L, null,
+                "accepting", "paused", "主管一键下班");
+    }
+
+    @Test
+    void pauseAllDispatchReturnsZeroForManagerWithoutSubordinates() {
+        when(permissionService.getManagedUserIds(10L)).thenReturn(Set.of());
+
+        var result = service.pauseAllDispatch(10L);
+
+        assertEquals(0, result.getTotalCount());
+        assertEquals(0, result.getChangedCount());
+        assertEquals(0, result.getAlreadyPausedCount());
+        verify(dispatchStatusService, never()).pausePreferenceByManager(org.mockito.ArgumentMatchers.anyLong());
+    }
+
     private static LeadAssignmentUserRespVO sales(Long id) {
         LeadAssignmentUserRespVO result = new LeadAssignmentUserRespVO();
         result.setId(id); result.setNickname("销售" + id); return result;
+    }
+
+    private static AdminUserRespDTO subordinate(Long id, int status, Long postId) {
+        AdminUserRespDTO result = new AdminUserRespDTO();
+        result.setId(id);
+        result.setStatus(status);
+        result.setPostIds(Set.of(postId));
+        return result;
     }
 }

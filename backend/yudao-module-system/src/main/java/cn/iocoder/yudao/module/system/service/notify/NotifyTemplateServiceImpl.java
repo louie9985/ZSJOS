@@ -131,12 +131,8 @@ public class NotifyTemplateServiceImpl implements NotifyTemplateService {
         if (scene == null) {
             throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.NOTIFY_SCENE_NOT_EXISTS, sceneCode);
         }
-        Set<String> available = new LinkedHashSet<>();
-        scene.getVariables().forEach(variable -> available.add(variable.getKey()));
-        for (String param : params) {
-            if (!available.contains(param)) {
+        for (String param : notifySceneRegistry.findInvalidTemplateParams(sceneCode, params)) {
                 throw exception(cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.NOTIFY_TEMPLATE_PARAM_INVALID, param);
-            }
         }
     }
 

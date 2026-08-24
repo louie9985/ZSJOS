@@ -24,6 +24,11 @@ public class WebProperties {
     @NotNull(message = "APP API 不能为空")
     private Api appApi = new Api("/app-api", "**.controller.app.**");
     /**
+     * 独立兼职端 API。必须放在通用 appApi 之前匹配，避免兼职 Controller 被重复挂载。
+     */
+    @NotNull(message = "PARTNER API 不能为空")
+    private Api partnerApi = new Api("/part-api", "**.controller.app.partner.**");
+    /**
      * App API 子路径对应的用户类型。未配置的 App API 仍使用 MEMBER。
      */
     private Map<@NotEmpty String, @NotNull Integer> appApiUserTypePrefixes = new LinkedHashMap<>();

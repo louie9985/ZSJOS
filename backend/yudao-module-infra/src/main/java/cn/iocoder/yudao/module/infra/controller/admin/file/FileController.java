@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.framework.web.config.WebProperties;
 import cn.iocoder.yudao.module.infra.controller.admin.file.vo.file.*;
 import cn.iocoder.yudao.module.infra.dal.dataobject.file.FileDO;
 import cn.iocoder.yudao.module.infra.service.file.FileService;
@@ -27,6 +28,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.util.List;
 
@@ -42,6 +44,8 @@ public class FileController {
 
     @Resource
     private FileService fileService;
+    @Resource
+    private WebProperties webProperties;
 
     @PostMapping("/upload")
     @Operation(summary = "上传文件", description = "模式一：后端上传文件")
@@ -52,6 +56,34 @@ public class FileController {
         byte[] content = IoUtil.readBytes(file.getInputStream());
         return success(fileService.createFile(content, file.getOriginalFilename(),
                 uploadReqVO.getDirectory(), file.getContentType()));
+    }
+
+    @PostMapping("/avatar/upload")
+    @Operation(summary = "上传员工头像", description = "返回不随私有存储签名过期的稳定头像地址")
+    public CommonResult<String> uploadAvatar(@Valid FileUploadReqVO uploadReqVO) throws Exception {
+        MultipartFile file = uploadReqVO.getFile();
+        FileDO avatar = fileService.createAvatarFile(IoUtil.readBytes(file.getInputStream()),
+                uploadReqVO.getDirectory());
+        String url = ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path(webProperties.getAdminApi().getPrefix())
+                .path("/infra/file/avatar/{id}").buildAndExpand(avatar.getId()).toUriString();
+        return success(url);
+    }
+
+    @GetMapping("/avatar/{id}")
+    @PermitAll
+    @TenantIgnore
+    @Operation(summary = "读取员工头像")
+    public void getAvatar(@PathVariable("id") Long id, HttpServletResponse response) throws Exception {
+        FileDO avatar = fileService.getAvatarFile(id);
+        byte[] content = fileService.getAvatarFileContent(id);
+        if (content == null) {
+            response.setStatus(HttpStatus.NOT_FOUND.value());
+            return;
+        }
+        response.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+        response.setHeader("X-Content-Type-Options", "nosniff");
+        writeAttachment(response, avatar.getName(), content);
     }
 
     @GetMapping("/presigned-url")
