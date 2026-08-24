@@ -9,7 +9,9 @@
 - WebSocket 使用现有 `/infra/ws`，消息类型为 `zsjos_lead_assignment`，内容仅包含 `leadId` 和 `eventType`。
 - `eventType` 包含 `assigned`、`reassigned`、`accepted`、`rejected`、`expired`、`cancelled`；客户端只将消息作为重新查询信号。
 - 待接列表项返回 `remainingSeconds`、`rejectable`、`deferrable` 和 `assignmentHistoryId`。自动派单可拒绝且不可延后，指定派单不可拒绝但可收起稍后处理。
-- 待接列表和抢单池中的 `sourceChannel`、`leadCategory` 始终是持久化的稳定字典键；`sourceChannelLabel`、`leadCategoryLabel` 是当前启用字典解析出的展示标签。字典缺项时标签字段为空，客户端必须显示未配置状态，不得把稳定键当作展示标签。
+- 待接列表和抢单池中的 `sourceChannel`、`leadCategory` 始终是持久化的稳定字典键。`leadCategoryLabel` 优先返回 Lead 选择时固化的分类标签快照；仅迁移前没有快照的历史记录兼容解析当前启用字典。`sourceChannelLabel` 仍是当前启用字典解析出的展示标签。兼容解析也缺失时客户端显示未配置状态，不得把稳定键当作展示标签。
+
+客资创建时服务端同时固化 `leadCategory` 与 `leadCategoryLabelSnapshot`。疑似重复提交进入复核队列时也先保存服务端解析出的分类标签，稍后新建或重新激活 Lead 仍使用原提交标签。基础信息、提交人补充、跟进和有效性判定明确改选分类时生成新的值与标签快照；仅修改、停用或删除系统字典项不会回写既有 Lead。迁移前历史 Lead 不猜测提交时标签，响应在快照为空时兼容当前字典解析。
 - 用户可见客资响应同时返回字符串 `leadNo` 和数值 `leadId`/`id`。`leadNo` 格式为 `KZyyyyMMddHHmmss` 加租户当日四位序号，序号从 `0001` 到 `9999` 循环，超过 `9999` 后重新从 `0001` 开始；时间固定使用北京时间。URL、命令、WebSocket 和对象权限继续使用数值 ID。
 
 ## 员工接口与权限

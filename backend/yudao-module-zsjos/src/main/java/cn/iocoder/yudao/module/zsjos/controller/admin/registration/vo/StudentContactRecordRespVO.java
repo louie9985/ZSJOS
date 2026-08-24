@@ -18,4 +18,6 @@ public class StudentContactRecordRespVO {
     private Long operatorUserId;
     private String operatorUserName;
     private LocalDateTime submittedAt;
+    private String deliveryStage;
+    private String deliveryData;
 }

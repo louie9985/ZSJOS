@@ -41,7 +41,6 @@
 
 ### 工作台扩展
 
-- `/zsjos/handovers` 提供交接待接、部分接收、全部接收和退回命令。
 - `/zsjos/student-ops` 提供异常工单处理和配合度评估入口。
 - `/zsjos/reviews` 提供每日、7/14/28日及结业复盘报告提交和归档。
 - `/zsjos/positioning/workspace` 提供采访导入确认、定位版本历史和三方执行卡签字。
@@ -51,7 +50,7 @@
 - `POST /zsjos/media-account/create`：从当前学员创建第三方账号；学员不可改，普通创建人的 `directorUserId` 和 `ownerOperatorUserId` 由服务端绑定，`accountNo` 由服务端生成。
 - `GET /zsjos/media-account/get?id=...`：查询账号详情。
 - `POST /zsjos/media-account/{id}/bind-student?studentPersonId=...`：绑定学员并保留历史。
-- `GET /zsjos/media-account/student-candidates`：按当前租户返回账号绑定表单可选的精简学员候选。
+- `GET /zsjos/media-account/student-candidates`：返回当前用户有权访问的精简学员候选；仅具备 `zsjos:media-account:query-all` 的管理员可查询租户全量候选。工作台学员中心创建账号时优先使用当前学员上下文，不得用该接口扩大可见范围。
 - `POST /zsjos/media-account/{id}/unbind-student`：解绑学员并保留历史。
 - `POST /zsjos/media-account/{id}/advance-stage`、`rollback-stage`：推进或回退 S0-S6 阶段，必须携带版本号。
 - `PUT /zsjos/media-account/{id}`：编辑账号资料，必须携带版本号。
@@ -69,7 +68,7 @@
 
 - `GET /zsjos/media-account-field-config/published` 返回当前租户已发布的版本化字段定义。默认字段为 `uid`、`nickname`；选择类字段的选项来自定义指定的 System 字典类型。
 - 账号保存 `detailConfigVersionId`、`detailValues` 与字段名称/字典标签快照。历史记录展示保存时快照，不重新解析当前字典；旧记录没有值时显示“未记录”。
-- `GET /zsjos/media-students/{personId}` 返回账号、定位、内容、交谈记录、操作时间线和任务线；服务端先验证当前用户是否在该学员的媒体业务范围内。
+- `GET /zsjos/media-students/{personId}` 返回账号、定位、内容、交谈记录、按业务更新时间排序的操作时间线、`定位 -> 运营 -> 结业` 任务线和待处理统计；服务端先验证当前用户是否在该学员的媒体业务范围内。页面按所选课程服务的真实 `leadId` 读取完整学员档案，并复用“我的学员”的客户档案、来源渠道、地区、成交课程、备注附件等概览结构；销售联系和客资流转不会混入媒体概览。
 - `GET /zsjos/media-students/target?bizType=...&bizId=...` 将受权业务对象解析为 `personId`、`targetTab` 和记录 ID，供待办与通知构造受控深链。未绑定学员的历史对象不得回退到退役页面。
 
 认证失败既可能使用 HTTP 401，也可能使用 HTTP 200 包裹业务码 `401`。工作台对两种响应执行同一套单次刷新与请求回放；刷新失败通过全局事件立即卸载工作台并进入登录页。HTTP 403 保留当前会话并显示无权限，网络错误和服务端错误保留独立的重试状态。
@@ -92,3 +91,13 @@ WebSocket 使用 `/infra/ws?token=...`，不带 `/admin-api` 前缀。当前消�
 ### 拍剪工单返工
 
 `POST /admin-api/zsjos/production-ticket/{id}/reject` 使用 `version` 与必填 `reason`。原因去除首尾空白后必须为 1-500 个字符；服务端在返工上限内原子递增 `revisionCount`，将原因保存到工单返工原因与业务状态事件，并向原剪拍责任人发送返工消息。工单列表优先展示 `deadlineAt`，兼容仅返回 `expectedDeliveredAt` 的历史记录。
+### Student delivery stages
+
+`GET /zsjos/student/service/{serviceRelationId}/contact-context` returns the server-owned normal delivery stage projection in `deliveryStage`, `deliveryStageLabel`, and `deliveryStages`. The planner advances the current stage with `POST /zsjos/student/service/{serviceRelationId}/delivery-stage` using the current `stage`, a required remark, structured `data`, and an idempotency key. The backend validates service ownership, stage order, required facts, attachment ownership, and idempotency; the client must not mutate stage fields directly.
+
+### Generic work orders
+
+- Scene create/update requests use a structured `fields` array. Each field declares `key`, `label`, `type`, `required`, and, only for dictionary fields, `dictionaryType`; administrator-maintained business choices must not be embedded as static options.
+- `POST /zsjos/work-order/create` accepts `values` as a JSON object plus a top-level `attachmentIds` list. The backend validates required/unknown fields and type-specific user, department, dictionary, date and number values, then stores both definitions and display-label snapshots.
+- Create and action commands require an idempotency key. Reuse is accepted only when order, actor, operation, version, reason, values, and normalized attachments are identical; any mismatch returns an idempotency conflict.
+- `GET /zsjos/work-order/pool?sceneCode=...&pageNo=...&pageSize=...` returns `PageResult<WorkOrderRespVO>` and applies the framework page-size limit.

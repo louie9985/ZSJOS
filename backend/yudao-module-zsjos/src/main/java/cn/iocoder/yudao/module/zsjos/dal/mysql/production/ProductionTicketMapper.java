@@ -18,6 +18,12 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
                 .in(ProductionTicketDO::getAccountId, accountIds)
                 .orderByDesc(ProductionTicketDO::getUpdateTime).orderByDesc(ProductionTicketDO::getId));
     }
+    default List<ProductionTicketDO> selectRecentByAccountIds(Collection<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<ProductionTicketDO>().in(ProductionTicketDO::getAccountId, accountIds)
+                .orderByDesc(ProductionTicketDO::getUpdateTime).orderByDesc(ProductionTicketDO::getId)
+                .last("LIMIT 100"));
+    }
     default PageResult<ProductionTicketDO> selectPage(ProductionTicketPageReqVO req, Collection<Long> userIds, boolean all) {
         LambdaQueryWrapperX<ProductionTicketDO> query = new LambdaQueryWrapperX<>();
         query.eqIfPresent(ProductionTicketDO::getStatus, req.getStatus());

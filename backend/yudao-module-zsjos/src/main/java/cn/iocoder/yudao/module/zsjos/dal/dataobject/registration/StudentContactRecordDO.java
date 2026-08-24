@@ -24,6 +24,8 @@ public class StudentContactRecordDO extends TenantBaseDO {
     private String remark;
     private String attachmentFileIdsJson;
     private String checklistResultJson;
+    private String deliveryStage;
+    private String deliveryDataJson;
     private LocalDateTime nextContactAt;
     private Long operatorUserId;
     private LocalDateTime submittedAt;

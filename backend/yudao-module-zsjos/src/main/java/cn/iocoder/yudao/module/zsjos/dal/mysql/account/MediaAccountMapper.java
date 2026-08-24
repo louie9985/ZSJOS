@@ -7,6 +7,8 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountPageReqVO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import java.util.Collection;
 import java.util.List;
 
@@ -46,6 +48,15 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                 .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId));
     }
 
+    default List<MediaAccountDO> selectRecentByParticipantAndStudent(Long userId, Long studentPersonId) {
+        return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
+                .eq(MediaAccountDO::getStudentPersonId, studentPersonId)
+                .and(row -> row.eq(MediaAccountDO::getDirectorUserId, userId)
+                        .or().eq(MediaAccountDO::getOwnerOperatorUserId, userId))
+                .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId)
+                .last("LIMIT 100"));
+    }
+
     default List<Long> selectParticipantStudentIds(Long userId) {
         return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
                 .select(MediaAccountDO::getStudentPersonId)
@@ -54,6 +65,36 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                         .or().eq(MediaAccountDO::getOwnerOperatorUserId, userId)))
                 .stream().map(MediaAccountDO::getStudentPersonId).distinct().toList();
     }
+
+    default List<Long> selectParticipantStudentIds(Long userId, Collection<Long> personIds) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
+                .select(MediaAccountDO::getStudentPersonId)
+                .in(MediaAccountDO::getStudentPersonId, personIds)
+                .and(row -> row.eq(MediaAccountDO::getDirectorUserId, userId)
+                        .or().eq(MediaAccountDO::getOwnerOperatorUserId, userId)))
+                .stream().map(MediaAccountDO::getStudentPersonId).distinct().toList();
+    }
+
+    @Select("<script>SELECT DISTINCT p.id FROM zsjos_person p "
+            + "WHERE p.tenant_id=#{tenantId} AND p.deleted=b'0' "
+            + "<if test='keyword != null and keyword != \"\"'>AND p.name LIKE CONCAT('%',#{keyword},'%') </if>"
+            + "AND EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.tenant_id=p.tenant_id "
+            + "AND sr.person_id=p.id AND sr.deleted=b'0' "
+            + "AND ((sr.owner_user_id=#{userId} AND sr.status IN ('active','paused','completed')) "
+            + "OR ((sr.content_director_user_id=#{userId} OR sr.career_planner_user_id=#{userId}) "
+            + "AND sr.status='active' AND sr.acceptance_status='accepted'))) ORDER BY p.id DESC LIMIT 100</script>")
+    List<Long> selectVisibleStudentIds(@Param("userId") Long userId, @Param("keyword") String keyword,
+                                       @Param("tenantId") Long tenantId);
+
+    @Select("SELECT COUNT(1) FROM zsjos_media_account ma "
+            + "JOIN zsjos_service_relation sr ON sr.person_id=ma.student_person_id "
+            + "AND sr.tenant_id=ma.tenant_id AND sr.deleted=b'0' AND sr.status='active' AND sr.acceptance_status='accepted' "
+            + "JOIN zsjos_order o ON o.id=sr.order_id AND o.tenant_id=sr.tenant_id AND o.deleted=b'0' "
+            + "WHERE (ma.director_user_id=#{userId} OR ma.owner_operator_user_id=#{userId}) "
+            + "AND o.lead_id=#{leadId} AND ma.tenant_id=#{tenantId} AND ma.deleted=b'0'")
+    long countParticipantByLead(@Param("userId") Long userId, @Param("leadId") Long leadId,
+                                @Param("tenantId") Long tenantId);
 
     default int updateStage(Long id, Integer version, String fromStage, String toStage, String stageVersion,
                             Long judgedByUserId, java.time.LocalDateTime enteredAt) {

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.order;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.DigestUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -40,6 +41,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
@@ -82,6 +84,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private SalesOrderItemMapper itemMapper;
     @Resource private SalesOrderApprovalRoundMapper roundMapper;
     @Resource private SalesOrderApprovalConfigMapper salesOrderApprovalConfigMapper;
+    @Resource private ServiceRelationMapper serviceRelationMapper;
     @Resource private LeadMapper leadMapper;
     @Resource private LeadAppealMapper leadAppealMapper;
     @Resource private OpportunityMapper opportunityMapper;
@@ -172,14 +175,37 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return createRepurchase(person.getId(), null, userId, userId, reqVO.getRepurchaseReason(), reqVO.getOrder(), false);
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student", bizId = "#personId", action = "repurchase")
+    public Long createStudentRepurchase(Long personId, Long userId, SalesOrderRepurchaseReqVO reqVO) {
+        if (serviceRelationMapper.selectOwnedRepurchaseEligibleByPersonForUpdate(userId, personId,
+                TenantContextHolder.getRequiredTenantId()).isEmpty()) {
+            throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
+        }
+        return createRepurchase(personId, null, userId, userId, reqVO.getRepurchaseReason(), reqVO.getOrder(), true,
+                SUBMITTER_CENTER_STUDENT_DELIVERY);
+    }
+
     private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
                                   SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder) {
-        Long duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey());
+        return createRepurchase(personId, sourceLeadId, formalSalesUserId, userId, reason, submission,
+                requireEffectiveOrder, SUBMITTER_CENTER_SALES);
+    }
+
+    private Long createRepurchase(Long personId, Long sourceLeadId, Long formalSalesUserId, Long userId, String reason,
+                                  SalesOrderSubmitReqVO submission, boolean requireEffectiveOrder,
+                                  String submitterCenterType) {
+        String requestFingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(
+                personId, userId, submitterCenterType, StrUtil.trim(reason), submission)));
+        Long duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey(),
+                submitterCenterType, requestFingerprint);
         if (duplicateId != null) return duplicateId;
         if (personMapper.selectByIdForUpdate(personId, TenantContextHolder.getRequiredTenantId()) == null) {
             throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         }
-        duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey());
+        duplicateId = findIdempotentCustomerOrder(personId, userId, submission.getIdempotencyKey(),
+                submitterCenterType, requestFingerprint);
         if (duplicateId != null) return duplicateId;
         if (requireEffectiveOrder && !orderMapper.hasEffectiveOrder(personId)) {
             throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
@@ -193,9 +219,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         order.setPersonId(personId); order.setLeadId(null); order.setOpportunityId(null);
         order.setOrderType(ORDER_TYPE_REPURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(formalSalesUserId);
-        order.setSubmitterCenterType(SUBMITTER_CENTER_SALES); order.setRepurchaseReason(reason.trim());
+        order.setSubmitterCenterType(submitterCenterType); order.setRepurchaseReason(reason.trim());
         applySubmission(order, submission, validated, now);
-        order.setSubmissionIdempotencyKey(submission.getIdempotencyKey()); order.setVersion(0);
+        order.setSubmissionIdempotencyKey(submission.getIdempotencyKey());
+        order.setSubmissionRequestFingerprint(requestFingerprint); order.setVersion(0);
         insertOrderWithNumber(order);
         List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
         createDealCashbacks(sourceLeadId, order.getId(), createdItems, validated.items());
@@ -203,11 +230,16 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return order.getId();
     }
 
-    private Long findIdempotentCustomerOrder(Long personId, Long userId, String key) {
+    private Long findIdempotentCustomerOrder(Long personId, Long userId, String key, String submitterCenterType,
+                                             String requestFingerprint) {
         SalesOrderDO duplicate = orderMapper.selectByIdempotencyKey(key);
         if (duplicate == null) return null;
         if (Objects.equals(duplicate.getPersonId(), personId)
-                && Objects.equals(duplicate.getSubmitterUserId(), userId)) return duplicate.getId();
+                && Objects.equals(duplicate.getSubmitterUserId(), userId)
+                && Objects.equals(duplicate.getSubmitterCenterType(), submitterCenterType)
+                && Objects.equals(duplicate.getSubmissionRequestFingerprint(), requestFingerprint)) {
+            return duplicate.getId();
+        }
         throw exception(SALES_ORDER_IDEMPOTENCY_CONFLICT);
     }
 
@@ -1248,7 +1280,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         result.setProvinceName(lead.getProvinceName());
         result.setCityName(lead.getCityName());
         result.setLeadCategory(lead.getLeadCategory());
-        result.setLeadCategoryLabelSnapshot(dictLabel(DICT_CATEGORY, lead.getLeadCategory()));
+        result.setLeadCategoryLabelSnapshot(lead.getLeadCategoryLabelSnapshot() != null
+                ? lead.getLeadCategoryLabelSnapshot() : dictLabel(DICT_CATEGORY, lead.getLeadCategory()));
         result.setDispatchMode(lead.getDispatchMode());
         result.setOwnerUserName(userName(users, lead.getOwnerUserId()));
         return result;

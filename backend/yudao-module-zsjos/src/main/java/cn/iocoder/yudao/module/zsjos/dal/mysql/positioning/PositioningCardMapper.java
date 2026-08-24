@@ -26,6 +26,15 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .in(PositioningCardDO::getAccountId, accountIds)
                 .orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId));
     }
+    default List<PositioningCardDO> selectRecentByStudentAndAccountIds(Long studentPersonId,
+                                                                       Collection<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<PositioningCardDO>()
+                .eq(PositioningCardDO::getStudentPersonId, studentPersonId)
+                .in(PositioningCardDO::getAccountId, accountIds)
+                .orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId)
+                .last("LIMIT 100"));
+    }
     @Select("SELECT * FROM zsjos_positioning_card WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     PositioningCardDO selectByIdForUpdate(Long id, Long tenantId);
     default PositioningCardDO selectByIpProcessId(String id) { return selectOne(PositioningCardDO::getIpProcessInstanceId, id); }

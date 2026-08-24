@@ -24,7 +24,6 @@ import {
   ApiError,
   api,
   type DictData,
-  type HandoverSheet,
   type MediaAccount,
   type MediaContent,
   type MediaException,
@@ -41,7 +40,6 @@ export type MediaFeature =
   | "content"
   | "tickets"
   | "positioning"
-  | "handovers"
   | "student-ops"
   | "reviews";
 type Row = (
@@ -49,7 +47,6 @@ type Row = (
   | MediaContent
   | ProductionTicket
   | PositioningCard
-  | HandoverSheet
   | MediaException
   | MediaReview
 ) & { id: number; version: number; availableActions: string[] };
@@ -85,17 +82,12 @@ const labels: Record<string, string> = {
   pending: "待处理",
   draft: "草稿",
   approved: "审核通过",
-  arbitration_pending: "待仲裁",
-  all_received: "全部接收",
-  partial_received: "部分接收",
-  arbitration_terminated: "仲裁终止",
 };
 const titles: Record<MediaFeature, string> = {
   accounts: "第三方账号",
   content: "内容生产",
   tickets: "拍剪工单",
   positioning: "账号定位",
-  handovers: "交接中心",
   "student-ops": "学员运营",
   reviews: "复盘中心",
 };
@@ -132,9 +124,6 @@ const actionLabels: Record<string, string> = {
   submit: "提交",
   approve: "审核通过",
   archive: "归档",
-  "request-arbitration": "申请仲裁",
-  "arbitrate-accept": "仲裁接收",
-  "arbitrate-terminate": "仲裁终止",
 };
 const actionText = (action: string) => actionLabels[action] || action;
 const statusText = (status?: string) =>
@@ -150,7 +139,6 @@ const detailQuery: Partial<Record<MediaFeature, string>> = {
   content: 'contentId',
   tickets: 'ticketId',
   positioning: 'positioningCardId',
-  handovers: 'handoverId',
 };
 
 async function loadRows(
@@ -179,11 +167,9 @@ async function loadRows(
     return { list: result.list as Row[], total: result.total };
   }
   const result =
-    feature === "handovers"
-      ? await api.handover.list()
-      : feature === "student-ops"
-        ? await api.studentOps.exceptions()
-        : await api.mediaReview.list();
+    feature === "student-ops"
+      ? await api.studentOps.exceptions()
+      : await api.mediaReview.list();
   return { list: result as Row[], total: result.length };
 }
 async function loadDetail(feature: MediaFeature, preferredId: number) {
@@ -249,22 +235,6 @@ async function runAction(
     };
     return f[action]?.();
   }
-  if (feature === "handovers") {
-    if (action === "accept") return api.handover.accept(row.id, row.version);
-    if (action === "reject")
-      return api.handover.reject(row.id, row.version, reason || "退回补充");
-    if (action === "request-arbitration")
-      return api.handover.requestArbitration(
-        row.id,
-        row.version,
-        reason || "申请仲裁",
-      );
-    if (action === "arbitrate-accept")
-      return api.handover.arbitrate(row.id, row.version, true, reason);
-    if (action === "arbitrate-terminate")
-      return api.handover.arbitrate(row.id, row.version, false, reason);
-    return undefined;
-  }
   if (feature === "student-ops")
     return api.studentOps.resolve(row.id, row.version, "已处理");
   if (action === "submit") return api.mediaReview.submit(row.id, row.version);
@@ -323,9 +293,7 @@ export default function MediaFeaturePage({
           ? "zsjos:production-ticket:create"
           : feature === "positioning"
             ? "zsjos:positioning-card:create"
-            : feature === "handovers"
-              ? "zsjos:handover:create"
-              : feature === "student-ops"
+            : feature === "student-ops"
                 ? "zsjos:student-ops:create-exception"
                 : feature === "reviews"
                   ? "zsjos:review:create"
@@ -435,7 +403,6 @@ export default function MediaFeaturePage({
         } as never);
       if (feature === "positioning")
         await api.positioningCard.create(values as never);
-      if (feature === "handovers") await api.handover.create(values as never);
       if (feature === "student-ops")
         await api.studentOps.createException(values);
       if (feature === "reviews") await api.mediaReview.create(values as never);
@@ -663,19 +630,7 @@ export default function MediaFeaturePage({
                   },
                   { label: "状态", value: (r: Row) => statusText(r.status) },
                 ]
-              : feature === "handovers"
-                ? [
-                    {
-                      label: "交接编号",
-                      value: (r: Row) => (r as HandoverSheet).handoverNo,
-                    },
-                    {
-                      label: "业务类型",
-                      value: (r: Row) => (r as HandoverSheet).bizType,
-                    },
-                    { label: "状态", value: (r: Row) => statusText(r.status) },
-                  ]
-                : feature === "student-ops"
+              : feature === "student-ops"
                   ? [
                       {
                         label: "异常编号",
@@ -1289,52 +1244,6 @@ function CreateMediaModal({
             </Form.Item>
           </>
         )}
-        {feature === "handovers" && (
-          <>
-            <Form.Item
-              name="bizType"
-              label="交接业务类型"
-              rules={[{ required: true }]}
-            >
-              <Select
-                options={[
-                  { value: "media-account", label: "第三方账号" },
-                  { value: "content", label: "内容" },
-                  { value: "production-ticket", label: "拍剪工单" },
-                  { value: "positioning-card", label: "定位卡" },
-                ]}
-              />
-            </Form.Item>
-            <Form.Item
-              name="bizId"
-              label="业务对象 ID"
-              rules={[{ required: true }]}
-            >
-              <InputNumber min={1} style={{ width: "100%" }} />
-            </Form.Item>
-            <Form.Item
-              name="fromUserId"
-              label="原责任人"
-              rules={[{ required: true }]}
-            >
-              <Select options={userOptions} />
-            </Form.Item>
-            <Form.Item
-              name="toUserId"
-              label="新责任人"
-              rules={[{ required: true }]}
-            >
-              <Select options={userOptions} />
-            </Form.Item>
-            <Form.Item
-              name="checklistJson"
-              label="交接清单 JSON"
-              rules={[{ required: true }]}
-            >
-              <Input.TextArea rows={4} />
-            </Form.Item>
-          </>
-        )}
         {feature === "student-ops" && (
           <>
             <Form.Item
@@ -1447,9 +1356,6 @@ export function PositioningPage({
   permissions?: string[];
 }) {
   return <MediaFeaturePage feature="positioning" permissions={permissions} />;
-}
-export function HandoversPage() {
-  return <MediaFeaturePage feature="handovers" />;
 }
 export function StudentOpsPage() {
   return <MediaFeaturePage feature="student-ops" />;

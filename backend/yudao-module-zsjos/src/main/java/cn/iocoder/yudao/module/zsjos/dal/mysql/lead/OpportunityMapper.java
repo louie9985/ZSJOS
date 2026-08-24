@@ -7,8 +7,17 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.util.Collection;
+import java.util.List;
+
 @Mapper
 public interface OpportunityMapper extends BaseMapperX<OpportunityDO> {
+    default List<OpportunityDO> selectListByLeadIds(Collection<Long> leadIds) {
+        return selectList(new LambdaQueryWrapperX<OpportunityDO>()
+                .in(OpportunityDO::getLeadId, leadIds)
+                .eq(OpportunityDO::getType, "initial_conversion"));
+    }
+
     default OpportunityDO selectByLeadId(Long leadId) {
         return selectOne(new LambdaQueryWrapperX<OpportunityDO>()
                 .eq(OpportunityDO::getLeadId, leadId)

@@ -18,7 +18,6 @@ INSERT IGNORE INTO system_menu
 (6980,'账号定位','zsjos:positioning-card:query',2,43,6735,'positioning','ep:compass','zsjos-workbench','MediaPositioningPage',0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (6981,'创建定位卡','zsjos:positioning-card:create',3,1,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (6982,'提交定位审核','zsjos:positioning-card:submit-review',3,2,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(6983,'交接单','zsjos:handover:query',2,44,6735,'handovers','ep:connection','zsjos-workbench','MediaHandoversPage',0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (6984,'学员运营','zsjos:student-ops:query',2,45,6735,'student-ops','ep:user','zsjos-workbench','MediaStudentOpsPage',0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (6985,'复盘与诊断','zsjos:review:query',2,46,6735,'reviews','ep:data-analysis','zsjos-workbench','MediaReviewsPage',0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
 INSERT IGNORE INTO system_menu
@@ -50,9 +49,6 @@ INSERT IGNORE INTO system_menu
 (7007,'编辑工单内容项','zsjos:production-ticket:edit',3,6,6977,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7008,'编辑定位工作台','zsjos:positioning-card:edit',3,6,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7009,'定位执行卡签字','zsjos:positioning-card:sign',3,7,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7010,'创建交接单','zsjos:handover:create',3,1,6983,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7011,'接收交接单','zsjos:handover:accept',3,2,6983,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7012,'退回交接单','zsjos:handover:reject',3,3,6983,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7013,'创建异常工单','zsjos:student-ops:create-exception',3,1,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7014,'处理异常工单','zsjos:student-ops:resolve-exception',3,2,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7015,'配合度评估','zsjos:student-ops:assess',3,3,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),

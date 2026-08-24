@@ -13,6 +13,9 @@ public class MediaStudentDetailRespVO {
     private List<PositioningVO> positioningCards;
     private List<ContentVO> contents;
     private List<TicketVO> productionTickets;
+    private List<OperationVO> operationTimeline;
+    private List<TaskStageVO> taskLine;
+    private PendingStatsVO pendingStats;
 
     @Data
     public static class AccountVO {
@@ -23,6 +26,7 @@ public class MediaStudentDetailRespVO {
         private String stage;
         private String runStatus;
         private Integer version;
+        private LocalDateTime lastActivityAt;
         private List<String> availableActions;
         private List<MediaAccountDetailSnapshotVO> detailSnapshots;
     }
@@ -36,6 +40,7 @@ public class MediaStudentDetailRespVO {
         private Integer versionNo;
         private Boolean professionalRisk;
         private Integer version;
+        private LocalDateTime lastActivityAt;
         private List<String> availableActions;
     }
 
@@ -49,6 +54,7 @@ public class MediaStudentDetailRespVO {
         private Integer currentVersionNo;
         private LocalDateTime publishedAt;
         private Integer version;
+        private LocalDateTime lastActivityAt;
         private List<String> availableActions;
     }
 
@@ -60,5 +66,32 @@ public class MediaStudentDetailRespVO {
         private String status;
         private LocalDateTime deadlineAt;
         private Integer revisionCount;
+        private LocalDateTime lastActivityAt;
+    }
+
+    @Data
+    public static class OperationVO {
+        private String key;
+        private String type;
+        private String title;
+        private String detail;
+        private String operatorName;
+        private LocalDateTime occurredAt;
+    }
+
+    @Data
+    public static class TaskStageVO {
+        private String key;
+        private String label;
+        private String status;
+        private String detail;
+    }
+
+    @Data
+    public static class PendingStatsVO {
+        private Integer accountCount;
+        private Integer positioningCount;
+        private Integer contentCount;
+        private Integer productionCount;
     }
 }

@@ -27,6 +27,9 @@ public class ServiceRelationDO extends TenantBaseDO {
     private Long contentDirectorUserId;
     private Long careerPlannerUserId;
     private String serviceSnapshot;
+    /** Current delivery stage is owned by the service relation, not inferred from labels or contact text. */
+    private String deliveryStage;
+    private String deliveryDataJson;
     private LocalDateTime activatedAt;
     private LocalDateTime pausedAt;
     private String pauseReason;

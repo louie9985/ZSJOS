@@ -39,6 +39,7 @@ class LeadBasicInfoServiceTest {
     @Mock private BusinessEventMapper eventMapper;
     @Mock private LeadDuplicateMatcher duplicateMatcher;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
+    @Mock private LeadCategorySnapshotService categorySnapshotService;
 
     @Test
     void updateRejectsNonOwnerBeforeMutation() {

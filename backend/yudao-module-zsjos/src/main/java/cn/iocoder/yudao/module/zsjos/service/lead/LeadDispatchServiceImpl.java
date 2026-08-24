@@ -472,7 +472,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         result.setSourceChannel(lead.getSourceChannelId());
         result.setSourceChannelLabel(channelLabels.get(lead.getSourceChannelId()));
         result.setLeadCategory(lead.getLeadCategory());
-        result.setLeadCategoryLabel(categoryLabels.get(lead.getLeadCategory()));
+        result.setLeadCategoryLabel(lead.getLeadCategoryLabelSnapshot() != null
+                ? lead.getLeadCategoryLabelSnapshot() : categoryLabels.get(lead.getLeadCategory()));
         result.setRemark(lead.getRemark());
         result.setAttachmentUrls(attachments.stream()
                 .sorted(Comparator.comparing(LeadAttachmentDO::getSort))

@@ -6,7 +6,7 @@ describe('new media workflow pages', () => {
   const host = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
   const style = readFileSync('src/styles/pages/media-feature.css', 'utf8')
   it('registers independent page entry points for all seven routes', () => {
-    for (const name of ['AccountsPage', 'ContentPage', 'ProductionTicketsPage', 'PositioningPage', 'HandoversPage', 'StudentOpsPage', 'ReviewsPage']) expect(page).toContain(`export function ${name}`)
+    for (const name of ['AccountsPage', 'ContentPage', 'ProductionTicketsPage', 'PositioningPage', 'StudentOpsPage', 'ReviewsPage']) expect(page).toContain(`export function ${name}`)
     expect(host).not.toContain('MediaWorkflowPage')
   })
   it('uses the master-detail UI recipe and server projected actions', () => {
@@ -23,7 +23,7 @@ describe('new media workflow pages', () => {
     expect(page).toContain('AccountActionModal')
   })
   it('opens message deep links at the requested business object', () => {
-    for (const query of ['accountId', 'contentId', 'ticketId', 'positioningCardId', 'handoverId']) {
+    for (const query of ['accountId', 'contentId', 'ticketId', 'positioningCardId']) {
       expect(page).toContain(`'${query}'`)
     }
     expect(page).toContain('loadDetail(feature, preferredId)')

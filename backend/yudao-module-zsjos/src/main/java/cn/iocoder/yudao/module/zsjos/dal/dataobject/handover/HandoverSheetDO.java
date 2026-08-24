@@ -1,5 +1,0 @@
-package cn.iocoder.yudao.module.zsjos.dal.dataobject.handover;
-import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
-import com.baomidou.mybatisplus.annotation.*; import lombok.Data; import lombok.EqualsAndHashCode;
-@Data @EqualsAndHashCode(callSuper=true) @TableName("zsjos_handover_sheet") @KeySequence("zsjos_handover_sheet_seq")
-public class HandoverSheetDO extends TenantBaseDO { @TableId private Long id; private String handoverNo; private String bizType; private Long bizId; private Long fromUserId; private Long toUserId; private String checklistJson; private String status; private java.time.LocalDateTime acceptedAt; private java.time.LocalDateTime responsibilityStartedAt; private String rejectReason; private Long correctionTaskId; private String riskProcessInstanceId; private Long arbitrationApplicantUserId; private Long arbitratorUserId; private String arbitrationReason; private String arbitrationDecision; private java.time.LocalDateTime arbitrationAt; private Integer version; }

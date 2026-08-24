@@ -39,7 +39,7 @@ import {
   WorkPlanConfigPage
 } from '../pages/ConfigurationPages'
 import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
-import { ProductionTicketsPage, HandoversPage, StudentOpsPage, ReviewsPage } from '../pages/MediaFeaturePage'
+import { ProductionTicketsPage, StudentOpsPage, ReviewsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
 
 interface RouteHostProps {
@@ -96,14 +96,13 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
-  if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage/>
+  if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.MEDIA_HANDOVERS) return <HandoversPage/>
   if (menu?.path === APP_ROUTES.MEDIA_STUDENT_OPS) return <StudentOpsPage/>
   if (menu?.path === APP_ROUTES.MEDIA_REVIEWS) return <ReviewsPage/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>

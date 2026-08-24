@@ -26,3 +26,13 @@ describe('inbox detail presentation', () => {
     })
   }
 })
+
+describe('my sales-order page chrome', () => {
+  it('keeps the page header free of title and descriptive copy', () => {
+    const source = readFileSync('src/pages/MySalesOrderPage.tsx', 'utf8')
+
+    expect(source).toContain('className="sales-order-inbox-actions"')
+    expect(source).not.toContain('>我的订单<')
+    expect(source).not.toContain('查看本人提交的全部成交订单及当前状态')
+  })
+})

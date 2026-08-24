@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAttachmentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
@@ -114,10 +115,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
                 intendedProductMapper.selectListByLeadIds(leadIds), LeadIntendedProductDO::getLeadId);
+        Map<Long, OpportunityDO> opportunities = getOpportunityMap(leadIds);
+        Map<Long, PartnerDO> partners = getPartnerMap(page.getList());
         Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
         List<LeadManagementRespVO> result = page.getList().stream()
                 .map(lead -> convert(lead, userId, users, products.getOrDefault(lead.getId(), List.of()),
-                        List.of(), Map.of(), false))
+                        List.of(), Map.of(), false, opportunities, partners))
                 .toList();
         return new PageResult<>(result, page.getTotal());
     }
@@ -129,9 +132,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
                 intendedProductMapper.selectListByLeadIds(leadIds), LeadIntendedProductDO::getLeadId);
+        Map<Long, OpportunityDO> opportunities = getOpportunityMap(leadIds);
+        Map<Long, PartnerDO> partners = getPartnerMap(page.getList());
         Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
         return new PageResult<>(page.getList().stream().map(lead -> convert(lead, null, users,
-                products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false)).toList(), page.getTotal());
+                products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false,
+                opportunities, partners)).toList(), page.getTotal());
     }
 
     @Override
@@ -192,10 +198,13 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<Long> leadIds = page.getList().stream().map(LeadDO::getId).toList();
         Map<Long, List<LeadIntendedProductDO>> products = groupByLeadId(
                 intendedProductMapper.selectListByLeadIds(leadIds), LeadIntendedProductDO::getLeadId);
+        Map<Long, OpportunityDO> opportunities = getOpportunityMap(leadIds);
+        Map<Long, PartnerDO> partners = getPartnerMap(page.getList());
         Map<Long, AdminUserRespDTO> users = getUserMap(page.getList());
         return new PageResult<>(page.getList().stream()
                 .map(lead -> convert(lead, managerUserId, users,
-                        products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false))
+                        products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false,
+                        opportunities, partners))
                 .toList(), page.getTotal());
     }
 
@@ -288,12 +297,36 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         return new LeadInboxFilterProfileRespVO.GroupVO(group.getKey(), group.getLabel(), sections);
     }
 
+    private Map<Long, OpportunityDO> getOpportunityMap(Collection<Long> leadIds) {
+        if (leadIds.isEmpty()) return Map.of();
+        return opportunityMapper.selectListByLeadIds(leadIds).stream()
+                .collect(Collectors.toMap(OpportunityDO::getLeadId, Function.identity(), (first, ignored) -> first));
+    }
+
+    private Map<Long, PartnerDO> getPartnerMap(Collection<LeadDO> leads) {
+        List<Long> partnerIds = leads.stream().map(LeadDO::getPartnerId).filter(Objects::nonNull).distinct().toList();
+        if (partnerIds.isEmpty()) return Map.of();
+        return partnerMapper.selectListByIds(partnerIds).stream()
+                .collect(Collectors.toMap(PartnerDO::getId, Function.identity()));
+    }
+
     private LeadManagementRespVO convert(LeadDO lead, Long currentUserId,
                                           Map<Long, AdminUserRespDTO> users,
                                           List<LeadIntendedProductDO> products,
                                           List<LeadAttachmentDO> attachments,
                                           Map<Long, String> attachmentUrls,
                                           boolean detail) {
+        return convert(lead, currentUserId, users, products, attachments, attachmentUrls, detail, Map.of(), Map.of());
+    }
+
+    private LeadManagementRespVO convert(LeadDO lead, Long currentUserId,
+                                          Map<Long, AdminUserRespDTO> users,
+                                          List<LeadIntendedProductDO> products,
+                                          List<LeadAttachmentDO> attachments,
+                                          Map<Long, String> attachmentUrls,
+                                          boolean detail,
+                                          Map<Long, OpportunityDO> opportunities,
+                                          Map<Long, PartnerDO> partners) {
         LeadManagementRespVO result = BeanUtils.toBean(lead, LeadManagementRespVO.class);
         result.setSourceChannel(lead.getSourceChannelId());
         boolean blindIdentity = isBlindIdentity(lead, currentUserId);
@@ -310,7 +343,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 ? maskedUserName(users, lead.getOwnerUserId()) : userName(users, lead.getOwnerUserId()));
         result.setSourceLabel(sourceLabel(lead.getSourceType()));
         if (SOURCE_PARTNER.equals(lead.getSourceType()) && lead.getPartnerId() != null) {
-            var partner = partnerMapper.selectById(lead.getPartnerId());
+            var partner = detail ? partnerMapper.selectById(lead.getPartnerId()) : partners.get(lead.getPartnerId());
             String partnerName = partner == null ? null : partner.getName();
             result.setSourceUserName(blindIdentity && viewerIsOwner && partnerName != null
                     ? DesensitizedUtil.chineseName(partnerName) : partnerName);
@@ -340,7 +373,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                 ? "counterparty_masked" : "full");
         result.setPrimaryProduct(products.stream().filter(item -> Boolean.TRUE.equals(item.getIsPrimary()))
                 .findFirst().map(this::convertProduct).orElse(null));
-        OpportunityDO opportunity = opportunityMapper.selectByLeadId(lead.getId());
+        OpportunityDO opportunity = detail ? opportunityMapper.selectByLeadId(lead.getId()) : opportunities.get(lead.getId());
         // Keep the legacy Lead timestamp internal; customer-facing conversion is opportunity won time.
         result.setConvertedAt(opportunity == null ? null : opportunity.getWonAt());
         result.setQualificationStatus(LeadStateProjection.qualification(lead));

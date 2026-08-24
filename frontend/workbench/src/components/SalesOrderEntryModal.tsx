@@ -36,9 +36,10 @@ export type SalesOrderEntryLead = {
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
 
-export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, open, onClose, onSubmitted }: {
+export default function SalesOrderEntryModal({ lead, orderId, repurchase, externalCustomer, studentRepurchase, open, onClose, onSubmitted }: {
   lead: SalesOrderEntryLead; orderId?: number; repurchase?: boolean
   externalCustomer?: { customerName: string; customerMobile?: string; customerWechatId?: string }
+  studentRepurchase?: boolean
   open: boolean; onClose: () => void; onSubmitted: (orderId: number) => void
 }) {
   const [form] = Form.useForm<Values>()
@@ -139,9 +140,14 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
         if (repurchase) {
           const repurchaseReason = values.repurchaseReason!.trim()
-          const submittedOrderId = externalCustomer
-            ? await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason: repurchaseReason.trim(), order: request })
-            : await api.submitSystemRepurchase(lead.id, repurchaseReason.trim(), request)
+          let submittedOrderId: number
+          if (externalCustomer) {
+            submittedOrderId = await api.submitExternalRepurchase({ ...externalCustomer, repurchaseReason, order: request })
+          } else if (studentRepurchase) {
+            submittedOrderId = await api.submitStudentRepurchase(lead.id, { customerName: request.studentName, customerMobile: request.studentMobile, customerWechatId: request.studentWechatId, repurchaseReason, order: request })
+          } else {
+            submittedOrderId = await api.submitSystemRepurchase(lead.id, repurchaseReason, request)
+          }
           message.success('复购订单已提交审批')
           onSubmitted(submittedOrderId)
         } else if (orderId) {

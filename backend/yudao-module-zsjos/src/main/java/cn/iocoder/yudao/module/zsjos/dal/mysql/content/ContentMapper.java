@@ -18,6 +18,11 @@ public interface ContentMapper extends BaseMapperX<ContentDO> {
                 .in(ContentDO::getAccountId, accountIds)
                 .orderByDesc(ContentDO::getUpdateTime).orderByDesc(ContentDO::getId));
     }
+    default List<ContentDO> selectRecentByAccountIds(Collection<Long> accountIds) {
+        if (accountIds == null || accountIds.isEmpty()) return List.of();
+        return selectList(new LambdaQueryWrapperX<ContentDO>().in(ContentDO::getAccountId, accountIds)
+                .orderByDesc(ContentDO::getUpdateTime).orderByDesc(ContentDO::getId).last("LIMIT 100"));
+    }
     default int advanceCurrentVersion(Long id, Integer expectedVersion, Integer nextVersion) {
         return update(null, new LambdaUpdateWrapper<ContentDO>().eq(ContentDO::getId, id)
                 .eq(ContentDO::getVersion, expectedVersion)

@@ -54,6 +54,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     @Resource private LeadIntendedProductMapper intendedProductMapper;
     @Resource private BusinessTaskReminderService taskReminderService;
     @Resource private CashbackService cashbackService;
+    @Resource private LeadCategorySnapshotService categorySnapshotService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -63,7 +64,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         String key = commandKey(reqVO.getIdempotencyKey());
         if (isIdempotent(key, leadId, userId, EVENT_LEAD_QUALIFIED_VALID)) return;
         requireQualificationPending(lead, userId);
-        String category = normalizeCategory(reqVO.getLeadCategory());
+        LeadCategorySnapshotService.Selection category = categorySnapshotService.requireEnabled(reqVO.getLeadCategory());
         LocalDateTime now = LocalDateTime.now();
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
         boolean createOpportunity = opportunity == null;
@@ -83,7 +84,10 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setQualifiedByUserId(userId);
         lead.setQualifiedAt(now);
         lead.setConvertedAt(now);
-        lead.setLeadCategory(category);
+        if (!Objects.equals(lead.getLeadCategory(), category.value())) {
+            lead.setLeadCategory(category.value());
+            lead.setLeadCategoryLabelSnapshot(category.labelSnapshot());
+        }
         lead.setValidDescription(reqVO.getRemark().trim());
         lead.setInvalidReason(null);
         lead.setInvalidReasonLabelSnapshot(null);
@@ -347,15 +351,6 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         return context;
     }
 
-    private String normalizeCategory(String value) {
-        if (value == null || value.isBlank()) return null;
-        String normalized = value.trim();
-        DictDataRespDTO category = dictDataApi.getDictDataList(DICT_CATEGORY).stream()
-                .filter(item -> Objects.equals(item.getValue(), normalized))
-                .filter(item -> CommonStatusEnum.ENABLE.getStatus().equals(item.getStatus()))
-                .findFirst().orElseThrow(() -> exception(LEAD_FOLLOW_UP_DICT_INVALID));
-        return category.getValue();
-    }
 
     private LeadDO requireLeadForUpdate(Long leadId) {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());

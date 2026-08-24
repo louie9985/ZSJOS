@@ -32,7 +32,7 @@ public class MediaAccountFieldConfigController {
     }
 
     @GetMapping("/published")
-    @PreAuthorize("@ss.hasPermission('zsjos:media-account:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-student:query-my')")
     public CommonResult<MediaAccountFieldConfigRespVO.VersionVO> getPublished() {
         return success(service.getPublished());
     }

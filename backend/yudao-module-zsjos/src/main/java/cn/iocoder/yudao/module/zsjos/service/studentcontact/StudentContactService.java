@@ -23,4 +23,5 @@ public interface StudentContactService {
     PageResult<StudentContactExtensionRespVO> getExtensions(PageParam page, String statusScope, Long userId);
     void completeAssistance(Long taskId, String remark, Long userId);
     StudentContactAttachmentRespVO uploadAttachment(Long relationId, Long userId, MultipartFile file) throws IOException;
+    Long submitDeliveryStage(Long relationId, StudentDeliveryStageSubmitReqVO request, Long userId);
 }

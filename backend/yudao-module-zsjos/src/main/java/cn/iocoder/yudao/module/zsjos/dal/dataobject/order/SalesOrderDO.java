@@ -54,6 +54,7 @@ public class SalesOrderDO extends TenantBaseDO {
     private LocalDateTime submittedAt;
     private LocalDateTime effectiveAt;
     private String submissionIdempotencyKey;
+    private String submissionRequestFingerprint;
     private String repurchaseReason;
     private String terminationReason;
     private LocalDateTime terminatedAt;

@@ -70,11 +70,14 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadFollowUpRuleService followUpRuleService;
     @Mock private LeadDuplicateReviewService duplicateReviewService;
     @Mock private ZsjosProductSkuService productSkuService;
+    @Mock private LeadCategorySnapshotService categorySnapshotService;
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {
         org.mockito.Mockito.lenient().when(identityService.requireOrdinarySubmitter(1L)).thenReturn(
                 new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null));
+        org.mockito.Mockito.lenient().when(categorySnapshotService.requireEnabled(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(new LeadCategorySnapshotService.Selection("test", "提交时分类"));
     }
 
     @Test
@@ -206,6 +209,8 @@ class LeadSubmissionServiceImplTest {
 
         assertEquals("review_pending", result.getOutcome());
         assertEquals(99L, result.getReviewId());
+        verify(duplicateReviewMapper).insert(org.mockito.ArgumentMatchers.argThat(
+                (LeadDuplicateReviewDO review) -> "提交时分类".equals(review.getLeadCategoryLabelSnapshot())));
         verify(duplicateReviewService, never()).resolveAutomatically(any(), any(), any());
     }
 

@@ -44,6 +44,53 @@ SELECT 1,'published',JSON_ARRAY(
 FROM `system_tenant` t WHERE t.status=0 AND t.deleted=b'0'
   AND NOT EXISTS (SELECT 1 FROM `zsjos_media_account_field_config` c WHERE c.tenant_id=t.id AND c.deleted=b'0');
 
+DROP PROCEDURE IF EXISTS `zsjos_v113_assert_menu_slots`;
+DELIMITER $$
+CREATE PROCEDURE `zsjos_v113_assert_menu_slots`()
+BEGIN
+  IF (SELECT COUNT(*) FROM `system_menu` WHERE `path`='/zsjos' AND `parent_id`=0
+      AND `status`=0 AND `deleted`=b'0') <> 1 THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='V113 blocked: active /zsjos root menu is missing or ambiguous';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=7022
+      AND `parent_id`=(SELECT `id` FROM `system_menu` WHERE `path`='/zsjos' AND `parent_id`=0
+                       AND `status`=0 AND `deleted`=b'0') AND `type`=2
+      AND `permission`='zsjos:media-student:query-my' AND `path`='/zsjos/media-students'
+      AND `status`=0 AND `deleted`=b'0') THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='V113 blocked: media-student menu 7022 is missing or reassigned';
+  END IF;
+  IF EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=73500
+      AND NOT (`permission`='zsjos:media-account-field-config:query'
+               AND `path`='/zsjos/media-account-field-config')) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='V113 blocked: system_menu ID 73500 is owned by another menu';
+  END IF;
+  IF EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=73501
+      AND NOT (`permission`='zsjos:media-account-field-config:update')) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='V113 blocked: system_menu ID 73501 is owned by another menu';
+  END IF;
+  IF EXISTS (SELECT 1 FROM `system_menu` WHERE `id`=73502
+      AND NOT (`permission`='zsjos:media-account-field-config:publish')) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='V113 blocked: system_menu ID 73502 is owned by another menu';
+  END IF;
+  IF EXISTS (SELECT 1 FROM `system_menu` WHERE
+      (`permission`='zsjos:media-account-field-config:query' AND `id`<>73500 AND `deleted`=b'0') OR
+      (`permission`='zsjos:media-account-field-config:update' AND `id`<>73501 AND `deleted`=b'0') OR
+      (`permission`='zsjos:media-account-field-config:publish' AND `id`<>73502 AND `deleted`=b'0')) THEN
+    SIGNAL SQLSTATE '45000'
+      SET MESSAGE_TEXT='V113 blocked: account-field configuration permission is duplicated';
+  END IF;
+END$$
+DELIMITER ;
+CALL `zsjos_v113_assert_menu_slots`();
+DROP PROCEDURE IF EXISTS `zsjos_v113_assert_menu_slots`;
+SET @v113_zsjos_menu_id := (SELECT `id` FROM `system_menu`
+  WHERE `path`='/zsjos' AND `parent_id`=0 AND `status`=0 AND `deleted`=b'0');
+
 UPDATE `system_menu` SET `parent_id`=7022,`updater`='migration-V113',`update_time`=NOW()
 WHERE `parent_id` IN (6970,6974,6980) AND `type`=3 AND `deleted`=b'0';
 UPDATE `system_menu` SET `status`=1,`visible`=b'0',`deleted`=b'1',`updater`='migration-V113',`update_time`=NOW()
@@ -53,19 +100,6 @@ INSERT IGNORE INTO `system_role_menu`
 (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT r.id,7022,'migration-V113',NOW(),'migration-V113',NOW(),b'0',r.tenant_id
 FROM `system_role` r WHERE r.code='new_media_operator' AND r.status=0 AND r.deleted=b'0';
-
-SET @v113_zsjos_menu_id := (SELECT `id` FROM `system_menu`
-  WHERE `path`='/zsjos' AND `parent_id`=0 AND `deleted`=b'0' ORDER BY `id` LIMIT 1);
-SET @v113_menu_id_collision := EXISTS(
-  SELECT 1 FROM `system_menu` WHERE
-    (`id`=73500 AND (`permission`<>'zsjos:media-account-field-config:query' OR `path`<>'/zsjos/media-account-field-config')) OR
-    (`id`=73501 AND `permission`<>'zsjos:media-account-field-config:update') OR
-    (`id`=73502 AND `permission`<>'zsjos:media-account-field-config:publish')
-);
-SET @v113_sql := IF(@v113_menu_id_collision,
-  'SIGNAL SQLSTATE ''45000'' SET MESSAGE_TEXT=''V113 menu IDs 73500-73502 are already used by unrelated menus''',
-  'SELECT 1');
-PREPARE v113_stmt FROM @v113_sql; EXECUTE v113_stmt; DEALLOCATE PREPARE v113_stmt;
 INSERT INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,
  `keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
@@ -95,5 +129,5 @@ UPDATE `system_dict_type` SET `name`='第三方账号平台',`remark`='第三方
 WHERE `type`='zsjos_account_platform' AND `deleted`=b'0';
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
-VALUES ('V113','Consolidate media workflow into student center','media-student-center-v2')
+VALUES ('V113','Consolidate media workflow into student center','media-student-center-v3')
 ON DUPLICATE KEY UPDATE `description`=VALUES(`description`),`checksum`=VALUES(`checksum`);

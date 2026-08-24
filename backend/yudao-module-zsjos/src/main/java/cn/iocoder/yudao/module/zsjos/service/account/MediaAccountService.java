@@ -145,12 +145,19 @@ public class MediaAccountService {
         return new PageResult<>(page.getList().stream().map(row -> toResp(row, userId)).toList(), page.getTotal());
     }
 
-    public List<MediaAccountStudentCandidateRespVO> studentCandidates(String keyword) {
+    public List<MediaAccountStudentCandidateRespVO> studentCandidates(String keyword, Long userId) {
         var query = new LambdaQueryWrapperX<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO>()
                 .likeIfPresent(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO::getName,
                         keyword == null ? null : keyword.trim())
                 .orderByDesc(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO::getId)
                 .last("LIMIT 100");
+        if (!permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) {
+            List<Long> visibleStudentIds = mapper.selectVisibleStudentIds(userId,
+                    keyword == null ? null : keyword.trim(),
+                    cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+            if (visibleStudentIds.isEmpty()) return List.of();
+            query.in(cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO::getId, visibleStudentIds);
+        }
         return personMapper.selectList(query).stream().map(person -> {
             var response = new MediaAccountStudentCandidateRespVO();
             response.setPersonId(person.getId());

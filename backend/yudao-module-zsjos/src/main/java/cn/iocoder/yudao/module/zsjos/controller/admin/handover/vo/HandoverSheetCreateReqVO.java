@@ -1,1 +1,0 @@
-package cn.iocoder.yudao.module.zsjos.controller.admin.handover.vo; import jakarta.validation.constraints.*; import lombok.Data; @Data public class HandoverSheetCreateReqVO { @NotBlank private String bizType; @NotNull private Long bizId; @NotNull private Long fromUserId; @NotNull private Long toUserId; @NotBlank private String checklistJson; }

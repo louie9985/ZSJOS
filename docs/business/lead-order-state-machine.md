@@ -217,7 +217,7 @@ ServiceRelation 1:N ServiceRecord
 | `partner_id` | bigint | 条件必填 | 兼职提交主体标识 |
 | `source_channel_id` | bigint/varchar | 否 | 更细的业务来源，来自业务配置或字典 |
 | `province_code`、`province_name`、`city_code`、`city_name` | varchar | 新提交必填 | 提交时省市及名称快照；标准编码为数字字符串，“其他”为 `OTHER` |
-| `lead_category`、`remark` | varchar | 新提交是/否 | 客资分类字典值与备注 |
+| `lead_category`、`lead_category_label_snapshot`、`remark` | varchar | 新提交是/否 | 客资分类字典值、选择时标签快照与备注；后续明确改选分类时生成新快照，管理员修改字典不回写历史标签 |
 | `dispatch_mode` | varchar | 新提交必填 | `auto` 或 `specified` |
 | `pending_assignee_user_id`、`pending_expires_at` | bigint/datetime | 条件必填 | 当前待接销售及自动派单截止时间；指定派单不超时 |
 | `assignment_attempt_count`、`assignment_rule_snapshot` | int/json | 自动派单必填 | 已尝试次数和提交时规则快照 |

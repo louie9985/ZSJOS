@@ -339,6 +339,30 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
+    void repurchaseReplayRejectsSameKeyFromDifferentCenter() {
+        SalesOrderDO existing = repurchaseReplay("fingerprint", SUBMITTER_CENTER_SALES);
+        when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(existing);
+
+        ServiceException error = assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(service,
+                "findIdempotentCustomerOrder", 10L, 20L, "key-1", SUBMITTER_CENTER_STUDENT_DELIVERY,
+                "fingerprint"));
+
+        assertEquals(SALES_ORDER_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
+    }
+
+    @Test
+    void repurchaseReplayRejectsSameKeyForDifferentRequestFingerprint() {
+        SalesOrderDO existing = repurchaseReplay("old-fingerprint", SUBMITTER_CENTER_STUDENT_DELIVERY);
+        when(orderMapper.selectByIdempotencyKey("key-1")).thenReturn(existing);
+
+        ServiceException error = assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(service,
+                "findIdempotentCustomerOrder", 10L, 20L, "key-1", SUBMITTER_CENTER_STUDENT_DELIVERY,
+                "new-fingerprint"));
+
+        assertEquals(SALES_ORDER_IDEMPOTENCY_CONFLICT.getCode(), error.getCode());
+    }
+
+    @Test
     void createRechecksIdempotencyAfterLeadLock() {
         LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(20L); lead.setStatus("valid");
         SalesOrderDO existing = new SalesOrderDO();
@@ -731,6 +755,13 @@ class SalesOrderServiceImplTest {
         request.setOrderVersion(3); request.setRoundVersion(4); request.setReason("审批意见");
         request.setIdempotencyKey(idempotencyKey);
         return request;
+    }
+
+    private SalesOrderDO repurchaseReplay(String fingerprint, String submitterCenter) {
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setPersonId(10L); order.setSubmitterUserId(20L);
+        order.setSubmitterCenterType(submitterCenter); order.setSubmissionRequestFingerprint(fingerprint);
+        return order;
     }
 
     private SalesOrderSubmitReqVO request(BigDecimal amount, String mobile, String wechat) {

@@ -4,11 +4,16 @@ import cn.iocoder.yudao.module.system.api.notify.NotifyActionType;
 import cn.iocoder.yudao.module.system.api.notify.NotifySceneProvider;
 import cn.iocoder.yudao.module.system.api.notify.dto.*;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderApprovalConfigDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderApprovalConfigMapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,6 +26,9 @@ import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationCon
 public class RegistrationNotifySceneProvider implements NotifySceneProvider {
 
     @Resource private PermissionApi permissionApi;
+    @Resource private SalesOrderApprovalConfigMapper approvalConfigMapper;
+    @Resource private DeptApi deptApi;
+    @Resource private AdminUserApi adminUserApi;
 
     @Override
     public List<NotifySceneRespDTO> getScenes() {
@@ -58,7 +66,23 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
             return Set.of();
         }
         if (!roles.contains(NOTIFY_ROLE_POOL_HANDLERS)) return Set.of();
-        Set<Long> userIds = permissionApi.getEnabledUserIdsByPermission(PERMISSION_QUERY_POOL);
+        Set<Long> permissionUserIds = permissionApi.getEnabledUserIdsByPermission(PERMISSION_QUERY_POOL);
+        SalesOrderApprovalConfigDO config = approvalConfigMapper.selectCurrent();
+        Long registrationDeptId = config == null ? null : config.getRegistrationDeptId();
+        if (registrationDeptId == null || permissionUserIds.isEmpty()) {
+            log.warn("[resolveRecipients][tenantId({}) registrationCaseId({}) has no registration department scope or permission user]",
+                    event.getTenantId(), event.getBizId());
+            return Set.of();
+        }
+        Set<Long> deptIds = new LinkedHashSet<>();
+        deptIds.add(registrationDeptId);
+        deptApi.getChildDeptList(registrationDeptId).stream().map(item -> item.getId())
+                .filter(java.util.Objects::nonNull).forEach(deptIds::add);
+        Set<Long> scopedUserIds = new LinkedHashSet<>();
+        adminUserApi.getUserListByDeptIds(deptIds).stream().map(user -> user.getId())
+                .filter(java.util.Objects::nonNull).forEach(scopedUserIds::add);
+        scopedUserIds.retainAll(permissionUserIds);
+        Set<Long> userIds = scopedUserIds;
         if (userIds.isEmpty()) {
             log.warn("[resolveRecipients][tenantId({}) registrationCaseId({}) has no enabled pool handler]",
                     event.getTenantId(), event.getBizId());

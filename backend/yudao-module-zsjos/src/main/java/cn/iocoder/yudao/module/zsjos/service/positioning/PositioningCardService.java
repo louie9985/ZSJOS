@@ -311,6 +311,12 @@ public class PositioningCardService {
         if (!objectPermissionProvider.hasPermission(card.getId(), "read", userId)) {
             response.setAvailableActions(List.of()); return response;
         }
+        response.setAvailableActions(availableActionsForVisible(card, userId, true));
+        return response;
+    }
+
+    public List<String> availableActionsForVisible(PositioningCardDO card, Long userId, boolean objectAuthorized) {
+        if (!objectAuthorized) return List.of();
         String permission = switch (card.getStatus()) {
             case POSITIONING_CO_CREATING -> "zsjos:positioning-card:submit-review";
             case POSITIONING_OPERATOR_FEASIBILITY -> "zsjos:positioning-card:feasibility-review";
@@ -319,16 +325,15 @@ public class PositioningCardService {
             default -> null;
         };
         if (permission == null || !permissionApi.hasAnyPermissions(userId, permission)) {
-            response.setAvailableActions(List.of()); return response;
+            return List.of();
         }
-        response.setAvailableActions(switch (card.getStatus()) {
+        return switch (card.getStatus()) {
             case POSITIONING_CO_CREATING -> List.of(ACTION_SUBMIT_POSITIONING_REVIEW);
             case POSITIONING_OPERATOR_FEASIBILITY -> List.of(ACTION_APPROVE_POSITIONING_FEASIBILITY,
                     ACTION_REJECT_POSITIONING_FEASIBILITY);
             case POSITIONING_TRIAL_14D -> List.of(ACTION_CONFIRM_POSITIONING_TRIAL);
             case POSITIONING_CONFIRMED -> List.of(ACTION_ARCHIVE_POSITIONING);
             default -> List.of();
-        });
-        return response;
+        };
     }
 }

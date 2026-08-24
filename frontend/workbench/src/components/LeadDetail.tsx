@@ -25,7 +25,7 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, onDirtyChange, onChanged, extraTabs = [], contextHeader, studentContext, studentToolbarActions = [] }: {
+export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, studentContext, studentService, studentToolbarActions = [], overviewContent }: {
   lead: ManagedLead
   categories: DictData[]
   categoryLabel: (value?: string) => string
@@ -33,18 +33,23 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   mode: LeadDetailMode
   autoExpandFollowUp: boolean
   initialTab?: LeadDetailTab
+  activeTab?: string
+  onTabChange?: (key: string) => void
   onDirtyChange: (dirty: boolean) => void
   onChanged: () => void
   extraTabs?: LeadDetailExtraTab[]
+  baseTabs?: LeadDetailTab[]
   contextHeader?: ReactNode
   studentContext?: StudentLeadContext
+  studentService?: MyStudent['services'][number]
   studentToolbarActions?: ToolbarAction[]
+  overviewContent?: ReactNode
 }) {
   const readOnly = mode === 'manager-readonly' || mode === 'student-readonly'
-  const visibleTabs = detailTabsFromProjection(lead.visibleTabs).filter(tab => mode !== 'student-readonly' || tab !== 'follow-ups')
+  const visibleTabs = (baseTabs || detailTabsFromProjection(lead.visibleTabs)).filter(tab => mode !== 'student-readonly' || tab !== 'follow-ups')
   const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
   const visibleTabKey = visibleTabs.join(',')
-  const [activeTab, setActiveTab] = useState<LeadDetailTab>(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
+  const [internalActiveTab, setInternalActiveTab] = useState<string>(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
   const [followUpTotal, setFollowUpTotal] = useState(0)
   const [followUpRefreshVersion, setFollowUpRefreshVersion] = useState(0)
   const [orderTotal, setOrderTotal] = useState<number>()
@@ -134,7 +139,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   }
 
   useEffect(() => {
-    setActiveTab(resolveLeadDetailTab(visibleTabs, requestedInitialTab)); setFollowUpTotal(0); setOrderTotal(undefined); setFollowUpOpen(!readOnly)
+    if (!controlledActiveTab) setInternalActiveTab(resolveLeadDetailTab(visibleTabs, requestedInitialTab)); setFollowUpTotal(0); setOrderTotal(undefined); setFollowUpOpen(!readOnly)
   // visibleTabKey tracks server projection changes without resetting on every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, readOnly, requestedInitialTab, visibleTabKey])
@@ -159,13 +164,17 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   ].filter(Boolean) as ToolbarAction[]
 
   const tabItems: LeadDetailExtraTab[] = visibleTabs.map<LeadDetailExtraTab>(tab => {
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content"><LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext}/></div> }
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService}/>}</div> }
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
     if (tab === 'flow-history') return { key: tab, label: '流转记录', children: <div className="lead-detail-tab-content"><LeadFlowHistoryPanel leadId={lead.id}/></div> }
     return { key: tab, label: `订单记录${orderTotal === undefined ? '' : ` (${orderTotal})`}`, children: <div className="lead-detail-tab-content"><LeadCustomerOrders leadId={lead.id} onCount={setOrderTotal}/></div> }
   }); tabItems.push(...extraTabs)
+  const validTabKeys = new Set(tabItems.map(item => item.key))
+  const fallbackTab = validTabKeys.has(internalActiveTab) ? internalActiveTab : tabItems[0]?.key
+  const activeTab = controlledActiveTab && validTabKeys.has(controlledActiveTab)
+    ? controlledActiveTab : fallbackTab
 
   return <div className="lead-inbox-detail">
     <div className="lead-detail-hero">
@@ -182,7 +191,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       </div>}
     </div>
     {contextHeader}
-    <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => setActiveTab(key as LeadDetailTab)} items={tabItems}/>
+    <Tabs className="lead-detail-tabs" activeKey={activeTab} onChange={key => { setInternalActiveTab(key); onTabChange?.(key) }} items={tabItems}/>
     {!readOnly && <>
       <Modal title="判定为无效客资" open={invalidOpen} onCancel={closeInvalid} footer={<Space><Button onClick={closeInvalid}>取消</Button><IrreversiblePopconfirm action={`将客资「${lead.submittedName}」判定为无效`} danger open={invalidConfirmOpen} onOpenChange={setInvalidConfirmOpen} onConfirm={judgeInvalid}><Button danger type="primary" loading={qualificationSaving} disabled={invalidReasonLoading || Boolean(invalidReasonError) || !invalidReasons.length} onClick={prepareJudgeInvalid}>确认判无效</Button></IrreversiblePopconfirm></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>

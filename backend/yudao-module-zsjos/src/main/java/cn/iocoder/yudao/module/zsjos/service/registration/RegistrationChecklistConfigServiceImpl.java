@@ -45,8 +45,8 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
         RegistrationChecklistConfigRespVO result = new RegistrationChecklistConfigRespVO();
         result.setTemplateId(template.getId());
         result.setTemplateVersion(template.getVersion());
-        result.setPublished(convertVersion(template.getPublishedVersionId()));
-        result.setDraft(convertVersion(template.getDraftVersionId()));
+        result.setPublished(convertVersion(template.getPublishedVersionId(), "published"));
+        result.setDraft(convertVersion(template.getDraftVersionId(), "draft"));
         return result;
     }
 
@@ -54,7 +54,9 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
     @Transactional(rollbackFor = Exception.class)
     public Long copyPublishedToDraft(Integer templateVersion) {
         RegistrationChecklistTemplateDO template = lockTemplate(templateVersion);
-        if (template.getDraftVersionId() != null) return template.getDraftVersionId();
+        RegistrationChecklistVersionDO existingDraft = template.getDraftVersionId() == null ? null
+                : versionMapper.selectById(template.getDraftVersionId());
+        if (existingDraft != null && "draft".equals(existingDraft.getStatus())) return existingDraft.getId();
         RegistrationChecklistVersionDO published = versionMapper.selectById(template.getPublishedVersionId());
         if (published == null) throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         RegistrationChecklistVersionDO draft = new RegistrationChecklistVersionDO();
@@ -166,8 +168,9 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
             throw exception(REGISTRATION_CHECKLIST_CONFIG_INVALID);
         }
         draft.setStatus("published"); draft.setPublishedAt(LocalDateTime.now()); versionMapper.updateById(draft);
-        template.setPublishedVersionId(draft.getId()); template.setDraftVersionId(null);
-        template.setVersion(template.getVersion() + 1); templateMapper.updateById(template);
+        if (templateMapper.publishDraft(template.getId(), draft.getId(), draft.getId(), template.getVersion()) != 1) {
+            throw exception(REGISTRATION_VERSION_CONFLICT);
+        }
     }
 
     private RegistrationChecklistTemplateDO requireTemplate() {
@@ -184,10 +187,10 @@ public class RegistrationChecklistConfigServiceImpl implements RegistrationCheck
         return locked;
     }
 
-    private RegistrationChecklistConfigRespVO.VersionVO convertVersion(Long versionId) {
+    private RegistrationChecklistConfigRespVO.VersionVO convertVersion(Long versionId, String expectedStatus) {
         if (versionId == null) return null;
         RegistrationChecklistVersionDO version = versionMapper.selectById(versionId);
-        if (version == null) return null;
+        if (version == null || !expectedStatus.equals(version.getStatus())) return null;
         RegistrationChecklistConfigRespVO.VersionVO result = new RegistrationChecklistConfigRespVO.VersionVO();
         result.setId(version.getId()); result.setVersionNo(version.getVersionNo()); result.setStatus(version.getStatus());
         result.setPublishedAt(version.getPublishedAt());

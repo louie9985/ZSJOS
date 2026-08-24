@@ -173,21 +173,6 @@ CREATE TABLE IF NOT EXISTS `zsjos_interview_record` (
   PRIMARY KEY (`id`), KEY `idx_tenant_account_status` (`tenant_id`,`account_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位采访记录';
 
-CREATE TABLE IF NOT EXISTS `zsjos_handover_sheet` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `handover_no` varchar(64) NOT NULL, `biz_type` varchar(40) NOT NULL,
-  `biz_id` bigint NOT NULL, `from_user_id` bigint NOT NULL, `to_user_id` bigint NOT NULL,
-  `checklist_json` json NOT NULL, `status` varchar(24) NOT NULL, `accepted_at` datetime DEFAULT NULL,
-  `responsibility_started_at` datetime DEFAULT NULL, `reject_reason` varchar(2000) DEFAULT NULL,
-  `correction_task_id` bigint DEFAULT NULL, `risk_process_instance_id` varchar(64) DEFAULT NULL,
-  `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_handover_no` (`tenant_id`,`handover_no`,`deleted`),
-  KEY `idx_tenant_to_status` (`tenant_id`,`to_user_id`,`status`),
-  KEY `idx_tenant_biz` (`tenant_id`,`biz_type`,`biz_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务交接单';
-
 CREATE TABLE IF NOT EXISTS `zsjos_cooperation_assessment` (
   `id` bigint NOT NULL AUTO_INCREMENT, `student_person_id` bigint NOT NULL, `account_id` bigint NOT NULL,
   `operator_user_id` bigint NOT NULL, `period` varchar(32) NOT NULL,

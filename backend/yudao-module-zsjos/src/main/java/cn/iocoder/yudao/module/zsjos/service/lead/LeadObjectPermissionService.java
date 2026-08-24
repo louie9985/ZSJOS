@@ -6,6 +6,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAgingPoolCycleDO;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
@@ -44,6 +45,7 @@ public class LeadObjectPermissionService {
     @Resource private SalesOrderMapper salesOrderMapper;
     @Resource private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
     @Resource private LeadAgingPoolService leadAgingPoolService;
+    @Resource private MediaAccountMapper mediaAccountMapper;
 
     public void check(Long leadId, String action) {
         LeadDO lead = leadMapper.selectById(leadId);
@@ -104,7 +106,8 @@ public class LeadObjectPermissionService {
                 || Objects.equals(userId, lead.getOwnerUserId())
                 || managesUserDepartment(userId, lead.getOwnerUserId())
                 || canReadAgingPool(lead.getId(), userId)
-                || canReadManualPublicSea(lead, userId) || canReadStudentSalesHistory(lead, userId)) {
+                || canReadManualPublicSea(lead, userId) || canReadStudentSalesHistory(lead, userId)
+                || canReadMediaStudentLead(lead, userId)) {
             return true;
         }
         return salesOrderMapper.selectByLeadId(lead.getId()).stream()
@@ -115,6 +118,11 @@ public class LeadObjectPermissionService {
         long tenantId = TenantContextHolder.getRequiredTenantId();
         return serviceRelationMapper.countActiveByOwnerAndLead(userId, lead.getId(), tenantId) > 0
                 || serviceRelationMapper.countActiveByParticipantAndLead(userId, lead.getId(), tenantId) > 0;
+    }
+
+    public boolean canReadMediaStudentLead(LeadDO lead, Long userId) {
+        long tenantId = TenantContextHolder.getRequiredTenantId();
+        return mediaAccountMapper.countParticipantByLead(userId, lead.getId(), tenantId) > 0;
     }
 
     public boolean canReadAsOwnerOrManager(LeadDO lead, Long userId) {

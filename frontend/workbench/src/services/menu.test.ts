@@ -114,7 +114,7 @@ describe('workbench menu conversion', () => {
   })
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
-    expect(RENDERABLE_APP_ROUTES.size).toBe(45)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(44)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/accounts')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/content')

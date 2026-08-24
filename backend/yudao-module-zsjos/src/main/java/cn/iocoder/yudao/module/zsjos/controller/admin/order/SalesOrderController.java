@@ -56,6 +56,14 @@ public class SalesOrderController {
         return success(orderService.createExternalRepurchase(WebFrameworkUtils.getLoginUserId(), reqVO));
     }
 
+    @PostMapping("/student/{personId}/repurchase")
+    @Operation(summary = "学习规划师为本人负责的学员提交复购订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:student-repurchase')")
+    public CommonResult<Long> createStudentRepurchase(@PathVariable Long personId,
+                                                       @Valid @RequestBody SalesOrderRepurchaseReqVO reqVO) {
+        return success(orderService.createStudentRepurchase(personId, WebFrameworkUtils.getLoginUserId(), reqVO));
+    }
+
     @GetMapping("/lead/{leadId}/customer-orders")
     @Operation(summary = "按客资客户聚合全部首购和复购订单")
     @PreAuthorize("@ss.hasPermission('zsjos:lead-detail:order-read')")

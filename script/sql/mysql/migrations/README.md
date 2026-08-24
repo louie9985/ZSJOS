@@ -285,14 +285,11 @@ Workbench form, which collects a single delivery deadline. The migration is forw
 repeatable, and changes no existing business rows; tightening the column again requires
 an explicit backfill and separate schema decision.
 
-### V106 media handover, review, and graduation closure
+### V106 media review and graduation closure
 
-Adds handover-arbitration and review-approval columns, the graduation-application table,
-three server-owned button permissions, and the in-app templates/rules for arbitration,
-review, and graduation result scenes. The migration is additive, repeatable, and
-forward-only. It grants no role permissions, publishes no BPM model, and changes no
-existing business row; recovery preserves delivered messages and disables the new rules
-or permissions instead of dropping populated schema objects.
+Adds review-approval columns, the graduation-application table, one server-owned button
+permission, and the in-app templates/rules for review and graduation result scenes. The
+migration is additive, repeatable, and forward-only.
 
 ### V107 new-media role operation permissions
 
@@ -303,8 +300,8 @@ object authorization and responsibility checks remain authoritative.
 
 ### V108 new-media supervisor review permissions
 
-Adds handover arbitration to `dept_manager`, and review approval plus graduation initiation
-to `delivery_manager`. It is additive, repeatable, and limited to existing roles; it does
+Adds review approval plus graduation initiation to `delivery_manager`. It is additive,
+repeatable, and limited to existing roles; it does
 not create users, publish BPM, or change business rows.
 
 ### V109 local media BPM publisher permission
@@ -327,3 +324,74 @@ Moves third-party account, content and positioning operation permissions beneath
 page, retires their standalone page menus, grants the scoped student page to the media operator,
 and adds versioned account-field configuration plus media-student talk records. The migration is
 repeatable and preserves all business rows and stable permission strings.
+### V114 Student delivery stages
+
+Adds the normal learning-planner delivery-stage projection and immutable structured stage facts to student service relations and contact records. The repeatable backfill uses only authoritative history: completed services become `completed`, successful study-plan records advance to `group_handoff`, successful first-contact records advance to `study_plan`, and accepted services without later evidence start at `first_contact`. It does not infer stages from names, remarks, or UI labels. Apply after V113; do not execute against an existing environment without the reviewed migration procedure.
+
+V114 runs every schema, backfill, menu, grant and version statement inside one stored-procedure call.
+It creates or canonically restores the V073-owned My Students page `73020`, creates or restores button
+`73428`, and grants both menus to every enabled `study_planner`; having no such role is valid and
+leaves the menus ready for later administrator assignment. Repeated execution preserves business
+facts and does not duplicate grants. Only an invalid `/zsjos` root, a fixed menu ID owned by another
+permission, or an active duplicate permission blocks execution. MySQL cannot execute `SIGNAL` through
+`PREPARE`, so those true-conflict failures use direct procedural `SIGNAL` statements.
+
+If an earlier manual V114 v4/v5 attempt continued after a statement error, first inspect both version
+tables, the five affected columns, menus `73020`/`73428`, and role grants. A database that already
+records that earlier V114 must use a separately reviewed forward migration rather than replacing its
+executed file/checksum. Production environments where V114 has never run use the reviewed v6 file.
+
+### V115 Generic work-order core
+
+Adds tenant-scoped configurable work-order scenes, JSON field definitions and immutable
+work-order status history. It supports direct assignment and public claim-pool records;
+it seeds no scenes, users, files or business rows. Apply after V114; database execution
+against an existing environment requires the normal reviewed migration procedure.
+### V116__study_planner_repurchase_permissions.sql
+
+Adds only the dedicated `zsjos:sales-order:student-repurchase` button and the existing personal-order page grant to `study_planner`, and adds the nullable order request-fingerprint column used for exact future repurchase replay. It does not grant generic order creation or external historical-customer repurchase, does not backfill invented historical fingerprints, and changes no business rows. Apply after V115 through the reviewed migration process; do not execute automatically in shared environments.
+
+V116 v5 runs its guarded column addition, canonical menu recovery, grants and version writes inside
+one stored-procedure call. It restores migration-owned `73020`, V025/quick-init-owned `6813`, and
+V116-owned `73440` records when missing, soft-deleted or metadata-drifted. Zero enabled
+`study_planner` roles is valid; existing enabled roles receive exactly the personal-order page and
+student-repurchase button without duplicate grants. A foreign fixed-ID owner, an active duplicate
+permission, or an invalid `/zsjos` root remains a blocking ownership conflict. Environments that
+already recorded V116 v4 retain that executed migration/checksum and use a forward migration for any
+future repair; production environments where V116 has never run use the reviewed v5 file.
+
+### V117 Lead category label snapshot
+
+Adds nullable `lead_category_label_snapshot` columns to Lead and duplicate-review submission
+persistence. New selections retain the administrator-owned display label that existed when the
+business choice was made. The migration does not invent or backfill labels for historical Leads or
+pending reviews. It is repeatable through `information_schema` guards and records both schema-version
+markers. Apply after V116 through the reviewed migration process; database execution remains a
+separately confirmed operation.
+
+### V118 Independent role-managed permission boundaries
+
+Removes the accidental default `zsjos:student-ops:*` role-menu grants from the
+`study_planner` role. The `学员运营` menu and operation buttons remain in
+`system_menu` and can be assigned independently by an administrator to an explicitly
+chosen role. No users, posts, roles, menu definitions, or business rows are changed.
+The migration is repeatable and forward-only; apply it after V117 through the reviewed
+migration process.
+
+### V119 Workbench relative child menu paths
+
+Normalizes page-menu paths directly beneath the active `/zsjos` Workbench root from
+duplicated absolute values such as `/zsjos/my-students` to relative child values such
+as `my-students`. The resolved public browser URL remains `/zsjos/my-students` because
+the client joins the parent and child paths. The migration changes no menu IDs,
+permissions, role grants, users, or business rows. It blocks on an ambiguous Workbench
+root or a conflicting active sibling path and is otherwise repeatable. Apply after V118.
+
+### V120 Restore operator media-student menu grant
+
+Re-grants the shared `/zsjos/media-students` page (`7022`,
+`zsjos:media-student:query-my`) to enabled `new_media_operator` roles. V103
+removed that grant when the page was temporarily director-only; V113 established
+the shared director/operator student-center contract. The migration changes only
+role-menu metadata, is repeatable, and does not broaden the backend object scope.
+Apply after V119; no business rows are changed.

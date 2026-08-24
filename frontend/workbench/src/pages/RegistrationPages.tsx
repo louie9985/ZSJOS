@@ -26,6 +26,8 @@ import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutline
 import { useLocation } from "react-router-dom";
 import { NameAvatar } from "../components/LeadDetailOverview";
 import LeadDetail from "../components/LeadDetail";
+import SalesOrderEntryModal from "../components/SalesOrderEntryModal";
+import { hasPermission } from "../services/managementAccess";
 import type { ToolbarAction } from "../components/OverflowToolbar";
 import {
   api,
@@ -127,7 +129,6 @@ export function RegistrationPoolPage() {
   const listGeneration = useRef(0);
   const detailGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
-
   const applyCase = useCallback((next: RegistrationCase) => {
     setSelected(next);
     setRows((current) =>
@@ -565,7 +566,7 @@ export function RegistrationPoolPage() {
   );
 }
 
-export function MyStudentsPage() {
+export function MyStudentsPage({ permissions = [] }: { permissions?: string[] }) {
   const location = useLocation();
   const taskTarget = location.state as { serviceRelationId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
   const requestedServiceId = Number(taskTarget?.serviceRelationId) || undefined;
@@ -573,6 +574,7 @@ export function MyStudentsPage() {
     [selected, setSelected] = useState<MyStudent>();
   const [leadDetail, setLeadDetail] = useState<ManagedLead>();
   const [selectedServiceId, setSelectedServiceId] = useState<number>();
+  const [repurchaseOpen, setRepurchaseOpen] = useState(false);
   const [studentContactContext, setStudentContactContext] = useState<import("../services/api").StudentContactContext>();
   const [studentContactRecords, setStudentContactRecords] = useState<import("../services/api").StudentContactRecord[]>([]);
   const [categories, setCategories] = useState<DictData[]>([]);
@@ -580,6 +582,7 @@ export function MyStudentsPage() {
   const [categoryError, setCategoryError] = useState(false);
   const [channelError, setChannelError] = useState(false);
   const [keyword, setKeyword] = useState("");
+  const [serviceStatus, setServiceStatus] = useState<'active' | 'paused' | 'completed'>();
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [pageNo, setPageNo] = useState(1),
     [total, setTotal] = useState(0);
@@ -591,6 +594,11 @@ export function MyStudentsPage() {
   const detailGeneration = useRef(0);
   const dictionaryGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
+  const resetSelection = () => {
+    detailGeneration.current += 1;
+    setRows([]); setSelected(undefined); setSelectedServiceId(undefined); setLeadDetail(undefined);
+    setStudentContactContext(undefined); setStudentContactRecords([]); setDetailError("");
+  };
   const loadStudent = useCallback(async (personId: number, preferredServiceId?: number) => {
     const generation = ++detailGeneration.current;
     setDetailLoading(true);
@@ -646,7 +654,7 @@ export function MyStudentsPage() {
   useEffect(() => { void loadDictionaries(); }, [loadDictionaries]);
   const load = useCallback(
     async (targetPage = pageNo) => {
-      const requestKey = `${targetPage}:${keyword}:${JSON.stringify(advancedFilter)}`;
+      const requestKey = `${targetPage}:${keyword}:${serviceStatus || ''}:${JSON.stringify(advancedFilter)}`;
       if (inflightLists.current.has(requestKey)) return;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
@@ -657,6 +665,7 @@ export function MyStudentsPage() {
           pageNo: targetPage,
           pageSize: PAGE_SIZE,
           keyword: keyword || undefined,
+          serviceStatus,
           advancedFilter,
         });
         if (generation !== listGeneration.current) return;
@@ -677,12 +686,15 @@ export function MyStudentsPage() {
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, keyword, loadStudent, pageNo, selected],
+    [advancedFilter, keyword, loadStudent, pageNo, selected, serviceStatus],
   );
   useEffect(() => {
     void load(1);
-  }, [advancedFilter, keyword]);
+  }, [advancedFilter, keyword, serviceStatus]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
+  const canStudentRepurchase = Boolean(selectedService && hasPermission(permissions, 'zsjos:sales-order:student-repurchase')
+    && selectedService.owner && selectedService.acceptanceStatus === 'accepted'
+    && ['active', 'paused', 'completed'].includes(selectedService.status));
   const selectService = async (relationId: number) => {
     const service = selected?.services.find(item => item.serviceRelationId === relationId);
     if (!service) return;
@@ -731,7 +743,9 @@ export function MyStudentsPage() {
       autoExpandFollowUp={false}
       onDirtyChange={() => undefined}
       onChanged={() => void loadStudent(selected.personId)}
-      studentToolbarActions={studentToolbarActions}
+      studentToolbarActions={canStudentRepurchase
+         ? [...studentToolbarActions, { key: 'student-repurchase', icon: <PlusOutlined />, label: '录入复购', onClick: () => setRepurchaseOpen(true) }]
+         : studentToolbarActions}
       contextHeader={selectedService ? <div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div> : undefined}
       studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }}
       extraTabs={[
@@ -814,18 +828,21 @@ export function MyStudentsPage() {
       <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
           <div className="lead-inbox-toolbar">
+            <Select allowClear value={serviceStatus} placeholder="全部服务状态" style={{ width: '100%', marginBottom: 8 }}
+              onChange={value => { resetSelection(); setPageNo(1); setServiceStatus(value); }}
+              options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/>
             <AdvancedFilterToolbar
               scene="student"
               placeholder="搜索姓名、手机号或客资编号"
               keyword={keyword}
               value={advancedFilter}
               onKeyword={(value) => {
-                setSelected(undefined);
+                resetSelection();
                 setPageNo(1);
                 setKeyword(value);
               }}
               onChange={(value) => {
-                setSelected(undefined);
+                resetSelection();
                 setPageNo(1);
                 setAdvancedFilter(value);
               }}
@@ -880,6 +897,12 @@ export function MyStudentsPage() {
         </aside>
         <main className="lead-inbox-detail-pane">{detailContent}</main>
       </div>
+      {repurchaseOpen && selected && <SalesOrderEntryModal
+        lead={{ id: selected.personId, submittedName: selected.name || '', submittedMobile: selected.mobile, submittedWechatId: selected.wechatId,
+          provinceCode: leadDetail?.provinceCode, provinceName: leadDetail?.provinceName, cityCode: leadDetail?.cityCode, cityName: leadDetail?.cityName }}
+        repurchase studentRepurchase open={repurchaseOpen}
+        onClose={() => setRepurchaseOpen(false)} onSubmitted={async () => { setRepurchaseOpen(false); await load(pageNo); }}
+      />}
     </section>
   );
 }
@@ -954,6 +977,10 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
   const [candidateUserId, setCandidateUserId] = useState<number>();
   const [correctionReason, setCorrectionReason] = useState("");
   const [assignmentSaving, setAssignmentSaving] = useState(false);
+  const [deliveryOpen, setDeliveryOpen] = useState(false);
+  const [deliverySaving, setDeliverySaving] = useState(false);
+  const [deliveryForm] = Form.useForm();
+  const deliveryIdempotencyKey = useRef<string | undefined>(undefined);
   const available = context.availableActions || [];
   const stageAction = available.find(action => ["FIRST_CONTACT", "STUDY_PLAN", "FOLLOW_UP"].includes(action));
   const stageLabel = stageAction === "FIRST_CONTACT" ? "首联" : stageAction === "STUDY_PLAN" ? "制定学习计划" : "普通跟进";
@@ -1035,6 +1062,38 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     } catch (error) { message.error(errorMessage(error)); }
     finally { setAssignmentSaving(false); }
   };
+  const currentDeliveryStage = context.deliveryStages?.find(item => item.current);
+  const submitDeliveryStage = async (values: { remark: string; data: string }) => {
+    if (!currentDeliveryStage) return;
+    let parsed: Record<string, unknown> = {};
+    try {
+      const value: unknown = values.data?.trim() ? JSON.parse(values.data) : {};
+      if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        message.warning("阶段事实必须是 JSON 对象"); return;
+      }
+      parsed = value as Record<string, unknown>;
+    }
+    catch { message.warning("阶段事实必须是合法 JSON"); return; }
+    const requiredFacts: Record<string, Record<string, "boolean" | "string">> = {
+      group_handoff: { groupJoined: "boolean", teacherConnected: "boolean" },
+      exam_confirmation: { examIntention: "string", examDate: "string" },
+      exam_preparation: { examNoticeSent: "boolean", admissionTicketNoticeSent: "boolean" },
+      post_exam: { examFeedback: "string" }, result: { result: "string" },
+      certificate: { certificateNotice: "string", mailingInfo: "string" },
+    };
+    const schema = requiredFacts[currentDeliveryStage.code] || {};
+    if (Object.entries(schema).some(([field, type]) => typeof parsed[field] !== type
+        || type === "string" && !String(parsed[field]).trim())) {
+      message.warning("阶段事实缺少必填字段或字段类型不正确"); return;
+    }
+    setDeliverySaving(true);
+    try {
+      const idempotencyKey = deliveryIdempotencyKey.current ||= key();
+      await api.studentDeliveryStage(service.serviceRelationId, { stage: currentDeliveryStage.code, successful: true, remark: values.remark.trim(), data: parsed, idempotencyKey });
+      message.success("交付阶段已完成"); setDeliveryOpen(false); deliveryIdempotencyKey.current = undefined; deliveryForm.resetFields(); await onRefresh();
+    } catch (error) { message.error(errorMessage(error)); }
+    finally { setDeliverySaving(false); }
+  };
 
   const toolbarActions: ToolbarAction[] = [
     available.includes("ACCEPT") && { key: "student-accept", icon: <CheckOutlined />, label: "接收", onClick: accept },
@@ -1042,6 +1101,20 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     available.includes("EDIT_BASIC_INFO") && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
     available.includes("ASSIGN_CONTENT_DIRECTOR") && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
     available.includes("ASSIGN_CAREER_PLANNER") && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
+    service.status === "active" && currentDeliveryStage?.available
+      && !["first_contact", "study_plan"].includes(currentDeliveryStage.code)
+      && { key: "student-delivery-stage", icon: <CheckOutlined />, label: currentDeliveryStage.label, onClick: () => {
+        const templates: Record<string, Record<string, unknown>> = {
+          group_handoff: { groupJoined: true, teacherConnected: true },
+          supervision: {}, exam_confirmation: { examIntention: "", examDate: "" },
+          exam_preparation: { examNoticeSent: true, admissionTicketNoticeSent: true },
+          post_exam: { examFeedback: "" }, result: { result: "" },
+          certificate: { certificateNotice: "", mailingInfo: "" },
+        };
+        deliveryIdempotencyKey.current = key();
+        deliveryForm.setFieldsValue({ data: JSON.stringify(templates[currentDeliveryStage.code] || {}, null, 2) });
+        setDeliveryOpen(true);
+      } },
   ].filter(Boolean) as ToolbarAction[];
 
   return <>
@@ -1066,6 +1139,13 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
           <Form.Item label="修改原因" required style={{ marginBottom: 0 }}><Input.TextArea value={correctionReason} onChange={event => setCorrectionReason(event.target.value)} rows={3} maxLength={500} showCount /></Form.Item>
         </>}
       </Space>
+    </Modal>
+    <Modal title={currentDeliveryStage?.label || "完成交付阶段"} open={deliveryOpen} confirmLoading={deliverySaving} okText="完成阶段" onCancel={() => { setDeliveryOpen(false); deliveryIdempotencyKey.current = undefined; }} onOk={() => void deliveryForm.submit()} destroyOnHidden>
+      <Form form={deliveryForm} layout="vertical" onFinish={submitDeliveryStage} initialValues={{ data: "{}" }}>
+        <Alert type="info" showIcon title="完成后将推进到下一阶段，阶段事实会作为历史快照保留。" />
+        <Form.Item name="remark" label="本次处理说明" rules={[{ required: true, whitespace: true, max: 2000 }]}><Input.TextArea rows={4} showCount maxLength={2000} /></Form.Item>
+        <Form.Item name="data" label="阶段事实（JSON）" rules={[{ required: true }]}><Input.TextArea rows={7} placeholder='例如：{"examDate":"2026-12-20","examIntention":"参加"}' /></Form.Item>
+      </Form>
     </Modal>
   </>;
 }

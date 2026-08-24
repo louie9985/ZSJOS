@@ -25,6 +25,7 @@ public class LeadManagementRespVO {
     private String cityCode;
     private String cityName;
     private String leadCategory;
+    private String leadCategoryLabelSnapshot;
     private String remark;
     private String status;
     private String assignmentStatus;

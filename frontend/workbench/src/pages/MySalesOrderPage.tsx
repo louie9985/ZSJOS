@@ -105,17 +105,16 @@ export default function MySalesOrderPage() {
   } : undefined
 
   return <section className="workspace-page sales-order-inbox-page">
-    <header className="sales-order-inbox-header">
-      <div><Typography.Title level={4}>我的订单</Typography.Title><Typography.Text type="secondary">查看本人提交的全部成交订单及当前状态</Typography.Text></div><Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
-    </header>
+    <div className="sales-order-inbox-actions">
+      {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => setStatus(key as StatusTab)} items={[
+        { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
+        { key: 'revision_required', label: `已驳回待修改 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `已被重提 ${counts.superseded}` }
+      ]}/>}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button>
+    </div>
     {countsError && <Alert
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => setStatus(key as StatusTab)} items={[
-      { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
-      { key: 'revision_required', label: `已驳回待修改 ${counts.revisionRequired}` }, { key: 'effective', label: `已通过 ${counts.effective}` }, { key: 'superseded', label: `已被重提 ${counts.superseded}` }
-    ]}/>}
     <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">
         <AdvancedFilterToolbar scene="order" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>

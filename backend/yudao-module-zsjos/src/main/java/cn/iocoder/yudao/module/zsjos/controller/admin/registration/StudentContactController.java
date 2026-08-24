@@ -79,6 +79,13 @@ public class StudentContactController {
         return success(service.submitContact(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
     }
 
+    @PostMapping("/{relationId}/delivery-stage")
+    @PreAuthorize("@ss.hasPermission('zsjos:student-contact:delivery-stage-submit')")
+    public CommonResult<Long> submitDeliveryStage(@PathVariable Long relationId,
+                                                   @Valid @RequestBody StudentDeliveryStageSubmitReqVO request) {
+        return success(service.submitDeliveryStage(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
+    }
+
     @GetMapping("/{relationId}/collaborator-candidates")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct')")
     public CommonResult<List<StudyPlannerSimpleRespVO>> getCollaboratorCandidates(
@@ -120,7 +127,8 @@ public class StudentContactController {
 
     @PostMapping("/{relationId}/attachments")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-contact:first-submit', 'zsjos:student-contact:study-plan-submit', "
-            + "'zsjos:student-contact:submit', 'zsjos:student-contact-extension:apply')")
+            + "'zsjos:student-contact:submit', 'zsjos:student-contact:delivery-stage-submit', "
+            + "'zsjos:student-contact-extension:apply')")
     public CommonResult<StudentContactAttachmentRespVO> uploadAttachment(@PathVariable Long relationId,
                                                                           @RequestParam("file") MultipartFile file)
             throws IOException {

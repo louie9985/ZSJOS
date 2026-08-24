@@ -4,13 +4,16 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactContextRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentBasicInfoUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentDeliveryStageSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactConfigVersionDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactRecordDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactConfigVersionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
@@ -18,6 +21,7 @@ import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,6 +31,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.HashMap;
+import java.util.Map;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.*;
@@ -43,6 +48,7 @@ class StudentContactServiceImplTest {
     @InjectMocks private StudentContactServiceImpl service;
     @Mock private ServiceRelationMapper relationMapper;
     @Mock private StudentContactConfigVersionMapper configMapper;
+    @Mock private StudentContactRecordMapper recordMapper;
     @Mock private BusinessTaskMapper taskMapper;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
@@ -50,6 +56,11 @@ class StudentContactServiceImplTest {
     @Mock private PersonMapper personMapper;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private BusinessEventMapper eventMapper;
+
+    @BeforeEach
+    void grantDeliveryStagePermissionForServiceContractTests() {
+        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PERMISSION_DELIVERY_STAGE_SUBMIT))).thenReturn(true);
+    }
 
     @AfterEach
     void clearTenant() {
@@ -121,6 +132,102 @@ class StudentContactServiceImplTest {
         assertEquals(TYPE_STUDY_PLAN, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_STUDY_PLAN, false));
         assertEquals(TYPE_CONTACT, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_STUDY_PLAN, true));
         assertEquals(TYPE_CONTACT, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_CONTACT, true));
+    }
+
+    @Test
+    void deliveryStageProjectionIsOrderedAndOnlyCurrentStageIsAvailable() {
+        List<StudentContactContextRespVO.DeliveryStageVO> stages = ReflectionTestUtils.invokeMethod(
+                service, "deliveryStages", STAGE_EXAM_CONFIRMATION, true);
+
+        assertEquals(10, stages.size());
+        assertEquals(STAGE_EXAM_CONFIRMATION, stages.get(4).getCode());
+        assertEquals("current", stages.get(4).getStatus());
+        assertEquals(true, stages.get(4).getAvailable());
+        assertEquals("done", stages.get(0).getStatus());
+        assertEquals("pending", stages.get(5).getStatus());
+
+        List<StudentContactContextRespVO.DeliveryStageVO> completed = ReflectionTestUtils.invokeMethod(
+                service, "deliveryStages", STAGE_COMPLETED, true);
+        assertEquals(false, completed.get(completed.size() - 1).getAvailable());
+
+        List<StudentContactContextRespVO.DeliveryStageVO> unauthorized = ReflectionTestUtils.invokeMethod(
+                service, "deliveryStages", STAGE_EXAM_CONFIRMATION, false);
+        assertEquals(false, unauthorized.get(4).getAvailable());
+    }
+
+    @Test
+    void taskBackedDeliveryStagesAreNotAvailableToGenericStageSubmission() {
+        for (String stage : List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN)) {
+            List<StudentContactContextRespVO.DeliveryStageVO> stages = ReflectionTestUtils.invokeMethod(
+                    service, "deliveryStages", stage, true);
+            StudentContactContextRespVO.DeliveryStageVO current = stages.stream()
+                    .filter(item -> stage.equals(item.getCode()))
+                    .findFirst().orElseThrow();
+
+            assertEquals("current", current.getStatus());
+            assertFalse(current.getAvailable());
+        }
+    }
+
+    @Test
+    void deliveryStageRequiredBooleanFactsMustBeCompleted() {
+        ServiceException error = assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(
+                service, "validateDeliveryData", STAGE_GROUP_HANDOFF,
+                Map.of("groupJoined", false, "teacherConnected", true)));
+
+        assertEquals(STUDENT_CONTACT_FORM_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void submitDeliveryStageRejectsTaskBackedAndTerminalStages() {
+        TenantContextHolder.setTenantId(1L);
+        for (String stage : List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED)) {
+            ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(stage);
+            when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+            when(recordMapper.selectByIdempotencyKey(stage + "-key")).thenReturn(null);
+
+            ServiceException error = assertThrows(ServiceException.class,
+                    () -> service.submitDeliveryStage(10L, deliveryRequest(stage, stage + "-key"), 7L));
+
+            assertEquals(STUDENT_CONTACT_TASK_INVALID.getCode(), error.getCode());
+        }
+        verify(recordMapper, never()).insert(any(StudentContactRecordDO.class));
+    }
+
+    @Test
+    void submitDeliveryStageReplaysBeforeCurrentStageValidation() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_EXAM_PREPARATION);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+        StudentDeliveryStageSubmitReqVO request = deliveryRequest(STAGE_EXAM_CONFIRMATION, "replay-key");
+        StudentContactRecordDO replay = new StudentContactRecordDO(); replay.setId(99L); replay.setServiceRelationId(10L);
+        replay.setRequestFingerprint(ReflectionTestUtils.invokeMethod(service, "deliveryFingerprint", 10L, request));
+        when(recordMapper.selectByIdempotencyKey("replay-key")).thenReturn(replay);
+
+        assertEquals(99L, service.submitDeliveryStage(10L, request, 7L));
+        verify(relationMapper, never()).advanceDeliveryStage(anyLong(), anyLong(), anyString(), anyString(), any(), anyInt());
+    }
+
+    @Test
+    void submitDeliveryStageUsesExpectedStageAndVersion() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_GROUP_HANDOFF);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+        when(recordMapper.selectByIdempotencyKey("stage-key")).thenReturn(null);
+        when(relationMapper.advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_GROUP_HANDOFF), eq(STAGE_SUPERVISION),
+                anyString(), eq(2))).thenReturn(1);
+        doAnswer(invocation -> {
+            StudentContactRecordDO row = invocation.getArgument(0);
+            row.setId(100L);
+            return 1;
+        }).when(recordMapper).insert(any(StudentContactRecordDO.class));
+
+        Long id = service.submitDeliveryStage(10L, deliveryRequest(STAGE_GROUP_HANDOFF, "stage-key"), 7L);
+
+        assertEquals(100L, id);
+        verify(recordMapper).insert(any(StudentContactRecordDO.class));
+        verify(relationMapper).advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_GROUP_HANDOFF),
+                eq(STAGE_SUPERVISION), anyString(), eq(2));
     }
 
     @Test
@@ -225,6 +332,15 @@ class StudentContactServiceImplTest {
     private StudentBasicInfoUpdateReqVO basicInfoRequest(String mobile) {
         StudentBasicInfoUpdateReqVO request = new StudentBasicInfoUpdateReqVO();
         request.setName("学员"); request.setMobile(mobile); request.setReason("更正");
+        return request;
+    }
+
+    private StudentDeliveryStageSubmitReqVO deliveryRequest(String stage, String key) {
+        StudentDeliveryStageSubmitReqVO request = new StudentDeliveryStageSubmitReqVO();
+        request.setStage(stage); request.setSuccessful(true); request.setRemark("完成阶段");
+        request.setData(STAGE_GROUP_HANDOFF.equals(stage)
+                ? Map.of("groupJoined", true, "teacherConnected", true) : Map.of());
+        request.setIdempotencyKey(key);
         return request;
     }
 }

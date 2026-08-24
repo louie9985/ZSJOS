@@ -132,6 +132,14 @@ describe('spacing and sizing anchors', () => {
     expect(anchors.filter(re => !re.test(joined)).map(re => re.source)).toEqual([])
   })
 
+  it('keeps my sales orders on the approved compact top and start edges', () => {
+    const salesOrder = business.find(([path]) => path.endsWith('sales-order.css'))?.[1] ?? ''
+
+    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*max-width: none/)
+    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*padding-block-start: var\(--crm-sp-1\)[^}]*padding-inline-start: var\(--crm-sp-1\)/)
+    expect(salesOrder).toMatch(/\.sales-order-inbox-actions \{[^}]*display: flex[^}]*align-items: center/)
+  })
+
   it('unifies the master-detail list column width', () => {
     // scoped to the four master-detail layouts; other grids (e.g. the
     // description-list label column) legitimately use fixed widths

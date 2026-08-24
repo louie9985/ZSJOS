@@ -1,6 +1,6 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
-本矩阵以 `system_menu` 返回的正式路径为准。React Workbench 只渲染授权菜单；隐藏菜单仍可在授权后直达，但不出现在导航。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
+本矩阵记录父子菜单解析后的正式 URL。数据库中直接挂在 `/zsjos`“工作台”父菜单下的页面保存相对子路径，例如正式 URL `/zsjos/my-students` 对应菜单 `path=my-students`。React Workbench 只渲染授权菜单；隐藏菜单仍可在授权后直达，但不出现在导航。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
 
 H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计入下表 38 个页面路由。V071 只把已失去有效父菜单的兼职权限按钮归为根级、无 path/component 的不可路由元数据，不重建已由 V069 退役的 `partner-portal` 页面。
 
@@ -47,7 +47,6 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
 | 40 | 异常情况处理 | `/zsjos/student-contact-exceptions` | `StudentContactExceptionsPage` | `zsjos/studentContactExceptions/index` |
 | 41 | 拍剪工单 | `/zsjos/production-tickets` | `MediaWorkflowPage` | `zsjos-workbench/MediaProductionTicketsPage` |
-| 42 | 交接单 | `/zsjos/handovers` | `MediaWorkflowPage` | `zsjos-workbench/MediaHandoversPage` |
 | 43 | 学员运营 | `/zsjos/student-ops` | `MediaWorkflowPage` | `zsjos-workbench/MediaStudentOpsPage` |
 | 44 | 复盘与诊断 | `/zsjos/reviews` | `MediaWorkflowPage` | `zsjos-workbench/MediaReviewsPage` |
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |

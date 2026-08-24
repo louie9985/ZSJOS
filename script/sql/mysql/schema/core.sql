@@ -3901,6 +3901,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `city_code` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交时市级地区编码，OTHER 表示其他',
   `city_name` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交时市级地区名称快照',
   `lead_category` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '客资分类字典值',
+  `lead_category_label_snapshot` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '客资分类选择时标签快照',
   `remark` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '提交备注',
   `dispatch_mode` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '派单模式：auto 或 specified',
   `pending_assignee_user_id` bigint DEFAULT NULL COMMENT '当前待接单销售用户编号',
@@ -3946,7 +3947,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_no_daily_counter` (
 CREATE TABLE IF NOT EXISTS `zsjos_lead_duplicate_review` (
   `id` bigint NOT NULL AUTO_INCREMENT, `status` varchar(32) NOT NULL, `submitter_user_id` bigint DEFAULT NULL,
   `submission_source_type` varchar(32) DEFAULT NULL, `submission_partner_id` bigint DEFAULT NULL,
-  `submission_snapshot` json NOT NULL, `match_rules` json NOT NULL, `candidate_snapshot` json NOT NULL,
+  `submission_snapshot` json NOT NULL, `lead_category_label_snapshot` varchar(128) DEFAULT NULL,
+  `match_rules` json NOT NULL, `candidate_snapshot` json NOT NULL,
   `matched_person_id` bigint DEFAULT NULL, `matched_lead_id` bigint DEFAULT NULL, `result_type` varchar(32) DEFAULT NULL,
   `review_opinion` varchar(2000) DEFAULT NULL, `review_attachments` json DEFAULT NULL, `selected_sales_user_id` bigint DEFAULT NULL,
   `reviewer_user_id` bigint DEFAULT NULL, `reviewed_at` datetime DEFAULT NULL, `before_snapshot` json DEFAULT NULL,
@@ -4436,6 +4438,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `material_delivery_contact` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '教材邮递联系',
   `payment_voucher_refs` json DEFAULT NULL COMMENT '缴费凭证文件快照',
   `submission_idempotency_key` varchar(128) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次提交幂等键',
+  `submission_request_fingerprint` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '规范化提交请求指纹',
   `repurchase_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '复购说明',
   `termination_reason` varchar(1000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '终止原因',
   `terminated_at` datetime DEFAULT NULL COMMENT '终止时间',
@@ -5066,6 +5069,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_service_relation` (
   `content_director_user_id` bigint DEFAULT NULL COMMENT '编导用户编号',
   `career_planner_user_id` bigint DEFAULT NULL COMMENT '职业规划师用户编号',
   `service_snapshot` json DEFAULT NULL COMMENT '服务权益及产品规则快照',
+  `delivery_stage` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '学习交付阶段',
+  `delivery_data_json` json DEFAULT NULL COMMENT '交付阶段事实快照',
   `activated_at` datetime NOT NULL COMMENT '激活时间',
   `paused_at` datetime DEFAULT NULL COMMENT '暂停时间',
   `pause_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '暂停原因',
@@ -5110,10 +5115,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_student_contact_config_command` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员联系配置幂等命令';
 
 CREATE TABLE IF NOT EXISTS `zsjos_student_contact_record` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL, `task_id` bigint NOT NULL,
+  `id` bigint NOT NULL AUTO_INCREMENT, `service_relation_id` bigint NOT NULL, `task_id` bigint DEFAULT NULL,
   `contact_type` varchar(64) NOT NULL, `successful` bit(1) NOT NULL, `unsuccessful_reason_value` varchar(100) DEFAULT NULL,
   `unsuccessful_reason_label_snapshot` varchar(100) DEFAULT NULL, `remark` varchar(2000) NOT NULL,
-  `attachment_file_ids_json` json NOT NULL, `checklist_result_json` json NOT NULL, `next_contact_at` datetime NOT NULL,
+  `attachment_file_ids_json` json NOT NULL, `checklist_result_json` json NOT NULL,
+  `delivery_stage` varchar(64) DEFAULT NULL, `delivery_data_json` json DEFAULT NULL, `next_contact_at` datetime NOT NULL,
   `operator_user_id` bigint NOT NULL, `submitted_at` datetime NOT NULL, `idempotency_key` varchar(128) NOT NULL,
   `request_fingerprint` varchar(64) NOT NULL DEFAULT '',
   `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -5384,4 +5390,48 @@ CREATE TABLE IF NOT EXISTS `system_notify_business_outbox` (
  PRIMARY KEY (`id`), UNIQUE KEY `uk_notify_outbox_event_rule` (`tenant_id`,`source_event_key`,`target_rule_id`),
  KEY `idx_notify_outbox_due` (`status`,`next_attempt_at`,`lease_until`), KEY `idx_notify_outbox_retention` (`status`,`succeeded_at`,`update_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='业务通知持久化 Outbox';
+-- V115 generic work-order core
+CREATE TABLE IF NOT EXISTS `zsjos_work_order_scene` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0,
+ `code` varchar(64) NOT NULL, `name` varchar(128) NOT NULL, `remark` varchar(500) DEFAULT NULL,
+ `source_post_code` varchar(64) NOT NULL, `target_post_code` varchar(64) NOT NULL,
+ `assignment_mode` varchar(32) NOT NULL, `fields_json` json NOT NULL, `status` tinyint NOT NULL DEFAULT 1,
+ `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '',
+ `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+ `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL,
+ PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工单场景';
+CREATE TABLE IF NOT EXISTS `zsjos_work_order` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0,
+ `order_no` varchar(64) NOT NULL, `scene_code` varchar(64) NOT NULL,
+ `scene_name_snapshot` varchar(128) NOT NULL, `assignment_mode` varchar(32) NOT NULL,
+ `source_user_id` bigint NOT NULL, `target_user_id` bigint DEFAULT NULL,
+ `source_name_snapshot` varchar(128) DEFAULT NULL, `target_name_snapshot` varchar(128) DEFAULT NULL,
+ `status` varchar(40) NOT NULL, `field_snapshot_json` json NOT NULL, `value_json` json NOT NULL,
+ `attachment_ids_json` json NOT NULL, `idempotency_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+ `command_user_id` bigint NOT NULL, `request_fingerprint` varchar(64) NOT NULL,
+ `return_reason` varchar(1000) DEFAULT NULL, `claimed_at` datetime DEFAULT NULL,
+ `completed_at` datetime DEFAULT NULL, `accepted_at` datetime DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
+ `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL,
+ PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_order_no` (`tenant_id`,`order_no`),
+ UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
+ KEY `idx_pool` (`tenant_id`,`scene_code`,`status`,`create_time`),
+ KEY `idx_source_user` (`tenant_id`,`source_user_id`,`status`,`create_time`),
+ KEY `idx_target_user` (`tenant_id`,`target_user_id`,`status`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 通用工单';
+CREATE TABLE IF NOT EXISTS `zsjos_work_order_history` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0,
+ `work_order_id` bigint NOT NULL, `from_status` varchar(40) DEFAULT NULL, `to_status` varchar(40) NOT NULL,
+ `operator_user_id` bigint NOT NULL, `reason` varchar(1000) DEFAULT NULL,
+ `operated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `idempotency_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+ `operation` varchar(32) NOT NULL, `request_fingerprint` varchar(64) NOT NULL,
+ `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL,
+ PRIMARY KEY (`id`), KEY `idx_order_time` (`tenant_id`,`work_order_id`,`operated_at`),
+ UNIQUE KEY `uk_order_key` (`tenant_id`,`work_order_id`,`idempotency_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工单状态历史';
 SET FOREIGN_KEY_CHECKS=1;

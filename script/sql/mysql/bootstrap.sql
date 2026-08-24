@@ -89,6 +89,13 @@ SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 SOURCE script/sql/mysql/migrations/V112__repair_registration_planner_notification_template.sql;
 SOURCE script/sql/mysql/migrations/V113__media_student_center_consolidation.sql;
+SOURCE script/sql/mysql/migrations/V114__student_delivery_stages.sql;
+SOURCE script/sql/mysql/migrations/V115__generic_work_order.sql;
+SOURCE script/sql/mysql/migrations/V116__study_planner_repurchase_permissions.sql;
+SOURCE script/sql/mysql/migrations/V117__lead_category_label_snapshot.sql;
+SOURCE script/sql/mysql/migrations/V118__independent_role_permission_boundaries.sql;
+SOURCE script/sql/mysql/migrations/V119__workbench_relative_child_paths.sql;
+SOURCE script/sql/mysql/migrations/V120__restore_operator_media_student_menu.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

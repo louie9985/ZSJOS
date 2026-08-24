@@ -96,6 +96,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         result.setFirstContactTimeoutMinutes(config.getFirstContactTimeoutMinutes());
         result.setStudyPlanTimeoutMinutes(config.getStudyPlanTimeoutMinutes());
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
+        boolean operational = "active".equals(relation.getStatus());
         if (owner) result.setVisibleTabs(List.of("overview", "first-contact", "study-plan", "contacts"));
         else {
             String type = Objects.equals(relation.getContentDirectorUserId(), userId) ? COLLABORATOR_DIRECTOR : COLLABORATOR_CAREER;
@@ -107,10 +108,10 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         List<String> availableActions = new ArrayList<>();
         boolean accepted = "accepted".equals(relation.getAcceptanceStatus());
-        if (owner && !accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_ACCEPT)) {
+        if (operational && owner && !accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_ACCEPT)) {
             availableActions.add(CONTEXT_ACTION_ACCEPT);
         }
-        if (owner && accepted && task != null && "pending".equals(task.getStatus())) {
+        if (operational && owner && accepted && task != null && "pending".equals(task.getStatus())) {
             String permission = switch (task.getTaskType()) {
                 case TYPE_FIRST_CONTACT -> PERMISSION_FIRST_CONTACT_SUBMIT;
                 case TYPE_STUDY_PLAN -> PERMISSION_STUDY_PLAN_SUBMIT;
@@ -127,13 +128,13 @@ public class StudentContactServiceImpl implements StudentContactService {
                 availableActions.add(action);
             }
         }
-        if (owner && accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_BASIC_INFO)) {
+        if (operational && owner && accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_BASIC_INFO)) {
             availableActions.add(CONTEXT_ACTION_EDIT_BASIC_INFO);
         }
-        boolean canAssign = accepted
+        boolean canAssign = operational && accepted
                 && ((owner && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN))
                 || permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT));
-        boolean ownerCanAssign = owner && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
+        boolean ownerCanAssign = operational && owner && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
         if (canAssign && (relation.getContentDirectorUserId() == null
                 || ownerCanAssign || permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT))) {
             availableActions.add(CONTEXT_ACTION_ASSIGN_CONTENT_DIRECTOR);
@@ -155,6 +156,14 @@ public class StudentContactServiceImpl implements StudentContactService {
         result.setContentDirectorUserName(name(users.get(relation.getContentDirectorUserId())));
         result.setCareerPlannerUserId(relation.getCareerPlannerUserId());
         result.setCareerPlannerUserName(name(users.get(relation.getCareerPlannerUserId())));
+        String stage = relation.getDeliveryStage();
+        if (stage == null || stage.isBlank()) stage = STAGE_FIRST_CONTACT;
+        result.setDeliveryStage(stage);
+        result.setDeliveryStageLabel(stageLabel(stage));
+        boolean canSubmitDeliveryStage = operational && owner && accepted
+                && !Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(stage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT);
+        result.setDeliveryStages(deliveryStages(stage, canSubmitDeliveryStage));
         return result;
     }
 
@@ -172,6 +181,8 @@ public class StudentContactServiceImpl implements StudentContactService {
             result.setUnsuccessfulReasonLabel(row.getUnsuccessfulReasonLabelSnapshot()); result.setRemark(row.getRemark());
             result.setAttachmentFileIds(parseLongs(row.getAttachmentFileIdsJson()));
             result.setCompletedChecklistKeys(parseStrings(row.getChecklistResultJson())); result.setNextContactAt(row.getNextContactAt());
+            result.setDeliveryStage(row.getDeliveryStage());
+            result.setDeliveryData(row.getDeliveryDataJson());
             result.setOperatorUserId(row.getOperatorUserId()); result.setOperatorUserName(name(users.get(row.getOperatorUserId())));
             result.setSubmittedAt(row.getSubmittedAt()); return result;
         }).toList(), rows.getTotal());
@@ -252,6 +263,58 @@ public class StudentContactServiceImpl implements StudentContactService {
                 request.getNextContactAt(), null, null, null, request.getIdempotencyKey(), userId);
     }
 
+    @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "delivery-stage")
+    public Long submitDeliveryStage(Long relationId, StudentDeliveryStageSubmitReqVO request, Long userId) {
+        if (!permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
+            throw exception(STUDENT_PERMISSION_DENIED);
+        }
+        ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
+        if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
+        String fingerprint = deliveryFingerprint(relationId, request);
+        StudentContactRecordDO replay = recordMapper.selectByIdempotencyKey(request.getIdempotencyKey());
+        if (replay != null) {
+            if (!fingerprint.equals(replay.getRequestFingerprint()) || !relationId.equals(replay.getServiceRelationId())) {
+                throw exception(STUDENT_CONTACT_FORM_INVALID);
+            }
+            return replay.getId();
+        }
+        List<String> stages = deliveryStageCodes();
+        String current = relation.getDeliveryStage();
+        boolean invalidPersistedStage = current == null || current.isBlank() || !stages.contains(current);
+        if (invalidPersistedStage) current = STAGE_FIRST_CONTACT;
+        if (!stages.contains(request.getStage()) || invalidPersistedStage || !request.getStage().equals(current)
+                || Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(current)) {
+            throw exception(STUDENT_CONTACT_TASK_INVALID);
+        }
+        validateAttachments(request.getAttachmentFileIds(), relationId, userId);
+        if (Boolean.TRUE.equals(request.getSuccessful())) validateDeliveryData(request.getStage(), request.getData());
+        String next = Boolean.TRUE.equals(request.getSuccessful()) ? stages.get(stages.indexOf(current) + 1 < stages.size() ? stages.indexOf(current) + 1 : stages.size() - 1) : current;
+        LocalDateTime now = LocalDateTime.now();
+        StudentContactRecordDO record = new StudentContactRecordDO();
+        record.setServiceRelationId(relationId); record.setTaskId(null); record.setContactType(TYPE_DELIVERY_STAGE);
+        record.setSuccessful(request.getSuccessful()); record.setRemark(request.getRemark().trim());
+        List<Long> normalizedAttachments = normalizeAttachmentIds(request.getAttachmentFileIds());
+        record.setAttachmentFileIdsJson(JsonUtils.toJsonString(normalizedAttachments));
+        record.setChecklistResultJson("[]"); record.setDeliveryStage(request.getStage());
+        record.setDeliveryDataJson(JsonUtils.toJsonString(request.getData() == null ? Map.of() : request.getData()));
+        record.setNextContactAt(now); record.setOperatorUserId(userId); record.setSubmittedAt(now);
+        record.setIdempotencyKey(request.getIdempotencyKey()); record.setRequestFingerprint(fingerprint);
+        try { recordMapper.insert(record); } catch (DuplicateKeyException duplicate) {
+            StudentContactRecordDO concurrent = recordMapper.selectByIdempotencyKey(request.getIdempotencyKey());
+            if (concurrent == null) throw duplicate;
+            if (!fingerprint.equals(concurrent.getRequestFingerprint())
+                    || !relationId.equals(concurrent.getServiceRelationId())) throw exception(STUDENT_CONTACT_FORM_INVALID);
+            return concurrent.getId();
+        }
+        if (Boolean.TRUE.equals(request.getSuccessful())
+                && relationMapper.advanceDeliveryStage(relationId, userId, current, next,
+                record.getDeliveryDataJson(), relation.getVersion()) != 1) {
+            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        }
+        return record.getId();
+    }
+
     private Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
                           String remark, List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
                           String extensionReason, String extensionDescription, List<Long> extensionAttachments,
@@ -303,6 +366,13 @@ public class StudentContactServiceImpl implements StudentContactService {
                 "student-contact:record:" + record.getId(), config.getId());
         if (extensionRequired) createExtension(relation, nextTaskId, allowedDueAt, nextAt, extensionReason,
                 extensionDescription, extensionAttachments, userId, idempotencyKey + ":extension");
+        if (Boolean.TRUE.equals(successful) && TYPE_FIRST_CONTACT.equals(expectedType)) {
+            if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN,
+                    null, relation.getVersion()) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        } else if (Boolean.TRUE.equals(successful) && TYPE_STUDY_PLAN.equals(expectedType)) {
+            if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_STUDY_PLAN, STAGE_GROUP_HANDOFF,
+                    null, relation.getVersion()) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        }
         return record.getId();
     }
 
@@ -310,7 +380,9 @@ public class StudentContactServiceImpl implements StudentContactService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "assign")
     public List<StudyPlannerSimpleRespVO> getCollaboratorCandidates(Long relationId, String type, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(relationId);
-        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        if (relation == null || !Set.of("active", "paused", "completed").contains(relation.getStatus())) {
+            throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        }
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
         boolean assign = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
@@ -333,9 +405,10 @@ public class StudentContactServiceImpl implements StudentContactService {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId, TenantContextHolder.getRequiredTenantId());
         if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
+        boolean operational = "active".equals(relation.getStatus());
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
         boolean assign = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
-        boolean ownerCanAssign = owner && assign;
+        boolean ownerCanAssign = operational && owner && assign;
         if (!ownerCanAssign && !correction || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
         StudentCollaboratorAssignmentLogDO replay = assignmentLogMapper.selectByIdempotencyKey(request.getIdempotencyKey());
         if (replay != null) {
@@ -556,7 +629,9 @@ public class StudentContactServiceImpl implements StudentContactService {
     }
     private ServiceRelationDO requireReadable(Long id, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(id);
-        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        if (relation == null || !Set.of("active", "paused", "completed").contains(relation.getStatus())) {
+            throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        }
         if (!Objects.equals(relation.getOwnerUserId(), userId)
                 && !Objects.equals(relation.getContentDirectorUserId(), userId)
                 && !Objects.equals(relation.getCareerPlannerUserId(), userId)) {
@@ -641,9 +716,76 @@ public class StudentContactServiceImpl implements StudentContactService {
         payload.put("extensionAttachments", extensionAttachments == null ? List.of() : extensionAttachments);
         return DigestUtil.sha256Hex(JsonUtils.toJsonString(payload));
     }
+    private String deliveryFingerprint(Long relationId, StudentDeliveryStageSubmitReqVO request) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("relationId", relationId); payload.put("stage", request.getStage());
+        payload.put("successful", request.getSuccessful()); payload.put("remark", request.getRemark().trim());
+        payload.put("data", request.getData() == null ? Map.of() : request.getData());
+        payload.put("attachmentFileIds", normalizeAttachmentIds(request.getAttachmentFileIds()));
+        return DigestUtil.sha256Hex(JsonUtils.toJsonString(payload));
+    }
     private String attachmentDirectory(Long relationId, Long userId) {
         return "zsjos/student-contact/" + relationId + "/" + userId;
     }
     private List<Long> parseLongs(String json) { return json == null ? List.of() : JsonUtils.parseArray(json, Long.class); }
     private List<String> parseStrings(String json) { return json == null ? List.of() : JsonUtils.parseArray(json, String.class); }
+
+    private List<String> deliveryStageCodes() {
+        return List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_GROUP_HANDOFF, STAGE_SUPERVISION,
+                STAGE_EXAM_CONFIRMATION, STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
+                STAGE_CERTIFICATE, STAGE_COMPLETED);
+    }
+
+    private String stageLabel(String code) {
+        return switch (code) {
+            case STAGE_FIRST_CONTACT -> "首次联系";
+            case STAGE_STUDY_PLAN -> "制定学习计划";
+            case STAGE_GROUP_HANDOFF -> "入群与教研对接";
+            case STAGE_SUPERVISION -> "常规督学";
+            case STAGE_EXAM_CONFIRMATION -> "考期确认与报名资料";
+            case STAGE_EXAM_PREPARATION -> "考前通知与冲刺";
+            case STAGE_POST_EXAM -> "考后回访";
+            case STAGE_RESULT -> "成绩通知";
+            case STAGE_CERTIFICATE -> "证书通知与邮寄";
+            case STAGE_COMPLETED -> "服务完成";
+            default -> code;
+        };
+    }
+
+    private List<StudentContactContextRespVO.DeliveryStageVO> deliveryStages(String current, boolean canSubmit) {
+        List<String> stages = deliveryStageCodes();
+        int currentIndex = stages.indexOf(current);
+        List<StudentContactContextRespVO.DeliveryStageVO> result = new ArrayList<>();
+        for (int i = 0; i < stages.size(); i++) {
+            StudentContactContextRespVO.DeliveryStageVO row = new StudentContactContextRespVO.DeliveryStageVO();
+            row.setCode(stages.get(i)); row.setLabel(stageLabel(stages.get(i))); row.setCurrent(i == currentIndex);
+            row.setAvailable(canSubmit && i == currentIndex
+                    && !Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(stages.get(i)));
+            row.setStatus(i < currentIndex ? "done" : i == currentIndex ? "current" : "pending");
+            result.add(row);
+        }
+        return result;
+    }
+
+    private List<Long> normalizeAttachmentIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return ids.stream().filter(Objects::nonNull).distinct().sorted().toList();
+    }
+
+    private void validateDeliveryData(String stage, Map<String, Object> values) {
+        if (values == null) throw exception(STUDENT_CONTACT_FORM_INVALID);
+        List<String> required = switch (stage) {
+            case STAGE_GROUP_HANDOFF -> List.of("groupJoined", "teacherConnected");
+            case STAGE_EXAM_CONFIRMATION -> List.of("examIntention", "examDate");
+            case STAGE_EXAM_PREPARATION -> List.of("examNoticeSent", "admissionTicketNoticeSent");
+            case STAGE_POST_EXAM -> List.of("examFeedback");
+            case STAGE_RESULT -> List.of("result");
+            case STAGE_CERTIFICATE -> List.of("certificateNotice", "mailingInfo");
+            default -> List.of();
+        };
+        if (required.stream().anyMatch(key -> values.get(key) == null
+                || Boolean.FALSE.equals(values.get(key)) || String.valueOf(values.get(key)).isBlank())) {
+            throw exception(STUDENT_CONTACT_FORM_INVALID);
+        }
+    }
 }

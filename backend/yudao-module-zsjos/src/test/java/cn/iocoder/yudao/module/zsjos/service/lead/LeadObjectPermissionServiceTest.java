@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAgingPoolCycleMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.order.SalesOrderObjectPermissionService;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
@@ -55,6 +56,7 @@ class LeadObjectPermissionServiceTest {
     @Mock private SalesOrderMapper salesOrderMapper;
     @Mock private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
     @Mock private LeadAgingPoolService leadAgingPoolService;
+    @Mock private MediaAccountMapper mediaAccountMapper;
 
     @BeforeEach
     void setUpPermissionDefaults() {
@@ -300,6 +302,15 @@ class LeadObjectPermissionServiceTest {
         when(salesOrderMapper.selectByLeadId(1L)).thenReturn(List.of(requestedLeadOrder));
         when(salesOrderObjectPermissionService.canRead(requestedLeadOrder, 30L)).thenReturn(true);
         assertTrue(service.canReadDetail(lead, 30L));
+    }
+
+    @Test
+    void mediaAccountParticipantCanReadOnlyTheRelatedLeadDetail() {
+        LeadDO lead = lead(10L, 20L);
+        when(mediaAccountMapper.countParticipantByLead(30L, 1L, 1L)).thenReturn(1L);
+
+        assertTrue(service.canReadDetail(lead, 30L));
+        assertFalse(service.canReadMediaStudentLead(new LeadDO().setId(2L), 30L));
     }
 
     private void assertActionAllowed(Long userId, String action) {

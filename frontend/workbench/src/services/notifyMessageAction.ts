@@ -94,7 +94,6 @@ const isStudentMediaBusiness = (detail: NotifyMessage) => isPositiveId(detail.bi
 const legacyMediaRoute = (detail: NotifyMessage) => {
   if (!isPositiveId(detail.bizId)) return null
   if (detail.bizType === 'production-ticket') return `${APP_ROUTES.MEDIA_PRODUCTION_TICKETS}?ticketId=${detail.bizId}`
-  if (detail.bizType === 'handover') return `${APP_ROUTES.MEDIA_HANDOVERS}?handoverId=${detail.bizId}`
   return null
 }
 

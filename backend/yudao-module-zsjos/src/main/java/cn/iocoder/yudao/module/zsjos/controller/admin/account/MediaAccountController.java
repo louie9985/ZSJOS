@@ -51,7 +51,7 @@ public class MediaAccountController {
     @PreAuthorize("@ss.hasPermission('zsjos:media-account:bind-student')")
     public CommonResult<List<MediaAccountStudentCandidateRespVO>> studentCandidates(
             @RequestParam(required = false) String keyword) {
-        return success(mediaAccountService.studentCandidates(keyword));
+        return success(mediaAccountService.studentCandidates(keyword, getLoginUserId()));
     }
 
     @PostMapping("/{id}/advance-stage")

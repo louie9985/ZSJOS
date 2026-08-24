@@ -17,6 +17,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
+import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,6 +43,7 @@ class MyStudentServiceImplTest {
     @Mock private SalesOrderMapper orderMapper;
     @Mock private SalesOrderItemMapper orderItemMapper;
     @Mock private MediaAccountMapper mediaAccountMapper;
+    @Mock private AdvancedFilterService advancedFilterService;
 
     @Test
     void getMyStudentReturnsStructuredCourseRights() {
@@ -60,7 +62,7 @@ class MyStudentServiceImplTest {
                 "{\"delivery\":\"线上\",\"period\":\"一天\"}", BigDecimal.ZERO, false, false);
         item.setProductSnapshot(JsonUtils.toJsonString(snapshot));
 
-        when(relationMapper.selectActiveByOwnerAndPerson(8L, 2L)).thenReturn(List.of(relation));
+        when(relationMapper.selectByOwnerAndPersonIncludingHistory(8L, 2L)).thenReturn(List.of(relation));
         when(relationMapper.selectActiveByCollaboratorAndPerson(8L, 2L)).thenReturn(List.of());
         when(personMapper.selectById(2L)).thenReturn(person);
         when(leadMapper.selectById(5L)).thenReturn(lead);
@@ -87,7 +89,7 @@ class MyStudentServiceImplTest {
         SalesOrderDO order = new SalesOrderDO(); order.setId(13L); order.setOrderNo("OD202608180001");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(14L); item.setOrderId(13L);
 
-        when(relationMapper.selectActiveByOwnerAndPerson(18L, 12L)).thenReturn(List.of());
+        when(relationMapper.selectByOwnerAndPersonIncludingHistory(18L, 12L)).thenReturn(List.of());
         when(relationMapper.selectActiveByCollaboratorAndPerson(18L, 12L)).thenReturn(List.of(relation));
         when(personMapper.selectById(12L)).thenReturn(person);
         when(orderMapper.selectBatchIds(Set.of(13L))).thenReturn(List.of(order));
@@ -106,14 +108,13 @@ class MyStudentServiceImplTest {
     void getDirectorStudentUsesOnlyContentDirectorRelations() {
         ServiceRelationDO relation = new ServiceRelationDO();
         relation.setId(21L); relation.setPersonId(22L); relation.setOrderId(23L); relation.setOrderItemId(24L);
-        relation.setStatus("active"); relation.setAcceptanceStatus("pending");
+        relation.setStatus("active"); relation.setAcceptanceStatus("accepted");
         relation.setActivatedAt(LocalDateTime.now()); relation.setContentDirectorUserId(28L);
         PersonDO person = new PersonDO(); person.setId(22L); person.setName("编导负责学员");
         SalesOrderDO order = new SalesOrderDO(); order.setId(23L); order.setOrderNo("OD202608200001");
         SalesOrderItemDO item = new SalesOrderItemDO(); item.setId(24L); item.setOrderId(23L);
 
         when(relationMapper.selectActiveByContentDirectorAndPerson(28L, 22L)).thenReturn(List.of(relation));
-        when(mediaAccountMapper.selectByParticipantAndStudent(28L, 22L)).thenReturn(List.of());
         when(personMapper.selectById(22L)).thenReturn(person);
         when(orderMapper.selectBatchIds(Set.of(23L))).thenReturn(List.of(order));
         when(orderItemMapper.selectBatchIds(Set.of(24L))).thenReturn(List.of(item));
@@ -122,20 +123,51 @@ class MyStudentServiceImplTest {
 
         assertEquals("编导负责学员", result.getName());
         assertEquals(28L, result.getServices().getFirst().getContentDirectorUserId());
-        assertEquals("pending", result.getServices().getFirst().getAcceptanceStatus());
+        assertEquals("accepted", result.getServices().getFirst().getAcceptanceStatus());
     }
 
     @Test
     void getDirectorPageDoesNotTreatMissingAdvancedFilterAsNoMatches() {
         MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20);
-        when(relationMapper.selectActiveByContentDirector(28L)).thenReturn(List.of());
-        when(mediaAccountMapper.selectParticipantStudentIds(28L)).thenReturn(List.of());
-        when(personMapper.selectStudentPage(reqVO, Set.of(), null)).thenReturn(PageResult.empty());
+        when(personMapper.selectMediaStudentPage(reqVO, 28L)).thenReturn(PageResult.empty());
 
         PageResult<MyStudentRespVO> result = service.getDirectorPage(28L, reqVO);
 
         assertEquals(0, result.getTotal());
-        verify(personMapper).selectStudentPage(reqVO, Set.of(), null);
+        verify(personMapper).selectMediaStudentPage(reqVO, 28L);
+    }
+
+    @Test
+    void getMyPagePushesServiceStatusIntoPersonAndRelationQueries() {
+        MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setServiceStatus("paused");
+        when(advancedFilterService.matchStudentPersonIds(null, 28L)).thenReturn(null);
+        when(personMapper.selectMyStudentPage(reqVO, 28L, null)).thenReturn(PageResult.empty());
+        when(relationMapper.selectAssignedByUserAndPersonIds(28L, List.of(), "paused")).thenReturn(List.of());
+
+        PageResult<MyStudentRespVO> result = service.getMyPage(28L, reqVO);
+
+        assertEquals(0, result.getTotal());
+        verify(personMapper).selectMyStudentPage(reqVO, 28L, null);
+        verify(relationMapper).selectAssignedByUserAndPersonIds(28L, List.of(), "paused");
+    }
+
+    @Test
+    void getMediaPageKeepsPersonAssetsWhenNoCurrentServiceRelationExists() {
+        MyStudentPageReqVO reqVO = new MyStudentPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20);
+        PersonDO person = new PersonDO(); person.setId(42L); person.setName("媒体学员");
+        when(personMapper.selectMediaStudentPage(reqVO, 28L))
+                .thenReturn(new PageResult<>(List.of(person), 1L));
+        when(mediaAccountMapper.selectParticipantStudentIds(28L, List.of(42L))).thenReturn(List.of(42L));
+        when(relationMapper.selectActiveByPersonIds(List.of(42L))).thenReturn(List.of());
+        when(personMapper.selectById(42L)).thenReturn(person);
+
+        PageResult<MyStudentRespVO> result = service.getMediaPage(28L, reqVO);
+
+        assertEquals(1, result.getTotal());
+        assertEquals("媒体学员", result.getList().getFirst().getName());
+        assertEquals(List.of(), result.getList().getFirst().getServices());
     }
 }

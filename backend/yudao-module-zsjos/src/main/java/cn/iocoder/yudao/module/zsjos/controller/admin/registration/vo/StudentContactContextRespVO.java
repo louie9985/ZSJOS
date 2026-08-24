@@ -22,6 +22,9 @@ public class StudentContactContextRespVO {
     private String contentDirectorUserName;
     private Long careerPlannerUserId;
     private String careerPlannerUserName;
+    private String deliveryStage;
+    private String deliveryStageLabel;
+    private List<DeliveryStageVO> deliveryStages;
 
     @Data public static class CurrentTaskVO {
         private Long id;
@@ -35,5 +38,12 @@ public class StudentContactContextRespVO {
         private String title;
         private String type;
         private Boolean attachmentRequired;
+    }
+    @Data public static class DeliveryStageVO {
+        private String code;
+        private String label;
+        private String status;
+        private Boolean current;
+        private Boolean available;
     }
 }

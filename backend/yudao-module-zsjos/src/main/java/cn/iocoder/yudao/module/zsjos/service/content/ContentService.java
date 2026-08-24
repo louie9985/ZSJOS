@@ -152,6 +152,12 @@ public class ContentService {
         if (!objectPermissionProvider.hasPermission(content.getId(), "read", userId)) {
             response.setAvailableActions(List.of()); return response;
         }
+        response.setAvailableActions(availableActionsForVisible(content, userId, true));
+        return response;
+    }
+
+    public List<String> availableActionsForVisible(ContentDO content, Long userId, boolean objectAuthorized) {
+        if (!objectAuthorized) return List.of();
         String permission = switch (content.getStatus()) {
             case CONTENT_TOPIC -> "zsjos:content:complete-topic";
             case CONTENT_SCRIPT -> "zsjos:content:submit-production";
@@ -162,9 +168,9 @@ public class ContentService {
             default -> null;
         };
         if (permission == null || !permissionApi.hasAnyPermissions(userId, permission)) {
-            response.setAvailableActions(List.of()); return response;
+            return List.of();
         }
-        response.setAvailableActions(switch (content.getStatus()) {
+        return switch (content.getStatus()) {
             case CONTENT_TOPIC -> List.of(ACTION_COMPLETE_TOPIC);
             case CONTENT_SCRIPT -> List.of(ACTION_SUBMIT_PRODUCTION);
             case CONTENT_IN_PRODUCTION -> List.of(ACTION_SUBMIT_ACCEPTANCE);
@@ -172,7 +178,6 @@ public class ContentService {
             case CONTENT_REJECTED -> List.of(ACTION_START_CONTENT_REVISION);
             case CONTENT_REVISING -> List.of(ACTION_RESUBMIT_PRODUCTION);
             default -> List.of();
-        });
-        return response;
+        };
     }
 }

@@ -11,7 +11,15 @@ public interface MediaStudentTalkRecordMapper extends BaseMapperX<MediaStudentTa
     default List<MediaStudentTalkRecordDO> selectByStudent(Long personId) {
         return selectList(new LambdaQueryWrapperX<MediaStudentTalkRecordDO>()
                 .eq(MediaStudentTalkRecordDO::getStudentPersonId, personId)
-                .orderByDesc(MediaStudentTalkRecordDO::getUpdateTime)
+                .orderByDesc(MediaStudentTalkRecordDO::getOccurredAt)
                 .orderByDesc(MediaStudentTalkRecordDO::getId));
+    }
+
+    default List<MediaStudentTalkRecordDO> selectRecentByStudent(Long personId) {
+        return selectList(new LambdaQueryWrapperX<MediaStudentTalkRecordDO>()
+                .eq(MediaStudentTalkRecordDO::getStudentPersonId, personId)
+                .orderByDesc(MediaStudentTalkRecordDO::getOccurredAt)
+                .orderByDesc(MediaStudentTalkRecordDO::getId)
+                .last("LIMIT 100"));
     }
 }

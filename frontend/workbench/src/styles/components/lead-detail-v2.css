@@ -675,6 +675,15 @@
   padding: 8px 0 4px;
 }
 
+.lead-status-pipeline-delivery {
+  overflow-x: auto;
+  padding-bottom: 10px;
+}
+
+.lead-status-pipeline-delivery .lead-status-node {
+  flex: 0 0 104px;
+}
+
 .lead-status-node {
   display: flex;
   flex-direction: column;
@@ -746,7 +755,7 @@
 /* 节点标签 */
 .lead-status-step-label {
   font-size: var(--crm-font-sm);
-  letter-spacing: 0.5px;
+  letter-spacing: 0;
   color: var(--crm-text-tertiary);
   white-space: nowrap;
 }

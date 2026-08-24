@@ -16,7 +16,8 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 
 @Component
 public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermissionProvider {
-    private static final Set<String> OWNER_ACTIONS = Set.of("read", "accept", "contact", "assign", "update-basic-info");
+    private static final Set<String> OWNER_ACTIONS = Set.of(
+            "read", "accept", "contact", "assign", "update-basic-info", "delivery-stage");
 
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private PermissionApi permissionApi;
@@ -26,8 +27,12 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
     @Override
     public boolean hasPermission(Long bizId, String action, Long userId) {
         ServiceRelationDO relation = relationMapper.selectById(bizId);
-        if (relation == null || !"active".equals(relation.getStatus())) return false;
-        if (Objects.equals(relation.getOwnerUserId(), userId)) return OWNER_ACTIONS.contains(action);
+        if (relation == null) return false;
+        if (Objects.equals(relation.getOwnerUserId(), userId)) {
+            if ("read".equals(action) && Set.of("active", "paused", "completed").contains(relation.getStatus())) return true;
+            return "active".equals(relation.getStatus()) && OWNER_ACTIONS.contains(action);
+        }
+        if (!"active".equals(relation.getStatus())) return false;
         if ("read".equals(action) && "accepted".equals(relation.getAcceptanceStatus())) {
             return Objects.equals(relation.getContentDirectorUserId(), userId)
                     || Objects.equals(relation.getCareerPlannerUserId(), userId);

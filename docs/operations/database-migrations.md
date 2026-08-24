@@ -74,6 +74,13 @@ bash deploy/production/zsjos-db verify production
 An empty schema uses `bootstrap.sql`. A non-empty schema is never bootstrapped;
 only pending versioned migrations are applied.
 
+`bootstrap.sql` is reserved for a fresh empty environment. It is not an upgrade
+mechanism and must never be run against an existing database. Releases containing
+the study-planner repurchase implementation require V116 to be applied and verified
+first; an environment without `zsjos_order.submission_request_fingerprint` must not
+start that application version. Historical orders are not backfilled with fabricated
+request fingerprints.
+
 ## Every production database update
 
 Run these commands from the reviewed release directory:
@@ -295,6 +302,70 @@ exclusive to `content_director`; the planner-owned `/zsjos/my-students` menu is 
 is repeatable and changes no business or audit rows. Applying V103 locally is recorded separately from
 formal/shared-environment rollout.
 
+## V115 generic work-order core
+
+V115 follows V114 and adds the additive tenant-scoped work-order scene, work-order, and
+status-history tables. Scene field definitions and submitted values are JSON snapshots;
+no business options, users, attachments, or sample work orders are seeded. The migration
+is repeatable and does not delete or rewrite existing user-relation, Lead, or task rows.
+Apply only through the numbered migration chain, then run the read-only bootstrap/schema
+verification. Existing-environment execution still requires separate approval.
+
+V116 follows V115 and grants `study_planner` only the dedicated student-repurchase button
+and the existing personal-order page. It explicitly does not grant generic order creation or
+external historical-customer repurchase. V113-V116 are edited in place only while delivery
+records confirm they have not run in any shared environment; otherwise use a new forward migration.
+
+V116 v5 contains its guarded order-column addition, canonical menu recovery, role grants and version
+writes in one temporary stored-procedure call. It treats records owned by V073/V114/V116 for menu
+`73020`, V025/quick-init/V116 for menu `6813`, and V116 for menu `73440` as recoverable migration
+state. Missing, soft-deleted or drifted records from those owners are restored to canonical metadata;
+zero enabled `study_planner` roles is valid. A foreign fixed-ID owner, active duplicate permission or
+invalid `/zsjos` root still blocks before any mutation. A GUI runner that continues after the failed
+call can execute only the final temporary-procedure cleanup.
+
+The local 2026-08-23 diagnostic environment already records V116 v4 and currently has canonical
+menus/grants after its GUI runner continued past the assertion. That environment must retain its v4
+record; this v5 file is the production/fresh-chain definition for environments where V116 has not run.
+
+## V117 Lead category label snapshot
+
+V117 follows V116 and adds only nullable category-label snapshot columns to `zsjos_lead` and
+`zsjos_lead_duplicate_review`. It deletes no rows and deliberately performs no historical backfill:
+an old Lead without a snapshot continues through the documented current-dictionary compatibility
+path, while every new or explicitly changed category selection stores its contemporaneous label.
+Run V117 through the normal reviewed migration sequence and then require the
+`lead_category_label_snapshot` check in `verify-bootstrap.sql` to return `PASS`. Do not execute the
+migration against a shared environment without separate confirmation.
+
+## V114 failed-execution recovery
+
+V114 v6 executes all schema, backfill, menu, role-grant and version statements within one temporary
+stored-procedure call. It creates or canonically restores the V073-owned My Students page `73020`,
+creates or restores delivery-stage button `73428`, and grants both to enabled `study_planner` roles.
+An environment with no enabled planner role still completes successfully and leaves the permissions
+available for later System role configuration. Expected missing or soft-deleted records are therefore
+repeatable recovery cases, not migration failures.
+
+Only an invalid or ambiguous active `/zsjos` root, a fixed menu ID owned by another permission, or an
+active duplicate permission raises a direct procedural `SIGNAL`. These are unsafe ownership conflicts
+that require administrator investigation. Do not encode `SIGNAL` in a prepared SQL string: MySQL
+rejects that command in the prepared-statement protocol. Keeping every migration mutation inside the
+same `CALL` also prevents GUI runners that continue after an error from executing later business SQL;
+after a failed call, the only remaining file statement drops the temporary procedure.
+
+The repository static migration check enforces this rule for V113 and later migrations. Older applied
+migrations retain their historical bytes and checksums; specifically, V094 still contains the legacy
+dynamic validation pattern and must not be rewritten in place.
+
+After any failed manual V114 v4/v5 attempt, stop before rerunning it and inspect both schema-version tables,
+the delivery columns on `zsjos_service_relation` and `zsjos_student_contact_record`, menus `73020` and
+`73428`, and tenant-scoped `study_planner` grants. If neither version table records V114, correct the
+V073-owned parent-menu baseline and run the reviewed repeatable V114 v6 file. If either table records
+the earlier V114, preserve the executed file/checksum and create a new forward migration from the observed state;
+do not overwrite or manually delete the version marker. Database inspection and recovery execution
+remain separately approved operations.
+
 ## V113 media student center consolidation
 
 V113 follows V112 and retires the standalone third-party-account, content-production, and
@@ -310,3 +381,17 @@ It seeds only the system defaults `uid` and `nickname` for enabled tenants, guar
 `73500`-`73502` against unrelated ownership, and changes no historical business value or snapshot.
 It is forward-only and repeatable. Applying it to an existing environment requires separate approval;
 after controlled execution, run `verify-bootstrap.sql` and require every V113 check to return `PASS`.
+
+## V119 Workbench relative child menu paths
+
+V119 follows V118 and normalizes only active page-menu metadata directly beneath the unique active
+`/zsjos` Workbench root. A stored child path such as `/zsjos/my-students` becomes `my-students`; the
+resolved browser URL remains `/zsjos/my-students`. Buttons, external links, nested pages outside that
+direct parent, role grants, users, and business rows are not changed.
+
+The migration is repeatable. Before updating, it blocks when the Workbench root is missing or
+ambiguous, or when normalization would collide with an existing active sibling path. Recovery is a
+forward correction after resolving the conflicting menu metadata; there is no automatic rollback
+because restoring duplicated parent prefixes would reintroduce invalid routing. Apply V119 only
+through the reviewed migration sequence and require `workbench_relative_child_paths` in
+`verify-bootstrap.sql` to return `PASS`.

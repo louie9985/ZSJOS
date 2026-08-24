@@ -95,7 +95,6 @@ export const APP_ROUTES = {
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
   ,MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets'
-  ,MEDIA_HANDOVERS: '/zsjos/handovers'
   ,MEDIA_STUDENT_OPS: '/zsjos/student-ops'
   ,MEDIA_REVIEWS: '/zsjos/reviews'
   ,MEDIA_STUDENTS: '/zsjos/media-students'
@@ -143,7 +142,6 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.ALL_MESSAGES,
   APP_ROUTES.UNREAD_MESSAGES
   ,APP_ROUTES.MEDIA_PRODUCTION_TICKETS
-  ,APP_ROUTES.MEDIA_HANDOVERS
   ,APP_ROUTES.MEDIA_STUDENT_OPS
   ,APP_ROUTES.MEDIA_REVIEWS
   ,APP_ROUTES.MEDIA_STUDENTS

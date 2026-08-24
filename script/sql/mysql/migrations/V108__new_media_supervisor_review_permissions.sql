@@ -4,10 +4,9 @@
 SET NAMES utf8mb4;
 INSERT INTO system_role_menu (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT r.id,m.id,'migration-V108',NOW(),'migration-V108',NOW(),b'0',r.tenant_id
-FROM system_role r JOIN system_menu m ON m.permission IN ('zsjos:handover:arbitrate','zsjos:review:approve','zsjos:student-ops:graduate')
+FROM system_role r JOIN system_menu m ON m.permission IN ('zsjos:review:approve','zsjos:student-ops:graduate')
 WHERE r.tenant_id=1 AND r.status=0 AND r.deleted=b'0' AND m.deleted=b'0'
-  AND ((r.code='dept_manager' AND m.permission='zsjos:handover:arbitrate')
-    OR (r.code='delivery_manager' AND m.permission IN ('zsjos:review:approve','zsjos:student-ops:graduate')))
+  AND r.code='delivery_manager' AND m.permission IN ('zsjos:review:approve','zsjos:student-ops:graduate')
   AND NOT EXISTS (SELECT 1 FROM system_role_menu x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
 INSERT INTO zsjos_schema_version(version,description,checksum)

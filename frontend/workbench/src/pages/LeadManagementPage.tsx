@@ -25,6 +25,7 @@ import {
   prioritizeLeads,
   protocolDisplayLabel,
   resolveLeadSelection,
+  snapshotOrDictionaryDisplayLabel,
   tryStartLeadPageRequest
 } from '../services/leadManagement'
 import {
@@ -377,7 +378,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
                   <span>{item.submittedMobile || '无手机号'} · {item.submittedWechatId || '无微信号'}</span>
                 </div>
               </div>
-              <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{channelLabel(item.sourceChannel)} · {categoryLabel(item.leadCategory)} · {formatTimestamp(item.submittedAt)}</span></div>
+              <div className="lead-inbox-item-meta"><Badge status="processing"/><span>{channelLabel(item.sourceChannel)} · {snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError)} · {formatTimestamp(item.submittedAt)}</span></div>
             </button>
           })}
           {!initialLoading && items.length > 0 && <div ref={listSentinelRef} className="lead-list-sentinel">

@@ -73,6 +73,17 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode BUSINESS_TASK_BUCKET_INVALID = new ErrorCode(1_900_003_028, "待办时间分组无效");
     ErrorCode BUSINESS_TASK_NOT_EXISTS = new ErrorCode(1_900_003_080, "业务待办不存在");
     ErrorCode BUSINESS_TASK_COMPLETE_FORBIDDEN = new ErrorCode(1_900_003_081, "无权完成该业务待办");
+    ErrorCode LEAD_CATEGORY_INVALID = new ErrorCode(1_900_003_083, "客资分类不存在或已停用");
+    ErrorCode WORK_ORDER_SCENE_NOT_EXISTS = new ErrorCode(1_900_003_100, "工单场景不存在");
+    ErrorCode WORK_ORDER_SCENE_CODE_DUPLICATE = new ErrorCode(1_900_003_101, "工单场景编码已存在");
+    ErrorCode WORK_ORDER_SCENE_INVALID = new ErrorCode(1_900_003_102, "工单场景配置无效");
+    ErrorCode WORK_ORDER_NOT_EXISTS = new ErrorCode(1_900_003_103, "工单不存在");
+    ErrorCode WORK_ORDER_STATE_INVALID = new ErrorCode(1_900_003_104, "当前工单状态不允许该操作");
+    ErrorCode WORK_ORDER_PERMISSION_DENIED = new ErrorCode(1_900_003_105, "无权操作该工单");
+    ErrorCode WORK_ORDER_CLAIM_ALREADY_TAKEN = new ErrorCode(1_900_003_106, "工单已被其他人接取");
+    ErrorCode WORK_ORDER_FIELD_INVALID = new ErrorCode(1_900_003_107, "工单表单字段无效");
+    ErrorCode WORK_ORDER_ATTACHMENT_INVALID = new ErrorCode(1_900_003_108, "工单附件无效");
+    ErrorCode WORK_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_109, "工单幂等键已被其他请求使用");
     ErrorCode LEAD_COLLABORATION_POOL_CONFLICT = new ErrorCode(1_900_003_082, "客资同时存在人工公海与超期公海记录，请联系管理员核查");
     ErrorCode LEAD_QUALIFICATION_STATE_INVALID = new ErrorCode(1_900_003_029, "当前客资状态不允许进行有效性判定");
     ErrorCode LEAD_INVALID_REASON_INVALID = new ErrorCode(1_900_003_030, "无效原因不存在或已停用");
@@ -286,11 +297,6 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
 
-    ErrorCode HANDOVER_NOT_EXISTS = new ErrorCode(1_900_016_001, "交接单不存在");
-    ErrorCode HANDOVER_STATE_INVALID = new ErrorCode(1_900_016_002, "当前交接单状态不允许该操作");
-    ErrorCode HANDOVER_VERSION_CONFLICT = new ErrorCode(1_900_016_003, "交接单已被其他人修改，请刷新后重试");
-    ErrorCode HANDOVER_PERMISSION_DENIED = new ErrorCode(1_900_016_004, "无权查看或处理该交接单");
-    ErrorCode HANDOVER_SUPERVISOR_INVALID = new ErrorCode(1_900_016_005, "交接发起人直属部门负责人未配置、已停用或为本人");
     ErrorCode MEDIA_REVIEW_NOT_EXISTS = new ErrorCode(1_900_017_001, "复盘报告不存在");
     ErrorCode MEDIA_REVIEW_STATE_INVALID = new ErrorCode(1_900_017_002, "当前复盘状态不允许该操作");
     ErrorCode MEDIA_REVIEW_VERSION_CONFLICT = new ErrorCode(1_900_017_003, "复盘报告已被其他人修改，请刷新后重试");

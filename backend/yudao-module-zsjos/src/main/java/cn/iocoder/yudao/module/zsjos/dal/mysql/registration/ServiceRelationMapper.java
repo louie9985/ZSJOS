@@ -28,7 +28,8 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
 
     default List<ServiceRelationDO> selectActiveByContentDirector(Long userId) {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
-                .eq(ServiceRelationDO::getStatus, "active")
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .eq(ServiceRelationDO::getContentDirectorUserId, userId)
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
@@ -37,6 +38,7 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getPersonId, personId)
                 .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .eq(ServiceRelationDO::getContentDirectorUserId, userId)
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
@@ -69,6 +71,21 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .set(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .set(ServiceRelationDO::getAcceptedByUserId, userId)
                 .set(ServiceRelationDO::getAcceptedAt, now)
+                .set(ServiceRelationDO::getDeliveryStage, "first_contact")
+                .set(ServiceRelationDO::getVersion, version + 1));
+    }
+
+    default int advanceDeliveryStage(Long id, Long userId, String expectedStage, String nextStage,
+                                     String deliveryDataJson, Integer version) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getOwnerUserId, userId)
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .eq(ServiceRelationDO::getDeliveryStage, expectedStage)
+                .eq(ServiceRelationDO::getVersion, version)
+                .set(ServiceRelationDO::getDeliveryStage, nextStage)
+                .set(ServiceRelationDO::getDeliveryDataJson, deliveryDataJson)
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
 
@@ -86,6 +103,13 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getOwnerUserId, ownerUserId)
                 .eq(ServiceRelationDO::getStatus, "active")
+                .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    default List<ServiceRelationDO> selectByOwnerUserIdIncludingHistory(Long ownerUserId) {
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getOwnerUserId, ownerUserId)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
@@ -144,11 +168,52 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
+    default List<ServiceRelationDO> selectByOwnerAndPersonIncludingHistory(Long ownerUserId, Long personId) {
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getOwnerUserId, ownerUserId)
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    default List<ServiceRelationDO> selectOwnedRepurchaseEligibleByPerson(Long ownerUserId, Long personId) {
+        return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getOwnerUserId, ownerUserId)
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .orderByDesc(ServiceRelationDO::getActivatedAt));
+    }
+
+    @Select("SELECT * FROM zsjos_service_relation WHERE owner_user_id=#{ownerUserId} "
+            + "AND person_id=#{personId} AND status IN ('active','paused','completed') "
+            + "AND acceptance_status='accepted' AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
+    List<ServiceRelationDO> selectOwnedRepurchaseEligibleByPersonForUpdate(@Param("ownerUserId") Long ownerUserId,
+                                                                            @Param("personId") Long personId,
+                                                                            @Param("tenantId") Long tenantId);
+
     default List<ServiceRelationDO> selectActiveByPersonIds(Collection<Long> personIds) {
         if (personIds == null || personIds.isEmpty()) return List.of();
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .in(ServiceRelationDO::getPersonId, personIds)
                 .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .orderByDesc(ServiceRelationDO::getUpdateTime).orderByDesc(ServiceRelationDO::getId));
+    }
+
+    default List<ServiceRelationDO> selectAssignedByUserAndPersonIds(Long userId, Collection<Long> personIds,
+                                                                     String status) {
+        if (personIds == null || personIds.isEmpty()) return List.of();
+        LambdaQueryWrapperX<ServiceRelationDO> query = new LambdaQueryWrapperX<>();
+        query.in(ServiceRelationDO::getPersonId, personIds)
+                .eqIfPresent(ServiceRelationDO::getStatus, status);
+        query.and(scope -> scope.and(owner -> owner.eq(ServiceRelationDO::getOwnerUserId, userId)
+                                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed")))
+                        .or(collaborator -> collaborator.eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                                .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
+                                .and(users -> users.eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))));
+        query.orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
+        return selectList(query);
     }
 }

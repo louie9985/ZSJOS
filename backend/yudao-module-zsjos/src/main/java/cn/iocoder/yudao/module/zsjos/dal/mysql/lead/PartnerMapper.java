@@ -7,8 +7,16 @@ import org.apache.ibatis.annotations.Mapper;
 
 import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_ENABLED;
 
+import java.util.Collection;
+import java.util.List;
+
 @Mapper
 public interface PartnerMapper extends BaseMapperX<PartnerDO> {
+    default List<PartnerDO> selectListByIds(Collection<Long> ids) {
+        return selectList(new LambdaQueryWrapperX<PartnerDO>()
+                .in(PartnerDO::getId, ids));
+    }
+
     default PartnerDO selectByBoundUserId(Long userId) {
         return selectOne(new LambdaQueryWrapperX<PartnerDO>()
                 .eq(PartnerDO::getBoundSystemUserId, userId).last("LIMIT 1"));

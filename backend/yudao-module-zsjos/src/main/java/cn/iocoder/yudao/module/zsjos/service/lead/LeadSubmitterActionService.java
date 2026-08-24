@@ -5,7 +5,6 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
@@ -32,10 +31,11 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Service
 public class LeadSubmitterActionService {
     @Resource private LeadMapper leadMapper; @Resource private LeadIntendedProductMapper productMapper;
-    @Resource private AreaApi areaApi; @Resource private DictDataApi dictDataApi;
+    @Resource private AreaApi areaApi;
     @Resource private ZsjosProductSkuService productSkuService; @Resource private BusinessEventMapper eventMapper;
     @Resource private LeadUrgeMapper urgeMapper; @Resource private LeadNotifyEventPublisher notifyPublisher;
     @Resource private LeadSubmissionIdentityService identityService;
+    @Resource private LeadCategorySnapshotService categorySnapshotService;
 
     @Transactional(rollbackFor = Exception.class)
     public void supplement(Long leadId, Long userId, LeadSubmitterSupplementReqVO req) {
@@ -52,13 +52,17 @@ public class LeadSubmitterActionService {
         LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId, partnerId);
         requireActionable(lead);
         Region region = region(req.getProvinceCode(), req.getCityCode());
-        dictDataApi.validateDictDataList(DICT_CATEGORY, List.of(req.getLeadCategory()));
+        LeadCategorySnapshotService.Selection category = categorySnapshotService.requireEnabled(req.getLeadCategory());
         List<LeadProductSnapshot> snapshots = products(req.getIntendedProducts());
         Map<String,Object> before = Map.of("provinceCode", Objects.toString(lead.getProvinceCode(), ""),
                 "cityCode", Objects.toString(lead.getCityCode(), ""), "leadCategory", Objects.toString(lead.getLeadCategory(), ""),
                 "remark", Objects.toString(lead.getRemark(), ""));
         lead.setProvinceCode(region.provinceCode()); lead.setProvinceName(region.provinceName());
-        lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName()); lead.setLeadCategory(req.getLeadCategory());
+        lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName());
+        if (!Objects.equals(lead.getLeadCategory(), category.value())) {
+            lead.setLeadCategory(category.value());
+            lead.setLeadCategoryLabelSnapshot(category.labelSnapshot());
+        }
         lead.setRemark(StrUtil.trimToNull(req.getRemark())); leadMapper.updateById(lead);
         productMapper.deleteByLeadId(leadId); insertProducts(leadId, req.getIntendedProducts(), snapshots);
         BusinessEventDO event = new BusinessEventDO(); event.setEventType("lead_submitter_supplemented");

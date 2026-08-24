@@ -46,23 +46,29 @@ public class MyStudentServiceImpl implements MyStudentService {
 
     @Override
     public PageResult<MyStudentRespVO> getMyPage(Long userId, MyStudentPageReqVO reqVO) {
-        Map<Long, List<ServiceRelationDO>> groups = selectAssignedRelations(userId).stream()
-                .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
         List<Long> matchedIds = advancedFilterService.matchStudentPersonIds(reqVO.getAdvancedFilter(), userId);
-        PageResult<PersonDO> people = personMapper.selectStudentPage(reqVO, groups.keySet(), matchedIds);
+        PageResult<PersonDO> people = personMapper.selectMyStudentPage(reqVO, userId, matchedIds);
+        List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
+        Map<Long, List<ServiceRelationDO>> groups = relationMapper
+                .selectAssignedByUserAndPersonIds(userId, personIds, reqVO.getServiceStatus()).stream()
+                .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
         return new PageResult<>(people.getList().stream().map(person -> convert(userId, person.getId(), groups.get(person.getId())))
                 .toList(), people.getTotal());
     }
 
     @Override
     public PageResult<MyStudentRespVO> getMediaPage(Long userId, MyStudentPageReqVO reqVO) {
+        PageResult<PersonDO> people = personMapper.selectMediaStudentPage(reqVO, userId);
+        List<Long> personIds = people.getList().stream().map(PersonDO::getId).toList();
+        Set<Long> participantPersonIds = new HashSet<>(mediaAccountMapper.selectParticipantStudentIds(userId, personIds));
         Map<Long, ServiceRelationDO> visibleRelations = new LinkedHashMap<>();
-        relationMapper.selectActiveByContentDirector(userId).forEach(row -> visibleRelations.put(row.getId(), row));
-        relationMapper.selectActiveByPersonIds(mediaAccountMapper.selectParticipantStudentIds(userId))
+        relationMapper.selectActiveByPersonIds(personIds).stream()
+                .filter(row -> Objects.equals(row.getContentDirectorUserId(), userId)
+                        || Objects.equals(row.getCareerPlannerUserId(), userId)
+                        || participantPersonIds.contains(row.getPersonId()))
                 .forEach(row -> visibleRelations.put(row.getId(), row));
         Map<Long, List<ServiceRelationDO>> groups = visibleRelations.values().stream()
                 .collect(Collectors.groupingBy(ServiceRelationDO::getPersonId, LinkedHashMap::new, Collectors.toList()));
-        PageResult<PersonDO> people = personMapper.selectStudentPage(reqVO, groups.keySet(), null);
         return new PageResult<>(people.getList().stream()
                 .map(person -> convert(userId, person.getId(), groups.get(person.getId())))
                 .toList(), people.getTotal());
@@ -86,10 +92,8 @@ public class MyStudentServiceImpl implements MyStudentService {
         Map<Long, ServiceRelationDO> visibleRelations = new LinkedHashMap<>();
         relationMapper.selectActiveByContentDirectorAndPerson(userId, personId)
                 .forEach(row -> visibleRelations.put(row.getId(), row));
-        if (!mediaAccountMapper.selectByParticipantAndStudent(userId, personId).isEmpty()) {
-            relationMapper.selectActiveByPersonIds(List.of(personId))
-                    .forEach(row -> visibleRelations.put(row.getId(), row));
-        }
+        relationMapper.selectAssignedByUserAndPersonIds(userId, List.of(personId), null)
+                .forEach(row -> visibleRelations.put(row.getId(), row));
         List<ServiceRelationDO> relations = new ArrayList<>(visibleRelations.values());
         if (relations.isEmpty()) throw exception(STUDENT_NOT_EXISTS);
         return convert(userId, personId, relations);
@@ -104,7 +108,9 @@ public class MyStudentServiceImpl implements MyStudentService {
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
     public MyStudentRespVO getMyStudentByService(Long userId, Long relationId) {
         ServiceRelationDO relation = relationMapper.selectById(relationId);
-        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_NOT_EXISTS);
+        if (relation == null || !Set.of("active", "paused", "completed").contains(relation.getStatus())) {
+            throw exception(STUDENT_NOT_EXISTS);
+        }
         List<ServiceRelationDO> relations = selectAssignedRelationsForPerson(userId, relation.getPersonId());
         if (relations.stream().noneMatch(item -> Objects.equals(item.getId(), relationId))) {
             throw exception(STUDENT_NOT_EXISTS);
@@ -113,7 +119,7 @@ public class MyStudentServiceImpl implements MyStudentService {
     }
 
     private List<ServiceRelationDO> selectAssignedRelationsForPerson(Long userId, Long personId) {
-        List<ServiceRelationDO> owned = relationMapper.selectActiveByOwnerAndPerson(userId, personId);
+        List<ServiceRelationDO> owned = relationMapper.selectByOwnerAndPersonIncludingHistory(userId, personId);
         Map<Long, ServiceRelationDO> result = new LinkedHashMap<>();
         owned.forEach(relation -> result.put(relation.getId(), relation));
         relationMapper.selectActiveByCollaboratorAndPerson(userId, personId).stream()
@@ -122,7 +128,7 @@ public class MyStudentServiceImpl implements MyStudentService {
     }
 
     private List<ServiceRelationDO> selectAssignedRelations(Long userId) {
-        List<ServiceRelationDO> owned = relationMapper.selectByOwnerUserId(userId);
+        List<ServiceRelationDO> owned = relationMapper.selectByOwnerUserIdIncludingHistory(userId);
         Map<Long, ServiceRelationDO> result = new LinkedHashMap<>();
         owned.forEach(relation -> result.put(relation.getId(), relation));
         relationMapper.selectActiveByCollaborator(userId)
@@ -131,13 +137,14 @@ public class MyStudentServiceImpl implements MyStudentService {
     }
 
     private MyStudentRespVO convert(Long userId, Long personId, List<ServiceRelationDO> relations) {
+        relations = relations == null ? List.of() : relations;
         PersonDO person = personMapper.selectById(personId);
         if (person == null) throw exception(STUDENT_NOT_EXISTS);
         Set<Long> orderIds = relations.stream().map(ServiceRelationDO::getOrderId).collect(Collectors.toSet());
-        Map<Long, SalesOrderDO> orders = orderMapper.selectBatchIds(orderIds).stream()
+        Map<Long, SalesOrderDO> orders = orderIds.isEmpty() ? Map.of() : orderMapper.selectBatchIds(orderIds).stream()
                 .collect(Collectors.toMap(SalesOrderDO::getId, Function.identity()));
         Set<Long> itemIds = relations.stream().map(ServiceRelationDO::getOrderItemId).collect(Collectors.toSet());
-        Map<Long, SalesOrderItemDO> items = orderItemMapper.selectBatchIds(itemIds).stream()
+        Map<Long, SalesOrderItemDO> items = itemIds.isEmpty() ? Map.of() : orderItemMapper.selectBatchIds(itemIds).stream()
                 .collect(Collectors.toMap(SalesOrderItemDO::getId, Function.identity()));
         Set<Long> collaboratorIds = relations.stream()
                 .flatMap(relation -> java.util.stream.Stream.of(relation.getContentDirectorUserId(), relation.getCareerPlannerUserId()))

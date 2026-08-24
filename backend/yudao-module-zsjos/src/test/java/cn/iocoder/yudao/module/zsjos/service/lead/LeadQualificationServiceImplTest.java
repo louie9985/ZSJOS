@@ -52,13 +52,22 @@ class LeadQualificationServiceImplTest {
     @Mock private LeadIntendedProductMapper intendedProductMapper;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private CashbackService cashbackService;
+    @Mock private LeadCategorySnapshotService categorySnapshotService;
 
     @org.junit.jupiter.api.BeforeEach
-    void setUpAdvancedFilter() { lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null); }
+    void setUpAdvancedFilter() {
+        lenient().when(advancedFilterService.matchLeadIds(any())).thenReturn(null);
+        lenient().when(categorySnapshotService.requireEnabled(any()))
+                .thenReturn(new LeadCategorySnapshotService.Selection(null, null));
+    }
 
     @Test
     void judgeValidCompletesCurrentQualificationRound() {
         LeadDO lead = pendingLead();
+        lead.setLeadCategory("high_intent");
+        lead.setLeadCategoryLabelSnapshot("提交时分类");
+        when(categorySnapshotService.requireEnabled(any()))
+                .thenReturn(new LeadCategorySnapshotService.Selection("high_intent", "当前字典名称"));
         when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
         when(eventMapper.selectByIdempotencyKey("lead-qualification:request-1")).thenReturn(null);
         doAnswer(invocation -> {
@@ -72,6 +81,7 @@ class LeadQualificationServiceImplTest {
         assertEquals("owned", lead.getAssignmentStatus());
         assertEquals("已确认有明确学习意向", lead.getValidDescription());
         assertEquals(20L, lead.getQualifiedByUserId());
+        assertEquals("提交时分类", lead.getLeadCategoryLabelSnapshot());
         assertNotNull(lead.getQualifiedAt());
         verify(opportunityMapper).insert(argThat((OpportunityDO opportunity) ->
                 "initial_conversion".equals(opportunity.getType())

@@ -144,6 +144,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             notifyEventPublisher.publish(CATEGORY_CHANGED, leadId, categoryEvent.getIdempotencyKey(), operatorUserId,
                     occurredAt, categoryContext);
             lead.setLeadCategory(categoryAfter);
+            lead.setLeadCategoryLabelSnapshot(labelOf(afterCategory, categoryAfter));
         }
         boolean first = lifecycleTaskService.completeFirstFollowUpTask(
                 lead.getCurrentAssignmentHistoryId(), occurredAt);
@@ -240,7 +241,11 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             image.setOriginalName(file.getName()); image.setContentType(file.getType());
             image.setFileSize(file.getSize()); image.setSort(i); opportunityImageMapper.insert(image);
         }
-        lead.setLeadCategory(categoryAfter); lead.setLastFollowUpAt(occurredAt); lead.setLastActivityAt(occurredAt);
+        lead.setLeadCategory(categoryAfter);
+        if (!Objects.equals(record.getCategoryBefore(), categoryAfter)) {
+            lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
+        }
+        lead.setLastFollowUpAt(occurredAt); lead.setLastActivityAt(occurredAt);
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
         leadMapper.updateById(lead);

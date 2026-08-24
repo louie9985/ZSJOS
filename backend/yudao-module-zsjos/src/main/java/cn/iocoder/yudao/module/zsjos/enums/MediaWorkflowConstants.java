@@ -68,7 +68,6 @@ public final class MediaWorkflowConstants {
     public static final String ACTION_ACCEPT_TICKET = "ACCEPT_TICKET";
     public static final String ACTION_CHECK_TICKET = "CHECK_TICKET";
     public static final String ACTION_ACCEPT_CONTENT = "ACCEPT_CONTENT";
-    public static final String ACTION_ACCEPT_HANDOVER = "ACCEPT_HANDOVER";
     public static final String ACTION_ADVANCE_STAGE = "ADVANCE_STAGE";
     public static final String ACTION_ROLLBACK_STAGE = "ROLLBACK_STAGE";
 

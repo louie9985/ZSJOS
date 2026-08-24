@@ -133,7 +133,7 @@ public class LeadManagementController {
     @GetMapping("/get")
     @Operation(summary = "获得客资详情")
     @Parameter(name = "id", description = "内部客资ID", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query','zsjos:student:query-my','zsjos:sales-order:query','zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read','zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query','zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query','zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read','zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
     public CommonResult<LeadManagementRespVO> getLead(@RequestParam("id") Long id) {
         return success(leadManagementService.getLead(id, getLoginUserId()));
     }

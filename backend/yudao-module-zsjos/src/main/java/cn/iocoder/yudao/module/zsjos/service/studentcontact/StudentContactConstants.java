@@ -5,6 +5,17 @@ public interface StudentContactConstants {
     String TYPE_FIRST_CONTACT = "student_first_contact";
     String TYPE_STUDY_PLAN = "student_study_plan";
     String TYPE_CONTACT = "student_contact";
+    String TYPE_DELIVERY_STAGE = "student_delivery_stage";
+    String STAGE_FIRST_CONTACT = "first_contact";
+    String STAGE_STUDY_PLAN = "study_plan";
+    String STAGE_GROUP_HANDOFF = "group_handoff";
+    String STAGE_SUPERVISION = "supervision";
+    String STAGE_EXAM_CONFIRMATION = "exam_confirmation";
+    String STAGE_EXAM_PREPARATION = "exam_preparation";
+    String STAGE_POST_EXAM = "post_exam";
+    String STAGE_RESULT = "result";
+    String STAGE_CERTIFICATE = "certificate";
+    String STAGE_COMPLETED = "completed";
     String TYPE_ASSISTANCE = "student_first_contact_assistance";
     String ACTION_FIRST_CONTACT = "OPEN_STUDENT_FIRST_CONTACT";
     String ACTION_STUDY_PLAN = "OPEN_STUDENT_STUDY_PLAN";
@@ -37,6 +48,7 @@ public interface StudentContactConstants {
     String PERMISSION_FIRST_CONTACT_SUBMIT = "zsjos:student-contact:first-submit";
     String PERMISSION_STUDY_PLAN_SUBMIT = "zsjos:student-contact:study-plan-submit";
     String PERMISSION_CONTACT_SUBMIT = "zsjos:student-contact:submit";
+    String PERMISSION_DELIVERY_STAGE_SUBMIT = "zsjos:student-contact:delivery-stage-submit";
     String PERMISSION_COLLABORATOR_ASSIGN = "zsjos:student-collaborator:assign";
     String NOTIFY_FIRST_CONTACT = "zsjos.student.first_contact_reminder";
     String NOTIFY_STUDY_PLAN = "zsjos.student.study_plan_reminder";

@@ -27,7 +27,8 @@ describe('study planner student sales history', () => {
 
   it('uses service contact and order snapshots in the planner overview', () => {
     const overview = readFileSync('src/components/LeadDetailOverview.tsx', 'utf8')
-    expect(overview).toContain("studentContext ? '成交产品' : '意向产品'")
+    expect(overview).toContain('const service = studentContext?.service || studentService')
+    expect(overview).toContain("service ? '成交产品' : '意向产品'")
     expect(overview).toContain('<LatestStudentContact records={studentContext.contactRecords} />')
     expect(overview).toContain("{ key: 'student_first_contact', label: '首联' }")
     expect(overview).toContain("{ key: 'student_study_plan', label: '制定学习计划' }")

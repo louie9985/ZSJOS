@@ -50,6 +50,7 @@ class LeadDuplicateReviewServiceImplTest {
     @Mock private LeadLifecycleTaskService lifecycleTaskService;
     @Mock private LeadNotifyEventPublisher notifyEventPublisher;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
+    @Mock private LeadCategorySnapshotService categorySnapshotService;
 
     @BeforeEach
     void setUp() {
@@ -104,6 +105,7 @@ class LeadDuplicateReviewServiceImplTest {
         assertEquals("public_pool", lead.getAssignmentStatus());
         assertNull(lead.getOwnerUserId());
         assertNull(lead.getOwnershipStartedAt());
+        assertEquals("提交时分类", lead.getLeadCategoryLabelSnapshot());
         verify(lifecycleTaskService).cancelFirstFollowUpTasks(eq(20L), any(), any());
         verify(lifecycleTaskService).cancelFollowUpReminders(eq(20L), any(), any());
         verify(notifyEventPublisher).publish(eq(DUPLICATE_REACTIVATED), eq(20L), any(), eq(99L), any(), any());
@@ -137,6 +139,7 @@ class LeadDuplicateReviewServiceImplTest {
     private static LeadDuplicateReviewDO review(Long id) {
         LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
         review.setId(id); review.setStatus("pending"); review.setSubmitterUserId(5L);
+        review.setLeadCategoryLabelSnapshot("提交时分类");
         review.setSubmissionIdempotencyKey("submission-1"); review.setVersion(0);
         review.setSubmissionSnapshot("{\"name\":\"新客户\",\"mobile\":\"13800138000\","
                 + "\"provinceCode\":\"OTHER\",\"cityCode\":\"OTHER\","

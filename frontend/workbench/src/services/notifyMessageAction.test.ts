@@ -164,7 +164,6 @@ describe('notify message business actions', () => {
 
   it.each([
     ['production-ticket', '/zsjos/production-tickets?ticketId=41'],
-    ['handover', '/zsjos/handovers?handoverId=41']
   ])('opens %s notifications at the existing Workbench route', async (bizType, expected) => {
     const navigate = vi.fn()
     await executeNotifyMessageAction(message({ bizType, bizId: 41, sceneCode: `media.${bizType}.updated` }), {

@@ -10,6 +10,10 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.production.ProductionTicketMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.GraduationApplicationMapper;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.MediaStudentTalkRecordMapper;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardRespVO;
@@ -25,7 +29,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class MediaStudentServiceTest {
@@ -38,6 +42,10 @@ class MediaStudentServiceTest {
     @Mock private MediaAccountService accountService;
     @Mock private ContentService contentService;
     @Mock private PositioningCardService positioningService;
+    @Mock private GraduationApplicationMapper graduationMapper;
+    @Mock private AdminUserApi adminUserApi;
+    @Mock private MediaStudentTalkRecordMapper talkRecordMapper;
+    @Mock private PermissionApi permissionApi;
 
     @Test
     void detailUsesOnlyDirectorOwnedStudentAccounts() {
@@ -47,7 +55,7 @@ class MediaStudentServiceTest {
                 .setNickname("账号").setPlatformLabelSnapshot("视频平台").setSStage("s2");
         ContentDO content = new ContentDO(); content.setId(4L); content.setAccountId(3L); content.setStatus("script");
         PositioningCardDO positioning = new PositioningCardDO().setId(5L).setAccountId(3L)
-                .setStudentPersonId(2L).setStatus("co_creating");
+                .setStudentPersonId(2L).setDirectorUserId(9L).setStatus("co_creating");
         ProductionTicketDO ticket = new ProductionTicketDO(); ticket.setId(6L); ticket.setAccountId(3L); ticket.setStatus("pending_accept");
 
         when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
@@ -56,14 +64,15 @@ class MediaStudentServiceTest {
         accountDetail.setAvailableActions(List.of("update")); accountDetail.setDetailSnapshots(List.of());
         when(accountService.get(3L, 1L)).thenReturn(accountDetail);
         when(positioningMapper.selectByStudentAndAccountIds(2L, List.of(3L))).thenReturn(List.of(positioning));
-        PositioningCardRespVO positioningDetail = new PositioningCardRespVO();
-        positioningDetail.setAvailableActions(List.of("submit-review"));
-        when(positioningService.get(5L, 1L)).thenReturn(positioningDetail);
+        when(positioningService.availableActionsForVisible(positioning, 1L, false)).thenReturn(List.of());
         when(contentMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of(content));
         ContentRespVO contentDetail = new ContentRespVO();
         contentDetail.setAvailableActions(List.of("update-script"));
-        when(contentService.get(4L, 1L)).thenReturn(contentDetail);
+        when(contentService.availableActionsForVisible(content, 1L, false))
+                .thenReturn(contentDetail.getAvailableActions());
         when(ticketMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of(ticket));
+        when(graduationMapper.selectByStudent(2L)).thenReturn(List.of());
+        when(talkRecordMapper.selectRecentByStudent(2L)).thenReturn(List.of());
 
         MediaStudentDetailRespVO result = service.getDetail(1L, 2L);
 
@@ -72,6 +81,12 @@ class MediaStudentServiceTest {
         assertEquals("s2", result.getAccounts().getFirst().getStage());
         assertEquals(4L, result.getContents().getFirst().getId());
         assertEquals(5L, result.getPositioningCards().getFirst().getId());
+        assertEquals(List.of(), result.getPositioningCards().getFirst().getAvailableActions());
         assertEquals(6L, result.getProductionTickets().getFirst().getId());
+        assertEquals(3, result.getTaskLine().size());
+        assertEquals(0, result.getPendingStats().getPositioningCount());
+        assertEquals(1, result.getPendingStats().getContentCount());
+        assertEquals(1, result.getPendingStats().getProductionCount());
+        verify(positioningService).availableActionsForVisible(positioning, 1L, false);
     }
 }

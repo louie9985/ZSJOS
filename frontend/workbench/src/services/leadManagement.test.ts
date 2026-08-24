@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { ManagedLead } from './api'
-import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, pinLeadFirst, prioritizeLeads, protocolDisplayLabel, resolveLeadSelection, resolvedDisplayLabel, snapshotDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
+import { applyInvalidRemarkTemplate, canJudgeLeadQualification, defaultInboxStage, dictionaryDisplayLabel, hasNextLeadInboxPage, invalidReasonSnapshotLabel, isLeadInboxUnauthorized, leadPendingTaskAlert, mergeUniqueLeads, pinLeadFirst, prioritizeLeads, protocolDisplayLabel, resolveLeadSelection, resolvedDisplayLabel, snapshotDisplayLabel, snapshotOrDictionaryDisplayLabel, sumStatusCounts, tryStartLeadPageRequest } from './leadManagement'
 
 const lead = (id: number, name: string): ManagedLead => ({
   id,
@@ -78,6 +78,15 @@ describe('lead management paging helpers', () => {
     expect(resolvedDisplayLabel('抖音', 'douyin')).toBe('抖音')
     expect(resolvedDisplayLabel(undefined, 'douyin')).toBe('标签未配置')
     expect(resolvedDisplayLabel(undefined, undefined)).toBe('-')
+  })
+
+  it('keeps the persisted Lead category label after dictionary labels change', () => {
+    const current = [{ value: 'high_intent', label: '当前分类名称' }]
+
+    expect(snapshotOrDictionaryDisplayLabel('提交时分类名称', current, 'high_intent'))
+      .toBe('提交时分类名称')
+    expect(snapshotOrDictionaryDisplayLabel(undefined, current, 'high_intent'))
+      .toBe('当前分类名称')
   })
 
   it('does not expose unknown protocol keys as user-facing statuses', () => {

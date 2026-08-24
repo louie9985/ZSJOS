@@ -9,11 +9,13 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkR
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.MediaStudentTalkRecordMapper;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.production.ProductionTicketMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.GraduationApplicationMapper;
 import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountService;
 import cn.iocoder.yudao.module.zsjos.service.content.ContentService;
 import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningCardService;
@@ -21,6 +23,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Map;
+import java.util.Set;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.MEDIA_ACCOUNT_STUDENT_INVALID;
 
@@ -36,12 +42,17 @@ public class MediaStudentService {
     @Resource private PositioningCardService positioningService;
     @Resource private MediaStudentTalkRecordMapper talkRecordMapper;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private GraduationApplicationMapper graduationMapper;
+    @Resource private PermissionApi permissionApi;
 
     public MediaStudentDetailRespVO getDetail(Long userId, Long personId) {
         MediaStudentDetailRespVO result = new MediaStudentDetailRespVO();
         result.setStudent(myStudentService.getMediaStudent(userId, personId));
         List<MediaAccountDO> accounts = accountMapper.selectByParticipantAndStudent(userId, personId);
         List<Long> accountIds = accounts.stream().map(MediaAccountDO::getId).toList();
+        Map<Long, MediaAccountDO> accountById = accounts.stream()
+                .collect(java.util.stream.Collectors.toMap(MediaAccountDO::getId, row -> row));
+        boolean positioningQueryAll = permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:query-all");
         result.setAccounts(accounts.stream().map(account -> {
             MediaStudentDetailRespVO.AccountVO row = BeanUtils.toBean(account, MediaStudentDetailRespVO.AccountVO.class);
             row.setPlatformLabel(account.getPlatformLabelSnapshot());
@@ -49,23 +60,159 @@ public class MediaStudentService {
             var accountDetail = accountService.get(account.getId(), userId);
             row.setAvailableActions(accountDetail.getAvailableActions());
             row.setDetailSnapshots(accountDetail.getDetailSnapshots());
+            row.setLastActivityAt(account.getUpdateTime());
             return row;
         }).toList());
-        result.setPositioningCards(positioningMapper.selectByStudentAndAccountIds(personId, accountIds).stream()
+        var positioningCards = positioningMapper.selectByStudentAndAccountIds(personId, accountIds);
+        result.setPositioningCards(positioningCards.stream()
                 .map(row -> {
                     MediaStudentDetailRespVO.PositioningVO value = BeanUtils.toBean(row, MediaStudentDetailRespVO.PositioningVO.class);
-                    value.setAvailableActions(positioningService.get(row.getId(), userId).getAvailableActions());
+                    MediaAccountDO account = accountById.get(row.getAccountId());
+                    boolean objectAuthorized = positioningQueryAll || userId.equals(row.getDirectorUserId())
+                            || account != null && userId.equals(account.getOwnerOperatorUserId());
+                    value.setAvailableActions(positioningService.availableActionsForVisible(row, userId,
+                            objectAuthorized));
+                    value.setLastActivityAt(row.getUpdateTime());
                     return value;
                 }).toList());
-        result.setContents(contentMapper.selectByAccountIds(accountIds).stream()
+        var contents = contentMapper.selectByAccountIds(accountIds);
+        result.setContents(contents.stream()
                 .map(row -> {
                     MediaStudentDetailRespVO.ContentVO value = BeanUtils.toBean(row, MediaStudentDetailRespVO.ContentVO.class);
-                    value.setAvailableActions(contentService.get(row.getId(), userId).getAvailableActions());
+                    MediaAccountDO account = accountById.get(row.getAccountId());
+                    boolean objectAuthorized = permissionApi.hasAnyPermissions(userId, "zsjos:content:query-all")
+                            || userId.equals(row.getOwnerOperatorUserId())
+                            || userId.equals(row.getFilmingEditorUserId())
+                            || account != null && (userId.equals(account.getDirectorUserId())
+                            || userId.equals(account.getOwnerOperatorUserId()));
+                    value.setAvailableActions(contentService.availableActionsForVisible(row, userId, objectAuthorized));
+                    value.setLastActivityAt(row.getUpdateTime());
                     return value;
                 }).toList());
-        result.setProductionTickets(ticketMapper.selectByAccountIds(accountIds).stream()
-                .map(row -> BeanUtils.toBean(row, MediaStudentDetailRespVO.TicketVO.class)).toList());
+        var tickets = ticketMapper.selectByAccountIds(accountIds);
+        result.setProductionTickets(tickets.stream().map(row -> {
+            MediaStudentDetailRespVO.TicketVO value = BeanUtils.toBean(row, MediaStudentDetailRespVO.TicketVO.class);
+            value.setLastActivityAt(row.getUpdateTime());
+            return value;
+        }).toList());
+        var graduations = graduationMapper.selectByStudent(personId);
+        var talks = talkRecordMapper.selectRecentByStudent(personId);
+        result.setOperationTimeline(buildOperationTimeline(
+                accountMapper.selectRecentByParticipantAndStudent(userId, personId),
+                positioningMapper.selectRecentByStudentAndAccountIds(personId, accountIds),
+                contentMapper.selectRecentByAccountIds(accountIds), ticketMapper.selectRecentByAccountIds(accountIds),
+                graduations, talks));
+        result.setTaskLine(buildTaskLine(positioningCards, contents, graduations));
+        MediaStudentDetailRespVO.PendingStatsVO pending = new MediaStudentDetailRespVO.PendingStatsVO();
+        pending.setAccountCount((int) result.getAccounts().stream()
+                .filter(row -> row.getAvailableActions() != null && !row.getAvailableActions().isEmpty()).count());
+        pending.setPositioningCount((int) result.getPositioningCards().stream()
+                .filter(row -> row.getAvailableActions() != null && !row.getAvailableActions().isEmpty()).count());
+        pending.setContentCount((int) result.getContents().stream()
+                .filter(row -> row.getAvailableActions() != null && !row.getAvailableActions().isEmpty()).count());
+        pending.setProductionCount((int) tickets.stream().filter(row -> !"completed".equals(row.getStatus())).count());
+        result.setPendingStats(pending);
         return result;
+    }
+
+    private List<MediaStudentDetailRespVO.OperationVO> buildOperationTimeline(
+            List<MediaAccountDO> accounts,
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO> positioningCards,
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentDO> contents,
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.production.ProductionTicketDO> tickets,
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.GraduationApplicationDO> graduations,
+            List<MediaStudentTalkRecordDO> talks) {
+        Set<Long> operatorIds = new java.util.HashSet<>();
+        accounts.forEach(row -> { operatorIds.add(row.getDirectorUserId()); operatorIds.add(row.getOwnerOperatorUserId()); });
+        positioningCards.forEach(row -> { operatorIds.add(row.getDirectorUserId()); operatorIds.add(row.getOperatorReviewedByUserId()); });
+        contents.forEach(row -> { operatorIds.add(row.getOwnerOperatorUserId()); operatorIds.add(row.getFilmingEditorUserId()); });
+        tickets.forEach(row -> { operatorIds.add(row.getOwnerOperatorUserId()); operatorIds.add(row.getAssigneeFilmingEditorUserId()); operatorIds.add(row.getReviewerUserId()); });
+        graduations.forEach(row -> { operatorIds.add(row.getDirectorUserId()); operatorIds.add(row.getOperatorUserId()); operatorIds.add(row.getReviewerUserId()); });
+        talks.forEach(row -> operatorIds.add(row.getOperatorUserId()));
+        accounts.forEach(row -> operatorIds.add(parseUserId(row.getUpdater())));
+        positioningCards.forEach(row -> operatorIds.add(parseUserId(row.getUpdater())));
+        contents.forEach(row -> operatorIds.add(parseUserId(row.getUpdater())));
+        tickets.forEach(row -> operatorIds.add(parseUserId(row.getUpdater())));
+        graduations.forEach(row -> operatorIds.add(parseUserId(row.getUpdater())));
+        talks.forEach(row -> operatorIds.add(parseUserId(row.getUpdater())));
+        operatorIds.remove(null);
+        Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users = operatorIds.isEmpty()
+                ? Map.of() : adminUserApi.getUserMap(operatorIds);
+        List<MediaStudentDetailRespVO.OperationVO> timeline = new ArrayList<>();
+        accounts.forEach(row -> timeline.add(operation("account-" + row.getId(), "account", "第三方账号更新",
+                row.getNickname() == null ? row.getAccountNo() : row.getNickname(),
+                userName(users, row.getUpdater(), row.getDirectorUserId()), row.getUpdateTime())));
+        positioningCards.forEach(row -> timeline.add(operation("positioning-" + row.getId(), "positioning", "账号定位更新",
+                row.getCardNo() + " · " + row.getStatus(),
+                userName(users, row.getUpdater(), row.getDirectorUserId()), row.getUpdateTime())));
+        contents.forEach(row -> timeline.add(operation("content-" + row.getId(), "content", "内容生产更新",
+                (row.getTitle() == null ? row.getContentNo() : row.getTitle()) + " · " + row.getStatus(),
+                userName(users, row.getUpdater(), row.getOwnerOperatorUserId()), row.getUpdateTime())));
+        tickets.forEach(row -> timeline.add(operation("ticket-" + row.getId(), "production", "拍剪工单更新",
+                row.getTicketNo() + " · " + row.getStatus(),
+                userName(users, row.getUpdater(), row.getAssigneeFilmingEditorUserId()), row.getUpdateTime())));
+        graduations.forEach(row -> timeline.add(operation("graduation-" + row.getId(), "graduation", "结业流程更新",
+                row.getApplicationNo() + " · " + row.getStatus(),
+                userName(users, row.getUpdater(), row.getReviewerUserId()), row.getUpdateTime())));
+        talks.forEach(row -> timeline.add(operation("talk-" + row.getId(), "talk", "交谈记录",
+                row.getContent(), userName(users, row.getUpdater(), row.getOperatorUserId()), row.getOccurredAt())));
+        return timeline.stream().filter(row -> row.getOccurredAt() != null)
+                .sorted(Comparator.comparing(MediaStudentDetailRespVO.OperationVO::getOccurredAt).reversed()
+                        .thenComparing(MediaStudentDetailRespVO.OperationVO::getKey, Comparator.reverseOrder()))
+                .limit(20).toList();
+    }
+
+    private List<MediaStudentDetailRespVO.TaskStageVO> buildTaskLine(
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO> positioningCards,
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentDO> contents,
+            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.GraduationApplicationDO> graduations) {
+        String positioningStatus = positioningCards.isEmpty() ? null : positioningCards.get(0).getStatus();
+        String operationStatus = contents.isEmpty() ? null : contents.get(0).getStatus();
+        String graduationStatus = graduations.isEmpty() ? null : graduations.get(0).getStatus();
+        boolean positioningDone = "archived".equals(positioningStatus);
+        boolean positioningStarted = positioningStatus != null;
+        boolean operationDone = "published".equals(operationStatus);
+        boolean operationStarted = operationStatus != null;
+        boolean graduationDone = "approved".equals(graduationStatus);
+        boolean graduationStarted = graduationStatus != null;
+        return List.of(
+                taskStage("positioning", "定位", stageStatus(positioningDone, positioningStarted),
+                        positioningDone ? "定位已归档" : positioningStarted ? "定位处理中" : "尚未发起定位"),
+                taskStage("operation", "运营", stageStatus(operationDone, operationStarted),
+                        operationDone ? "已有内容发布" : operationStarted ? "内容运营中" : "尚未开始运营"),
+                taskStage("graduation", "结业", stageStatus(graduationDone, graduationStarted),
+                        graduationDone ? "结业已通过" : graduationStarted ? "结业流程中" : "尚未发起结业")
+        );
+    }
+
+    private static String stageStatus(boolean done, boolean started) {
+        return done ? "done" : started ? "current" : "pending";
+    }
+
+    private static MediaStudentDetailRespVO.TaskStageVO taskStage(String key, String label, String status, String detail) {
+        MediaStudentDetailRespVO.TaskStageVO row = new MediaStudentDetailRespVO.TaskStageVO();
+        row.setKey(key); row.setLabel(label); row.setStatus(status); row.setDetail(detail); return row;
+    }
+
+    private static MediaStudentDetailRespVO.OperationVO operation(String key, String type, String title,
+                                                                   String detail, String operatorName,
+                                                                   java.time.LocalDateTime occurredAt) {
+        MediaStudentDetailRespVO.OperationVO row = new MediaStudentDetailRespVO.OperationVO();
+        row.setKey(key); row.setType(type); row.setTitle(title); row.setDetail(detail);
+        row.setOperatorName(operatorName); row.setOccurredAt(occurredAt); return row;
+    }
+
+    private static String userName(Map<Long, cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO> users,
+                                   String updater, Long fallbackUserId) {
+        Long userId = parseUserId(updater);
+        if (userId == null) userId = fallbackUserId;
+        var user = userId == null ? null : users.get(userId);
+        return user == null ? null : user.getNickname();
+    }
+
+    private static Long parseUserId(String value) {
+        if (value == null || value.isBlank()) return null;
+        try { return Long.valueOf(value); } catch (NumberFormatException ignored) { return null; }
     }
 
     public MediaStudentTargetRespVO resolveTarget(Long userId, String bizType, Long bizId) {

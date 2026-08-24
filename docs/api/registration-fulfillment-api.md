@@ -54,9 +54,9 @@ compensation. User-requested attachment deletion continues to remove only the bu
 does not physically delete the Infra file.
 
 When `registrationReview` first passes, the service creates the order-unique case and publishes
-`zsjos.registration.task_created`. The default in-app rule resolves every enabled user who holds
-`zsjos:registration:query-pool`; department membership is not inferred or used to suppress an
-authorized public-pool handler. System persists the message and emits the existing post-commit
+`zsjos.registration.task_created`. The default in-app rule resolves the intersection of enabled
+users who hold `zsjos:registration:query-pool` and enabled users in the configured registration
+approval department subtree (including the configured root department). System persists the message and emits the existing post-commit
 WebSocket hint.
 
 When a case is assigned to a study planner, `zsjos.registration.planner_assigned` sends the

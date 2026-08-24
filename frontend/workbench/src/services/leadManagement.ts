@@ -48,6 +48,15 @@ export function dictionaryDisplayLabel(
   return loadFailed ? '标签加载失败' : '标签未配置'
 }
 
+export function snapshotOrDictionaryDisplayLabel(
+  snapshot: string | undefined,
+  options: Array<{ value: string; label: string }>,
+  value?: string,
+  loadFailed = false
+): string {
+  return snapshot?.trim() || dictionaryDisplayLabel(options, value, loadFailed)
+}
+
 export function resolvedDisplayLabel(label?: string, value?: string): string {
   if (!value) return '-'
   return label || '标签未配置'
