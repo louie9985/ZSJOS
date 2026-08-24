@@ -32,18 +32,18 @@ public class RegistrationNotifyPublisher {
     }
 
     public void publishPlannerAssigned(RegistrationCaseDO registrationCase, SalesOrderDO order,
-                                       String leadNo, Long plannerUserId) {
+                                       String studentNo, Long plannerUserId, Long personId) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("registrationCaseId", registrationCase.getId());
         payload.put("orderNo", order == null ? "" : order.getOrderNo());
-        payload.put("leadNo", leadNo == null ? "" : leadNo);
+        payload.put("studentNo", studentNo == null ? "" : studentNo);
+        payload.put("studentName", order == null || order.getStudentName() == null ? "" : order.getStudentName());
         payload.put("studyPlannerUserId", plannerUserId);
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
                 .tenantId(TenantContextHolder.getRequiredTenantId())
                 .sceneCode(NOTIFY_SCENE_PLANNER_ASSIGNED)
-                .sourceEventKey("registration-planner-assigned:" + registrationCase.getId() + ":"
-                        + registrationCase.getVersion() + ":" + plannerUserId)
-                .bizType("registration_case").bizId(registrationCase.getId())
+                .sourceEventKey("registration-planner-activated:" + registrationCase.getId() + ":" + plannerUserId)
+                .bizType("student").bizId(personId)
                 .occurredAt(java.time.LocalDateTime.now()).payload(payload).build());
     }
 

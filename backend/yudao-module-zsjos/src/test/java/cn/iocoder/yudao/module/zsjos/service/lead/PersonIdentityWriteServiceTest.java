@@ -27,11 +27,13 @@ class PersonIdentityWriteServiceTest {
     @InjectMocks private PersonIdentityWriteService service;
     @Mock private PersonMapper personMapper;
     @Mock private PersonContactClaimMapper claimMapper;
+    @Mock private PersonNumberService personNumberService;
     private final Map<String, PersonContactClaimDO> claims = new HashMap<>();
 
     @BeforeEach
     void setUp() {
         TenantContextHolder.setTenantId(1L);
+        lenient().when(personNumberService.next()).thenReturn("XY202608241430250001");
         lenient().doAnswer(invocation -> {
             String value = invocation.getArgument(1); String key = invocation.getArgument(2);
             claims.computeIfAbsent(value, ignored -> claim(value, null, key));
@@ -51,6 +53,7 @@ class PersonIdentityWriteServiceTest {
         PersonDO person = service.createNew("张三", " wx-id ", "wx-id", "active");
 
         assertEquals("wx-id", person.getMobile()); assertEquals("wx-id", person.getWechatId());
+        assertEquals("XY202608241430250001", person.getPersonNo());
         verify(claimMapper, times(1)).reserve(eq(1L), eq("wx-id"), anyString());
         verify(claimMapper).bindReservations(eq(1L), anyString(), eq(10L));
     }
@@ -66,6 +69,7 @@ class PersonIdentityWriteServiceTest {
         verify(claimMapper).reserve(eq(1L), eq("WxCase"), anyString());
         verify(claimMapper).bindReservations(eq(1L), anyString(), eq(10L));
         verify(personMapper, never()).insert(any(PersonDO.class));
+        verify(personNumberService, never()).next();
     }
 
     @Test

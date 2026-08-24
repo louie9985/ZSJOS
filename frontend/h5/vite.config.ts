@@ -20,15 +20,16 @@ export default defineConfig({
     }
   },
   server: {
+    host: '0.0.0.0',
     port: 10086,
     strictPort: true,
     proxy: {
       '/part-api': {
-        target: 'http://localhost:48080',
+        target: 'http://127.0.0.1:48080',
         changeOrigin: true
       },
       '/app-api': {
-        target: 'http://localhost:48080',
+        target: 'http://127.0.0.1:48080',
         changeOrigin: true
       }
     }

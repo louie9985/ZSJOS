@@ -46,6 +46,7 @@ import { AdvancedFilterToolbar } from "../components/AdvancedFilter";
 import type { AdvancedFilterGroup } from "../services/api";
 import { DICT_TYPE } from "../constants";
 import { dictionaryDisplayLabel } from "../services/leadManagement";
+import RegistrationAttachmentPreview from "../components/RegistrationAttachmentPreview";
 
 const PAGE_SIZE = 20;
 const errorMessage = (error: unknown) =>
@@ -54,6 +55,10 @@ const key = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const serviceStatusLabel = (status: string) =>
   ({ active: "服务中", completed: "已完成", cancelled: "已取消" })[status] ||
   "未知状态";
+const studentContactTypeLabel = (type?: string) =>
+  ({ student_first_contact: "首联", student_study_plan: "制定学习计划", student_contact: "普通跟进", student_delivery_stage: "交付记录" })[type || ""] || type || "联系记录";
+const studentDeliveryStageLabel = (stage?: string) =>
+  ({ first_contact: "首联", study_plan: "制定学习计划", supervision: "督学", exam_confirmation: "考试确认", exam_preparation: "考前准备", post_exam: "考后跟进", result: "成绩跟进", certificate: "证书办理" })[stage || ""] || "历史交付记录";
 
 function LoadState({
   error,
@@ -417,13 +422,13 @@ export function RegistrationPoolPage() {
                   <span>最多 9 个文件，单个不超过 20 MB</span>
                   <div className="registration-attachment-list">
                     {item.attachments?.map((attachment) => (
-                      <span key={attachment.id}>
-                        <a href={attachment.fileUrl} target="_blank" rel="noreferrer">{attachment.originalName}</a>
+                      <div className="registration-attachment-entry" key={attachment.id}>
+                        <RegistrationAttachmentPreview attachment={attachment} />
                         {! ["completed", "cancelled"].includes(selected.status) && (
                           <Button type="text" danger size="small" icon={<DeleteOutlined />} aria-label={`删除 ${attachment.originalName}`}
                             onClick={() => void deleteAttachment(item.id, attachment.id)} />
                         )}
-                      </span>
+                      </div>
                     ))}
                   </div>
                 </div>
@@ -568,7 +573,8 @@ export function RegistrationPoolPage() {
 
 export function MyStudentsPage({ permissions = [] }: { permissions?: string[] }) {
   const location = useLocation();
-  const taskTarget = location.state as { serviceRelationId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
+  const taskTarget = location.state as { personId?: number; serviceRelationId?: number; openContactTask?: boolean; taskId?: number; taskType?: string } | null;
+  const requestedPersonId = Number(taskTarget?.personId) || undefined;
   const requestedServiceId = Number(taskTarget?.serviceRelationId) || undefined;
   const [rows, setRows] = useState<MyStudent[]>([]),
     [selected, setSelected] = useState<MyStudent>();
@@ -630,15 +636,20 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       if (generation === detailGeneration.current) setDetailLoading(false);
     }
   }, [selectedServiceId]);
-  const taskTargetHandled = useRef(false);
+  const targetNavigationKey = location.key;
   useEffect(() => {
-    if (!requestedServiceId || taskTargetHandled.current) return;
-    taskTargetHandled.current = true;
-    void api.myStudentByService(requestedServiceId).then(student => {
+    const targetKey = requestedPersonId ? `person:${requestedPersonId}`
+      : requestedServiceId ? `service:${requestedServiceId}` : "";
+    if (!targetKey) return;
+    if (requestedPersonId) {
+      void loadStudent(requestedPersonId);
+      return;
+    }
+    void api.myStudentByService(requestedServiceId!).then(student => {
       setSelectedServiceId(requestedServiceId);
       return loadStudent(student.personId, requestedServiceId);
     }).catch(requestError => setDetailError(errorMessage(requestError)));
-  }, [loadStudent, requestedServiceId]);
+  }, [loadStudent, requestedPersonId, requestedServiceId, targetNavigationKey]);
   const loadDictionaries = useCallback(async () => {
     const generation = ++dictionaryGeneration.current;
     const [categoryResult, channelResult] = await Promise.allSettled([
@@ -672,13 +683,13 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         setRows(page.list);
         setTotal(page.total);
         setPageNo(targetPage);
-        const target =
-          selected &&
-          page.list.some((item) => item.personId === selected.personId)
+        if (!requestedPersonId) {
+          const target = selected && page.list.some((item) => item.personId === selected.personId)
             ? selected.personId
             : page.list[0]?.personId;
-        if (target) await loadStudent(target);
-        else setSelected(undefined);
+          if (target) await loadStudent(target);
+          else setSelected(undefined);
+        }
       } catch (requestError) {
         if (generation === listGeneration.current) setError(errorMessage(requestError));
       } finally {
@@ -686,7 +697,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         if (generation === listGeneration.current) setLoading(false);
       }
     },
-    [advancedFilter, keyword, loadStudent, pageNo, selected, serviceStatus],
+    [advancedFilter, keyword, loadStudent, pageNo, requestedPersonId, selected, serviceStatus],
   );
   useEffect(() => {
     void load(1);
@@ -717,7 +728,10 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   ) : detailError ? (
     <LoadState
       error={detailError}
-      retry={() => selected?.personId && void loadStudent(selected.personId)}
+      retry={() => {
+        const personId = selected?.personId || requestedPersonId;
+        if (personId) void loadStudent(personId);
+      }}
     />
   ) : selected && leadDetail && selectedService && studentContactContext ? (
     <StudentPlannerOperations
@@ -1075,7 +1089,6 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     }
     catch { message.warning("阶段事实必须是合法 JSON"); return; }
     const requiredFacts: Record<string, Record<string, "boolean" | "string">> = {
-      group_handoff: { groupJoined: "boolean", teacherConnected: "boolean" },
       exam_confirmation: { examIntention: "string", examDate: "string" },
       exam_preparation: { examNoticeSent: "boolean", admissionTicketNoticeSent: "boolean" },
       post_exam: { examFeedback: "string" }, result: { result: "string" },
@@ -1105,7 +1118,6 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
       && !["first_contact", "study_plan"].includes(currentDeliveryStage.code)
       && { key: "student-delivery-stage", icon: <CheckOutlined />, label: currentDeliveryStage.label, onClick: () => {
         const templates: Record<string, Record<string, unknown>> = {
-          group_handoff: { groupJoined: true, teacherConnected: true },
           supervision: {}, exam_confirmation: { examIntention: "", examDate: "" },
           exam_preparation: { examNoticeSent: true, admissionTicketNoticeSent: true },
           post_exam: { examFeedback: "" }, result: { result: "" },
@@ -1159,7 +1171,29 @@ function StudentContactDetail({ service }: { service: MyStudent["services"][numb
   const load = useCallback(async (page = 1) => { setLoading(true); try { const [next, history] = await Promise.all([api.studentContactContext(service.serviceRelationId), api.studentContactRecords(service.serviceRelationId, page, PAGE_SIZE)]); setContext(next); setRecords(history.list); setRecordPage(page); setRecordTotal(history.total); } catch (error) { message.error(errorMessage(error)); } finally { setLoading(false); } }, [service.serviceRelationId]);
   useEffect(() => { void load(1); }, [load]);
   if (loading || !context) return <Skeleton active paragraph={{ rows: 10 }} />;
-  const history = records.length ? <Space direction="vertical" style={{ width: "100%" }}>{records.map(row => <section className="registration-summary-card" key={row.id}><Space wrap><Tag>{row.contactType}</Tag><Tag color={row.successful ? "success" : "warning"}>{row.successful ? "已联系" : row.unsuccessfulReasonLabel || "未联系"}</Tag><span>{row.nextContactAt}</span></Space><Typography.Paragraph>{row.remark}</Typography.Paragraph></section>)}{recordTotal > PAGE_SIZE && <Pagination current={recordPage} pageSize={PAGE_SIZE} total={recordTotal} showSizeChanger={false} onChange={page => void load(page)} />}</Space> : <Empty description="暂无联系记录" />;
+  const history = records.length ? <Space direction="vertical" className="student-contact-history" style={{ width: "100%" }}>{records.map(row => {
+    const checklistTitles = row.completedChecklistKeys.map(itemKey => context.firstContactChecklist.find(item => item.key === itemKey)?.title || itemKey);
+    return <section className="registration-summary-card student-contact-record" key={row.id}>
+      <div className="student-contact-record-header">
+        <Space wrap size={[8, 4]}>
+          <Tag color="blue">{studentContactTypeLabel(row.contactType)}</Tag>
+          {row.deliveryStage && <Tag>{studentDeliveryStageLabel(row.deliveryStage)}</Tag>}
+          <Tag color={row.successful ? "success" : "warning"}>{row.successful ? "已联系" : "未联系成功"}</Tag>
+        </Space>
+        <Typography.Text type="secondary">联系时间：{formatTimestamp(new Date(row.submittedAt).getTime())}</Typography.Text>
+      </div>
+      <div className="student-contact-record-meta">
+        <Typography.Text type="secondary">操作人：{row.operatorUserName || "未记录"}</Typography.Text>
+        {row.nextContactAt && <Typography.Text type="secondary">下次联系：{formatTimestamp(new Date(row.nextContactAt).getTime())}</Typography.Text>}
+        {!row.successful && row.unsuccessfulReasonLabel && <Typography.Text type="secondary">原因：{row.unsuccessfulReasonLabel}</Typography.Text>}
+      </div>
+      <Typography.Paragraph className="student-contact-record-remark">{row.remark || "未填写备注"}</Typography.Paragraph>
+      {(checklistTitles.length > 0 || row.attachmentFileIds.length > 0) && <div className="student-contact-record-footer">
+        {checklistTitles.length > 0 && <Typography.Text type="secondary">已完成清单：{checklistTitles.join("、")}</Typography.Text>}
+        {row.attachmentFileIds.length > 0 && <Typography.Text type="secondary">附件：{row.attachmentFileIds.length} 个</Typography.Text>}
+      </div>}
+    </section>;
+  })}{recordTotal > PAGE_SIZE && <Pagination current={recordPage} pageSize={PAGE_SIZE} total={recordTotal} showSizeChanger={false} onChange={page => void load(page)} />}</Space> : <Empty description="暂无联系记录" />;
   const taskLabel = context.currentTask?.type === "student_first_contact" ? "首联" : context.currentTask?.type === "student_study_plan" ? "制定学习计划" : context.currentTask?.type === "student_contact" ? "普通跟进" : "暂无待办";
   return <Space direction="vertical" size="middle" style={{ width: "100%" }}>
     <Alert type={context.currentTask?.overdue ? "warning" : "info"} showIcon title={`当前任务：${taskLabel}`} description={context.currentTask?.dueAt ? `截止时间：${formatTimestamp(new Date(context.currentTask.dueAt).getTime())}` : undefined} />

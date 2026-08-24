@@ -830,6 +830,7 @@ FROM (
   UNION ALL SELECT 'system_role' UNION ALL SELECT 'system_menu' UNION ALL SELECT 'bpm_category'
   UNION ALL SELECT 'pay_app' UNION ALL SELECT 'crm_customer' UNION ALL SELECT 'ai_model'
   UNION ALL SELECT 'zsjos_lead' UNION ALL SELECT 'zsjos_lead_no_daily_counter'
+  UNION ALL SELECT 'zsjos_person_no_daily_counter'
   UNION ALL SELECT 'zsjos_product' UNION ALL SELECT 'zsjos_product_sku'
   UNION ALL SELECT 'zsjos_lead_inbox_filter_scheme' UNION ALL SELECT 'zsjos_lead_inbox_filter_version'
   UNION ALL SELECT 'zsjos_lead_follow_up_rule' UNION ALL SELECT 'zsjos_business_task'
@@ -1036,19 +1037,32 @@ SELECT 'V082 planner notification rules' AS check_name,
              WHERE scene_code='zsjos.registration.planner_assigned'
                AND creator='migration-V082' AND deleted=b'0')=
           (SELECT COUNT(*) FROM system_tenant WHERE deleted=b'0'),'PASS','FAIL') AS result;
-SELECT 'V112 planner template lead.no contract' AS check_name,
+SELECT 'V124 planner template student.no contract' AS check_name,
        IF((SELECT COUNT(*) FROM system_notify_template
              WHERE code='ZSJOS_REGISTRATION_PLANNER_ASSIGNED'
                AND scene_code='zsjos.registration.planner_assigned'
                AND creator='migration-V082' AND deleted=b'0'
-               AND params='["registration.caseId","lead.no"]'
-               AND content='客资{{lead.no}}已分配给你。')=1,'PASS','FAIL') AS result;
+               AND params='["registration.caseId","student.name","student.no"]'
+               AND content='学员{{student.name}}（{{student.no}}）已分配给你。')=1,'PASS','FAIL') AS result;
 SELECT 'V113 media student center version' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V113'
                     AND checksum='media-student-center-v3'),'PASS','FAIL') AS result;
 SELECT 'V113 media account field and talk tables' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
              AND table_name IN ('zsjos_media_account_field_config','zsjos_media_student_talk_record'))=2,
+          'PASS','FAIL') AS result;
+SELECT 'V125 student business number schema' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name='zsjos_person_no_daily_counter')=1
+          AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
+             AND table_name='zsjos_person_no_daily_counter' AND index_name='uk_tenant_sequence_date')>0,
+          'PASS','FAIL') AS result;
+SELECT 'V125 student number data compatibility' AS check_name,
+       IF((SELECT COUNT(*) FROM zsjos_person
+             WHERE person_no IS NULL OR person_no='' OR
+               (person_no NOT REGEXP '^P[0-9A-F]{32}$' AND person_no NOT REGEXP '^XY[0-9]{18}$'))=0
+          AND (SELECT COUNT(*) FROM (SELECT tenant_id,person_no FROM zsjos_person
+               GROUP BY tenant_id,person_no HAVING COUNT(*)>1) duplicates)=0,
           'PASS','FAIL') AS result;
 SELECT 'V113 media account detail snapshot columns' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE()
@@ -1278,4 +1292,32 @@ SELECT 'workbench_relative_child_paths' AS check_name,
                 AND root_menu.status=0 AND root_menu.deleted=b'0'
               WHERE child_menu.type=2 AND child_menu.deleted=b'0'
                 AND child_menu.path LIKE '/zsjos/%'),
+          'PASS','FAIL') AS result;
+SELECT 'student_group_handoff_stage_retired' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                   WHERE version='V123' AND checksum='V123__retire_student_group_handoff_stage.sql')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                       WHERE module_code='core' AND version='V123'
+                         AND checksum=SHA2('V123__retire_student_group_handoff_stage.sql',256))
+          AND NOT EXISTS (SELECT 1 FROM zsjos_service_relation
+                           WHERE deleted=b'0' AND delivery_stage='group_handoff'),
+          'PASS','FAIL') AS result;
+SELECT 'V124 planner notification student contract' AS check_name,
+       IF(EXISTS (SELECT 1 FROM system_notify_template
+                   WHERE code='ZSJOS_REGISTRATION_PLANNER_ASSIGNED'
+                     AND scene_code='zsjos.registration.planner_assigned'
+                     AND creator='migration-V082' AND deleted=b'0'
+                     AND params='["registration.caseId","student.name","student.no"]'
+                     AND content='学员{{student.name}}（{{student.no}}）已分配给你。')
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version
+                      WHERE version='V124'
+                        AND checksum='V124__repair_registration_planner_student_notification_template.sql'),
+          'PASS','FAIL') AS result;
+SELECT 'V125 student business number migration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                   WHERE version='V125'
+                     AND checksum='V125__student_business_number.sql')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V125'
+                        AND checksum=SHA2('V125__student_business_number.sql',256)),
           'PASS','FAIL') AS result;

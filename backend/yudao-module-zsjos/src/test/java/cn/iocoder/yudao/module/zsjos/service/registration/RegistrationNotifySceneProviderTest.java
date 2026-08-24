@@ -87,13 +87,15 @@ class RegistrationNotifySceneProviderTest {
     }
 
     @Test
-    void registrationScenesUseBusinessNumbersInsteadOfStudentName() {
-        provider.getScenes().forEach(scene -> {
-            Set<String> keys = scene.getVariables().stream()
-                    .map(variable -> variable.getKey()).collect(java.util.stream.Collectors.toSet());
-            org.junit.jupiter.api.Assertions.assertFalse(keys.contains("student.name"));
-            org.junit.jupiter.api.Assertions.assertTrue(keys.contains("order.no"));
-        });
+    void plannerSceneUsesStudentIdentityAndNumber() {
+        var scene = provider.getScenes().stream()
+                .filter(item -> NOTIFY_SCENE_PLANNER_ASSIGNED.equals(item.getCode())).findFirst().orElseThrow();
+        Set<String> keys = scene.getVariables().stream()
+                .map(variable -> variable.getKey()).collect(java.util.stream.Collectors.toSet());
+        org.junit.jupiter.api.Assertions.assertTrue(keys.contains("student.name"));
+        org.junit.jupiter.api.Assertions.assertTrue(keys.contains("student.no"));
+        org.junit.jupiter.api.Assertions.assertFalse(keys.contains("lead.no"));
+        org.junit.jupiter.api.Assertions.assertTrue(keys.contains("order.no"));
     }
 
     @Test
@@ -103,18 +105,18 @@ class RegistrationNotifySceneProviderTest {
         assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(NOTIFY_ROLE_STUDY_PLANNER)));
         Map<String, Object> variables = provider.resolveVariables(event, NotifyRecipientDTO.admin(1L));
         assertEquals(null, variables.get("order.no"));
-        assertEquals(null, variables.get("lead.no"));
+        assertEquals(null, variables.get("student.no"));
     }
 
     @Test
-    void resolvesLeadNumberForPlannerTemplate() {
+    void resolvesStudentNumberForPlannerTemplate() {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().tenantId(1L).bizId(7L)
-                .payload(Map.of("registrationCaseId", 7L, "leadNo", "KZ202608210001"))
+                .payload(Map.of("registrationCaseId", 7L, "studentNo", "XS202608210001"))
                 .build();
 
         Map<String, Object> variables = provider.resolveVariables(event, NotifyRecipientDTO.admin(241L));
 
-        assertEquals("KZ202608210001", variables.get("lead.no"));
+        assertEquals("XS202608210001", variables.get("student.no"));
     }
 
     private static AdminUserRespDTO user(Long id) {

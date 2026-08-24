@@ -24,14 +24,14 @@ class RegistrationNotifyPublisherTest {
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
 
     @Test
-    void plannerAssignmentPublishesLeadNumberAndPlannerRecipient() {
+    void plannerAssignmentPublishesStudentNumberAndPlannerRecipient() {
         RegistrationCaseDO registrationCase = new RegistrationCaseDO();
         registrationCase.setId(2L); registrationCase.setOrderId(9L); registrationCase.setVersion(3);
         SalesOrderDO order = new SalesOrderDO();
         order.setId(9L); order.setLeadId(29L); order.setStudentName("验收学员");
         TenantContextHolder.setTenantId(1L);
         try {
-            publisher.publishPlannerAssigned(registrationCase, order, "KZ202608172332360004", 241L);
+            publisher.publishPlannerAssigned(registrationCase, order, "XS202608240001", 241L, 501L);
         } finally {
             TenantContextHolder.clear();
         }
@@ -40,9 +40,12 @@ class RegistrationNotifyPublisherTest {
         verify(notifyBusinessEventApi).publish(captor.capture());
         NotifyBusinessEvent event = captor.getValue();
         assertEquals(RegistrationConstants.NOTIFY_SCENE_PLANNER_ASSIGNED, event.getSceneCode());
-        assertEquals("registration-planner-assigned:2:3:241", event.getSourceEventKey());
+        assertEquals("registration-planner-activated:2:241", event.getSourceEventKey());
+        assertEquals("student", event.getBizType());
+        assertEquals(501L, event.getBizId());
         Map<String, Object> payload = event.getPayload();
-        assertEquals("KZ202608172332360004", payload.get("leadNo"));
+        assertEquals("XS202608240001", payload.get("studentNo"));
+        assertEquals("验收学员", payload.get("studentName"));
         assertEquals(241L, payload.get("studyPlannerUserId"));
     }
 

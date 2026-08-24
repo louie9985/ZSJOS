@@ -5,17 +5,25 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.Registrati
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationVersionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationPlannerUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderItemDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentRelationDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseChecklistItemDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCommandDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationItemAttachmentDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.RegistrationCaseRouteDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderItemMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseChecklistItemMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCommandMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationCaseRouteMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationItemAttachmentMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.RegistrationItemMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.permission.RoleApi;
@@ -49,6 +57,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class RegistrationServiceImplTest {
@@ -60,6 +69,11 @@ class RegistrationServiceImplTest {
     @Mock private RegistrationCommandMapper commandMapper;
     @Mock private RegistrationCaseRouteMapper caseRouteMapper;
     @Mock private RegistrationItemAttachmentMapper attachmentMapper;
+    @Mock private RegistrationItemMapper registrationItemMapper;
+    @Mock private ServiceRelationMapper serviceRelationMapper;
+    @Mock private SalesOrderItemMapper orderItemMapper;
+    @Mock private PersonMapper personMapper;
+    @Mock private LeadAssignmentRelationMapper userRelationMapper;
     @Mock private FileApi fileApi;
     @Mock private RoleApi roleApi;
     @Mock private PermissionApi permissionApi;
@@ -253,7 +267,46 @@ class RegistrationServiceImplTest {
             cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
         }
 
-        verify(registrationNotifyPublisher, never()).publishPlannerAssigned(any(), any(), any(), any());
+        verify(registrationNotifyPublisher, never()).publishPlannerAssigned(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void completeCreatesEveryServiceAndPublishesOneStudentNotification() {
+        RegistrationCaseDO registrationCase = editableCase();
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(10L); order.setStatus(STATUS_EFFECTIVE); order.setPersonId(501L);
+        RegistrationCaseChecklistItemDO item = new RegistrationCaseChecklistItemDO();
+        item.setId(101L); item.setItemType("checkbox"); item.setChecked(true);
+        RegistrationCaseRouteDO route = new RegistrationCaseRouteDO();
+        route.setId(201L); route.setAssigneeType("study_planner"); route.setSelected(true);
+        route.setAssigneeUserId(30L);
+        LeadAssignmentRelationDO assignment = new LeadAssignmentRelationDO();
+        assignment.setTargetUserId(30L); assignment.setStatus(0);
+        AdminUserRespDTO planner = new AdminUserRespDTO();
+        planner.setId(30L); planner.setStatus(0); planner.setNickname("规划师");
+        SalesOrderItemDO first = new SalesOrderItemDO(); first.setId(301L);
+        SalesOrderItemDO second = new SalesOrderItemDO(); second.setId(302L);
+        PersonDO person = new PersonDO(); person.setId(501L); person.setVersion(0);
+        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
+        when(orderMapper.selectById(10L)).thenReturn(order);
+        when(caseItemMapper.selectByCaseId(1L)).thenReturn(List.of(item));
+        when(caseRouteMapper.selectByCaseId(1L)).thenReturn(List.of(route));
+        when(userRelationMapper.selectListBySourceUserIds(any(), any())).thenReturn(List.of(assignment));
+        when(adminUserApi.getUserList(any())).thenReturn(List.of(planner));
+        when(orderItemMapper.selectListByOrderId(10L)).thenReturn(List.of(first, second));
+        when(personMapper.selectByIdForUpdate(501L, 1L)).thenReturn(person);
+        RegistrationVersionReqVO request = new RegistrationVersionReqVO();
+        request.setVersion(0); request.setIdempotencyKey("complete-student");
+
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            service.complete(1L, 9L, request);
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+
+        verify(serviceRelationMapper, times(2)).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO.class));
+        verify(registrationNotifyPublisher).publishPlannerAssigned(registrationCase, order, null, 30L, 501L);
     }
 
     private RegistrationCaseDO editableCase() {

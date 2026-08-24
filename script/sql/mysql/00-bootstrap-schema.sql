@@ -4770,6 +4770,21 @@ CREATE TABLE IF NOT EXISTS `zsjos_person` (
   KEY `idx_tenant_last_seen` (`tenant_id`,`last_seen_at`,`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客户与学员身份主档';
 
+-- zsjos_person_no_daily_counter
+CREATE TABLE IF NOT EXISTS `zsjos_person_no_daily_counter` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `sequence_date` date NOT NULL COMMENT '北京时间业务日期',
+  `current_value` int NOT NULL COMMENT '当日最后已分配循环序号',
+  `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_sequence_date` (`tenant_id`,`sequence_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 学员业务编号日序';
+
 -- zsjos_person_contact_claim
 CREATE TABLE IF NOT EXISTS `zsjos_person_contact_claim` (
   `id` bigint NOT NULL AUTO_INCREMENT,

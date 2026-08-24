@@ -41,7 +41,8 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
                 new NotifySceneRespDTO(NOTIFY_SCENE_PLANNER_ASSIGNED, "学习规划师分配", List.of(
                         new NotifySceneVariableRespDTO("registration.caseId", "报名履约任务编号", false),
                         new NotifySceneVariableRespDTO("order.no", "订单号", false),
-                        new NotifySceneVariableRespDTO("lead.no", "客资编号", false)),
+                        new NotifySceneVariableRespDTO("student.name", "学员姓名", false),
+                        new NotifySceneVariableRespDTO("student.no", "学员编号", false)),
                 List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_STUDY_PLANNER, "学习规划师")),
                 List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), false),
                 new NotifySceneRespDTO(NOTIFY_SCENE_DIRECTOR_ASSIGNED, "编导学员分配", List.of(
@@ -98,8 +99,11 @@ public class RegistrationNotifySceneProvider implements NotifySceneProvider {
         result.put("registration.caseId", payload.get("registrationCaseId"));
         result.put("order.id", payload.get("orderId"));
         result.put("order.no", payload.get("orderNo"));
-        result.put("lead.no", payload.get("leadNo"));
+        if (!NOTIFY_SCENE_PLANNER_ASSIGNED.equals(event.getSceneCode())) {
+            result.put("lead.no", payload.get("leadNo"));
+        }
         result.put("student.name", payload.get("studentName"));
+        result.put("student.no", payload.get("studentNo"));
         return result;
     }
 }

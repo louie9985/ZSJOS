@@ -96,6 +96,11 @@ SOURCE script/sql/mysql/migrations/V117__lead_category_label_snapshot.sql;
 SOURCE script/sql/mysql/migrations/V118__independent_role_permission_boundaries.sql;
 SOURCE script/sql/mysql/migrations/V119__workbench_relative_child_paths.sql;
 SOURCE script/sql/mysql/migrations/V120__restore_operator_media_student_menu.sql;
+SOURCE script/sql/mysql/migrations/V121__retire_lead_qualification_exception_menu.sql;
+SOURCE script/sql/mysql/migrations/V122__repair_partner_lead_source_and_cashback_defaults.sql;
+SOURCE script/sql/mysql/migrations/V123__retire_student_group_handoff_stage.sql;
+SOURCE script/sql/mysql/migrations/V124__repair_registration_planner_student_notification_template.sql;
+SOURCE script/sql/mysql/migrations/V125__student_business_number.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

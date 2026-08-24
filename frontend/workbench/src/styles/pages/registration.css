@@ -54,6 +54,36 @@
   box-shadow: var(--crm-shadow-card);
 }
 
+.student-contact-history {
+  gap: var(--crm-sp-3) !important;
+}
+
+.student-contact-record {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.student-contact-record-header,
+.student-contact-record-meta,
+.student-contact-record-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  flex-wrap: wrap;
+}
+
+.student-contact-record-meta,
+.student-contact-record-footer {
+  justify-content: flex-start;
+}
+
+.student-contact-record-remark {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
+
 .registration-checklist-card h5 {
   margin-top: 0;
 }
@@ -156,19 +186,72 @@
 
 .registration-attachment-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--crm-sp-1) var(--crm-sp-3);
-}
-
-.registration-attachment-list > span {
-  display: inline-flex;
-  max-width: 100%;
-  align-items: center;
+  min-width: 0;
+  flex-direction: column;
   gap: var(--crm-sp-1);
 }
 
-.registration-attachment-list a {
-  overflow-wrap: anywhere;
+.registration-attachment-entry,
+.registration-attachment-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+.registration-attachment-entry {
+  justify-content: space-between;
+  padding: var(--crm-sp-1) var(--crm-sp-2);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.registration-attachment-item {
+  flex: 1;
+}
+
+.registration-attachment-thumbnail {
+  flex: none;
+  border-radius: var(--crm-radius-sm);
+  object-fit: cover;
+}
+
+.registration-attachment-icon {
+  flex: none;
+  color: var(--crm-color-primary);
+  font-size: var(--crm-font-display);
+}
+
+.registration-attachment-meta {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.registration-pdf-preview {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: min(68vh, 680px);
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+}
+
+.registration-pdf-preview iframe {
+  width: 100%;
+  height: min(68vh, 680px);
+  border: 0;
+  background: var(--crm-bg-container);
+}
+
+.registration-pdf-preview iframe.loading {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
 }
 
 @media (max-width: 768px) {

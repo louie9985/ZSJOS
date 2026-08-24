@@ -228,7 +228,6 @@ public class RegistrationServiceImpl implements RegistrationService {
             throw exception(REGISTRATION_ROUTE_INVALID);
         }
         LocalDateTime now = LocalDateTime.now();
-        Long previousPlannerId = registrationCase.getStudyPlannerUserId();
         Long plannerId = null;
         for (RegistrationCaseRouteDO route : routes) {
             RegistrationRoutesUpdateReqVO.RouteReqVO value = requested.get(route.getId());
@@ -256,10 +255,6 @@ public class RegistrationServiceImpl implements RegistrationService {
         plannerItem.setCheckedAt(plannerId != null ? now : null);
         plannerItem.setVersion(plannerItem.getVersion() + 1); caseItemMapper.updateById(plannerItem);
         touch(registrationCase);
-        if (plannerId != null && !Objects.equals(previousPlannerId, plannerId)) {
-            SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
-            registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order, resolveLeadNo(order), plannerId);
-        }
         return convert(registrationCase, true);
     }
 
@@ -396,9 +391,6 @@ public class RegistrationServiceImpl implements RegistrationService {
         plannerItem.setChecked(true); plannerItem.setCheckedByUserId(userId); plannerItem.setCheckedAt(now);
         plannerItem.setVersion(plannerItem.getVersion() + 1); caseItemMapper.updateById(plannerItem);
         touch(registrationCase);
-        SalesOrderDO order = orderMapper.selectById(registrationCase.getOrderId());
-        registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order, resolveLeadNo(order),
-                reqVO.getStudyPlannerUserId());
         return convert(registrationCase, true);
     }
 
@@ -465,6 +457,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         if (person != null) { person.setIdentityStatus("student"); person.setLastSeenAt(now); person.setVersion(person.getVersion() + 1); personMapper.updateById(person); }
         registrationCase.setStatus(STATUS_COMPLETED); registrationCase.setCompletedByUserId(userId);
         registrationCase.setCompletedAt(now); registrationCase.setVersion(registrationCase.getVersion() + 1); caseMapper.updateById(registrationCase);
+        registrationNotifyPublisher.publishPlannerAssigned(registrationCase, order,
+                person == null ? null : person.getPersonNo(), plannerId, order.getPersonId());
     }
 
     @Override

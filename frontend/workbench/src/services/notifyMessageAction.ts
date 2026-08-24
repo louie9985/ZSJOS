@@ -104,6 +104,7 @@ export const isNotifyBusinessActionCandidate = (detail: NotifyMessage) =>
     || detail.sceneCode === 'zsjos.lead.public_pool'
     || detail.sceneCode === 'zsjos.lead.qualification_released'
     || (detail.bizType === 'sales_order' && isPositiveId(detail.bizId))
+    || (detail.bizType === 'student' && isPositiveId(detail.bizId))
     || (detail.bizType === 'student_service' && isPositiveId(detail.bizId))
     || isStudentMediaBusiness(detail)
     || Boolean(legacyMediaRoute(detail))
@@ -177,6 +178,10 @@ export async function executeNotifyMessageAction(detail: NotifyMessage, deps: No
   }
   if (detail.bizType === 'student_service' && isPositiveId(detail.bizId)) {
     deps.navigate(APP_ROUTES.MY_STUDENTS, { state: { serviceRelationId: detail.bizId } })
+    return
+  }
+  if (detail.bizType === 'student' && isPositiveId(detail.bizId)) {
+    deps.navigate(APP_ROUTES.MY_STUDENTS, { state: { personId: detail.bizId } })
     return
   }
   if (isStudentMediaBusiness(detail)) {

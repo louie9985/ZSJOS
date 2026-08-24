@@ -8,7 +8,6 @@ public interface StudentContactConstants {
     String TYPE_DELIVERY_STAGE = "student_delivery_stage";
     String STAGE_FIRST_CONTACT = "first_contact";
     String STAGE_STUDY_PLAN = "study_plan";
-    String STAGE_GROUP_HANDOFF = "group_handoff";
     String STAGE_SUPERVISION = "supervision";
     String STAGE_EXAM_CONFIRMATION = "exam_confirmation";
     String STAGE_EXAM_PREPARATION = "exam_preparation";

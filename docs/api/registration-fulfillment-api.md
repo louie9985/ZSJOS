@@ -52,6 +52,8 @@ results fail with `1_900_010_020` instead of guessing by file name and size. If 
 but the business transaction fails before completion, the service invokes Infra's idempotent delete
 compensation. User-requested attachment deletion continues to remove only the business reference and
 does not physically delete the Infra file.
+Workbench previews JPG/PNG/WebP images and PDF files in the registration detail. Word and Excel
+attachments remain downloadable/openable but are not rendered in the application.
 
 When `registrationReview` first passes, the service creates the order-unique case and publishes
 `zsjos.registration.task_created`. The default in-app rule resolves the intersection of enabled
@@ -59,12 +61,13 @@ users who hold `zsjos:registration:query-pool` and enabled users in the configur
 approval department subtree (including the configured root department). System persists the message and emits the existing post-commit
 WebSocket hint.
 
-When a case is assigned to a study planner, `zsjos.registration.planner_assigned` sends the
-assigned planner the message `客资{{lead.no}}已分配给你。` and emits the same
-post-commit WebSocket refresh hint. Reassignments use a planner-specific event key, while a
-repeated assignment to the same planner is idempotent.
-The assignment event is published only when `studyPlannerUserId` actually changes; a new command key
-that writes the same planner does not create another notification.
+When registration completion has created the student's service relations,
+`zsjos.registration.planner_assigned` sends the assigned planner the message
+`学员{{student.name}}（{{student.no}}）已分配给你。` and emits the same post-commit WebSocket refresh hint. Selecting or
+changing the planner on an incomplete case does not notify. One completion publishes one event keyed
+by registration case and planner even when the order contains multiple service items. The durable
+message uses `bizType=student` and internal `personId` as its click target, so Workbench opens the
+corresponding My Students detail independently of the current list page.
 
 When completion assigns a content director, `zsjos.registration.director_assigned` creates one durable
 in-app message and the standard post-commit WebSocket hint for that director.
@@ -100,12 +103,17 @@ order creation, appeal, or complaint access. The Workbench student detail theref
 Each service keeps the internal `productSnapshot` compatibility field and additionally returns
 `courseName`, `skuName`, `categoryPath`, and `attributeValues` for user-facing display. Clients
 must render these structured fields and must not display the raw JSON snapshot.
-Registration notifications identify the business object with `leadNo` or `orderNo`; customer/student names are not included in titles, summaries, bodies or structured notification parameters. Planner and director assignment messages retain the Lead business number when available and may use the order number for an order without a Lead relation.
+Registration notifications identify the business object with `leadNo` or `orderNo`; planner assignment messages use the student name and `personNo` because the recipient is being assigned a student, not a Lead. Newly created student numbers use `XYyyyyMMddHHmmss` plus a four-digit sequence that resets daily per tenant in Beijing time and wraps from `9999` to `0001`; existing `P + UUID` values are preserved. Historical delivered-message snapshots remain unchanged.
 For databases where V085 was already applied, V087 forward-repairs missing registration business-number parameters and any safely resolvable residual `student.name` snapshot. V087 never substitutes an internal Lead ID and blocks when the tenant-scoped order/Lead relation cannot provide a stable business number.
 
 ## Student acceptance and contact chain
 
 Each active service relation is accepted independently through `/zsjos/student/service/{serviceRelationId}/accept`. Acceptance creates the first-contact task. First contact, study plan, and recurring contact use separate read/submit contracts; successful first contact advances to study plan, successful study plan advances to recurring contact, while failed first/study submissions repeat their current task type. Every submission stores an immutable record and requires a future next-contact time and remark. Failure additionally requires `zsjos_student_contact_unsuccessful_reason`; a next time beyond the published first-contact or study-plan interval requires `zsjos_student_contact_extension_reason`, description, and BPM approval under process key `zsjos_student_contact_extension`.
+
+The delivery-stage projection advances directly from `study_plan` to `supervision`; there is no
+planner group/handoff stage. V123 moves an existing current `group_handoff` projection to
+`supervision` and clears only that relation's retired current-stage facts. Historical contact-record
+snapshots are not rewritten.
 
 `PUT /zsjos/student/service/{serviceRelationId}/basic-info` accepts `name`, `mobile`, `wechatId`, and required `reason`. It requires `zsjos:student:update-basic-info`, an accepted active service, and the current service owner. Mobile and WeChat cannot both be blank; Person contact uniqueness and mobile format are revalidated. The command updates only the Person identity master and writes a `student_basic_info_updated` event containing changed field names, operator, reason, and Person/service references without full contact values. Lead submissions, intended products, regions, categories, orders, and historical snapshots are not rewritten.
 

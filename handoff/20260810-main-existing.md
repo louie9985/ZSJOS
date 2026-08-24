@@ -2854,3 +2854,90 @@
 - Verification evidence: Static scans found the renamed field/reference and no remaining ZSJOS `@Resource ...ConfigMapper configMapper` declarations; the 21-module ZSJOS dependency-chain compile passed; the 28-module `yudao-server` dependency-graph package passed and produced the executable JAR; scoped whitespace validation passed before this append.
 - Dependency or integration impact: No new dependency, schema/data, permissions, proxy configuration, mapper scan, branch, commit, push, or service lifecycle action. The server artifact was rebuilt but not started.
 - Remaining work: Restart or rerun the application through the user's normal local workflow to verify the live Spring context; report any next deepest startup exception separately. Runtime startup was not performed because service lifecycle changes require separate confirmation.
+
+### Workstream scope update: 2026-08-24 11:52:55 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Add registration-attachment preview, make completed planner-assignment notifications open the assigned student, and retire the learning-planner group/handoff delivery stage.
+- Non-goals: Office document rendering, rewriting immutable historical migrations or contact-record snapshots, changing notification administration or permissions, executing a real database migration, restarting services, adding dependencies, unrelated refactors, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Registration notification publication and focused tests; student-contact stage constants, service behavior and tests; Workbench registration attachment preview, My Students notification targeting, notify action tests and registration styles; forward-only Core `V123`, bootstrap/verification/migration documentation; directly affected registration, permission-flow and state-machine documentation; this handoff file. Existing overlapping user changes in Registration pages/styles remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing Yudao System notification/WebSocket and Infra file facilities, ZSJOS registration/student services, React/Ant Design primitives, and current SQL migration tooling only. No new dependency.
+- Integration order: Register scope -> retire runtime group/handoff stage -> move planner notification after service creation -> add student notification navigation -> add attachment previews -> add V123 and documentation -> run focused/full backend, frontend, SQL, browser and whitespace verification -> append delivery evidence.
+- Verification plan: Focused registration notification/completion and student-contact tests; full ZSJOS module tests and server dependency package; focused Workbench tests plus full test/typecheck/build; desktop/mobile browser checks for registration attachments and student targeting when a compatible authenticated runtime is available; SQL consistency/checksum/repeatability review and `zsjos_db.py check`; scoped `git diff --check`. No real migration or service lifecycle action.
+
+### Workstream scope update: 2026-08-24 12:16:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Correct planner-assignment notification terminology/number display and make notification deep links select the exact student without requiring a My Students page refresh.
+- Non-goals: Changing notification recipients, historical message snapshots, student visibility rules, route permissions, database business rows, dependencies, services, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Registration planner notification payload/scene/template migration and tests; My Students response/type/deep-link loading and notification action tests; directly affected API/docs and this handoff file. Existing user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing `PersonDO.personNo`, notification scene/template APIs, React Router state, and current Workbench API module only. No new dependency.
+- Integration order: Register scope -> update student number contract -> isolate deep-link detail loading from list state -> update focused tests/docs -> run backend/frontend checks and browser availability check -> append delivery evidence.
+- Verification plan: Focused notification scene/publisher and My Students tests; full ZSJOS and Workbench tests where feasible; typecheck/build; static migration and whitespace checks; authenticated desktop/mobile browser verification if a compatible runtime is available. No real migration or service lifecycle action.
+
+### 2026-08-24 13:08:26 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- User goal: Make planner assignment notifications identify the student and show the student number, and make WebSocket/message navigation select the exact student without requiring a My Students refresh.
+- Key decisions: Use authoritative `PersonDO.personNo` as `student.no`; planner notifications no longer expose `lead.no`, while director notifications retain their independent Lead contract; add forward-only V124 that updates only the migration-owned planner template and preserves delivered snapshots; use a fresh React Router location key for each notification navigation and prevent the list fetch from auto-selecting or clearing a deep-linked target.
+- Execution or analysis result: Added `personNo` to My Students responses and Workbench types, passed student name/number through the planner notification scene, updated the migration-owned template to `学员{{student.name}}（{{student.no}}）已分配给你。`, updated verification/docs, and fixed target detail loading when the page is already mounted. Existing user changes and unrelated files were preserved.
+- Changed files: My Student response/service and registration notification publisher/scene plus focused tests; Workbench API type, My Students page and notification action test; V124 migration, bootstrap, verification script and migration README; directly affected API/permission-flow docs; this handoff file. Generated `frontend/workbench/tsconfig.tsbuildinfo` changes from existing verification runs remain untouched.
+- Verification evidence: Focused backend suite passed 27/27; full ZSJOS module suite passed 520/520. Workbench notification test passed 19/19, full Workbench suite passed 341/341, typecheck passed, production build passed with the existing large-chunk warning. Static checks confirmed planner scenes/templates use `student.name` and `student.no`, V124 is bootstrapped and verified, and `git diff --check` reported line-ending notices only. No compatible authenticated Workbench browser instance was available for live desktop/mobile verification.
+- Dependency or integration impact: No new dependency, branch/worktree operation, commit, push, real database migration, service restart, permission change, or business-data mutation. V124 must be applied through the controlled migration workflow before the new template is active in an existing environment; historical messages remain unchanged.
+- Remaining work: Apply V124 only after explicit database migration approval, restart/redeploy the application, and verify same-page WebSocket clicks plus message-list clicks at desktop/mobile widths. Existing SQL schema-check and dependency-reactor baseline issues from the prior delivery remain unchanged.
+
+### 2026-08-24 12:14:08 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- User goal: Add in-app registration-attachment preview, make completed study-planner assignment notifications open the exact student, and remove the planner group/handoff delivery stage.
+- Key decisions: Preview images with Ant Design Image and PDFs in a responsive modal/iframe while keeping Office and unsupported files openable/downloadable; publish one planner event only after completion creates service relations, using `bizType=student` and `bizId=personId`; handle repeated same-route notification navigation by target identity; advance study-plan success directly to supervision; retain immutable historical contact snapshots and V114 while forward-migrating only current `group_handoff` projections through repeatable V123.
+- Execution or analysis result: Implemented the backend notification timing and target contract, Workbench notification deep link and direct student loading/error retry behavior, attachment classification/preview/fallback UI, retired-stage runtime removal, V123/bootstrap/verification wiring, focused regression coverage, and directly affected documentation. Existing overlapping Registration page/style edits were preserved.
+- Changed files: Registration notification/service and student-contact constants/service source plus focused tests under `backend/yudao-module-zsjos`; `frontend/workbench/src/components/RegistrationAttachmentPreview.tsx` and its test; Workbench Registration page, notification action/test, registration styles and generated `tsconfig.tsbuildinfo`; `script/sql/mysql/migrations/V123__retire_student_group_handoff_stage.sql`, bootstrap, verification and migration README; registration API, permission-flow and Lead/order state-machine documentation; this handoff file. Pre-existing unrelated `frontend/h5/vite.config.ts` and `handoff/main-student-contact-card.md` changes were not modified.
+- Verification evidence: Focused backend suite passed 30/30 and full ZSJOS-only module suite passed 520/520. Focused Workbench suite passed 25/25, full Workbench suite passed 341/341, typecheck passed, and production build passed with the existing large-chunk warning. Server dependency packaging compiled all 28 modules and built the ordinary server JAR, but final Spring Boot repackaging could not rename the currently locked `yudao-server.jar`. V123 static checks confirmed the exact non-deleted retired-stage predicate, supervision target, current-fact clearing, version increment, no DELETE, and both version registrations; static runtime/current-doc scans found no retired constant, label or fact fields outside compatibility/history locations. `git diff --check` reported line-ending notices only. `zsjos_db.py check` reached repository consistency validation but failed on pre-existing Core-schema Java mapping gaps unrelated to V123; the dependency-reactor test was likewise blocked before ZSJOS by the existing Infra `CodegenEngineUniappTest.testExecute_treeSearch` failure. No compatible running Workbench existed for authenticated desktop/mobile browser verification.
+- Dependency or integration impact: No new dependency, branch/worktree operation, commit, push, permission/data mutation, real database execution, or service lifecycle action. V123 changes only matching service-relation current projections when separately applied; historical contact records remain unchanged.
+- Remaining work: Review and explicitly approve controlled V123 database execution, then restart/redeploy through the normal service workflow and verify image/PDF rendering plus WebSocket/message clicks at desktop and mobile widths. Re-run `zsjos_db.py check` after the existing Core-schema mapping baseline is reconciled, rerun dependency-reactor tests after the unrelated Infra assertion is repaired, and rerun executable server repackaging after the process holding `yudao-server.jar` intentionally releases it.
+
+### Workstream scope update: 2026-08-24 14:00:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Change newly generated student numbers from `P + UUID` to `XYyyyyMMddHHmmss` plus a tenant-daily four-digit sequence, preserving existing student numbers.
+- Non-goals: Renumbering existing Person rows, changing Person IDs or relationships, changing notification targets/templates, executing V125 against a real database, restarting services, adding dependencies, branches, commits, pushes, or unrelated refactors.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Person number generation and daily counter DAL/service/tests; Person counter schema in Core/bootstrap and V125; SQL verification and migration documentation; directly affected student/registration API, architecture and state-machine documentation; this handoff file. Existing user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing ZSJOS transaction, tenant, MyBatis and Beijing-time conventions; no new npm or Maven dependency.
+- Integration order: Register scope -> add Person counter and runtime generation -> add V125/bootstrap/verification -> update tests and documentation -> run backend and SQL static checks -> append delivery evidence.
+- Verification plan: Person identity focused tests, ZSJOS module tests, server dependency compile where feasible, V125 syntax/repeatability/static checks, format scans, and `git diff --check`; no real migration or service lifecycle action.
+
+### 2026-08-24 13:35:55 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- User goal: Change newly generated student numbers to `XYyyyyMMddHHmmss0001`, with a tenant-and-Beijing-date daily sequence that resets at `0001`, wraps after `9999`, and preserves historical `P + UUID` numbers.
+- Key decisions: Allocate the number only when creating a new `Person`; reuse the existing number on identity resolution; use a database-atomic tenant/date counter and `Asia/Shanghai`; keep the existing tenant-scoped `person_no` uniqueness constraint; add forward-only V125 without backfilling or modifying business rows.
+- Execution or analysis result: Added the daily counter DO/Mapper/service, switched `PersonIdentityWriteService` to the new format, added focused regression tests, added the counter table to Core/fresh bootstrap and V125 migration/registries/checks, and synchronized the affected student/registration/architecture documentation. Existing workspace changes were preserved.
+- Changed files: `PersonIdentityWriteService` and new Person number counter source/tests under `backend/yudao-module-zsjos`; `script/sql/mysql/00-bootstrap-schema.sql`, `script/sql/mysql/schema/core.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/migrations/V125__student_business_number.sql`, `script/sql/mysql/migrations/README.md`, `script/sql/mysql/verify-bootstrap.sql`; directly affected docs; this handoff file.
+- Verification evidence: Person-focused Maven tests passed 9/9; the full ZSJOS module suite passed 523/523; server dependency packaging compiled all 28 modules, while the ordinary Spring Boot repackage was blocked by the existing locked `yudao-server.jar` and the repackage-skipped package completed successfully; V125 static checks passed for no delete/update, counter table, tenant/date unique key, version registries, bootstrap inclusion, and Core/bootstrap presence; `git diff --check` reported only Windows line-ending notices.
+- Dependency or integration impact: No new npm/Maven dependency, branch/worktree operation, commit, push, real database migration, service restart, permission change, or business-data mutation. V125 must be applied through the controlled migration workflow before existing environments create numbers using the new counter table.
+- Remaining work: Obtain explicit approval before applying V125 to a real database; restart/redeploy through the normal service workflow; verify concurrent production behavior and the live student-number display. Existing locked-JAR repackage limitation remains an environment issue.

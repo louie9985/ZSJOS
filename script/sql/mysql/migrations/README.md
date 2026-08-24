@@ -102,6 +102,23 @@ V063 creates the tenant-scoped `part_time_partner` role and app-api permissions,
 
 Repairs active partner Leads whose `source_user_id` is null only when the same tenant and partner have exactly one enabled non-deleted partner account; ambiguous or invalid rows are left for manual review. It fills missing first-level product-category cashback defaults with 10.00 and 0.1000 without overwriting configured values. The migration is non-destructive, tenant-scoped, repeatable, records both schema registries, and must be applied through the normal controlled migration process. Rollback is forward-only; retain repaired provenance and financial snapshots.
 
+### V123 - retire student group/handoff delivery stage
+
+Moves only service relations whose current projection is `group_handoff` to `supervision`, clears the retired current-stage fact payload, and increments their optimistic-lock version. Immutable student-contact records, including historical stage snapshots, remain unchanged. The migration deletes no rows, is repeatable because migrated rows no longer match, and records both schema registries. Apply V123 before deploying the matching application release; recovery requires a reviewed forward migration and may use immutable contact records as audit evidence rather than inventing current-stage facts.
+
+### V124 - repair planner notification student contract
+
+Updates only the migration-owned planner-assignment template from the old Lead wording to `student.name` and `student.no`, preserving administrator-edited templates and delivered message snapshots. It is repeatable, forward-only, and records both schema registries.
+
+### V125 - tenant-daily student business numbers
+
+Adds the `zsjos_person_no_daily_counter` table used by newly created Person records to allocate
+`XYyyyyMMddHHmmss` plus a four-digit tenant-daily sequence in Beijing time. Existing `person_no`
+values, including legacy `P + UUID` values, are preserved and are not backfilled. The migration
+changes no Person or relationship rows, is repeatable, and records both schema registries. Apply
+it through the reviewed migration process before deploying the matching application release;
+real database execution remains separately confirmed.
+
 V068 repairs the V063 partner-permission menu-ID collision without rewriting the applied migration. It logically removes only accidental `zsjos:work-plan*` grants from `part_time_partner`, resolves the eleven H5 permissions by permission code, creates the missing self-profile permission when necessary, and grants no finance-review capability. Reruns preserve administrator-managed menus and business data; rollback should restore grants only from a reviewed pre-migration role snapshot.
 
 V069 logically removes the invalid `ZsjosPartnerPortal` admin menu created by V063/V068. The partner portal is served by the app-api/H5 surface and has no matching admin Vue component; retaining the malformed `partner-portal` route causes Vue Router 5 navigation to fail after login. The migration changes only the menu and any role-menu rows referencing that route, preserves all partner permissions and business data, and is repeatable. Rollback is forward-only and must retain the retired menu if a replacement administrator-owned route references it.

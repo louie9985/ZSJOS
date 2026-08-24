@@ -156,6 +156,7 @@ public class MyStudentServiceImpl implements MyStudentService {
                 .collect(Collectors.toMap(LeadDO::getId, Function.identity()));
         MyStudentRespVO result = new MyStudentRespVO();
         result.setPersonId(personId);
+        result.setPersonNo(person.getPersonNo());
         Long relatedLeadId = relations.stream().map(relation -> orders.get(relation.getOrderId()))
                 .filter(Objects::nonNull).map(SalesOrderDO::getLeadId).filter(Objects::nonNull).findFirst().orElse(null);
         Long ownedLeadId = relations.stream()

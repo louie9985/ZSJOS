@@ -370,7 +370,7 @@ public class StudentContactServiceImpl implements StudentContactService {
             if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN,
                     null, relation.getVersion()) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
         } else if (Boolean.TRUE.equals(successful) && TYPE_STUDY_PLAN.equals(expectedType)) {
-            if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_STUDY_PLAN, STAGE_GROUP_HANDOFF,
+            if (relationMapper.advanceDeliveryStage(relationId, userId, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
                     null, relation.getVersion()) != 1) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
         }
         return record.getId();
@@ -731,7 +731,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     private List<String> parseStrings(String json) { return json == null ? List.of() : JsonUtils.parseArray(json, String.class); }
 
     private List<String> deliveryStageCodes() {
-        return List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_GROUP_HANDOFF, STAGE_SUPERVISION,
+        return List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
                 STAGE_EXAM_CONFIRMATION, STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
                 STAGE_CERTIFICATE, STAGE_COMPLETED);
     }
@@ -740,7 +740,6 @@ public class StudentContactServiceImpl implements StudentContactService {
         return switch (code) {
             case STAGE_FIRST_CONTACT -> "首次联系";
             case STAGE_STUDY_PLAN -> "制定学习计划";
-            case STAGE_GROUP_HANDOFF -> "入群与教研对接";
             case STAGE_SUPERVISION -> "常规督学";
             case STAGE_EXAM_CONFIRMATION -> "考期确认与报名资料";
             case STAGE_EXAM_PREPARATION -> "考前通知与冲刺";
@@ -775,7 +774,6 @@ public class StudentContactServiceImpl implements StudentContactService {
     private void validateDeliveryData(String stage, Map<String, Object> values) {
         if (values == null) throw exception(STUDENT_CONTACT_FORM_INVALID);
         List<String> required = switch (stage) {
-            case STAGE_GROUP_HANDOFF -> List.of("groupJoined", "teacherConnected");
             case STAGE_EXAM_CONFIRMATION -> List.of("examIntention", "examDate");
             case STAGE_EXAM_PREPARATION -> List.of("examNoticeSent", "admissionTicketNoticeSent");
             case STAGE_POST_EXAM -> List.of("examFeedback");

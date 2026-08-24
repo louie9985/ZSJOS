@@ -156,6 +156,16 @@ describe('notify message business actions', () => {
     expect(navigate).toHaveBeenCalledWith(expect.any(String), { state: { serviceRelationId: 41 } })
   })
 
+  it('opens planner assignment notifications at the assigned student', async () => {
+    const navigate = vi.fn()
+    await executeNotifyMessageAction(message({ bizType: 'student', bizId: 29,
+      sceneCode: 'zsjos.registration.planner_assigned' }), {
+      navigate, warn: vi.fn(), refreshUnreadCount: vi.fn().mockResolvedValue(undefined)
+    })
+    expect(isNotifyBusinessActionCandidate(message({ bizType: 'student', bizId: 29 }))).toBe(true)
+    expect(navigate).toHaveBeenCalledWith(expect.any(String), { state: { personId: 29 } })
+  })
+
   it('exposes media business detail messages as actionable', () => {
     expect(isNotifyBusinessActionCandidate(message({ bizType: 'production-ticket', bizId: 41,
       sceneCode: 'media.ticket.pending_accept' }))).toBe(true)

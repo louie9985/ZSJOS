@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactContextRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentDeliveryStageSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentStudyPlanSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
@@ -17,7 +18,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactRecord
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import org.junit.jupiter.api.AfterEach;
@@ -50,6 +53,8 @@ class StudentContactServiceImplTest {
     @Mock private StudentContactConfigVersionMapper configMapper;
     @Mock private StudentContactRecordMapper recordMapper;
     @Mock private BusinessTaskMapper taskMapper;
+    @Mock private BusinessTaskCommandService taskCommandService;
+    @Mock private SalesOrderMapper orderMapper;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
     @Mock private StudentContactConfigService configService;
@@ -139,12 +144,14 @@ class StudentContactServiceImplTest {
         List<StudentContactContextRespVO.DeliveryStageVO> stages = ReflectionTestUtils.invokeMethod(
                 service, "deliveryStages", STAGE_EXAM_CONFIRMATION, true);
 
-        assertEquals(10, stages.size());
-        assertEquals(STAGE_EXAM_CONFIRMATION, stages.get(4).getCode());
-        assertEquals("current", stages.get(4).getStatus());
-        assertEquals(true, stages.get(4).getAvailable());
+        assertEquals(9, stages.size());
+        int currentIndex = java.util.stream.IntStream.range(0, stages.size())
+                .filter(index -> STAGE_EXAM_CONFIRMATION.equals(stages.get(index).getCode()))
+                .findFirst().orElseThrow();
+        assertEquals("current", stages.get(currentIndex).getStatus());
+        assertEquals(true, stages.get(currentIndex).getAvailable());
         assertEquals("done", stages.get(0).getStatus());
-        assertEquals("pending", stages.get(5).getStatus());
+        assertEquals("pending", stages.get(currentIndex + 1).getStatus());
 
         List<StudentContactContextRespVO.DeliveryStageVO> completed = ReflectionTestUtils.invokeMethod(
                 service, "deliveryStages", STAGE_COMPLETED, true);
@@ -152,7 +159,7 @@ class StudentContactServiceImplTest {
 
         List<StudentContactContextRespVO.DeliveryStageVO> unauthorized = ReflectionTestUtils.invokeMethod(
                 service, "deliveryStages", STAGE_EXAM_CONFIRMATION, false);
-        assertEquals(false, unauthorized.get(4).getAvailable());
+        assertEquals(false, unauthorized.get(currentIndex).getAvailable());
     }
 
     @Test
@@ -170,18 +177,17 @@ class StudentContactServiceImplTest {
     }
 
     @Test
-    void deliveryStageRequiredBooleanFactsMustBeCompleted() {
-        ServiceException error = assertThrows(ServiceException.class, () -> ReflectionTestUtils.invokeMethod(
-                service, "validateDeliveryData", STAGE_GROUP_HANDOFF,
-                Map.of("groupJoined", false, "teacherConnected", true)));
+    void deliveryStageProjectionDoesNotContainRetiredGroupHandoff() {
+        List<StudentContactContextRespVO.DeliveryStageVO> stages = ReflectionTestUtils.invokeMethod(
+                service, "deliveryStages", STAGE_SUPERVISION, true);
 
-        assertEquals(STUDENT_CONTACT_FORM_INVALID.getCode(), error.getCode());
+        assertFalse(stages.stream().anyMatch(item -> "group_handoff".equals(item.getCode())));
     }
 
     @Test
     void submitDeliveryStageRejectsTaskBackedAndTerminalStages() {
         TenantContextHolder.setTenantId(1L);
-        for (String stage : List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED)) {
+        for (String stage : List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, "group_handoff", STAGE_COMPLETED)) {
             ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(stage);
             when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
             when(recordMapper.selectByIdempotencyKey(stage + "-key")).thenReturn(null);
@@ -211,10 +217,10 @@ class StudentContactServiceImplTest {
     @Test
     void submitDeliveryStageUsesExpectedStageAndVersion() {
         TenantContextHolder.setTenantId(1L);
-        ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_GROUP_HANDOFF);
+        ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_SUPERVISION);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
         when(recordMapper.selectByIdempotencyKey("stage-key")).thenReturn(null);
-        when(relationMapper.advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_GROUP_HANDOFF), eq(STAGE_SUPERVISION),
+        when(relationMapper.advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_SUPERVISION), eq(STAGE_EXAM_CONFIRMATION),
                 anyString(), eq(2))).thenReturn(1);
         doAnswer(invocation -> {
             StudentContactRecordDO row = invocation.getArgument(0);
@@ -222,12 +228,43 @@ class StudentContactServiceImplTest {
             return 1;
         }).when(recordMapper).insert(any(StudentContactRecordDO.class));
 
-        Long id = service.submitDeliveryStage(10L, deliveryRequest(STAGE_GROUP_HANDOFF, "stage-key"), 7L);
+        Long id = service.submitDeliveryStage(10L, deliveryRequest(STAGE_SUPERVISION, "stage-key"), 7L);
 
         assertEquals(100L, id);
         verify(recordMapper).insert(any(StudentContactRecordDO.class));
-        verify(relationMapper).advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_GROUP_HANDOFF),
-                eq(STAGE_SUPERVISION), anyString(), eq(2));
+        verify(relationMapper).advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_SUPERVISION),
+                eq(STAGE_EXAM_CONFIRMATION), anyString(), eq(2));
+    }
+
+    @Test
+    void successfulStudyPlanAdvancesDirectlyToSupervision() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_STUDY_PLAN);
+        BusinessTaskDO task = new BusinessTaskDO();
+        task.setId(20L); task.setTaskType(TYPE_STUDY_PLAN); task.setBizType(BIZ_TYPE); task.setBizId(10L);
+        task.setAssigneeId(7L); task.setStatus("pending"); task.setPayload("{\"configVersionId\":30}");
+        task.setIdempotencyKey("study-task");
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+        when(recordMapper.selectByIdempotencyKey("study-submit")).thenReturn(null);
+        when(taskMapper.selectByIdForUpdate(20L, 1L)).thenReturn(task);
+        when(configMapper.selectById(30L)).thenReturn(config());
+        when(taskCommandService.create(any())).thenReturn(21L);
+        when(relationMapper.advanceDeliveryStage(10L, 7L, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
+                null, 2)).thenReturn(1);
+        doAnswer(invocation -> {
+            StudentContactRecordDO row = invocation.getArgument(0);
+            row.setId(100L);
+            return 1;
+        }).when(recordMapper).insert(any(StudentContactRecordDO.class));
+        StudentStudyPlanSubmitReqVO request = new StudentStudyPlanSubmitReqVO();
+        request.setTaskId(20L); request.setSuccessful(true); request.setRemark("学习计划已确认");
+        request.setNextContactAt(LocalDateTime.now().plusHours(1)); request.setAttachmentFileIds(List.of());
+        request.setIdempotencyKey("study-submit");
+
+        assertEquals(100L, service.submitStudyPlan(10L, request, 7L));
+
+        verify(relationMapper).advanceDeliveryStage(10L, 7L, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
+                null, 2);
     }
 
     @Test
@@ -338,8 +375,7 @@ class StudentContactServiceImplTest {
     private StudentDeliveryStageSubmitReqVO deliveryRequest(String stage, String key) {
         StudentDeliveryStageSubmitReqVO request = new StudentDeliveryStageSubmitReqVO();
         request.setStage(stage); request.setSuccessful(true); request.setRemark("完成阶段");
-        request.setData(STAGE_GROUP_HANDOFF.equals(stage)
-                ? Map.of("groupJoined", true, "teacherConnected", true) : Map.of());
+        request.setData(Map.of());
         request.setIdempotencyKey(key);
         return request;
     }
