@@ -4,6 +4,7 @@ import zhCN from 'antd/locale/zh_CN';
 import type { ReactNode } from 'react';
 import { BORDER_RADIUS_VALUES, FONT_SCALE_SIZE, type Density, type FontScale, type ThemePreset } from '../../constants';
 import { withGlassSurface } from './glassSurface';
+import { withScale } from './scaleTokens';
 import { buildDefaultConfig } from './presets';
 import useBlossomTheme from './presets/blossomTheme';
 import useBootstrapTheme from './presets/bootstrapTheme';
@@ -81,12 +82,19 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     serene: useSereneTheme(),
   };
 
+  // 顺序有意义：withScale 与 withGlassSurface 都写 components.Table / Card，
+  // 二者共用 mergeComponentTokens 的浅合并，且玻璃态包在外层 ——
+  // 玻璃态的 headerBg 是「有自定义背景时才生效」的条件覆盖，必须后写才不被冲掉。
   const finalConfig = withGlassSurface(
-    withDensity(
-      configs[preset] ?? configs['default-light'],
+    withScale(
+      withDensity(
+        configs[preset] ?? configs['default-light'],
+        density,
+        fontScale,
+        radiusValue,
+      ),
       density,
       fontScale,
-      radiusValue,
     ),
     hasBackground,
     glassOpacity,

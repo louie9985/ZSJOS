@@ -6,6 +6,7 @@ import {
   Badge,
   Button,
   Card,
+  ConfigProvider,
   Dropdown,
   Layout,
   Menu,
@@ -18,6 +19,7 @@ import {
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
+  DownOutlined,
   InboxOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -37,10 +39,9 @@ import {
   getInaccessiblePathFallback,
   getInitialTarget,
   getPrimaryTarget,
-  type PrimaryNavigationItem,
-  type SecondaryNavigationItem
+  type PrimaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
+import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
@@ -61,6 +62,7 @@ import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
+import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
 import LeadManagementPage from './pages/LeadManagementPage'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from './services/impersonation'
@@ -93,17 +95,6 @@ function toPrimaryItems(items: PrimaryNavigationItem[]): MenuItem[] {
   }))
 }
 
-function toFlatSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
-  return items.flatMap(item => item.children.length > 0
-    ? toFlatSecondaryItems(item.children)
-    : [{
-        key: item.menu.path,
-        label: item.label,
-        title: item.label,
-        icon: <BackendMenuIcon icon={item.icon}/>
-      }])
-}
-
 function NoAccessibleMenu({ hasMenus }: { hasMenus: boolean }) {
   return <Result
     status="403"
@@ -119,6 +110,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const { isDark, backgroundValue, layoutMode, watermark: watermarkEnabled, headerFixed, tabs: tabsEnabled, tabStyle } = useTheme()
   const [primaryCollapsed, setPrimaryCollapsed] = useState(false)
   const [secondaryCollapsed, setSecondaryCollapsed] = useState(false)
+  const [singleSiderOpenKeys, setSingleSiderOpenKeys] = useState<string[]>([])
   const [aiOpen, setAiOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0)
@@ -178,6 +170,13 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     if (inaccessiblePathFallback) navigate(inaccessiblePathFallback, { replace: true })
   }, [inaccessiblePathFallback, navigate])
 
+  // 左单列模式：路由切换时自动展开当前一级组。
+  useEffect(() => {
+    if (activePrimary) {
+      setSingleSiderOpenKeys(prev => prev.includes(activePrimary.key) ? prev : [...prev, activePrimary.key])
+    }
+  }, [activePrimary])
+
   useEffect(() => {
     if (!activePrimary || location.pathname !== activePrimary.menu.path || activePrimary.pages.length === 0) return
     const target = getPrimaryTarget(activePrimary, false)
@@ -203,8 +202,31 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 
   // 布局模式分支
   const showPrimarySider = layoutMode === 'side'
-  const showSecondarySider = true
-  const showTopPrimary = layoutMode === 'top'
+  const showSecondarySider = layoutMode === 'side' || layoutMode === 'top'
+  const showSingleSider = layoutMode === 'single-sider'
+  const showMiniSider = layoutMode === 'mini-float'
+  const showTopPrimary = layoutMode === 'top' || layoutMode === 'top-only'
+  const showTopSecondary = layoutMode === 'top-only'
+
+  const singleSiderItems: MenuItem[] = useMemo(
+    () => showSingleSider ? buildNavMenuItems(navigation) : [],
+    [navigation, showSingleSider]
+  )
+  const miniSiderItems: MenuItem[] = useMemo(
+    () => showMiniSider
+      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: 'mini-flyout' })
+      : [],
+    [navigation, showMiniSider]
+  )
+  const topOnlyItems: MenuItem[] = useMemo(
+    () => showTopSecondary
+      ? buildNavMenuItems(navigation, {
+          childIcons: false,
+          expandSuffix: <DownOutlined style={{ fontSize: 10, marginLeft: 2 }}/>
+        })
+      : [],
+    [navigation, showTopSecondary]
+  )
 
   const layoutClass = [
     'crm-shell',
@@ -235,7 +257,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 
     {/* 一级侧栏：仅 side 模式渲染 */}
     {showPrimarySider && (
-      <Sider theme={isDark ? 'dark' : 'light'} width={72} collapsedWidth={56} collapsed={primaryCollapsed} trigger={null} className="crm-sider primary-sider">
+      <Sider theme={isDark ? 'dark' : 'light'} width={LAYOUT_SIZES.PRIMARY_SIDER_W} collapsedWidth={LAYOUT_SIZES.PRIMARY_SIDER_COLLAPSED} collapsed={primaryCollapsed} trigger={null} className="crm-sider primary-sider">
         <div className="brand"><span className="brand-default">{primaryCollapsed ? 'CRM' : '中世健\nAI-CRM'}</span><span className="brand-mobile">CRM</span></div>
         <div className="sider-menu-scroll">
           <nav className="primary-nav">
@@ -269,7 +291,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 
     {/* 二级侧栏：side / top 模式 */}
     {showSecondarySider && (
-      <Sider theme={isDark ? 'dark' : 'light'} width={180} collapsedWidth={48} collapsed={secondaryCollapsed} trigger={null} className="crm-sider secondary-sider">
+      <Sider theme={isDark ? 'dark' : 'light'} width={LAYOUT_SIZES.SECONDARY_SIDER_W} collapsedWidth={LAYOUT_SIZES.SECONDARY_SIDER_COLLAPSED} collapsed={secondaryCollapsed} trigger={null} className="crm-sider secondary-sider">
         <div className="secondary-title">
           {!secondaryCollapsed && <Typography.Text strong>{activePrimary?.label || '菜单'}</Typography.Text>}
           <Tooltip title={secondaryCollapsed ? '展开二级菜单' : '收起二级菜单'}>
@@ -281,10 +303,52 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
             mode="inline"
             inlineCollapsed={secondaryCollapsed}
             selectedKeys={currentMenu ? [currentMenu.path] : []}
-            items={toFlatSecondaryItems(activePrimary?.pages || [])}
+            items={buildHierarchicalSecondaryItems(activePrimary?.menu)}
             onClick={({ key }) => go(String(key))}
             className="transparent-menu"
           />
+        </div>
+      </Sider>
+    )}
+
+    {/* 左单列：一二级合并为可折叠目录树 */}
+    {showSingleSider && (
+      <Sider theme={isDark ? 'dark' : 'light'} width={LAYOUT_SIZES.SINGLE_SIDER_W} collapsedWidth={LAYOUT_SIZES.PRIMARY_SIDER_COLLAPSED} collapsed={primaryCollapsed} trigger={null} className="crm-sider single-sider">
+        <div className="brand"><span className="brand-default">{primaryCollapsed ? 'CRM' : '中世健\nAI-CRM'}</span><span className="brand-mobile">CRM</span></div>
+        <div className="sider-menu-scroll">
+          <Menu
+            mode="inline"
+            inlineCollapsed={primaryCollapsed}
+            selectedKeys={currentMenu ? [currentMenu.path] : []}
+            openKeys={singleSiderOpenKeys}
+            onOpenChange={(keys) => setSingleSiderOpenKeys(keys as string[])}
+            items={singleSiderItems}
+            onClick={({ key }) => go(String(key))}
+            className="transparent-menu"
+          />
+        </div>
+        <div className="sider-toggle">
+          <Tooltip title={primaryCollapsed ? '展开菜单' : '收起菜单'} placement="right">
+            <Button type="text" aria-label={primaryCollapsed ? '展开菜单' : '收起菜单'} icon={primaryCollapsed ? <MenuUnfoldOutlined/> : <MenuFoldOutlined/>} onClick={() => setPrimaryCollapsed(value => !value)}/>
+          </Tooltip>
+        </div>
+      </Sider>
+    )}
+
+    {/* mini-float：图标侧栏 + popup 二级菜单 */}
+    {showMiniSider && (
+      <Sider theme={isDark ? 'dark' : 'light'} width={MINI_RAIL_W} collapsedWidth={MINI_RAIL_W} collapsed trigger={null} className="crm-sider mini-sider">
+        <div className="brand">CRM</div>
+        <div className="sider-menu-scroll">
+          <ConfigProvider theme={{ components: { Menu: { collapsedWidth: MINI_RAIL_W } } }}>
+            <Menu
+              mode="inline"
+              selectedKeys={currentMenu ? [currentMenu.path] : []}
+              items={miniSiderItems}
+              onClick={({ key }) => go(String(key))}
+              className="transparent-menu"
+            />
+          </ConfigProvider>
         </div>
       </Sider>
     )}
@@ -294,12 +358,22 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         {/* 移动端汉堡按钮 */}
         <Button type="text" className="mobile-nav-trigger" aria-label="打开导航菜单" icon={<MenuUnfoldOutlined/>} onClick={() => setMobileNavOpen(true)}/>
         {/* 顶部模式：一级菜单放在 header */}
-        {showTopPrimary && (
+        {showTopPrimary && !showTopSecondary && (
           <Menu
             mode="horizontal"
             selectedKeys={activePrimary ? [activePrimary.key] : []}
             items={toPrimaryItems(navigation)}
             onClick={({ key }) => selectPrimary(String(key))}
+            className="top-primary-menu"
+          />
+        )}
+        {/* 纯顶栏模式：一二级合并为递归下拉菜单 */}
+        {showTopSecondary && (
+          <Menu
+            mode="horizontal"
+            selectedKeys={currentMenu ? [currentMenu.path] : []}
+            items={topOnlyItems}
+            onClick={({ key }) => go(String(key))}
             className="top-primary-menu"
           />
         )}
@@ -346,7 +420,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
             <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
           </Routes>
         </Content>
-        {aiOpen && <Sider width={320} className="ai-sider"><Typography.Title level={5}><RobotOutlined/> AI 助手</Typography.Title><Result status="info" title="AI 助手暂未接入"/></Sider>}
+        {aiOpen && <Sider width={LAYOUT_SIZES.AI_SIDER_W} className="ai-sider"><Typography.Title level={5}><RobotOutlined/> AI 助手</Typography.Title><Result status="info" title="AI 助手暂未接入"/></Sider>}
       </Layout>
     </Layout>
   </Layout>

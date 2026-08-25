@@ -137,8 +137,11 @@
   background: var(--crm-bg-layout);
 }
 
+/* 页面唯一容器。默认不限宽 —— 多数页面是表格或主从布局，越宽越好用；
+   少数表单/阅读类页面自行取 --crm-page-max-* 限宽。
+   padding 只在这里声明一次，页面类不要重复写（有守卫）。 */
 .workspace-page {
-  max-width: 1440px;
+  padding: var(--crm-page-pad);
   margin: auto;
 }
 
@@ -149,12 +152,14 @@
   padding: 16px;
 }
 
-@media(max-width:768px) {
+@media (max-width: 768px) {
+  /* !important 压过 antd Sider 写在元素上的 inline width —— 移动端要强制收窄，
+     React 侧的 collapsed 状态同步见 main.tsx 的 matchMedia 监听。 */
   .primary-sider {
-    width: 56px!important;
-    min-width: 56px!important;
-    max-width: 56px!important;
-    flex: 0 0 56px!important;
+    width: var(--crm-sider-1-collapsed)!important;
+    min-width: var(--crm-sider-1-collapsed)!important;
+    max-width: var(--crm-sider-1-collapsed)!important;
+    flex: 0 0 var(--crm-sider-1-collapsed)!important;
   }
 
   .brand-default {
@@ -218,10 +223,6 @@
 html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass='frosted'] .custom-background .crm-header,html[data-crm-glass='frosted'] .custom-background .ai-sider {
   backdrop-filter: blur(var(--crm-glass-blur));
   -webkit-backdrop-filter: blur(var(--crm-glass-blur));
-}
-
-.workspace-page {
-  padding: var(--crm-page-pad);
 }
 
 @media(max-width:768px) {

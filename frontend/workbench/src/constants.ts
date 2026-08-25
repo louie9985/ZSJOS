@@ -493,6 +493,35 @@ export const FONT_SCALE_SIZE: Record<FontScale, number> = {
   large: 15
 }
 
+/**
+ * 密度档的尺寸真值，供 antd 组件 token 注入（见 scaleTokens.ts）。
+ *
+ * 为什么要在 JS 侧再存一份：antd 的 bodyPadding 一类 token 只接受 number，
+ * 读不到 `--crm-card-pad` 这样的 CSS 变量。若不注入，antd <Card> 会一直用
+ * 自己的 24px / 12px 默认值，与自绘卡片的 14px 并存 —— 同一屏三种卡片内边距，
+ * 且切密度档时只有自绘那套会动。
+ *
+ * **取值须与 styles/tokens.css 的对应变量逐档一致**，由 scaleTokens.test.ts 守卫。
+ */
+export const DENSITY_SCALE: Record<Density, { cardPad: number; cardPadSM: number; pagePad: number; panePad: number }> = {
+  loose: { cardPad: 18, cardPadSM: 14, pagePad: 16, panePad: 20 },
+  default: { cardPad: 14, cardPadSM: 10, pagePad: 12, panePad: 16 },
+  compact: { cardPad: 10, cardPadSM: 8, pagePad: 8, panePad: 12 }
+}
+
+/**
+ * 表格单元格内边距，随字号档缩放。
+ *
+ * antd v5 的 Table 没有独立字号 token，单元格字号继承全局 fontSize，
+ * 但 cellPaddingBlock / cellPaddingInline 是写死的常量、不随 fontSize 派生。
+ * 结果切「字号大」时字变大而行高不动，字被挤胀 —— 故在此按档位显式给出。
+ */
+export const FONT_SCALE_TABLE: Record<FontScale, { cellBlock: number; cellInline: number }> = {
+  small: { cellBlock: 6, cellInline: 12 },
+  default: { cellBlock: 8, cellInline: 16 },
+  large: { cellBlock: 10, cellInline: 20 }
+}
+
 // ========== Layout Mode ==========
 
 /**
@@ -513,6 +542,22 @@ export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top', 'top-only', '
  * 须与 Menu 的 collapsedWidth token 一起设定，避免图标因 antd 默认宽度过大而被裁切。
  */
 export const MINI_RAIL_W = 56
+
+/**
+ * 布局尺寸真值。antd Sider 的 width / collapsedWidth prop 只接受 number，
+ * 读不到 CSS 变量，故 JS 侧持有真值，`styles/tokens.css` 的 `--crm-sider-*`
+ * 为 CSS 侧镜像（calc 需要），两边由 styles.guard.test.ts 比对。
+ */
+export const LAYOUT_SIZES = {
+  PRIMARY_SIDER_W: 72,
+  PRIMARY_SIDER_COLLAPSED: 56,
+  SECONDARY_SIDER_W: 180,
+  SECONDARY_SIDER_COLLAPSED: 48,
+  /** 左单列模式：一栏同时容纳一二级，故比 primary 宽 */
+  SINGLE_SIDER_W: 220,
+  AI_SIDER_W: 320,
+  MINI_RAIL_W
+} as const
 
 export const LAYOUT_MODE_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
   { label: '左双列', value: 'side' },

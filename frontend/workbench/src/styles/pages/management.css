@@ -3,7 +3,6 @@
   min-width: 0;
   flex-direction: column;
   gap: var(--crm-gap);
-  padding: var(--crm-page-pad);
 }
 
 .management-page .page-heading {

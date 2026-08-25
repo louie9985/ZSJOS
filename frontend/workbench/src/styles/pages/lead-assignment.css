@@ -1,7 +1,7 @@
 /* Assignment relations page and the pending-acceptance overlays. */
 
 .assignment-page {
-  max-width: 1360px;
+  max-width: var(--crm-page-max-table);
 }
 
 .assignment-toolbar {

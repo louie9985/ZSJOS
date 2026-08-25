@@ -1,7 +1,6 @@
 /* Lead inbox: filter shell, master list, detail pane, attachments. */
 
 .lead-management-page {
-  max-width: none;
   height: 100%;
   display: flex;
   min-height: 0;
@@ -406,10 +405,6 @@
   cursor: zoom-in;
 }
 
-.lead-management-page {
-  padding: var(--crm-page-pad);
-}
-
 .lead-inbox-filter-shell {
   padding: 0;
   margin-bottom: var(--crm-gap-sm);
@@ -459,10 +454,6 @@
 }
 
 @media(max-width:768px) {
-  .lead-management-page {
-    padding: var(--crm-page-pad);
-  }
-
   .lead-inbox-filter-shell {
     padding: 0;
   }

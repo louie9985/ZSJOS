@@ -20,6 +20,16 @@ function collect(dir: string): string[] {
   })
 }
 
+/** 递归收集 .ts / .tsx，用于扫描 tsx 内联样式里的 var(--crm-*) */
+function collectTs(dir: string): string[] {
+  return readdirSync(dir).flatMap(entry => {
+    if (entry === 'node_modules') return []
+    const path = join(dir, entry)
+    if (statSync(path).isDirectory()) return collectTs(path)
+    return /\.tsx?$/.test(path) ? [path] : []
+  })
+}
+
 const all = collect(ROOT)
 const tokens = readFileSync(join(ROOT, 'tokens.css'), 'utf8')
 // tokens.css holds the static fallback palette on purpose, so it is excluded
@@ -108,20 +118,10 @@ describe('spacing and sizing anchors', () => {
   const joined = business.map(([, text]) => text).join('\n')
 
   it('keeps page and pane padding on density variables', () => {
+    // 页面外边距只由 .workspace-page 提供（见 layout.css）——页面类不再各自
+    // 重复声明，重复项已删。详情区仍逐个锚定，它们各自是独立的滚动容器。
     const anchors = [
       /\.workspace-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.lead-management-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.message-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.sales-order-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.work-plan-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.claim-pool-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.subordinate-sales-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.business-inbox-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.registration-page,.registration-config-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.media-students-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.media-accounts-page[^}]*padding:\s*var\(--crm-page-pad\)/,
-      /\.eam-repair-page,[\s\S]*?padding: var\(--crm-page-pad\)/,
-      /\.eam-category-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.eam-category-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
@@ -135,11 +135,27 @@ describe('spacing and sizing anchors', () => {
     expect(anchors.filter(re => !re.test(joined)).map(re => re.source)).toEqual([])
   })
 
+  it('lets .workspace-page own the page padding without per-page duplicates', () => {
+    // 19 个页面类曾与父类同值重复声明 padding，纯冗余且切档时两处都要改
+    const offenders: string[] = []
+    for (const [path, text] of business) {
+      const rules = stripComments(text).matchAll(/(\.[a-z0-9-]+-page(?:\s*,\s*\.[a-z0-9-]+-page)*)\s*\{([^}]*)\}/g)
+      for (const [, selector, body] of rules) {
+        // .workspace-page 本身就是那个唯一出口，它当然要声明
+        if (selector.trim() === '.workspace-page') continue
+        if (/padding:\s*var\(--crm-page-pad\)\s*;/.test(body)) offenders.push(`${path}  ${selector.trim()}`)
+        // 父类已不限宽，反解就没有意义了
+        if (/max-width:\s*none/.test(body)) offenders.push(`${path}  ${selector.trim()} (max-width: none)`)
+      }
+    }
+    expect(offenders).toEqual([])
+  })
+
   it('keeps my sales orders on the approved compact top and start edges', () => {
     const salesOrder = business.find(([path]) => path.endsWith('sales-order.css'))?.[1] ?? ''
 
-    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*max-width: none/)
-    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*padding-block-start: var\(--crm-sp-1\)[^}]*padding-inline-start: var\(--crm-sp-1\)/)
+    // 刻意比通用页面更紧，故显式覆盖父类的 page-pad
+    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*padding: var\(--crm-sp-1\) var\(--crm-page-pad\)/)
     expect(salesOrder).toMatch(/\.sales-order-inbox-actions \{[^}]*display: flex[^}]*align-items: center/)
   })
 
@@ -203,6 +219,78 @@ describe('spacing and sizing anchors', () => {
       })
     }
     expect(offenders).toEqual([])
+  })
+})
+
+describe('token single source of truth', () => {
+  const constantsSrc = readFileSync('src/constants.ts', 'utf8')
+
+  /** 读 tokens.css 某个选择器块里的 px 取值 */
+  const readPx = (selector: string, name: string) => {
+    const body = tokens.split(selector)[1]?.split('}')[0] ?? ''
+    return body.match(new RegExp(`${name}:\\s*(\\d+)px`))?.[1]
+  }
+
+  it('keeps border radius identical between constants.ts and tokens.css', () => {
+    // 两个真值源：constants 注入 antd 的 borderRadius token（管 antd 组件），
+    // tokens.css 管自有 CSS。small 档曾是 4/6/8 vs 6/8/10，靠 antd-overrides
+    // 的 !important 强拉部分组件回来，未列举的组件留在另一个值上。
+    const block = constantsSrc.split('BORDER_RADIUS_VALUES')[1]?.split('\n}')[0] ?? ''
+    const jsValues = Object.fromEntries(
+      [...block.matchAll(/(\w+):\s*\{\s*sm:\s*(\d+),\s*md:\s*(\d+),\s*lg:\s*(\d+)\s*\}/g)]
+        .map(m => [m[1], { sm: m[2], md: m[3], lg: m[4] }])
+    )
+    expect(Object.keys(jsValues).sort()).toEqual(['full', 'round', 'sharp', 'small'])
+
+    const cssSelector: Record<string, string> = {
+      sharp: "html[data-crm-radius='sharp']",
+      small: ':root',
+      round: "html[data-crm-radius='round']",
+      full: "html[data-crm-radius='full']"
+    }
+    const mismatches: string[] = []
+    for (const [tier, js] of Object.entries(jsValues)) {
+      for (const size of ['sm', 'md', 'lg'] as const) {
+        const css = readPx(cssSelector[tier], `--crm-radius-${size}`)
+        if (css !== js[size]) mismatches.push(`${tier}.${size}: js=${js[size]} css=${css}`)
+      }
+    }
+    expect(mismatches).toEqual([])
+  })
+
+  it('keeps sider widths identical between constants.ts and tokens.css', () => {
+    // antd Sider 的 width prop 只接受 number，故 JS 侧持有真值，CSS 侧是镜像
+    const block = constantsSrc.split('LAYOUT_SIZES = {')[1]?.split('}')[0] ?? ''
+    const num = (key: string) => block.match(new RegExp(`${key}:\\s*(\\d+)`))?.[1]
+    const pairs: Array<[string, string | undefined, string | undefined]> = [
+      ['sider-1-w', num('PRIMARY_SIDER_W'), readPx(':root', '--crm-sider-1-w')],
+      ['sider-1-collapsed', num('PRIMARY_SIDER_COLLAPSED'), readPx(':root', '--crm-sider-1-collapsed')],
+      ['sider-2-w', num('SECONDARY_SIDER_W'), readPx(':root', '--crm-sider-2-w')],
+      ['sider-2-collapsed', num('SECONDARY_SIDER_COLLAPSED'), readPx(':root', '--crm-sider-2-collapsed')],
+      ['sider-single-w', num('SINGLE_SIDER_W'), readPx(':root', '--crm-sider-single-w')],
+      ['aside-w', num('AI_SIDER_W'), readPx(':root', '--crm-aside-w')]
+    ]
+    expect(pairs.filter(([, js, css]) => js === undefined || js !== css)).toEqual([])
+  })
+
+  it('defines every --crm-* variable that is referenced anywhere', () => {
+    // 幽灵变量（用了但没定义）会让整条声明在 computed-value 阶段失效，
+    // 且完全静默 —— FMS 凭证页的分隔线与合计金额曾因此不显示。
+    const bridged = readFileSync('src/components/Theme/themeTokens.ts', 'utf8')
+    const defined = new Set([
+      ...[...tokens.matchAll(/^\s*(--crm-[a-z0-9-]+):/gm)].map(m => m[1]),
+      ...[...bridged.matchAll(/'(--crm-[a-z0-9-]+)':/g)].map(m => m[1])
+    ])
+
+    const sources = [...collect(ROOT), ...collectTs('src')]
+    const missing = new Set<string>()
+    for (const path of sources) {
+      const text = readFileSync(path, 'utf8')
+      for (const [, name] of text.matchAll(/var\((--crm-[a-z0-9-]+)/g)) {
+        if (!defined.has(name)) missing.add(`${name}  (${path})`)
+      }
+    }
+    expect([...missing]).toEqual([])
   })
 })
 

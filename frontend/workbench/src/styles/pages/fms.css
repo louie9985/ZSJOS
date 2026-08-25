@@ -1,9 +1,5 @@
 /* FMS (财务管理) pages — shared shell for all 26 feature pages. */
 
-.fms-page {
-  padding: var(--crm-page-pad);
-}
-
 .fms-page .page-heading {
   display: flex;
   flex-wrap: wrap;

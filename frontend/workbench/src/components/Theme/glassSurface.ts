@@ -1,4 +1,5 @@
 import type { ConfigProviderProps, ThemeConfig } from 'antd'
+import { mergeComponentTokens } from './mergeComponents'
 
 /**
  * 玻璃覆盖层：当自定义背景启用时，向 antd ConfigProvider 的 theme.components
@@ -65,16 +66,6 @@ export function withGlassSurface(
     Segmented: { trackBg: inputVal }
   }
 
-  // 两级浅合并：先 merge 各组件对象
-  const base = config.theme ?? {}
-  const baseComponents = (base.components ?? {}) as Record<string, Record<string, unknown>>
-  const merged: Record<string, Record<string, unknown>> = { ...baseComponents }
-  for (const [name, fields] of Object.entries(glassComponents)) {
-    merged[name] = { ...(baseComponents[name] ?? {}), ...(fields as Record<string, unknown>) }
-  }
-
-  return {
-    ...config,
-    theme: { ...base, components: merged as ThemeConfig['components'] }
-  }
+  // 两级浅合并：见 mergeComponentTokens 的说明
+  return mergeComponentTokens(config, glassComponents)
 }

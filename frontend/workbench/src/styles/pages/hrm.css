@@ -1,9 +1,5 @@
 /* HRM (human resource) pages — shared shell for the employee portal and HR admin areas. */
 
-.hrm-page {
-  padding: var(--crm-page-pad);
-}
-
 .hrm-page .page-heading {
   display: flex;
   flex-wrap: wrap;

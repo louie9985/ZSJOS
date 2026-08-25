@@ -1,7 +1,6 @@
-import { Drawer, Menu, Typography } from 'antd'
-import { useEffect, useMemo, useState } from 'react'
-import type { PrimaryNavigationItem, SecondaryNavigationItem } from '../services/menu'
-import BackendMenuIcon from './BackendMenuIcon'
+import { Drawer, Menu } from 'antd'
+import type { PrimaryNavigationItem } from '../services/menu'
+import { buildNavMenuItems } from './navItems'
 
 interface MobileNavDrawerProps {
   open: boolean
@@ -12,29 +11,9 @@ interface MobileNavDrawerProps {
   onSelect: (path: string) => void
 }
 
-/**
- * 移动端用两个平级列表展示一级分类与二级叶子页面，不产生折叠或下拉菜单。
- */
+/** 移动端导航保留服务端目录层级，通过 SubMenu 展开二级和更深层页面。 */
 export default function MobileNavDrawer({ open, onClose, navigation, activePrimaryKey, activePagePath, onSelect }: MobileNavDrawerProps) {
-  const [primaryKey, setPrimaryKey] = useState(activePrimaryKey)
-  useEffect(() => { setPrimaryKey(activePrimaryKey) }, [activePrimaryKey, open])
-  const primary = useMemo(
-    () => navigation.find(item => item.key === primaryKey) || navigation[0],
-    [navigation, primaryKey]
-  )
-  const flattenPages = (items: SecondaryNavigationItem[]): SecondaryNavigationItem[] => items.flatMap(item =>
-    item.children.length > 0 ? flattenPages(item.children) : [item]
-  )
-  const primaryItems = navigation.map(item => ({
-    key: item.key,
-    label: item.label,
-    icon: <BackendMenuIcon icon={item.icon}/>
-  }))
-  const secondaryItems = flattenPages(primary?.pages || []).map(item => ({
-    key: item.menu.path,
-    label: item.label,
-    icon: <BackendMenuIcon icon={item.icon}/>
-  }))
+  const items = buildNavMenuItems(navigation)
 
   return <Drawer
     open={open}
@@ -44,22 +23,11 @@ export default function MobileNavDrawer({ open, onClose, navigation, activePrima
     title="导航菜单"
     styles={{ body: { padding: 0 } }}
   >
-    <Typography.Text type="secondary" className="mobile-nav-section-title">一级分类</Typography.Text>
     <Menu
       mode="inline"
-      selectedKeys={primary ? [primary.key] : []}
-      items={primaryItems}
-      onClick={({ key }) => {
-        const selected = navigation.find(item => item.key === String(key))
-        setPrimaryKey(String(key))
-        if (selected?.pages.length === 0) { onSelect(selected.menu.path); onClose() }
-      }}
-    />
-    <Typography.Text type="secondary" className="mobile-nav-section-title">{primary?.label || '二级菜单'}</Typography.Text>
-    <Menu
-      mode="inline"
+      defaultOpenKeys={activePrimaryKey ? [activePrimaryKey] : []}
       selectedKeys={activePagePath ? [activePagePath] : []}
-      items={secondaryItems}
+      items={items}
       onClick={({ key }) => { onSelect(String(key)); onClose() }}
     />
   </Drawer>

@@ -1,11 +1,5 @@
 /* Claim pool card grid. */
 
-.claim-pool-page {
-  max-width: none;
-  margin: 0;
-  padding: var(--crm-page-pad);
-}
-
 .claim-pool-page>.page-heading {
   align-items: center;
   margin-bottom: 10px;

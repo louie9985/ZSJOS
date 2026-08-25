@@ -9,8 +9,8 @@ type MenuItem = Required<MenuProps>['items'][number]
 /**
  * 服务端递归导航 → antd Menu items。
  *
- * single-sider / mini-float / top-only / 移动端抽屉四处共用：它们都需要把两级
- * 导航压进一棵 Menu 树，规则一致。
+ * single-sider / mini-float / top-only / 移动端抽屉四处共用：它们都需要把服务端
+ * 递归导航压进一棵 Menu 树，规则一致。
  *
  * 关键：没有可见子节点的菜单必须渲染成叶子项，不能是 SubMenu。
  * 一级节点在后台菜单里既可能是分组容器，也可能自身就是页面（此时 children 为空）。

@@ -1,14 +1,13 @@
 /* Sales order inbox: list, detail cards, vouchers. */
 
+/* 我的成交单：列表铺满，上/左边距刻意比通用页面更紧（贴近顶部与侧栏），
+   故显式覆盖 .workspace-page 的 --crm-page-pad。 */
 .sales-order-inbox-page {
   display: flex;
-  max-width: none;
   height: 100%;
   min-height: 0;
   flex-direction: column;
-  padding: var(--crm-page-pad);
-  padding-block-start: var(--crm-sp-1);
-  padding-inline-start: var(--crm-sp-1);
+  padding: var(--crm-sp-1) var(--crm-page-pad) var(--crm-page-pad) var(--crm-sp-1);
 }
 
 .sales-order-inbox-actions {

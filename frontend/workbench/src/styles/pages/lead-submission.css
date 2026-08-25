@@ -1,7 +1,7 @@
 /* Lead submission form page. */
 
 .lead-submission-page {
-  max-width: 1120px;
+  max-width: var(--crm-page-max-form);
 }
 
 .lead-form-card {

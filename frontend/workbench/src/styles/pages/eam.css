@@ -1,23 +1,11 @@
 /* EAM (asset management) pages — shared shell for the eight feature areas. */
 
-.eam-repair-page,
-.eam-inventory-page,
-.eam-asset-page,
-.eam-transfer-page,
-.eam-scrap-page,
-.eam-code-rule-page,
-.eam-statistics-page {
-  padding: var(--crm-page-pad);
-}
-
 /* 分类页是主从布局，需铺满内容区并自行管理滚动 */
 .eam-category-page {
-  max-width: none;
   height: 100%;
   display: flex;
   min-height: 0;
   flex-direction: column;
-  padding: var(--crm-page-pad);
 }
 
 .eam-repair-page .page-heading,

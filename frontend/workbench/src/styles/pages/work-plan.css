@@ -2,10 +2,8 @@
 
 .work-plan-page {
   display: flex;
-  max-width: none;
   height: 100%;
   min-height: 0;
-  padding: var(--crm-page-pad);
   flex-direction: column;
 }
 

@@ -391,5 +391,27 @@ function LayoutIcon({ mode, active, primaryColor }: { mode: LayoutMode; active: 
           <rect x="1" y="11" width="14" height="24" rx="2" fill={fill} opacity={0.4} />
         </svg>
       )
+    case 'top-only':
+      return (
+        <svg {...common}>
+          <rect width="48" height="36" rx="3" fill={bg} />
+          <rect x="1" y="1" width="46" height="8" rx="2" fill={fill} />
+        </svg>
+      )
+    case 'single-sider':
+      return (
+        <svg {...common}>
+          <rect width="48" height="36" rx="3" fill={bg} />
+          <rect x="1" y="1" width="14" height="34" rx="2" fill={fill} />
+        </svg>
+      )
+    case 'mini-float':
+      return (
+        <svg {...common}>
+          <rect width="48" height="36" rx="3" fill={bg} />
+          <rect x="1" y="1" width="7" height="34" rx="2" fill={fill} />
+          <rect x="10" y="6" width="12" height="20" rx="2" fill={fill} opacity={0.3} />
+        </svg>
+      )
   }
 }

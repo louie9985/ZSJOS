@@ -7,7 +7,7 @@
 }
 
 .today-tasks-page {
-  max-width: 1200px;
+  max-width: var(--crm-page-max-narrow);
 }
 
 .task-center-grid {
