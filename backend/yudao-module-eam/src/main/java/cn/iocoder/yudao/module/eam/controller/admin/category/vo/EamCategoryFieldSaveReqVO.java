@@ -27,13 +27,19 @@ public class EamCategoryFieldSaveReqVO {
     @NotBlank(message = "字段显示名不能为空")
     private String fieldName;
 
-    @Schema(description = "字段类型（1单行文本 2多行文本 3数字 4日期 5下拉选择）",
+    @Schema(description = "字段类型（1单行文本 2多行文本 3数字 4日期 5下拉选择 6图片/文件）",
             requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "字段类型不能为空")
     private Integer fieldType;
 
     @Schema(description = "下拉选项，仅字段类型为下拉选择时使用", example = "[\"移动\",\"联通\"]")
     private List<String> options;
+
+    @Schema(description = "选项来源：STATIC 或 SYSTEM_DICT")
+    private String optionSource;
+
+    @Schema(description = "System 字典类型编码")
+    private String dictType;
 
     @Schema(description = "是否必填", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
     @NotNull(message = "是否必填不能为空")

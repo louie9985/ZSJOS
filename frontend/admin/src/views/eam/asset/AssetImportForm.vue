@@ -18,11 +18,11 @@
       drag
     >
       <Icon icon="ep:upload-filled" />
-      <div class="el-upload__text">拖入中世健资产台账，或<em>选择文件</em></div>
+      <div class="el-upload__text">拖入 EAM V3 资产台账，或<em>选择文件</em></div>
       <template #tip>
         <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
-          <span>仅读取“在岗资产初始申报表”，从第 3 行开始预检</span>
-          <el-button link type="primary" @click.stop="downloadTemplate">下载 54 列模板</el-button>
+          <span>仅读取“资产台账”，按分类编码和表头名称预检</span>
+          <el-button link type="primary" @click.stop="downloadTemplate">下载 V3 模板</el-button>
         </div>
       </template>
     </el-upload>

@@ -28,6 +28,12 @@ public class EamCategoryFieldRespVO {
     @Schema(description = "下拉选项", example = "[\"移动\",\"联通\"]")
     private List<String> options;
 
+    @Schema(description = "选项来源：STATIC 或 SYSTEM_DICT")
+    private String optionSource;
+
+    @Schema(description = "System 字典类型编码")
+    private String dictType;
+
     @Schema(description = "是否必填", requiredMode = Schema.RequiredMode.REQUIRED, example = "false")
     private Boolean required;
 

@@ -120,6 +120,9 @@ describe('spacing and sizing anchors', () => {
       /\.registration-page,.registration-config-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.media-students-page \{[^}]*padding: var\(--crm-page-pad\)/,
       /\.media-accounts-page[^}]*padding:\s*var\(--crm-page-pad\)/,
+      /\.eam-repair-page,[\s\S]*?padding: var\(--crm-page-pad\)/,
+      /\.eam-category-page \{[^}]*padding: var\(--crm-page-pad\)/,
+      /\.eam-category-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.sales-order-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
@@ -153,6 +156,7 @@ describe('spacing and sizing anchors', () => {
       'business-inbox-layout',
       'media-students-inbox-layout'
       ,'media-feature-inbox-layout'
+      ,'eam-category-layout'
     ]
     const offenders = layouts.filter(name => {
       const body = joined.split(`.${name} {`)[1]?.split('}')[0] ?? ''

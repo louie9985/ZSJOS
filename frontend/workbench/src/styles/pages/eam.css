@@ -1,0 +1,303 @@
+/* EAM (asset management) pages — shared shell for the eight feature areas. */
+
+.eam-repair-page,
+.eam-inventory-page,
+.eam-asset-page,
+.eam-transfer-page,
+.eam-scrap-page,
+.eam-code-rule-page,
+.eam-statistics-page {
+  padding: var(--crm-page-pad);
+}
+
+/* 分类页是主从布局，需铺满内容区并自行管理滚动 */
+.eam-category-page {
+  max-width: none;
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: var(--crm-page-pad);
+}
+
+.eam-repair-page .page-heading,
+.eam-inventory-page .page-heading,
+.eam-asset-page .page-heading,
+.eam-transfer-page .page-heading,
+.eam-scrap-page .page-heading,
+.eam-code-rule-page .page-heading,
+.eam-statistics-page .page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--crm-sp-3);
+}
+
+.eam-table-area {
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+  min-width: 0;
+}
+
+.eam-pagination {
+  margin-block-start: var(--crm-sp-4);
+  text-align: end;
+}
+
+.eam-inline-alert {
+  margin-block-end: var(--crm-sp-3);
+}
+
+.eam-muted {
+  color: var(--crm-text-tertiary);
+}
+
+.eam-count-alert {
+  color: var(--crm-color-error);
+  font-weight: 500;
+}
+
+.eam-section-title {
+  margin-block: var(--crm-sp-4) var(--crm-sp-2);
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+.eam-code-preview {
+  font-family: var(--crm-font-mono, ui-monospace, monospace);
+}
+
+.eam-code-preview-accent {
+  color: var(--crm-color-primary);
+}
+
+/* ---------- 表格内嵌元素 ---------- */
+
+.eam-progress-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eam-progress-caption {
+  font-size: 12px;
+  color: var(--crm-text-tertiary);
+}
+
+.eam-detail-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  margin-block-end: var(--crm-sp-3);
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.eam-log-meta {
+  margin-block-start: var(--crm-sp-1);
+  font-size: 12px;
+  color: var(--crm-text-tertiary);
+}
+
+/* ---------- 资产表单 ---------- */
+
+.eam-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--crm-gap);
+}
+
+.eam-wide-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 var(--crm-gap);
+}
+
+.eam-wide-form > * {
+  min-width: 0;
+}
+
+.eam-form-grid > * {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .eam-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .eam-wide-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.eam-qrcode-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--crm-sp-3);
+}
+
+.eam-qrcode-caption {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+/* ---------- 分类主从页 ---------- */
+
+.eam-category-layout {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  gap: var(--crm-gap);
+  grid-template-columns: var(--crm-list-pane-w) minmax(0, 1fr);
+}
+
+@media (max-width: 768px) {
+  .eam-category-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.eam-category-tree-pane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.eam-category-detail-pane {
+  padding: var(--crm-pane-pad);
+  overflow-y: auto;
+  min-width: 0;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.eam-pane-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-2);
+  margin-block-end: var(--crm-sp-3);
+}
+
+.eam-pane-title {
+  font-weight: 500;
+}
+
+.eam-category-filters {
+  display: flex;
+  width: 100%;
+  margin-block-end: var(--crm-sp-3);
+}
+
+.eam-category-tree-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.eam-category-node {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--crm-sp-1);
+  flex-wrap: wrap;
+}
+
+.eam-category-name {
+  font-weight: 500;
+}
+
+.eam-category-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+  margin-block-start: var(--crm-sp-3);
+  padding-block-start: var(--crm-sp-3);
+  border-block-start: 1px solid var(--crm-border);
+}
+
+/* ---------- 统计页 ---------- */
+
+.eam-stats-grid {
+  display: grid;
+  gap: var(--crm-gap);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  margin-block-end: var(--crm-gap);
+}
+
+.eam-stat-card {
+  padding: var(--crm-card-pad);
+}
+
+.eam-stat-card-label {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+.eam-stat-card-value {
+  margin-block-start: var(--crm-sp-1);
+  font-size: 30px;
+  font-weight: 600;
+}
+
+.eam-stats-columns {
+  display: grid;
+  gap: var(--crm-gap);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.eam-stats-columns > .lead-card {
+  padding: var(--crm-card-pad);
+  min-width: 0;
+}
+
+.eam-stat-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.eam-stat-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.eam-stat-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--crm-sp-2);
+}
+
+.eam-stat-name {
+  font-size: var(--crm-font-sm);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.eam-stat-count {
+  font-weight: 500;
+}

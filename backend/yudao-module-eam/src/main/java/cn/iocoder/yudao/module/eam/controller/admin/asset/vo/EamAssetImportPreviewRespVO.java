@@ -24,6 +24,7 @@ public class EamAssetImportPreviewRespVO {
     private Integer updateCount;
     private Integer skipCount;
     private Integer warningCount;
+    private Integer errorCount;
     private Long batchId;
     @Builder.Default
     private List<Row> rows = new ArrayList<>();
@@ -50,6 +51,8 @@ public class EamAssetImportPreviewRespVO {
         private List<String> defaultedFields = new ArrayList<>();
         @Builder.Default
         private List<String> warnings = new ArrayList<>();
+        @Builder.Default
+        private List<String> errors = new ArrayList<>();
     }
 
 }

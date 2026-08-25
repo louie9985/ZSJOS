@@ -7,7 +7,8 @@
 - **Non-goals**:
   - 不做折旧（用户明确要求移除）
   - 不做扫码交互（本期只生成二维码，扫码端后续再排）
-  - 不做 React workbench 页面（本模块为管理员后台功能，按 AGENTS.md 归 Vue admin）
+  - ~~不做 React workbench 页面（本模块为管理员后台功能，按 AGENTS.md 归 Vue admin）~~
+    **已于 2026-08-24 推翻** — 见下方「决策变更：EAM 迁移至 React workbench」
   - 不改动 ZSJOS、CRM、HRM、FMS 任何既有行为
 - **Branch**: main
 - **Worktree**: /Users/louie/Documents/ChatGPT/ZSJOS 2
@@ -96,6 +97,62 @@ backend/yudao-server/pom.xml    需增加 yudao-module-eam 依赖
 ## Status
 
 `in-progress` — 代码完成，验证全部待补。**不可在未编译验证前合入。**
+
+## 2026-08-24 决策变更：EAM 迁移至 React workbench
+
+**推翻的原决策**：Non-goals 中的「不做 React workbench 页面（本模块为管理员后台功能，按 AGENTS.md 归 Vue admin）」。
+
+**新决策**：用户明确要求把 EAM 全部 8 个功能域整体迁到 React 员工工作台，Vue admin 侧后续下线。
+理由是员工需在统一工作台内完成资产全生命周期操作，不再切换到 admin 面板。
+
+**已交付**（`frontend/workbench/`）：
+
+| 文件 | 说明 |
+|---|---|
+| `src/services/api.ts` | 新增 EAM 类型区 + `api.eam` 命名空间，覆盖 9 个 Controller 的全部端点 |
+| `src/services/eam.ts` | 枚举常量、`buildEamTree`、`filterCategoryTree`、`previewAssetCode`、`pruneExtFields` 等纯函数 |
+| `src/services/eam.test.ts` | 12 个纯函数单测 |
+| `src/services/useDict.ts` | 字典加载 hook（复用 `api.dictDataByType`） |
+| `src/components/AssetSelect.tsx` | 资产远程搜索选择器（300ms 防抖 + 竞态防护） |
+| `src/components/DynamicFields.tsx` | 分类驱动的动态字段渲染 |
+| `src/components/AssetImportModal.tsx` | 台账 Excel 预检/确认导入、模板下载、行级警告展开 |
+| `src/components/CategoryImportModal.tsx` | 分类配置 Excel 预检/确认导入、模板下载、冲突阻断 |
+| `src/services/download.ts` | 带鉴权的 Blob 下载；统一处理二进制错误响应 |
+| `src/pages/Eam{Asset,Category,CodeRule,Inventory,Repair,Scrap,Statistics,Transfer}Page.tsx` | 8 个页面 |
+| `src/styles/pages/eam.css` | 统一样式，全部走 `--crm-*` token |
+| `src/constants.ts` | `APP_ROUTES` 8 条 + `RENDERABLE_APP_ROUTES` 8 条 |
+| `src/layouts/RouteHost.tsx` | 8 条路由分发 |
+| `src/styles/styles.guard.test.ts` | 新增 page/pane padding 锚点与 `eam-category-layout` 列宽锚点 |
+
+**关键事实**（核验自 `script/sql/mysql/migrations/eam/V002__eam_menu.sql`）：
+- 菜单路径为 `/eam/{category,asset,transfer,inventory,repair,scrap,code-rule,statistics}`
+- `component` 字段仍指向 Vue 路径（如 `eam/repair/index`），但 workbench 走 `menu.path` 匹配，
+  **后端菜单无需修改**即可让 workbench 渲染
+- 权限码沿用 admin 侧的 `eam:*`，页面按 `permissions` 数组控制按钮显隐
+
+**验证**：`npx tsc --noEmit` 干净；`npm test` 58 文件 353 用例全绿（含 12 个新增）；`npm run build` 通过。
+guard 反向验证：故意把 `--crm-pane-pad` 改成字面量后测试确实转红，锚点非空转。
+
+**本轮补齐**（2026-08-24）：
+- 台账 Excel：预检、确认导入、模板下载、更新已有资产标签、行级映射/默认值/警告展开。
+- 分类配置 Excel：预检、冲突阻断、确认导入、模板下载、分类/字段差异表。
+- 资产附件：复用 `/infra/file/upload`，表单上传后写回 `fileUrls`。
+- 资产导出：通过带鉴权的 Blob 请求下载 `资产台账.xlsx`。
+- 资产二维码：改为带鉴权的 Blob 请求并使用 object URL，关闭/卸载时释放 URL；修复原 `<img src>` 不携带 Authorization 的问题。
+
+**本轮补齐**（2026-08-24，字段配置与二维码功能对齐 admin）：
+- 字段配置表单补齐 `optionSource`（STATIC / SYSTEM_DICT）与 `dictType`，并遵循后端 `normalizeOptions`：
+  非下拉类型清空选项相关字段，系统字典源不留静态选项，`required` 恒为 false，员工表不可见时强制关闭 `collectionRequired`。
+- 字段类型补充 `FILE(6)`，下拉类型合法值从 5 扩展到 6。
+- 字段配置表单补充 `conditionRule` 条件规则 JSON 输入与校验（必须是对象，留空则置空）。
+- `DynamicFields` 支持 `SYSTEM_DICT` 下拉：按 `dictType` 用 `useDict` 加载字典选项（修复 admin 端下拉字段选项恒为空的缺陷）。
+- 二维码弹窗补充「打印」功能，只打印标签区域，对标 admin `QrCodeDialog.handlePrint`。
+
+**验证（本轮）**：`npx tsc --noEmit` EAM 相关文件零错误；`npm test` 58 文件 353 用例全绿。
+
+**仍未完成**：admin 侧尚未下线 — `frontend/admin/src/views/eam/` 与 `src/api/eam/` 原样保留，两端目前并存。
+
+**历史缺口（已关闭）**：Excel 导入导出、资产附件上传、二维码鉴权已在本轮完成。
 
 ## 2026-08-17 EAM JSON attachment mapping continuation
 

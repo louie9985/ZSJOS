@@ -1,5 +1,34 @@
 # Main Workstream
 
+## Active delivery: rewrite ruoyi-vue-pro as a ZSJOS-specific skill
+
+- Workstream ID: `main-zsj-os-ruoyi-skill-rewrite`
+- Goal: rewrite the repository-local `ruoyi-vue-pro/` skill around the current ZSJOS backend, Vue administration frontend, React employee workbench, Partner H5, BPM, Quartz, permission, dictionary, code-generation, and SQL contracts.
+- Non-goals: modify application source, architecture documents, installed skills under `/Users/louie/.cc-switch/skills/ruoyi-vue-pro`, Git branches, commits, deployment, database state, or external dependencies.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `02961f62360e96a85c734c0b87c34a43dea77309` plus existing user changes
+- Target branch: `main`
+- Ownership scope: `ruoyi-vue-pro/SKILL.md`, its five reference documents, removal of `ruoyi-vue-pro/.DS_Store`, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing `AGENTS.md`, architecture documents, backend/frontend manifests, BPM public APIs, and skill-creator validation guidance; no new dependency.
+- Integration order: register workstream -> rewrite skill documents -> remove `.DS_Store` -> static contract checks -> skill validation fallback if PyYAML remains unavailable -> append delivery evidence.
+- Verification plan: frontmatter/reference-link checks, forbidden-pattern checks, repository-path/version/API consistency checks, `git diff --check`, and skill validator attempt without installing dependencies.
+
+## Delivery Entry - 2026-08-24 14:24:09 +08:00
+
+- Workstream ID: `main-zsj-os-ruoyi-skill-rewrite`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `02961f62360e96a85c734c0b87c34a43dea77309` (no commit created)
+- User goal: rewrite the repository-local `ruoyi-vue-pro` skill as a ZSJOS-specific guide covering the Java backend, Vue administration frontend, React employee workbench, Partner H5, BPM, Quartz/MQ, permissions, dictionaries, SQL, and code generation.
+- Key decisions: retain the `ruoyi-vue-pro` name and five reference filenames; use a concise routing entrypoint; treat repository manifests as version truth; select conversion strategy by complexity; enforce cumulative feature/data/object authorization; use code generation only as an audited skeleton; keep BPM and Quartz guidance while making MQ dependency-driven; do not sync the installed symlink target; remove the binary `.DS_Store` artifact.
+- Execution or analysis result: rewrote `SKILL.md` and all five reference documents around current ZSJOS paths, versions, API prefix mapping, module ownership, three frontend runtimes, BPM public APIs, tenant/object permission boundaries, dictionary snapshots, migration rules, and verification commands. Removed `ruoyi-vue-pro/.DS_Store`.
+- Changed files: `ruoyi-vue-pro/SKILL.md`; `ruoyi-vue-pro/references/architecture.md`; `ruoyi-vue-pro/references/backend.md`; `ruoyi-vue-pro/references/frontend.md`; `ruoyi-vue-pro/references/workflow.md`; `ruoyi-vue-pro/references/middleware.md`; `ruoyi-vue-pro/.DS_Store`; `handoff/main.md`.
+- Verification evidence: frontmatter static check passed; all five reference links resolve; all target files are non-empty; forbidden-pattern scan passed for stale versions, Sentinel, duplicated API prefixes, BPM internal-table examples, test tokens, incorrect FileApi example, hardcoded LocalDate prohibition, destructive module-removal guidance, and blanket MapStruct wording; `git diff --check` passed. `quick_validate.py` was attempted and remained unverified because both available Python runtimes lack the `yaml`/PyYAML module; no dependency was installed.
+- Dependency or integration impact: no new dependency, application source change, architecture-document change, database operation, branch/worktree operation, commit, push, deployment, or installed-skill synchronization. The current Codex-installed symlink still points to `/Users/louie/.cc-switch/skills/ruoyi-vue-pro` and was not modified.
+- Remaining work: if this repository copy should become active for Codex, install or synchronize it in a separately authorized task; rerun the official skill validator after providing the validator's missing PyYAML runtime dependency.
+
 ## Active delivery: repair partner lead qualification cashback chain
 
 - Workstream ID: `main-partner-lead-cashback-repair`
@@ -2066,3 +2095,59 @@
 - Verification evidence: all merge conflict markers were absent from the four resolved files before staging; Git reported only the expected four unmerged paths awaiting resolution staging.
 - Dependency or integration impact: local main now contains the remote changes plus the preserved local commit; no push, branch/worktree change, service operation, database execution, or dependency installation was performed.
 - Remaining work: None for the requested local merge; the local commits remain unpushed.
+
+## Active delivery: Workbench FMS complete migration
+
+- Workstream ID: `main-fms-workbench-migration`
+- Goal: keep the Vue Admin FMS fully available while completing functional parity for all 26 FMS pages in the React Workbench, including existing API operations, server-owned permissions and dictionaries, account-set context, import/export/print behavior, and recoverable remote states.
+- Non-goals: retire or redirect Vue Admin FMS; change FMS business rules or database data; create duplicate Workbench aggregation APIs; modify unrelated EAM, HRM, H5, or ZSJOS behavior; execute migrations; start or stop shared services; create or switch branches/worktrees; commit, push, or publish.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `02961f62360e96a85c734c0b87c34a43dea77309`
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/fms/**`; `frontend/workbench/src/components/fms/**` and FMS account-set/print components; `frontend/workbench/src/services/fms/**` and `useFmsAccountSet.ts`; `frontend/workbench/src/layouts/fmsRoutes.tsx` plus the minimum shared Workbench route/provider/menu/style/package wiring required by FMS; focused FMS tests; directly affected Workbench/FMS documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing `yudao-module-fms` admin APIs, System permission/menu/dictionary APIs, Vue Admin FMS as the behavior reference, approved `echarts@6.1.0`, and current uncommitted Workbench EAM/HRM changes that must remain intact; no additional dependency is planned.
+- Integration order: freeze Admin-to-Workbench parity matrix -> repair provider/routing/build foundation -> close data-corruption and permission gaps -> complete voucher/closing/config/ledger/report/home capabilities -> focused tests and full Workbench static build checks -> desktop/mobile browser smoke checks -> documentation and delivery record.
+- Verification plan: focused Vitest coverage for account-set context, period conversion, permission gates, and auxiliary-balance preservation; full Workbench `npm test`, `npm run typecheck`, and `npm run build`; representative authorized/read-only/empty/error flows in a real browser at desktop and mobile widths when the runtime is available; scoped parity review and `git diff --check`. No heavyweight all-page E2E suite is planned.
+
+## Delivery Entry - 2026-08-25 00:45:39 +08:00
+
+- Workstream ID: `main-fms-workbench-migration`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `02961f62360e96a85c734c0b87c34a43dea77309` (no commit created)
+- User goal: keep Vue FMS available and complete the FMS finance-page migration into React Workbench without heavyweight testing.
+- Key decisions: preserve Vue Admin FMS without deletion, redirect, or retirement; expose all 26 server-menu-backed Workbench routes; reuse existing FMS/System APIs; keep the approved `echarts@6.1.0`; separate voucher create/update permissions; update account-set context only after the server accepts the default switch; use server dictionaries for user-maintained choices; preserve auxiliary initial-balance combinations; avoid unrelated EAM/HRM changes and all database, branch, commit, push, and shared-service operations.
+- Execution or analysis result: completed Workbench account-set provider/switch/guide and FMS route wiring; implemented the 26 FMS pages and shared import, print, chart, report-formula, voucher-operation, voucher-print, and closing-scheme components; closed parity gaps in account-set management, subject usage/migration, initial balances, voucher templates/copy/attachments/print/move/tidy, closing schemes/templates, home states, ledger permissions, and finance-indicator detail/type/status fields; documented the dual-runtime boundary. Vue Admin FMS source remained unchanged.
+- Changed files: `frontend/workbench/package.json`; `frontend/workbench/package-lock.json`; FMS-related wiring in `frontend/workbench/src/constants.ts`, `frontend/workbench/src/main.tsx`, `frontend/workbench/src/layouts/fmsRoutes.tsx`, `frontend/workbench/src/layouts/RouteHost.tsx`, `frontend/workbench/src/layouts/navItems.tsx`, and `frontend/workbench/src/styles/index.css`; `frontend/workbench/src/pages/fms/**`; `frontend/workbench/src/components/fms/**`; `frontend/workbench/src/components/FmsAccountSetGuide.tsx`; `frontend/workbench/src/components/FmsAccountSetProvider.tsx`; `frontend/workbench/src/components/FmsAccountSetSwitch.tsx`; `frontend/workbench/src/components/FmsPrintPreview.tsx`; `frontend/workbench/src/services/fms/**`; `frontend/workbench/src/services/useFmsAccountSet.ts`; `frontend/workbench/src/services/useDict.ts`; `frontend/workbench/src/services/download.ts`; `frontend/workbench/src/styles/pages/fms.css`; `docs/frontend/fms-workbench-migration.md`; `handoff/main.md`.
+- Verification evidence: static parity check found 26 Workbench FMS constants and 26 lazy route targets corresponding to the Vue pages; Vue API-only differences were limited to `simple-list` endpoints covered by full list APIs and directory-level regex noise; focused FMS Vitest passed 3/3; full Workbench Vitest passed 59 files and 356 tests; full `npm run typecheck` passed before later unrelated HRM edits resumed; production `npm run build` passed with 5,757 modules and only the existing chunk-size warning; `git diff --check` passed; Playwright production-package smoke checks rendered FMS home, account-set switch, subject, initial balance, finance indicator, voucher entry, and closing pages at desktop and 390x844 mobile widths, with screenshots visually checked for blank output and overlap. The mocked smoke environment produced only the expected missing WebSocket connection error; no live credentials or business data were used.
+- Dependency or integration impact: adds the explicitly approved `echarts@6.1.0` Workbench dependency and lazy FMS chunks; no backend/API/schema/menu migration, permission grant, database execution, Vue removal, branch/worktree operation, commit, push, publication, or shared-service change. Concurrent EAM/HRM work in the same worktree was preserved.
+- Remaining work: the most recent final typecheck retry is currently blocked by an unrelated concurrent HRM type mismatch in `HrmAssessmentTemplatePage.tsx` after the successful FMS build/typecheck evidence was recorded; the active dev server can also briefly show HRM import errors while that workstream adds/removes files. Re-run Workbench typecheck/build after the HRM workstream settles, then perform an authenticated smoke check against a running backend if live credentials and target tenant data become available. No FMS migration gap remains in the audited Vue-to-Workbench surface.
+
+## Delivery Entry - 2026-08-25 09:43:18 +08:00
+
+- Workstream ID: `main-fms-workbench-migration`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `02961f62360e96a85c734c0b87c34a43dea77309` (no commit created)
+- User goal: keep Vue FMS online while correcting Workbench menu hierarchy, upgrading FMS tables to Ant Design ProTable, and widening FMS forms.
+- Key decisions: consume the server menu tree recursively for side, secondary, top, and mobile navigation; keep route/path keys on leaves and ancestor keys on directories; introduce one FMS ProTable wrapper with reload, density, column setting, and fullscreen defaults while preserving native table props; retain AntD `Table.Summary` only for the voucher-statistics summary renderer; widen FMS dialogs only; do not alter backend menus/APIs, Vue FMS, EAM/HRM, database state, branches, commits, pushes, or shared services.
+- Execution or analysis result: restored recursive `SecondaryNavigationItem.children` and ancestor-key resolution; wired Workbench secondary/mobile menus to the hierarchical builders; added hierarchy regression tests; added `FmsProTable` and migrated FMS configuration, voucher, ledger, report, closing, and formula tables; widened configuration, voucher-operation, import, print, and initialization dialogs.
+- Changed files: `frontend/workbench/src/services/menu.ts`; `frontend/workbench/src/services/menu.test.ts`; `frontend/workbench/src/layouts/navItems.tsx`; `frontend/workbench/src/layouts/navItems.test.tsx`; `frontend/workbench/src/layouts/MobileNavDrawer.tsx`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/components/fms/FmsProTable.tsx`; affected files under `frontend/workbench/src/pages/fms/**` and `frontend/workbench/src/components/fms/**`; this handoff record.
+- Verification evidence: focused menu tests passed 23/23; full Workbench Vitest passed 59 files and 359 tests; `npx vite build` passed with 6,909 transformed modules and only existing chunk-size warnings; `git diff --check` passed. `npm run typecheck` remains blocked by unrelated concurrent HRM ProTable/type and JSX errors (no FMS/menu errors observed in the output); no heavy E2E or live backend smoke was run.
+- Dependency or integration impact: reused the already installed `@ant-design/pro-components`; no new dependency, API, permission, menu seed, migration, Vue retirement, branch/worktree operation, commit, push, or shared-service change. Existing EAM/HRM modifications were preserved.
+- Remaining work: rerun typecheck after the concurrent HRM workstream settles; optionally perform an authenticated browser check of nested menu expansion, ProTable toolbar, and widened dialogs when a live tenant session is available.
+
+## Delivery Entry - 2026-08-25 10:09:30 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `02961f62360e96a85c734c0b87c34a43dea77309` (pre-commit HEAD)
+- User goal: 将当前 Git 改动直接提交并推送到云端。
+- Key decisions: 保留当前主工作区全部 EAM、FMS、HRM、Workbench 导航、文档、SQL、模板和测试改动；排除被 `.gitignore` 忽略的 `frontend/workbench/.playwright-cli/` 临时运行产物；不切换分支、不重写历史、不执行数据库或服务状态变更。
+- Execution result: 完成远端同步检查；准备将全部非忽略改动作为一个提交推送至 `origin/main`。
+- Changed files: 当前工作区全部已跟踪改动及新增源文件、文档、SQL、Excel 模板和测试文件；不包含 Workbench Playwright 临时目录。
+- Verification evidence: EAM Maven 模块 40 个测试通过；Workbench Vitest 59 个测试文件、359 个测试通过；Workbench `npm run typecheck` 和 `npm run build` 通过，构建仅报告既有大 chunk 警告；`git diff --check` 通过。Admin `pnpm ts:check` 仍有仓库既有错误，涉及 BPM/CRM/MES 及未改动的 EAM 页面，当前改动的资产/分类页面未出现在报错中。未执行数据库、服务重启或鉴权浏览器验证。
+- Dependency/integration impact: 未新增本次任务之外的依赖；现有 Workbench FMS 依赖改动属于当前工作区既有内容；无数据库执行、权限变更、BPM 发布、分支或工作树操作。
+- Remaining work: 完成暂存、提交、推送后核对本地与 `origin/main` 哈希及工作区状态；Admin 既有类型错误和真实后端鉴权验证留作后续工作。

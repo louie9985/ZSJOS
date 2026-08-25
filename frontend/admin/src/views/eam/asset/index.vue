@@ -47,6 +47,17 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="字段筛选">
+        <el-select v-model="queryParams.extFieldKey" clearable class="!w-180px" @change="queryParams.extFieldValue = undefined">
+          <el-option v-for="field in filterFields" :key="field.fieldKey" :label="field.fieldName" :value="field.fieldKey" />
+        </el-select>
+      </el-form-item>
+      <el-form-item v-if="selectedFilterField" :label="selectedFilterField.fieldName" prop="extFieldValue">
+        <el-select v-if="selectedFilterField.fieldType === 5" v-model="queryParams.extFieldValue" clearable class="!w-180px">
+          <el-option v-for="item in filterOptions" :key="String(item.value)" :label="item.label" :value="item.value" />
+        </el-select>
+        <el-input v-else v-model="queryParams.extFieldValue" clearable class="!w-180px" />
+      </el-form-item>
       <el-form-item>
         <el-button @click="handleQuery"><Icon icon="ep:search" class="mr-5px" /> 搜索</el-button>
         <el-button @click="resetQuery"><Icon icon="ep:refresh" class="mr-5px" /> 重置</el-button>
@@ -148,6 +159,8 @@ import { handleTree } from '@/utils/tree'
 import download from '@/utils/download'
 import * as AssetApi from '@/api/eam/asset'
 import * as CategoryApi from '@/api/eam/category'
+import * as CategoryFieldApi from '@/api/eam/categoryField'
+import { getStrDictOptions } from '@/utils/dict'
 import AssetForm from './AssetForm.vue'
 import AssetImportForm from './AssetImportForm.vue'
 import AssetDetail from './AssetDetail.vue'
@@ -174,6 +187,17 @@ const queryParams = reactive({
   status: undefined,
   useDeptId: undefined,
   useUserId: undefined,
+  extFieldKey: undefined,
+  extFieldValue: undefined,
+})
+const filterFields = ref<CategoryFieldApi.CategoryFieldVO[]>([])
+const selectedFilterField = computed(() => filterFields.value.find((field) => field.fieldKey === queryParams.extFieldKey))
+const filterOptions = computed(() => {
+  const field = selectedFilterField.value
+  if (!field) return []
+  return field.optionSource === 'SYSTEM_DICT' && field.dictType
+    ? getStrDictOptions(field.dictType)
+    : (field.options || []).map((value) => ({ label: value, value }))
 })
 
 const getList = async () => {
@@ -191,6 +215,14 @@ const loadCategoryTree = async () => {
   const categories = await CategoryApi.getCategoryList()
   categoryTree.value = handleTree(categories as any, 'id', 'parentId')
 }
+
+watch(() => queryParams.categoryId, async (categoryId) => {
+  filterFields.value = categoryId ? await CategoryFieldApi.getEffectiveFieldList(categoryId) : []
+  if (!filterFields.value.some((field) => field.fieldKey === queryParams.extFieldKey)) {
+    queryParams.extFieldKey = undefined
+    queryParams.extFieldValue = undefined
+  }
+})
 
 const handleQuery = () => {
   queryParams.pageNo = 1

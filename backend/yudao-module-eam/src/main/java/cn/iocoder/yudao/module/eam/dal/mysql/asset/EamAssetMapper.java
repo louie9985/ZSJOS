@@ -21,6 +21,9 @@ public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
                 .eqIfPresent(EamAssetDO::getStatus, reqVO.getStatus())
                 .eqIfPresent(EamAssetDO::getUseDeptId, reqVO.getUseDeptId())
                 .eqIfPresent(EamAssetDO::getUseUserId, reqVO.getUseUserId())
+                .apply(reqVO.getExtFieldKey() != null && reqVO.getExtFieldValue() != null,
+                        "JSON_UNQUOTE(JSON_EXTRACT(ext_fields, {0})) = {1}",
+                        "$." + reqVO.getExtFieldKey(), reqVO.getExtFieldValue())
                 .orderByDesc(EamAssetDO::getId));
     }
 

@@ -31,6 +31,7 @@ public interface ErrorCodeConstants {
     ErrorCode ASSET_IMPORT_LIST_EMPTY = new ErrorCode(1_070_003_003, "导入资产数据不能为空");
     ErrorCode ASSET_IMPORT_FILE_INVALID = new ErrorCode(1_070_003_004, "资产台账文件无效：{}");
     ErrorCode ASSET_IMPORT_CATEGORY_MISSING = new ErrorCode(1_070_003_005, "资产分类【{} / {}】不存在，请先导入分类配置");
+    ErrorCode ASSET_IMPORT_HAS_ERRORS = new ErrorCode(1_070_003_006, "资产台账存在 {} 个错误，请先修正后再提交");
 
     // ========== 流转 1-070-004-000 ==========
     ErrorCode TRANSFER_NOT_EXISTS = new ErrorCode(1_070_004_000, "流转单不存在");

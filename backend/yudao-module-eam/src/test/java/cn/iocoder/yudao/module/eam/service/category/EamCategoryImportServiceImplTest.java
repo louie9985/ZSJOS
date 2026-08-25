@@ -43,11 +43,11 @@ class EamCategoryImportServiceImplTest {
     }
 
     @Test
-    void preview_shouldRejectNonObjectConditionRule() throws Exception {
+    void preview_shouldIgnoreRemovedLegacyConditionRuleColumn() throws Exception {
         EamCategoryImportRespVO result = importService.preview(workbook("[1,2]"));
 
-        assertEquals(1, result.getConflictCount());
-        assertEquals("条件规则必须是 JSON 对象", result.getItems().get(2).getMessage());
+        assertEquals(0, result.getConflictCount());
+        assertEquals(3, result.getCreateCount());
     }
 
     private static byte[] workbook(String conditionRule) throws Exception {
@@ -64,11 +64,11 @@ class EamCategoryImportServiceImplTest {
 
             Sheet fields = workbook.createSheet("字段");
             Row fieldHeader = fields.createRow(0);
-            for (int index = 0; index < 10; index++) set(fieldHeader, index, "H" + index);
+            for (int index = 0; index < 9; index++) set(fieldHeader, index, "H" + index);
             Row field = fields.createRow(1);
             set(field, 0, "IT"); set(field, 1, "cpu"); set(field, 2, "处理器");
-            set(field, 3, "单行文本"); set(field, 5, "是"); set(field, 6, "是");
-            set(field, 7, "否"); set(field, 8, conditionRule); set(field, 9, "1");
+            set(field, 3, "单行文本"); set(field, 6, "是"); set(field, 7, "1");
+            set(field, 8, conditionRule);
             workbook.write(output);
             return output.toByteArray();
         }

@@ -1,17 +1,18 @@
 import type { ReactNode } from 'react'
 import type { MenuProps } from 'antd'
-import type { PrimaryNavigationItem } from '../services/menu'
+import type { PrimaryNavigationItem, SecondaryNavigationItem } from '../services/menu'
+import type { WorkbenchMenu } from '../services/api'
 import BackendMenuIcon from './BackendMenuIcon'
 
 type MenuItem = Required<MenuProps>['items'][number]
 
 /**
- * 一级 + 二级导航 → antd Menu items。
+ * 服务端递归导航 → antd Menu items。
  *
  * single-sider / mini-float / top-only / 移动端抽屉四处共用：它们都需要把两级
  * 导航压进一棵 Menu 树，规则一致。
  *
- * 关键：`pages` 为空的一级项必须渲染成**叶子项**，不能是 SubMenu。
+ * 关键：没有可见子节点的菜单必须渲染成叶子项，不能是 SubMenu。
  * 一级节点在后台菜单里既可能是分组容器，也可能自身就是页面（此时 children 为空）。
  * 渲染成 SubMenu 会得到一个空弹层，且 Menu 的 onClick 只对叶子项触发，
  * 该一级页面在这些模式下完全点不到。key 用 `menu.path`，与 selectedKeys
@@ -29,18 +30,31 @@ export function buildNavMenuItems(
   } = {}
 ): MenuItem[] {
   const { childIcons = true, expandSuffix, groupChildren = false, popupClassName } = options
+  const buildChildren = (nodes: SecondaryNavigationItem[]): MenuItem[] => nodes.map(node => {
+    const icon = childIcons ? <BackendMenuIcon icon={node.icon}/> : undefined
+    if (node.children.length === 0) {
+      return { key: node.menu.path, label: node.label, title: node.label, ...(icon ? { icon } : {}) }
+    }
+    return {
+      key: node.key,
+      label: node.label,
+      title: node.label,
+      ...(icon ? { icon } : {}),
+      ...(popupClassName ? { popupClassName } : {}),
+      children: buildChildren(node.children)
+    }
+  })
+
   return navigation.map(primary => {
     const icon = <BackendMenuIcon icon={primary.icon}/>
     // 自身即页面：叶子项，key 用 path
     if (primary.pages.length === 0) {
       return { key: primary.menu.path, label: primary.label, title: primary.label, icon }
     }
-    const pages = primary.pages.map(page => ({
-      key: page.key,
-      label: page.label,
-      title: page.label,
-      ...(childIcons ? { icon: <BackendMenuIcon icon={page.icon}/> } : {})
-    }))
+    const pages = buildChildren(primary.pages)
+    const children = groupChildren
+      ? [{ type: 'group' as const, key: `${primary.key}-group`, label: primary.label, children: pages }]
+      : pages
     return {
       key: primary.key,
       // 展开标记只加在真有二级的项上
@@ -48,9 +62,62 @@ export function buildNavMenuItems(
       title: primary.label,
       icon,
       ...(popupClassName ? { popupClassName } : {}),
-      children: groupChildren
-        ? [{ type: 'group' as const, key: `${primary.key}-group`, label: primary.label, children: pages }]
-        : pages
+      children
     }
   })
+}
+
+type HierarchicalMenuOptions = {
+  childIcons?: boolean
+  expandSuffix?: ReactNode
+  popupClassName?: string
+}
+
+function buildHierarchicalItems(menus: WorkbenchMenu[], options: HierarchicalMenuOptions): MenuItem[] {
+  const { childIcons = true, expandSuffix, popupClassName } = options
+  return menus.filter(menu => !menu.hidden).map(menu => {
+    const children = buildHierarchicalItems(menu.children, options)
+    const icon = childIcons ? <BackendMenuIcon icon={menu.icon}/> : undefined
+    if (children.length === 0) {
+      return { key: menu.path, label: menu.name, title: menu.name, ...(icon ? { icon } : {}) }
+    }
+    return {
+      key: menu.path,
+      label: expandSuffix ? <span>{menu.name}{expandSuffix}</span> : menu.name,
+      title: menu.name,
+      ...(icon ? { icon } : {}),
+      ...(popupClassName ? { popupClassName } : {}),
+      children
+    }
+  })
+}
+
+/** 保留服务端目录层级，用于侧栏、顶栏和移动端的下拉菜单。 */
+export function buildHierarchicalNavMenuItems(
+  navigation: PrimaryNavigationItem[],
+  options: HierarchicalMenuOptions = {}
+): MenuItem[] {
+  return navigation.map(primary => {
+    const children = buildHierarchicalItems(primary.menu.children, options)
+    const icon = <BackendMenuIcon icon={primary.icon}/>
+    if (children.length === 0) {
+      return { key: primary.menu.path, label: primary.label, title: primary.label, icon }
+    }
+    return {
+      key: primary.key,
+      label: options.expandSuffix ? <span>{primary.label}{options.expandSuffix}</span> : primary.label,
+      title: primary.label,
+      icon,
+      ...(options.popupClassName ? { popupClassName: options.popupClassName } : {}),
+      children
+    }
+  })
+}
+
+/** 把某个一级菜单的子树转换为带下拉目录的二级菜单项。 */
+export function buildHierarchicalSecondaryItems(
+  menu: WorkbenchMenu | undefined,
+  options: HierarchicalMenuOptions = {}
+): MenuItem[] {
+  return menu ? buildHierarchicalItems(menu.children, options) : []
 }

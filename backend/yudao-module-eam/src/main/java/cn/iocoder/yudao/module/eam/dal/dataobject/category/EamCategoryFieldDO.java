@@ -58,6 +58,10 @@ public class EamCategoryFieldDO extends BaseDO {
      */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private List<String> options;
+    /** 下拉选项来源：STATIC 或 SYSTEM_DICT。 */
+    private String optionSource;
+    /** System 字典类型编码。 */
+    private String dictType;
     /**
      * 是否必填
      */

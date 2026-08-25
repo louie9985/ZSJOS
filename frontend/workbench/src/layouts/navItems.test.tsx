@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildNavMenuItems } from './navItems'
+import { buildHierarchicalNavMenuItems, buildHierarchicalSecondaryItems, buildNavMenuItems } from './navItems'
 import type { PrimaryNavigationItem } from '../services/menu'
 import type { WorkbenchMenu } from '../services/api'
 
@@ -11,7 +11,7 @@ const primary = (id: number, name: string, path: string, pages: Array<[string, s
   label: name,
   icon: 'mdi:home',
   menu: menu(id, name, path),
-  pages: pages.map(([label, page]) => ({ key: page, label, icon: 'mdi:file', menu: menu(0, label, page) }))
+  pages: pages.map(([label, page]) => ({ key: page, label, icon: 'mdi:file', menu: menu(0, label, page), children: [] }))
 })
 
 // any-casts below: MenuItem is a wide union, narrowing each variant adds no signal
@@ -70,5 +70,56 @@ describe('buildNavMenuItems', () => {
     )
     expect(built[0].popupClassName).toBe('mini-flyout')
     expect(built[1].popupClassName).toBeUndefined()
+  })
+
+  it('renders deep directories as nested submenus instead of flattening them', () => {
+    const navigation = primary(1, '资产管理', '/eam', [])
+    navigation.pages = [{
+      key: '2',
+      label: '资产台账',
+      icon: 'mdi:folder',
+      menu: menu(2, '资产台账', '/eam/ledger'),
+      children: [{
+        key: '/eam/ledger/assets',
+        label: '资产列表',
+        icon: 'mdi:file',
+        menu: menu(3, '资产列表', '/eam/ledger/assets'),
+        children: []
+      }]
+    }]
+
+    const [item] = items([navigation])
+    expect(item.children[0].key).toBe('2')
+    expect(item.children[0].children[0].key).toBe('/eam/ledger/assets')
+  })
+})
+
+describe('hierarchical menu builders', () => {
+  it('keeps server directory levels in the merged sider tree', () => {
+    const root = menu(1, '工作台', '/zsjos')
+    root.children = [
+      { ...menu(2, '财务', '/zsjos/fms'), parentId: 1, children: [
+        { ...menu(3, '科目', '/zsjos/fms/subjects'), parentId: 2 }
+      ] }
+    ]
+    const navigation = [{
+      key: '1', label: '工作台', icon: 'mdi:home', menu: root, pages: []
+    }] as unknown as PrimaryNavigationItem[]
+
+    const [item] = buildHierarchicalNavMenuItems(navigation) as any[]
+    expect(item.children[0].key).toBe('/zsjos/fms')
+    expect(item.children[0].children[0].key).toBe('/zsjos/fms/subjects')
+  })
+
+  it('builds secondary menu from the active server root without flattening', () => {
+    const root = menu(1, '工作台', '/zsjos')
+    root.children = [{
+      ...menu(2, '财务', '/zsjos/fms'),
+      parentId: 1,
+      children: [{ ...menu(3, '科目', '/zsjos/fms/subjects'), parentId: 2 }]
+    }]
+    const [item] = buildHierarchicalSecondaryItems(root) as any[]
+    expect(item.key).toBe('/zsjos/fms')
+    expect(item.children[0].key).toBe('/zsjos/fms/subjects')
   })
 })

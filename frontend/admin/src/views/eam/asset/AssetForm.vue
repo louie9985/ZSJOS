@@ -109,10 +109,11 @@
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="12"><el-form-item label="上级" prop="supervisorUserId"><el-select v-model="formData.supervisorUserId" clearable filterable class="!w-full"><el-option v-for="user in userList" :key="user.id" :label="user.nickname" :value="user.id" /></el-select></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="入司日期" prop="joinDate"><el-date-picker v-model="formData.joinDate" type="date" value-format="YYYY-MM-DD" class="!w-full" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="使用人承诺"><el-checkbox v-model="formData.commitmentAccepted">已承诺</el-checkbox></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="承诺日期"><el-date-picker v-model="formData.commitmentDate" type="date" value-format="YYYY-MM-DD" class="!w-full" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="资产来源"><el-select v-model="formData.source" clearable class="!w-full"><el-option v-for="item in getIntDictOptions('eam_asset_source')" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="原值"><el-input-number v-model="formData.originalValue" :min="0" :precision="2" :controls="false" class="!w-full" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="净值"><el-input-number v-model="formData.netValue" :min="0" :precision="2" :controls="false" class="!w-full" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="保修到期日"><el-date-picker v-model="formData.warrantyDate" type="date" value-format="YYYY-MM-DD" clearable class="!w-full" /></el-form-item></el-col>
+        <el-col :span="12"><el-form-item label="预计寿命（月）"><el-input-number v-model="formData.expectedLife" :min="1" :precision="0" class="!w-full" /></el-form-item></el-col>
         <el-col :span="24"><el-form-item label="上传附件"><el-upload action="/admin-api/infra/file/upload" :file-list="(formData.fileUrls || []).map((url) => ({ name: url.split('/').pop() || url, url }))" :on-success="(res) => formData.fileUrls = [...(formData.fileUrls || []), res.data]" :on-remove="(_file, files) => formData.fileUrls = files.map((item) => item.url || '')"><el-button>选择文件</el-button></el-upload></el-form-item></el-col>
         <el-col :span="24">
           <el-form-item label="存放地点" prop="location">
@@ -151,6 +152,7 @@
 
 <script setup lang="ts">
 import { handleTree } from '@/utils/tree'
+import { getIntDictOptions } from '@/utils/dict'
 import * as AssetApi from '@/api/eam/asset'
 import * as DeptApi from '@/api/system/dept'
 import * as UserApi from '@/api/system/user'
@@ -200,14 +202,15 @@ function buildEmptyForm(): AssetApi.AssetVO {
     specification: '',
     sn: '',
     barcode: '',
+    originalValue: undefined,
+    netValue: undefined,
+    source: undefined,
+    warrantyDate: undefined,
+    expectedLife: undefined,
     purchaseDate: undefined,
     useDeptId: undefined,
     useUserId: undefined,
     location: '',
-    supervisorUserId: undefined,
-    joinDate: undefined,
-    commitmentAccepted: false,
-    commitmentDate: undefined,
     remark: '',
     fileUrls: [],
     extFields: {}

@@ -10,6 +10,8 @@ import cn.iocoder.yudao.module.eam.enums.category.EamFieldTypeEnum;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 
 import java.math.BigDecimal;
 import java.util.HashMap;
@@ -37,6 +39,8 @@ public class EamCategoryFieldServiceImplTest extends BaseDbUnitTest {
     private EamCategoryMapper categoryMapper;
     @Resource
     private EamCategoryFieldMapper fieldMapper;
+    @MockitoBean
+    private DictDataApi dictDataApi;
 
     private Long createCategory(String name, String code, Long parentId) {
         EamCategoryDO category = EamCategoryDO.builder()

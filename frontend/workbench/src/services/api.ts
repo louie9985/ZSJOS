@@ -57,6 +57,579 @@ export type StudentDeliveryStage = { code: string; label: string; status: string
 export type StudentContactContext = { serviceRelationId: number; acceptanceStatus?: string; acceptedAt?: string; version: number; firstContactChecklist: StudentContactChecklistItem[]; quickNotes: string[]; firstContactTimeoutMinutes?: number; studyPlanTimeoutMinutes?: number; visibleTabs: string[]; availableActions: StudentContactAction[]; currentTask?: { id: number; type: string; status: string; dueAt?: string; overdue?: boolean }; contentDirectorUserId?: number; contentDirectorUserName?: string; careerPlannerUserId?: number; careerPlannerUserName?: string; deliveryStage?: string; deliveryStageLabel?: string; deliveryStages?: StudentDeliveryStage[] }
 export type StudentContactRecord = { id: number; contactType: string; successful: boolean; unsuccessfulReasonValue?: string; unsuccessfulReasonLabel?: string; remark: string; attachmentFileIds: number[]; completedChecklistKeys: string[]; nextContactAt: string; operatorUserId: number; operatorUserName?: string; submittedAt: string; deliveryStage?: string; deliveryData?: string }
 export type StudentContactExtension = { id: number; serviceRelationId: number; taskId: number; status: string; originalDueAt: string; requestedDueAt: string; reasonValue: string; reasonLabel?: string; description: string; attachmentFileIds: number[]; applicantUserId: number; reviewerUserId: number; processInstanceId?: string; decisionReason?: string; submittedAt: string; resolvedAt?: string; version: number }
+// ========== HRM Types ==========
+/** 打卡记录。字典字段（type/sourceType/status）为数字码，展示走 useDict。 */
+export type HrmClockItem = {
+  id: number; employeeId?: number; employeeName?: string; jobNumber?: string; deptId?: number; deptName?: string; postName?: string
+  clockTime?: Timestamp; type?: number; attendanceTime?: Timestamp; sourceType?: number; status?: number; stage?: number
+  address?: string; longitude?: number; latitude?: number; ssid?: string; mac?: string; remark?: string; createTime?: Timestamp
+}
+export type HrmClockSave = {
+  id?: number; employeeId?: number; clockTime?: Timestamp; type: number; attendanceTime?: Timestamp
+  sourceType?: number; status?: number; stage?: number; address?: string; remark?: string
+}
+/** 请假记录。type 是字典 value（字符串），approvalStatus 见 LEAVE_APPROVAL_STATUS。 */
+export type HrmLeaveItem = {
+  id: number; employeeId?: number; employeeName?: string; jobNumber?: string; deptId?: number; deptName?: string; postName?: string
+  type: string; startTime?: Timestamp; endTime?: Timestamp; day: number; reason?: string; remark?: string
+  approvalStatus?: number; processInstanceId?: string; approvalTime?: Timestamp; approvalReason?: string; createTime?: Timestamp
+}
+/** 员工端请假申请。startTime/endTime 为毫秒时间戳，与后端 VO 一致。 */
+export type HrmLeaveCreate = { type: string; startTime: number; endTime: number; day: number; reason?: string; remark?: string }
+export type HrmAttendanceMonthRecord = {
+  employeeId: number; employeeName: string; jobNumber?: string; deptId?: number; deptName?: string; postName?: string
+  attendanceGroupName?: string; entryTime?: Timestamp; employeeStatus?: number; workCity?: string
+  year: number; month: number; attendDays: number; actualDays: number
+  lateMinute: number; lateCount: number; earlyMinute: number; earlyCount: number
+  misscardCount: number; absenteeismDays: number; absenteeismMinutes: number; leaveDays: number; leaveMinutes: number
+  lateDeductAmount: number; earlyDeductAmount: number; misscardDeductAmount: number; absenteeismDeductAmount: number
+  attendanceDeductAmount: number; fullAttendance: boolean
+}
+export type HrmAttendanceDailyDetail = {
+  employeeId: number; employeeName?: string; jobNumber?: string; deptId?: number; deptName?: string; postName?: string
+  attendanceTime: Timestamp; shiftName?: string; scheduled?: boolean; requiredClockCount?: number; scheduledMinutes?: number
+  misscardCount?: number; absenteeism?: boolean; absenteeismMinutes?: number; absenteeismDays?: number
+  leaveStatus?: boolean; leaveMinutes?: number; leaveDays?: number; attendanceResult?: string
+  lateCount: number; lateMinutes?: number; earlyCount: number; earlyMinutes?: number; clockList: HrmClockItem[]
+}
+export type HrmAttendanceMonthDetail = {
+  summary: HrmAttendanceMonthRecord; dailyDetails: HrmAttendanceDailyDetail[]; leaves: HrmLeaveItem[]
+}
+/** 工资项。可嵌套一层 children，展示时需递归摊平。 */
+export type HrmSalaryOption = { name?: string; type?: number; code?: number; parentCode?: number; value?: number; remark?: string; sort?: number; children?: HrmSalaryOption[] }
+export type HrmSalarySlip = {
+  id: number; sendRecordId?: number; monthEmployeeRecordId?: number
+  employeeId?: number; employeeName?: string; jobNumber?: string; mobile?: string
+  deptId?: number; deptName?: string; postName?: string
+  year: number; month: number; readStatus?: number; realPaySalary?: number; remark?: string
+  options?: HrmSalaryOption[]; createTime?: Timestamp
+}
+export type HrmSalarySlipUnread = { unreadCount: number; reminder?: string }
+export type HrmSalarySlipTemplate = { id?: number; name: string; hideEmpty?: boolean; defaultStatus?: boolean; options?: Array<{ name?: string; type?: number; code?: number; remark?: string; parentCode?: number; hidden?: boolean; sort?: number }> }
+export type HrmSalarySlipSendRecord = { id: number; monthRecordId?: number; employeeCount?: number; sendEmployeeCount?: number; readCount?: number; year?: number; month?: number; creatorName?: string; createTime?: Timestamp }
+export type HrmSalarySlipSendEmployee = {
+  monthEmployeeRecordId: number; employeeId: number; employeeName?: string; jobNumber?: string; mobile?: string
+  deptId?: number; deptName?: string; postName?: string; expectedPaySalary?: number; realPaySalary?: number; sent?: boolean
+}
+export type HrmSalaryEmployeeInfo = {
+  id?: number; employeeId?: number; employeeName?: string; jobNumber?: string; mobile?: string
+  deptId?: number; deptName?: string; postName?: string; entryStatus?: number; status?: number
+  entryTime?: Timestamp; regularTime?: Timestamp; changeReason?: number; effectTime?: Timestamp; changeType?: number
+  probationSalary?: number; regularSalary?: number; remark?: string
+  salaryOptions?: HrmSalaryOption[]; probationSalaryOptions?: HrmSalaryOption[]; createTime?: Timestamp
+}
+export type HrmSalaryChangeRecord = {
+  id: number; employeeId?: number; recordType?: number; recordTypeName?: string; changeReason?: number
+  effectTime?: Timestamp; beforeTotal?: number; afterTotal?: number; probationBeforeTotal?: number
+  probationAfterTotal?: number; status?: number; remark?: string; salaryOptions?: HrmSalaryOption[]
+  probationSalaryOptions?: HrmSalaryOption[]; createTime?: Timestamp
+}
+export type HrmSalaryEmployeeBatchResult = { successEmployeeIds: number[]; failureEmployeeReasons: Record<number, string> }
+export type HrmSalaryEmployeeImportResult = { successJobNumbers: string[]; failureJobNumbers: Record<string, string> }
+export type HrmSalaryMonthRecord = {
+  id: number; title?: string; year?: number; month?: number; employeeCount?: number
+  startTime?: Timestamp; endTime?: Timestamp; expectedPaySalary?: number
+  personalInsuranceAmount?: number; personalProvidentFundAmount?: number; personalTax?: number
+  realPaySalary?: number; corporateInsuranceAmount?: number; corporateProvidentFundAmount?: number
+  status?: number; optionHeaders?: HrmSalaryOption[]; createTime?: Timestamp
+}
+export type HrmSalaryMonthEmployeeRecord = {
+  id?: number; monthRecordId?: number; employeeId?: number; year?: number; month?: number
+  employeeName?: string; jobNumber?: string; deptId?: number; deptName?: string; postName?: string
+  actualWorkDay?: number; needWorkDay?: number; expectedPaySalary?: number; taxableSalary?: number
+  personalTax?: number; realPaySalary?: number; performanceCoefficient?: number; optionValues?: HrmSalaryOption[]
+}
+export type HrmSalaryPayrollReadinessEmployee = {
+  employeeId?: number; employeeName?: string; jobNumber?: string; deptId?: number; deptName?: string
+  postName?: string; entryStatus?: number; status?: number; entryTime?: Timestamp
+}
+export type HrmSalaryPayrollReadiness = {
+  monthRecordId?: number; title?: string; year?: number; month?: number; startTime?: Timestamp; endTime?: Timestamp
+  socialSecurityYearMonth?: string; payrollEmployeeCount?: number; salaryEmployeeCount?: number
+  noSalaryEmployeeCount?: number; noSalaryGroupEmployeeCount?: number; changeEmployeeCount?: number
+  changeTypeCountMap?: Record<number, number>; noSalaryEmployees?: HrmSalaryPayrollReadinessEmployee[]
+  noSalaryGroupEmployees?: HrmSalaryPayrollReadinessEmployee[]
+}
+/** 员工精简档（simple-page/simple-list 返回）。字段比完整员工 VO 少，只有选择器必需的部分。 */
+export type HrmPortableEmployee = { id: number; name?: string; jobNumber?: string; deptId?: number; deptName?: string; postName?: string; mobile?: string; status?: number }
+/** 绩效计划。operationType 是后端下发的「当前可操作阶段」，据此渲染流转按钮而非硬编码状态机。 */
+export type HrmPerformancePlan = {
+  id: number; name: string; cycleType?: number; cycle?: string; quarter?: number
+  startTime?: Timestamp; endTime?: Timestamp; description?: string
+  assessmentTemplateId?: number; assessmentTemplateName?: string
+  assessmentConfig?: HrmPerformanceAssessmentConfig
+  resultTemplateId?: number; resultTemplateName?: string
+  resultConfig?: HrmPerformanceResultConfig
+  quotaSettingType?: number; targetConfirmation?: boolean; resultAudit?: boolean
+  resultConfirmation?: boolean; syncToSalary?: boolean; paidForMonth?: string
+  scopes?: HrmPerformanceScope[]; targetConfirmationStage?: HrmPerformanceHandlerStage
+  reviewStages?: HrmPerformanceReviewStage[]; resultAuditStages?: HrmPerformanceHandlerStage[]
+  appealStages?: HrmPerformanceHandlerStage[]; appealTimeoutDays?: number; appealTimeoutAction?: number
+  stageType?: number; status?: number; operationType?: number
+  terminateTime?: Timestamp; employeeCount?: number; finishedCount?: number
+  scoringReady?: boolean; interviewReady?: boolean; archiveReady?: boolean
+  stageCountMap?: Record<number, number>; createTime?: Timestamp
+}
+export type HrmPerformanceScope = { type: number; employeeIds?: number[]; deptIds?: number[]; employeeType?: number; employeeStatuses?: number[] }
+export type HrmPerformanceHandlerStage = { type: number; level?: number; employeeId?: number }
+export type HrmPerformanceReviewStage = {
+  name: string; rater: HrmPerformanceHandlerStage; weight: number; scoringType: number
+  visibleContent: number; requiredSetting: boolean; rejectAuthority: boolean
+}
+export type HrmPerformanceAssessmentConfig = {
+  name: string; scoreCalculation: number; upperLimitType: number; upperLimitScore: number
+  dimensions: HrmAssessmentDimension[]
+}
+export type HrmPerformanceResultConfig = { name: string; levels: HrmPerformanceResultLevel[] }
+/** 绩效计划创建/编辑入参。字段与后端 PerformancePlanVO 对齐，含嵌套配置快照。 */
+export type HrmPerformancePlanSave = {
+  id?: number; name: string; cycleType: number; cycle?: string; quarter?: number
+  startTime?: Timestamp; endTime?: Timestamp; description?: string
+  assessmentTemplateId: number; assessmentConfig: HrmPerformanceAssessmentConfig
+  resultTemplateId: number; resultConfig: HrmPerformanceResultConfig
+  quotaSettingType: number; targetConfirmation: boolean; targetConfirmationStage?: HrmPerformanceHandlerStage
+  reviewStages: HrmPerformanceReviewStage[]; resultAudit: boolean; resultAuditStages?: HrmPerformanceHandlerStage[]
+  resultConfirmation: boolean; appealStages?: HrmPerformanceHandlerStage[]
+  appealTimeoutDays: number; appealTimeoutAction: number
+  syncToSalary: boolean; paidForMonth?: string; scopes: HrmPerformanceScope[]
+}
+/** 绩效维度。allowEdit 由后端下发，决定员工能否编辑该维度指标。 */
+export type HrmPerformanceDimension = { id?: number; assessmentId?: number; name?: string; quotaType?: number; weight?: number; remark?: string; allowEdit?: boolean; sort?: number }
+/** 绩效指标。allowEdit 决定员工能否改动；分数随阶段不同而变化。 */
+export type HrmPerformanceQuota = {
+  id?: number; assessmentId?: number; dimensionId?: number; allowEdit?: boolean; preset?: boolean
+  dimensionName?: string; name?: string; description?: string; standard?: string; dimensionWeight?: number
+  weight?: number; scoreType?: number; targetValue?: string; actualValue?: string
+  selfScore?: number; reviewerScore?: number; finalScore?: number; comment?: string; sort?: number
+}
+export type HrmPerformanceStage = {
+  id?: number; assessmentId?: number; type?: number; handlerEmployeeId?: number; handlerName?: string
+  name?: string; raterType?: number; weight?: number; scoringType?: number; visibleContent?: number
+  requiredSetting?: boolean; rejectAuthority?: boolean; sort?: number; status?: number
+  score?: number; resultLevel?: string; comment?: string; rejectReason?: string
+  submitTime?: Timestamp; deadlineTime?: Timestamp; canHandle?: boolean; canScore?: boolean
+  quotaScoreList?: Array<{ id?: number; assessmentQuotaId?: number; score?: number; comment?: string }>
+}
+/** 员工绩效考核（员工端与管理端共用结构，具体字段因接口而异）。 */
+export type HrmPerformanceAssessment = {
+  id?: number; planId?: number; name?: string; cycleType?: number; cycle?: string
+  startTime?: Timestamp; endTime?: Timestamp; employeeId?: number; employeeName?: string; jobNumber?: string
+  deptId?: number; deptName?: string; postName?: string; employeeType?: number; employeeStatus?: number
+  currentHandlerName?: string; status?: number; processStatus?: number; stageType?: number; stageSort?: number
+  score?: number; resultLevel?: string; coefficient?: number
+  canConfirmTarget?: boolean; selfComment?: string; reviewerComment?: string; resultComment?: string
+  resultAuditStatus?: number; resultAuditTime?: Timestamp; resultAuditReason?: string
+  appealReason?: string; appealStatus?: number; appealTime?: Timestamp; appealComment?: string
+  archiveTime?: Timestamp; dimensions?: HrmPerformanceDimension[]; quotas?: HrmPerformanceQuota[]
+  reviewStages?: HrmPerformanceStage[]; currentReviewStage?: HrmPerformanceStage
+  stages?: HrmPerformanceStage[]; currentStage?: HrmPerformanceStage; createTime?: Timestamp
+}
+/** 员工端绩效列表的精简摘要。 */
+export type HrmPerformanceAssessmentSummary = {
+  id: number; planId?: number; name?: string; status?: number; stageType?: number
+  score?: number; resultLevel?: string; coefficient?: number
+  resultAuditStatus?: number; appealStatus?: number; appealReason?: string
+  startTime?: Timestamp; endTime?: Timestamp; archiveTime?: Timestamp
+}
+export type HrmPerformanceProcessRecord = { title?: string; content?: string; source?: string; status?: number; operatorName?: string; operateTime?: Timestamp; fileUrls?: string[] }
+export type HrmPerformanceQuotaSave = {
+  id?: number; dimensionId?: number; name?: string; description?: string; standard?: string
+  weight?: number; scoreType?: number; targetValue?: string; actualValue?: string
+  selfScore?: number; reviewerScore?: number; finalScore?: number; comment?: string; sort?: number
+}
+/** 绩效确认/处理通用入参：pass=1 通过、0 不通过。 */
+export type HrmPerformanceConfirm = { assessmentId: number; pass: number; comment?: string }
+/** 绩效评分入参：一个考核在某个评分阶段的全部指标一起提交。 */
+export type HrmEmployee = {
+  id: number
+  name?: string
+  avatar?: string
+  jobNumber?: string
+  userId?: number
+  mobile?: string
+  country?: string
+  nation?: string
+  idType?: number
+  idNumber?: string
+  sex?: number
+  email?: string
+  nativePlace?: string
+  birthday?: Timestamp
+  age?: number
+  address?: string
+  highestEducation?: number
+  deptId?: number
+  deptName?: string
+  leaderEmployeeId?: number
+  leaderEmployeeName?: string
+  entryStatus?: number
+  status?: number
+  type?: number
+  entryTime?: Timestamp
+  entryDay?: number
+  probation?: number
+  regularTime?: Timestamp
+  leaveTime?: Timestamp
+  postName?: string
+  postLevel?: string
+  workCity?: string
+  workAddress?: string
+  workDetailAddress?: string
+  channelId?: number
+  companyAgeStartTime?: Timestamp
+  companyAge?: number
+  candidateId?: number
+  remark?: string
+}
+
+/** 员工档案增改入参，与 HrmEmployeeSaveReqVO 对齐；时间字段按后端约定传毫秒时间戳 */
+export type HrmEmployeeSave = Omit<
+  HrmEmployee,
+  'id' | 'deptName' | 'leaderEmployeeName' | 'entryDay' | 'companyAge' | 'avatar' | 'birthday' | 'entryTime' | 'regularTime' | 'leaveTime' | 'companyAgeStartTime'
+> & {
+  id?: number
+  birthday?: number
+  entryTime?: number
+  regularTime?: number
+  leaveTime?: number
+  companyAgeStartTime?: number
+}
+export type HrmEmployeeFieldConfig = {
+  name: string; title: string; groupName: string; visible: boolean
+  editable?: boolean; visibleLocked: boolean; editableLocked: boolean
+}
+
+/** 五类异动共用入参；probation 仅转为全职时使用 */
+export type HrmEmployeeChangeReq = {
+  employeeId: number
+  reason?: number
+  probation?: number
+  newDeptId?: number
+  newPostName?: string
+  newPostLevel?: string
+  newWorkAddress?: string
+  newLeaderEmployeeId?: number
+  effectTime?: number
+  remark?: string
+}
+
+export type HrmEmployeeQuitReq = {
+  employeeId: number
+  planQuitTime?: number
+  applyQuitTime?: number
+  salarySettlementTime?: number
+  type?: number
+  reason?: number
+  remark?: string
+}
+
+export type HrmEmployeeStatusCount = { status: number; count: number }
+
+export type HrmEmployeeCreateFromUser = {
+  userId: number; jobNumber: string; mobile: string; deptId?: number; leaderEmployeeId?: number
+  type: number; status?: number; entryTime: number; probation?: number; postName?: string
+  postLevel?: string; workCity?: string; workAddress?: string; remark?: string
+}
+export type HrmEmployeeNotifyResult = { successCount: number; skippedCount: number; failureCount: number }
+export type HrmEmployeeImportResult = {
+  createJobNumbers: string[]; updateJobNumbers: string[]; skipJobNumbers: string[]
+  failureJobNumbers: Record<string, string>
+}
+export type HrmEmployeeFile = { id: number; employeeId: number; type: number; url: string; createTime?: Timestamp }
+export type HrmEmployeeChangeRecord = {
+  id: number; employeeId: number; type?: number; reason?: number
+  oldDeptId?: number; oldDeptName?: string; newDeptId?: number; newDeptName?: string
+  oldPostName?: string; newPostName?: string; oldPostLevel?: string; newPostLevel?: string
+  oldWorkAddress?: string; newWorkAddress?: string
+  oldLeaderEmployeeId?: number; oldLeaderEmployeeName?: string
+  newLeaderEmployeeId?: number; newLeaderEmployeeName?: string
+  probation?: number; effectTime?: Timestamp; remark?: string; createTime?: Timestamp
+}
+
+export type HrmPerformanceScoreSave = {
+  assessmentId: number; reviewStageId: number; comment?: string; quotas: HrmPerformanceQuotaSave[]
+}
+
+/** 员工端社保项目明细。 */
+export type HrmInsuranceProject = {
+  schemeProjectId?: number; type?: number; name?: string
+  baseAmount?: number; corporateRate?: number; personalRate?: number
+  corporateAmount?: number; personalAmount?: number
+}
+/** 员工端社保记录。projects 仅详情返回。 */
+export type HrmInsuranceRecord = {
+  id: number; monthRecordId?: number; employeeId: number
+  schemeId?: number; schemeName?: string; schemeType?: number; schemeCity?: string
+  year: number; month: number
+  personalInsuranceAmount?: number; personalProvidentFundAmount?: number
+  corporateInsuranceAmount?: number; corporateProvidentFundAmount?: number
+  status?: number; createTime?: Timestamp; projects?: HrmInsuranceProject[]
+}
+/** 员工端工作台日历事项。 */
+export type HrmHomeCalendarItem = {
+  personalNoteId?: number; type: number; typeName: string; content: string
+  typeId?: number; date: string; eventTime?: Timestamp
+}
+
+// ========== HRM 管理端配置类型 ==========
+/** 薪资项。children 是下一层；code/parentCode 构成层级。 */
+export type HrmSalaryOptionCfg = {
+  id: number; code: number; parentCode: number; name: string; remark?: string
+  systemFlag: boolean; type: number; taxEnabled: boolean; visible: boolean
+  calculateEnabled: boolean; enabled: boolean; templateId?: number
+  children?: HrmSalaryOptionCfg[]; createTime?: Timestamp
+}
+/** 薪资组。deptIds/employeeIds 是适用范围，可并存。 */
+export type HrmSalaryGroup = {
+  id: number; name: string; salaryStandard?: number; changeRule?: string
+  taxRuleId?: number; taxRuleName?: string
+  deptIds?: number[]; deptNames?: string[]; employeeIds?: number[]; employeeNames?: string[]
+  createTime?: Timestamp
+}
+/** 计税规则。 */
+export type HrmSalaryTaxRule = {
+  id?: number; name: string; type?: number; taxEnabled?: boolean; threshold?: number
+  decimalScale?: number; cycleType?: number; usedGroupCount?: number; createTime?: Timestamp
+}
+/** 调薪项。 */
+export type HrmSalaryChangeOption = { name: string; code: number }
+/** 调薪模板。 */
+export type HrmSalaryChangeTemplate = {
+  id?: number; name: string; defaultStatus: boolean; options: HrmSalaryChangeOption[]
+  createTime?: Timestamp
+}
+/** 计薪配置。 */
+export type HrmSalaryConfig = {
+  id: number; cycleStartDay?: number; cycleEndDay?: number; socialSecurityMonthType?: number
+  startYear?: number; startMonth?: number; createTime?: Timestamp
+}
+/** 组织（部门）节点。 */
+export type HrmDept = { id: number; parentId: number; name: string; sort?: number; status?: number; leaderUserId?: number; leaderName?: string; createTime?: Timestamp }
+/** 生日关怀配置。 */
+export type HrmBirthdayCareConfig = {
+  enabled: boolean; advanceDays: number; triggerTime: string
+  deptIds: number[]; includeChildDepartments: boolean; recipientUserIds?: number[];
+  missingTaskPermissionUserIds?: number[]
+}
+/** 考勤节假日。date 与 type（节日类型字典）组成。 */
+export type HrmAttendanceHoliday = { id: number; date?: Timestamp; type: number; createTime?: Timestamp }
+/** 考勤组班次。 */
+export type HrmAttendanceShift = {
+  weeks: number[]; startTime: string; endTime: string
+  clockInStartTime: string; clockInEndTime: string
+  clockOutStartTime: string; clockOutEndTime: string
+  restStartTime?: string; restEndTime?: string; excludeRestTime: boolean
+}
+/** 考勤组扣款规则。 */
+export type HrmAttendanceDeductRule = {
+  lateMethod: number; lateDeductMoney: number; earlyMethod: number; earlyDeductMoney: number
+  absenteeismMethod: number; absenteeismDeductMoney: number; misscardMethod: number; misscardDeductMoney: number
+}
+/** 考勤组。班次/打卡点/WiFi/扣款规则为嵌套子结构。 */
+export type HrmAttendanceGroup = {
+  id?: number; name: string; openWifiCard?: boolean; openPointCard?: boolean
+  rest?: boolean; defaultStatus?: boolean
+  deptIds?: number[]; deptNames?: string[]; employeeIds?: number[]; employeeNames?: string[]
+  shifts?: HrmAttendanceShift[]; deductRule?: HrmAttendanceDeductRule; createTime?: Timestamp
+}
+/** 社保方案项目。 */
+export type HrmInsuranceProjectCfg = {
+  id?: number; schemeId?: number; type?: number; name?: string; baseAmount?: number
+  corporateRate?: number; personalRate?: number; corporateAmount?: number; personalAmount?: number; createTime?: Timestamp
+}
+/** 社保方案。方案项目分社保/公积金两组。 */
+export type HrmInsuranceScheme = {
+  id?: number; name: string; areaId?: number; areaName?: string; householdType?: string; type?: number
+  projectList?: HrmInsuranceProjectCfg[]; socialSecurityProjectList?: HrmInsuranceProjectCfg[]
+  providentFundProjectList?: HrmInsuranceProjectCfg[]
+  personalInsuranceAmount?: number; corporateInsuranceAmount?: number
+  personalProvidentFundAmount?: number; corporateProvidentFundAmount?: number
+  useCount?: number; monthRecordCount?: number; createTime?: Timestamp
+}
+/** 社保月度记录。员工交费记录。 */
+export type HrmInsuranceMonthRecord = {
+  id?: number; title?: string; year?: number; month?: number; insuredEmployeeCount?: number; stoppedEmployeeCount?: number
+  personalInsuranceAmount?: number; personalProvidentFundAmount?: number
+  corporateInsuranceAmount?: number; corporateProvidentFundAmount?: number; status?: number; createTime?: Timestamp
+}
+export type HrmInsuranceMonthEmployeeRecord = {
+  id: number; monthRecordId: number; employeeId: number; employeeName?: string; jobNumber?: string
+  mobile?: string; idNumber?: string; sex?: number; age?: number; deptId?: number; deptName?: string
+  postName?: string; entryStatus?: number; employeeStatus?: number; entryTime?: Timestamp
+  schemeId?: number; schemeName?: string; areaName?: string; areaId?: number; houseType?: string
+  schemeType?: number; socialSecurityNumber?: string; accumulationFundNumber?: string
+  year?: number; month?: number; personalInsuranceAmount?: number; personalProvidentFundAmount?: number
+  corporateInsuranceAmount?: number; corporateProvidentFundAmount?: number; status?: number
+  socialSecurityProjectList: HrmInsuranceProject[]; providentFundProjectList: HrmInsuranceProject[]
+  createTime?: Timestamp
+}
+export type HrmInsuranceProjectUpdate = {
+  schemeProjectId: number; baseAmount?: number; corporateAmount?: number; personalAmount?: number
+}
+export type HrmInsuranceMonthEmployeeUpdate = {
+  id: number; schemeId: number; projects: HrmInsuranceProjectUpdate[]
+}
+/** 绩效结果等级。 */
+export type HrmPerformanceResultLevel = { name: string; minScore: number; maxScore: number; coefficient: number }
+/** 绩效结果模板。levels 是等级列表。 */
+export type HrmPerformanceResultTemplate = {
+  id?: number; name: string; levels: HrmPerformanceResultLevel[]
+  status?: number; creatorName?: string; createTime?: Timestamp; updateTime?: Timestamp
+}
+/** 考核指标模板（单个维度）。 */
+export type HrmAssessmentQuota = { id?: number; name?: string; dimensionId?: number; weight?: number; illustrate?: string; description?: string; standard?: string; scoreType?: number; sort?: number }
+export type HrmAssessmentDimension = { id?: number; name?: string; quotaType?: number; weight?: number; remark?: string; allowEdit?: boolean; sort?: number; quotas?: HrmAssessmentQuota[] }
+/** 考核指标模板。 */
+export type HrmAssessmentTemplate = {
+  id?: number; name: string; illustrate?: string; upperLimitScore?: number; scoreCalculation?: number; upperLimitType?: number
+  dimensions?: HrmAssessmentDimension[]; status?: number; creatorName?: string; createTime?: Timestamp
+}
+/** 招聘职位。 */
+export type HrmRecruitPost = {
+  id?: number; postName: string; deptId?: number; deptName?: string
+  jobNature?: number; areaId?: number; areaName?: string; recruitNum?: number; reason?: string
+  workTime?: number; educationRequire?: number; minSalary?: number; maxSalary?: number; salaryUnit?: number
+  minAge?: number; maxAge?: number; latestEntryTime?: Timestamp
+  ownerEmployeeId?: number; ownerEmployeeName?: string
+  interviewEmployeeIds?: number[]; interviewEmployeeNames?: string[]
+  description?: string; emergencyLevel?: number; postTypeId?: number; postTypeName?: string
+  status?: number; stopReason?: string; hasEntryNum?: number; recruitSchedule?: number; createTime?: Timestamp
+}
+/** 招聘渠道。 */
+export type HrmRecruitChannel = { id?: number; name: string; status?: number; createTime?: Timestamp }
+/** 招聘候选人（列表摘要）。 */
+export type HrmRecruitCandidate = {
+  id?: number; name: string; postId?: number; postName?: string; deptName?: string
+  mobile?: string; age?: number; sex?: number; email?: string; education?: number; workTime?: number
+  channelId?: number; channelName?: string; status?: number; stage?: string
+  postStatus?: number; deptId?: number; ownerEmployeeId?: number; ownerEmployeeName?: string; stageNumber?: number
+  interviewId?: number; interviewType?: number; interviewEmployeeId?: number; interviewEmployeeName?: string
+  otherInterviewEmployeeIds?: number[]; otherInterviewEmployeeNames?: string[]; interviewTime?: Timestamp
+  interviewAddress?: string; interviewResult?: number; employeeId?: number; entryTime?: Timestamp
+  eliminate?: string; statusUpdateTime?: Timestamp; creatorName?: string; createTime?: Timestamp; updateTime?: Timestamp
+  graduateSchool?: string; latestWorkPlace?: string; remark?: string; resumeUrls?: string[]
+}
+export type HrmRecruitInterview = {
+  id?: number; candidateId: number; type: number; stageNumber?: number; interviewEmployeeId: number
+  interviewEmployeeName?: string; otherInterviewEmployeeIds?: number[]; otherInterviewEmployeeNames?: string[]
+  interviewTime: Timestamp; address?: string; remark?: string; result?: number; evaluate?: string
+  cancelReason?: string; createTime?: Timestamp
+}
+export type HrmRecruitInterviewResultSave = { id: number; result: number; evaluate?: string; cancelReason?: string }
+/** 招聘候选人状态统计。 */
+export type HrmRecruitCandidateStatusCount = { status: number; count: number }
+/** HR 工作台统计汇总。四个 survey 分别聚合员工/招聘/薪资/待办。 */
+export type HrmHrHomeStatistics = {
+  employeeSurvey: { activeCount: number; entryThisMonthCount: number; pendingEntryThisMonthCount: number; leaveThisMonthCount: number; pendingLeaveThisMonthCount: number; regularThisMonthCount: number; transferThisMonthCount: number }
+  recruitSurvey: { recruitingPostCount: number; candidateInProcessCount: number; pendingEntryCount: number; joinedCount: number }
+  salarySurvey: { monthRecordId?: number; employeeCount: number; realPaySalary: number; deptProportions: Array<{ deptId: number; deptName: string; proportion: number; totalSalary: number }> }
+  todoSurvey: { toEntryCount: number; toLeaveCount: number; toExpireContractCount: number; toRegularCount: number; toSalaryComputeCount: number; toBirthdayCount: number }
+}
+/** 团队工作台统计汇总。 */
+export type HrmTeamHomeStatistics = {
+  leaderEmployeeId?: number
+  teamOverview: { employeeCount: number; entryThisMonthCount: number; leaveThisMonthCount: number; regularThisMonthCount: number }
+  teamSurvey: {
+    statusAnalysis: Array<{ type: number | null; count: number }>
+    sexAnalysis: Array<{ type: number | null; count: number }>
+    ageAnalysis: Array<{ type: number | null; count: number }>
+    companyAgeAnalysis: Array<{ type: number | null; count: number }>
+  }
+}
+
+// ========== HRM 员工档案子表 ==========
+/** 合同。 */
+export type HrmContract = {
+  id?: number; employeeId?: number; no?: string; type?: number
+  startTime?: number; endTime?: number; term?: number; status?: number
+  signCompany?: string; signTime?: number; remark?: string; expireRemind?: boolean
+  fileUrls?: string[]; sort?: number; createTime?: Timestamp
+}
+/** 证件。 */
+export type HrmCertificate = {
+  id?: number; employeeId?: number; name: string; level?: string; no?: string
+  startTime?: number; endTime?: number; issuingAuthority?: string; issuingTime?: number
+  remark?: string; sort?: number; createTime?: Timestamp
+}
+/** 教育经历。 */
+export type HrmEducationExperience = {
+  id?: number; employeeId?: number; education: number; graduateSchool?: string; major?: string
+  admissionTime?: number; graduationTime?: number; teachingMethods?: number; firstDegree?: boolean
+  sort?: number; createTime?: Timestamp
+}
+/** 工作经历。 */
+export type HrmWorkExperience = {
+  id?: number; employeeId?: number; workUnit: string; postName: string
+  startTime?: number; endTime?: number; reason?: string; witnessName?: string; witnessPhone?: string
+  remark?: string; sort?: number; createTime?: Timestamp
+}
+/** 培训经历。 */
+export type HrmTrainingExperience = {
+  id?: number; employeeId?: number; course: string; organizationName?: string
+  startTime?: number; endTime?: number; duration?: string; result?: string; certificateName?: string
+  remark?: string; sort?: number; createTime?: Timestamp
+}
+/** 联系人。 */
+export type HrmContact = {
+  id?: number; employeeId?: number; name: string; relation?: string; phone?: string
+  workUnit?: string; postName?: string; address?: string; sort?: number; createTime?: Timestamp
+}
+/** 工资卡。 */
+export type HrmSalaryCard = {
+  bankCardNumber: string; bankAreaId?: number; bankAreaName?: string; bankName?: string; bankBranchName?: string
+}
+/** 离职信息（只读）。 */
+export type HrmQuitInfo = {
+  planQuitTime?: number; applyQuitTime?: number; salarySettlementTime?: number
+  type?: number; reason?: number; remark?: string; oldEmployeeStatus?: number
+}
+
+// ========== EAM Types ==========
+export type EamRepairItem = { id: number; assetId: number; assetName?: string; assetCode?: string; faultDesc: string; repairVendor?: string; cost?: number; startTime?: string; endTime?: string; result?: string }
+export type EamRepairCreate = { assetId: number; faultDesc: string; repairVendor?: string; cost?: number; startTime?: string }
+export type EamRepairFinish = { id: number; endTime?: string; cost?: number; result?: string }
+export type EamInventoryItem = { id: number; no?: string; name: string; scopeType: number; scopeValue?: string; status?: number; totalCount?: number; checkedCount?: number; normalCount?: number; abnormalCount?: number; startTime?: string; endTime?: string; remark?: string }
+export type EamInventoryCreate = { name: string; scopeType: number; scopeValue?: string; remark?: string }
+export type EamInventoryDetail = { id: number; inventoryId: number; assetId: number; assetName?: string; assetCode?: string; expectUserId?: number; expectUserName?: string; expectDeptId?: number; expectLocation?: string; actualUserId?: number; actualDeptId?: number; actualLocation?: string; result: number; remark?: string; checkUserId?: number; checkTime?: string }
+export type EamInventoryCheck = { detailId: number; result: number; actualUserId?: number; actualDeptId?: number; actualLocation?: string; remark?: string }
+export type EamAsset = {
+  id?: number; assetCode?: string; name: string; categoryId: number; categoryName?: string; managementMode?: number
+  quantity?: number; unit?: string; status?: number; brand?: string; specification?: string; sn?: string; barcode?: string
+  originalValue?: number; netValue?: number; purchaseDate?: string; source?: number; sourceLabelSnapshot?: string; warrantyDate?: string
+  useDeptId?: number; useDeptName?: string; useUserId?: number; useUserName?: string; useUserNameSnapshot?: string
+  expectedLife?: number
+  extFieldLabels?: Record<string, string>; extFieldDictTypes?: Record<string, string>
+  location?: string; remark?: string; fileUrls?: string[]; extFields?: Record<string, unknown>; createTime?: string
+}
+export type EamAssetListItem = EamAsset & { id: number }
+export type EamAssetChangeLog = { id: number; assetId: number; changeType: number; beforeStatus?: number; afterStatus?: number; beforeUserId?: number; afterUserId?: number; beforeDeptId?: number; afterDeptId?: number; bizId?: number; content?: string; operatorId?: number; operatorName?: string; operateTime: string }
+export type EamTransfer = { id: number; no?: string; type: number; assetId: number; assetName?: string; assetCode?: string; fromUserId?: number; fromUserName?: string; fromDeptId?: number; toUserId?: number; toUserName?: string; toDeptId?: number; expectedReturnDate?: string; actualReturnDate?: string; status?: number; processInstanceId?: string; reason?: string; applyUserId?: number; applyUserName?: string; applyTime?: string }
+export type EamTransferCreate = { type: number; assetId: number; toUserId?: number; toDeptId?: number; expectedReturnDate?: string; actualReturnDate?: string; reason?: string }
+export type EamScrap = { id: number; no?: string; assetId: number; assetName?: string; assetCode?: string; reasonType: number; reason?: string; scrapDate?: string; status?: number; processInstanceId?: string; applyUserId?: number; applyUserName?: string; applyTime?: string }
+export type EamScrapCreate = { assetId: number; reasonType: number; reason?: string; scrapDate?: string }
+export type EamCategory = { id: number; parentId: number; name: string; code: string; sort: number; status: number; managementMode: number; unit: string; remark?: string; createTime?: string }
+export type EamCategorySave = { id?: number; parentId: number; name: string; code: string; sort: number; status: number; managementMode: number; unit: string; remark?: string }
+export type EamCategoryField = { id?: number; categoryId: number; fieldKey: string; fieldName: string; fieldType: number; options?: string[]; optionSource?: 'STATIC' | 'SYSTEM_DICT'; dictType?: string; required: boolean; adminVisible: boolean; collectionVisible: boolean; collectionRequired: boolean; conditionRule?: Record<string, unknown>; sort: number; inherited?: boolean }
+export type EamCodeRule = { id?: number; categoryId?: number; prefix?: string; useCategoryCode: boolean; dateFormat?: string; serialLength: number; separator?: string; currentSerial?: number }
+export type EamStatisticsItem = { key: string; name: string; count: number }
+export type EamStatistics = { totalCount: number; totalOriginalValue?: number; statusStats: EamStatisticsItem[]; categoryStats: EamStatisticsItem[]; deptStats: EamStatisticsItem[] }
+export type EamAssetImportRow = {
+  rowNum: number; assetCode?: string; name: string; categoryName: string; managementMode: number; quantity: number
+  useUserName?: string; matchedUserName?: string
+  action: 'CREATE' | 'UPDATE' | 'SKIP_EXISTING' | 'SKIP_SAME_FILE' | 'ERROR'
+  mappedFields: Record<string, unknown>; defaultedFields: string[]; warnings: string[]; errors: string[]
+}
+export type EamAssetImportPreview = {
+  fileHash: string; totalRows: number; createCount: number; updateCount: number; skipCount: number
+  warningCount: number; errorCount: number; batchId?: number; rows: EamAssetImportRow[]
+}
+export type EamCategoryImportItem = { kind: 'CATEGORY' | 'FIELD'; code: string; name: string; action: 'CREATE' | 'UPDATE' | 'SKIP' | 'CONFLICT'; message?: string }
+export type EamCategoryImportResult = {
+  createCount: number; updateCount: number; skipCount: number; conflictCount: number
+  categoryCount: number; leafCategoryCount: number; fieldCount: number; legacyFieldCount: number
+  credentialFieldCount: number; allManagementFieldsOptional: boolean; items: EamCategoryImportItem[]
+}
+
 export type AdvancedFilterCondition = { fieldKey: string; operator: string; value?: unknown; valueFrom?: unknown; valueTo?: unknown }
 export type AdvancedFilterGroup = { logic: 'AND' | 'OR'; conditions: AdvancedFilterCondition[]; groups: AdvancedFilterGroup[] }
 export type AdvancedFilterScene = 'lead' | 'order' | 'lead_appeal' | 'duplicate_review' | 'registration' | 'student' | 'subordinate_sales'
@@ -1043,4 +1616,477 @@ export const api = {
   copyRegistrationChecklistDraft: async (version: number) => unwrap<number>(await http.post('/zsjos/registration-checklist-config/draft/copy', { version, idempotencyKey: crypto.randomUUID() })),
   saveRegistrationChecklistDraft: async (data: { templateVersion: number; items: Array<{ id?: number; itemKey?: string; itemType: string; title: string; sort: number; enabled: boolean; systemRequired?: boolean; attachmentRequired?: boolean }>; routeOptions: Array<{ id?: number; optionKey: string; departmentId: number; assigneeType: string; sort: number; enabled: boolean; systemRequired?: boolean }>; idempotencyKey: string }) => unwrap<boolean>(await http.put('/zsjos/registration-checklist-config/draft', data)),
   publishRegistrationChecklist: async (version: number) => unwrap<boolean>(await http.post('/zsjos/registration-checklist-config/publish', { version, idempotencyKey: crypto.randomUUID() }))
+  // ========== HRM (Human Resource) ==========
+  // portal.* 打的是「我自己」的数据，其余是全员数据。两者分开挂，调用点一眼能看出权限范围。
+  ,hrm: {
+    portal: {
+      employee: {
+        /** 当前账号是否已绑定员工档案。未绑定则「我的档案」页提示联系 HR。 */
+        getBindStatus: async () => unwrap<boolean>(await http.get('/hrm/portal/employee/get-bind-status')),
+        get: async () => unwrap<HrmEmployee>(await http.get('/hrm/portal/employee/get')),
+        /** 只可改个人字段（姓名/手机号/证件/性别/邮箱/籍贯/学历/户籍地址等）。 */
+        update: async (data: Partial<HrmEmployeeSave>) => unwrap<boolean>(await http.put('/hrm/portal/employee/update', data))
+      },
+      attendance: {
+        /** 我的打卡记录。后端返回整月数组，不分页。 */
+        clockList: async (params: { year?: number; month?: number }) => unwrap<HrmClockItem[]>(await http.get('/hrm/portal/attendance/clock/list', { params })),
+        /** 我的请假申请。后端返回全量数组，不分页。 */
+        leaveList: async () => unwrap<HrmLeaveItem[]>(await http.get('/hrm/portal/attendance/leave/list')),
+        leaveCreate: async (data: HrmLeaveCreate) => unwrap<number>(await http.post('/hrm/portal/attendance/leave/create', data)),
+        leaveCancel: async (id: number, reason: string) => unwrap<boolean>(await http.put('/hrm/portal/attendance/leave/cancel', { id, reason })),
+        monthDetail: async (params: { year?: number; month?: number }) => unwrap<HrmAttendanceMonthDetail>(await http.get('/hrm/portal/attendance/statistics/month-detail', { params }))
+      },
+      salary: {
+        /** 我的工资条。后端返回数组，不分页；startMonth/endMonth 形如 2026-08。 */
+        slipList: async (params?: { startMonth?: string; endMonth?: string }) => unwrap<HrmSalarySlip[]>(await http.get('/hrm/portal/salary/slip/list', { params })),
+        unreadSummary: async () => unwrap<HrmSalarySlipUnread>(await http.get('/hrm/portal/salary/slip/unread-summary')),
+        /** 标记已读。后端按逗号分隔的 ids 查询参数接收。 */
+        read: async (ids: number[]) => unwrap<boolean>(await http.put('/hrm/portal/salary/slip/read', null, { params: { ids: ids.join(',') } }))
+      },
+      performance: {
+        /** 我的绩效列表。返回分页。 */
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmPerformanceAssessmentSummary>>(await http.get('/hrm/portal/performance/assessment/page', { params })),
+        /** 我的绩效参评详情。stageId 可选，用于定位到某个运行阶段。 */
+        get: async (id: number, stageId?: number) => unwrap<HrmPerformanceAssessment>(await http.get('/hrm/portal/performance/assessment/get', { params: { id, stageId } })),
+        /** 我的绩效流程记录。 */
+        processRecordList: async (id: number, stageId?: number) => unwrap<HrmPerformanceProcessRecord[]>(await http.get('/hrm/portal/performance/assessment/process-record-list', { params: { id, stageId } })),
+        /** 填写绩效指标。 */
+        fillQuota: async (data: { assessmentId: number; quotas: HrmPerformanceQuotaSave[] }) => unwrap<boolean>(await http.put('/hrm/portal/performance/assessment/fill-quota', data)),
+        /** 确认绩效目标。 */
+        confirmTarget: async (data: HrmPerformanceConfirm) => unwrap<boolean>(await http.put('/hrm/portal/performance/assessment/confirm-target', data)),
+        /** 提交绩效评分。带一个评分阶段 + 该阶段的全部指标。 */
+        score: async (data: HrmPerformanceScoreSave) => unwrap<{ id: number; nextStageId?: number }>(await http.put('/hrm/portal/performance/assessment/score', data)),
+        /** 驳回某个评分阶段。 */
+        rejectReviewStage: async (data: { assessmentId: number; reviewStageId: number; reason: string }) => unwrap<boolean>(await http.put('/hrm/portal/performance/assessment/reject-review-stage', data)),
+        /** 处理结果审核。 */
+        handleResultAudit: async (data: HrmPerformanceConfirm & { stageId?: number; reviewStageIds?: number[] }) => unwrap<boolean>(await http.put('/hrm/portal/performance/assessment/handle-result-audit', data)),
+        /** 确认绩效结果。 */
+        confirmResult: async (data: HrmPerformanceConfirm) => unwrap<boolean>(await http.put('/hrm/portal/performance/assessment/confirm-result', data)),
+        /** 提交绩效申诉。 */
+        submitAppeal: async (data: { assessmentId: number; appealReason: string; appealFileUrls?: string[]; reviewStageIds: number[] }) => unwrap<{ id: number; nextStageId?: number }>(await http.put('/hrm/portal/performance/assessment/submit-appeal', data)),
+        /** 处理绩效申诉。 */
+        handleAppeal: async (data: HrmPerformanceConfirm & { stageId?: number; reviewStageIds?: number[] }) => unwrap<boolean>(await http.put('/hrm/portal/performance/assessment/handle-appeal', data))
+      },
+      insurance: {
+        /** 我的社保记录。返回整年数组，不分页。 */
+        recordList: async (params?: { year?: number }) => unwrap<HrmInsuranceRecord[]>(await http.get('/hrm/portal/insurance/record/list', { params })),
+        recordGet: async (id: number) => unwrap<HrmInsuranceRecord>(await http.get('/hrm/portal/insurance/record/get', { params: { id } }))
+      },
+      home: {
+        /** 我的工作台日历。startDate/endDate 形如 2026-08-01。 */
+        calendar: async (params: { startDate: string; endDate: string }) => unwrap<HrmHomeCalendarItem[]>(await http.get('/hrm/portal/home/calendar', { params }))
+      }
+    },
+    attendance: {
+      clock: {
+        page: async (params: { pageNo: number; pageSize: number; employeeId?: number; type?: number; status?: number }) => unwrap<PageResult<HrmClockItem>>(await http.get('/hrm/attendance/clock/page', { params })),
+        get: async (id: number) => unwrap<HrmClockItem>(await http.get('/hrm/attendance/clock/get', { params: { id } })),
+        create: async (data: HrmClockSave) => unwrap<number>(await http.post('/hrm/attendance/clock/create', data)),
+        update: async (data: HrmClockSave) => unwrap<boolean>(await http.put('/hrm/attendance/clock/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/attendance/clock/delete', { params: { id } })),
+        deleteList: async (ids: number[]) => unwrap<boolean>(await http.delete('/hrm/attendance/clock/delete-list', { params: { ids: ids.join(',') } }))
+      },
+      leave: {
+        page: async (params: { pageNo: number; pageSize: number; employeeId?: number; type?: string; approvalStatus?: number }) => unwrap<PageResult<HrmLeaveItem>>(await http.get('/hrm/attendance/leave/page', { params })),
+        get: async (id: number) => unwrap<HrmLeaveItem>(await http.get('/hrm/attendance/leave/get', { params: { id } }))
+      },
+      statistics: {
+        monthRecordPage: async (params: { pageNo: number; pageSize: number; year: number; month: number; employeeId?: number; deptId?: number }) => unwrap<PageResult<HrmAttendanceMonthRecord>>(await http.get('/hrm/attendance/statistics/month-record-page', { params })),
+        monthDetail: async (params: { employeeId: number; year: number; month: number }) => unwrap<HrmAttendanceMonthDetail>(await http.get('/hrm/attendance/statistics/month-detail', { params }))
+      },
+      group: {
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmAttendanceGroup>>(await http.get('/hrm/attendance/group/page', { params })),
+        get: async (id: number) => unwrap<HrmAttendanceGroup>(await http.get('/hrm/attendance/group/get', { params: { id } })),
+        create: async (data: HrmAttendanceGroup) => unwrap<number>(await http.post('/hrm/attendance/group/create', data)),
+        update: async (data: HrmAttendanceGroup) => unwrap<boolean>(await http.put('/hrm/attendance/group/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/attendance/group/delete', { params: { id } }))
+      },
+      holiday: {
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmAttendanceHoliday>>(await http.get('/hrm/attendance/holiday/page', { params })),
+        create: async (data: { date?: number; type: number }) => unwrap<number>(await http.post('/hrm/attendance/holiday/create', data)),
+        update: async (data: { id: number; date?: number; type: number }) => unwrap<boolean>(await http.put('/hrm/attendance/holiday/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/attendance/holiday/delete', { params: { id } }))
+      }
+    },
+    salary: {
+      employeeInfo: {
+        page: async (params: { pageNo: number; pageSize: number; status?: number; search?: string; deptId?: number; postName?: string; entryStatus?: number; statusCategory?: number }) => unwrap<PageResult<HrmSalaryEmployeeInfo>>(await http.get('/hrm/salary/employee-info/page', { params })),
+        /** 注意按 employeeId 取，不是薪资档案自身的 id */
+        get: async (employeeId: number) => unwrap<HrmSalaryEmployeeInfo>(await http.get('/hrm/salary/employee-info/get', { params: { employeeId } })),
+        update: async (data: { id?: number; employeeId: number; recordType: number; changeReason: number; effectTime?: number; remark?: string; salaryOptions?: HrmSalaryOption[]; probationSalaryOptions?: HrmSalaryOption[] }) => unwrap<number>(await http.put('/hrm/salary/employee-info/update', data)),
+        minEffectDate: async () => unwrap<string | null>(await http.get('/hrm/salary/employee-info/get-adjustment-min-effect-date')),
+        updateList: async (data: { employeeIds: number[]; deptIds: number[]; type: number; changeReason: number; effectTime: number; remark?: string; salaryOptions: HrmSalaryOption[] }) => unwrap<HrmSalaryEmployeeBatchResult>(await http.put('/hrm/salary/employee-info/update-list', data)),
+        importFix: async (file: File) => { const data = new FormData(); data.append('file', file); return unwrap<HrmSalaryEmployeeImportResult>(await http.post('/hrm/salary/employee-info/import-fix', data)) },
+        importChange: async (file: File) => { const data = new FormData(); data.append('file', file); return unwrap<HrmSalaryEmployeeImportResult>(await http.post('/hrm/salary/employee-info/import-change', data)) }
+      },
+      changeRecord: {
+        list: async (employeeId: number) => unwrap<HrmSalaryChangeRecord[]>(await http.get('/hrm/salary/change-record/list', { params: { employeeId } })),
+        get: async (id: number) => unwrap<HrmSalaryChangeRecord>(await http.get('/hrm/salary/change-record/get', { params: { id } })),
+        cancel: async (id: number) => unwrap<boolean>(await http.put('/hrm/salary/change-record/cancel', null, { params: { id } })),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/change-record/delete', { params: { id } }))
+      },
+      monthRecord: {
+        page: async (params: { pageNo: number; pageSize: number; year?: number; status?: number }) => unwrap<PageResult<HrmSalaryMonthRecord>>(await http.get('/hrm/salary/month-record/page', { params })),
+        get: async (id: number) => unwrap<HrmSalaryMonthRecord>(await http.get('/hrm/salary/month-record/get', { params: { id } })),
+        createNext: async () => unwrap<number>(await http.post('/hrm/salary/month-record/create-next')),
+        compute: async (id: number) => unwrap<boolean>(await http.post('/hrm/salary/month-record/compute', null, { params: { id } })),
+        computeImport: async (data: FormData) => unwrap<boolean>(await http.post('/hrm/salary/month-record/compute-import', data)),
+        payrollReadiness: async (monthRecordId?: number) => unwrap<HrmSalaryPayrollReadiness>(await http.get('/hrm/salary/month-record/payroll-readiness', { params: { monthRecordId } })),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/month-record/delete', { params: { id } })),
+        employeePage: async (params: { pageNo: number; pageSize: number; monthRecordId: number; employeeName?: string; jobNumber?: string; deptId?: number; employeeChangeType?: number }) => unwrap<PageResult<HrmSalaryMonthEmployeeRecord>>(await http.get('/hrm/salary/month-employee-record/page', { params })),
+        employeeList: async (params: { monthRecordId: number; employeeName?: string; jobNumber?: string; deptId?: number; employeeChangeType?: number; employeeIds?: number[]; salarySlipSent?: boolean }) => unwrap<HrmSalaryMonthEmployeeRecord[]>(await http.get('/hrm/salary/month-employee-record/list', { params })),
+        employeeUpdateList: async (data: Array<{ id: number; optionValues?: HrmSalaryOption[] }>) => unwrap<boolean>(await http.put('/hrm/salary/month-employee-record/update-list', data)),
+        optionSummary: async (params: { monthRecordId: number; employeeName?: string; jobNumber?: string; deptId?: number; employeeChangeType?: number }) => unwrap<HrmSalaryOption[]>(await http.get('/hrm/salary/month-record/option-summary', { params }))
+      },
+      slip: {
+        page: async (params: { pageNo: number; pageSize: number; year?: number; month?: number; sendRecordId?: number; employeeId?: number; search?: string; deptId?: number; readStatus?: number; remark?: string }) => unwrap<PageResult<HrmSalarySlip>>(await http.get('/hrm/salary/slip/page', { params })),
+        get: async (id: number) => unwrap<HrmSalarySlip>(await http.get('/hrm/salary/slip/get', { params: { id } })),
+        remark: async (data: { id: number; remark?: string }) => unwrap<boolean>(await http.put('/hrm/salary/slip/remark', data)),
+        templates: async () => unwrap<HrmSalarySlipTemplate[]>(await http.get('/hrm/salary/slip-template/list')),
+        sendRecords: {
+          page: async (params: { pageNo: number; pageSize: number; year?: number; month?: number }) => unwrap<PageResult<HrmSalarySlipSendRecord>>(await http.get('/hrm/salary/slip-send-record/page', { params })),
+          get: async (id: number) => unwrap<HrmSalarySlipSendRecord>(await http.get('/hrm/salary/slip-send-record/get', { params: { id } })),
+          create: async (data: { monthRecordId: number; hideEmpty: boolean; options?: HrmSalarySlipTemplate['options']; all: boolean; employeeIds?: number[]; search?: string; deptId?: number; sent?: boolean }) => unwrap<number>(await http.post('/hrm/salary/slip-send-record/create', data)),
+          employeePage: async (params: { pageNo: number; pageSize: number; monthRecordId: number; search?: string; deptId?: number; sent?: boolean }) => unwrap<PageResult<HrmSalarySlipSendEmployee>>(await http.get('/hrm/salary/slip-send-record/employee-page', { params })),
+          delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/slip-send-record/delete', { params: { id } }))
+        }
+      }
+    },
+    /** 通用 HRM 员工精简分页，供员工选择器远程搜索。返回结构含 id/员工姓名/部门。 */
+    employeeSimplePage: async (params: { pageNo: number; pageSize: number; name?: string }) => unwrap<PageResult<HrmPortableEmployee>>(await http.get('/hrm/employee/simple-page', { params })),
+    /** 通用部门树，供范围选择器按部门筛选。 */
+    deptSimpleList: async () => unwrap<Array<{ id: number; name: string; parentId: number }>>(await http.get('/system/dept/simple-list')),
+    dept: {
+      list: async () => unwrap<Array<{ id: number; name: string; parentId: number; sort?: number; status?: number; leaderUserId?: number; createTime?: string }>>(await http.get('/system/dept/list')),
+      get: async (id: number) => unwrap<HrmDept>(await http.get('/system/dept/get', { params: { id } })),
+      create: async (data: Partial<HrmDept>) => unwrap<number>(await http.post('/system/dept/create', data)),
+      update: async (data: Partial<HrmDept>) => unwrap<boolean>(await http.put('/system/dept/update', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/system/dept/delete', { params: { id } }))
+    },
+    employee: {
+      page: async (params: { pageNo: number; pageSize: number; name?: string; statusCategory?: number }) => unwrap<PageResult<HrmEmployee>>(await http.get('/hrm/employee/page', { params })),
+      get: async (id: number) => unwrap<HrmEmployee>(await http.get('/hrm/employee/get', { params: { id } })),
+      create: async (data: HrmEmployeeSave) => unwrap<number>(await http.post('/hrm/employee/create', data)),
+      createList: async (data: HrmEmployeeCreateFromUser[]) => unwrap<number[]>(await http.post('/hrm/employee/create-list', data)),
+      boundUserIdList: async () => unwrap<number[]>(await http.get('/hrm/employee/bound-user-id-list')),
+      sendProfileFillMessage: async (ids: number[]) => unwrap<HrmEmployeeNotifyResult>(await http.post('/hrm/employee/send-profile-fill-message', null, { params: { ids: ids.join(',') } })),
+      update: async (data: HrmEmployeeSave) => unwrap<boolean>(await http.put('/hrm/employee/update', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/delete', { params: { id } })),
+      deleteList: async (ids: number[]) => unwrap<boolean>(await http.delete('/hrm/employee/delete-list', { params: { ids: ids.join(',') } })),
+      import: async (file: File, duplicateStrategy: number) => {
+        const data = new FormData(); data.append('file', file); data.append('duplicateStrategy', String(duplicateStrategy))
+        return unwrap<HrmEmployeeImportResult>(await http.post('/hrm/employee/import', data))
+      },
+      uploadFile: async (file: File) => {
+        const data = new FormData(); data.append('file', file); data.append('directory', 'hrm/employee/material')
+        return unwrap<string>(await http.post('/infra/file/upload', data))
+      },
+      statusCount: async (params: { statusCategory?: number }) => unwrap<HrmEmployeeStatusCount[]>(await http.get('/hrm/employee/status-count', { params })),
+      confirmEntry: async (data: HrmEmployeeSave) => unwrap<boolean>(await http.put('/hrm/employee/confirm-entry', data)),
+      rehire: async (data: { employeeId: number }) => unwrap<boolean>(await http.post('/hrm/employee/rehire', data)),
+      cancelQuit: async (data: { employeeId: number; reason: string }) => unwrap<boolean>(await http.put('/hrm/employee/cancel-quit', data)),
+      regular: async (data: HrmEmployeeChangeReq) => unwrap<boolean>(await http.post('/hrm/employee/regular', data)),
+      transfer: async (data: HrmEmployeeChangeReq) => unwrap<boolean>(await http.post('/hrm/employee/transfer', data)),
+      promote: async (data: HrmEmployeeChangeReq) => unwrap<boolean>(await http.post('/hrm/employee/promote', data)),
+      demote: async (data: HrmEmployeeChangeReq) => unwrap<boolean>(await http.post('/hrm/employee/demote', data)),
+      convertToFullTime: async (data: HrmEmployeeChangeReq) => unwrap<boolean>(await http.post('/hrm/employee/convert-to-full-time', data)),
+      quit: async (data: HrmEmployeeQuitReq) => unwrap<boolean>(await http.post('/hrm/employee/quit', data)),
+      // 档案子表：按 employeeId 查询 + 标准 CRUD
+      contract: {
+        list: async (employeeId: number) => unwrap<HrmContract[]>(await http.get('/hrm/employee/contract/list', { params: { employeeId } })),
+        create: async (data: HrmContract) => unwrap<number>(await http.post('/hrm/employee/contract/create', data)),
+        update: async (data: HrmContract) => unwrap<boolean>(await http.put('/hrm/employee/contract/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/contract/delete', { params: { id } }))
+      },
+      certificate: {
+        list: async (employeeId: number) => unwrap<HrmCertificate[]>(await http.get('/hrm/employee/certificate/list', { params: { employeeId } })),
+        create: async (data: HrmCertificate) => unwrap<number>(await http.post('/hrm/employee/certificate/create', data)),
+        update: async (data: HrmCertificate) => unwrap<boolean>(await http.put('/hrm/employee/certificate/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/certificate/delete', { params: { id } }))
+      },
+      education: {
+        list: async (employeeId: number) => unwrap<HrmEducationExperience[]>(await http.get('/hrm/employee/education-experience/list', { params: { employeeId } })),
+        create: async (data: HrmEducationExperience) => unwrap<number>(await http.post('/hrm/employee/education-experience/create', data)),
+        update: async (data: HrmEducationExperience) => unwrap<boolean>(await http.put('/hrm/employee/education-experience/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/education-experience/delete', { params: { id } }))
+      },
+      workExperience: {
+        list: async (employeeId: number) => unwrap<HrmWorkExperience[]>(await http.get('/hrm/employee/work-experience/list', { params: { employeeId } })),
+        create: async (data: HrmWorkExperience) => unwrap<number>(await http.post('/hrm/employee/work-experience/create', data)),
+        update: async (data: HrmWorkExperience) => unwrap<boolean>(await http.put('/hrm/employee/work-experience/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/work-experience/delete', { params: { id } }))
+      },
+      training: {
+        list: async (employeeId: number) => unwrap<HrmTrainingExperience[]>(await http.get('/hrm/employee/training-experience/list', { params: { employeeId } })),
+        create: async (data: HrmTrainingExperience) => unwrap<number>(await http.post('/hrm/employee/training-experience/create', data)),
+        update: async (data: HrmTrainingExperience) => unwrap<boolean>(await http.put('/hrm/employee/training-experience/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/training-experience/delete', { params: { id } }))
+      },
+      contact: {
+        list: async (employeeId: number) => unwrap<HrmContact[]>(await http.get('/hrm/employee/contact/list', { params: { employeeId } })),
+        create: async (data: HrmContact) => unwrap<number>(await http.post('/hrm/employee/contact/create', data)),
+        update: async (data: HrmContact) => unwrap<boolean>(await http.put('/hrm/employee/contact/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/employee/contact/delete', { params: { id } }))
+      },
+      salaryCard: {
+        get: async (employeeId: number) => unwrap<HrmSalaryCard>(await http.get('/hrm/employee/salary-card/get', { params: { employeeId } })),
+        save: async (employeeId: number, data: HrmSalaryCard) => unwrap<number>(await http.put('/hrm/employee/salary-card/save', { ...data, employeeId })),
+        delete: async (employeeId: number) => unwrap<boolean>(await http.delete('/hrm/employee/salary-card/delete', { params: { employeeId } }))
+      },
+      quitInfo: {
+        get: async (employeeId: number) => unwrap<HrmQuitInfo>(await http.get('/hrm/employee/quit-info/get', { params: { employeeId } }))
+      },
+      file: {
+        list: async (employeeId: number) => unwrap<HrmEmployeeFile[]>(await http.get('/hrm/employee/file/list', { params: { employeeId } })),
+        save: async (data: { employeeId: number; type: number; fileUrls: string[] }) => unwrap<boolean>(await http.put('/hrm/employee/file/save', data))
+      },
+      changeRecord: {
+        list: async (employeeId: number) => unwrap<HrmEmployeeChangeRecord[]>(await http.get('/hrm/employee/change-record/list', { params: { employeeId } }))
+      },
+      config: {
+        createFieldList: async (entryStatus: number) => unwrap<HrmEmployeeFieldConfig[]>(await http.get('/hrm/employee/config/create-field/list', { params: { entryStatus } })),
+        saveCreateField: async (entryStatus: number, fields: Array<{ name: string; visible: boolean }>) => unwrap<boolean>(await http.put('/hrm/employee/config/create-field/save', { entryStatus, fields })),
+        archiveFieldList: async () => unwrap<HrmEmployeeFieldConfig[]>(await http.get('/hrm/employee/config/archive-field/list')),
+        saveArchiveField: async (fields: Array<{ name: string; visible: boolean; editable?: boolean }>) => unwrap<boolean>(await http.put('/hrm/employee/config/archive-field/save', { fields }))
+      }
+    },
+    salaryCfg: {
+      option: {
+        list: async () => unwrap<HrmSalaryOptionCfg[]>(await http.get('/hrm/salary/option/list')),
+        create: async (data: { parentCode?: number; name: string; remark?: string }) => unwrap<number>(await http.post('/hrm/salary/option/create', data)),
+        updateEnabled: async (id: number, enabled: boolean) => unwrap<boolean>(await http.put('/hrm/salary/option/update-enabled', { id, enabled })),
+        updateVisible: async (id: number, visible: boolean) => unwrap<boolean>(await http.put('/hrm/salary/option/update-visible', { id, visible })),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/option/delete', { params: { id } }))
+      },
+      group: {
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmSalaryGroup>>(await http.get('/hrm/salary/group/page', { params })),
+        list: async () => unwrap<HrmSalaryGroup[]>(await http.get('/hrm/salary/group/list')),
+        simpleList: async () => unwrap<HrmSalaryGroup[]>(await http.get('/hrm/salary/group/simple-list')),
+        get: async (id: number) => unwrap<HrmSalaryGroup>(await http.get('/hrm/salary/group/get', { params: { id } })),
+        create: async (data: HrmSalaryGroup) => unwrap<number>(await http.post('/hrm/salary/group/create', data)),
+        update: async (data: HrmSalaryGroup) => unwrap<boolean>(await http.put('/hrm/salary/group/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/group/delete', { params: { id } }))
+      },
+      taxRule: {
+        list: async () => unwrap<HrmSalaryTaxRule[]>(await http.get('/hrm/salary/tax-rule/list')),
+        create: async (data: HrmSalaryTaxRule) => unwrap<number>(await http.post('/hrm/salary/tax-rule/create', data)),
+        update: async (data: HrmSalaryTaxRule) => unwrap<boolean>(await http.put('/hrm/salary/tax-rule/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/tax-rule/delete', { params: { id } }))
+      },
+      changeTemplate: {
+        list: async () => unwrap<HrmSalaryChangeTemplate[]>(await http.get('/hrm/salary/change-template/list')),
+        create: async (data: HrmSalaryChangeTemplate) => unwrap<number>(await http.post('/hrm/salary/change-template/create', data)),
+        update: async (data: HrmSalaryChangeTemplate) => unwrap<boolean>(await http.put('/hrm/salary/change-template/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/salary/change-template/delete', { params: { id } }))
+      },
+      config: {
+        get: async () => unwrap<HrmSalaryConfig>(await http.get('/hrm/salary/config/get')),
+        create: async (data: { cycleStartDay: number; socialSecurityMonthType: number; startYear: number; startMonth: number }) => unwrap<number>(await http.post('/hrm/salary/config/create', data)),
+        update: async (data: { socialSecurityMonthType: number }) => unwrap<boolean>(await http.put('/hrm/salary/config/update', data))
+      }
+    },
+    birthdayCare: {
+      get: async () => unwrap<HrmBirthdayCareConfig>(await http.get('/hrm/birthday-care/config')),
+      save: async (data: HrmBirthdayCareConfig) => unwrap<boolean>(await http.put('/hrm/birthday-care/config', data))
+    },
+    home: {
+      hrStatistics: async () => unwrap<HrmHrHomeStatistics>(await http.get('/hrm/home/hr-statistics-summary')),
+      hrCalendar: async (params: { startDate: string; endDate: string }) => unwrap<HrmHomeCalendarItem[]>(await http.get('/hrm/home/hr-calendar', { params })),
+      teamStatistics: async () => unwrap<HrmTeamHomeStatistics>(await http.get('/hrm/home/team-statistics-summary')),
+      teamCalendar: async (params: { startDate: string; endDate: string }) => unwrap<HrmHomeCalendarItem[]>(await http.get('/hrm/home/team-calendar', { params }))
+    },
+    insurance: {
+      scheme: {
+        list: async () => unwrap<HrmInsuranceScheme[]>(await http.get('/hrm/insurance/scheme/list')),
+        get: async (id: number) => unwrap<HrmInsuranceScheme>(await http.get('/hrm/insurance/scheme/get', { params: { id } })),
+        create: async (data: HrmInsuranceScheme) => unwrap<number>(await http.post('/hrm/insurance/scheme/create', data)),
+        update: async (data: HrmInsuranceScheme) => unwrap<boolean>(await http.put('/hrm/insurance/scheme/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/insurance/scheme/delete', { params: { id } }))
+      },
+      monthRecord: {
+        page: async (params: { pageNo: number; pageSize: number; year?: number }) => unwrap<PageResult<HrmInsuranceMonthRecord>>(await http.get('/hrm/insurance/month-record/page', { params })),
+        createFirst: async (data: { year: number; month: number }) => unwrap<number>(await http.post('/hrm/insurance/month-record/create-first', data)),
+        createNext: async () => unwrap<number>(await http.post('/hrm/insurance/month-record/create-next')),
+        get: async (id: number) => unwrap<HrmInsuranceMonthRecord>(await http.get('/hrm/insurance/month-record/get', { params: { id } })),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/insurance/month-record/delete', { params: { id } })),
+        employeePage: async (params: { pageNo: number; pageSize: number; monthRecordId: number; employeeName?: string; schemeId?: number; areaId?: number; status?: number }) => unwrap<PageResult<HrmInsuranceMonthEmployeeRecord>>(await http.get('/hrm/insurance/month-employee-record/page', { params })),
+        employeeGet: async (id: number) => unwrap<HrmInsuranceMonthEmployeeRecord>(await http.get('/hrm/insurance/month-employee-record/get', { params: { id } })),
+        employeeUpdate: async (data: HrmInsuranceMonthEmployeeUpdate) => unwrap<boolean>(await http.put('/hrm/insurance/month-employee-record/update', data)),
+        employeeStopList: async (ids: number[]) => unwrap<boolean>(await http.put('/hrm/insurance/month-employee-record/stop-list', { ids })),
+        employeeCreateList: async (data: { monthRecordId: number; employeeIds: number[] }) => unwrap<boolean>(await http.post('/hrm/insurance/month-employee-record/create-list', data)),
+        uninsuredEmployeeList: async (monthRecordId: number) => unwrap<HrmEmployee[]>(await http.get('/hrm/insurance/month-employee-record/uninsured-employee-list', { params: { monthRecordId } }))
+      }
+    },
+    perfCfg: {
+      resultTemplate: {
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmPerformanceResultTemplate>>(await http.get('/hrm/performance/result-template/page', { params })),
+        get: async (id: number) => unwrap<HrmPerformanceResultTemplate>(await http.get('/hrm/performance/result-template/get', { params: { id } })),
+        simpleList: async (status?: number) => unwrap<HrmPerformanceResultTemplate[]>(await http.get('/hrm/performance/result-template/simple-list', { params: { status } })),
+        create: async (data: HrmPerformanceResultTemplate) => unwrap<number>(await http.post('/hrm/performance/result-template/create', data)),
+        update: async (data: HrmPerformanceResultTemplate) => unwrap<boolean>(await http.put('/hrm/performance/result-template/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/performance/result-template/delete', { params: { id } }))
+      },
+      assessmentTemplate: {
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmAssessmentTemplate>>(await http.get('/hrm/performance/assessment-template/page', { params })),
+        get: async (id: number) => unwrap<HrmAssessmentTemplate>(await http.get('/hrm/performance/assessment-template/get', { params: { id } })),
+        simpleList: async () => unwrap<HrmAssessmentTemplate[]>(await http.get('/hrm/performance/assessment-template/simple-list')),
+        create: async (data: HrmAssessmentTemplate) => unwrap<number>(await http.post('/hrm/performance/assessment-template/create', data)),
+        update: async (data: HrmAssessmentTemplate) => unwrap<boolean>(await http.put('/hrm/performance/assessment-template/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/performance/assessment-template/delete', { params: { id } }))
+      }
+    },
+    recruit: {
+      post: {
+        page: async (params: { pageNo: number; pageSize: number; status?: number }) => unwrap<PageResult<HrmRecruitPost>>(await http.get('/hrm/recruit/post/page', { params })),
+        get: async (id: number) => unwrap<HrmRecruitPost>(await http.get('/hrm/recruit/post/get', { params: { id } })),
+        create: async (data: HrmRecruitPost) => unwrap<number>(await http.post('/hrm/recruit/post/create', data)),
+        update: async (data: HrmRecruitPost) => unwrap<boolean>(await http.put('/hrm/recruit/post/update', data)),
+        updateStatus: async (data: { id: number; status: number; stopReason?: string }) => unwrap<boolean>(await http.put('/hrm/recruit/post/update-status', data)),
+        statusCount: async () => unwrap<HrmRecruitCandidateStatusCount[]>(await http.get('/hrm/recruit/post/status-count'))
+      },
+      candidate: {
+        page: async (params: { pageNo: number; pageSize: number; postId?: number; status?: number; name?: string; mobile?: string; channelId?: number }) => unwrap<PageResult<HrmRecruitCandidate>>(await http.get('/hrm/recruit/candidate/page', { params })),
+        get: async (id: number) => unwrap<HrmRecruitCandidate>(await http.get('/hrm/recruit/candidate/get', { params: { id } })),
+        create: async (data: HrmRecruitCandidate) => unwrap<number>(await http.post('/hrm/recruit/candidate/create', data)),
+        update: async (data: HrmRecruitCandidate) => unwrap<boolean>(await http.put('/hrm/recruit/candidate/update', data)),
+        updateStatus: async (data: { id: number; status: number }) => unwrap<boolean>(await http.put('/hrm/recruit/candidate/update-status', data)),
+        updatePost: async (data: { id: number; postId: number }) => unwrap<boolean>(await http.put('/hrm/recruit/candidate/update-post', data)),
+        updateChannel: async (data: { id: number; channelId: number }) => unwrap<boolean>(await http.put('/hrm/recruit/candidate/update-channel', data)),
+        eliminate: async (data: { id: number; eliminate?: string; remark?: string }) => unwrap<boolean>(await http.put('/hrm/recruit/candidate/eliminate', data)),
+        convertEmployee: async (data: HrmEmployeeSave & { candidateId: number }) => unwrap<number>(await http.post('/hrm/recruit/candidate/convert-employee', data)),
+        cleanIds: async (statuses: number[], days: number) => unwrap<number[]>(await http.get('/hrm/recruit/candidate/clean-ids', { params: { statuses: statuses.join(','), days } })),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/recruit/candidate/delete', { params: { id } }))
+      },
+      interview: {
+        get: async (id: number) => unwrap<HrmRecruitInterview>(await http.get('/hrm/recruit/interview/get', { params: { id } })),
+        listByCandidate: async (candidateId: number) => unwrap<HrmRecruitInterview[]>(await http.get('/hrm/recruit/interview/list-by-candidate', { params: { candidateId } })),
+        create: async (data: HrmRecruitInterview) => unwrap<number>(await http.post('/hrm/recruit/interview/create', data)),
+        update: async (data: HrmRecruitInterview) => unwrap<boolean>(await http.put('/hrm/recruit/interview/update', data)),
+        updateResult: async (data: HrmRecruitInterviewResultSave) => unwrap<boolean>(await http.put('/hrm/recruit/interview/update-result', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/recruit/interview/delete', { params: { id } }))
+      },
+      uploadResume: async (file: File) => {
+        const data = new FormData(); data.append('file', file); data.append('directory', 'hrm/recruit/candidate/resume')
+        return unwrap<string>(await http.post('/infra/file/upload', data))
+      },
+      channel: {
+        page: async (params: { pageNo: number; pageSize: number }) => unwrap<PageResult<HrmRecruitChannel>>(await http.get('/hrm/recruit/channel/page', { params })),
+        create: async (data: { name: string }) => unwrap<number>(await http.post('/hrm/recruit/channel/create', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/recruit/channel/delete', { params: { id } }))
+      },
+      eliminateReason: {
+        list: async () => unwrap<string[]>(await http.get('/hrm/recruit/config/eliminate-reason/list')),
+        save: async (reasons: string[]) => unwrap<boolean>(await http.post('/hrm/recruit/config/eliminate-reason/save', { reasons }))
+      }
+    },
+    performance: {
+      plan: {
+        page: async (params: { pageNo: number; pageSize: number; status?: number }) => unwrap<PageResult<HrmPerformancePlan>>(await http.get('/hrm/performance/plan/page', { params })),
+        get: async (id: number) => unwrap<HrmPerformancePlan>(await http.get('/hrm/performance/plan/get', { params: { id } })),
+        create: async (data: HrmPerformancePlanSave) => unwrap<number>(await http.post('/hrm/performance/plan/create', data)),
+        update: async (data: HrmPerformancePlanSave) => unwrap<boolean>(await http.put('/hrm/performance/plan/update', data)),
+        delete: async (id: number) => unwrap<boolean>(await http.delete('/hrm/performance/plan/delete', { params: { id } })),
+        start: async (id: number) => unwrap<boolean>(await http.post('/hrm/performance/plan/start', null, { params: { id } })),
+        openScoring: async (id: number) => unwrap<boolean>(await http.post('/hrm/performance/plan/open-scoring', null, { params: { id } })),
+        startInterview: async (id: number) => unwrap<boolean>(await http.post('/hrm/performance/plan/start-interview', null, { params: { id } })),
+        archive: async (id: number) => unwrap<boolean>(await http.post('/hrm/performance/plan/archive', null, { params: { id } })),
+        terminate: async (id: number) => unwrap<boolean>(await http.post('/hrm/performance/plan/terminate', null, { params: { id } }))
+      },
+      assessment: {
+        page: async (params: { pageNo: number; pageSize: number; planId?: number }) => unwrap<PageResult<HrmPerformanceAssessment>>(await http.get('/hrm/performance/assessment/page', { params })),
+        get: async (id: number) => unwrap<HrmPerformanceAssessment>(await http.get('/hrm/performance/assessment/get', { params: { id } })),
+        processRecordList: async (id: number) => unwrap<HrmPerformanceProcessRecord[]>(await http.get('/hrm/performance/assessment/process-record-list', { params: { id } }))
+      }
+    }
+  }
+  // ========== EAM (Asset Management) ==========
+  ,eam: {
+    repair: {
+      page: async (params: { pageNo: number; pageSize: number; assetId?: number }) => unwrap<PageResult<EamRepairItem>>(await http.get('/eam/repair/page', { params })),
+      get: async (id: number) => unwrap<EamRepairItem>(await http.get('/eam/repair/get', { params: { id } })),
+      listByAsset: async (assetId: number) => unwrap<EamRepairItem[]>(await http.get('/eam/repair/list-by-asset', { params: { assetId } })),
+      create: async (data: EamRepairCreate) => unwrap<number>(await http.post('/eam/repair/create', data)),
+      finish: async (data: EamRepairFinish) => unwrap<boolean>(await http.put('/eam/repair/finish', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/eam/repair/delete', { params: { id } }))
+    },
+    inventory: {
+      page: async (params: { pageNo: number; pageSize: number; name?: string; status?: number }) => unwrap<PageResult<EamInventoryItem>>(await http.get('/eam/inventory/page', { params })),
+      get: async (id: number) => unwrap<EamInventoryItem>(await http.get('/eam/inventory/get', { params: { id } })),
+      create: async (data: EamInventoryCreate) => unwrap<number>(await http.post('/eam/inventory/create', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/eam/inventory/delete', { params: { id } })),
+      detailList: async (inventoryId: number) => unwrap<EamInventoryDetail[]>(await http.get('/eam/inventory/detail-list', { params: { inventoryId } })),
+      check: async (data: EamInventoryCheck) => unwrap<boolean>(await http.put('/eam/inventory/check', data)),
+      finish: async (id: number) => unwrap<boolean>(await http.put('/eam/inventory/finish', null, { params: { id } })),
+      syncDetail: async (detailId: number) => unwrap<boolean>(await http.put('/eam/inventory/sync-detail', null, { params: { detailId } })),
+      markLost: async (detailId: number) => unwrap<boolean>(await http.put('/eam/inventory/mark-lost', null, { params: { detailId } }))
+    },
+    asset: {
+      page: async (params: { pageNo: number; pageSize: number; name?: string; assetCode?: string; categoryId?: number; status?: number; extFieldKey?: string; extFieldValue?: string }) => unwrap<PageResult<EamAssetListItem>>(await http.get('/eam/asset/page', { params })),
+      get: async (id: number) => unwrap<EamAsset>(await http.get('/eam/asset/get', { params: { id } })),
+      create: async (data: EamAsset) => unwrap<number>(await http.post('/eam/asset/create', data)),
+      update: async (data: EamAsset) => unwrap<boolean>(await http.put('/eam/asset/update', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/eam/asset/delete', { params: { id } })),
+      changeLog: async (assetId: number) => unwrap<EamAssetChangeLog[]>(await http.get('/eam/asset/change-log', { params: { assetId } })),
+      importPreview: async (file: File, updateExisting = false) => {
+        const data = new FormData(); data.append('file', file); data.append('updateExisting', String(updateExisting))
+        return unwrap<EamAssetImportPreview>(await http.post('/eam/asset/import/preview', data))
+      },
+      importCommit: async (file: File, updateExisting = false) => {
+        const data = new FormData(); data.append('file', file); data.append('updateExisting', String(updateExisting))
+        return unwrap<EamAssetImportPreview>(await http.post('/eam/asset/import/commit', data))
+      }
+    },
+    transfer: {
+      page: async (params: { pageNo: number; pageSize: number; no?: string; type?: number; status?: number }) => unwrap<PageResult<EamTransfer>>(await http.get('/eam/transfer/page', { params })),
+      get: async (id: number) => unwrap<EamTransfer>(await http.get('/eam/transfer/get', { params: { id } })),
+      create: async (data: EamTransferCreate) => unwrap<number>(await http.post('/eam/transfer/create', data)),
+      approve: async (id: number) => unwrap<boolean>(await http.put('/eam/transfer/approve', null, { params: { id } })),
+      reject: async (id: number, reason?: string) => unwrap<boolean>(await http.put('/eam/transfer/reject', null, { params: { id, reason } })),
+      cancel: async (id: number) => unwrap<boolean>(await http.put('/eam/transfer/cancel', null, { params: { id } }))
+    },
+    scrap: {
+      page: async (params: { pageNo: number; pageSize: number; no?: string; status?: number }) => unwrap<PageResult<EamScrap>>(await http.get('/eam/scrap/page', { params })),
+      get: async (id: number) => unwrap<EamScrap>(await http.get('/eam/scrap/get', { params: { id } })),
+      create: async (data: EamScrapCreate) => unwrap<number>(await http.post('/eam/scrap/create', data)),
+      approve: async (id: number) => unwrap<boolean>(await http.put('/eam/scrap/approve', null, { params: { id } })),
+      reject: async (id: number, reason?: string) => unwrap<boolean>(await http.put('/eam/scrap/reject', null, { params: { id, reason } }))
+    },
+    category: {
+      list: async () => unwrap<EamCategory[]>(await http.get('/eam/category/list')),
+      get: async (id: number) => unwrap<EamCategory>(await http.get('/eam/category/get', { params: { id } })),
+      create: async (data: EamCategorySave) => unwrap<number>(await http.post('/eam/category/create', data)),
+      update: async (data: EamCategorySave) => unwrap<boolean>(await http.put('/eam/category/update', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/eam/category/delete', { params: { id } })),
+      importPreview: async (file: File) => {
+        const data = new FormData(); data.append('file', file)
+        return unwrap<EamCategoryImportResult>(await http.post('/eam/category/import/preview', data))
+      },
+      importCommit: async (file: File) => {
+        const data = new FormData(); data.append('file', file)
+        return unwrap<EamCategoryImportResult>(await http.post('/eam/category/import/commit', data))
+      }
+    },
+    categoryField: {
+      list: async (categoryId: number) => unwrap<EamCategoryField[]>(await http.get('/eam/category-field/list', { params: { categoryId } })),
+      effectiveList: async (categoryId: number) => unwrap<EamCategoryField[]>(await http.get('/eam/category-field/effective-list', { params: { categoryId } })),
+      create: async (data: EamCategoryField) => unwrap<number>(await http.post('/eam/category-field/create', data)),
+      update: async (data: EamCategoryField) => unwrap<boolean>(await http.put('/eam/category-field/update', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/eam/category-field/delete', { params: { id } }))
+    },
+    codeRule: {
+      list: async () => unwrap<EamCodeRule[]>(await http.get('/eam/code-rule/list')),
+      get: async (id: number) => unwrap<EamCodeRule>(await http.get('/eam/code-rule/get', { params: { id } })),
+      create: async (data: EamCodeRule) => unwrap<number>(await http.post('/eam/code-rule/create', data)),
+      update: async (data: EamCodeRule) => unwrap<boolean>(await http.put('/eam/code-rule/update', data)),
+      delete: async (id: number) => unwrap<boolean>(await http.delete('/eam/code-rule/delete', { params: { id } }))
+    },
+    statistics: async () => unwrap<EamStatistics>(await http.get('/eam/statistics/overview')),
+    /** 资产附件走 infra 通用上传，返回可直接存进 fileUrls 的 URL */
+    uploadFile: async (file: File) => {
+      const data = new FormData(); data.append('file', file)
+      return unwrap<string>(await http.post('/infra/file/upload', data))
+    },
+    deptSimpleList: async () => unwrap<Array<{ id: number; name: string; parentId: number }>>(await http.get('/system/dept/simple-list')),
+    userSimpleList: async () => unwrap<Array<{ id: number; nickname: string }>>(await http.get('/system/user/simple-list'))
+  }
 }

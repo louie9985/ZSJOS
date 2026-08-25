@@ -3,11 +3,13 @@ package cn.iocoder.yudao.module.eam.service.category;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategoryFieldSaveReqVO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryFieldDO;
 import cn.iocoder.yudao.module.eam.dal.mysql.category.EamCategoryFieldMapper;
 import cn.iocoder.yudao.module.eam.enums.category.EamFieldTypeEnum;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -35,6 +37,8 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
     private EamCategoryFieldMapper fieldMapper;
     @Resource
     private EamCategoryService categoryService;
+    @Resource
+    private DictDataApi dictDataApi;
 
     @Override
     public Long createField(EamCategoryFieldSaveReqVO reqVO) {
@@ -99,8 +103,16 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
 
     @Override
     public Map<String, Object> validateAndNormalizeExtFields(Long categoryId, Map<String, Object> extFields) {
+        return validateAndNormalizeExtFieldsWithSnapshots(categoryId, extFields).values();
+    }
+
+    @Override
+    public NormalizedExtFields validateAndNormalizeExtFieldsWithSnapshots(
+            Long categoryId, Map<String, Object> extFields) {
         List<EamCategoryFieldDO> definitions = getEffectiveFieldList(categoryId);
         Map<String, Object> normalized = new LinkedHashMap<>();
+        Map<String, String> labels = new LinkedHashMap<>();
+        Map<String, String> dictTypes = new LinkedHashMap<>();
         Map<String, Object> input = extFields != null ? extFields : Map.of();
 
         for (EamCategoryFieldDO def : definitions) {
@@ -109,10 +121,17 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
             if (blank) {
                 continue; // 管理端字段全部选填；员工收集表规则由独立表单执行
             }
-            normalized.put(def.getFieldKey(), convertValue(def, raw));
+            Object value = convertValue(def, raw);
+            normalized.put(def.getFieldKey(), value);
+            if (Objects.equals(def.getFieldType(), EamFieldTypeEnum.SELECT.getType())) {
+                labels.put(def.getFieldKey(), resolveSelectLabel(def, String.valueOf(value)));
+                if ("SYSTEM_DICT".equals(def.getOptionSource())) {
+                    dictTypes.put(def.getFieldKey(), def.getDictType());
+                }
+            }
         }
         // 未在定义中的键直接丢弃，避免脏数据随分类变更堆积
-        return normalized;
+        return new NormalizedExtFields(normalized, labels, dictTypes);
     }
 
     /**
@@ -136,13 +155,34 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
             }
         }
         if (Objects.equals(type, EamFieldTypeEnum.SELECT.getType())) {
+            if ("SYSTEM_DICT".equals(def.getOptionSource())) {
+                if (StrUtil.isBlank(def.getDictType())) {
+                    throw exception(FIELD_VALUE_INVALID, def.getFieldName());
+                }
+                dictDataApi.validateDictDataList(def.getDictType(), List.of(text));
+                return text;
+            }
             if (CollUtil.isEmpty(def.getOptions()) || !def.getOptions().contains(text)) {
                 throw exception(FIELD_VALUE_INVALID, def.getFieldName());
             }
             return text;
         }
+        if (Objects.equals(type, EamFieldTypeEnum.FILE.getType())) {
+            return text;
+        }
         // 单行/多行文本
         return text;
+    }
+
+    private String resolveSelectLabel(EamCategoryFieldDO def, String value) {
+        if (!"SYSTEM_DICT".equals(def.getOptionSource())) {
+            return value;
+        }
+        return dictDataApi.getDictDataList(def.getDictType()).stream()
+                .filter(item -> Objects.equals(item.getValue(), value))
+                .map(DictDataRespDTO::getLabel)
+                .findFirst()
+                .orElseThrow(() -> exception(FIELD_VALUE_INVALID, def.getFieldName()));
     }
 
     private EamCategoryFieldDO markInherited(EamCategoryFieldDO field) {
@@ -151,6 +191,12 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
 
     private void normalizeOptions(EamCategoryFieldDO field) {
         if (!Objects.equals(field.getFieldType(), EamFieldTypeEnum.SELECT.getType())) {
+            field.setOptions(null);
+            field.setOptionSource(null);
+            field.setDictType(null);
+        } else if (StrUtil.isBlank(field.getOptionSource())) {
+            field.setOptionSource("STATIC");
+        } else if ("SYSTEM_DICT".equals(field.getOptionSource())) {
             field.setOptions(null);
         }
         field.setRequired(false); // 兼容旧字段；管理端不执行必填校验

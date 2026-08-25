@@ -388,6 +388,11 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   display: none;
 }
 
+.mobile-nav-section-title {
+  display: block;
+  padding: var(--crm-sp-3) var(--crm-sp-4) var(--crm-sp-1);
+}
+
 @media(max-width:768px) {
   .mobile-nav-trigger {
     display: inline-flex;

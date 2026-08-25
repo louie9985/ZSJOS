@@ -53,7 +53,7 @@ layout → sunken → chrome → container → elevated
 
 ### 1.5 字号
 
-`--crm-font-sm` / `-base` / `-lg` / `-display` (12/14/15/22)。  
+`--crm-font-sm` / `-base` / `-lg` / `-display` (12/14/15/22)。
 Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 
 ---
@@ -216,6 +216,11 @@ Guard 允许的 px 字面量白名单：`10, 11, 12, 13, 16, 18, 30`。
 ```
 
 如需限宽：`max-width: var(--crm-page-max-table)` (1360px) 或 `var(--crm-page-max-narrow)` (1200px)。
+
+HRM 表格统一使用 `src/components/HrmProTable.tsx`。管理主列表传入 `advanced`、稳定的
+`persistenceKey` 和 `onReload`，获得当前页搜索、刷新、列设置、密度和全屏能力；详情、
+编辑器和静态子表不传 `advanced`，避免在弹窗或抽屉中重复堆叠工具栏。服务端分页、
+导出、行选择和业务操作仍沿用页面既有 API 与权限边界。
 
 ### 3.3 表单/详情页
 

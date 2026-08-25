@@ -17,9 +17,12 @@ import cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum;
 import cn.iocoder.yudao.module.eam.enums.asset.EamChangeTypeEnum;
 import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
+import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService.NormalizedExtFields;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.coderule.EamCodeRuleService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -39,6 +42,7 @@ import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_IMPORT_
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_CODE_DUPLICATE;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_NOT_EXISTS;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_STATUS_INVALID;
+import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.FIELD_VALUE_INVALID;
 
 /**
  * EAM 资产 Service 实现类
@@ -59,18 +63,21 @@ public class EamAssetServiceImpl implements EamAssetService {
     private EamAssetChangeLogService changeLogService;
     @Resource
     private AdminUserApi adminUserApi;
+    @Resource
+    private DictDataApi dictDataApi;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Long createAsset(EamAssetSaveReqVO reqVO) {
         // 1. 校验分类与自定义字段
         EamCategoryDO category = categoryService.validateCategoryExists(reqVO.getCategoryId());
-        Map<String, Object> extFields =
-                categoryFieldService.validateAndNormalizeExtFields(reqVO.getCategoryId(), reqVO.getExtFields());
+        NormalizedExtFields extFields = categoryFieldService
+                .validateAndNormalizeExtFieldsWithSnapshots(reqVO.getCategoryId(), reqVO.getExtFields());
 
         // 2. 组装资产，新建资产一律以「闲置」入账，归属由后续流转单驱动
         EamAssetDO asset = BeanUtils.toBean(reqVO, EamAssetDO.class);
-        asset.setExtFields(extFields);
+        applyExtFieldSnapshots(asset, extFields);
+        applySourceSnapshot(asset);
         applyUserSnapshots(asset);
         asset.setStatus(EamAssetStatusEnum.IDLE.getStatus());
         applyManagementSnapshot(asset, category, reqVO.getQuantity());
@@ -97,12 +104,13 @@ public class EamAssetServiceImpl implements EamAssetService {
     public void updateAsset(EamAssetSaveReqVO reqVO) {
         EamAssetDO before = validateAssetExists(reqVO.getId());
         EamCategoryDO category = categoryService.validateCategoryExists(reqVO.getCategoryId());
-        Map<String, Object> extFields =
-                categoryFieldService.validateAndNormalizeExtFields(reqVO.getCategoryId(), reqVO.getExtFields());
+        NormalizedExtFields extFields = categoryFieldService
+                .validateAndNormalizeExtFieldsWithSnapshots(reqVO.getCategoryId(), reqVO.getExtFields());
 
         // 状态与资产编号不通过编辑表单变更：状态归状态机，编号归编号规则
         EamAssetDO updateObj = BeanUtils.toBean(reqVO, EamAssetDO.class);
-        updateObj.setExtFields(extFields);
+        applyExtFieldSnapshots(updateObj, extFields);
+        applySourceSnapshot(updateObj);
         applyUserSnapshots(updateObj);
         applyManagementSnapshot(updateObj, category, reqVO.getQuantity());
         updateObj.setStatus(null);
@@ -144,6 +152,26 @@ public class EamAssetServiceImpl implements EamAssetService {
             throw exception(ASSET_NOT_EXISTS);
         }
         return asset;
+    }
+
+    private void applyExtFieldSnapshots(EamAssetDO asset, NormalizedExtFields normalized) {
+        asset.setExtFields(normalized.values());
+        asset.setExtFieldLabels(normalized.labels());
+        asset.setExtFieldDictTypes(normalized.dictTypes());
+    }
+
+    private void applySourceSnapshot(EamAssetDO asset) {
+        if (asset.getSource() == null) {
+            asset.setSourceLabelSnapshot(null);
+            return;
+        }
+        String value = String.valueOf(asset.getSource());
+        dictDataApi.validateDictDataList("eam_asset_source", List.of(value));
+        asset.setSourceLabelSnapshot(dictDataApi.getDictDataList("eam_asset_source").stream()
+                .filter(item -> value.equals(item.getValue()))
+                .map(DictDataRespDTO::getLabel)
+                .findFirst()
+                .orElseThrow(() -> exception(FIELD_VALUE_INVALID, "资产来源")));
     }
 
     @Override

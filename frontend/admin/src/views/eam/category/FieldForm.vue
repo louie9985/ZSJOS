@@ -24,18 +24,20 @@
           <el-option label="数字" :value="FieldType.NUMBER" />
           <el-option label="日期" :value="FieldType.DATE" />
           <el-option label="下拉选择" :value="FieldType.SELECT" />
+          <el-option label="图片/文件" :value="FieldType.FILE" />
         </el-select>
       </el-form-item>
-      <el-form-item v-if="formData.fieldType === FieldType.SELECT" label="下拉选项" prop="options">
-        <div class="w-full">
-          <div v-for="(_, index) in formData.options" :key="index" class="mb-2 flex gap-2">
-            <el-input v-model="formData.options![index]" placeholder="请输入选项" />
-            <el-button link type="danger" @click="removeOption(index)">删除</el-button>
-          </div>
-          <el-button type="primary" plain size="small" @click="addOption">
-            <Icon icon="ep:plus" class="mr-5px" /> 添加选项
-          </el-button>
-        </div>
+      <el-form-item v-if="formData.fieldType === FieldType.SELECT" label="选项来源" prop="optionSource">
+        <el-select v-model="formData.optionSource" class="!w-full">
+          <el-option label="系统字典" value="SYSTEM_DICT" />
+          <el-option label="固定选项" value="STATIC" />
+        </el-select>
+      </el-form-item>
+      <el-form-item v-if="formData.fieldType === FieldType.SELECT && formData.optionSource === 'SYSTEM_DICT'" label="字典类型" prop="dictType">
+        <el-input v-model="formData.dictType" placeholder="请输入 System 字典类型编码" />
+      </el-form-item>
+      <el-form-item v-if="formData.fieldType === FieldType.SELECT && formData.optionSource === 'STATIC'" label="下拉选项" prop="options">
+        <el-select v-model="formData.options" multiple filterable allow-create default-first-option class="!w-full" />
       </el-form-item>
       <el-form-item label="管理端显示" prop="adminVisible">
         <el-switch v-model="formData.adminVisible" />
@@ -108,19 +110,14 @@ function buildEmptyForm(): CategoryFieldApi.CategoryFieldVO {
     fieldName: '',
     fieldType: FieldType.TEXT,
     options: [],
+    optionSource: 'SYSTEM_DICT',
+    dictType: '',
     required: false,
     adminVisible: true,
     collectionVisible: true,
     collectionRequired: false,
     sort: 0
   }
-}
-
-const addOption = () => {
-  formData.value.options = [...(formData.value.options || []), '']
-}
-const removeOption = (index: number) => {
-  formData.value.options!.splice(index, 1)
 }
 
 const open = async (type: string, id?: number) => {
@@ -153,13 +150,17 @@ defineExpose({ open })
 const submitForm = async () => {
   await formRef.value.validate()
   // 下拉类型必须至少有一个非空选项，否则该字段在资产表单上无法选值
-  if (formData.value.fieldType === FieldType.SELECT) {
+  if (formData.value.fieldType === FieldType.SELECT && formData.value.optionSource === 'STATIC') {
     const options = (formData.value.options || []).map((o) => o.trim()).filter(Boolean)
     if (options.length === 0) {
       message.warning('下拉选择类型至少需要一个选项')
       return
     }
     formData.value.options = options
+  }
+  if (formData.value.fieldType === FieldType.SELECT && formData.value.optionSource === 'SYSTEM_DICT' && !formData.value.dictType?.trim()) {
+    message.warning('请选择或填写系统字典类型')
+    return
   }
   if (conditionRuleText.value.trim()) {
     try {

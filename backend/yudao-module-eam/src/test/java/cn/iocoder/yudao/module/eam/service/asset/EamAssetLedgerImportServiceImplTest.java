@@ -8,8 +8,10 @@ import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetImportRowMapper;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
 import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
+import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -42,6 +44,10 @@ class EamAssetLedgerImportServiceImplTest {
     private EamAssetImportRowMapper importRowMapper;
     @Mock
     private AdminUserApi adminUserApi;
+    @Mock
+    private EamCategoryFieldService categoryFieldService;
+    @Mock
+    private DictDataApi dictDataApi;
 
     @Test
     void preview_shouldHandleDuplicateExistingAndUserMatchWithoutDroppingRows() {
@@ -58,7 +64,8 @@ class EamAssetLedgerImportServiceImplTest {
         when(assetMapper.selectListByAssetCodes(anyList())).thenReturn(List.of(existingAsset));
         when(categoryService.getCategoryList()).thenReturn(categories());
         when(adminUserApi.getUserListByStatus(0)).thenReturn(List.of(user(1L, "张三", 10L)));
-
+        when(categoryFieldService.validateAndNormalizeExtFieldsWithSnapshots(any(), any()))
+                .thenReturn(new EamCategoryFieldService.NormalizedExtFields(Map.of(), Map.of(), Map.of()));
         EamAssetImportPreviewRespVO defaultPreview = importService.preview(
                 new byte[]{1, 2, 3}, "台账.xlsx", false);
         EamAssetImportPreviewRespVO updatePreview = importService.preview(
@@ -76,17 +83,16 @@ class EamAssetLedgerImportServiceImplTest {
     }
 
     private static EamAssetLedgerParser.LedgerRow row(int rowNum, String code, String userName) {
-        return new EamAssetLedgerParser.LedgerRow(rowNum, "IT硬件设备", "笔记本", "笔记本",
-                code, "", "品牌", "SN", "C栋", 1, 0, null, null, userName, null, null,
-                null, null, new LinkedHashMap<String, Object>(), Map.of("使用人姓名", userName),
-                null, null, null, List.of(), List.of());
+        return new EamAssetLedgerParser.LedgerRow(rowNum, "IT-COMPUTER", "电脑", code, "",
+                "品牌", "SN", "C栋", 1, 0, null, null, userName, null, null, null, null,
+                new LinkedHashMap<>(), Map.of("使用人", userName), List.of(), List.of(), List.of());
     }
 
     private static List<EamCategoryDO> categories() {
         EamCategoryDO root = EamCategoryDO.builder().id(1L).parentId(0L).name("IT硬件设备")
                 .code("IT").managementMode(EamManagementModeEnum.SERIALIZED.getMode()).unit("个").build();
-        EamCategoryDO leaf = EamCategoryDO.builder().id(2L).parentId(1L).name("笔记本")
-                .code("IT-003").managementMode(EamManagementModeEnum.SERIALIZED.getMode()).unit("个").build();
+        EamCategoryDO leaf = EamCategoryDO.builder().id(2L).parentId(1L).name("电脑")
+                .code("IT-COMPUTER").managementMode(EamManagementModeEnum.SERIALIZED.getMode()).unit("台").build();
         return List.of(root, leaf);
     }
 

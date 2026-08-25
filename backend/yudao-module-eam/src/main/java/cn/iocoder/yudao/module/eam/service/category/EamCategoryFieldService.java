@@ -39,4 +39,13 @@ public interface EamCategoryFieldService {
      */
     Map<String, Object> validateAndNormalizeExtFields(Long categoryId, Map<String, Object> extFields);
 
+    /**
+     * 校验扩展字段，并同时生成下拉字段的标签和字典类型快照。
+     */
+    NormalizedExtFields validateAndNormalizeExtFieldsWithSnapshots(Long categoryId, Map<String, Object> extFields);
+
+    record NormalizedExtFields(Map<String, Object> values, Map<String, String> labels,
+                               Map<String, String> dictTypes) {
+    }
+
 }

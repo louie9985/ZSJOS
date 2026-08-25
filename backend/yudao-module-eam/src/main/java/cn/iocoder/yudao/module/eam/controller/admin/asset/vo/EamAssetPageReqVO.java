@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import jakarta.validation.constraints.Pattern;
 
 @Schema(description = "管理后台 - EAM 资产分页 Request VO")
 @Data
@@ -29,5 +30,12 @@ public class EamAssetPageReqVO extends PageParam {
 
     @Schema(description = "使用人编号", example = "1")
     private Long useUserId;
+
+    @Schema(description = "分类自定义字段标识", example = "subject")
+    @Pattern(regexp = "^[a-zA-Z][a-zA-Z0-9_]*$", message = "自定义字段标识格式不正确")
+    private String extFieldKey;
+
+    @Schema(description = "分类自定义字段值", example = "pharmacist")
+    private String extFieldValue;
 
 }

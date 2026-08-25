@@ -14,21 +14,24 @@ export interface AssetVO {
   specification?: string
   sn?: string
   barcode?: string
+  originalValue?: number
+  netValue?: number
   purchaseDate?: string
+  source?: number
+  sourceLabelSnapshot?: string
+  warrantyDate?: string
   useDeptId?: number
   useDeptName?: string
   useUserId?: number
   useUserName?: string
   useUserNameSnapshot?: string
-  supervisorUserId?: number
-  supervisorNameSnapshot?: string
-  joinDate?: string
-  commitmentAccepted?: boolean
-  commitmentDate?: string
   location?: string
+  expectedLife?: number
   remark?: string
   fileUrls?: string[]
   extFields?: Record<string, any>
+  extFieldLabels?: Record<string, string>
+  extFieldDictTypes?: Record<string, string>
   createTime?: Date
 }
 
@@ -112,10 +115,11 @@ export interface AssetImportRowVO {
   supervisorName?: string
   matchedUserName?: string
   matchedSupervisorName?: string
-  action: 'CREATE' | 'UPDATE' | 'SKIP_EXISTING' | 'SKIP_SAME_FILE'
+  action: 'CREATE' | 'UPDATE' | 'SKIP_EXISTING' | 'SKIP_SAME_FILE' | 'ERROR'
   mappedFields: Record<string, any>
   defaultedFields: string[]
   warnings: string[]
+  errors: string[]
 }
 
 export interface AssetImportPreviewRespVO {
@@ -125,6 +129,7 @@ export interface AssetImportPreviewRespVO {
   updateCount: number
   skipCount: number
   warningCount: number
+  errorCount: number
   batchId?: number
   rows: AssetImportRowVO[]
 }

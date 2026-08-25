@@ -1,7 +1,6 @@
 package cn.iocoder.yudao.module.eam.service.category;
 
 import cn.hutool.core.util.StrUtil;
-import cn.hutool.json.JSONUtil;
 import cn.idev.excel.FastExcelFactory;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategoryFieldSaveReqVO;
@@ -156,9 +155,6 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
             } else if (!FIELD_TYPES.containsKey(row.fieldType())) {
                 action = "CONFLICT";
                 message = "字段类型不支持";
-            } else if ("__INVALID__".equals(row.conditionRule())) {
-                action = "CONFLICT";
-                message = "条件规则必须是 JSON 对象";
             } else if (StrUtil.hasBlank(row.fieldKey(), row.fieldName())) {
                 action = "CONFLICT";
                 message = "字段标识和字段名称不能为空";
@@ -205,13 +201,8 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     }
 
     private FieldRow parseField(Map<Integer, String> row) {
-        String condition = cell(row, 8);
-        if (StrUtil.isNotBlank(condition) && !JSONUtil.isTypeJSONObject(condition)) {
-            condition = "__INVALID__";
-        }
-        return new FieldRow(cell(row, 0), cell(row, 1), cell(row, 2), cell(row, 3), splitOptions(cell(row, 4)),
-                parseBoolean(cell(row, 5), true), parseBoolean(cell(row, 6), true),
-                parseBoolean(cell(row, 7), false), condition, parseInteger(cell(row, 9), 0));
+        return new FieldRow(cell(row, 0), cell(row, 1), cell(row, 2), cell(row, 3), cell(row, 4), cell(row, 5),
+                parseBoolean(cell(row, 6), true), parseInteger(cell(row, 7), 0), cell(row, 8));
     }
 
     private EamCategorySaveReqVO toCategoryReq(CategoryRow row, Long parentId) {
@@ -224,12 +215,11 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private EamCategoryFieldSaveReqVO toFieldReq(FieldRow row, Long categoryId) {
         EamCategoryFieldSaveReqVO req = new EamCategoryFieldSaveReqVO();
         req.setCategoryId(categoryId); req.setFieldKey(row.fieldKey()); req.setFieldName(row.fieldName());
-        req.setFieldType(FIELD_TYPES.get(row.fieldType())); req.setOptions(row.options()); req.setRequired(false);
-        req.setAdminVisible(row.adminVisible()); req.setCollectionVisible(row.collectionVisible());
-        req.setCollectionRequired(row.collectionRequired()); req.setSort(row.sort());
-        if (StrUtil.isNotBlank(row.conditionRule()) && !"__INVALID__".equals(row.conditionRule())) {
-            req.setConditionRule(parseConditionRule(row.conditionRule()));
-        }
+        req.setFieldType(FIELD_TYPES.get(row.fieldType())); req.setRequired(false);
+        req.setOptionSource(StrUtil.emptyToNull(row.optionSource()));
+        req.setDictType(StrUtil.emptyToNull(row.dictType()));
+        req.setAdminVisible(row.adminVisible()); req.setCollectionVisible(true);
+        req.setCollectionRequired(false); req.setSort(row.sort());
         return req;
     }
 
@@ -243,21 +233,12 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private boolean sameField(EamCategoryFieldDO existing, FieldRow row) {
         return Objects.equals(existing.getFieldName(), row.fieldName())
                 && Objects.equals(existing.getFieldType(), FIELD_TYPES.get(row.fieldType()))
-                && Objects.equals(existing.getOptions() == null ? List.of() : existing.getOptions(), row.options())
+                && Objects.equals(existing.getOptionSource(), StrUtil.emptyToNull(row.optionSource()))
+                && Objects.equals(existing.getDictType(), StrUtil.emptyToNull(row.dictType()))
                 && Objects.equals(Boolean.TRUE.equals(existing.getAdminVisible()), row.adminVisible())
-                && Objects.equals(Boolean.TRUE.equals(existing.getCollectionVisible()), row.collectionVisible())
-                && Objects.equals(Boolean.TRUE.equals(existing.getCollectionRequired()), row.collectionRequired())
-                && Objects.equals(existing.getConditionRule() == null ? Map.of() : existing.getConditionRule(),
-                    parseConditionRule(row.conditionRule()))
                 && Objects.equals(existing.getSort(), row.sort());
     }
 
-    private static Map<String, Object> parseConditionRule(String value) {
-        if (StrUtil.isBlank(value) || "__INVALID__".equals(value)) {
-            return Map.of();
-        }
-        return JSONUtil.parseObj(value).toBean(new cn.hutool.core.lang.TypeReference<Map<String, Object>>() {});
-    }
 
     private static <T> Set<String> duplicates(List<T> rows, Function<T, String> keyFunction) {
         Set<String> seen = new HashSet<>();
@@ -304,13 +285,11 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private static int parseStatus(String value) { return "关闭".equals(value) || "1".equals(value) ? 1 : 0; }
     private static int parseMode(String value) { return "批量".equals(value) || "2".equals(value) ? EamManagementModeEnum.BATCH.getMode() : EamManagementModeEnum.SERIALIZED.getMode(); }
     private static boolean parseBoolean(String value, boolean fallback) { return StrUtil.isBlank(value) ? fallback : Set.of("是", "true", "1").contains(value.toLowerCase()); }
-    private static List<String> splitOptions(String value) { return StrUtil.isBlank(value) ? List.of() : StrUtil.split(value, '|').stream().map(String::trim).filter(StrUtil::isNotBlank).toList(); }
 
     private record CategoryRow(String code, String name, String parentCode, Integer status, Integer sort,
                                Integer managementMode, String unit, String remark) {}
     private record FieldRow(String categoryCode, String fieldKey, String fieldName, String fieldType,
-                            List<String> options, Boolean adminVisible, Boolean collectionVisible,
-                            Boolean collectionRequired, String conditionRule, Integer sort) {}
+                            String optionSource, String dictType, Boolean adminVisible, Integer sort, String remark) {}
     private record ParsedConfig(List<CategoryRow> categories, List<FieldRow> fields) {}
 
 }

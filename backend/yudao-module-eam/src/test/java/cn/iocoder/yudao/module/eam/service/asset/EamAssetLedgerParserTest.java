@@ -9,7 +9,8 @@ import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -21,61 +22,49 @@ class EamAssetLedgerParserTest {
     private final EamAssetLedgerParser parser = new EamAssetLedgerParser();
 
     @Test
-    void parse_shouldMapDualHeaderAndNeverExposeCredential() throws Exception {
-        byte[] content = workbook(List.of(row -> {
-            set(row, 0, "张三");
-            set(row, 3, "C栋24楼");
-            set(row, 4, "IT硬件设备");
-            set(row, 8, "其他IT硬件设备");
-            set(row, 9, "会议终端");
-            set(row, 18, "品牌 A");
-            set(row, 19, "SN-001");
-            set(row, 25, "2026年6月");
-            set(row, 36, "TOP_SECRET_PASSWORD");
-            set(row, 48, "ZSJ-001");
-            set(row, 50, "附件.jpg");
-        }));
+    void parse_shouldUseHeaderNamesAndFieldKeysWithoutExposingPassword() throws Exception {
+        LinkedHashMap<String, String> values = new LinkedHashMap<>();
+        values.put("cpu:CPU", "M4 Pro");
+        values.put("资产名称", "MacBook Pro");
+        values.put("微信密码", "TOP_SECRET_PASSWORD");
+        values.put("购入日期", "2026年6月");
+        values.put("分类编码", "IT-COMPUTER");
+        values.put("资产状态", "在用");
+        values.put("数量", "1");
+        values.put("资产编号", "ZSJ-001");
 
-        EamAssetLedgerParser.LedgerRow actual = parser.parse(content).get(0);
+        EamAssetLedgerParser.LedgerRow actual = parser.parse(workbook(values)).get(0);
 
-        assertEquals(3, actual.rowNum());
-        assertEquals("IT硬件设备", actual.rootCategoryName());
-        assertEquals("其他IT硬件设备", actual.leafCategoryName());
-        assertEquals("会议终端", actual.assetName());
-        assertEquals(1, actual.quantity());
-        assertEquals(EamAssetStatusEnum.IDLE.getStatus(), actual.status());
+        assertEquals(2, actual.rowNum());
+        assertEquals("IT-COMPUTER", actual.categoryCode());
+        assertEquals("MacBook Pro", actual.assetName());
+        assertEquals(EamAssetStatusEnum.IN_USE.getStatus(), actual.status());
         assertEquals(LocalDate.of(2026, 6, 1), actual.purchaseDate());
-        assertTrue(actual.defaultedFields().contains("数量为空，默认按 1 导入"));
-        assertTrue(actual.defaultedFields().contains("使用状态为空，默认按闲置导入"));
+        assertEquals("M4 Pro", actual.extFields().get("cpu"));
         assertFalse(actual.extFields().toString().contains("TOP_SECRET_PASSWORD"));
         assertFalse(actual.mappedFields().toString().contains("TOP_SECRET_PASSWORD"));
-        assertFalse(actual.extFields().containsKey("wechat_password"));
     }
 
     @Test
-    void parse_shouldUseStableOtherLeafAndDescriptionAsName() throws Exception {
-        byte[] content = workbook(List.of(row -> {
-            set(row, 4, "其他");
-            set(row, 5, "企业文化纪念品");
-            set(row, 16, "2");
-            set(row, 43, "正常使用中");
-        }));
-
-        EamAssetLedgerParser.LedgerRow actual = parser.parse(content).get(0);
-
-        assertEquals("其他资产", actual.leafCategoryName());
-        assertEquals("企业文化纪念品", actual.assetName());
-        assertEquals(2, actual.quantity());
-        assertEquals(EamAssetStatusEnum.IN_USE.getStatus(), actual.status());
+    void parse_shouldReportMissingCategoryCodeAsRowError() throws Exception {
+        EamAssetLedgerParser.LedgerRow actual = parser.parse(
+                workbook(Map.of("资产名称", "未分类资产", "分类编码", ""))).get(0);
+        assertTrue(actual.errors().contains("分类编码为空"));
     }
 
     @Test
-    void parse_shouldReportActualExcelRowForUnknownCategory() throws Exception {
-        byte[] content = workbook(List.of(row -> set(row, 4, "未知分类")));
+    void parse_shouldRejectWorkbookWithoutRequiredHeaders() throws Exception {
+        ServiceException exception = assertThrows(ServiceException.class,
+                () -> parser.parse(workbook(Map.of("资产名称", "缺分类表头"))));
+        assertTrue(exception.getMessage().contains("分类编码和资产名称"));
+    }
 
-        ServiceException exception = assertThrows(ServiceException.class, () -> parser.parse(content));
-
-        assertTrue(exception.getMessage().contains("第 3 行资产大类无法识别"));
+    @Test
+    void parse_shouldReportInvalidStandardFieldTypes() throws Exception {
+        EamAssetLedgerParser.LedgerRow actual = parser.parse(workbook(Map.of(
+                "分类编码", "BOOK", "资产名称", "教材", "原值", "十二元",
+                "预计使用年限（月）", "1.5", "保修到期日", "待确认"))).get(0);
+        assertEquals(3, actual.errors().size());
     }
 
     @Test
@@ -86,24 +75,19 @@ class EamAssetLedgerParserTest {
         assertEquals(null, EamAssetLedgerParser.parseDate("待确认"));
     }
 
-    private static byte[] workbook(List<java.util.function.Consumer<Row>> dataRows) throws Exception {
+    private static byte[] workbook(Map<String, String> values) throws Exception {
         try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet(EamAssetLedgerParser.SHEET_NAME);
-            sheet.createRow(0).createCell(0).setCellValue("责任人信息");
-            Row header = sheet.createRow(1);
-            set(header, 4, "资产大类");
-            set(header, 48, "资产标签");
-            for (int index = 0; index < dataRows.size(); index++) {
-                Row row = sheet.createRow(index + 2);
-                dataRows.get(index).accept(row);
+            Row header = sheet.createRow(0);
+            Row data = sheet.createRow(1);
+            int index = 0;
+            for (Map.Entry<String, String> entry : values.entrySet()) {
+                header.createCell(index).setCellValue(entry.getKey());
+                data.createCell(index).setCellValue(entry.getValue());
+                index++;
             }
             workbook.write(output);
             return output.toByteArray();
         }
     }
-
-    private static void set(Row row, int column, String value) {
-        row.createCell(column).setCellValue(value);
-    }
-
 }

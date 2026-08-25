@@ -1,0 +1,286 @@
+/* HRM (human resource) pages — shared shell for the employee portal and HR admin areas. */
+
+.hrm-page {
+  padding: var(--crm-page-pad);
+}
+
+.hrm-page .page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+  align-items: center;
+  justify-content: space-between;
+  margin-block-end: var(--crm-sp-3);
+}
+
+.hrm-table-area {
+  padding: var(--crm-card-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+  min-width: 0;
+}
+
+.hrm-pro-table .ant-pro-table-list-toolbar-container {
+  padding-block: var(--crm-sp-2);
+}
+
+.hrm-pro-table:not(.advanced) .ant-pro-table-list-toolbar {
+  display: none;
+}
+
+.hrm-pagination {
+  margin-block-start: var(--crm-sp-4);
+  text-align: end;
+}
+
+.hrm-inline-alert {
+  margin-block-end: var(--crm-sp-3);
+}
+
+.hrm-muted {
+  color: var(--crm-text-tertiary);
+}
+
+/* 月度出勤概览，置于打卡明细表之上 */
+.hrm-summary {
+  margin-block-end: var(--crm-sp-4);
+}
+
+.hrm-drawer-subtitle {
+  margin-block: var(--crm-sp-4) var(--crm-sp-2);
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+  font-weight: 500;
+}
+
+/* 员工端用 Tabs 承载打卡/请假两块，页签内容自带 page-heading，去掉重复的上边距 */
+.hrm-my-attendance-page .ant-tabs-content .page-heading {
+  margin-block-start: 0;
+}
+
+/* ---------- 工资条卡片流 ---------- */
+
+/* 工资条是一份份单据，卡片比表格行更贴合阅读场景 */
+.hrm-slip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--crm-sp-3);
+}
+
+.hrm-slip-amount {
+  font-size: var(--crm-font-display);
+  font-weight: 600;
+  color: var(--crm-text);
+}
+
+.hrm-slip-caption {
+  margin-block-start: 2px;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}
+
+/* ---------- 绩效页 ---------- */
+
+/* 详情抽屉底部动作区：与流程记录之间留出间距 */
+.hrm-drawer-actions {
+  margin-block: var(--crm-sp-3);
+}
+
+.hrm-modal-comment {
+  margin-block-start: var(--crm-sp-3);
+}
+
+.hrm-modal-alert {
+  margin-block-start: var(--crm-sp-3);
+}
+
+.hrm-timeline-title {
+  font-weight: 500;
+}
+
+.hrm-timeline-content {
+  margin-block-start: 2px;
+  color: var(--crm-text-secondary);
+}
+
+.hrm-timeline-meta {
+  margin-block-start: 2px;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}
+
+/* ---------- 员工档案页 ---------- */
+
+.hrm-profile-name {
+  margin: 0;
+  font-size: var(--crm-font-lg);
+  font-weight: 600;
+  color: var(--crm-text);
+}
+
+/* 两列表单网格（新增/编辑员工） */
+.hrm-edit-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: var(--crm-sp-3);
+}
+
+.hrm-modal-employee {
+  margin-block-end: var(--crm-sp-3);
+}
+
+.hrm-tab-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 组织/薪资项树里的行内操作，避免树节点过长 */
+.hrm-dept-actions {
+  display: none;
+  margin-inline-start: var(--crm-sp-2);
+}
+
+.hrm-dept-actions:hover,
+.hrm-dept-actions.ant-space {
+  display: inline-flex;
+}
+
+.hrm-option-system {
+  font-weight: 500;
+}
+
+/* 考勤组班次行：每个班次一块，带边框分隔 */
+.hrm-shift-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-3);
+  margin-block-end: var(--crm-sp-2);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  flex-wrap: wrap;
+}
+
+.hrm-shift-row .ant-form-item {
+  margin-block-end: 0;
+}
+
+/* 绩效结果等级 chip */
+.hrm-level-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+/* 考核模板维度块与指标行 */
+.hrm-dimension-block {
+  padding: var(--crm-sp-3);
+  margin-block-end: var(--crm-sp-2);
+  border: 1px dashed var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+}
+
+.hrm-quota-row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--crm-sp-2);
+  margin-block-start: var(--crm-sp-2);
+}
+
+.hrm-quota-row .ant-form-item {
+  margin-block-end: 0;
+}
+
+/* ---------- 员工工作台首页 ---------- */
+
+.hrm-dashboard {
+  margin-block-start: var(--crm-sp-2);
+}
+
+.hrm-todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.hrm-todo-item {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+.hrm-todo-label {
+  flex-shrink: 0;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+  width: 36px;
+}
+
+.hrm-todo-main {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hrm-calendar-head {
+  font-weight: 600;
+  margin-block-end: var(--crm-sp-3);
+}
+
+.hrm-calendar-day {
+  display: flex;
+  gap: var(--crm-sp-3);
+  padding-block: var(--crm-sp-2);
+  border-block-end: 1px solid var(--crm-border);
+}
+
+.hrm-calendar-day:last-child {
+  border-block-end: none;
+}
+
+.hrm-calendar-date {
+  flex-shrink: 0;
+  width: 44px;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+.hrm-calendar-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+}
+
+.hrm-calendar-item-text {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+/* 占比分析行 */
+.hrm-analysis-row {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  margin-block-end: var(--crm-sp-2);
+}
+
+.hrm-analysis-label {
+  flex-shrink: 0;
+  width: 60px;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+.hrm-analysis-count {
+  flex-shrink: 0;
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}

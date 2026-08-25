@@ -33,10 +33,11 @@
         </el-descriptions-item>
         <el-descriptions-item label="使用人">{{ detail.useUserName || '-' }}</el-descriptions-item>
         <el-descriptions-item label="使用人姓名快照">{{ detail.useUserNameSnapshot || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="上级">{{ detail.supervisorNameSnapshot || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="入司日期">{{ detail.joinDate || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="使用人承诺">{{ detail.commitmentAccepted ? '已承诺' : '待补' }}</el-descriptions-item>
-        <el-descriptions-item label="承诺日期">{{ detail.commitmentDate || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="资产来源">{{ detail.sourceLabelSnapshot || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="原值">{{ detail.originalValue ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="净值">{{ detail.netValue ?? '-' }}</el-descriptions-item>
+        <el-descriptions-item label="保修到期日">{{ detail.warrantyDate || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="预计寿命（月）">{{ detail.expectedLife ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="存放地点" :span="2">
           {{ detail.location || '-' }}
         </el-descriptions-item>
@@ -129,11 +130,12 @@ const statusName = (status?: number) =>
 /** 用字段定义把 extFields 的 key 翻译成中文名，未定义的 key 直接显示原始 key */
 const extFieldEntries = computed(() => {
   const values = detail.value.extFields || {}
+  const snapshots = detail.value.extFieldLabels || {}
   const labelMap = new Map(fieldDefs.value.map((f) => [f.fieldKey, f.fieldName]))
   return Object.entries(values).map(([key, value]) => ({
     key,
     label: labelMap.get(key) ?? key,
-    value: value === null || value === undefined || value === '' ? '-' : String(value)
+    value: snapshots[key] || (value === null || value === undefined || value === '' ? '-' : String(value))
   }))
 })
 

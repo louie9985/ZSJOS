@@ -7,6 +7,7 @@ extend the repository root instructions.
 
 - The runtime **MUST** remain React + Vite + TypeScript + Ant Design 6 and Ant Design Pro Components unless the user approves an architecture change.
 - Employee-only pages **MUST NOT** be duplicated in the Vue administration frontend by default.
+- **Exception — FMS (财务管理):** The FMS module exists in both `frontend/admin/src/views/fms/` and `frontend/workbench/src/pages/fms/` by explicit user decision (2026-08-24). FMS serves both employee self-service and administrator scenarios; the dual-frontend coexistence is authorized and **MUST NOT** be treated as prohibited duplication.
 - The workbench is a presentation client for existing system and business APIs. It **MUST NOT** introduce generic `/zsjos/workbench/*` aggregation endpoints as a parallel source of truth.
 - Backend `component` strings may be metadata for a local component registry. They **MUST NOT** be dynamically imported or executed as arbitrary code.
 
@@ -15,6 +16,7 @@ extend the repository root instructions.
 - React components **MUST NOT** call Axios directly. Authentication, `tenant-id`, token refresh, response unwrapping, and HTTP errors belong in typed modules under `src/services`.
 - Request and response types **MUST** be explicit. `any` is allowed only at a narrow external-data boundary and should be validated or normalized immediately.
 - Menus, names, ordering, visibility, icons, and permissions **MUST** originate from the permission response. The client may normalize paths and derive display navigation, but **MUST NOT** infer access from role names.
+- Workbench navigation **MUST** render server-owned root menus as first-level categories and every visible descendant leaf as a flat second-level page. Layout variants and mobile navigation **MUST NOT** reintroduce nested dropdown, popup, or collapsible directory menus.
 - Dictionary-backed controls **MUST** submit stable dictionary values and display backend labels.
 - Administrator-maintained options **MUST NOT** silently fall back to hard-coded production data.
 
@@ -30,6 +32,7 @@ extend the repository root instructions.
 - Before changing shared layout, themes, navigation, or component styling, **MUST** read `frontend/workbench/docs/ui-guidelines.md` for token usage, page skeletons, and naming conventions.
 - Visual decisions (dimensions, tokens, hierarchy, icons, interaction) **MUST** be grounded in the documented design system and existing page implementations. **MUST NOT** approximate from memory.
 - Prefer existing Ant Design, Pro Components, icon, and theme primitives over new custom controls.
+- HRM tabular views **MUST** use the shared `HrmProTable`; management lists enable its advanced toolbar, while detail and editable child tables use its compact mode.
 - Remote views **MUST** provide the applicable loading, empty, error, retry, and unauthorized states.
 - Fixed-format UI elements **SHOULD** use stable responsive dimensions so dynamic labels and states do not shift or overlap the layout.
 - User-facing text **MUST** use the Zhongshijian employee-work-platform context and avoid upstream developer-oriented branding or technology marketing copy.

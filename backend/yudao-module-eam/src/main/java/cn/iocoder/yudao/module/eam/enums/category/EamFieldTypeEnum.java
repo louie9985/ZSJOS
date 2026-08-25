@@ -17,7 +17,8 @@ public enum EamFieldTypeEnum implements ArrayValuable<Integer> {
     TEXTAREA(2, "多行文本"),
     NUMBER(3, "数字"),
     DATE(4, "日期"),
-    SELECT(5, "下拉选择");
+    SELECT(5, "下拉选择"),
+    FILE(6, "图片/文件");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(EamFieldTypeEnum::getType).toArray(Integer[]::new);

@@ -174,7 +174,7 @@ public class EamAssetController {
     }
 
     @PostMapping("/import/preview")
-    @Operation(summary = "预检中世健资产台账", description = "只读取在岗资产初始申报表，不写入数据库")
+    @Operation(summary = "预检中世健资产台账", description = "只读取资产台账工作表，不写入数据库")
     @PreAuthorize("@ss.hasPermission('eam:asset:import')")
     public CommonResult<EamAssetImportPreviewRespVO> previewLedgerImport(
             @RequestParam("file") MultipartFile file,

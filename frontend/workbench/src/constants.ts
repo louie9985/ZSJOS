@@ -47,7 +47,8 @@ export const STORAGE_KEYS = {
   EXPIRES_TIME: 'zsjos_expires_time',
   LOGIN_FORM: 'zsjos_login_form',
   IMPERSONATION: 'zsjos.impersonation.session',
-  THEME: 'crm-theme'
+  THEME: 'crm-theme',
+  FMS_ACCOUNT_SET: 'zsjos.fms.account-set'
 } as const
 
 export const APP_ROUTES = {
@@ -97,6 +98,80 @@ export const APP_ROUTES = {
   ,MEDIA_STUDENT_OPS: '/zsjos/student-ops'
   ,MEDIA_REVIEWS: '/zsjos/reviews'
   ,MEDIA_STUDENTS: '/zsjos/media-students'
+  ,EAM_CATEGORY: '/eam/category'
+  ,EAM_ASSET: '/eam/asset'
+  ,EAM_TRANSFER: '/eam/transfer'
+  ,EAM_INVENTORY: '/eam/inventory'
+  ,EAM_REPAIR: '/eam/repair'
+  ,EAM_SCRAP: '/eam/scrap'
+  ,EAM_CODE_RULE: '/eam/code-rule'
+  ,EAM_STATISTICS: '/eam/statistics'
+  // HRM 路径由后端菜单的父子片段拼接而成，见 V058 与 V119 迁移
+  ,HRM_PORTAL_ATTENDANCE: '/hrm/portal/attendance/report'
+  ,HRM_ATTENDANCE_CLOCK: '/hrm/attendance/clock'
+  ,HRM_ATTENDANCE_LEAVE: '/hrm/attendance/leave'
+  ,HRM_ATTENDANCE_MONTH: '/hrm/attendance/month'
+  ,HRM_PORTAL_SALARY_SLIP: '/hrm/portal/salary/slip'
+  ,HRM_SALARY_EMPLOYEE_INFO: '/hrm/salary/employee-info'
+  ,HRM_SALARY_MONTH_RECORD: '/hrm/salary/month-record'
+  ,HRM_SALARY_HISTORY: '/hrm/salary/history'
+  ,HRM_SALARY_SLIP: '/hrm/salary/slip'
+  ,HRM_PORTAL_PERFORMANCE: '/hrm/portal/performance/assessment'
+  ,HRM_PORTAL_PERFORMANCE_HISTORY: '/hrm/portal/performance/history'
+  ,HRM_PERFORMANCE_PLAN: '/hrm/performance/plan'
+  ,HRM_PERFORMANCE_ASSESSMENT: '/hrm/performance/assessment'
+  ,HRM_PORTAL_EMPLOYEE: '/hrm/portal/employee'
+  ,HRM_EMPLOYEE_LIST: '/hrm/employee/list'
+  ,HRM_EMPLOYEE_CONFIG: '/hrm/employee/config'
+  ,HRM_PORTAL_HOME: '/hrm/portal/home'
+  ,HRM_PORTAL_INSURANCE: '/hrm/portal/insurance'
+  ,HRM_PORTAL_OPENING_GUIDE: '/hrm/portal/opening-guide'
+  ,HRM_DEPT: '/hrm/dept'
+  ,HRM_BIRTHDAY_CARE: '/hrm/birthday-care'
+  ,HRM_ATTENDANCE_GROUP: '/hrm/attendance/config/group'
+  ,HRM_ATTENDANCE_HOLIDAY: '/hrm/attendance/config/holiday'
+  ,HRM_INSURANCE_SCHEME: '/hrm/insurance/scheme'
+  ,HRM_INSURANCE_MONTH: '/hrm/insurance/month-record'
+  ,HRM_RESULT_TEMPLATE: '/hrm/performance/config/result-template'
+  ,HRM_ASSESSMENT_TEMPLATE: '/hrm/performance/config/assessment-template'
+  ,HRM_RECRUIT_POST: '/hrm/recruit/post'
+  ,HRM_RECRUIT_CANDIDATE: '/hrm/recruit/candidate'
+  ,HRM_RECRUIT_CHANNEL: '/hrm/recruit/settings/channel'
+  ,HRM_RECRUIT_ELIMINATE: '/hrm/recruit/settings/eliminate-reason'
+  ,HRM_HR_HOME: '/hrm/home/hr'
+  ,HRM_TEAM_HOME: '/hrm/home/team-home'
+  ,HRM_SALARY_OPTION: '/hrm/salary/config/option'
+  ,HRM_SALARY_GROUP: '/hrm/salary/config/group'
+  ,HRM_SALARY_TAX_RULE: '/hrm/salary/config/tax-rule'
+  ,HRM_SALARY_CHANGE_TEMPLATE: '/hrm/salary/config/change-template'
+  ,HRM_SALARY_CONFIG: '/hrm/salary/config/config'
+  // FMS 财务管理 — 路径由后端菜单 601894 子树的父子片段拼接而成，见 V058
+  ,FMS_HOME: '/fms/home'
+  ,FMS_VOUCHER_CREATE: '/fms/voucher/create'
+  ,FMS_VOUCHER_LIST: '/fms/voucher/list'
+  ,FMS_VOUCHER_STATISTICS: '/fms/voucher/statistics'
+  ,FMS_LEDGER_GENERAL: '/fms/ledger/general'
+  ,FMS_LEDGER_DETAIL: '/fms/ledger/detail'
+  ,FMS_LEDGER_SUBJECT_BALANCE: '/fms/ledger/subject-balance'
+  ,FMS_LEDGER_QUANTITY_DETAIL: '/fms/ledger/quantity-detail'
+  ,FMS_LEDGER_QUANTITY_GENERAL: '/fms/ledger/quantity-general'
+  ,FMS_LEDGER_MULTI_COLUMN: '/fms/ledger/multi-column'
+  ,FMS_LEDGER_AUXILIARY_DETAIL: '/fms/ledger/auxiliary-detail'
+  ,FMS_LEDGER_AUXILIARY_BALANCE: '/fms/ledger/auxiliary-balance'
+  ,FMS_REPORT_BALANCE_SHEET: '/fms/report/balance-sheet'
+  ,FMS_REPORT_INCOME_STATEMENT: '/fms/report/income-statement'
+  ,FMS_REPORT_CASH_FLOW_STATEMENT: '/fms/report/cash-flow-statement'
+  ,FMS_CLOSING_PERIOD: '/fms/closing/period'
+  ,FMS_CONFIG_ACCOUNT_SET: '/fms/config/account-set'
+  ,FMS_CONFIG_SUBJECT: '/fms/config/subject'
+  ,FMS_CONFIG_AUXILIARY: '/fms/config/auxiliary'
+  ,FMS_CONFIG_INITIAL_BALANCE: '/fms/config/initial-balance'
+  ,FMS_CONFIG_CURRENCY: '/fms/config/currency'
+  ,FMS_CONFIG_DIGEST: '/fms/config/digest'
+  ,FMS_CONFIG_VOUCHER_WORD: '/fms/config/voucher-word'
+  ,FMS_CONFIG_VOUCHER_TEMPLATE: '/fms/config/voucher-template'
+  ,FMS_CONFIG_FINANCE_PARAMETER: '/fms/config/finance-parameter'
+  ,FMS_CONFIG_FINANCE_INDICATOR: '/fms/config/finance-indicator'
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
@@ -143,11 +218,85 @@ export const RENDERABLE_APP_ROUTES = new Set([
   ,APP_ROUTES.MEDIA_STUDENT_OPS
   ,APP_ROUTES.MEDIA_REVIEWS
   ,APP_ROUTES.MEDIA_STUDENTS
+  ,APP_ROUTES.EAM_REPAIR
+  ,APP_ROUTES.EAM_INVENTORY
+  ,APP_ROUTES.EAM_ASSET
+  ,APP_ROUTES.EAM_TRANSFER
+  ,APP_ROUTES.EAM_SCRAP
+  ,APP_ROUTES.EAM_CATEGORY
+  ,APP_ROUTES.EAM_CODE_RULE
+  ,APP_ROUTES.EAM_STATISTICS
+  ,APP_ROUTES.HRM_PORTAL_ATTENDANCE
+  ,APP_ROUTES.HRM_ATTENDANCE_CLOCK
+  ,APP_ROUTES.HRM_ATTENDANCE_LEAVE
+  ,APP_ROUTES.HRM_ATTENDANCE_MONTH
+  ,APP_ROUTES.HRM_PORTAL_SALARY_SLIP
+  ,APP_ROUTES.HRM_SALARY_EMPLOYEE_INFO
+  ,APP_ROUTES.HRM_SALARY_MONTH_RECORD
+  ,APP_ROUTES.HRM_SALARY_HISTORY
+  ,APP_ROUTES.HRM_SALARY_SLIP
+  ,APP_ROUTES.HRM_PORTAL_PERFORMANCE
+  ,APP_ROUTES.HRM_PORTAL_PERFORMANCE_HISTORY
+  ,APP_ROUTES.HRM_PERFORMANCE_PLAN
+  ,APP_ROUTES.HRM_PERFORMANCE_ASSESSMENT
+  ,APP_ROUTES.HRM_PORTAL_EMPLOYEE
+  ,APP_ROUTES.HRM_EMPLOYEE_LIST
+  ,APP_ROUTES.HRM_EMPLOYEE_CONFIG
+  ,APP_ROUTES.HRM_PORTAL_HOME
+  ,APP_ROUTES.HRM_PORTAL_INSURANCE
+  ,APP_ROUTES.HRM_PORTAL_OPENING_GUIDE
+  ,APP_ROUTES.HRM_DEPT
+  ,APP_ROUTES.HRM_BIRTHDAY_CARE
+  ,APP_ROUTES.HRM_ATTENDANCE_GROUP
+  ,APP_ROUTES.HRM_ATTENDANCE_HOLIDAY
+  ,APP_ROUTES.HRM_INSURANCE_SCHEME
+  ,APP_ROUTES.HRM_INSURANCE_MONTH
+  ,APP_ROUTES.HRM_RESULT_TEMPLATE
+  ,APP_ROUTES.HRM_ASSESSMENT_TEMPLATE
+  ,APP_ROUTES.HRM_RECRUIT_POST
+  ,APP_ROUTES.HRM_RECRUIT_CANDIDATE
+  ,APP_ROUTES.HRM_RECRUIT_CHANNEL
+  ,APP_ROUTES.HRM_RECRUIT_ELIMINATE
+  ,APP_ROUTES.HRM_HR_HOME
+  ,APP_ROUTES.HRM_TEAM_HOME
+  ,APP_ROUTES.HRM_SALARY_OPTION
+  ,APP_ROUTES.HRM_SALARY_GROUP
+  ,APP_ROUTES.HRM_SALARY_TAX_RULE
+  ,APP_ROUTES.HRM_SALARY_CHANGE_TEMPLATE
+  ,APP_ROUTES.HRM_SALARY_CONFIG
+  // FMS 财务管理
+  ,APP_ROUTES.FMS_HOME
+  ,APP_ROUTES.FMS_VOUCHER_CREATE
+  ,APP_ROUTES.FMS_VOUCHER_LIST
+  ,APP_ROUTES.FMS_VOUCHER_STATISTICS
+  ,APP_ROUTES.FMS_LEDGER_GENERAL
+  ,APP_ROUTES.FMS_LEDGER_DETAIL
+  ,APP_ROUTES.FMS_LEDGER_SUBJECT_BALANCE
+  ,APP_ROUTES.FMS_LEDGER_QUANTITY_DETAIL
+  ,APP_ROUTES.FMS_LEDGER_QUANTITY_GENERAL
+  ,APP_ROUTES.FMS_LEDGER_MULTI_COLUMN
+  ,APP_ROUTES.FMS_LEDGER_AUXILIARY_DETAIL
+  ,APP_ROUTES.FMS_LEDGER_AUXILIARY_BALANCE
+  ,APP_ROUTES.FMS_REPORT_BALANCE_SHEET
+  ,APP_ROUTES.FMS_REPORT_INCOME_STATEMENT
+  ,APP_ROUTES.FMS_REPORT_CASH_FLOW_STATEMENT
+  ,APP_ROUTES.FMS_CLOSING_PERIOD
+  ,APP_ROUTES.FMS_CONFIG_ACCOUNT_SET
+  ,APP_ROUTES.FMS_CONFIG_SUBJECT
+  ,APP_ROUTES.FMS_CONFIG_AUXILIARY
+  ,APP_ROUTES.FMS_CONFIG_INITIAL_BALANCE
+  ,APP_ROUTES.FMS_CONFIG_CURRENCY
+  ,APP_ROUTES.FMS_CONFIG_DIGEST
+  ,APP_ROUTES.FMS_CONFIG_VOUCHER_WORD
+  ,APP_ROUTES.FMS_CONFIG_VOUCHER_TEMPLATE
+  ,APP_ROUTES.FMS_CONFIG_FINANCE_PARAMETER
+  ,APP_ROUTES.FMS_CONFIG_FINANCE_INDICATOR
 ])
 
 // ========== Dictionaries ==========
 
 export const DICT_TYPE = {
+  COMMON_STATUS: 'common_status',
   LEAD_SOURCE_CHANNEL: 'zsjos_lead_source_channel',
   LEAD_CATEGORY: 'zsjos_lead_category',
   LEAD_FOLLOW_UP_METHOD: 'zsjos_lead_follow_up_method',
@@ -163,6 +312,22 @@ export const DICT_TYPE = {
   ,ORDER_PAYMENT_METHOD: 'zsjos_order_payment_method'
   ,STUDENT_CONTACT_UNSUCCESSFUL_REASON: 'zsjos_student_contact_unsuccessful_reason'
   ,STUDENT_CONTACT_EXTENSION_REASON: 'zsjos_student_contact_extension_reason'
+  // FMS 字典类型（V058 已建）
+  ,FMS_ACCOUNT_USER_LEVEL: 'fms_account_user_level'
+  ,FMS_ACCOUNTING_STANDARD: 'fms_accounting_standard'
+  ,FMS_SUBJECT_CATEGORY: 'fms_subject_category'
+  ,FMS_DEBIT_CREDIT_DIRECTION: 'fms_debit_credit_direction'
+  ,FMS_AUXILIARY_TYPE: 'fms_auxiliary_type'
+  ,FMS_CLOSING_TEMPLATE_CATEGORY: 'fms_closing_template_category'
+  ,FMS_CLOSING_TIME_TYPE: 'fms_closing_time_type'
+  ,FMS_CLOSING_VOUCHER_TYPE: 'fms_closing_voucher_type'
+  ,FMS_FORMULA_RULE: 'fms_formula_rule'
+  ,FMS_FINANCE_INDICATOR_TYPE: 'fms_finance_indicator_type'
+  ,FMS_LEDGER_BALANCE_MODE: 'fms_ledger_balance_mode'
+  ,FMS_VOUCHER_TIDY_TYPE: 'fms_voucher_tidy_type'
+  ,FMS_SUBJECT_TYPE: 'fms_subject_type'
+  ,FMS_BALANCE_DIRECTION: 'fms_balance_direction'
+  ,FMS_VOUCHER_STATUS: 'fms_voucher_status'
 } as const
 
 // ========== Lead Management ==========
@@ -328,27 +493,15 @@ export const FONT_SCALE_SIZE: Record<FontScale, number> = {
  * 布局模式：
  * - side: 侧边双列（一级窄栏 + 二级栏），默认
  * - top:  顶部一级 + 侧边二级（内容区多出 144px 宽度）
- * - top-only: 纯顶栏（一二级菜单全部横排在顶部）
- * - single-sider: 左单列（一级展开/收起包含二级子项）
- * - mini-float: 左 mini 图标 + hover 浮层弹出二级
+ * 所有布局都固定显示一级入口和二级平级页面，不提供下拉或浮层子菜单。
  */
-export type LayoutMode = 'side' | 'top' | 'top-only' | 'single-sider' | 'mini-float'
+export type LayoutMode = 'side' | 'top'
 
-export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top', 'top-only', 'single-sider', 'mini-float']
-
-/**
- * mini-float 图标栏宽度。
- * 须与 Menu 的 collapsedWidth token 一起设定：token 默认 controlHeightLG*2，
- * 与此值不一致时 ul 溢出被裁，图标偏离居中。CSS 侧对应 --crm-sider-1-collapsed。
- */
-export const MINI_RAIL_W = 56
+export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top']
 
 export const LAYOUT_MODE_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
   { label: '左双列', value: 'side' },
-  { label: '顶+左', value: 'top' },
-  { label: '纯顶栏', value: 'top-only' },
-  { label: '左单列', value: 'single-sider' },
-  { label: 'Mini浮层', value: 'mini-float' }
+  { label: '顶+左', value: 'top' }
 ]
 
 export const THEME_METAS: ThemeMeta[] = [

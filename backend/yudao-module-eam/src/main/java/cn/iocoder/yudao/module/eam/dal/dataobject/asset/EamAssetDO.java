@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 
 import java.time.LocalDate;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -82,10 +83,20 @@ public class EamAssetDO extends BaseDO {
      * 条码
      */
     private String barcode;
+    /** 原值 */
+    private BigDecimal originalValue;
+    /** 净值 */
+    private BigDecimal netValue;
     /**
      * 购入日期
      */
     private LocalDate purchaseDate;
+    /** 资产来源字典值 */
+    private Integer source;
+    /** 资产来源标签快照 */
+    private String sourceLabelSnapshot;
+    /** 保修到期日 */
+    private LocalDate warrantyDate;
     /**
      * 使用部门
      */
@@ -122,6 +133,8 @@ public class EamAssetDO extends BaseDO {
      * 存放地点
      */
     private String location;
+    /** 预计使用年限，单位月 */
+    private Integer expectedLife;
     /**
      * 备注
      */
@@ -137,6 +150,12 @@ public class EamAssetDO extends BaseDO {
      */
     @TableField(typeHandler = JacksonTypeHandler.class)
     private Map<String, Object> extFields;
+    /** 下拉扩展字段的标签快照 */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, String> extFieldLabels;
+    /** 下拉扩展字段的字典类型快照 */
+    @TableField(typeHandler = JacksonTypeHandler.class)
+    private Map<String, String> extFieldDictTypes;
     /**
      * 状态变更前的状态（用于维修完成/报废驳回/解冻 恢复原状态）
      */

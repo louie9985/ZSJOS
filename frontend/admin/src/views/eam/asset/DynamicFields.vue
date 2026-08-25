@@ -37,8 +37,18 @@
         clearable
         :placeholder="`请选择${field.fieldName}`"
       >
-        <el-option v-for="opt in field.options || []" :key="opt" :label="opt" :value="opt" />
+        <el-option v-for="opt in selectOptions(field)" :key="String(opt.value)" :label="opt.label" :value="opt.value" />
       </el-select>
+      <el-upload
+        v-else-if="field.fieldType === FieldType.FILE"
+        action="/admin-api/infra/file/upload"
+        :limit="1"
+        :file-list="fileList(field.fieldKey)"
+        :on-success="(res) => setFile(field.fieldKey, res.data)"
+        :on-remove="() => setFile(field.fieldKey, '')"
+      >
+        <el-button><Icon icon="ep:upload" class="mr-5px" />上传文件</el-button>
+      </el-upload>
     </el-form-item>
   </template>
 
@@ -52,6 +62,7 @@
 <script setup lang="ts">
 import * as CategoryFieldApi from '@/api/eam/categoryField'
 import { FieldType } from '@/api/eam/categoryField'
+import { getStrDictOptions } from '@/utils/dict'
 
 defineOptions({ name: 'EamDynamicFields' })
 
@@ -70,6 +81,15 @@ const model = computed({
   get: () => props.modelValue || {},
   set: (val) => emit('update:modelValue', val)
 })
+
+const selectOptions = (field: CategoryFieldApi.CategoryFieldVO) =>
+  field.optionSource === 'SYSTEM_DICT' && field.dictType
+    ? getStrDictOptions(field.dictType)
+    : (field.options || []).map((value) => ({ label: value, value }))
+const fileList = (key: string) => model.value[key]
+  ? [{ name: String(model.value[key]).split('/').pop() || '已上传文件', url: model.value[key] }]
+  : []
+const setFile = (key: string, value: string) => emit('update:modelValue', { ...model.value, [key]: value || undefined })
 
 /** 分类切换后，丢弃不再属于新分类的扩展字段值，避免提交时被后端拒绝 */
 const loadFields = async (categoryId?: number) => {

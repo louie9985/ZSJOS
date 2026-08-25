@@ -31,7 +31,7 @@ describe('workbench menu conversion', () => {
       .toThrow(AuthenticationError)
   })
 
-  it('keeps backend roots and flattens visible descendant pages in tree order', () => {
+  it('keeps visible descendant directories in the server hierarchy', () => {
     const routes = buildMenuTree([
       menu({
         id: 1,
@@ -55,8 +55,11 @@ describe('workbench menu conversion', () => {
     expect(navigation).toHaveLength(1)
     expect(navigation[0]).toMatchObject({ key: '1', label: 'CRM', icon: 'ep:user' })
     expect(navigation[0].pages.map(page => ({ key: page.key, label: page.label }))).toEqual([
-      { key: '/crm/customers/list', label: 'Customer list' },
+      { key: '2', label: 'Customers' },
       { key: '/crm/leads', label: 'Leads' }
+    ])
+    expect(navigation[0].pages[0].children.map(page => ({ key: page.key, label: page.label }))).toEqual([
+      { key: '/crm/customers/list', label: 'Customer list' }
     ])
   })
 
@@ -114,8 +117,61 @@ describe('workbench menu conversion', () => {
   })
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
-    expect(RENDERABLE_APP_ROUTES.size).toBe(43)
+    // 迁移基线包含 HRM 员工设置与历史工资表两个正式服务端页面。
+    expect(RENDERABLE_APP_ROUTES.size).toBe(115)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/eam/repair')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/eam/inventory')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/eam/asset')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/eam/category')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/eam/statistics')).toBe(true)
+    // HRM 路径由后端菜单父子片段拼接，改动需与 V058 菜单数据保持一致
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/attendance/report')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/attendance/clock')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/attendance/leave')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/attendance/month')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/salary/slip')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/employee-info')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/month-record')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/slip')).toBe(true)
+    // HRM 绩效
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/performance/assessment')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/performance/history')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/performance/plan')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/performance/assessment')).toBe(true)
+    // HRM 员工档案
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/employee')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/employee/list')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/employee/config')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/history')).toBe(true)
+    // HRM 员工工作台首页 + 社保
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/home')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/insurance')).toBe(true)
+    // HRM 薪资配置
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/config/option')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/config/group')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/config/tax-rule')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/config/change-template')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/salary/config/config')).toBe(true)
+    // HRM 员工端引导/组织/生日关怀/考勤设置
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/portal/opening-guide')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/dept')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/birthday-care')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/attendance/config/group')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/attendance/config/holiday')).toBe(true)
+    // HRM 社保管理
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/insurance/scheme')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/insurance/month-record')).toBe(true)
+    // HRM 绩效配置
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/performance/config/result-template')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/performance/config/assessment-template')).toBe(true)
+    // HRM 招聘管理
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/recruit/post')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/recruit/candidate')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/recruit/settings/channel')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/recruit/settings/eliminate-reason')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/home/hr')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/hrm/home/team-home')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/accounts')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/content')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/positioning')

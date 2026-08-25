@@ -6,6 +6,7 @@ export type SecondaryNavigationItem = {
   label: string
   icon?: string
   menu: WorkbenchMenu
+  children: SecondaryNavigationItem[]
 }
 
 export type PrimaryNavigationItem = {
@@ -34,15 +35,19 @@ export function findMenuByPath(menus: WorkbenchMenu[], path: string): WorkbenchM
   }
 }
 
-function collectVisibleLeaves(menus: WorkbenchMenu[]): SecondaryNavigationItem[] {
-  return menus.flatMap(menu => {
-    if (menu.hidden) return []
-    const visibleChildren = menu.children.filter(child => !child.hidden)
-    if (visibleChildren.length === 0) {
-      return [{ key: menu.path, label: menu.name, icon: menu.icon, menu }]
-    }
-    return collectVisibleLeaves(visibleChildren)
-  })
+function buildNavigationNodes(menus: WorkbenchMenu[]): SecondaryNavigationItem[] {
+  return menus
+    .filter(menu => !menu.hidden)
+    .map(menu => {
+      const children = buildNavigationNodes(menu.children)
+      return {
+        key: children.length > 0 ? String(menu.id) : menu.path,
+        label: menu.name,
+        icon: menu.icon,
+        menu,
+        children
+      }
+    })
 }
 
 export function buildTwoLevelNavigation(menus: WorkbenchMenu[]): PrimaryNavigationItem[] {
@@ -53,27 +58,62 @@ export function buildTwoLevelNavigation(menus: WorkbenchMenu[]): PrimaryNavigati
       label: menu.name,
       icon: menu.icon,
       menu,
-      pages: collectVisibleLeaves(menu.children.filter(child => !child.hidden))
+      pages: buildNavigationNodes(menu.children)
     }))
 }
 
+function findNavigationNodeByPath(items: SecondaryNavigationItem[], path: string): SecondaryNavigationItem | undefined {
+  for (const item of items) {
+    if (item.menu.path === path) return item
+    const child = findNavigationNodeByPath(item.children, path)
+    if (child) return child
+  }
+}
+
 export function findPrimaryByPath(items: PrimaryNavigationItem[], path: string) {
-  return items.find(item => item.menu.path === path || item.pages.some(page => page.key === path))
+  return items.find(item => item.menu.path === path || findNavigationNodeByPath(item.pages, path))
 }
 
 export function findPageByPath(items: PrimaryNavigationItem[], path: string) {
   for (const item of items) {
     if (item.menu.path === path && item.pages.length === 0) return item.menu
-    const page = item.pages.find(candidate => candidate.key === path)
+    const page = findNavigationNodeByPath(item.pages, path)
     if (page) return page.menu
   }
 }
 
 export function getPrimaryTarget(item: PrimaryNavigationItem, includeExternal = true) {
-  const internalPage = item.pages.find(page => !isExternalPath(page.key))
-  if (internalPage) return internalPage.key
-  if (item.pages.length > 0) return includeExternal ? item.pages[0].key : undefined
+  const findFirstTarget = (nodes: SecondaryNavigationItem[], allowExternal: boolean): string | undefined => {
+    for (const node of nodes) {
+      const childTarget = findFirstTarget(node.children, allowExternal)
+      if (childTarget) return childTarget
+      if (node.children.length === 0 && (allowExternal || !isExternalPath(node.menu.path))) return node.menu.path
+    }
+  }
+  const pageTarget = findFirstTarget(item.pages, false)
+  if (pageTarget) return pageTarget
+  if (includeExternal) {
+    const externalTarget = findFirstTarget(item.pages, true)
+    if (externalTarget) return externalTarget
+  }
+  if (item.pages.length > 0) return
   if (!isExternalPath(item.menu.path) || includeExternal) return item.menu.path
+}
+
+export function getNavigationOpenKeys(items: PrimaryNavigationItem[], path: string): string[] {
+  const findKeys = (nodes: SecondaryNavigationItem[]): string[] | undefined => {
+    for (const node of nodes) {
+      if (node.menu.path === path) return []
+      const childKeys = findKeys(node.children)
+      if (childKeys) return node.children.length > 0 ? [node.key, ...childKeys] : childKeys
+    }
+  }
+  for (const item of items) {
+    if (item.menu.path === path) return []
+    const childKeys = findKeys(item.pages)
+    if (childKeys) return item.pages.length > 0 ? [item.key, ...childKeys] : childKeys
+  }
+  return []
 }
 
 export function getInitialTarget(items: PrimaryNavigationItem[]) {

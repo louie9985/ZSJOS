@@ -7,6 +7,8 @@ export interface CategoryFieldVO {
   fieldName: string
   fieldType: number
   options?: string[]
+  optionSource?: 'STATIC' | 'SYSTEM_DICT'
+  dictType?: string
   required: boolean
   adminVisible: boolean
   collectionVisible: boolean
@@ -23,7 +25,8 @@ export const FieldType = {
   TEXTAREA: 2,
   NUMBER: 3,
   DATE: 4,
-  SELECT: 5
+  SELECT: 5,
+  FILE: 6
 } as const
 
 // 查询分类【直接定义】的字段列表

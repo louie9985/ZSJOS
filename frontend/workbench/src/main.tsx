@@ -6,7 +6,6 @@ import {
   Badge,
   Button,
   Card,
-  ConfigProvider,
   Dropdown,
   Layout,
   Menu,
@@ -19,7 +18,6 @@ import {
 } from 'antd'
 import type { MenuProps } from 'antd'
 import {
-  DownOutlined,
   InboxOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
@@ -42,7 +40,7 @@ import {
   type PrimaryNavigationItem,
   type SecondaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, MINI_RAIL_W, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
+import { APP_ROUTES, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
@@ -55,12 +53,14 @@ import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/Empl
 import ThemeProvider from './components/Theme/ThemeProvider'
 import SettingsDrawer from './components/SettingsDrawer'
 import TabBar from './components/TabBar'
+import { FmsAccountSetProvider } from './components/FmsAccountSetProvider'
+import FmsAccountSetGuide from './components/FmsAccountSetGuide'
+import FmsAccountSetSwitch from './components/FmsAccountSetSwitch'
 import { useTheme } from './components/Theme/ThemeContext'
 import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
-import { buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
 import LeadManagementPage from './pages/LeadManagementPage'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from './services/impersonation'
@@ -93,13 +93,15 @@ function toPrimaryItems(items: PrimaryNavigationItem[]): MenuItem[] {
   }))
 }
 
-function toSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
-  return items.map(item => ({
-    key: item.key,
-    label: item.label,
-    title: item.label,
-    icon: <BackendMenuIcon icon={item.icon}/>
-  }))
+function toFlatSecondaryItems(items: SecondaryNavigationItem[]): MenuItem[] {
+  return items.flatMap(item => item.children.length > 0
+    ? toFlatSecondaryItems(item.children)
+    : [{
+        key: item.menu.path,
+        label: item.label,
+        title: item.label,
+        icon: <BackendMenuIcon icon={item.icon}/>
+      }])
 }
 
 function NoAccessibleMenu({ hasMenus }: { hasMenus: boolean }) {
@@ -117,7 +119,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const { isDark, backgroundValue, layoutMode, watermark: watermarkEnabled, headerFixed, tabs: tabsEnabled, tabStyle } = useTheme()
   const [primaryCollapsed, setPrimaryCollapsed] = useState(false)
   const [secondaryCollapsed, setSecondaryCollapsed] = useState(false)
-  const [singleSiderOpenKeys, setSingleSiderOpenKeys] = useState<string[]>([])
   const [aiOpen, setAiOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0)
@@ -152,6 +153,10 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     [info.menus]
   )
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
+  const fmsEnabled = useMemo(
+    () => (info.permissions || []).some(permission => permission.startsWith('fms:')),
+    [info.permissions]
+  )
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const leadDetailDeepLink = useMemo(() => {
     return canOpenLeadDetailDeepLink(location.pathname, location.search, info.permissions || [])
@@ -172,13 +177,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   useEffect(() => {
     if (inaccessiblePathFallback) navigate(inaccessiblePathFallback, { replace: true })
   }, [inaccessiblePathFallback, navigate])
-
-  // 左单列模式：路由切换时自动展开当前一级组
-  useEffect(() => {
-    if (activePrimary) {
-      setSingleSiderOpenKeys(prev => prev.includes(activePrimary.key) ? prev : [...prev, activePrimary.key])
-    }
-  }, [activePrimary])
 
   useEffect(() => {
     if (!activePrimary || location.pathname !== activePrimary.menu.path || activePrimary.pages.length === 0) return
@@ -205,37 +203,8 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 
   // 布局模式分支
   const showPrimarySider = layoutMode === 'side'
-  const showSecondarySider = layoutMode === 'side' || layoutMode === 'top'
-  const showSingleSider = layoutMode === 'single-sider'
-  const showMiniSider = layoutMode === 'mini-float'
-  const showTopPrimary = layoutMode === 'top' || layoutMode === 'top-only'
-  const showTopSecondary = layoutMode === 'top-only'
-
-  // single-sider: 一二级合并为 SubMenu 树
-  const singleSiderItems: MenuItem[] = useMemo(
-    () => showSingleSider ? buildNavMenuItems(navigation) : [],
-    [navigation, showSingleSider]
-  )
-
-  // mini-float: 图标栏 items。收起态由 antd 隐藏 label、二级走 popup；
-  // 浮层里补一级名作分组头，否则只剩页面名、看不出属于哪个一级
-  const miniSiderItems: MenuItem[] = useMemo(
-    () => showMiniSider
-      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: 'mini-flyout' })
-      : [],
-    [navigation, showMiniSider]
-  )
-
-  // top-only 模式：一二级合并到顶栏 SubMenu
-  const topOnlyItems: MenuItem[] = useMemo(
-    () => showTopSecondary
-      ? buildNavMenuItems(navigation, {
-          childIcons: false,
-          expandSuffix: <DownOutlined style={{ fontSize: 10, marginLeft: 2 }}/>
-        })
-      : [],
-    [navigation, showTopSecondary]
-  )
+  const showSecondarySider = true
+  const showTopPrimary = layoutMode === 'top'
 
   const layoutClass = [
     'crm-shell',
@@ -249,6 +218,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 
   const shellContent = (
     <Layout className={layoutClass} style={shellStyle}>
+    <FmsAccountSetGuide/>
     <LeadAssignmentHost
       canAccept={(info.permissions || []).includes('zsjos:lead:accept')}
       onCountChange={setPendingAssignmentCount}
@@ -311,56 +281,10 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
             mode="inline"
             inlineCollapsed={secondaryCollapsed}
             selectedKeys={currentMenu ? [currentMenu.path] : []}
-            items={toSecondaryItems(activePrimary?.pages || [])}
+            items={toFlatSecondaryItems(activePrimary?.pages || [])}
             onClick={({ key }) => go(String(key))}
             className="transparent-menu"
           />
-        </div>
-      </Sider>
-    )}
-
-    {/* 左单列：一二级合并为 SubMenu 树 */}
-    {showSingleSider && (
-      <Sider theme={isDark ? 'dark' : 'light'} width={220} collapsedWidth={56} collapsed={primaryCollapsed} trigger={null} className="crm-sider single-sider">
-        <div className="brand"><span className="brand-default">{primaryCollapsed ? 'CRM' : '中世健 AI-CRM'}</span><span className="brand-mobile">CRM</span></div>
-        <div className="sider-menu-scroll">
-          <Menu
-            mode="inline"
-            inlineCollapsed={primaryCollapsed}
-            selectedKeys={currentMenu ? [currentMenu.path] : []}
-            openKeys={singleSiderOpenKeys}
-            onOpenChange={(keys) => setSingleSiderOpenKeys(keys as string[])}
-            items={singleSiderItems}
-            onClick={({ key }) => go(String(key))}
-            className="transparent-menu"
-          />
-        </div>
-        <div className="sider-toggle">
-          <Tooltip title={primaryCollapsed ? '展开菜单' : '收起菜单'} placement="right">
-            <Button type="text" aria-label={primaryCollapsed ? '展开菜单' : '收起菜单'} icon={primaryCollapsed ? <MenuUnfoldOutlined/> : <MenuFoldOutlined/>} onClick={() => setPrimaryCollapsed(value => !value)}/>
-          </Tooltip>
-        </div>
-      </Sider>
-    )}
-
-    {/* mini-float：图标侧栏 + popup 二级菜单 */}
-    {showMiniSider && (
-      <Sider theme={isDark ? 'dark' : 'light'} width={MINI_RAIL_W} collapsedWidth={MINI_RAIL_W} collapsed trigger={null} className="crm-sider mini-sider">
-        {/* 无 brand-default/brand-mobile 之分：rail 恒为窄栏，桌面端也须显示 */}
-        <div className="brand">CRM</div>
-        <div className="sider-menu-scroll">
-          {/* Menu 的 collapsedWidth token 默认 controlHeightLG*2（=80px），比 56px 的
-              rail 宽：ul 溢出后被 .crm-sider 的 overflow:hidden 裁掉，图标偏左。
-              对齐到 rail 宽度后 antd 自己的居中式 padding 就成立，无需 CSS 覆盖。 */}
-          <ConfigProvider theme={{ components: { Menu: { collapsedWidth: MINI_RAIL_W } } }}>
-            <Menu
-              mode="inline"
-              selectedKeys={currentMenu ? [currentMenu.path] : []}
-              items={miniSiderItems}
-              onClick={({ key }) => go(String(key))}
-              className="transparent-menu"
-            />
-          </ConfigProvider>
         </div>
       </Sider>
     )}
@@ -370,7 +294,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         {/* 移动端汉堡按钮 */}
         <Button type="text" className="mobile-nav-trigger" aria-label="打开导航菜单" icon={<MenuUnfoldOutlined/>} onClick={() => setMobileNavOpen(true)}/>
         {/* 顶部模式：一级菜单放在 header */}
-        {showTopPrimary && !showTopSecondary && (
+        {showTopPrimary && (
           <Menu
             mode="horizontal"
             selectedKeys={activePrimary ? [activePrimary.key] : []}
@@ -379,18 +303,8 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
             className="top-primary-menu"
           />
         )}
-        {/* 纯顶栏模式：一二级合并 */}
-        {showTopSecondary && (
-          <Menu
-            mode="horizontal"
-            selectedKeys={currentMenu ? [currentMenu.path] : []}
-            items={topOnlyItems}
-            // SubMenu 标题只触发 onTitleClick，不走这里；无二级的一级项 key 即其 path
-            onClick={({ key }) => go(String(key))}
-            className="top-primary-menu"
-          />
-        )}
         <Space size={8} className="header-actions">
+          <FmsAccountSetSwitch/>
           <SalesDispatchStatusControl/>
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
@@ -438,12 +352,14 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   </Layout>
   )
 
-  return <RealtimeProvider><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
-    {showWatermark
-      ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
-      : <div className="crm-watermark-wrapper">{shellContent}</div>
-    }
-  </NotifyMessageProvider></SalesDispatchStatusProvider></RealtimeProvider>
+  return <FmsAccountSetProvider enabled={fmsEnabled}>
+    <RealtimeProvider><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
+      {showWatermark
+        ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
+        : <div className="crm-watermark-wrapper">{shellContent}</div>
+      }
+    </NotifyMessageProvider></SalesDispatchStatusProvider></RealtimeProvider>
+  </FmsAccountSetProvider>
 }
 
 function Root() {
