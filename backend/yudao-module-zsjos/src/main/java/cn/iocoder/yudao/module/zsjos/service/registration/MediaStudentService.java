@@ -236,7 +236,8 @@ public class MediaStudentService {
                 taskStage("positioning", "账号定位", stageStatus(operatorConfirmed, positioningStarted), "各账号独立填写定位卡"),
                 taskStage("operator_confirm", "运营确认", stageStatus(operatorConfirmed, "operator_feasibility".equals(positioningStatus)), "运营逐账号确认"),
                 taskStage("student_confirm", "学员确认", stageStatus(studentConfirmed,
-                        Set.of("student_link_pending", "student_confirm").contains(positioningStatus)), "学员通过安全链接确认"),
+                        positioningStatus != null
+                                && Set.of("student_link_pending", "student_confirm").contains(positioningStatus)), "学员通过安全链接确认"),
                 taskStage("trial", "试运行", stageStatus(trialDone, "trial_14d".equals(positioningStatus)), "各账号独立试运行"),
                 taskStage("formal", "正式定位", stageStatus("archived".equals(positioningStatus), "confirmed".equals(positioningStatus)), "正式定位完成后解锁内容生产")
         );

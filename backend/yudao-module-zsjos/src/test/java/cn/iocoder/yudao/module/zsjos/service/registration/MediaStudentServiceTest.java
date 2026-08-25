@@ -29,8 +29,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -97,5 +99,13 @@ class MediaStudentServiceTest {
         assertEquals(1, result.getPendingStats().getContentCount());
         assertEquals(1, result.getPendingStats().getProductionCount());
         verify(positioningService).availableActionsForVisible(positioning, 1L);
+    }
+
+    @Test
+    void accountTaskLineAllowsMissingPositioningStatus() throws Exception {
+        Method method = MediaStudentService.class.getDeclaredMethod("buildAccountTaskLine", String.class);
+        method.setAccessible(true);
+
+        assertDoesNotThrow(() -> method.invoke(service, (Object) null));
     }
 }

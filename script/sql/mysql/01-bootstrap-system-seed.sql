@@ -1879,3 +1879,23 @@ INSERT IGNORE INTO system_user_role (id, user_id, role_id, creator, create_time,
 
 INSERT IGNORE INTO system_user_post (id, user_id, post_id, creator, create_time, updater, update_time, deleted, tenant_id) VALUES (1, 1, 2029, '1', NOW(), '1', NOW(), b'0', 1);
 
+-- Fresh environments use the same Workbench presentation as upgraded environments.
+WITH RECURSIVE `zsjos_hfm_workbench_menu_tree` AS (
+  SELECT `id`, `parent_id`, `type`
+  FROM `system_menu`
+  WHERE `id` IN (601476, 601894, 7100)
+    AND `deleted` = b'0'
+  UNION ALL
+  SELECT child.`id`, child.`parent_id`, child.`type`
+  FROM `system_menu` child
+  INNER JOIN `zsjos_hfm_workbench_menu_tree` parent
+    ON child.`parent_id` = parent.`id`
+  WHERE child.`deleted` = b'0'
+)
+UPDATE `system_menu` menu
+INNER JOIN `zsjos_hfm_workbench_menu_tree` target
+  ON target.`id` = menu.`id`
+SET menu.`workbench_render_mode` = 'admin_embed'
+WHERE target.`type` IN (1, 2)
+  AND menu.`deleted` = b'0';
+

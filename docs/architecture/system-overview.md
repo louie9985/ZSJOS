@@ -28,6 +28,13 @@ for downstream queries. The feature is fail-closed and disabled by default. Its 
 contracts are documented in `docs/api/media-screen-public-api.md` and
 `docs/operations/media-screen-deployment.md`.
 
+The positioning confirmation handoff uses an authenticated Workbench command only to mint or regenerate
+the opaque link. The linked page belongs to the anonymous H5 surface and calls
+`/public-api/zsjos/positioning-confirmation/**`; it never enters the Workbench login shell. The backend
+must receive the externally reachable H5 base URL through `ZSJOS_PUBLIC_H5_BASE_URL` before it can mutate
+link or positioning state. Deployment ownership and proxy requirements are documented in
+`docs/operations/positioning-confirmation-deployment.md`.
+
 `../CRM-demo-Ant-design` is a design reference when available. It is not a runtime
 dependency or a source of production data, routes, permissions, or API contracts.
 

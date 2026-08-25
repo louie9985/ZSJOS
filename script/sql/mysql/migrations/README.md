@@ -541,3 +541,12 @@ adds `system_menu.workbench_render_mode` only when absent, then records its own 
 markers. Fresh environments also run V137 as a guarded no-op after V132-V136. It changes no menu grants or
 business rows; rollback requires a reviewed forward repair because removing the column loses configured
 rendering metadata.
+
+### V138 HRM/FMS/EAM Workbench admin embed mode
+
+V138 updates the active HRM (`601476`), FMS (`601894`), and EAM (`7100`) Workbench
+menu trees. Their roots and every descendant page or directory (`type` 1/2) use
+`admin_embed`, so Vue Admin content is rendered in the Workbench. Button permission
+rows (`type` 3), menu grants, and business data are intentionally unchanged. The
+migration is repeatable and forward-only; fresh bootstrap applies the same update
+after the System menu seed.

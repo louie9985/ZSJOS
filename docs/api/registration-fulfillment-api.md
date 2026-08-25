@@ -141,6 +141,11 @@ data, submission time, field/value/label snapshots and decision state, but no ca
 user IDs, or token. A decision, regeneration, or non-current submission invalidates the active link.
 `request_changes` requires a 1-500 character comment and returns the card to the director draft stage;
 `agree` advances the existing `trial_14d` flow.
+
+Generated links must be absolute and target the anonymous H5 page, not the authenticated Workbench.
+The backend reads that origin from `ZSJOS_PUBLIC_H5_BASE_URL` and rejects link generation before any
+token or workflow mutation when the value is absent or invalid. Production configuration and reverse
+proxy requirements are documented in `docs/operations/positioning-confirmation-deployment.md`.
 # 编导学员级阶段
 
 编导通过 `GET /zsjos/student/service/{relationId}/contact-context` 获取服务关系负责人、编导、

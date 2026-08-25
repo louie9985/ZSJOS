@@ -71,4 +71,14 @@ describe('director and operator My Students', () => {
     expect(api).toContain('http.put(`/zsjos/positioning-card/draft/${id}`')
     expect(api).toContain('unwrap<PositioningCardDraftResult>')
   })
+
+  it('uses the typed positioning student confirmation link API', () => {
+    expect(page).toContain('api.positioningCard.generateStudentLink(row.id, row.version)')
+    expect(api).toContain('generateStudentLink: async (id: number, version: number)')
+    expect(api).toContain('http.post(`/zsjos/positioning-card/${id}/student-link`, null, { params: { version } })')
+    expect(api).toContain('unwrap<PositioningLinkResult>')
+    expect(page).toContain('const positioningShareUrl = (sharePath: string)')
+    expect(page).toContain("url.protocol !== 'http:' && url.protocol !== 'https:'")
+    expect(page).not.toContain('`${window.location.origin}${result.sharePath}`')
+  })
 })

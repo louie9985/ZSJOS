@@ -26,6 +26,9 @@ export type MediaReview = { id: number; reviewNo: string; reviewType: string; su
 export type GraduationApplication = { id: number; applicationNo: string; serviceRelationId: number; studentPersonId: number; plannerUserId: number; reviewerUserId: number; status: string; processInstanceId?: string; resultReason?: string; version: number }
 export type ProductionTicket = { id: number; ticketNo: string; accountId: number; status: string; version: number; expectedDeliveredAt?: Timestamp; deadlineAt?: Timestamp; availableActions: string[] }
 export type PositioningCard = { id: number; cardNo: string; accountId: number; studentPersonId?: number; serviceRelationId?: number; directorUserId?: number; operatorUserId?: number; templateId?: number; templateVersionId?: number; fieldsSnapshot?: StudentContactFormField[]; valuesSnapshot?: Record<string, unknown>; dictSnapshot?: Record<string, unknown>; trialEndDate?: string; status: string; professionalRisk?: boolean; versionNo?: number; version: number; availableActions: string[] }
+export type PositioningCardDraftRequest = { accountId: number; studentPersonId?: number; serviceRelationId?: number; templateId?: number; trialEndDate?: string; values?: Record<string, unknown>; version?: number; professionalRisk?: boolean; layer1Json?: string; layer2Json?: string; formulaJson?: string; feasibilityJson?: string; contentFormJson?: string; complianceJson?: string }
+export type PositioningCardDraftResult = { id: number; version: number }
+export type PositioningLinkResult = { sharePath: string }
 export type SalesUser = { id: number; nickname: string; maskedMobile?: string; deptName?: string; avatar?: string }
 export type AssignmentUser = SalesUser & { deptId?: number; status: number }
 export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]; validSalesCount: number; invalidSalesCount: number; updateTime?: Timestamp }
@@ -703,12 +706,15 @@ export const api = {
   },
   positioningCard: {
     publishedTemplate: async (templateId?: number) => unwrap<DirectorTemplateSnapshot>(await http.get('/zsjos/positioning-card/published-template', { params: { templateId } })),
-    create: async (data: { accountId: number; studentPersonId?: number; serviceRelationId?: number; templateId?: number; trialEndDate?: string; values?: Record<string, unknown>; version?: number; professionalRisk?: boolean; layer1Json?: string; layer2Json?: string; formulaJson?: string; feasibilityJson?: string; contentFormJson?: string; complianceJson?: string }) => unwrap<number>(await http.post('/zsjos/positioning-card/create', data)),
+    create: async (data: PositioningCardDraftRequest) => unwrap<number>(await http.post('/zsjos/positioning-card/create', data)),
+    createDraft: async (data: PositioningCardDraftRequest) => unwrap<PositioningCardDraftResult>(await http.post('/zsjos/positioning-card/draft', data)),
+    updateDraft: async (id: number, data: PositioningCardDraftRequest & { version: number }) => unwrap<PositioningCardDraftResult>(await http.put(`/zsjos/positioning-card/draft/${id}`, data)),
     get: async (id: number) => unwrap<PositioningCard>(await http.get('/zsjos/positioning-card/get', { params: { id } })),
     page: async (params: { pageNo: number; pageSize: number; status?: string }) => unwrap<PageResult<PositioningCard>>(await http.get('/zsjos/positioning-card/page', { params })),
     submitReview: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/submit-review`, null, { params: { version } })),
     operatorApprove: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/operator-approve`, null, { params: { version } })),
     operatorReject: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/operator-reject`, null, { params: { version, reason } })),
+    generateStudentLink: async (id: number, version: number) => unwrap<PositioningLinkResult>(await http.post(`/zsjos/positioning-card/${id}/student-link`, null, { params: { version } })),
     confirmTrial: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/confirm-trial`, null, { params: { version } })),
     archive: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/archive`, null, { params: { version } })),
     versions: async (cardId: number) => unwrap<unknown[]>(await http.get('/zsjos/positioning/workspace/versions', { params: { cardId } })),

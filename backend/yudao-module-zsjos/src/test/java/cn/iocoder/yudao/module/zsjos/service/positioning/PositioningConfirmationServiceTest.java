@@ -23,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.POSITIONING_STUDENT_CONFIRM;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.POSITIONING_STUDENT_LINK_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.POSITIONING_PUBLIC_H5_URL_INVALID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
@@ -68,7 +69,7 @@ class PositioningConfirmationServiceTest {
 
     @Test
     void regenerateRevokesOldLinkWithoutChangingCardStateAgain() {
-        ReflectionTestUtils.setField(service, "publicBaseUrl", "");
+        ReflectionTestUtils.setField(service, "publicBaseUrl", "https://m.example.com");
         PositioningCardDO card = card(POSITIONING_STUDENT_CONFIRM, 4);
         PositioningCardSubmissionDO submission = submission(POSITIONING_STUDENT_CONFIRM, 2);
         when(cardService.require(1L)).thenReturn(card);
@@ -76,10 +77,32 @@ class PositioningConfirmationServiceTest {
 
         var result = service.generateLink(1L, 4, 88L);
 
-        assertTrue(result.getSharePath().startsWith("/positioning/share#token="));
+        assertTrue(result.getSharePath().startsWith("https://m.example.com/positioning/share#token="));
         verify(linkMapper).revokeActiveBySubmission(eq(11L), any());
         verify(submissionMapper, never()).markStatus(any(), any(), any(), any());
         verify(cardMapper, never()).transition(any(), any(), any(), any());
+    }
+
+    @Test
+    void generateLinkRejectsMissingPublicBaseUrlBeforeMutation() {
+        ReflectionTestUtils.setField(service, "publicBaseUrl", " ");
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.generateLink(1L, 3, 88L));
+
+        assertEquals(POSITIONING_PUBLIC_H5_URL_INVALID.getCode(), error.getCode());
+        verifyNoInteractions(cardService, cardMapper, submissionMapper, linkMapper, workflowEventService);
+    }
+
+    @Test
+    void generateLinkRejectsNonHttpPublicBaseUrlBeforeMutation() {
+        ReflectionTestUtils.setField(service, "publicBaseUrl", "javascript:alert(1)");
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.generateLink(1L, 3, 88L));
+
+        assertEquals(POSITIONING_PUBLIC_H5_URL_INVALID.getCode(), error.getCode());
+        verifyNoInteractions(cardService, cardMapper, submissionMapper, linkMapper, workflowEventService);
     }
 
     @Test

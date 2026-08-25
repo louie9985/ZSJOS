@@ -1,5 +1,34 @@
 # Main Workstream
 
+## Workstream Registration - 2026-08-25 20:00:00 +08:00
+
+- Workstream ID: `main-media-student-null-positioning-status`
+- Goal: prevent the media-student detail endpoint from throwing when an account has no positioning status.
+- Non-goals: change positioning workflow states, API contracts, permissions, database data, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `da10ba31749229c5e0014615c24b194971284685` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/MediaStudentService.java`, its focused test, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Java collections and JUnit/Mockito test infrastructure; no new dependency.
+- Integration order: guard the nullable status membership check -> add focused regression test -> run module test and diff checks -> append delivery evidence.
+- Verification plan: focused `MediaStudentServiceTest`, ZSJOS module compile/test if practical, and scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-25 19:56:00 +08:00
+
+- Workstream ID: `main-media-student-null-positioning-status`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `da10ba31749229c5e0014615c24b194971284685` (no commit created)
+- User goal: fix the media-student detail 500 caused by a null positioning status.
+- Key decisions: preserve all existing task-stage states; short-circuit the immutable-set membership check when `positioningStatus` is null; add a focused regression test through the service's task-line behavior.
+- Execution or analysis result: `/admin-api/zsjos/media-students/{id}` no longer throws from `buildAccountTaskLine` when an account has no positioning status.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/registration/MediaStudentService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/registration/MediaStudentServiceTest.java`; this handoff record.
+- Verification evidence: `mvn -pl yudao-module-zsjos -Dtest=MediaStudentServiceTest test` passed 2/2; scoped `git diff --check` passed with only existing LF/CRLF conversion warnings.
+- Dependency or integration impact: no dependency, API/schema/permission/database, branch/worktree, commit, push, deployment, or service operation changes; existing unrelated nested `frontend/yudao-ui-admin-uniapp` change preserved.
+- Remaining work: None for this null-status exception; authenticated endpoint smoke verification remains optional environment-level follow-up.
+
 ## Workstream Registration - 2026-08-25 17:20:00 +08:00
 
 - Workstream ID: `main-workbench-sales-order-detail-rail`
@@ -3451,6 +3480,40 @@
 - Dependency or integration impact: remote Workbench/Admin rendering changes and frontend removals are now local; existing unrelated tracked, untracked, and nested-repository changes remain. No dependency installation, database mutation, service operation, branch/worktree change, commit, push, or publication occurred. Existing databases with legacy V132/V133/V134 markers require separately approved controlled execution of V137; those historical markers must remain unchanged.
 - Remaining work: Execute V137 only through the repository's controlled database rollout after separate approval, then run `verify-bootstrap.sql`; no remaining Git synchronization work.
 
+## Active delivery: synchronize remote main on 2026-08-25 late
+
+- Workstream ID: `main-remote-sync-20260825-late`
+- Goal: Fast-forward local `main` to `origin/main`, use the remote Workbench generated state for the confirmed frontend conflict, and preserve both sides of the confirmed handoff conflict.
+- Non-goals: Commit, push, execute SQL, mutate databases, start/stop services, change branches/worktrees, install dependencies, or clean unrelated local changes.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `da10ba31749229c5e0014615c24b194971284685` plus existing uncommitted changes; Target branch: `main`.
+- Ownership scope: remote commits `70e8796722`, `77c5c14e9f`, and `ac5c2b1104`; `frontend/workbench/tsconfig.tsbuildinfo`; merged `handoff/main.md`; this delivery record.
+- Owner: Codex `/root`.
+- Dependencies: `origin/main` at `ac5c2b1104`; all unrelated local tracked, untracked, and nested-repository changes remain intact.
+- Integration order: register scope -> preserve handoff overlap -> replace confirmed frontend generated file -> fast-forward -> restore and resolve handoff -> verify.
+- Verification plan: confirm HEAD equals `origin/main`, ahead/behind `0/0`, no unmerged/index/stash residue, remote generated file hash match, no conflict markers, and preservation of unrelated dirty paths.
+
+## Delivery Entry - 2026-08-25 21:54:13 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `ac5c2b1104b047a804ec8cd23b66f75b3aba57dd`.
+- User goal: Pull the latest remote code, use remote frontend content for conflicts, and ask for confirmation on other conflicts.
+- Key decisions: fast-forwarded through remote commits `70e8796722`, `77c5c14e9f`, and `ac5c2b1104`; used the remote `frontend/workbench/tsconfig.tsbuildinfo`; preserved both local and remote `handoff/main.md` records; retained all unrelated local changes and nested-repository changes.
+- Execution or analysis result: local `main` advanced from `da10ba3174` to `ac5c2b1104`; the Workbench environment file merged automatically; no commit, push, SQL execution, database mutation, service operation, or cleanup occurred.
+- Changed files: 20 files from the remote commits; `handoff/main.md` was merged with both sides retained and this entry appended. The confirmed remote generated Workbench state is present.
+- Verification evidence: `HEAD` equals `origin/main` after fetch; no remote deletion; conflict markers were cleared; all unrelated tracked and untracked changes remain; the nested UniApp repository remains independently dirty and untouched. Builds and tests were not run because this turn only synchronized remote history.
+- Dependency or integration impact: remote embedded-admin session bridge, Workbench font probe, tab/layout changes, and documentation are now local. No dependency installation, branch/worktree operation, commit, push, or database change occurred.
+- Remaining work: None for this synchronization; existing local worktree changes remain for their owning workstreams.
+
+## Delivery Entry - 2026-08-25 22:05:00 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; pre-commit HEAD: `ac5c2b1104b047a804ec8cd23b66f75b3aba57dd`.
+- User goal: submit the current parent-repository changes to the cloud remote.
+- Key decisions: include all current parent-repository source, test, documentation, configuration and SQL changes; exclude internal modifications of nested `frontend/yudao-ui-admin-uniapp`; do not force-push or rewrite history.
+- Execution or analysis result: prepared the positioning confirmation follow-up, media-student projection/test updates, application configuration, deployment documentation, bootstrap updates, and V138 migration for one parent-repository commit.
+- Changed files: 17 parent paths including two new files; the nested UniApp repository remains outside the parent commit.
+- Verification evidence: local `main` matched `origin/main` before staging; no staged changes existed beforehand; tests, builds and database execution were not run because this is a commit-and-push request.
+- Dependency or integration impact: publishes the current positioning confirmation and HRM/FMS/EAM Workbench embed migration changes; no dependency installation, service operation, branch/worktree operation or database mutation.
+- Remaining work: verify the pushed commit and parent worktree status; nested UniApp changes remain local.
+
 ## Delivery Entry - 2026-08-25 19:15:55 +08:00
 
 - Branch: `main`; Worktree: `D:\ZSJ-OS`; pre-commit HEAD: `6921fecff4767e7390ad5442137074ec2f1ec5dd`.
@@ -3475,3 +3538,118 @@
 - Verification evidence: 冲突标记扫描为空；无未合并路径；合并前后 `git diff --check` 均通过；推送返回 `da10ba31..8f966f77 main -> main`。合并后 Workbench Vitest 通过 62 个文件、385 个测试，失败 1 个文件中的 2 个守卫测试；`npm run typecheck` 和 `npm run build` 均失败。根因核对显示远端 `da10ba31` 修改了 `MediaStudentsPage.tsx` 和 `MySalesOrderPage.tsx`，但未提交其交付记录声称的 `frontend/workbench/src/services/api.ts` 等对应契约，导致新增定位卡草稿、学生确认链接、团队订单接口和类型字段缺失；该失败不是 Git 文本冲突或本地 iframe/probe 提交造成的。
 - Dependency or integration impact: `origin/main` 已包含字号 probe、Admin 单 iframe 复用以及远端定位卡/团队订单等提交；没有新增依赖、数据库执行、权限变更、服务操作、分支切换、历史改写或强制推送。当前远端 Workbench 存在上述已知不可通过类型检查和构建的风险。
 - Remaining work: 单独补齐并评审 `da10ba31` 遗漏的 Workbench API/类型契约及守卫预期，重新运行 Workbench 全量测试、类型检查和生产构建；本次 Git 同步、冲突解决与首次推送已完成。
+## Active delivery: HRM/FMS/EAM Workbench admin embed mode
+
+- Workstream ID: `main-workbench-admin-embed-hfm`
+- Goal: 将 System 菜单中 HRM、FMS、EAM Workbench 根菜单及其页面/目录子节点的 `workbench_render_mode` 从 `native` 统一调整为 `admin_embed`，直接同步本地开发数据库并更新 fresh bootstrap 初始化脚本。
+- Non-goals: 不修改按钮权限节点、菜单权限分配、菜单路径、业务数据、前端实现、分支/提交/发布；不运行测试或完整数据库验证套件。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd` plus existing unrelated user changes
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V138__hrm_fms_eam_workbench_admin_embed.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/01-bootstrap-system-seed.sql`; this workstream record; controlled updates to local `ruoyi-vue-pro.system_menu`.
+- Owner: Codex `/root`
+- Dependencies: `system_menu.workbench_render_mode`, roots `601476` (HRM), `601894` (FMS), `7100` (EAM), and the existing V137 migration chain.
+- Integration order: register scope -> inspect current recursive menu rows -> add repeatable migration and bootstrap seed synchronization -> execute direct local DB update -> record result.
+- Verification plan: no tests or verification suite requested; use only the required pre/post row-count and mode queries to confirm the direct update did not target buttons or unrelated menus.
+
+## Delivery Entry - 2026-08-25 20:19:10 +08:00
+
+- Workstream ID: `main-workbench-admin-embed-hfm`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd` (no commit created)
+- User goal: 将 HRM、FMS、EAM 的 Workbench 菜单及子菜单/子目录从 `native` 改为 `admin_embed`，直接更新数据库并同步初始化脚本。
+- Key decisions: 以固定根菜单 `601476`（HRM）、`601894`（FMS）、`7100`（EAM）递归定位；只更新活动页面/目录节点（`type` 1/2），保留按钮权限节点（`type` 3）、权限关系和业务数据不变；新增可重复 V138 并在 fresh seed 中复用同一递归更新。
+- Execution or analysis result: V138 已直接执行到本地 `ruoyi-vue-pro`，递归目标共 92 个页面/目录，全部变为 `admin_embed`；原生模式为 0；按钮节点 249 个未改；legacy/module V138 标记各 1 条。
+- Changed files: `script/sql/mysql/migrations/V138__hrm_fms_eam_workbench_admin_embed.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/01-bootstrap-system-seed.sql`; `script/sql/mysql/migrations/README.md`; this workstream record.
+- Verification evidence: 仅执行用户要求范围内的数据库前后查询；结果为 `pages=92,admin_embed=92,native=0,buttons=249`，且 `legacy_v138=1,module_v138=1`。未运行测试套件或完整数据库验证脚本。
+- Dependency or integration impact: 新增 core V138 migration，fresh bootstrap 会在 V137 后加载；数据库仅更新 `system_menu.workbench_render_mode` 元数据并写入两个版本标记；无依赖、分支、提交、推送或服务变更。
+- Remaining work: None for this request. Existing unrelated dirty-worktree changes remain untouched.
+
+## Workstream Registration - 2026-08-25 20:29:25 +08:00
+
+- Workstream ID: `main-positioning-card-autosave-api`
+- Goal: fix account positioning-card autosave by exposing the backend-supported draft create and update methods through the Workbench typed API client.
+- Non-goals: change backend behavior, autosave timing or coordination, positioning workflow states, permissions, database data, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `da10ba31749229c5e0014615c24b194971284685` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/services/api.ts` and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Workbench Axios wrapper and backend `PositioningCardDraftRespVO`; no new dependency.
+- Integration order: add typed positioning draft request/result contracts -> expose create/update draft API methods -> run focused test, typecheck/build, and diff checks -> append delivery evidence.
+- Verification plan: focused `media-students.guard.test.ts`, Workbench typecheck and production build with unrelated failures separated, plus scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-25 20:32:13 +08:00
+
+- Workstream ID: `main-positioning-card-autosave-api`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `da10ba31749229c5e0014615c24b194971284685` (no commit created)
+- User goal: fix the account positioning-card autosave error `api.positioningCard.createDraft is not a function`.
+- Key decisions: mirror the existing backend draft endpoints in the Workbench API object; use a shared typed request contract; return the backend-authoritative `{ id, version }` result from both create and update so subsequent saves retain optimistic-lock state; leave unrelated API/type gaps unchanged.
+- Execution or analysis result: `api.positioningCard` now exposes `createDraft` for `POST /zsjos/positioning-card/draft` and `updateDraft` for `PUT /zsjos/positioning-card/draft/{id}`; the runtime method-missing failure is removed.
+- Changed files: `frontend/workbench/src/services/api.ts`; this handoff record.
+- Verification evidence: focused autosave guard test passed 1/1; TypeScript no longer reports missing `createDraft` or `updateDraft`; the running Vite service returned HTTP 200 for the media-students page and transformed API module, which contained both methods and the draft endpoint; scoped `git diff --check` passed with line-ending warnings only. Full typecheck and production build remain blocked by pre-existing missing `DirectorStageForm.version`, positioning projection/link fields, and team-sales-order API/type contracts outside this workstream.
+- Dependency or integration impact: no dependency, backend/API contract, schema, permission, database, branch/worktree, commit, push, deployment, or service operation change; existing unrelated worktree changes were preserved.
+- Remaining work: authenticated end-to-end draft creation/update was not executed because no authenticated business session was available; the unrelated Workbench type-contract failures still need a separate scoped repair before full typecheck/build can pass.
+
+## Workstream Registration - 2026-08-25 20:54:18 +08:00
+
+- Workstream ID: `main-positioning-student-link-api`
+- Goal: fix positioning-card student confirmation link generation by exposing the existing backend command through the Workbench typed API client.
+- Non-goals: change link generation behavior or format, positioning workflow states, permissions, backend code, database data, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `da10ba31749229c5e0014615c24b194971284685` plus existing user changes and the confirmed positioning draft API fix.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/media-students.guard.test.ts`; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Workbench Axios wrapper and backend `PositioningLinkRespVO`; no new dependency.
+- Integration order: add the typed link response -> expose the student-link API command -> add focused contract guards -> run focused test, typecheck/build diagnostics, runtime module check, and diff checks -> append delivery evidence.
+- Verification plan: focused student-link guard test; confirm TypeScript no longer reports `generateStudentLink` missing; Workbench typecheck/build with unrelated failures separated; running Vite transformed-module check; scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-25 20:55:51 +08:00
+
+- Workstream ID: `main-positioning-student-link-api`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `da10ba31749229c5e0014615c24b194971284685` (no commit created)
+- User goal: fix the positioning-card student confirmation link error `api.positioningCard.generateStudentLink is not a function`.
+- Key decisions: mirror the established backend `POST /zsjos/positioning-card/{id}/student-link` command in the Workbench API client; pass the optimistic-lock version as a query parameter; model the backend `PositioningLinkRespVO` as `{ sharePath: string }`; retain all existing backend permission and object-authorization enforcement.
+- Execution or analysis result: `api.positioningCard.generateStudentLink(id, version)` now exists and returns the typed share path consumed by `MediaStudentsPage`; the runtime method-missing failure is removed.
+- Changed files: `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/pages/media-students.guard.test.ts`; this handoff record.
+- Verification evidence: focused student-link contract test passed 1/1; TypeScript no longer reports `generateStudentLink` missing; the running Vite service returned HTTP 200 for the transformed API module and included the method and `/student-link` path; scoped `git diff --check` passed with line-ending warnings only. Full typecheck and production build remain blocked by the pre-existing director-form, positioning projection, and team-sales-order type-contract errors already identified outside this workstream.
+- Dependency or integration impact: no dependency, backend/API contract, permission, schema, database, link format, branch/worktree, commit, push, deployment, or service operation change; the prior confirmed positioning draft API changes and all unrelated worktree changes were preserved.
+- Remaining work: authenticated end-to-end link creation and clipboard verification were not executed because no authenticated business session was available; unrelated Workbench type-contract failures still need a separate scoped repair before full typecheck/build can pass.
+
+## Workstream Registration - 2026-08-25 21:16:00 +08:00
+
+- Workstream ID: `main-positioning-public-h5-url`
+- Goal: ensure generated positioning confirmation links target the anonymous H5 surface, fail before mutation when its public origin is missing or invalid, and document exactly where production operators configure the public domain.
+- Non-goals: change the anonymous confirmation API contract, token format, positioning state machine, permissions, database schema/data, dependencies, branches, commits, deployment state, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `da10ba31749229c5e0014615c24b194971284685` plus existing user changes and the confirmed positioning draft/student-link API fixes.
+- Target branch: `main`
+- Ownership scope: positioning confirmation service/error/test; `backend/yudao-server/src/main/resources/application-local.yaml`; Workbench media-student link handling and focused guard; positioning deployment/API/system-overview documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Spring environment binding, ZSJOS service exceptions, H5 anonymous page and `/public-api` endpoints; no new dependency.
+- Integration order: validate configured H5 origin before token/state writes -> provide overridable local H5 origin -> reject relative Workbench results -> document production configuration ownership and rollout -> verify backend, Workbench, H5, runtime route, and diff.
+- Verification plan: focused `PositioningConfirmationServiceTest`; focused Workbench media-student guard; H5 production build; Workbench typecheck/build with unrelated failures separated; local H5/public API route checks; backend configuration binding/package check where practical; scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-25 21:16:56 +08:00
+
+- Workstream ID: `main-positioning-public-h5-url`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `da10ba31749229c5e0014615c24b194971284685` (no commit created)
+- User goal: make positioning confirmation links open the anonymous H5/public-API flow instead of Workbench login, and identify the exact production configuration location for the public H5 domain.
+- Key decisions: keep token generation as the authorized Admin command and detail/decision as anonymous public APIs; require an absolute HTTP(S) H5 base URL before any token or positioning-state mutation; use an overridable `http://localhost:10086` local-profile default; remove the Workbench-origin fallback; keep real production domains outside source control in the backend runtime environment; document that the repository production Compose currently owns database infrastructure only and does not consume this backend variable.
+- Execution or analysis result: link generation now fails with stable error `1_900_014_019` before mutation when `ZSJOS_PUBLIC_H5_BASE_URL` is missing or invalid; valid links always target the configured H5 base; Workbench accepts only absolute HTTP(S) results; local profile defaults to the running H5 port; production configuration and reverse-proxy rollout instructions now cover Docker Compose, Kubernetes/Helm, systemd, and direct JAR deployment.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningConfirmationService.java`; its focused test; `backend/yudao-server/src/main/resources/application-local.yaml`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; its focused guard test; `docs/operations/positioning-confirmation-deployment.md`; `docs/api/registration-fulfillment-api.md`; `docs/architecture/system-overview.md`; this handoff record.
+- Verification evidence: `PositioningConfirmationServiceTest` passed 8/8 including blank and non-HTTP configuration with zero service/mapper interactions; backend `mvn -q -pl yudao-server -am -DskipTests package` exited 0; focused Workbench student-link guard passed 1/1; running Vite module returned HTTP 200, contained the absolute-link validator, and no longer contained the Workbench-origin fallback; H5 production build passed; anonymous H5 route returned HTTP 200 and the public endpoint did not request login; scoped `git diff --check` passed with line-ending warnings only. Workbench typecheck/build still fail exclusively on pre-existing director-form, positioning projection, and team-sales-order type-contract errors outside this workstream.
+- Dependency or integration impact: no dependency, anonymous API shape, token format, permission, schema/database, branch/worktree, commit, push, production deployment, or live service change. The backend must be restarted or rolled out after setting the environment variable because Spring reads it at startup.
+- Remaining work: the currently running local backend was not restarted, so it will not consume the new local default until a separately approved restart; production operators must set the real H5 public origin in the actual backend deployment environment and complete the documented logged-out mobile verification. Existing unrelated Workbench type-contract failures remain outside this workstream.

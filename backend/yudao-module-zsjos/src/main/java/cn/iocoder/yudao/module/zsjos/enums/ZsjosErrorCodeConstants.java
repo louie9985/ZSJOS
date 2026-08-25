@@ -304,6 +304,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode POSITIONING_SUBMISSION_NOT_EXISTS = new ErrorCode(1_900_014_016, "定位卡尚无可确认的提交版本");
     ErrorCode POSITIONING_CONFIRMATION_LINK_INVALID = new ErrorCode(1_900_014_017, "确认链接无效或已失效");
     ErrorCode POSITIONING_STUDENT_COMMENT_REQUIRED = new ErrorCode(1_900_014_018, "修改意见不能为空且不能超过 500 个字符");
+    ErrorCode POSITIONING_PUBLIC_H5_URL_INVALID = new ErrorCode(1_900_014_019, "学员确认页公网地址未配置或无效，请联系管理员");
 
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");

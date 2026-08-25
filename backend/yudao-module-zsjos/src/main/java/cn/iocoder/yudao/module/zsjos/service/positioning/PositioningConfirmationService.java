@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,7 @@ public class PositioningConfirmationService {
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#cardId", action = "student-link-generate")
     @Transactional(rollbackFor = Exception.class)
     public PositioningLinkRespVO generateLink(Long cardId, Integer cardVersion, Long operatorUserId) {
+        String baseUrl = requirePublicBaseUrl();
         PositioningCardDO card = cardService.require(cardId);
         if (!Objects.equals(card.getVersion(), cardVersion)
                 || (!POSITIONING_STUDENT_LINK_PENDING.equals(card.getStatus())
@@ -74,8 +76,25 @@ public class PositioningConfirmationService {
                     POSITIONING_STUDENT_LINK_PENDING, POSITIONING_STUDENT_CONFIRM, null,
                     "positioning-link:" + cardId + ":" + cardVersion);
         }
-        String baseUrl = publicBaseUrl == null ? "" : publicBaseUrl.replaceAll("/+$", "");
         return new PositioningLinkRespVO(baseUrl + "/positioning/share#token=" + rawToken);
+    }
+
+    private String requirePublicBaseUrl() {
+        String baseUrl = publicBaseUrl == null ? "" : publicBaseUrl.trim().replaceAll("/+$", "");
+        if (baseUrl.isEmpty()) {
+            throw exception(POSITIONING_PUBLIC_H5_URL_INVALID);
+        }
+        try {
+            URI uri = URI.create(baseUrl);
+            boolean http = "http".equalsIgnoreCase(uri.getScheme()) || "https".equalsIgnoreCase(uri.getScheme());
+            if (!http || uri.getHost() == null || uri.getUserInfo() != null
+                    || uri.getRawQuery() != null || uri.getRawFragment() != null) {
+                throw exception(POSITIONING_PUBLIC_H5_URL_INVALID);
+            }
+        } catch (IllegalArgumentException ex) {
+            throw exception(POSITIONING_PUBLIC_H5_URL_INVALID);
+        }
+        return baseUrl;
     }
 
     public PublicPositioningConfirmationRespVO publicDetail(String rawToken) {

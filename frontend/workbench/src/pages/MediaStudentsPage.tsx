@@ -28,6 +28,15 @@ const actionLabels: Record<string, string> = {
   GENERATE_POSITIONING_STUDENT_LINK: '生成学员确认链接', CONFIRM_POSITIONING_TRIAL: '确认试跑', ARCHIVE_POSITIONING: '归档'
 }
 const errorText = (error: unknown) => error instanceof Error ? error.message : '请求失败，请重试'
+const positioningShareUrl = (sharePath: string) => {
+  try {
+    const url = new URL(sharePath)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new Error()
+    return url.toString()
+  } catch {
+    throw new Error('学员确认页公网地址未配置或无效，请联系管理员')
+  }
+}
 const positioningDisplayValue = (card: PositioningCard | undefined, key: string) => {
   const snapshot = card?.dictSnapshot?.[key]
   if (Array.isArray(snapshot)) {
@@ -304,7 +313,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     else if (action === 'APPROVE_POSITIONING_FEASIBILITY') await api.positioningCard.operatorApprove(row.id, row.version)
     else if (action === 'GENERATE_POSITIONING_STUDENT_LINK') {
       const result = await api.positioningCard.generateStudentLink(row.id, row.version)
-      const url = result.sharePath.startsWith('http') ? result.sharePath : `${window.location.origin}${result.sharePath}`
+      const url = positioningShareUrl(result.sharePath)
       setShareLink(url); await navigator.clipboard.writeText(url).catch(() => undefined)
       message.success('学员确认链接已生成并复制')
     } else if (action === 'CONFIRM_POSITIONING_TRIAL') await api.positioningCard.confirmTrial(row.id, row.version)
