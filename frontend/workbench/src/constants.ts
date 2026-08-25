@@ -261,7 +261,7 @@ export const DEFAULT_THEME = {
   headerFixed: true,
   animation: true,
   watermark: false,
-  tabs: false,
+  tabs: true,
   tabStyle: 'card' as TabStyle
 } as const
 

@@ -40,7 +40,6 @@ import {
 import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
 import { ProductionTicketsPage, StudentOpsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
-import AdminEmbedPage from './AdminEmbedPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -55,7 +54,6 @@ interface RouteHostProps {
  */
 export default function RouteHost({ menu, permissions, roles, onOpenAssignment }: RouteHostProps) {
   const location = useLocation()
-  if (menu?.workbenchRenderMode === 'admin_embed') return <AdminEmbedPage path={menu.path || location.pathname}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>

@@ -39,6 +39,7 @@ import './permission'
 
 import '@/plugins/tongji' // 百度统计
 import Logger from '@/utils/Logger'
+import { setupWorkbenchEmbedBridge } from '@/utils/workbenchEmbedBridge'
 
 import VueDOMPurifyHTML from 'vue-dompurify-html' // 解决v-html 的安全隐患
 
@@ -84,6 +85,8 @@ const setupAll = async () => {
   app.use(print)
 
   app.mount('#app')
+
+  setupWorkbenchEmbedBridge()
 }
 
 setupAll()

@@ -2,8 +2,11 @@
   display: flex;
   min-height: 0;
   height: 100%;
-  padding: 0;
   overflow: hidden;
+}
+
+.admin-embed-page-hidden {
+  display: none;
 }
 
 .admin-embed-frame {

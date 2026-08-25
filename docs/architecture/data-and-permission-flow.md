@@ -42,11 +42,18 @@ The workbench HTTP client centralizes:
 System menu metadata includes `workbenchRenderMode` (`native`, `admin_embed`, or
 `admin_only`). This field is presentation metadata only: the same server-returned menu,
 button permissions, tenant checks, and backend authorization apply in both clients.
-`admin_embed` menus are opened by the React Workbench as a same-origin Vue Admin iframe
-under `/admin-embed/`; Vue Admin runs in a content-only layout with its navigation chrome
-hidden. `admin_only` menus are omitted from Workbench navigation and remain available only
-through the Vue Admin route tree. Tokens are never placed in the iframe URL or sent through
-`postMessage`.
+`admin_embed` menus are opened by the React Workbench through one lazily initialized,
+same-origin Vue Admin iframe under `/admin-embed/`; Vue Admin runs in a content-only layout
+with its navigation chrome hidden. The iframe remains mounted for the Workbench session and
+menu changes are sent as route-only messages to Vue Router, so switching pages does not
+restart the Admin application. Both message receivers require the Workbench origin and the
+expected parent/frame window. Tokens are never placed in the iframe URL or sent through
+`postMessage`. Vue Admin's existing route `keep-alive` metadata still decides whether an
+individual page component retains local state. `admin_only` menus are omitted from Workbench
+navigation and remain available only through the Vue Admin route tree. During a rolling update
+where the Admin bridge is not yet available, Workbench retains the single iframe element but
+falls back to document navigation; functionality remains available, while fast route switching
+starts automatically after the updated Admin sends its ready handshake.
 
 The two browser applications share the same-origin `localStorage` keys
 `ACCESS_TOKEN`, `REFRESH_TOKEN`, and `CLIENT_ID`. Existing Workbench keys are migrated on

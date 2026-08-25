@@ -1,5 +1,5 @@
 import { Tabs } from 'antd'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import type { WorkbenchMenu } from '../services/api'
 import type { TabStyle } from '../constants'
@@ -10,7 +10,20 @@ export interface TabItem {
   closable: boolean
 }
 
-const MAX_TABS = 15
+export const MAX_TABS = 15
+
+export function appendMenuTab(tabs: TabItem[], currentMenu?: WorkbenchMenu): TabItem[] {
+  if (!currentMenu || tabs.some(tab => tab.key === currentMenu.path)) return tabs
+  const next = [
+    ...tabs,
+    { key: currentMenu.path, label: currentMenu.name, closable: tabs.length > 0 }
+  ]
+  if (next.length > MAX_TABS) {
+    const index = next.findIndex(tab => tab.closable && tab.key !== currentMenu.path)
+    if (index >= 0) next.splice(index, 1)
+  }
+  return next
+}
 
 /**
  * 顶部页签栏：记录打开过的页面，支持切换和关闭。
@@ -20,29 +33,17 @@ const TabBar: React.FC<{
   currentMenu?: WorkbenchMenu
   initialPath?: string
   tabStyle?: TabStyle
-}> = ({ currentMenu, initialPath, tabStyle = 'card' }) => {
+  tabs: TabItem[]
+  setTabs: Dispatch<SetStateAction<TabItem[]>>
+}> = ({ currentMenu, initialPath, tabStyle = 'card', tabs, setTabs }) => {
   const navigate = useNavigate()
   const location = useLocation()
-  const [tabs, setTabs] = useState<TabItem[]>([])
   const initialPathRef = useRef(initialPath)
 
   // 当前页面进入 tabs
   useEffect(() => {
-    if (!currentMenu) return
-    const key = currentMenu.path
-    const label = currentMenu.name
-
-    setTabs((prev) => {
-      if (prev.some((t) => t.key === key)) return prev
-      const next = [...prev, { key, label, closable: prev.length > 0 }]
-      // LRU: 超过上限时移除最早的可关闭 tab
-      if (next.length > MAX_TABS) {
-        const idx = next.findIndex((t) => t.closable && t.key !== key)
-        if (idx >= 0) next.splice(idx, 1)
-      }
-      return next
-    })
-  }, [currentMenu])
+    setTabs(prev => appendMenuTab(prev, currentMenu))
+  }, [currentMenu, setTabs])
 
   // 第一个 tab 设为不可关闭
   useEffect(() => {

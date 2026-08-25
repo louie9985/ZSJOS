@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import {
   Alert,
@@ -53,11 +53,12 @@ import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
 import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/EmployeeAvatar'
 import ThemeProvider from './components/Theme/ThemeProvider'
 import SettingsDrawer from './components/SettingsDrawer'
-import TabBar from './components/TabBar'
+import TabBar, { type TabItem } from './components/TabBar'
 import { useTheme } from './components/Theme/ThemeContext'
 import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
 import RouteHost from './layouts/RouteHost'
+import AdminEmbedFrame, { type AdminEmbedFrameHandle } from './layouts/AdminEmbedPage'
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
@@ -113,6 +114,9 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const [pendingAssignmentCount, setPendingAssignmentCount] = useState(0)
   const [openAssignmentRequest, setOpenAssignmentRequest] = useState(0)
   const [impersonation, setImpersonation] = useState<ReturnType<typeof getStoredImpersonation>>()
+  const [tabs, setTabs] = useState<TabItem[]>([])
+  const adminEmbedFrameRef = useRef<AdminEmbedFrameHandle>(null)
+  const previousTabsRef = useRef<TabItem[]>([])
 
   useEffect(() => {
     const sync = () => setImpersonation(getStoredImpersonation())
@@ -158,6 +162,32 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     () => findMenuByPath(menus, location.pathname),
     [menus, location.pathname]
   )
+  const activeAdminEmbedPath = currentMenu?.workbenchRenderMode === 'admin_embed'
+    ? currentMenu.path
+    : undefined
+
+  const handleAdminRouteChange = useCallback((path: string) => {
+    const menu = findMenuByPath(menus, path)
+    if (menu?.workbenchRenderMode === 'admin_embed' && path !== location.pathname) {
+      navigate(path)
+    }
+  }, [location.pathname, menus, navigate])
+
+  useEffect(() => {
+    if (!tabsEnabled) setTabs([])
+  }, [tabsEnabled])
+
+  useEffect(() => {
+    const currentPaths = new Set(tabs.map(tab => tab.key))
+    previousTabsRef.current.forEach(tab => {
+      if (currentPaths.has(tab.key)) return
+      const menu = findMenuByPath(menus, tab.key)
+      if (menu?.workbenchRenderMode === 'admin_embed') {
+        adminEmbedFrameRef.current?.closeRoute(tab.key)
+      }
+    })
+    previousTabsRef.current = tabs
+  }, [menus, tabs])
 
   useEffect(() => {
     if (inaccessiblePathFallback) navigate(inaccessiblePathFallback, { replace: true })
@@ -396,10 +426,16 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         message={`只读借视图：当前以 ${impersonation.targetNameSnapshot} 的数据权限查看，所有 ZSJOS 写操作均会被服务端拒绝。`}
       />}
       <SalesDispatchStatusAlert />
-      {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle}/>}
+      {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
       <Layout className="content-layout">
         <Content>
-          <Routes>
+          <AdminEmbedFrame
+            ref={adminEmbedFrameRef}
+            activePath={activeAdminEmbedPath}
+            title={currentMenu?.name}
+            onRouteChange={handleAdminRouteChange}
+          />
+          {!activeAdminEmbedPath && <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
               ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
@@ -409,7 +445,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
             <Route path={APP_ROUTES.SALES_ORDER_SUPERVISOR_CONFIRMATIONS} element={<Navigate to={APP_ROUTES.SALES_ORDER_APPROVALS} replace/>}/>
             <Route path="/" element={initialTarget ? <Navigate to={initialTarget} replace/> : <NoAccessibleMenu hasMenus={navigation.length > 0}/>}/>
             <Route path="*" element={currentMenu ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/> : <Result status="404" title="页面不存在"/>}/>
-          </Routes>
+          </Routes>}
         </Content>
         {aiOpen && <Sider width={LAYOUT_SIZES.AI_SIDER_W} className="ai-sider"><Typography.Title level={5}><RobotOutlined/> AI 助手</Typography.Title><Result status="info" title="AI 助手暂未接入"/></Sider>}
       </Layout>

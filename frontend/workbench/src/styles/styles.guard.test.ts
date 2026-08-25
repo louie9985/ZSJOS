@@ -150,6 +150,14 @@ describe('spacing and sizing anchors', () => {
     expect(offenders).toEqual([])
   })
 
+  it('lets embedded Admin pages inherit the standard Workbench page spacing', () => {
+    const adminEmbed = business.find(([path]) => path.endsWith('admin-embed.css'))?.[1] ?? ''
+
+    expect(adminEmbed).toMatch(/\.admin-embed-page\s*\{/)
+    expect(adminEmbed).not.toMatch(/\.admin-embed-page\s*\{[^}]*padding:/)
+    expect(adminEmbed).toMatch(/\.admin-embed-page-hidden\s*\{[^}]*display: none/)
+  })
+
   it('aligns my sales orders with the standard master-detail page shell', () => {
     const salesOrder = business.find(([path]) => path.endsWith('sales-order.css'))?.[1] ?? ''
 

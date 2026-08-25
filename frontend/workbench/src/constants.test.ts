@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_ROUTES, LAYOUT_MODE_OPTIONS, RENDERABLE_APP_ROUTES } from './constants'
+import { APP_ROUTES, DEFAULT_THEME, LAYOUT_MODE_OPTIONS, RENDERABLE_APP_ROUTES } from './constants'
 
 describe('renderable Workbench routes', () => {
   it('registers configuration pages and existing pages that previously lacked renderability', () => {
@@ -22,5 +22,9 @@ describe('Workbench navigation layouts', () => {
     expect(LAYOUT_MODE_OPTIONS.map(option => option.value)).toEqual([
       'side', 'top', 'top-only', 'single-sider', 'mini-float'
     ])
+  })
+
+  it('enables the shared page tabs by default', () => {
+    expect(DEFAULT_THEME.tabs).toBe(true)
   })
 })

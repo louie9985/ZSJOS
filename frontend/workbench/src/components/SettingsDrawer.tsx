@@ -313,7 +313,7 @@ const SettingsDrawer: React.FC = () => {
 
         {/* ===== 开关设置 ===== */}
         <SettingSwitch label="顶栏固定" description="关闭后顶栏随内容滚动" checked={headerFixed} onChange={setHeaderFixed} />
-        <SettingSwitch label="页签模式" description="多页签切换，保留页面状态" checked={tabs} onChange={setTabs} />
+        <SettingSwitch label="页签模式" description="多页签切换，嵌入页面按菜单配置缓存" checked={tabs} onChange={setTabs} />
         {tabs && (
           <>
             <SectionTitle style={{ marginBottom: 6 }}>页签样式</SectionTitle>
