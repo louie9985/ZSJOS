@@ -52,7 +52,12 @@ describe('business inbox alignment', () => {
     expect(styles).toMatch(/\.message-center-item \{[^}]*flex: none;/)
     expect(styles).toMatch(/\.message-center-item-copy > \.message-center-item-summary \{[^}]*overflow-wrap: anywhere;[^}]*word-break: break-word;[^}]*-webkit-line-clamp: 2;/)
     expect(styles).toMatch(/\.message-inbox-detail \.message-detail-section \.ant-typography \{[^}]*word-break: break-word;/)
-    expect(styles).toMatch(/\.message-detail-meta \.detail-field dt \{[^}]*text-align: left;/)
-    expect(styles).toMatch(/\.message-detail-meta \.detail-field dd \{[^}]*text-align: right;[^}]*word-break: break-word;/)
+
+    // 「标签左、值右」与长值换行已提升为 DetailFieldGrid 的基础样式，
+    // 此处的页面级覆盖随之删除（见 styles.guard.test.ts 的组件断言）。
+    // 靠右用 grid 而非 text-align，否则回行的尾巴会被甩到右边。
+    const detailFields = readFileSync('src/styles/components/detail-field-grid.css', 'utf8')
+    expect(detailFields).toMatch(/\.detail-field dt \{[^}]*text-align: left;/)
+    expect(detailFields).toMatch(/\.detail-field dd \{[\s\S]*?justify-items: end;[\s\S]*?word-break: break-word;/)
   })
 })

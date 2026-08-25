@@ -175,14 +175,6 @@
   gap: var(--crm-sp-4);
 }
 
-.sales-order-detail .detail-field dt {
-  text-align: left;
-}
-
-.sales-order-detail .detail-field dd {
-  text-align: right;
-}
-
 .sales-order-detail-hero {
   display: flex;
   align-items: center;

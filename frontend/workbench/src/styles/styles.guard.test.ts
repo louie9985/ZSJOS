@@ -196,9 +196,34 @@ describe('spacing and sizing anchors', () => {
     expect(detailFields).toMatch(/@media \(max-width: 768px\)[\s\S]*\.detail-field-grid\.columns-3[\s\S]*grid-template-columns: minmax\(0, 1fr\)/)
   })
 
-  it('aligns order detail labels left and values right', () => {
-    expect(joined).toMatch(/\.sales-order-detail \.detail-field dt \{[^}]*text-align: left/)
-    expect(joined).toMatch(/\.sales-order-detail \.detail-field dd \{[^}]*text-align: right/)
+  it('aligns detail field labels left and values right in the component itself', () => {
+    // 曾由 message-inbox 与 sales-order 各自覆盖，其余 10 处调用方是左左对齐。
+    // 现统一到组件基础样式，页面不该再打补丁。
+    const detailFields = readFileSync(join(ROOT, 'components/detail-field-grid.css'), 'utf8')
+    expect(detailFields).toMatch(/\.detail-field dt \{[^}]*text-align: left/)
+    // 值靠右用 grid + justify-items 而非 text-align —— 后者会把回行的尾巴
+    // 也甩到右边（"…6217 0012 / 3456 7890"）。整块靠右、行内左排才读得顺。
+    expect(detailFields).toMatch(/\.detail-field dd \{[^}]*justify-items: end/)
+    expect(detailFields).toMatch(/\.detail-field dd \{[^}]*text-align: left/)
+    // 值的字号必须显式声明，否则继承父级 → 同一组件跨页面字号不一致
+    expect(detailFields).toMatch(/\.detail-field dd \{[^}]*font-size: var\(--crm-font-base\)/)
+    // 整行长文本（备注、地址）不做右收拢，否则文字块远离标签
+    expect(detailFields).toMatch(/\.detail-field\.span-2 dd \{[^}]*justify-items: start/)
+
+    const offenders = business
+      .filter(([path]) => !path.endsWith('detail-field-grid.css'))
+      .filter(([, text]) => /\.detail-field d[td][^{]*\{[^}]*text-align/.test(stripComments(text)))
+      .map(([path]) => path)
+    expect(offenders).toEqual([])
+  })
+
+  it('keeps detail fields raised rather than sunken', () => {
+    // 字段块几乎总是嵌在大卡片内，凹陷会读成「洞中洞」，层次反了
+    const detailFields = readFileSync(join(ROOT, 'components/detail-field-grid.css'), 'utf8')
+    const base = detailFields.split('.detail-field {')[1]?.split('}')[0] ?? ''
+    expect(base).toContain('box-shadow: var(--crm-shadow)')
+    expect(base).not.toContain('shadow-inset')
+    expect(base).not.toContain('bg-sunken')
   })
 
   it('keeps intended-product checkbox hit areas on the control and label', () => {

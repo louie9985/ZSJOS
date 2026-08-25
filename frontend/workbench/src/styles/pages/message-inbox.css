@@ -512,15 +512,6 @@
   min-width: 0;
 }
 
-.message-detail-meta .detail-field dt {
-  text-align: left;
-}
-
-.message-detail-meta .detail-field dd {
-  text-align: right;
-  word-break: break-word;
-}
-
 @media (max-width: 768px) {
   .message-center-scope-bar {
     align-items: stretch;
