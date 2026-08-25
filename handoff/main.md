@@ -2959,3 +2959,99 @@
 - Verification evidence: 推送返回 `759accf4..c5d5b19c main -> main`；提交前 Workbench 59 个测试文件/366 个测试、类型检查、生产构建均通过；首次推送失败原因为 SSH 连接被远端关闭，重试成功。
 - Dependency/integration impact: 远端 `main` 已包含本次 Workbench UI、时间格式、销售订单详情、抢单池和代理配置改动；无数据库、权限、BPM、服务或分支变更。
 - Remaining work: 推送本收尾日志提交后，确认本地与远端哈希一致；`frontend/workbench/probe.html` 和 `frontend/workbench/src/__probe__/` 仍为本地未跟踪调试文件。
+
+## Workstream Registration - 2026-08-25 20:29:29 +08:00
+
+- Workstream ID: `main-workbench-admin-embed-spacing-tabs-20260825`
+- Goal: 为 Workbench 中的 Vue Admin 嵌入页面恢复标准页面留白，并默认开启 Workbench 统一页签。
+- Non-goals: 不恢复 Vue Admin 自身顶栏、侧边栏或 TagsView，不修改 Admin 80 端口独立访问布局，不改变 iframe 认证、菜单权限、路由、页面状态保留机制、依赖、分支、提交、推送、部署或无关未提交改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd` 加现有未提交改动；本地 `main` 当前落后 `origin/main` 1 个提交，本次不执行同步或分支操作。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/styles/pages/admin-embed.css`、`frontend/workbench/src/constants.ts`、相关聚焦测试及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 `.workspace-page` 页面间距 token、Workbench `TabBar` 和主题配置；无新增依赖。
+- Integration order: 恢复嵌入容器标准留白 -> 默认开启现有统一页签 -> 补充聚焦回归断言 -> 执行测试、类型检查、构建和浏览器验证 -> 追加交付记录。
+- Verification plan: 运行常量聚焦测试、样式守卫、Workbench 全量测试、`npm run typecheck`、`npm run build`、目标 diff 检查，并在现有本地服务可用时检查嵌入页面桌面与移动布局；Admin 80 端口页面不修改，以源代码边界确认其不受影响。
+
+## Delivery Entry - 2026-08-25 20:33:07 +08:00
+
+- Workstream ID: `main-workbench-admin-embed-spacing-tabs-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd`（未创建提交）
+- User goal: 为 Workbench 中嵌入的 Vue Admin 页面增加与顶部和菜单栏之间的留白，并增加统一标签页。
+- Key decisions: 删除嵌入页对 `.workspace-page` 标准页面间距的 `padding: 0` 覆盖，使其随 Workbench 密度 token 使用统一留白；复用 Workbench 已有可关闭 `TabBar` 并将新用户默认值改为开启；继续隐藏 Vue Admin 自身 TagsView，避免两套标签栏；已保存过明确主题偏好的用户继续保留其本地页签开关状态。
+- Execution or analysis result: Admin iframe 现在继承 Workbench 标准页面留白；未保存主题设置的新会话默认显示统一页签，页签同时覆盖 React 原生页和 Admin 嵌入页；新增常量断言与样式守卫，防止默认值或嵌入间距再次回退。
+- Changed files: `frontend/workbench/src/styles/pages/admin-embed.css`；`frontend/workbench/src/constants.ts`；`frontend/workbench/src/constants.test.ts`；`frontend/workbench/src/styles/styles.guard.test.ts`；`handoff/main.md`。
+- Verification evidence: 聚焦常量和样式测试通过 2 个文件/29 项测试；Workbench 全量测试通过 59 个文件/367 项测试；`npm run typecheck` 通过；`npm run build` 通过，仅有既有大 chunk 警告；目标文件 `git diff --check` 通过；Playwright 成功打开 `http://127.0.0.1:5174/`，但自动化会话无登录态，仅验证登录页可加载，未能进入授权嵌入业务页执行桌面/移动视觉检查。
+- Dependency or integration impact: 无新增依赖、Vue Admin 源码、后端/API、菜单权限、认证、数据库、分支、提交、推送、部署或服务状态变更；普通 Admin 80 端口独立布局不受影响；保留既有 `.env.local` 和 probe 调试文件改动。
+- Remaining work: 使用具备相应菜单权限的登录态补看嵌入业务页的桌面与移动效果；已有浏览器若曾保存 `tabs: false`，需在右上角设置中打开“页签模式”或恢复默认设置。
+
+## Workstream Registration - 2026-08-25 20:40:00 +08:00
+
+- Workstream ID: `main-workbench-admin-embed-keepalive-20260825`
+- Goal: 让 Workbench 统一页签在切换已打开的 Vue Admin 嵌入页面时保留 iframe 实例，避免每次切换都重新加载整个 Admin 页面。
+- Non-goals: 不缓存 React 原生页面，不修改 Vue Admin 内部路由/keep-alive/TagsView，不改变认证、共享 Token、菜单权限、后端 API、15 页签上限、Admin 80 端口独立访问、依赖、分支、提交、推送、部署或无关未提交改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd` 加现有未提交改动；本地 `main` 当前落后 `origin/main` 1 个提交，本次不执行同步或分支操作。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/components/TabBar.tsx`、`frontend/workbench/src/layouts/AdminEmbedPage.tsx`、`frontend/workbench/src/main.tsx`、嵌入页样式、聚焦测试及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 React Router、Workbench `TabBar`、服务端菜单树和同源 Admin iframe；无新增依赖。
+- Integration order: 将页签状态提升到 Workbench Shell -> 从已打开页签解析 Admin 缓存项 -> 常驻渲染并显隐 iframe -> 关闭/淘汰时移除缓存 -> 增加聚焦测试 -> 全量验证。
+- Verification plan: 聚焦验证多个 Admin 页签缓存、原生页排除、当前 Admin 首次立即加入、关闭后移除和样式隐藏；运行 Workbench 全量测试、`npm run typecheck`、`npm run build`、目标 diff 检查，并在可用登录态下用浏览器确认 iframe 元素在切换前后保持同一实例、关闭标签后被销毁。
+
+## Workstream Scope Update - 2026-08-25 20:50:00 +08:00
+
+- Workstream ID: `main-workbench-admin-embed-keepalive-20260825`
+- Confirmed direction change: 用户明确选择全局单 iframe，替代尚未交付的多 iframe 缓存方案。先前登记的多 iframe 目标、非目标、集成顺序和验证计划不再作为本工作流实现依据。
+- Updated goal: Workbench 在首次进入任一 `admin_embed` 菜单时懒加载一个全局 iframe，随后通过同源、仅路由的消息协议驱动 Vue Admin 内部 `router.push`；切换到 React 页面时隐藏但不销毁该 iframe。
+- Updated non-goals: 不创建每标签 iframe，不通过消息传递 Token，不绕过 Vue Router 权限守卫，不保证 `noCache` 页面保留未提交组件状态，不修改后端/API/数据库/菜单权限、Admin 80 端口独立模式、依赖、分支、提交、推送、部署或无关未提交改动。
+- Ownership scope addition: `frontend/admin/src/utils/workbenchEmbedBridge.ts`、`frontend/admin/src/main.ts`、`frontend/workbench/src/layouts/RouteHost.tsx`、相关聚焦测试、`docs/architecture/data-and-permission-flow.md` 和本交付记录。
+- Updated integration order: 将 Workbench 页签状态提升到 Shell -> 实现单 iframe 宿主与就绪/导航/关闭协议 -> Admin 注册同源消息桥并复用自身 Router/TagsView 缓存 -> 同步受影响架构文档 -> 双端构建和真实浏览器验证。
+- Updated verification plan: 验证 Workbench 只渲染一个 iframe、切换 Admin 菜单不改变 iframe 文档实例、React/Admin 切换只显隐、仅已授权的服务端 `admin_embed` 菜单可同步外层路由、关闭标签清理 Admin 标签缓存；运行 Workbench 聚焦/全量测试、typecheck/build、Admin 定向 lint/typecheck/build、目标 diff 检查和可用登录态下的桌面/移动浏览器检查。
+
+## Delivery Entry - 2026-08-25 21:20:00 +08:00
+
+- Workstream ID: `main-workbench-admin-embed-keepalive-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd`（未创建提交）
+- User goal: 采用全局单 iframe，使 Workbench 在 Vue Admin 菜单之间切换时复用同一 Admin 应用实例，并在 React 页面和 Admin 页面之间切换时保留该实例。
+- Key decisions: Workbench 首次进入 `admin_embed` 菜单时懒加载唯一 iframe，之后保持挂载；新版 Admin 通过同源、仅路由的 `ready`、`navigate`、`route-changed`、`close-route` 消息复用自身 Vue Router、TagsView 和 keep-alive；消息不携带 Token，父子端均校验 origin 和窗口来源；远端 Admin 尚未同步桥接代码时，继续复用同一个 iframe 元素并以更新 `src` 的方式降级切页。
+- Execution or analysis result: 将页签状态提升到 Workbench Shell；从路由页宿主移除逐页 iframe，改为 Shell 级单 iframe 的常驻渲染和显隐；页签关闭或超过 15 项淘汰时通知 Admin 清理对应 TagsView 缓存；Admin 注册嵌入路由桥；统一页签默认开启并保留标准 12px 页面留白；同步了共享渲染和会话架构说明。
+- Changed files: `frontend/workbench/src/layouts/AdminEmbedPage.tsx`; `frontend/workbench/src/layouts/AdminEmbedPage.test.ts`; `frontend/workbench/src/layouts/RouteHost.tsx`; `frontend/workbench/src/components/TabBar.tsx`; `frontend/workbench/src/components/TabBar.test.ts`; `frontend/workbench/src/components/SettingsDrawer.tsx`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/constants.ts`; `frontend/workbench/src/constants.test.ts`; `frontend/workbench/src/styles/pages/admin-embed.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `frontend/workbench/tsconfig.tsbuildinfo`; `frontend/admin/src/utils/workbenchEmbedBridge.ts`; `frontend/admin/src/main.ts`; `docs/architecture/data-and-permission-flow.md`; `handoff/main.md`。既有 `frontend/workbench/.env.local` 和未跟踪 probe 文件不属于本工作流改动。
+- Verification evidence: Workbench 聚焦测试通过 4 个文件/34 项测试，全量 Vitest 通过 61 个文件/373 项测试，`npm run typecheck` 通过，`npm run build` 通过且仅有既有大 chunk 警告；Admin `pnpm exec vite build --mode embed.local` 通过且仅有既有 legacy CSS 语法警告，新桥接文件 ESLint 和 Prettier 检查通过；Admin 全仓 `ts:check` 仍被 19 项既有错误阻断，本次桥接文件未新增错误；`git diff --check` 通过。真实 Chrome 登录态验证从 `/hrm/birthday-care` 切换到 `/hrm/dept` 时 DOM 始终只有一个 iframe，旧 Admin 降级时同一宿主的 `src` 正确更新；切到 React `/zsjos/tasks/today` 后 iframe 数量和地址不变、仅添加隐藏类，返回后恢复显示；组织管理页面最终正常渲染。先前浏览器检查已确认 390x844 无横向溢出且 iframe 左右各保留约 12px。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/菜单权限、分支、提交、推送或部署；Admin 80 端口的独立访问布局不受影响。只有将 `frontend/admin/src/utils/workbenchEmbedBridge.ts` 和 `frontend/admin/src/main.ts` 同步到运行 Admin 的局域网电脑并重启对应开发服务后，才会从旧版 `src` 降级切换自动升级为无刷新 Vue Router 切换。
+- Remaining work: 在另一台电脑同步并重启 Admin 后，用两个 `admin_embed` 菜单再次确认 iframe `src` 保持不变而 iframe 内部 Vue 路由发生变化；当前未执行该外部服务变更。未提交、未推送。
+
+## Workstream Registration - 2026-08-25 21:26:05 +08:00
+
+- Workstream ID: `main-workbench-font-probe-publish-20260825`
+- Goal: 将当前未跟踪的 Workbench 字号实验页面提交，并在同步最新远端代码后推送到 `origin/main`。
+- Non-goals: 不修改实验页内容，不执行数据库、服务启停、分支切换、历史重写或强制推送。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd`
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/probe.html`、`frontend/workbench/src/__probe__/`、`handoff/main.md` 及对应 Git 提交/推送状态。
+- Owner: Codex `/root`
+- Dependencies: `origin/main` 当前领先的提交 `da10ba31`；实际合并需单独确认。
+- Integration order: 验证 probe 文件，创建本地提交，确认并同步远端提交，复验后推送。
+- Verification plan: Workbench 全量测试、类型检查、生产构建、`git diff --check`、合并冲突检查及本地/远端哈希核对。
+
+## Delivery Entry - 2026-08-25 21:26:05 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd`（提交前）
+- User goal: 将当前 Git 改动直接提交并推送到云端。
+- Key decisions: 当前唯一未提交内容为先前保留在本地的字号 probe 实验页；本次明确将其纳入提交；远端领先 1 个提交，先创建本地提交，再按仓库规则单独确认合并；不强制推送。
+- Execution or analysis result: probe 实验页已完成验证，准备创建本地提交。
+- Changed files: `frontend/workbench/probe.html`；`frontend/workbench/src/__probe__/FontProbe.tsx`；`frontend/workbench/src/__probe__/main.tsx`；`handoff/main.md`。
+- Verification evidence: Workbench Vitest 61 个测试文件、373 个测试通过；`npm run typecheck` 通过；`npm run build` 通过，仅有既有大 chunk 警告；提交前 `git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖、数据库、权限、BPM、服务、分支或外部状态变更；远端 `main` 仍领先 1 个提交，尚未合并或推送。
+- Remaining work: 创建本地提交；取得远端合并确认后同步 `da10ba31`，重新核验并推送。
