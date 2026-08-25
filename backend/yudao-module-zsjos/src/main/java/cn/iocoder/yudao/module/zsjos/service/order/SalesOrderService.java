@@ -18,8 +18,11 @@ public interface SalesOrderService {
     SalesOrderRespVO getOwn(Long orderId, Long userId);
     PageResult<SalesOrderListItemRespVO> getMyPage(SalesOrderMyPageReqVO reqVO, Long userId);
     CursorPageResult<SalesOrderListItemRespVO> getMyCursorPage(SalesOrderMyCursorReqVO reqVO, Long userId);
+    PageResult<SalesOrderListItemRespVO> getTeamPage(SalesOrderTeamPageReqVO reqVO, Long userId);
+    CursorPageResult<SalesOrderListItemRespVO> getTeamCursorPage(SalesOrderTeamCursorReqVO reqVO, Long userId);
     PageResult<FinanceOrderExportRowRespVO> getFinanceExportPage(FinanceOrderExportReqVO reqVO, Long userId);
     SalesOrderStatusCountsRespVO getMyStatusCounts(Long userId);
+    SalesOrderStatusCountsRespVO getTeamStatusCounts(Long userId);
     PageResult<SalesOrderListItemRespVO> getInboxPage(SalesOrderPageReqVO reqVO, Long userId);
     CursorPageResult<SalesOrderListItemRespVO> getInboxCursor(SalesOrderPageReqVO reqVO, Long userId);
     SalesOrderApprovalFilterProfileRespVO getApprovalFilterProfile(Long userId);

@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
-describe('content director My Students', () => {
+describe('director and operator My Students', () => {
   const page = readFileSync('src/pages/MediaStudentsPage.tsx', 'utf8')
+  const api = readFileSync('src/services/api.ts', 'utf8')
   const style = readFileSync('src/styles/pages/media-students.css', 'utf8')
 
   it('uses the workbench master-detail recipe', () => {
@@ -22,17 +23,27 @@ describe('content director My Students', () => {
 
   it('loads the director-owned business detail projection', () => {
     expect(page).toContain('api.mediaStudents.get(personId)')
-    expect(page).toContain('api.managedLead(service.leadId)')
-    expect(page).toContain('<LeadDetail')
+    expect(page).toContain('api.studentContactContext(service.serviceRelationId)')
     expect(page).toContain('<LeadDetailOverview')
-    expect(page).toContain("baseTabs={['overview']}")
+    expect(page).toContain('<StudentDetail')
+    expect(page).toContain('student={detail.student}')
+    expect(page).toContain('overviewContent={mediaOverview}')
+    expect(page).not.toContain('当前课程服务尚未关联客资详情')
     expect(page).toContain('service.serviceRelationId')
-    expect(page).toContain('service.leadId')
     expect(page).toContain("label: '账号'")
     expect(page).toContain('账号定位卡')
     expect(page).toContain('内容生产历史')
-    expect(page).toContain("label: '学员信息'")
-    expect(page).toContain('沟通记录')
+    expect(page).not.toContain("label: '学员信息'")
+    expect(page).not.toContain('沟通记录')
+    expect(page).not.toContain('新增沟通记录')
+    expect(page).not.toContain('客资编号')
+    expect(page).not.toContain('api.managedLead')
+    expect(page).not.toContain('leadId')
+    expect(page).toContain("x.personNo || '暂无学员编号'")
+    expect(page).toContain("operationTimeline.filter(item => item.type !== 'talk')")
+    expect(page).toContain("value === 'positioning'")
+    expect(page).toContain("useState(normalizeMediaStudentTab(params.get('tab')))")
+    expect(api).not.toContain('/talk-records')
     expect(page).toContain("label: '学习规划师', value: selectedService.ownerUserName")
     expect(page).toContain('mainBeforeColumns')
     expect(page).toContain('最新内容')
@@ -42,5 +53,22 @@ describe('content director My Students', () => {
     expect(page).not.toContain('最近联系')
     expect(page).not.toContain('客资流转')
     expect(page).toContain('待处理')
+    expect(page).toContain("directorContext?.availableActions.filter(action => ['DIRECTOR_PRECHECK', 'DIRECTOR_INTERVIEW', 'ASSIGN_OPERATOR'].includes(action))")
+  })
+
+  it('autosaves only server-backed director business drafts', () => {
+    expect(page).toContain('const AUTO_SAVE_DELAY_MS = 1500')
+    expect(page).toContain('onValuesChange={scheduleAutoSave}')
+    expect(page).toContain("dialog === 'precheck' || dialog === 'interview' || dialog === 'positioning'")
+    expect(page).toContain('DirectorAutoSaveCoordinator')
+    expect(page).toContain('stageDraftVersion.current = authoritativeVersion')
+    expect(page).toContain('草稿已自动保存')
+    expect(page).toContain('草稿已在其他窗口更新，请刷新后继续')
+    expect(page).toContain('valuePropName="checked" label={label}')
+    expect(page).not.toContain("if (field.type === 'checkbox') return null")
+    expect(page).not.toContain('localStorage.setItem')
+    expect(api).toContain("http.post('/zsjos/positioning-card/draft'")
+    expect(api).toContain('http.put(`/zsjos/positioning-card/draft/${id}`')
+    expect(api).toContain('unwrap<PositioningCardDraftResult>')
   })
 })

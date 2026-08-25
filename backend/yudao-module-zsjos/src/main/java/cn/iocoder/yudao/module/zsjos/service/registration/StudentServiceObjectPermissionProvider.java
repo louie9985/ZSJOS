@@ -33,11 +33,13 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
             if ("read".equals(action) && Set.of("active", "paused", "completed").contains(relation.getStatus())) return true;
             return "active".equals(relation.getStatus()) && OWNER_ACTIONS.contains(action);
         }
+        if ("read".equals(action) && "accepted".equals(relation.getAcceptanceStatus())
+                && Set.of("active", "paused", "completed").contains(relation.getStatus())
+                && Objects.equals(relation.getOperatorUserId(), userId)) return true;
         if (!"active".equals(relation.getStatus())) return false;
         if ("read".equals(action) && "accepted".equals(relation.getAcceptanceStatus())) {
             return Objects.equals(relation.getContentDirectorUserId(), userId)
-                    || Objects.equals(relation.getCareerPlannerUserId(), userId)
-                    || Objects.equals(relation.getOperatorUserId(), userId);
+                    || Objects.equals(relation.getCareerPlannerUserId(), userId);
         }
         if ("assign".equals(action) && Objects.equals(relation.getContentDirectorUserId(), userId)
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) return true;

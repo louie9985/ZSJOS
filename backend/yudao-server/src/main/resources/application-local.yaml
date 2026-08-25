@@ -251,6 +251,13 @@ yudao:
     enable: false # 本地环境，暂时关闭图片验证码，方便登录等接口的测试；
   security:
     mock-enable: true
+  media-screen:
+    # Local development exception explicitly approved on 2026-08-25. Do not copy to shared environments.
+    enabled: true
+    clients:
+      - tenant-id: 1
+        cidrs:
+          - 0.0.0.0/0
   pay:
     order-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
     refund-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址

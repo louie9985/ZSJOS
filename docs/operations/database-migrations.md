@@ -395,3 +395,62 @@ forward correction after resolving the conflicting menu metadata; there is no au
 because restoring duplicated parent prefixes would reintroduce invalid routing. Apply V119 only
 through the reviewed migration sequence and require `workbench_relative_child_paths` in
 `verify-bootstrap.sql` to return `PASS`.
+
+## V132 Workbench menu rendering mode
+
+V132 adds the server-owned `workbench_render_mode` column to `system_menu`. It is additive and repeatable,
+defaults existing menu rows to `native`, and does not change permissions or business data. After controlled
+execution, run `verify-bootstrap.sql` and require the V132 rendering-mode check to pass. Removing the column
+is not an automatic rollback because administrator-selected rendering metadata would be lost.
+
+## V133 director interview form presentation
+
+V133 follows V132 in the baseline and normalizes active director interview templates, retires the
+six-dimension field, supplies the reviewed dictionary choices, and guards the two director draft-version
+columns. It uses a database named lock and preserves published history and service-relation snapshots.
+Execute it only through the controlled migration sequence, then require the V133 verification check to pass.
+Rollback must use a reviewed forward template version rather than rewriting historical snapshots.
+
+## V134 positioning confirmation handoff
+
+V134 follows V133 and adds tenant-scoped positioning submission snapshots and public confirmation-link
+records. Link rows contain only SHA-256 token digests; no plaintext token, fixed expiry, test account, or
+business dictionary option is seeded. It also defines `zsjos:positioning-card:student-link-generate`, adds it
+to tenant packages that already contain the media-student page, and grants it to existing
+`new_media_operator` roles. Runtime object and status checks remain mandatory.
+
+The only business-row conversion targets active, non-deleted positioning cards currently in legacy
+`student_confirm`. A compatibility submission is inserted only when its service relation, student and
+operator identifiers are present; only cards with a resulting submission move to `student_link_pending`.
+Because the old schema has no authoritative submit time, the compatibility `submitted_at` remains `NULL`.
+No card, history, or link is deleted. The migration is repeatable and forward-only. Generated or consumed
+links and student decisions cannot be rolled back into the retired Partner-H5 flow.
+
+Do not execute V134 against any database until the target environment and count of matching
+`student_confirm` rows have been reviewed and separately approved. After controlled execution, run
+`verify-bootstrap.sql` and check the V134 version marker, both tables, token-hash uniqueness, and button
+permission. This repository change wires V134 into fresh bootstrap but does not execute it.
+
+## V135 applied director and positioning schema repair
+
+V135 follows V134 and repairs environments that applied earlier revisions of V133 or V134. It adds the
+missing precheck/interview draft-version columns to `zsjos_service_relation` and the six legacy positioning
+section snapshot columns to `zsjos_positioning_card_submission`. The compatibility update targets only
+active submission rows created by V134, joins them to the authoritative positioning card by tenant and card
+ID, and fills only null snapshot sections. It does not invent data, overwrite existing snapshot content,
+change card status, rewrite V133/V134 markers, or modify permissions.
+
+The migration is guarded and repeatable. It performs additive DDL and a bounded source-backed update; it
+deletes no rows. Rollback by dropping the columns is unsafe after runtime writes because it would discard
+draft versions and immutable positioning snapshot content. Apply it only after V134. After execution, run
+`verify-bootstrap.sql` and require the V128, V134, and V135 checks to return `PASS`; also confirm no
+V134-owned submission retains a null legacy section.
+
+## V137 Workbench menu rendering-mode collision repair
+
+The Windows development line had already applied different local migrations under V132/V133/V134 before
+the remote Workbench rendering migration was received as V132. Those applied markers remain historical
+facts and must not be rewritten. V137 therefore repeatably ensures `system_menu.workbench_render_mode`
+exists and records a new unique compatibility marker without changing menu grants or business rows. Run it
+after V132-V136 for both upgraded and fresh environments, then require the V137 compatibility check in
+`verify-bootstrap.sql` to return `PASS`.

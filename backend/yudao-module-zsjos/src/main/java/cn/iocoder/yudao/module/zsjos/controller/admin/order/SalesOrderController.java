@@ -88,7 +88,7 @@ public class SalesOrderController {
 
     @GetMapping("/{id}")
     @Operation(summary = "获得成交订单详情")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:query','zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create')")
     public CommonResult<SalesOrderRespVO> get(@PathVariable Long id) {
         return success(orderService.get(id, WebFrameworkUtils.getLoginUserId()));
     }
@@ -104,6 +104,41 @@ public class SalesOrderController {
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
     public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> getMyCursorPage(@Valid SalesOrderMyCursorReqVO reqVO) {
         return success(orderService.getMyCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/team-page")
+    @Operation(summary = "获得团队成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
+    public CommonResult<PageResult<SalesOrderListItemRespVO>> getTeamPage(@Valid SalesOrderTeamPageReqVO reqVO) {
+        return success(orderService.getTeamPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/team-search-page")
+    @Operation(summary = "高级筛选团队成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
+    public CommonResult<PageResult<SalesOrderListItemRespVO>> searchTeamPage(@Valid @RequestBody SalesOrderTeamPageReqVO reqVO) {
+        return success(orderService.getTeamPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/team-cursor")
+    @Operation(summary = "使用游标获得团队成交订单")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> getTeamCursorPage(@Valid SalesOrderTeamCursorReqVO reqVO) {
+        return success(orderService.getTeamCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @PostMapping("/team-search-cursor")
+    @Operation(summary = "高级筛选团队成交订单游标列表")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
+    public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchTeamCursorPage(@Valid @RequestBody SalesOrderTeamCursorReqVO reqVO) {
+        return success(orderService.getTeamCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/team-status-counts")
+    @Operation(summary = "获得团队成交订单状态统计")
+    @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
+    public CommonResult<SalesOrderStatusCountsRespVO> getTeamStatusCounts() {
+        return success(orderService.getTeamStatusCounts(WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/my-search-cursor")
     @Operation(summary = "高级筛选本人订单游标列表")

@@ -24,11 +24,13 @@ import {
 } from "antd";
 import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
+import dayjs from "dayjs";
 import { NameAvatar } from "../components/LeadDetailOverview";
 import LeadDetail from "../components/LeadDetail";
+import StudentDetail from "../components/StudentDetail";
 import SalesOrderEntryModal from "../components/SalesOrderEntryModal";
 import { hasPermission } from "../services/managementAccess";
-import type { ToolbarAction } from "../components/OverflowToolbar";
+import OverflowToolbar, { type ToolbarAction } from "../components/OverflowToolbar";
 import {
   api,
   type DictData,
@@ -616,7 +618,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       setSelected(student);
       const service = student.services.find(item => item.serviceRelationId === (preferredServiceId || selectedServiceId)) || student.services[0];
       setSelectedServiceId(service?.serviceRelationId);
-      const leadId = service?.leadId || student.leadId;
+      const leadId = service?.leadId;
       const [lead, context, records] = await Promise.all([
         leadId ? api.managedLead(leadId) : Promise.resolve(undefined),
         service ? api.studentContactContext(service.serviceRelationId) : Promise.resolve(undefined),
@@ -747,7 +749,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         if (personId) void loadStudent(personId);
       }}
     />
-  ) : selected && leadDetail && selectedService && studentContactContext ? (
+  ) : selected && selectedService && studentContactContext ? (
     <StudentPlannerOperations
       key={selectedService.serviceRelationId}
       student={selected}
@@ -757,7 +759,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
       onRefresh={refreshCurrentStudent}
     >
-      {(studentToolbarActions) => <LeadDetail
+      {(studentToolbarActions) => leadDetail ? <LeadDetail
       lead={{
         ...leadDetail,
         submittedName: selected.name ?? leadDetail.submittedName,
@@ -776,6 +778,19 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
          : studentToolbarActions}
       contextHeader={selectedService ? <div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div> : undefined}
       studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }}
+      extraTabs={[
+        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} />{selectedService.attributeValues?.length ? <Space wrap style={{ marginTop: 12 }}>{selectedService.attributeValues.map(value => <Tag key={value}>{value}</Tag>)}</Space> : null}</section> },
+        { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> }
+      ]}
+    /> : <StudentDetail
+      student={selected}
+      service={selectedService}
+      contactContext={studentContactContext}
+      contactRecords={studentContactRecords}
+      toolbar={<OverflowToolbar actions={canStudentRepurchase
+        ? [...studentToolbarActions, { key: 'student-repurchase', icon: <PlusOutlined />, label: '录入复购', onClick: () => setRepurchaseOpen(true) }]
+        : studentToolbarActions} />}
+      contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div>}
       extraTabs={[
         { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} />{selectedService.attributeValues?.length ? <Space wrap style={{ marginTop: 12 }}>{selectedService.attributeValues.map(value => <Tag key={value}>{value}</Tag>)}</Space> : null}</section> },
         { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> }
@@ -1001,9 +1016,10 @@ function StudentContactForm({
       else if (field.type === "dict") control = <Select options={dictOptions} loading={Boolean(field.dictType && !fieldDicts[field.dictType])} placeholder={dictOptions.length ? "请选择" : "暂无可用字典项，请重试"} mode={field.multiple ? "multiple" : undefined} />;
       return <Form.Item key={field.key} name={field.key} label={field.title} rules={rules} extra={field.description}>{control}</Form.Item>;
     })}
-    {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => form.setFieldValue("remark", `${form.getFieldValue("remark") || ""}${note}`)}>{note}</Button>)}</Space></Form.Item>}
+    {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => { const current = String(form.getFieldValue("remark") || "").trimEnd(); form.setFieldValue("remark", current ? `${current}\n${note}` : note); }}>{note}</Button>)}</Space></Form.Item>}
     <Form.Item name="remark" label="备注" rules={[{ required: true }]}><Input.TextArea rows={4} maxLength={2000} showCount /></Form.Item>
     <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
+    <Space wrap className="student-contact-time-shortcuts">{[1, 2, 3, 5, 7, 14, 30].map(days => <Button key={days} size="small" onClick={() => form.setFieldValue("nextContactAt", dayjs().add(days, "day"))}>+{days} 天</Button>)}</Space>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => { const value = getFieldValue("nextContactAt"); const successful = getFieldValue("successful") === true; const nextTaskType = taskType === "student_first_contact" ? (successful ? "student_study_plan" : "student_first_contact") : taskType === "student_study_plan" ? (successful ? "student_contact" : "student_study_plan") : "student_contact"; const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0; const extended = Boolean(value && timeout && new Date(String(value)).getTime() > Date.now() + timeout * 60000); return extended ? <><Alert type="warning" showIcon title={`超过允许时限（${timeout} 分钟），将发起延期审批`} /><Form.Item name="extensionReasonValue" label="延期原因" rules={[{ required: true }]}><Select options={extensionReasons.map(row => ({ label: row.label, value: row.value }))} /></Form.Item><Form.Item name="extensionDescription" label="延期说明" rules={[{ required: true }]}><Input.TextArea rows={3} maxLength={1000} /></Form.Item></> : null; }}</Form.Item>
     <Space wrap><Upload multiple fileList={attachmentUploads} beforeUpload={async file => { setAttachmentUploads(items => [...items.filter(item => item.uid !== file.uid), { uid: file.uid, name: file.name, status: "uploading" }]); try { const uploaded = await api.studentContactUpload(relationId, file); setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "done", url: uploaded.url, fileId: uploaded.fileId } : item)); message.success(`${file.name}已上传`); } catch (error) { setAttachmentUploads(items => items.map(item => item.uid === file.uid ? { ...item, status: "error" } : item)); message.error(errorMessage(error)); } return false; }} onRemove={file => { setAttachmentUploads(items => items.filter(item => item.uid !== file.uid)); return true; }}><Button icon={<UploadOutlined />}>添加附件</Button></Upload>{attachmentUploads.length > 0 && <Tag>{attachmentUploads.length} 个附件</Tag>}</Space>
     <Space><Button type="primary" htmlType="submit" loading={submitting} disabled={attachmentUploads.some(item => item.status !== "done")}>提交{taskType === "student_first_contact" ? "首联" : taskType === "student_study_plan" ? "学习计划" : "普通跟进"}</Button></Space>
@@ -1269,11 +1285,13 @@ export function StudentContactConfigPage() {
   useEffect(() => { void load(); }, [load]);
   const draft = config?.draft;
   const update = (patch: Record<string, unknown>) => setConfig(value => value?.draft ? { ...value, draft: { ...value.draft, ...patch } } : value);
-  const persistDraft = async (value: NonNullable<import("../services/api").StudentContactConfig["draft"]>) => { if (value.firstContactTimeoutMinutes < 5 || value.studyPlanTimeoutMinutes < 5 || !value.checklist.some(item => item.enabled) || value.checklist.some(item => !item.title.trim())) throw new Error("请检查时间限制和首联任务清单"); await api.saveStudentContactConfigDraft({ id: value.id, version: value.version, idempotencyKey: key(), firstContactTimeoutMinutes: value.firstContactTimeoutMinutes, studyPlanTimeoutMinutes: value.studyPlanTimeoutMinutes, checklist: value.checklist, quickNotes: value.quickNotes, collaboratorTabs: value.collaboratorTabs }); };
+  const persistDraft = async (value: NonNullable<import("../services/api").StudentContactConfig["draft"]>) => { if (value.firstContactTimeoutMinutes < 5 || value.studyPlanTimeoutMinutes < 5 || !value.checklist.some(item => item.enabled) || value.checklist.some(item => !item.title.trim()) || value.quickNotes.some(note => !note.trim())) throw new Error("请检查时间限制、快捷备注和首联任务清单"); await api.saveStudentContactConfigDraft({ id: value.id, version: value.version, idempotencyKey: key(), firstContactTimeoutMinutes: value.firstContactTimeoutMinutes, studyPlanTimeoutMinutes: value.studyPlanTimeoutMinutes, checklist: value.checklist, quickNotes: value.quickNotes.map(note => note.trim()), collaboratorTabs: value.collaboratorTabs }); };
   const save = async () => { if (!draft) return; setSaving(true); try { await persistDraft(draft); message.success("草稿已保存"); await load(); } catch (error) { message.error(errorMessage(error)); } finally { setSaving(false); } };
   const publish = async () => { if (!draft) return; setSaving(true); try { await persistDraft(draft); const refreshed = await api.studentContactConfig(); const current = refreshed.draft; if (!current) throw new Error("草稿状态已变化，请刷新后重试"); await api.publishStudentContactConfig(current.id, current.version, key()); message.success("配置已发布"); await load(); } catch (error) { message.error(errorMessage(error)); } finally { setSaving(false); } };
   const copy = async () => { const published = config?.published; if (!published) return; setSaving(true); try { await api.copyStudentContactConfigDraft(published.id, published.version, key()); await load(); message.success("已创建草稿"); } catch (error) { message.error(errorMessage(error)); } finally { setSaving(false); } };
-  return <section className="workspace-page registration-config-page"><div className="page-heading"><div><Typography.Title level={4}>学员联系配置</Typography.Title><Typography.Text type="secondary">发布后仅新建联系任务使用新版本</Typography.Text></div><Space><Button loading={saving} disabled={Boolean(draft) || !config?.published} onClick={() => void copy()}>复制已发布版本</Button><Button type="primary" loading={saving} disabled={!draft} onClick={() => void save()}>保存草稿</Button>{draft && <Button loading={saving} onClick={() => void publish()}>保存并发布</Button>}</Space></div>{draft ? <Form layout="vertical"><Space wrap><Form.Item label="首次联系最大间隔（分钟）"><Input type="number" min={5} max={10080} value={draft.firstContactTimeoutMinutes} onChange={event => update({ firstContactTimeoutMinutes: Number(event.target.value) })} /></Form.Item><Form.Item label="制定学习计划最大间隔（分钟）"><Input type="number" min={5} max={43200} value={draft.studyPlanTimeoutMinutes} onChange={event => update({ studyPlanTimeoutMinutes: Number(event.target.value) })} /></Form.Item></Space><Typography.Title level={5}>首联任务清单</Typography.Title>{draft.checklist.map((item, index) => <Space key={item.key} style={{ display: "flex", marginBottom: 8 }}><Input value={item.title} onChange={event => update({ checklist: draft.checklist.map((row, rowIndex) => rowIndex === index ? { ...row, title: event.target.value } : row) })} /><Switch checked={item.enabled !== false} onChange={checked => update({ checklist: draft.checklist.map((row, rowIndex) => rowIndex === index ? { ...row, enabled: checked } : row) })} /></Space>)}</Form> : <Empty description="暂无草稿，请先复制已发布版本" />}</section>;
+  const updateQuickNote = (index: number, value: string) => update({ quickNotes: draft!.quickNotes.map((note, noteIndex) => noteIndex === index ? value : note) });
+  const moveQuickNote = (index: number, offset: number) => { const target = index + offset; if (target < 0 || target >= draft!.quickNotes.length) return; const notes = [...draft!.quickNotes]; [notes[index], notes[target]] = [notes[target], notes[index]]; update({ quickNotes: notes }); };
+  return <section className="workspace-page registration-config-page"><div className="page-heading"><div><Typography.Title level={4}>学员联系配置</Typography.Title><Typography.Text type="secondary">发布后仅新建联系任务使用新版本</Typography.Text></div><Space><Button loading={saving} disabled={Boolean(draft) || !config?.published} onClick={() => void copy()}>复制已发布版本</Button><Button type="primary" loading={saving} disabled={!draft} onClick={() => void save()}>保存草稿</Button>{draft && <Button loading={saving} onClick={() => void publish()}>保存并发布</Button>}</Space></div>{draft ? <Form layout="vertical"><Space wrap><Form.Item label="首次联系最大间隔（分钟）"><Input type="number" min={5} max={10080} value={draft.firstContactTimeoutMinutes} onChange={event => update({ firstContactTimeoutMinutes: Number(event.target.value) })} /></Form.Item><Form.Item label="制定学习计划最大间隔（分钟）"><Input type="number" min={5} max={43200} value={draft.studyPlanTimeoutMinutes} onChange={event => update({ studyPlanTimeoutMinutes: Number(event.target.value) })} /></Form.Item></Space><div className="student-contact-config-section"><Typography.Title level={5}>快捷备注</Typography.Title>{draft.quickNotes.map((note, index) => <Space key={`${index}-${note}`} style={{ display: "flex", marginBottom: 8 }}><Input value={note} maxLength={200} onChange={event => updateQuickNote(index, event.target.value)} /><Button icon={<UpOutlined />} aria-label="上移" disabled={index === 0} onClick={() => moveQuickNote(index, -1)} /><Button icon={<DownOutlined />} aria-label="下移" disabled={index === draft.quickNotes.length - 1} onClick={() => moveQuickNote(index, 1)} /><Button danger icon={<DeleteOutlined />} aria-label="删除" onClick={() => update({ quickNotes: draft.quickNotes.filter((_, noteIndex) => noteIndex !== index) })} /></Space>)}<Button icon={<PlusOutlined />} onClick={() => update({ quickNotes: [...draft.quickNotes, ""] })}>新增快捷备注</Button></div><Typography.Title level={5}>首联任务清单</Typography.Title>{draft.checklist.map((item, index) => <Space key={item.key} style={{ display: "flex", marginBottom: 8 }}><Input value={item.title} onChange={event => update({ checklist: draft.checklist.map((row, rowIndex) => rowIndex === index ? { ...row, title: event.target.value } : row) })} /><Switch checked={item.enabled !== false} onChange={checked => update({ checklist: draft.checklist.map((row, rowIndex) => rowIndex === index ? { ...row, enabled: checked } : row) })} /></Space>)}</Form> : <Empty description="暂无草稿，请先复制已发布版本" />}</section>;
 }
 
 export function StudentContactExceptionsPage() {

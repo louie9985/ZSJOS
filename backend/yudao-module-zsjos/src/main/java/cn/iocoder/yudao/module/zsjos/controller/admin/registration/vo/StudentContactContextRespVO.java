@@ -84,6 +84,7 @@ public class StudentContactContextRespVO {
         private DirectorFormVO interview;
     }
     @Data public static class DirectorFormVO {
+        private Integer version;
         private String state;
         private Long configId;
         private Integer configVersion;

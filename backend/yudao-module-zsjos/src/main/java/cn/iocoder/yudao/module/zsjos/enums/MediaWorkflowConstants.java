@@ -53,6 +53,7 @@ public final class MediaWorkflowConstants {
     public static final String POSITIONING_CO_CREATING = "co_creating";
     public static final String POSITIONING_IP_REVIEW = "ip_review";
     public static final String POSITIONING_OPERATOR_FEASIBILITY = "operator_feasibility";
+    public static final String POSITIONING_STUDENT_LINK_PENDING = "student_link_pending";
     public static final String POSITIONING_STUDENT_CONFIRM = "student_confirm";
     public static final String POSITIONING_TRIAL_14D = "trial_14d";
     public static final String POSITIONING_CONFIRMED = "confirmed";
@@ -92,6 +93,7 @@ public final class MediaWorkflowConstants {
     public static final String ACTION_SUBMIT_POSITIONING_REVIEW = "SUBMIT_POSITIONING_REVIEW";
     public static final String ACTION_APPROVE_POSITIONING_FEASIBILITY = "APPROVE_POSITIONING_FEASIBILITY";
     public static final String ACTION_REJECT_POSITIONING_FEASIBILITY = "REJECT_POSITIONING_FEASIBILITY";
+    public static final String ACTION_GENERATE_POSITIONING_STUDENT_LINK = "GENERATE_POSITIONING_STUDENT_LINK";
     public static final String ACTION_CONFIRM_POSITIONING_TRIAL = "CONFIRM_POSITIONING_TRIAL";
     public static final String ACTION_ARCHIVE_POSITIONING = "ARCHIVE_POSITIONING";
 }

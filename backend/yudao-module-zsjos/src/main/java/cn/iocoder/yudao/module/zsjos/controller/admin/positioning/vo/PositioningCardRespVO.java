@@ -23,6 +23,8 @@ public class PositioningCardRespVO {
     private Map<String, Object> dictSnapshot;
     private LocalDate trialEndDate;
     private Integer versionNo;
+    private Integer submissionNo;
+    private LocalDateTime submittedAt;
     private String layer1Json;
     private String layer2Json;
     private String formulaJson;

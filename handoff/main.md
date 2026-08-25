@@ -137,6 +137,84 @@
 - Dependencies: existing React + Vite + TypeScript + Ant Design Workbench primitives and server-owned menu response; no new dependency.
 - Integration order: restore layout modes -> restore hierarchical rendering -> synchronize constraints/docs -> focused tests/typecheck/build/browser checks.
 - Verification plan: Workbench tests, typecheck, production build, diff checks, and browser checks at desktop/mobile widths when a local server/backend is available.
+## Active delivery: team orders and follow-up fixes
+
+- Workstream ID: `main-team-orders-follow-up`
+- Goal: implement configurable student-contact quick notes/time shortcuts, constrain follow-up images, preserve handled supervisor-confirmation order read access, and add department-team order management to Workbench and Admin.
+- Non-goals: modify unrelated positioning/media-screen/H5 changes, add dependencies, execute database migrations, change real permissions, create branches, commit, push, or deploy.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted changes; Target branch: `main`.
+- Ownership scope: student contact configuration/form and follow-up styles; ZSJOS sales-order controller/service/mapper/VO/object permission/tests; Workbench/Admin order API/pages/routes/styles/tests; forward-only menu/permission SQL and directly affected docs; this handoff record.
+- Owner: Codex `/root`.
+- Dependencies: existing System department/user public APIs, ZSJOS order and advanced-filter services, existing Workbench/Admin UI dependencies; no new dependency.
+- Integration order: register scope -> follow-up UI -> order object permission -> team-order backend/API -> menus and both frontends -> focused tests/typecheck/build -> delivery entry.
+- Verification plan: focused ZSJOS tests and compile, Workbench tests/typecheck/build, Admin typecheck/build where available, SQL static review, browser checks if services are available, and `git diff --check`; no database execution.
+
+## Active delivery: reviewed director autosave follow-up fixes
+
+- Workstream ID: `main-director-autosave-review-fixes`
+- Goal: close the three code-review findings by restoring backend test compilation, serializing V132 schema preparation under its database lock, and preventing terminal draft conflicts from being replayed by explicit save or retry.
+- Non-goals: change media-screen production behavior, execute SQL, modify permissions or historical data, add dependencies, create branches, commit, push, or touch unrelated dirty-worktree changes.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted changes; Target branch: `main`
+- Ownership scope: `MediaScreenPropertiesTest.java` verification only unless still broken; V132 lock/DDL ordering and static verification; director autosave coordinator and focused tests; directly affected SQL comments/docs if required; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing MySQL named-lock/migration conventions and Workbench autosave coordinator; no new dependency.
+- Integration order: register scope -> preserve already-correct media-screen test -> move V132 DDL under named lock -> block terminal conflict replay across all coordinator entry points -> focused/full verification -> append delivery evidence.
+- Verification plan: requested focused Maven/Vitest tests, full ZSJOS and Workbench tests, typecheck/build, SQL ordering/static checks, and `git diff --check`; no real database execution.
+
+## Delivery Entry - 2026-08-25 17:37:20 +08:00
+
+- Workstream ID: `main-director-autosave-review-fixes`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: implement the complete fixes for the review findings covering media-screen test compilation, V132 schema locking, and terminal autosave conflict replay.
+- Key decisions: preserved the already-correct supplier-based media-screen test change found in the shared worktree; moved both repeatable V132 column preparations under the migration named lock and before the data transaction, explicitly documenting MySQL DDL as non-transactional; made terminal conflicts reject `saveNow`, `retry`, `flush`/`saveThrough`, and later scheduling until a new session starts.
+- Execution or analysis result: V132 can no longer race its column existence checks before acquiring the lock; its dictionary/template/version-marker work remains transactional. Terminal positioning/interview conflicts retain form state and cannot resend the known-stale request through explicit save or retry, while ordinary failures continue to reuse their idempotency key. Added regression coverage for explicit save, retry, continued input, and new-session recovery.
+- Changed files: `script/sql/mysql/migrations/V132__director_interview_form_presentation.sql`; `frontend/workbench/src/services/directorAutoSave.ts`; `frontend/workbench/src/services/directorAutoSave.test.ts`; this handoff record. `MediaScreenPropertiesTest.java` was verified but not modified in this turn because the shared worktree already contained the required compatible call.
+- Verification evidence: focused backend tests passed 35/35; focused autosave tests passed 10/10; full ZSJOS Surefire reports passed 564/564 across 106 report files; full Workbench tests passed 60 files and 373/373 tests; Workbench typecheck passed; production build generated `dist/index.html`; static SQL assertions confirmed named lock before DDL and DDL before `START TRANSACTION`; `git diff --check` reported line-ending warnings only and no whitespace errors.
+- Dependency or integration impact: no new dependency, database execution, permission or historical-data change, branch/worktree operation, commit, push, deployment, or external service change. Concurrent unrelated positioning/H5/media-screen worktree changes were preserved.
+- Remaining work: execute V132 only through the separately approved controlled database rollout and perform authenticated browser verification of the conflict/reload UX when an appropriate session is available.
+
+## Active delivery: positioning operator student confirmation handoff
+
+- Workstream ID: `main-positioning-confirmation-handoff`
+- Goal: separate positioning drafts from immutable submitted history, require an assigned operator before submission, let the assigned operator confirm the latest submission and generate a revocable public student link, and return requested changes through the complete director/operator review loop.
+- Non-goals: change the post-confirmation trial/formal-positioning lifecycle, execute V133 or mutate a real database/role assignment, add dependencies, change branches/worktrees, commit, push, deploy, or overwrite unrelated dirty-worktree work.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted changes; Target branch: `main`.
+- Ownership scope: ZSJOS positioning submission/link persistence, admin/public positioning APIs, positioning state/actions/events/object authorization, media-student positioning projection/timeline, Workbench account-positioning UI and typed client, public H5 confirmation UI/client/router, V133/bootstrap/verification SQL, focused tests, directly affected architecture/API/navigation/operations docs, and this handoff record.
+- Owner: Codex `/root`.
+- Dependencies: existing System menu/permission/user APIs, ZSJOS service relation/media account/business event facilities, Yudao tenant/security/transaction primitives, current Workbench and H5 runtimes; no new dependency.
+- Integration order: register scope -> persistence and immutable snapshot model -> state machine and authorization -> admin/public APIs -> media projection/timeline -> Workbench UI -> public H5 -> SQL/docs -> focused/full verification -> append delivery evidence.
+- Verification plan: focused backend service/controller/projection tests, ZSJOS compile/tests where available, Workbench tests/typecheck/build, H5 build/tests where available, SQL static/repeatability review, desktop/mobile browser checks, and `git diff --check`; do not execute database migrations or change real permissions.
+
+## Active delivery: director draft version isolation repair
+
+- Workstream ID: `main-director-draft-version-isolation`
+- Goal: isolate director precheck/interview draft optimistic versions from the global service-relation version and eliminate stale-context/failed-autosave conflict loops.
+- Non-goals: execute V132 or any real database migration, delete or rewrite historical drafts, change permissions, add dependencies, change branches, commit, push, or modify unrelated dirty-worktree changes.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base: current `main` HEAD plus existing uncommitted changes; Target: `main`
+- Ownership scope: service-relation director draft version fields and context/API contracts; Workbench director autosave/session handling; positioning draft concurrency query; current SQL baseline/bootstrap verification; focused tests and directly affected API documentation.
+- Owner: Codex `/root`
+- Dependencies: existing tenant/optimistic-lock conventions, StudentContactService, PositioningCardService, Workbench autosave coordinator; no new dependency.
+- Integration order: register scope -> backend fields/context/service/controller -> Workbench version/session binding -> SQL baseline/verification -> focused/full checks -> append delivery evidence.
+- Verification plan: focused backend/workbench tests, full ZSJOS and Workbench checks, typecheck/build, SQL static checks, and `git diff --check`; no authenticated browser session is assumed.
+
+## Delivery Entry - 2026-08-25 16:31:00 +08:00
+
+- Workstream ID: `main-director-draft-version-isolation`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: current `main` HEAD (no commit created)
+- User goal: stop director draft autosave from repeatedly reporting that another window updated the draft and requiring reloads.
+- Key decisions: added independent precheck/interview draft versions while retaining service-relation version for business commands; kept strict same-stage optimistic locking; bound Workbench drafts to service relation, stage and autosave session; terminal conflicts no longer replay stale jobs; kept positioning get-or-create and added explicit tenant filtering; added repeatable V132 schema guards without executing the database.
+- Execution result: backend context and draft save contracts now expose/use stage versions; draft saves no longer advance the global relation version; formal submit still advances business version; Workbench loads current context before showing the dialog, rejects stale session identities, resets positioning draft state, and preserves network retry/idempotency behavior; SQL verification expects both new columns; API documentation updated.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/dataobject/registration/ServiceRelationDO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/vo/StudentContactContextRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/positioning/PositioningCardMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java`; focused backend test; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/services/directorAutoSave.ts`; its test; `frontend/workbench/src/services/api.ts`; Workbench/API docs; `script/sql/mysql/migrations/V132__director_interview_form_presentation.sql`; `script/sql/mysql/verify-bootstrap.sql`; this handoff record.
+- Verification evidence: Workbench tests passed 60 files/371 tests; Workbench typecheck passed; production build generated `dist/index.html` after Vite transformed 6910 modules; ZSJOS main module compile passed; focused backend test execution was blocked during test compilation by the pre-existing `MediaScreenPropertiesTest` `BindResult.orElseThrow()` incompatibility; `git diff --check` reported line-ending warnings only and no whitespace errors; SQL was statically checked and not executed.
+- Dependency or integration impact: no new dependency, no real database mutation, no permission change, no branch/worktree operation, no commit, push or deployment. Existing unrelated dirty-worktree changes were preserved.
+- Remaining work: apply the updated baseline only through the approved database rollout, rerun backend tests after fixing or isolating the unrelated MediaScreen test compile issue, and verify authenticated desktop/mobile autosave and same-stage conflict behavior in Workbench.
+
+## Delivery Entry - 2026-08-25 16:35:00 +08:00
+
+- Workstream ID: `main-director-draft-version-isolation`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: current `main` HEAD (no commit created)
+- Correction: terminal version-conflict autosave jobs now keep the conflict state when the user edits again and are never replayed; only a new session/reload clears them.
+- Verification: focused autosave tests passed 8/8; Workbench typecheck passed; `git diff --check` reported only existing line-ending warnings. No additional dependencies or external state changes.
+- Remaining work: same as prior entry; database rollout and authenticated browser verification remain pending.
 
 ## Active delivery: rewrite ruoyi-vue-pro as a ZSJOS-specific skill
 
@@ -216,6 +294,18 @@
 - Verification evidence: ZSJOS dependency-reactor compile passed; Workbench typecheck passed; Workbench tests passed 57 files/342 tests; `git diff --check` passed with existing line-ending warnings. No database execution or browser verification.
 - Integration impact: no new dependency, branch, commit, deployment, or database execution. V126 requires controlled migration and backend restart.
 - Remaining work: tenant reminder rule CRUD is not yet wired and scheduler uses seven-day default; snapshot table exists but stage-submit persistence currently uses contact-record JSON; admin typecheck has unrelated pre-existing BPM/EAM/export/order errors; browser verification and focused new service tests remain pending.
+
+## Delivery Entry - 2026-08-25 11:52:15 +08:00
+
+- Workstream ID: `main-director-configurable-forms`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: complete the configurable director interview/positioning workflow, menu wiring, dictionary-backed forms, and real-role verification.
+- Key decisions: kept precheck data-free; retained server-owned dictionary and relationship-scene sources; verified the Admin designer and the Workbench director detail without changing user permissions or deleting data.
+- Execution result: real `admin2` login exposed 编导业务配置 with 采访表单配置、定位卡模板配置、编导时效配置; the interview designer rendered the published 22-field template, dictionary binding, preview, draft/save/publish controls; real `biandao1` login exposed 我的学员（编导）, four detail tabs, 指派运营, the unified `lead-action-toolbar`, and the reused `lead-card lead-status-card` pipeline. Existing service relation and positioning records loaded with account-level status and appointment data.
+- Changed files: None in this verification-only turn; prior implementation changes remain in the working tree.
+- Verification evidence: backend health returned UP; focused backend tests 27/27; full ZSJOS tests 531/531; Workbench tests 59 files/360 tests; Workbench typecheck/build; Admin local build; real Admin and Workbench login/API/UI checks; desktop viewport confirmed toolbar and status pipeline selectors. Mobile viewport resize was not available through the connected browser binding, so mobile visual evidence remains unverified. Admin `pnpm ts:check` still reports unrelated pre-existing BPM/CRM/EAM/MES/export/order errors.
+- Dependency or integration impact: no dependency, migration execution, permission mutation, branch, commit, or external service change. Development data already created for the workflow remains intact.
+- Remaining work: if required, run a separate mobile-browser session with viewport emulation; otherwise the director configurable-form implementation is ready for review.
 
 ## Active delivery: repair partner lead qualification cashback chain
 
@@ -2959,3 +3049,319 @@
 - Verification evidence: 推送返回 `759accf4..c5d5b19c main -> main`；提交前 Workbench 59 个测试文件/366 个测试、类型检查、生产构建均通过；首次推送失败原因为 SSH 连接被远端关闭，重试成功。
 - Dependency/integration impact: 远端 `main` 已包含本次 Workbench UI、时间格式、销售订单详情、抢单池和代理配置改动；无数据库、权限、BPM、服务或分支变更。
 - Remaining work: 推送本收尾日志提交后，确认本地与远端哈希一致；`frontend/workbench/probe.html` 和 `frontend/workbench/src/__probe__/` 仍为本地未跟踪调试文件。
+## Delivery Entry - 2026-08-25 15:30:00 +08:00
+
+- Workstream ID: `main-director-interview-form-presentation`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: current main HEAD (no commit created)
+- User goal: widen and clarify the director student interview form, remove the six-dimension gate, and restore demo dictionary options.
+- Key decisions: preserve historical service-relation drafts/snapshots; remove the retired gate from backend system-field validation; add repeatable V132 dictionary/template migration; use explicit Chinese single/multiple and required/optional labels in the Workbench renderer.
+- Execution or analysis result: backend gate removed; V132 publishes a new interview template without the retired field, normalizes demo group names, adds “暂不清楚” and “会一点”, and adds bootstrap verification. Workbench radio/checkbox controls and field required-state labels were updated.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `script/sql/mysql/migrations/V132__director_interview_form_presentation.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `handoff/main.md`.
+- Verification evidence: source and SQL review completed; controlled database execution, frontend typecheck/build, backend tests, and browser verification remain pending.
+- Dependency or integration impact: no new dependency, permission mutation, branch, commit, or destructive data operation. V132 must be applied through the normal migration/bootstrap flow before runtime uses the new published template.
+- Remaining work: finish grouped card rendering and responsive modal styling, then run Workbench typecheck/build, focused backend tests, SQL verification, and desktop/mobile browser checks.
+
+## Delivery Entry - 2026-08-25 20:38:00 +08:00
+
+- Workstream ID: `main-director-interview-form-presentation`
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: current main HEAD (no commit created)
+- User goal: complete the confirmed interview form presentation and six-dimension removal.
+- Key decisions: grouped rendering and responsive modal sizing are now implemented; historical snapshots remain immutable and V132 database execution is intentionally not performed without separate deployment approval.
+- Execution or analysis result: interview fields render in server-defined cards, retired field is omitted from the new form, and explanatory single/multiple plus required/optional labels are shown.
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/styles/pages/media-students.css`; `handoff/main.md`.
+- Verification evidence: Workbench typecheck passed; focused guard test passed (3/3); ZSJOS dependency-reactor compile passed; `git diff --check` passed. Browser verification and V132 SQL execution remain unverified.
+- Dependency or integration impact: no new dependency, permission mutation, branch, commit, or destructive data operation.
+- Remaining work: apply V132 through the approved migration process, then run real desktop/mobile browser checks against the restarted backend.
+
+## Active delivery: director business form autosave
+
+- Workstream ID: `main-director-business-form-autosave`
+- Goal: automatically persist server-side drafts for director precheck, student interview, and positioning-card forms with visible save state, retry, and version-conflict protection.
+- Non-goals: autosave account creation, content creation, talk records, operator assignment, rejection commands, administrator template/configuration forms, localStorage persistence, historical snapshot rewriting, migration execution, branch/commit/push, or unrelated cleanup.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted changes
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/MediaStudentsPage.tsx`, its typed service contract and focused tests/styles if needed, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing student precheck/interview draft APIs and positioning-card create/update draft APIs; no new dependency.
+- Integration order: register workstream -> add typed draft client -> implement debounced save coordinator/status -> restore positioning drafts -> add tests -> typecheck/build/browser verification -> append delivery evidence.
+- Verification plan: focused Workbench tests, full Workbench typecheck and production build, scoped diff review, and desktop/mobile browser checks against available runtime.
+
+## Delivery Entry - 2026-08-25 13:06:40 +08:00
+
+- Workstream ID: `main-director-business-form-autosave`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: give all applicable director business forms automatic server-side draft saving.
+- Key decisions: scope autosave to precheck, student interview, and positioning card; debounce changes by 1.5 seconds; serialize saves; advance local optimistic versions after success; restore an existing co-creating positioning draft; keep command dialogs and create-only account/content/talk forms out of scope; never persist student data in localStorage.
+- Execution or analysis result: Workbench now exposes dirty/saving/saved/error/conflict states, retries ordinary failures, reloads on stable version conflicts, flushes pending changes before close or formal submit, and keeps a failed form open. The typed client now consumes the existing positioning-card create/update draft endpoints.
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/styles/pages/media-students.css`; `handoff/main.md`.
+- Verification evidence: focused media-students guard tests passed 4/4; full Workbench tests passed 59 files and 361 tests; `npm run typecheck` passed; `npm run build` passed with the existing chunk-size warning; `git diff --check` passed with line-ending warnings only. The local page loaded successfully at `http://127.0.0.1:5174/`, but authenticated desktop/mobile interaction remains unverified because no browser session is signed in and entering credentials requires action-time user confirmation.
+- Dependency or integration impact: no new dependency, backend/schema change, permission mutation, database execution, branch, commit, push, or localStorage data. Existing backend draft and optimistic-version contracts are reused.
+- Remaining work: after explicit authorization to use the local development credentials in the browser, verify precheck/interview debounce saves, positioning draft create/update/restore, failure/conflict presentation, and desktop/mobile layout against the running backend.
+
+## Active delivery: repair UniApp Wot UI component resolution
+
+- Workstream ID: `main-uniapp-wot-component-resolution`
+- Goal: make the H5 compiler resolve `wd-*` tags from `@wot-ui/ui` so the login header and tenant picker render without Vue unresolved-component warnings.
+- Non-goals: change login or tenant behavior, alter page easycom rules, add or upgrade dependencies, modify generated type declarations, restart services, change branches, commit, push, or clean unrelated work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted changes; nested frontend repository HEAD `6929988b78bc00eaab3dff02cd52a463fb1a0467` plus existing generated declaration changes.
+- Target branch: `main`
+- Ownership scope: `frontend/yudao-ui-admin-uniapp/vite.config.ts` and this workstream record in `handoff/main.md`.
+- Owner: Codex `/root`
+- Dependencies: existing `@uni-helper/vite-plugin-uni-components` and `@wot-ui/ui`; no new dependency.
+- Integration order: register workstream -> add the package-specific Wot UI resolver -> typecheck -> H5 production build -> inspect transformed H5 modules -> append delivery evidence.
+- Verification plan: run `pnpm type-check` and `pnpm build:h5`; verify transformed login/header/tenant modules import Wot UI components instead of leaving `_resolveComponent("wd-*")`; run scoped diff checks.
+
+## Active delivery: director form autosave review fixes
+
+- Workstream ID: `main-director-form-autosave-review-fixes`
+- Goal: repair draft validation, autosave concurrency, authoritative versions, positioning-card draft idempotency, dynamic checkbox compatibility, and the V132 interview-template migration issues found in code review.
+- Non-goals: execute V132 against a real database, delete/archive/merge existing duplicate positioning drafts, add dependencies, change permissions or dictionaries beyond the confirmed V132 entries, modify historical business snapshots, change branches, commit, push, or touch the unrelated UniApp worktree.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: director form validation and focused tests; student director draft response contract and tests; positioning-card Controller/VO/Service/Mapper and tests; Workbench director autosave coordinator, page, typed API, styles and tests; V132/bootstrap verification SQL; the directly affected Workbench API contract; this workstream record.
+- Owner: Codex `/root`
+- Dependencies: existing ServiceRelation transaction row lock, positioning-card optimistic version, System dictionary APIs, React/Ant Design stack, and current MySQL 8 JSON support; no new dependency.
+- Integration order: register scope -> backend validation and draft contracts -> positioning get-or-create -> Workbench coordinator and form compatibility -> V132 rewrite -> focused and full verification -> delivery record.
+- Verification plan: focused backend unit tests plus ZSJOS reactor test/compile; Workbench coordinator/page tests, full tests, typecheck and production build; SQL static/repeatability review without real database mutation; desktop/mobile browser checks when the authenticated runtime is available; final `git diff --check` and scoped diff review.
+
+## Delivery Entry - 2026-08-25 13:20:07 +08:00
+
+- Workstream ID: `main-uniapp-wot-component-resolution`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created); nested frontend repository HEAD `6929988b78bc00eaab3dff02cd52a463fb1a0467` (no commit created).
+- User goal: eliminate the Vue unresolved-component warnings for `wd-img`, `wd-icon`, and `wd-picker` on the UniApp login page.
+- Key decisions: retained the existing Wot UI dependency and page easycom configuration; added a package-specific `UniComponents` resolver because the current H5 transform pipeline left nested login components as runtime `_resolveComponent` calls; did not use `compilerOptions.isCustomElement` because these tags are Vue components, not native custom elements.
+- Execution or analysis result: `Wd*` component names now resolve to `@wot-ui/ui/components/wd-*/wd-*.vue`; a fresh H5 development instance imports `wd-img`, `wd-icon`, and `wd-picker` directly and the login page renders without unresolved-component warnings.
+- Changed files: `frontend/yudao-ui-admin-uniapp/vite.config.ts`; `handoff/main.md`.
+- Verification evidence: `pnpm type-check` passed with exit code 0; `pnpm build:h5` passed with exit code 0; production output scan found no unresolved `wd-img`, `wd-icon`, or `wd-picker` patterns; fresh development transforms reported header imports 1/dynamic resolutions 0 and tenant-picker imports 2/dynamic resolutions 0; browser checks at 1440x900 and 390x844 rendered the image, icons, tenant picker, and login controls with no horizontal overflow and no console warnings or errors; scoped `git diff --check` passed with line-ending warnings only.
+- Dependency or integration impact: no new dependency, package-lock change, login/tenant behavior change, database operation, permission change, branch/worktree operation, commit, push, or deployment. The pre-existing changes in `src/types/auto-import.d.ts` and `src/types/local-components.d.ts` were preserved and excluded from this workstream. A fresh verification service is running at `http://127.0.0.1:9001/`; the pre-existing port 9000 service was not restarted and still has the old Vite plugin chain in memory.
+- Remaining work: restart the pre-existing port 9000 H5 development process before continuing to use that instance; no remaining code change for this warning fix.
+
+## Delivery Entry - 2026-08-25 14:10:51 +08:00
+
+- Workstream ID: `main-director-form-autosave-review-fixes`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: implement the complete director-form and autosave repair so incomplete information can be saved as a draft while formal submission remains strict.
+- Key decisions: drafts enforce field ownership, parseable types, active dictionary values and area structure but defer completeness, size/range and business-conflict rules to submit; positioning drafts preserve empty or temporarily invalid trial dates until submit-review; all autosave sessions serialize across stale in-flight requests; failed sequences retry with their original key before later snapshots; positioning create/update support identical-content replay and return authoritative versions; existing duplicate positioning drafts remain untouched and only the latest is restored; V132 remains an unexecuted baseline migration and preserves archived versions and business snapshots.
+- Execution or analysis result: repaired precheck/interview draft response versions, dynamic checkbox rendering, stale asynchronous form loads, autosave debounce/queue/session/failure behavior, positioning draft get-or-create/update persistence and replay, strict submit validation, V132 key-based template transformation/locking/repeatability, and bootstrap verification. Alibaba open-code-review examined 15 implementation files, reported 9 findings, and the actionable concurrency, persistence, stale-template and SQL verification findings were repaired and covered by tests or static checks.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/positioning/PositioningCardController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/positioning/vo/PositioningCardDraftRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/registration/StudentContactController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/positioning/PositioningCardMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/director/DirectorFormTemplateService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/positioning/PositioningCardService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/studentcontact/StudentContactServiceImpl.java`; their three focused test files; `frontend/workbench/src/services/directorAutoSave.ts`; `frontend/workbench/src/services/directorAutoSave.test.ts`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/styles/pages/media-students.css`; `frontend/workbench/docs/api-contract.md`; `script/sql/mysql/migrations/V132__director_interview_form_presentation.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; this handoff file. The generated `frontend/workbench/tsconfig.tsbuildinfo` changed during the required build.
+- Verification evidence: focused backend tests passed 35/35; full `yudao-module-zsjos` tests passed 539/539; Workbench tests passed 60 files and 368/368 tests; `npm run typecheck` passed; `npm run build` passed with the existing chunk-size warning; `git diff --check` passed with line-ending warnings only. The full dependency-reactor test attempt was stopped by the unrelated existing `yudao-module-infra` failure `CodegenEngineUniappTest.testExecute_treeSearch`, before ZSJOS ran. Browser reachability at `http://127.0.0.1:5177/zsjos/my-students` was checked at 1440x900 and 390x844 with no horizontal overflow, but the route showed the login page because no authenticated browser session was available. V132 and bootstrap received static key/lock/status/group/repeatability review only and were not executed against MySQL.
+- Dependency or integration impact: no new npm/Maven dependency, schema column, destructive data operation, permission mutation, branch/worktree operation, commit, push, or deployment. The unrelated `frontend/yudao-ui-admin-uniapp` worktree changes were preserved.
+- Remaining work: run V132 only through the approved controlled migration flow, then verify bootstrap twice against disposable MySQL; with an authorized signed-in Workbench session, verify real precheck/interview/positioning autosave, close-and-restore, version conflict, submit rejection, checkbox rendering, and desktop/mobile modal layout.
+
+## Active delivery: operator contact context read access
+
+- Workstream ID: `main-operator-contact-read`
+- Goal: allow the assigned new-media operator to read the student's contact context and contact history from the shared media-student detail without granting planner contact commands.
+- Non-goals: change contact task ownership or lifecycle, grant accept/first-contact/study-plan/follow-up/basic-info writes, broaden media-student list scope, add dependencies or schema changes, execute migrations, change branches, commit, push, or modify unrelated existing worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: student-contact read authorization and focused tests; directly affected student/media API documentation; existing Workbench media-student read flow and focused tests only if coverage requires adjustment; this workstream record.
+- Owner: Codex `/root`
+- Dependencies: existing `operatorUserId` service-relation assignment, `zsjos:media-student:query-my` feature permission, `StudentServiceObjectPermissionProvider` read check, and server-projected `availableActions`; no new dependency.
+- Integration order: register scope -> align service-level readable relationship and collaborator projection -> add authorization regression tests -> update contract documentation -> focused/full verification -> append delivery evidence.
+- Verification plan: focused `StudentContactServiceImplTest` and `StudentServiceObjectPermissionProviderTest`; ZSJOS module tests; Workbench media-student tests, typecheck and production build; authenticated operator browser verification only when a signed-in runtime is available; final scoped diff review and `git diff --check`.
+
+## Delivery Entry - 2026-08-25 14:19:29 +08:00
+
+- Workstream ID: `main-operator-contact-read`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: fix the assigned operator's `contact-context` permission failure when opening a media-student detail while keeping planner contact commands unavailable to operators.
+- Key decisions: added only the current service relation's `operatorUserId` as a readable relationship; required an accepted relation and preserved the established active/paused/completed read statuses; projected the configurable `operator` collaborator tabs instead of falling through to career-planner tabs; retained all owner-only write guards and server-projected actions; kept the existing Workbench context request and media workflow surfaces.
+- Execution or analysis result: assigned operators can now read contact context and contact history for their accepted assigned service relations, receive no planner contact actions, and remain unable to accept, submit first contact, submit a study plan, submit ordinary follow-up, or modify basic student information. Unrelated users and stale/non-current operator assignments remain denied.
+- Changed files: `StudentContactServiceImpl.java`; `StudentServiceObjectPermissionProvider.java`; their two focused test files; `frontend/workbench/src/pages/media-students.guard.test.ts`; `docs/api/registration-fulfillment-api.md`; `frontend/workbench/docs/api-contract.md`; this handoff file.
+- Verification evidence: focused backend permission tests passed 23/23; full ZSJOS module tests passed 543/543; focused Workbench guard tests passed 4/4; full Workbench tests passed 60 files and 368/368 tests; Workbench typecheck and production build passed with the existing chunk-size warning; scoped authorization diff review passed; `git diff --check` reported line-ending warnings only and no whitespace errors.
+- Dependency or integration impact: no new dependency, schema or SQL change, menu/role mutation, destructive operation, branch/worktree operation, commit, push, service restart, or deployment. Existing uncommitted director-form/autosave and UniApp changes were preserved.
+- Remaining work: deploy/restart through the normal environment process if required, then use an authenticated assigned-operator session to open `/zsjos/media-students`, confirm `/student/service/{relationId}/contact-context` and `/contact-records` return successfully, and confirm planner contact buttons remain absent. No authenticated operator browser session was available in this turn.
+
+## Active delivery: Person-owned unified student detail shell
+
+- Workstream ID: `main-student-person-detail-shell`
+- Goal: make Person and the selected service relation the stable student-detail subject for planners, directors, and operators so repurchase services without a source Lead retain the full student overview, service/contact operations, and role-authorized tabs.
+- Non-goals: invent or backfill a Lead for repurchase orders, reuse another Lead belonging to the same Person, broaden Lead history permissions, change service/contact/media state machines, add dependencies or schema changes, execute SQL, change branches, commit, push, or overwrite existing director-form/autosave and operator-read changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: shared Workbench student detail/overview components; planner and media-student detail composition and focused tests; directly affected student API, architecture, navigation and Workbench contract documentation; this workstream record.
+- Owner: Codex `/root`
+- Dependencies: authoritative `MyStudent` Person/service projection, optional current-order `leadId`, server-projected contact/media actions and tabs, existing Lead history object permissions, React/Ant Design Workbench stack; no new dependency.
+- Integration order: register scope -> add Lead-optional shared student overview/shell -> connect planner no-Lead operations and media no-Lead overview -> align focused tests and contracts -> full backend/frontend verification -> browser checks when authenticated state is available -> delivery record.
+- Verification plan: focused student/media guard and component tests; Workbench full tests, typecheck and production build; focused/full ZSJOS tests only if backend contracts change; desktop/mobile browser checks against the repurchase service when an authenticated runtime is available; scoped diff review and `git diff --check`.
+
+## Delivery Entry - 2026-08-25 14:55:09 +08:00
+
+- Workstream ID: `main-student-person-detail-shell`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: make planners, directors, and operators see the same Person/service-owned student detail even when a valid repurchase service has no source Lead, while retaining role-authorized tabs and actions.
+- Key decisions: made Person plus the selected service relation the stable detail subject; kept Lead as optional source/history data; used `personNo` as 学员编号 when no real Lead exists; retained a real Lead request failure as an independent error; removed the planner fallback from the selected service to the Person aggregate `leadId`; did not fabricate or borrow another Lead; retained server-projected contact actions and existing media object/feature permissions.
+- Execution or analysis result: added a shared Lead-optional `StudentDetail` shell; made `LeadDetailOverview` prefer Person identity fields and conditionally render Lead-only metadata, remarks, alerts, flow, and charts; the planner no-Lead path now remains inside `StudentPlannerOperations` with overview, course service, contact history, contact commands, collaborator actions, and repurchase entry; the media no-Lead path now retains the shared overview plus account, student-information, and content-production tabs and no longer displays the misleading “当前课程服务尚未关联客资详情” warning.
+- Changed files: `frontend/workbench/src/components/StudentDetail.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/components/LeadDetailOverview.lifecycle.test.ts`; `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `frontend/workbench/src/pages/student-sales-history.guard.test.ts`; `docs/architecture/data-and-permission-flow.md`; `docs/api/registration-fulfillment-api.md`; `docs/frontend/zsjos-menu-coverage.md`; `frontend/workbench/docs/api-contract.md`; this handoff file.
+- Verification evidence: focused component/page tests passed 17/17, followed by final focused tests 15/15; full Workbench tests passed 60 files and 370/370 tests; `npm run typecheck` passed; `npm run build` passed with the existing chunk-size warning; scoped and repository `git diff --check` reported line-ending warnings only and no whitespace errors. The local Workbench route was reachable at `http://127.0.0.1:5177/zsjos/media-students`, but the in-app browser showed the login page, so authenticated repurchase-detail checks at desktop/mobile widths could not be completed.
+- Dependency or integration impact: no backend, schema, SQL, dependency, permission configuration, external service, branch/worktree, commit, push, or deployment change. Existing director-form/autosave, operator-read, SQL, and nested UniApp changes were preserved.
+- Remaining work: in an authenticated planner/director/operator browser session, open the repurchase service with `leadId=NULL` and verify Person profile, course/contact/media tabs, role-specific actions, network success, and desktop/mobile layout. No implementation work remains for the confirmed scope.
+
+## Active delivery: media student surface boundary cleanup
+
+- Workstream ID: `main-media-student-surface-cleanup`
+- Goal: remove the redundant student/contact business tab from the director/operator media-student workspace and keep only media production surfaces plus necessary overview context.
+- Non-goals: delete historical talk records, remove or change backend compatibility APIs, change planner contact workflows, change director stage actions, alter media account/content/positioning state machines, add dependencies, change schema or SQL, execute data operations, change branches, commit, push, or overwrite unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; its focused guard test and typed API client cleanup; directly affected Workbench/navigation/API documentation; this workstream record.
+- Owner: Codex `/root`
+- Dependencies: existing Person/service overview, server-projected director `availableActions`, media account/content/positioning APIs, and current media object permissions; no new dependency.
+- Integration order: register scope -> remove talk read/write UI and API consumption -> remove the student tab and filter talk events from overview -> update focused guards and contracts -> full Workbench verification -> authenticated browser check when available -> append delivery evidence.
+- Verification plan: focused media-student guard tests; full Workbench tests, typecheck and production build; desktop/mobile browser checks against `/zsjos/media-students?personId=14&tab=student` when an authenticated session is available; scoped diff review and `git diff --check`.
+
+## Delivery Entry - 2026-08-25 15:21:48 +08:00
+
+- Workstream ID: `main-media-student-surface-cleanup`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: remove the redundant student-information and communication business surface from the director/operator media-student workspace, keeping stage and appointment context in overview and media work in account, positioning, content and filming flows.
+- Key decisions: reduced the media workspace to overview, account/positioning and content tabs; stopped loading Lead detail, Lead dictionaries, contact history and talk records; replaced visible Lead numbers with `personNo`; retained `contact-context` only for responsible users, director stage, appointment and `availableActions`; preserved backend talk APIs and historical data for compatibility; filtered legacy `talk` events from the visible operation timeline; normalized `positioning` deep links to accounts and removed/unknown `student` links to overview.
+- Execution or analysis result: removed the 学员信息 tab, 客资编号, communication record list and create-record modal/action; removed Workbench `talk-records` typed client methods and the separate talk request; removed media-page Lead requests and Lead-specific metadata; retained director precheck/interview/operator-assignment actions in overview and all account, positioning, content and filming workflow boundaries.
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `docs/architecture/data-and-permission-flow.md`; `docs/api/registration-fulfillment-api.md`; `docs/frontend/zsjos-menu-coverage.md`; `frontend/workbench/docs/api-contract.md`; this handoff file.
+- Verification evidence: focused media-student guard test passed 4/4; focused media/notification tests passed 23/23 after deep-link normalization; full Workbench tests passed 60 files and 370/370 tests; final `npm run typecheck` passed; final `npm run build` passed with the existing chunk-size warning; scoped `git diff --check` reported line-ending warnings only and no whitespace errors. The exact local route `http://localhost:5174/zsjos/media-students?personId=14&tab=student` was reachable, but the in-app browser had no authenticated session and showed the login page, so signed-in desktop/mobile rendering remains unverified.
+- Dependency or integration impact: no backend behavior, schema, SQL, historical data, dependency, permission configuration, external service, branch/worktree, commit, push, or deployment change. Existing unrelated dirty-worktree changes were preserved.
+- Remaining work: with an authenticated director/operator session, confirm the old `tab=student` URL opens overview, only overview/account/content tabs are visible, no Lead/contact/talk content is requested or rendered, and account/positioning/content actions remain correct at desktop and mobile widths. No implementation work remains for the confirmed scope.
+
+## Delivery Entry - 2026-08-25 17:13:00 +08:00
+
+- Workstream ID: `main-positioning-confirmation-handoff`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: implement the director/operator positioning-card handoff with draft/submission separation, assigned-operator submission enforcement, latest-version review, public student confirmation links, and Chinese timeline/UI presentation.
+- Key decisions: retained `zsjos_positioning_card` for mutable drafts and added immutable `zsjos_positioning_card_submission` snapshots; added digest-only `zsjos_positioning_confirmation_link`; required a locked active enabled operator before submission; limited operator actions and link generation to the latest submission and current assignment; put the token in `X-Positioning-Token` and the browser hash; retired the old Partner confirmation controller; made student changes require a comment and return to draft; kept compatibility backfill timestamps null when historical submit time is unavailable; rendered dictionary `labelSnapshot` values in H5 and Workbench.
+- Execution or analysis result: implemented the state path `草稿 -> IP审核（适用时） -> 待运营确认 -> 待生成学员链接 -> 待学员确认 -> 试运行`; separated `positioningDrafts` from submitted `positioningCards`; removed draft timeline entries and random/card-number presentation from the media student UI; added public loading/success/processed/error/retry and agree/change states; added V133 schema/permission/backfill and bootstrap verification wiring; added H5 `/public-api` development proxy.
+- Changed files: positioning admin/public controllers, services, mappers, DO/VO/error/state definitions; media-student projection and Workbench/H5 positioning UI/API/types/tests; `V133__positioning_confirmation_handoff.sql`, bootstrap and verification SQL; positioning/API/architecture/menu/migration documentation; `handoff/main.md`.
+- Verification evidence: ZSJOS focused tests passed 17/17 (`PositioningCardServiceTest`, `PositioningConfirmationServiceTest`, `MediaStudentServiceTest`); backend module compile passed; Workbench tests passed 60 files and 371/371 tests; Workbench `npm run typecheck` and `npm run build` passed; H5 `npm run build` passed; `git diff --check` reported only existing CRLF conversion warnings and no whitespace errors; local backend invalid-token request returned code `1900014017` with unified invalid-link text; in-app browser checked public route without login at desktop and 390px width, with no horizontal overflow and visible retry/error state. Authenticated Workbench business-action browser verification was unavailable.
+- Dependency or integration impact: no Maven/npm dependency added; no migration executed; no database rows, permissions, roles, branch, worktree, commit, push, or deployment changed. Existing unrelated dirty-worktree changes, including media-screen/director-form/autosave/UniApp work, were preserved. H5 preview was available at `http://127.0.0.1:4181/`; Vite dev server with `/public-api` proxy was available at `http://127.0.0.1:10087/`; existing backend was queried at `http://127.0.0.1:48080`.
+- Remaining work: separately review the target environment and count of legacy `student_confirm` rows, then explicitly approve and execute V133 through the normal migration process; run authenticated desktop/mobile Workbench checks for operator assignment, latest-card review, link generation and copy; create a real link in a controlled tenant and verify agree/change/revocation/concurrency end to end. No implementation work remains within the local code scope.
+
+## Delivery Entry - 2026-08-25 17:23:00 +08:00
+
+- Workstream ID: `main-positioning-confirmation-handoff`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: correction to ensure immutable positioning submissions include legacy structured positioning sections as well as dynamic template fields.
+- Key decisions: added six legacy section snapshots (`layer1`, `layer2`, `formula`, `feasibility`, `contentForm`, `compliance`) to submission persistence and V133 compatibility backfill; public details expose non-empty legacy sections without internal identifiers; H5 renders them alongside dynamic fields.
+- Execution or analysis result: submission creation now copies all positioning payload layers before any later draft edits; public response and H5 rendering preserve those snapshots.
+- Changed files: `PositioningCardSubmissionDO.java`; `PositioningCardService.java`; `PositioningConfirmationService.java`; `PublicPositioningConfirmationRespVO.java`; `frontend/h5/src/api/positioning.ts`; `frontend/h5/src/pages/positioning/confirmation.vue`; `V133__positioning_confirmation_handoff.sql`.
+- Verification evidence: ZSJOS reactor compile passed; H5 `npm run build` passed; `git diff --check` reported only CRLF conversion warnings and no whitespace errors.
+- Dependency or integration impact: no dependency, migration execution, data mutation, permission mutation, branch/worktree, commit, push, or deployment.
+- Remaining work: run the already documented focused test command again after this snapshot-field correction before release; controlled V133 execution and authenticated end-to-end browser verification remain separately pending.
+
+## Delivery Entry - 2026-08-25 17:26:00 +08:00
+
+- Workstream ID: `main-positioning-confirmation-handoff`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: final verification after adding complete legacy section snapshots.
+- Key decisions: None beyond the preceding correction.
+- Execution or analysis result: focused positioning/media tests re-run successfully after the schema/DTO/service changes.
+- Changed files: None in this verification-only entry.
+- Verification evidence: `PositioningCardServiceTest` 10/10, `PositioningConfirmationServiceTest` 6/6, `MediaStudentServiceTest` 1/1; total 17/17 passed.
+- Dependency or integration impact: None; no database migration executed.
+- Remaining work: controlled V133 execution and authenticated browser workflow verification remain pending as documented above.
+
+## Active delivery: V132/V133 applied-schema compatibility repair
+
+- Workstream ID: `main-v134-schema-compatibility-repair`
+- Goal: repair the confirmed local schema drift left by earlier applied V132/V133 revisions, preserve the two V133 positioning submission snapshots, and restore runtime compatibility with the current Java persistence model.
+- Non-goals: delete or rebuild tables, rewrite V132/V133 version markers, invent snapshot values, change positioning-card statuses or permissions, modify application behavior, add dependencies, change branches, commit, push, or touch unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted user changes
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V134__repair_applied_director_and_positioning_schema.sql`; bootstrap and bootstrap verification SQL; migration README and operations documentation; this workstream record; controlled execution against the confirmed local `ruoyi-vue-pro` development database.
+- Owner: Codex `/root`
+- Dependencies: applied V132/V133 markers, authoritative `zsjos_service_relation` and `zsjos_positioning_card` tables, the two existing V133-owned submission rows, and MySQL 8 guarded DDL; no new dependency.
+- Integration order: register scope -> add guarded V134 schema repair and source-backed snapshot repair -> wire bootstrap/verifier/docs -> static SQL review -> execute once and repeat locally -> verify schema/data/version invariants -> focused backend tests -> delivery record.
+- Verification plan: SQL syntax and prepare/execute/deallocate balance review; pre/post column, row and version queries; repeat V134 to prove idempotence; run the V128/V133/V134 bootstrap verification checks; run focused positioning and student-contact tests; final scoped diff review and `git diff --check`.
+
+## Delivery Entry - 2026-08-25 17:49:45 +08:00
+
+- Workstream ID: `main-v134-schema-compatibility-repair`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: repair the confirmed V132/V133 applied-schema drift and execute the forward repair against the local development database.
+- Key decisions: preserved the already-applied V132/V133 markers; used a new guarded V134 migration; added only missing columns; repaired only null section values on active submissions still owned by V133 and matched to an authoritative same-tenant positioning card; retained all card states, links, permissions, and non-null snapshot values.
+- Execution or analysis result: added V134 and wired it after V133; executed it against local `ruoyi-vue-pro`; added six missing submission section columns, inserted both V134 version markers, and repaired both existing V133 compatibility submissions from their unchanged source cards. The two service-relation draft-version columns were found already present immediately before execution and were left unchanged by the guards. A second V134 execution performed only guarded no-op selects.
+- Changed files: `script/sql/mysql/migrations/V134__repair_applied_director_and_positioning_schema.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; this handoff file.
+- Verification evidence: V134 has eight balanced prepare/execute/deallocate guards; post-execution schema checks found 2/2 service draft-version columns and 6/6 submission section columns; both legacy and module V134 markers exist; both V133-owned submissions have complete section snapshots and match their source cards field-for-field; status counts remained two `student_confirm` and two `student_link_pending`; V133 and V134 bootstrap checks returned `PASS`; focused backend tests passed 37/37; database contract queries for the original service-relation and submission fields succeeded; `git diff --check` reported line-ending warnings only and no whitespace errors. Live scheduler recovery was not observable because available log files were stale.
+- Dependency or integration impact: the confirmed local database gained six nullable `longtext` submission columns, two V134 version rows, and source-backed values on two existing V133 submission rows; no rows were deleted, no status or permission changed, no dependency was added, and no branch/worktree/commit/push/deployment operation occurred. Fresh-bootstrap execution was not performed.
+- Remaining work: the composite V128 bootstrap check remains `FAIL` only because local `zsjos_schema_version` has no V128 marker; all 11 checked columns and both checked permissions exist. Do not fabricate that marker: audit how V128 reached this database before recording or replaying it. Observe a live scheduler cycle or application request if runtime-level confirmation of the original error is required.
+
+## Delivery Entry - 2026-08-25 18:34:30 +08:00
+
+- Workstream ID: `main-team-orders-follow-up`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: add configurable student-contact quick notes and next-contact shortcuts, contain long follow-up images, preserve handled sales-supervisor order read access, and provide read-only team-order management in Workbench and Admin for the current department subtree.
+- Key decisions: reused the server-owned `quickNotes` draft/publish contract; appended quick notes without replacing existing remarks; reused the 1/2/3/5/7/14/30-day shortcuts; retained supervisor access only through a confirmation associated with that order's current approval round; introduced `zsjos:sales-order:query-team` as the page/API permission; resolved enabled members dynamically from the current department and descendants; scoped lists by submitter; kept team pages read-only; reused existing order detail/list/filter projections; corrected the initially selected V135 menu ID from the V130-conflicting 73480 to unused 73510.
+- Execution or analysis result: implemented quick-note editing with add/edit/delete/reorder and draft validation, quick next-contact controls, non-overflowing fixed image thumbnails, handled-supervisor read retention, team page/cursor/search/count APIs, dynamic team object reads, Workbench master-detail routing, Admin table filters/detail, server menu migration, bootstrap/verifier wiring, and API/menu/migration documentation.
+- Changed files: ZSJOS sales-order controller/VO/service/mapper/constants/object-permission code and focused tests; `frontend/workbench/src/pages/RegistrationPages.tsx`; `MySalesOrderPage.tsx`; `SalesOrderDetailCards.tsx`; route/constants/API files; contact/timeline styles and guard tests; `frontend/admin/src/api/zsjos/workbenchMenus.ts`; `frontend/admin/src/views/zsjos/mySalesOrder/index.vue`; `script/sql/mysql/migrations/V135__sales_order_team_management.sql`; bootstrap/verifier/migration README; sales-order API, menu coverage and Workbench API-contract documentation; this handoff file.
+- Verification evidence: ZSJOS module full test run passed 568/568; focused order/controller/permission suite passed 38/38; backend reactor compile passed; Workbench passed 61 files and 374/374 tests, `npm run typecheck`, and production build; Admin production build passed, including the team-order page; `git diff --check` reported line-ending warnings only and no whitespace errors. Admin `pnpm ts:check` still fails only in pre-existing BPM/CRM/EAM/MES/System/export files and reports no team-order file error. A full `-am` test run was blocked before ZSJOS by the pre-existing `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch` failure. The in-app browser reached the local Workbench login page but had no authenticated session, so signed-in desktop/mobile business-page checks remain unverified.
+- Dependency or integration impact: no dependency added; no migration or bootstrap SQL executed; no database row, real permission, external service, branch/worktree, commit, push, or deployment changed. V135 is repeatable and non-destructive, grants the new menu to active configured `sales_manager` roles, and is sourced by fresh bootstrap. Existing unrelated dirty-worktree changes were preserved.
+- Remaining work: after separate environment approval, apply V135 through the controlled migration process and run `verify-bootstrap.sql`; with authenticated supervisor/planner sessions, verify team filtering/detail/empty/error/unauthorized states, quick-note publication and use, long-image preview containment, and desktop/mobile layouts. Existing Admin typecheck and Infra codegen-test failures remain outside this workstream.
+
+## Active delivery: synchronize remote main on 2026-08-25 evening
+
+- Workstream ID: `main-remote-sync-20260825-evening`
+- Goal: Fast-forward local `main` to `origin/main`, accept remote frontend content and confirmed frontend deletions, preserve confirmed non-frontend history, and resolve the migration-version collision.
+- Non-goals: Commit, push, execute SQL, mutate a database, start/stop services, change branches/worktrees, install dependencies, or clean unrelated local changes.
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` plus existing uncommitted changes; Target branch: `main`.
+- Ownership scope: eight remote commits through `6921fecff4`; ten overlapping frontend files; 123 confirmed remote deletions; merged architecture and handoff records; migration numbering and references for remote V132 plus local director/positioning/order migrations.
+- Owner: Codex `/root`.
+- Dependencies: `origin/main` at `6921fecff4`; all unrelated tracked and untracked local changes must remain intact.
+- Integration order: register scope -> preserve non-frontend overlaps -> discard confirmed frontend overlaps -> fast-forward -> merge handoff/architecture changes -> renumber local V132-V135 to V133-V136 and update references -> verify.
+- Verification plan: confirm HEAD equals `origin/main` and ahead/behind is `0/0`; no unmerged/index/stash residue; confirmed frontend files match remote; remote deletions are applied; migration filenames/version markers/bootstrap order are unique and coherent; unrelated local changes remain.
+
+## Delivery Entry - 2026-08-25 19:05:49 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `6921fecff4767e7390ad5442137074ec2f1ec5dd`.
+- User goal: Pull the latest remote code, use remote frontend content for conflicts, and request confirmation for other conflicts.
+- Key decisions: accepted the separately confirmed 123 remote deletions and remote versions of all ten overlapping frontend files; preserved both handoff histories and both automatically merged architecture edits; retained remote V132, renumbered the four local pending migration files to V133-V136, and added repeatable V137 compatibility instead of rewriting already-applied legacy V132/V133/V134 database markers.
+- Execution or analysis result: fetched and fast-forwarded `main` by eight commits from `00d9dbec11` to `6921fecff4`; applied 225 remote file changes; resolved `handoff/main.md` by retaining both sides; resolved bootstrap order as V132-V137; synchronized migration checksums, verification, README, operations documentation, and menu documentation. No SQL or database operation ran.
+- Changed files: the 225 files from remote commits through `6921fecff4`; merged local architecture/handoff content; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/operations/database-migrations.md`; `docs/frontend/zsjos-menu-coverage.md`; renumbered local director/positioning/repair/team migrations V133-V136; new `V137__repair_workbench_menu_render_mode_version_collision.sql`; this handoff record.
+- Verification evidence: HEAD equals `origin/main` and ahead/behind is `0/0`; all ten confirmed frontend files have the same blob hash as remote; all 123 confirmed deleted paths are absent; no unmerged path, conflict marker, staged file, or duplicate migration version remains; V132-V137 filenames, internal markers, checksums and bootstrap order agree; stale active filename-reference scan is empty; prepared-statement balances are 2/2/2, 8/8/8 and 1/1/1 for V133, V135 and V137; scoped `git diff --check` reports no whitespace error. Builds, tests, SQL parsing against MySQL, and database execution were not run because this task synchronizes history and mechanically resolves migration numbering.
+- Dependency or integration impact: remote Workbench/Admin rendering changes and frontend removals are now local; existing unrelated tracked, untracked, and nested-repository changes remain. No dependency installation, database mutation, service operation, branch/worktree change, commit, push, or publication occurred. Existing databases with legacy V132/V133/V134 markers require separately approved controlled execution of V137; those historical markers must remain unchanged.
+- Remaining work: Execute V137 only through the repository's controlled database rollout after separate approval, then run `verify-bootstrap.sql`; no remaining Git synchronization work.
+
+## Delivery Entry - 2026-08-25 19:15:55 +08:00
+
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; pre-commit HEAD: `6921fecff4767e7390ad5442137074ec2f1ec5dd`.
+- User goal: submit the confirmed parent-repository changes to the cloud remote.
+- Key decisions: staged all 89 confirmed parent-repository files as one commit; excluded the dirty contents inside nested `frontend/yudao-ui-admin-uniapp`, whose parent gitlink remains unchanged; did not force-push or rewrite history.
+- Execution or analysis result: staged backend positioning/media-screen and sales-order workflows, Admin/H5/Workbench changes, tests, docs, V133-V137 migrations, bootstrap/verification updates, and handoff records. `git diff --cached --check` passed with only existing line-ending warnings.
+- Changed files: 89 parent-repository files, 4,343 insertions and 383 deletions; the nested UniApp repository's three local files were not staged.
+- Verification evidence: parent branch was up to date with `origin/main` before staging; no sensitive added configuration keys were detected in the reviewed application YAML; no tests, builds, SQL execution, or database mutation were run in this commit-only task.
+- Dependency or integration impact: commit and push will publish the confirmed positioning confirmation, team-order, media-screen, autosave, and migration compatibility changes. No dependency installation, service operation, permission mutation, branch/worktree change, or database execution occurred.
+- Remaining work: verify remote commit and parent worktree status after push; nested UniApp local changes remain outside this commit.

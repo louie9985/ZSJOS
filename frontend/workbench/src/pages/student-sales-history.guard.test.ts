@@ -12,10 +12,13 @@ describe('study planner student sales history', () => {
 
   it('reuses the complete Lead detail for an assigned student', () => {
     const page = readFileSync('src/pages/RegistrationPages.tsx', 'utf8')
-    expect(page).toContain('const leadId = service?.leadId || student.leadId')
+    expect(page).toContain('const leadId = service?.leadId;')
+    expect(page).not.toContain('service?.leadId || student.leadId')
     expect(page).toContain('mode="student-readonly"')
     expect(page).toContain('<LeadDetail')
     expect(page).toContain("key: 'student-contact'")
+    expect(page).toContain('<StudentDetail')
+    expect(page).toContain('contactContext={studentContactContext}')
   })
 
   it('keeps student mode read-only', () => {

@@ -21,6 +21,13 @@ Administration and employee APIs use `/admin-api/**` with ADMIN identities. Memb
 identities; its public dictionary and area lookups remain on `/app-api/system/**` without a
 partner bearer token. Development and production proxies must forward both H5 prefixes.
 
+The read-only media screen uses `/public-api/zsjos/media-screen/**` without a login token. It is
+not generally anonymous: the backend binds each configured client IP/CIDR to one tenant, rejects
+unlisted combinations before entering the Controller, and installs the validated tenant context
+for downstream queries. The feature is fail-closed and disabled by default. Its API and deployment
+contracts are documented in `docs/api/media-screen-public-api.md` and
+`docs/operations/media-screen-deployment.md`.
+
 `../CRM-demo-Ant-design` is a design reference when available. It is not a runtime
 dependency or a source of production data, routes, permissions, or API contracts.
 

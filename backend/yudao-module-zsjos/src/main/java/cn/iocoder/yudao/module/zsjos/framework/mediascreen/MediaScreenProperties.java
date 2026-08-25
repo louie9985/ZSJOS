@@ -14,8 +14,11 @@ import java.util.List;
 @Data
 @Configuration
 @EnableConfigurationProperties
-@ConfigurationProperties(prefix = "zsjos.media-screen")
+@ConfigurationProperties(prefix = MediaScreenProperties.PREFIX)
 public class MediaScreenProperties {
+
+    static final String PREFIX = "yudao.media-screen";
+
     private boolean enabled = false;
     private List<String> trustedProxies = new ArrayList<>();
     @Valid private List<Client> clients = new ArrayList<>();
@@ -26,9 +29,11 @@ public class MediaScreenProperties {
     void validateAccessConfiguration() {
         if (!enabled) return;
         if (cache.refreshIntervalSeconds < 5) throw new IllegalStateException("media-screen refresh interval must be at least 5 seconds");
+        if (clients.isEmpty()) throw new IllegalStateException("media-screen clients must not be empty when enabled");
         for (String cidr : trustedProxies) requireCidr(cidr);
         for (Client client : clients) {
             if (client.tenantId == null || client.tenantId <= 0) throw new IllegalStateException("media-screen tenant-id must be positive");
+            if (client.cidrs.isEmpty()) throw new IllegalStateException("media-screen client CIDRs must not be empty");
             for (String cidr : client.cidrs) requireCidr(cidr);
         }
     }

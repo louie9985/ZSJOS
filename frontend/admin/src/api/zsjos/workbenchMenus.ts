@@ -51,6 +51,7 @@ export const decideAppeal = (
 ) => request.put({ url: `/zsjos/lead/appeal/${id}/${decision}`, data })
 export const getSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/${id}` })
 export const getMySalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/my/${id}` })
+export const getTeamSalesOrder = (id: number) => request.get({ url: `/zsjos/sales-order/${id}` })
 export const decideSalesOrder = (
   id: number,
   decision: 'approve' | 'reject',

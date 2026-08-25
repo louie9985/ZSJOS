@@ -38,6 +38,15 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
     }
     @Select("SELECT * FROM zsjos_positioning_card WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     PositioningCardDO selectByIdForUpdate(Long id, Long tenantId);
+    default PositioningCardDO selectLatestCreatingDraft(Long serviceRelationId, Long accountId, Long tenantId) {
+        return selectOne(new LambdaQueryWrapperX<PositioningCardDO>()
+                .eq(PositioningCardDO::getServiceRelationId, serviceRelationId)
+                .eq(PositioningCardDO::getAccountId, accountId)
+                .eq(PositioningCardDO::getTenantId, tenantId)
+                .eq(PositioningCardDO::getStatus, "co_creating")
+                .orderByDesc(PositioningCardDO::getUpdateTime).orderByDesc(PositioningCardDO::getId)
+                .last("LIMIT 1"));
+    }
     default PositioningCardDO selectByIpProcessId(String id) { return selectOne(PositioningCardDO::getIpProcessInstanceId, id); }
     default int updateByVersion(PositioningCardDO card, Integer version, String fromStatus) {
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
@@ -46,6 +55,7 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .set(PositioningCardDO::getStatus, card.getStatus())
                 .set(PositioningCardDO::getIpProcessInstanceId, card.getIpProcessInstanceId())
                 .set(PositioningCardDO::getIpReviewerUserId, card.getIpReviewerUserId())
+                .set(PositioningCardDO::getOperatorUserId, card.getOperatorUserId())
                 .set(PositioningCardDO::getVersion, version + 1));
     }
     default int updateDraftSnapshot(PositioningCardDO card, Integer version, String fromStatus) {
@@ -56,6 +66,13 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .set(PositioningCardDO::getValuesSnapshotJson, card.getValuesSnapshotJson())
                 .set(PositioningCardDO::getDictSnapshotJson, card.getDictSnapshotJson())
                 .set(PositioningCardDO::getTrialEndDate, card.getTrialEndDate())
+                .set(PositioningCardDO::getLayer1Json, card.getLayer1Json())
+                .set(PositioningCardDO::getLayer2Json, card.getLayer2Json())
+                .set(PositioningCardDO::getFormulaJson, card.getFormulaJson())
+                .set(PositioningCardDO::getFeasibilityJson, card.getFeasibilityJson())
+                .set(PositioningCardDO::getContentFormJson, card.getContentFormJson())
+                .set(PositioningCardDO::getComplianceJson, card.getComplianceJson())
+                .set(PositioningCardDO::getProfessionalRisk, card.getProfessionalRisk())
                 .set(PositioningCardDO::getVersion, version + 1));
     }
     default int updateCurrentOperatorByServiceRelations(Collection<Long> serviceRelationIds, Long operatorUserId) {
@@ -78,6 +95,13 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>().eq(PositioningCardDO::getId, id)
                 .eq(PositioningCardDO::getVersion, version).eq(PositioningCardDO::getStatus, from)
                 .set(PositioningCardDO::getStatus, to).set(PositioningCardDO::getVersion, version + 1));
+    }
+    default int transitionWithOperator(Long id, Integer version, String from, String to, Long operatorUserId) {
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>().eq(PositioningCardDO::getId, id)
+                .eq(PositioningCardDO::getVersion, version).eq(PositioningCardDO::getStatus, from)
+                .set(PositioningCardDO::getStatus, to)
+                .set(PositioningCardDO::getOperatorUserId, operatorUserId)
+                .set(PositioningCardDO::getVersion, version + 1));
     }
     default int transitionOperatorReview(Long id, Integer version, String from, String to, Long operatorUserId,
                                          LocalDateTime reviewedAt, String comment) {

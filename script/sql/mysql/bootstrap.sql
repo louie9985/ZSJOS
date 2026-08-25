@@ -108,6 +108,11 @@ SOURCE script/sql/mysql/migrations/V129__seed_director_form_dictionaries.sql;
 SOURCE script/sql/mysql/migrations/V130__director_configurable_forms_and_menus.sql;
 SOURCE script/sql/mysql/migrations/V131__repair_director_operator_action_permissions.sql;
 SOURCE script/sql/mysql/migrations/V132__workbench_menu_render_mode.sql;
+SOURCE script/sql/mysql/migrations/V133__director_interview_form_presentation.sql;
+SOURCE script/sql/mysql/migrations/V134__positioning_confirmation_handoff.sql;
+SOURCE script/sql/mysql/migrations/V135__repair_applied_director_and_positioning_schema.sql;
+SOURCE script/sql/mysql/migrations/V136__sales_order_team_management.sql;
+SOURCE script/sql/mysql/migrations/V137__repair_workbench_menu_render_mode_version_collision.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

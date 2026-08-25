@@ -15,7 +15,7 @@ const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
 const emptyCounts: SalesOrderStatusCounts = { total: 0, pendingApproval: 0, revisionRequired: 0, effective: 0, superseded: 0 }
 
-export default function MySalesOrderPage() {
+export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
   const navigate = useNavigate()
   const requestedOrderId = useRef(Number(new URLSearchParams(location.search).get('orderId')) || undefined)
   const [status, setStatus] = useState<StatusTab>('all')
@@ -43,16 +43,16 @@ export default function MySalesOrderPage() {
 
   const loadCounts = useCallback(async () => {
     setCountsError('')
-    try { setCounts(await api.mySalesOrderStatusCounts()) }
+    try { setCounts(await (team ? api.teamSalesOrderStatusCounts() : api.mySalesOrderStatusCounts())) }
     catch (loadError) { setCountsError(loadError instanceof Error ? loadError.message : '订单数量加载失败') }
-  }, [])
+  }, [team])
 
   const loadPage = useCallback(async (targetCursor: string | undefined, replace: boolean, version: number) => {
     const key = `${version}:${targetCursor || 'first'}`
     if (activePages.current.has(key)) return
     activePages.current.add(key); setLoading(true); setError('')
     try {
-      const result = await api.mySalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter })
+      const result = await (team ? api.teamSalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }) : api.mySalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }))
       if (version !== listVersion.current) return
       let nextItems = result.list
       const requestedId = replace ? requestedOrderId.current : undefined
@@ -72,7 +72,7 @@ export default function MySalesOrderPage() {
     } catch (loadError) {
       if (version === listVersion.current) setError(loadError instanceof Error ? loadError.message : '我的订单加载失败')
     } finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
-  }, [advancedFilter, keyword, status])
+  }, [advancedFilter, keyword, status, team])
 
   const reload = useCallback(() => {
     const version = ++listVersion.current
@@ -85,18 +85,19 @@ export default function MySalesOrderPage() {
   const loadDetail = useCallback(async (id: number) => {
     const version = ++detailVersion.current
     setDetailLoading(true); setDetailError('')
-    try { const result = await api.mySalesOrder(id); if (version === detailVersion.current) setDetail(result) }
+    try { const result = await (team ? api.salesOrder(id) : api.mySalesOrder(id)); if (version === detailVersion.current) setDetail(result) }
     catch (loadError) { if (version === detailVersion.current) { setDetail(undefined); setDetailError(loadError instanceof Error ? loadError.message : '订单详情加载失败') } }
     finally { if (version === detailVersion.current) setDetailLoading(false) }
-  }, [])
+  }, [team])
   useEffect(() => { if (selectedId) void loadDetail(selectedId); else setDetail(undefined) }, [loadDetail, selectedId])
 
   const selectedItem = useMemo(() => items.find(item => item.id === selectedId), [items, selectedId])
   const detailContent = detailLoading ? <Skeleton active paragraph={{ rows: 10 }}/>
     : detailError ? <Alert type="error" showIcon message={detailError} action={<Button size="small" onClick={() => selectedId && void loadDetail(selectedId)}>重试</Button>}/>
       : detail ? <><div className="sales-order-detail-actions">{detail.supersedesOrderId && <Button onClick={() => setSelectedId(detail.supersedesOrderId)}>查看原订单</Button>}{detail.supersededByOrderId && <Button type="primary" onClick={() => setSelectedId(detail.supersededByOrderId)}>查看重提订单</Button>}{detail.leadId && <Button onClick={() => navigate(`${APP_ROUTES.LEAD_MANAGEMENT}?leadId=${detail.leadId}`)}>客户档案</Button>}</div>
-        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode="mine" onRevise={() => setRevisionOpen(true)}
-          onTerminate={() => { resetTerminationIntent(); setTerminateOpen(true) }}/></>
+        <SalesOrderDetailCards order={detail} approvalContext={selectedItem} mode={team ? "team" : "mine"}
+          onRevise={team ? undefined : () => setRevisionOpen(true)}
+          onTerminate={team ? undefined : () => { resetTerminationIntent(); setTerminateOpen(true) }}/></>
         : <Empty description="从左侧选择一条订单"/>
   const revisionLead: SalesOrderEntryLead | undefined = detail ? {
     id: detail.leadId || 0, submittedName: detail.studentName, submittedMobile: detail.studentMobile, submittedWechatId: detail.studentWechatId,

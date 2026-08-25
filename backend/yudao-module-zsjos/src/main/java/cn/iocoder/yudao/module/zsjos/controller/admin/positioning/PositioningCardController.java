@@ -4,7 +4,10 @@ import cn.iocoder.yudao.framework.common.pojo.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardDraftRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningLinkRespVO;
 import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningCardService;
+import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningConfirmationService;
 import cn.iocoder.yudao.module.zsjos.controller.admin.director.vo.DirectorFormTemplateVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,6 +28,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @Validated
 public class PositioningCardController {
     @Resource private PositioningCardService service;
+    @Resource private PositioningConfirmationService confirmationService;
     @GetMapping("/published-template") @Operation(summary = "获得当前定位卡业务模板")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
     public CommonResult<DirectorFormTemplateVO.Snapshot> publishedTemplate(@RequestParam(required = false) Long templateId) {
@@ -32,16 +36,19 @@ public class PositioningCardController {
     }
     @PostMapping("/create") @Operation(summary = "创建定位卡")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
-    public CommonResult<Long> create(@Valid @RequestBody PositioningCardSaveReqVO req) { return success(service.create(req, getLoginUserId())); }
+    public CommonResult<PositioningCardDraftRespVO> create(@Valid @RequestBody PositioningCardSaveReqVO req) {
+        return success(service.create(req, getLoginUserId()));
+    }
     @PostMapping("/draft") @Operation(summary = "创建定位卡草稿")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
-    public CommonResult<Long> createDraft(@Valid @RequestBody PositioningCardSaveReqVO req) {
+    public CommonResult<PositioningCardDraftRespVO> createDraft(@Valid @RequestBody PositioningCardSaveReqVO req) {
         return success(service.create(req, getLoginUserId()));
     }
     @PutMapping("/draft/{id}") @Operation(summary = "保存定位卡草稿")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
-    public CommonResult<Boolean> updateDraft(@PathVariable Long id, @Valid @RequestBody PositioningCardSaveReqVO req) {
-        service.updateDraft(id, req, getLoginUserId()); return success(true);
+    public CommonResult<PositioningCardDraftRespVO> updateDraft(@PathVariable Long id,
+                                                                 @Valid @RequestBody PositioningCardSaveReqVO req) {
+        return success(service.updateDraft(id, req, getLoginUserId()));
     }
     @PostMapping("/{id}/submit") @Operation(summary = "提交定位卡")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:submit-review')")
@@ -67,6 +74,12 @@ public class PositioningCardController {
     public CommonResult<Boolean> operatorReject(@PathVariable Long id, @RequestParam Integer version,
             @RequestParam @NotBlank @Size(max = 500) String reason) {
         service.operatorReject(id, version, reason); return success(true);
+    }
+    @PostMapping("/{id}/student-link") @Operation(summary = "生成学员定位卡确认链接")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:student-link-generate')")
+    public CommonResult<PositioningLinkRespVO> generateStudentLink(@PathVariable Long id,
+                                                                   @RequestParam Integer version) {
+        return success(confirmationService.generateLink(id, version, getLoginUserId()));
     }
     @PostMapping("/{id}/confirm-trial") @Operation(summary = "确认十四天试跑结果")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:confirm-trial')")

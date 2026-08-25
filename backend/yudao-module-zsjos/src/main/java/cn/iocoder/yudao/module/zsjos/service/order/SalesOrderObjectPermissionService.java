@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.order;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -31,6 +32,7 @@ public class SalesOrderObjectPermissionService {
     @Resource private SalesOrderSupervisorConfirmationMapper supervisorConfirmationMapper;
     @Resource private DeptApi deptApi;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private PermissionApi permissionApi;
     @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAgingPoolService agingPoolService;
 
     public void check(Long orderId, String action) {
@@ -56,7 +58,8 @@ public class SalesOrderObjectPermissionService {
                 || Objects.equals(order.getFormalSalesUserId(), userId)
                 || lead != null && Objects.equals(lead.getOwnerUserId(), userId)
                 || order.getLeadId() != null && agingPoolService.canRead(order.getLeadId(), userId)
-                || isApprovalPoolMember(userId) || isCurrentSupervisor(order, userId);
+                || isApprovalPoolMember(userId) || isCurrentSupervisor(order, userId)
+                || isTeamOrderReader(order, userId);
     }
 
     public boolean canRevise(SalesOrderDO order, Long userId) {
@@ -100,6 +103,17 @@ public class SalesOrderObjectPermissionService {
                 .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
                 .map(AdminUserRespDTO::getId).sorted().forEach(users::add);
         return users;
+    }
+
+    public Set<Long> teamUserIds(Long userId) {
+        AdminUserRespDTO user = adminUserApi.getUser(userId);
+        if (user == null || user.getDeptId() == null
+                || permissionApi == null || !permissionApi.hasAnyPermissions(userId, PERMISSION_QUERY_TEAM)) return Set.of();
+        return enabledUsers(user.getDeptId());
+    }
+
+    private boolean isTeamOrderReader(SalesOrderDO order, Long userId) {
+        return teamUserIds(userId).contains(order.getSubmitterUserId());
     }
 
     private boolean isCurrentSupervisor(SalesOrderDO order, Long userId) {
