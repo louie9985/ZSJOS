@@ -3461,3 +3461,17 @@
 - Verification evidence: parent branch was up to date with `origin/main` before staging; no sensitive added configuration keys were detected in the reviewed application YAML; no tests, builds, SQL execution, or database mutation were run in this commit-only task.
 - Dependency or integration impact: commit and push will publish the confirmed positioning confirmation, team-order, media-screen, autosave, and migration compatibility changes. No dependency installation, service operation, permission mutation, branch/worktree change, or database execution occurred.
 - Remaining work: verify remote commit and parent worktree status after push; nested UniApp local changes remain outside this commit.
+
+## Delivery Entry - 2026-08-25 21:43:28 +08:00
+
+- Workstream ID: `main-workbench-font-probe-publish-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `8f966f7745ed713f3df299c01a4dee4b0e0d8e6c`（交付日志提交前，已推送）
+- User goal: 拉取远端最新代码，合并到本地，解决冲突，并将本地 Git 改动直接提交到云端。
+- Key decisions: 使用普通 merge，不变基、不强制推送、不改写历史；`handoff/main.md` 的唯一文本冲突为双方并行追加历史，因此完整保留两侧记录并仅删除冲突标记；不执行 SQL、数据库、权限、BPM 或服务状态变更；远端提交遗漏 Workbench API 契约的产品修复超出本次 Git 同步授权范围，未擅自补写。
+- Execution or analysis result: 本地功能提交 `70e87967` 和 `77c5c14e` 已与远端 `da10ba31` 合并为 `8f966f77`；首次推送成功，远端 `main` 从 `da10ba31` 更新到 `8f966f77`。
+- Changed files: 合并引入 `da10ba31` 的 89 个远端文件；冲突解决仅修改 `handoff/main.md`，双方历史均保留；本条仅追加交付日志。
+- Verification evidence: 冲突标记扫描为空；无未合并路径；合并前后 `git diff --check` 均通过；推送返回 `da10ba31..8f966f77 main -> main`。合并后 Workbench Vitest 通过 62 个文件、385 个测试，失败 1 个文件中的 2 个守卫测试；`npm run typecheck` 和 `npm run build` 均失败。根因核对显示远端 `da10ba31` 修改了 `MediaStudentsPage.tsx` 和 `MySalesOrderPage.tsx`，但未提交其交付记录声称的 `frontend/workbench/src/services/api.ts` 等对应契约，导致新增定位卡草稿、学生确认链接、团队订单接口和类型字段缺失；该失败不是 Git 文本冲突或本地 iframe/probe 提交造成的。
+- Dependency or integration impact: `origin/main` 已包含字号 probe、Admin 单 iframe 复用以及远端定位卡/团队订单等提交；没有新增依赖、数据库执行、权限变更、服务操作、分支切换、历史改写或强制推送。当前远端 Workbench 存在上述已知不可通过类型检查和构建的风险。
+- Remaining work: 单独补齐并评审 `da10ba31` 遗漏的 Workbench API/类型契约及守卫预期，重新运行 Workbench 全量测试、类型检查和生产构建；本次 Git 同步、冲突解决与首次推送已完成。
