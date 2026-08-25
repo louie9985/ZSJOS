@@ -2,7 +2,7 @@
 
 @media (max-width: 768px) {
   .today-tasks-page {
-    padding: 12px;
+    padding: var(--crm-sp-4);
   }
 }
 
@@ -13,7 +13,7 @@
 .task-center-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--crm-sp-4);
 }
 
 .task-center-panel {
@@ -21,9 +21,9 @@
   min-width: 0;
   min-height: 560px;
   flex-direction: column;
-  padding: 16px;
+  padding: var(--crm-sp-5);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-bg-container);
 }
 
@@ -31,8 +31,8 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-5);
 }
 
 .task-panel-header h4 {
@@ -40,11 +40,11 @@
 }
 
 .task-bucket-control {
-  margin-top: 8px;
+  margin-top: var(--crm-sp-3);
 }
 
 .task-panel-alert {
-  margin-top: 10px;
+  margin-top: var(--crm-sp-4);
 }
 
 .task-panel-list {
@@ -52,7 +52,7 @@
   flex: 1;
   min-height: 0;
   flex-direction: column;
-  margin-top: 8px;
+  margin-top: var(--crm-sp-3);
 }
 
 .task-panel-item {
@@ -87,7 +87,7 @@
 
 .task-center-panel > .ant-pagination {
   align-self: flex-end;
-  margin-top: 10px;
+  margin-top: var(--crm-sp-4);
 }
 
 @media (max-width: 900px) {

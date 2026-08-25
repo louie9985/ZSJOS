@@ -52,13 +52,13 @@
   width: 10px;
   height: 10px;
   flex: none;
-  margin-top: 4px;
+  margin-top: var(--crm-sp-1);
   border-radius: 50%;
   background: var(--crm-color-primary);
   border: 2px solid var(--crm-bg-container);
   box-shadow: 0 0 0 2px var(--crm-color-primary-border);
   position: relative;
-  z-index: 1;
+  z-index: var(--crm-z-base);
 }
 
 .fu-node--first .fu-node-dot {
@@ -80,7 +80,7 @@
 /* Time label */
 .fu-node-time {
   font-size: var(--crm-font-sm);
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
   color: var(--crm-text-secondary);
   line-height: 18px;
   margin-bottom: var(--crm-sp-2);
@@ -96,7 +96,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--crm-sp-2);
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow var(--crm-duration-base) ease;
 }
 
 .fu-node-card:hover {

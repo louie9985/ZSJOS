@@ -2,40 +2,39 @@
 
 .lead-detail-card .ant-card-head {
   min-height: 42px;
-  padding: 0 14px;
+  padding: 0 var(--crm-sp-5);
   background: var(--crm-fill-tertiary);
 }
 
 .lead-detail-card .ant-card-head-title {
-  padding: 10px 0;
+  padding: var(--crm-sp-4) 0;
   font-size: var(--crm-font-lg);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
 }
 
 @media(max-width:768px) {
   .lead-detail-card .ant-card-body {
-    padding: 10px 12px;
+    padding: var(--crm-sp-4);
   }
 
   .lead-detail-card .ant-card-head {
-    padding: 0 12px;
+    padding: 0 var(--crm-sp-4);
   }
 }
 
 .lead-detail-card-grid {
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
-.crm-shell :where(.ant-card,.ant-alert,.ant-btn,.ant-input,.ant-input-affix-wrapper,.ant-input-number,.ant-picker,.ant-select-selector,.ant-segmented,.ant-upload-list-item-container,.ant-pagination-item),.ant-modal-content {
-  border-radius: var(--crm-radius-lg)!important;
-}
-
+/* antd 组件的圆角现由 ThemeProvider 注入（反解 genRadius 的 +2 派生后，
+   borderRadiusLG 恰等于 --crm-radius-lg），不再需要在 CSS 里事后压平。
+   自绘容器仍需显式对齐到同一档 —— 它们不经过 antd 的 token 体系。 */
 .lead-inbox-filter-shell,.lead-inbox-item,.lead-inbox-detail-pane,.business-inbox-item,.business-inbox-detail-pane,.business-inbox-detail-hero,.business-inbox-card,.lead-detail-hero,.lead-detail-card,.pending-reminder,.claim-pool-card,.claim-card-region,.claim-pool-state,.claim-pool-skeletons .ant-card,.assignment-subject,.assignment-picker,.subordinate-sales-item,.subordinate-sales-detail-pane,.subordinate-detail-hero,.subordinate-overview-card,.media-students-list-pane,.media-students-detail-pane,.media-students-card,.media-feature-list-pane,.media-feature-detail-pane,.media-feature-card {
-  border-radius: var(--crm-radius-lg)!important;
+  border-radius: var(--crm-radius-lg);
 }
 
 .lead-attachment-grid .ant-image,.lead-attachment-grid img,.claim-card-images .ant-image,.claim-card-images img,.follow-up-record-images img {
-  border-radius: var(--crm-radius-lg)!important;
+  border-radius: var(--crm-radius-lg);
 }
 
 .ant-drawer-content {

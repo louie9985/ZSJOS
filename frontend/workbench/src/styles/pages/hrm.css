@@ -48,7 +48,7 @@
   margin-block: var(--crm-sp-4) var(--crm-sp-2);
   font-size: var(--crm-font-sm);
   color: var(--crm-text-secondary);
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 /* 员工端用 Tabs 承载打卡/请假两块，页签内容自带 page-heading，去掉重复的上边距 */
@@ -67,7 +67,7 @@
 
 .hrm-slip-amount {
   font-size: var(--crm-font-display);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
   color: var(--crm-text);
 }
 
@@ -93,7 +93,7 @@
 }
 
 .hrm-timeline-title {
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 .hrm-timeline-content {
@@ -112,7 +112,7 @@
 .hrm-profile-name {
   margin: 0;
   font-size: var(--crm-font-lg);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
   color: var(--crm-text);
 }
 
@@ -130,7 +130,7 @@
 .hrm-tab-label {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--crm-sp-1);
 }
 
 /* 组织/薪资项树里的行内操作，避免树节点过长 */
@@ -145,7 +145,7 @@
 }
 
 .hrm-option-system {
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 /* 考勤组班次行：每个班次一块，带边框分隔 */
@@ -167,7 +167,7 @@
 /* 绩效结果等级 chip */
 .hrm-level-chip {
   display: inline-block;
-  padding: 2px 8px;
+  padding: 2px var(--crm-sp-3);
   border: 1px solid var(--crm-border);
   border-radius: var(--crm-radius-sm);
   font-size: var(--crm-font-sm);
@@ -227,7 +227,7 @@
 }
 
 .hrm-calendar-head {
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
   margin-block-end: var(--crm-sp-3);
 }
 

@@ -47,7 +47,7 @@
 
 .eam-count-alert {
   color: var(--crm-color-error);
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 .eam-section-title {
@@ -73,7 +73,7 @@
 }
 
 .eam-progress-caption {
-  font-size: 12px;
+  font-size: var(--crm-font-sm);
   color: var(--crm-text-tertiary);
 }
 
@@ -91,7 +91,7 @@
 
 .eam-log-meta {
   margin-block-start: var(--crm-sp-1);
-  font-size: 12px;
+  font-size: var(--crm-font-sm);
   color: var(--crm-text-tertiary);
 }
 
@@ -186,7 +186,7 @@
 }
 
 .eam-pane-title {
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 .eam-category-filters {
@@ -209,7 +209,7 @@
 }
 
 .eam-category-name {
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 .eam-category-actions {
@@ -241,8 +241,8 @@
 
 .eam-stat-card-value {
   margin-block-start: var(--crm-sp-1);
-  font-size: 30px;
-  font-weight: 600;
+  font-size: var(--crm-font-display);
+  font-weight: var(--crm-weight-semibold);
 }
 
 .eam-stats-columns {
@@ -287,5 +287,5 @@
 }
 
 .eam-stat-count {
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }

@@ -29,12 +29,12 @@
   min-height: 0;
   overflow-y: auto;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .work-plan-list-pane>.ant-pagination {
   margin-top: auto;
-  padding-top: 8px;
+  padding-top: var(--crm-sp-3);
 }
 
 .work-plan-list-item {
@@ -47,7 +47,7 @@
   overflow-y: auto;
   padding: var(--crm-pane-pad);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-bg-container);
 }
 
@@ -70,7 +70,7 @@
 .work-plan-form-grid {
   display: grid;
   grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: 0 12px;
+  gap: 0 var(--crm-sp-4);
 }
 
 .work-plan-form-item-heading {
@@ -80,14 +80,14 @@
 }
 
 .work-plan-form-item {
-  padding: 12px;
-  margin-top: 10px;
+  padding: var(--crm-sp-4);
+  margin-top: var(--crm-sp-4);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
 }
 
 .work-plan-form-item .ant-form-item {
-  margin-bottom: 12px;
+  margin-bottom: var(--crm-sp-4);
 }
 
 @media(max-width:900px) {

@@ -60,7 +60,7 @@
 
 .fu-panel-form-title {
   font-size: var(--crm-font-lg);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
   color: var(--crm-text);
 }
 
@@ -87,13 +87,13 @@
 
 .fu-panel-title {
   font-size: var(--crm-font-lg);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
   color: var(--crm-text);
 }
 
 .fu-panel-count {
   margin-left: var(--crm-sp-1);
-  font-weight: 400;
+  font-weight: var(--crm-weight-normal);
   color: var(--crm-text-tertiary);
 }
 
@@ -121,33 +121,33 @@
 /* ========== Form fields (shared) ========== */
 
 .follow-up-form {
-  padding: 16px;
-  margin-top: 12px;
+  padding: var(--crm-sp-5);
+  margin-top: var(--crm-sp-4);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-fill-quaternary);
 }
 
 .follow-up-field-grid {
   display: grid;
   grid-template-columns: repeat(3,minmax(0,1fr));
-  gap: 12px;
+  gap: var(--crm-sp-4);
 }
 
 .follow-up-quick-notes,.follow-up-day-shortcuts {
-  margin-bottom: 12px;
+  margin-bottom: var(--crm-sp-4);
 }
 
 .follow-up-upload-row {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-5);
 }
 
 @media(max-width:768px) {
   .follow-up-form {
-    padding: 12px;
+    padding: var(--crm-sp-4);
   }
 
   .follow-up-upload-row {

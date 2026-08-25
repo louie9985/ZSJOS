@@ -7,7 +7,7 @@
 .assignment-toolbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
 .assignment-search {
@@ -21,7 +21,7 @@
 .assignment-person {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--crm-sp-4);
 }
 
 .assignment-person>div,.assignment-selected-row>div,.assignment-check-row span {
@@ -38,10 +38,10 @@
 .assignment-subject {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
-  margin-bottom: 16px;
-  border-radius: 6px;
+  gap: var(--crm-sp-3);
+  padding: var(--crm-sp-4) var(--crm-sp-5);
+  margin-bottom: var(--crm-sp-5);
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-fill-secondary);
 }
 
@@ -49,9 +49,9 @@
   display: grid;
   grid-template-columns: minmax(0,1fr) minmax(260px,.72fr);
   min-height: 460px;
-  margin-top: 16px;
+  margin-top: var(--crm-sp-5);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
   overflow: hidden;
 }
 
@@ -59,8 +59,8 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 12px;
-  padding: 16px;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-sp-5);
 }
 
 .assignment-selected {
@@ -84,7 +84,7 @@
 .assignment-check-row {
   width: 100%;
   height: auto;
-  padding: 10px 4px;
+  padding: var(--crm-sp-4) var(--crm-sp-1);
   border-bottom: 1px solid var(--crm-border);
 }
 
@@ -97,7 +97,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 0;
+  padding: var(--crm-sp-4) 0;
   border-bottom: 1px solid var(--crm-border);
 }
 
@@ -123,20 +123,20 @@
 
 .pending-reminder {
   position: fixed;
-  z-index: 1090;
+  z-index: var(--crm-z-above-modal);
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  padding: 6px 12px;
+  padding: var(--crm-sp-2) var(--crm-sp-4);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-bg-container);
   box-shadow: var(--crm-shadow-raised);
 }
 
 .pending-load-error {
   position: fixed;
-  z-index: 1090;
+  z-index: var(--crm-z-above-modal);
   top: 56px;
   right: 16px;
   max-width: 420px;
@@ -147,7 +147,7 @@
 .assignment-modal-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
 .assignment-modal-title .ant-tag {
@@ -158,22 +158,22 @@
 .assignment-countdown {
   display: flex;
   align-items: baseline;
-  gap: 8px;
-  padding: 10px 12px;
+  gap: var(--crm-sp-3);
+  padding: var(--crm-sp-4);
   margin-bottom: var(--crm-gap);
   border-radius: var(--crm-radius-md);
-  background: color-mix(in srgb, var(--crm-color-warning) 12%, var(--crm-bg-container));
+  background: var(--crm-color-warning-bg);
   color: var(--crm-color-warning);
 }
 
 .assignment-countdown.critical {
-  background: color-mix(in srgb, var(--crm-color-error) 12%, var(--crm-bg-container));
+  background: var(--crm-color-error-bg);
   color: var(--crm-color-error);
 }
 
 .assignment-countdown-value {
   font-size: var(--crm-font-display);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
   font-variant-numeric: tabular-nums;
   line-height: 1;
 }
@@ -186,14 +186,14 @@
 .assignment-sheet {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--crm-sp-5);
 }
 
 .assignment-sheet-identity {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding-bottom: 16px;
+  gap: var(--crm-sp-4);
+  padding-bottom: var(--crm-sp-5);
   border-bottom: 1px solid var(--crm-border);
 }
 
@@ -201,7 +201,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .assignment-sheet-name {
@@ -215,14 +215,14 @@
 .assignment-sheet-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px 24px;
+  gap: var(--crm-sp-4) var(--crm-sp-6);
 }
 
 .assignment-field {
   display: flex;
   align-items: baseline;
   min-width: 0;
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
 .assignment-field-label {
@@ -236,7 +236,7 @@
 .assignment-field-value {
   font-size: var(--crm-font-base);
   color: var(--crm-text);
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -247,7 +247,7 @@
   display: flex;
   min-width: 0;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .assignment-sheet-block > .lead-field-label {
@@ -258,7 +258,7 @@
 .assignment-sheet-products {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .assignment-sheet-products .ant-tag {
@@ -266,18 +266,18 @@
 }
 
 .assignment-sheet-remark {
-  padding: 10px 12px;
+  padding: var(--crm-sp-4);
   margin: 0!important;
   border-radius: var(--crm-radius-sm);
   background: var(--crm-fill-quaternary);
   font-size: var(--crm-font-base);
-  line-height: 1.6;
+  line-height: var(--crm-lh-base);
 }
 
 .assignment-sheet-attachments {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
 .assignment-sheet-attachments .ant-image {
@@ -292,7 +292,7 @@
 .lead-assignment-actions {
   display: flex;
   width: 100%;
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
 /* 接单是主路径，给它更大的点击面积 */
@@ -303,7 +303,7 @@
 .lead-assignment-modal .ant-modal-body {
   max-height: min(68vh, 680px);
   overflow: auto;
-  padding: 20px 24px;
+  padding: var(--crm-sp-6);
 }
 
 @media(max-width:768px) {
@@ -333,8 +333,8 @@
   }
 
   .lead-assignment-modal .ant-modal-content {
-    border-radius: 8px 8px 0 0;
-    padding: 16px;
+    border-radius: var(--crm-radius-md) var(--crm-radius-md) 0 0;
+    padding: var(--crm-sp-5);
   }
 
   .lead-assignment-modal .ant-modal-body {
@@ -351,7 +351,7 @@
 }
 
 .assignment-toolbar {
-  padding: 0 0 10px;
+  padding: 0 0 var(--crm-sp-4);
   flex-wrap: wrap;
 }
 
@@ -360,11 +360,11 @@
 }
 
 .assignment-pagination {
-  padding-top: 10px;
+  padding-top: var(--crm-sp-4);
 }
 
 .assignment-page .ant-table,.assignment-page .ant-table-container {
-  border-radius: 10px!important;
+  border-radius: var(--crm-radius-lg)!important;
 }
 
 .assignment-page .ant-table-container {
@@ -373,7 +373,7 @@
 
 @media(max-width:768px) {
   .assignment-toolbar {
-    gap: 6px;
+    gap: var(--crm-sp-2);
   }
 
   .assignment-toolbar-spacer {
@@ -389,6 +389,6 @@
   }
 
   .lead-assignment-modal .ant-modal-content {
-    border-radius: 14px 14px 0 0!important;
+    border-radius: var(--crm-radius-lg) var(--crm-radius-lg) 0 0!important;
   }
 }

@@ -4,8 +4,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-4);
 }
 
 .aging-pool-layout {
@@ -16,11 +16,11 @@
 }
 
 .aging-pool-list,.aging-pool-detail {
-  border-radius: 8px;
+  border-radius: var(--crm-radius-md);
 }
 
 .aging-pool-item {
-  padding: 14px!important;
+  padding: var(--crm-sp-5)!important;
   cursor: pointer;
 }
 
@@ -29,13 +29,13 @@
 }
 
 .aging-pool-item .ant-list-item-meta-description>div {
-  margin-top: 3px;
+  margin-top: var(--crm-sp-1);
 }
 
 .aging-pool-pagination {
   display: flex;
   justify-content: center;
-  padding: 10px 8px;
+  padding: var(--crm-sp-4) var(--crm-sp-3);
   border-top: 1px solid var(--crm-border);
 }
 
@@ -43,12 +43,12 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-5);
 }
 
 .aging-pool-detail-heading h4 {
-  margin: 0 0 4px!important;
+  margin: 0 0 var(--crm-sp-1)!important;
 }
 
 .aging-pool-summary-card {

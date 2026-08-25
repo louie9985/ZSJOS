@@ -11,7 +11,7 @@
 .lead-form-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: var(--crm-sp-3);
 }
 
 @media(max-width:768px) {

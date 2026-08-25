@@ -22,7 +22,7 @@
 
 .fms-account-set-switch .fms-account-set-period {
   color: var(--crm-text-secondary);
-  font-size: 12px;
+  font-size: var(--crm-font-sm);
   white-space: nowrap;
 }
 

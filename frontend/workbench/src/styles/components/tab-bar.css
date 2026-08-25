@@ -2,7 +2,7 @@
 
 .crm-tab-bar {
   flex-shrink: 0;
-  padding: 4px 12px 0;
+  padding: var(--crm-sp-1) var(--crm-sp-4) 0;
   background: var(--crm-bg-container);
   border-bottom: 1px solid var(--crm-border);
 }
@@ -16,7 +16,7 @@
 }
 
 .crm-tab-bar .ant-tabs-tab {
-  padding: 4px 12px;
+  padding: var(--crm-sp-1) var(--crm-sp-4);
   font-size: var(--crm-font-sm);
 }
 
@@ -26,7 +26,7 @@
 
 @media (max-width: 768px) {
   .crm-tab-bar {
-    padding: 2px 8px 0;
+    padding: 2px var(--crm-sp-3) 0;
   }
 }
 
@@ -61,7 +61,7 @@
 
 /* ===== pill 样式：胶囊填色 ===== */
 .tab-style-pill {
-  padding: 6px 12px;
+  padding: var(--crm-sp-2) var(--crm-sp-4);
   border-bottom: none;
   background: var(--crm-fill-tertiary);
   border-radius: var(--crm-radius-lg);
@@ -71,9 +71,11 @@
   border: none !important;
   background: transparent !important;
   border-radius: var(--crm-radius-lg) !important;
-  padding: 4px 14px;
-  margin-right: 4px;
-  transition: all 0.2s ease;
+  padding: var(--crm-sp-1) var(--crm-sp-5);
+  margin-right: var(--crm-sp-1);
+  /* 显式列出而非 all：hover/active 实际只改这三项，
+     all 会连 padding、border-radius 等布局属性一起监听，白白触发重排 */
+  transition: background var(--crm-duration-base) ease, color var(--crm-duration-base) ease, box-shadow var(--crm-duration-base) ease;
   color: var(--crm-text-secondary);
 }
 
@@ -90,11 +92,11 @@
 
 .tab-style-pill .ant-tabs-tab-active .ant-tabs-tab-btn {
   color: var(--crm-text);
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 .tab-style-pill .ant-tabs-tab .ant-tabs-tab-remove {
-  margin-left: 4px;
+  margin-left: var(--crm-sp-1);
   color: var(--crm-text-tertiary);
   font-size: var(--crm-font-sm);
 }
@@ -124,7 +126,7 @@
   border: none !important;
   background: transparent !important;
   border-radius: 0 !important;
-  padding: 6px 16px;
+  padding: var(--crm-sp-2) var(--crm-sp-5);
 }
 
 .tab-style-flat .ant-tabs-tab-active {

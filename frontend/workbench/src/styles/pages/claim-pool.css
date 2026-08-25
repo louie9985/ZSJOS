@@ -2,7 +2,7 @@
 
 .claim-pool-page>.page-heading {
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: var(--crm-sp-4);
 }
 
 .claim-pool-page>.page-heading h4 {
@@ -22,7 +22,7 @@
 .claim-pool-card {
   height: 548px;
   min-width: 0;
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
 }
 
 .claim-pool-card .ant-card-body {
@@ -44,7 +44,7 @@
   min-width: 0;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: var(--crm-sp-4);
 }
 
 .claim-card-identity {
@@ -52,7 +52,7 @@
 }
 
 .claim-card-header h5 {
-  margin: 0 0 4px!important;
+  margin: 0 0 var(--crm-sp-1)!important;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -74,7 +74,7 @@
 .claim-card-contacts {
   display: grid;
   grid-template-columns: repeat(2,minmax(0,1fr));
-  gap: 8px;
+  gap: var(--crm-sp-3);
   font-size: var(--crm-font-sm);
 }
 
@@ -82,7 +82,7 @@
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .claim-card-contacts>.ant-typography>span {
@@ -94,9 +94,9 @@
 .claim-card-region {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 6px;
+  gap: var(--crm-sp-3);
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-fill-secondary);
 }
 
@@ -109,7 +109,7 @@
 .claim-card-fields {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: var(--crm-sp-3);
   margin: 0;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .claim-card-fields dd {
-  margin: 3px 0 0;
+  margin: var(--crm-sp-1) 0 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -146,7 +146,7 @@
   overflow-y: auto;
   align-content: flex-start;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: var(--crm-sp-2);
   padding-right: var(--crm-sp-1);
 }
 
@@ -161,7 +161,7 @@
   margin: 0;
   overflow-y: auto;
   padding-right: var(--crm-sp-1);
-  line-height: 1.55;
+  line-height: var(--crm-lh-base);
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
@@ -172,8 +172,8 @@
   min-height: 66px;
   overflow-x: auto;
   overflow-y: hidden;
-  gap: 8px;
-  padding: 1px 0 3px;
+  gap: var(--crm-sp-3);
+  padding: 1px 0 var(--crm-sp-1);
 }
 
 .claim-card-images .ant-image,.claim-card-images img {
@@ -182,7 +182,7 @@
   min-width: 60px;
   height: 60px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
 }
 
 .claim-card-images .ant-image {
@@ -191,20 +191,20 @@
 
 .claim-card-no-image {
   height: 66px;
-  padding: 8px 0;
+  padding: var(--crm-sp-3) 0;
 }
 
 .claim-card-action {
   width: calc(100% - 24px);
   height: 38px;
   flex: none;
-  margin: 14px auto 0;
+  margin: var(--crm-sp-5) auto 0;
 }
 
 .claim-pool-state {
-  padding: 56px 16px;
+  padding: var(--crm-sp-6) var(--crm-sp-5);
   border: 1px solid var(--crm-border);
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
   background: var(--crm-bg-container);
 }
 
@@ -212,14 +212,14 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--crm-sp-3);
   color: var(--crm-text-secondary);
   font-size: var(--crm-font-sm);
 }
 
 .claim-pool-skeletons .ant-card {
   height: 548px;
-  border-radius: 6px;
+  border-radius: var(--crm-radius-sm);
 }
 
 @container(min-width:680px) {
@@ -242,7 +242,7 @@
 
 @media(max-width:768px) {
   .claim-pool-page {
-    padding: 8px;
+    padding: var(--crm-sp-3);
   }
 
   .claim-card-fields {
@@ -254,38 +254,38 @@
   }
 
   .claim-pool-card .ant-card-body {
-    padding: 14px;
+    padding: var(--crm-sp-5);
   }
 }
 
 .claim-pool-toolbar {
   display: flex;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  margin-bottom: var(--crm-sp-3);
 }
 
 .claim-pool-grid {
-  gap: 10px;
+  gap: var(--crm-sp-4);
 }
 
 .claim-pool-card .ant-card-body {
-  padding: 14px;
+  padding: var(--crm-sp-5);
 }
 
 .claim-card-content {
-  gap: 10px;
+  gap: var(--crm-sp-4);
 }
 
 .claim-card-section {
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .claim-card-action {
-  margin-top: 12px;
+  margin-top: var(--crm-sp-4);
 }
 
 .claim-pool-inline-error {
-  margin-bottom: 8px;
+  margin-bottom: var(--crm-sp-3);
 }
 
 .claim-pool-sentinel {
@@ -294,6 +294,6 @@
 
 @media(max-width:768px) {
   .claim-pool-toolbar {
-    margin-bottom: 6px;
+    margin-bottom: var(--crm-sp-2);
   }
 }

@@ -18,7 +18,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--crm-sp-3);
 }
 
 .lead-charts-loading,
@@ -41,7 +41,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 /* 两列 header 强制等高对齐 */
@@ -58,13 +58,13 @@
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 6px;
-  padding: 4px 0;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-1) 0;
 }
 
 .chart-silent-days-number {
   font-size: calc(var(--crm-font-display) * 1.5);
-  font-weight: 700;
+  font-weight: var(--crm-weight-bold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
@@ -79,12 +79,12 @@
   display: flex;
   align-items: baseline;
   justify-content: center;
-  gap: 4px;
+  gap: var(--crm-sp-1);
 }
 
 .chart-total-number {
   font-size: var(--crm-font-display);
-  font-weight: 700;
+  font-weight: var(--crm-weight-bold);
   line-height: 1;
   font-variant-numeric: tabular-nums;
   color: var(--crm-text);
@@ -133,15 +133,15 @@
 
 .chart-donut-center-value {
   font-size: var(--crm-font-lg);
-  font-weight: 700;
+  font-weight: var(--crm-weight-bold);
   color: var(--crm-text);
-  line-height: 1.2;
+  line-height: var(--crm-lh-tight);
 }
 
 .chart-donut-center-sub {
   font-size: var(--crm-font-sm);
   color: var(--crm-text-tertiary);
-  line-height: 1.2;
+  line-height: var(--crm-lh-tight);
 }
 
 /* 悬浮 tooltip */
@@ -149,7 +149,7 @@
   position: absolute;
   pointer-events: none;
   transform: translate(-50%, -120%);
-  padding: 4px 8px;
+  padding: var(--crm-sp-1) var(--crm-sp-3);
   border-radius: var(--crm-radius-sm);
   background: color-mix(in srgb, var(--crm-bg-elevated) 92%, transparent);
   backdrop-filter: blur(8px);
@@ -161,19 +161,19 @@
   flex-direction: column;
   align-items: center;
   gap: 1px;
-  z-index: 10;
+  z-index: var(--crm-z-raised);
 }
 
 .chart-donut-tooltip-label {
   font-size: var(--crm-font-sm);
   color: var(--crm-text-secondary);
-  font-weight: 500;
+  font-weight: var(--crm-weight-medium);
 }
 
 .chart-donut-tooltip-value {
   font-size: var(--crm-font-sm);
   color: var(--crm-text);
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
 }
 
 /* ========== 跟进频率/间隔 ========== */
@@ -181,7 +181,7 @@
 .chart-frequency {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--crm-sp-2);
 }
 
 .chart-frequency-svg {

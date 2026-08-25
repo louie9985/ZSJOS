@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import type { ConfigProviderProps } from 'antd'
+import { theme as antdTheme } from 'antd'
 import { withScale } from './scaleTokens'
 import { withGlassSurface } from './glassSurface'
-import { DENSITY_SCALE, DENSITIES, FONT_SCALE_TABLE, FONT_SCALES } from '../../constants'
+import { DENSITY_SCALE, DENSITIES, FONT_SCALE_TABLE, FONT_SCALES, BORDER_RADIUS_OPTIONS, BORDER_RADIUS_VALUES } from '../../constants'
+
+/**
+ * 走 antd 真实算法而非抄一份派生规则：
+ * antd 若改了 genRadius，这里会立刻失败，而抄来的副本只会静默地继续通过。
+ */
+const antdRadiusLG = (base: number) =>
+  antdTheme.defaultAlgorithm({ ...antdTheme.defaultSeed, borderRadius: base }).borderRadiusLG
 
 describe('withScale', () => {
   it('injects card padding from the density tier', () => {
@@ -83,5 +91,20 @@ describe('scale token single source of truth', () => {
   it('orders the font tiers small < default < large', () => {
     const blocks = FONT_SCALES.map(f => FONT_SCALE_TABLE[f].cellBlock)
     expect(blocks).toEqual([...blocks].sort((a, b) => a - b))
+  })
+
+  it('lands antd borderRadiusLG exactly on --crm-radius-lg for every tier', () => {
+    // antd 的 borderRadius 是 base 值，borderRadiusLG 由 genRadius 派生
+    // （base ∈ [6,16) 时 +2），而 Card / Modal 用的是 LG，也正是自有 CSS
+    // 的 --crm-radius-lg 那一层。ThemeProvider 注入时反解这一档，
+    // 否则 small/round 会出现 12px 的 antd 卡片配 10px 的自绘面板。
+    const provider = readFileSync('src/components/Theme/ThemeProvider.tsx', 'utf8')
+    expect(provider).toMatch(/targetLg >= 8 && targetLg < 18 \? targetLg - 2 : targetLg/)
+
+    for (const tier of BORDER_RADIUS_OPTIONS.map(o => o.value)) {
+      const lg = BORDER_RADIUS_VALUES[tier].lg
+      const injected = lg >= 8 && lg < 18 ? lg - 2 : lg
+      expect(antdRadiusLG(injected), tier).toBe(lg)
+    }
   })
 })

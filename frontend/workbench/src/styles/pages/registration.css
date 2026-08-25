@@ -78,7 +78,7 @@
 }
 
 .student-contact-record-remark {
-  margin: 4px 0 0;
+  margin: var(--crm-sp-1) 0 0;
   white-space: pre-wrap;
 }
 

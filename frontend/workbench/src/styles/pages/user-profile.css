@@ -5,19 +5,19 @@
 .user-profile-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
-  gap: 16px;
+  gap: var(--crm-sp-5);
 }
 
 .profile-avatar-editor {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--crm-sp-5);
+  margin-bottom: var(--crm-sp-6);
 }
 
 @media(max-width:768px) {
   .user-profile-page {
-    padding: 8px;
+    padding: var(--crm-sp-3);
   }
 
   .user-profile-grid {

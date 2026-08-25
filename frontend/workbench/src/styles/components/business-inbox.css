@@ -110,7 +110,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: background var(--crm-duration-base) ease, border-color var(--crm-duration-base) ease, box-shadow var(--crm-duration-base) ease;
 }
 
 .business-inbox-item:hover {

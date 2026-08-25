@@ -11,7 +11,7 @@
   min-width: 72px;
   height: var(--crm-control-h);
   margin-inline-end: 0;
-  padding-inline: 9px;
+  padding-inline: var(--crm-sp-3);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -21,17 +21,17 @@
 .dispatch-mode-button {
   width: 96px;
   height: var(--crm-control-h);
-  padding-inline: 12px;
+  padding-inline: var(--crm-sp-4);
 }
 
 .sales-dispatch-status-alert {
   margin: 0;
   border-color: color-mix(in srgb, var(--crm-color-error) 55%, var(--crm-border));
-  background: color-mix(in srgb, var(--crm-color-error) 10%, var(--crm-bg-container));
+  background: var(--crm-color-error-bg);
 }
 
 .sales-dispatch-status-alert .ant-alert-message {
-  font-weight: 600;
+  font-weight: var(--crm-weight-semibold);
 }
 
 .sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {
@@ -46,12 +46,12 @@
 
   .dispatch-status-tag {
     min-width: 56px;
-    padding-inline: 3px;
+    padding-inline: var(--crm-sp-1);
   }
 
   .dispatch-mode-button {
     width: 72px;
-    padding-inline: 4px;
+    padding-inline: var(--crm-sp-1);
   }
 
   .sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {

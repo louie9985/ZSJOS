@@ -62,7 +62,18 @@ const ThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const value = useThemeState();
   const { preset, isDark, colorPrimary, density, fontScale, backgroundValue, glassOpacity, borderRadius } = value;
   const hasBackground = Boolean(backgroundValue);
-  const radiusValue = BORDER_RADIUS_VALUES[borderRadius].lg;
+  /**
+   * antd 的 borderRadius 是 **base** 值，borderRadiusLG 由它派生：
+   * base 在 [6,16) 时 LG = base + 2（见 antd 的 genRadius）。
+   * 而 Card / Modal / Drawer 这些大容器用的正是 borderRadiusLG，
+   * 也正是自有 CSS 里 --crm-radius-lg 对应的那一层。
+   *
+   * 所以注入时要反解一档，让派生结果落回我们要的 lg 值 ——
+   * 否则 small 档会得到 12px 的 antd 卡片配 10px 的自绘面板，
+   * 此前是靠 antd-overrides.css 的一批 !important 事后压平的。
+   */
+  const targetLg = BORDER_RADIUS_VALUES[borderRadius].lg;
+  const radiusValue = targetLg >= 8 && targetLg < 18 ? targetLg - 2 : targetLg;
 
   // 无条件调用全部预设 hook
   const configs: Record<ThemePreset, ConfigProviderProps> = {

@@ -205,17 +205,30 @@ describe('spacing and sizing anchors', () => {
     expect(joined).toMatch(/\.lead-product-checkbox-control \{[^}]*width: fit-content;[^}]*justify-self: start/)
   })
 
-  it('leaves only deliberate font-size literals', () => {
+  it('routes spacing through the sp-* ladder or a semantic alias', () => {
+    // 1px / 2px 是描边级微调（分隔线端点、1px 位移），0 与 auto 无档位含义
+    const ALLOWED = /^(0|auto|inherit|1px|2px|[\d.]+%|[\d.]+(?:vw|vh|em|rem|fr)|var\(--crm-)/
     const offenders: string[] = []
     for (const [path, text] of business) {
       stripComments(text).split('\n').forEach((line, i) => {
-        const match = line.match(/font-size:\s*(\d+)px/)
-        if (!match) return
-        // 13px brand must fit a 144px sider; 16px/30px are icon glyph sizes;
-        // 11px is deliberately below the sm tier; 10px is tab-close and
-        // primary-nav label; 12px is the brand mark, 18px is menu icons
-        if (['10', '11', '12', '13', '16', '18', '30'].includes(match[1])) return
+        const m = line.match(/^\s*(padding|margin|gap|row-gap|column-gap)(?:-[a-z-]+)?\s*:\s*([^;!]+?)(?:\s*!important)?\s*;/)
+        if (!m) return
+        const parts = m[2].trim().split(/\s+/)
+        if (parts.every(p => ALLOWED.test(p))) return
         offenders.push(`${path}:${i + 1}  ${line.trim()}`)
+      })
+    }
+    expect(offenders).toEqual([])
+  })
+
+  it('routes every font-size through a token', () => {
+    // 旧版豁免名单是 ['10','11','12','13','16','18','30'] —— 恰好覆盖了当时
+    // 出现的全部取值，等于空转。现在文字走 --crm-font-*、图标走 --crm-icon-*
+    // （后者不随字号档缩放，否则会破坏 antd Menu / Button 的内部对齐）。
+    const offenders: string[] = []
+    for (const [path, text] of business) {
+      stripComments(text).split('\n').forEach((line, i) => {
+        if (/font-size:\s*\d+px/.test(line)) offenders.push(`${path}:${i + 1}  ${line.trim()}`)
       })
     }
     expect(offenders).toEqual([])
