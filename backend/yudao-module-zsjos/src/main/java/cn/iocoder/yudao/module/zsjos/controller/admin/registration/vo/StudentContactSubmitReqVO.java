@@ -8,6 +8,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class StudentContactSubmitReqVO {
@@ -17,5 +18,6 @@ public class StudentContactSubmitReqVO {
     @NotBlank @Size(max = 2000) private String remark;
     @Future @NotNull private LocalDateTime nextContactAt;
     private List<Long> attachmentFileIds;
+    private Map<String, Object> data;
     @NotBlank private String idempotencyKey;
 }

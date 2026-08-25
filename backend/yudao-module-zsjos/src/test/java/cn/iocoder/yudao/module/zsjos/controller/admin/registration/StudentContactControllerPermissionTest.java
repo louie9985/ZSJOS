@@ -15,7 +15,7 @@ class StudentContactControllerPermissionTest {
                 .getAnnotation(PreAuthorize.class);
 
         assertEquals("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', "
-                + "'zsjos:student-collaborator:correct')", authorization.value());
+                + "'zsjos:student-collaborator:correct', 'zsjos:student:director-operator-assign')", authorization.value());
     }
 
     @Test
@@ -25,6 +25,26 @@ class StudentContactControllerPermissionTest {
                 .getAnnotation(PreAuthorize.class);
 
         assertEquals(true, authorization.value().contains("zsjos:student-contact:delivery-stage-submit"));
+    }
+
+    @Test
+    void contextReadAllowsDirectorAndPlannerQueryPermissions() throws NoSuchMethodException {
+        PreAuthorize authorization = StudentContactController.class
+                .getMethod("getContext", Long.class)
+                .getAnnotation(PreAuthorize.class);
+
+        assertEquals("@ss.hasAnyPermissions('zsjos:student:query-my', 'zsjos:media-student:query-my')",
+                authorization.value());
+    }
+
+    @Test
+    void contactRecordsReadAllowsDirectorAndPlannerQueryPermissions() throws NoSuchMethodException {
+        PreAuthorize authorization = StudentContactController.class
+                .getMethod("getRecords", Long.class, cn.iocoder.yudao.framework.common.pojo.PageParam.class)
+                .getAnnotation(PreAuthorize.class);
+
+        assertEquals("@ss.hasAnyPermissions('zsjos:student:query-my', 'zsjos:media-student:query-my')",
+                authorization.value());
     }
 
 }

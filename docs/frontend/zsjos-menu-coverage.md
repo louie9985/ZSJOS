@@ -44,10 +44,12 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 37 | 履约清单配置 | `/zsjos/registration-checklist-config` | `RegistrationChecklistConfigPage` | `zsjos/registrationChecklistConfig/index` |
 | 38 | 我的学员 | `/zsjos/my-students` | `MyStudentsPage` | `zsjos/my-students` |
 | 39 | 学员联系配置 | `/zsjos/student-contact-config` | `StudentContactConfigPage` | `zsjos/studentContactConfig/index` |
+| 40 | 采访表单配置 | `/zsjos/director-config/interview-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
+| 40.1 | 定位卡模板配置 | `/zsjos/director-config/positioning-template` | `DirectorTemplateConfigPage` | `zsjos/directorTemplate/index` |
+| 40.2 | 编导时效配置 | `/zsjos/director-config/sla` | `DirectorConfigPage` | `zsjos/directorConfig/index` |
 | 40 | 异常情况处理 | `/zsjos/student-contact-exceptions` | `StudentContactExceptionsPage` | `zsjos/studentContactExceptions/index` |
 | 41 | 拍剪工单 | `/zsjos/production-tickets` | `MediaWorkflowPage` | `zsjos-workbench/MediaProductionTicketsPage` |
 | 43 | 学员运营 | `/zsjos/student-ops` | `MediaWorkflowPage` | `zsjos-workbench/MediaStudentOpsPage` |
-| 44 | 复盘与诊断 | `/zsjos/reviews` | `MediaWorkflowPage` | `zsjos-workbench/MediaReviewsPage` |
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
 | 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
 

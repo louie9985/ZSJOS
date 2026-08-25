@@ -8,6 +8,7 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @TableName("zsjos_service_relation")
 @KeySequence("zsjos_service_relation_seq")
@@ -26,10 +27,25 @@ public class ServiceRelationDO extends TenantBaseDO {
     private LocalDateTime acceptedAt;
     private Long contentDirectorUserId;
     private Long careerPlannerUserId;
+    /** One operator owns the student relationship; account workflows keep independent states. */
+    private Long operatorUserId;
+    /** Director-owned student-level stage: precheck -> interview -> positioning_ready. */
+    private String directorStage;
+    private LocalDateTime directorInterviewAt;
+    private Long directorFormConfigId;
+    private Integer directorFormConfigVersion;
+    private String directorPrecheckDraftJson;
+    private String directorPrecheckSnapshotJson;
+    private String directorInterviewDraftJson;
+    private String directorInterviewSnapshotJson;
     private String serviceSnapshot;
     /** Current delivery stage is owned by the service relation, not inferred from labels or contact text. */
     private String deliveryStage;
     private String deliveryDataJson;
+    private LocalDate examDate;
+    private Integer examDateVersion;
+    private LocalDate lastNotifiedExamDate;
+    private LocalDateTime examNoticeSentAt;
     private LocalDateTime activatedAt;
     private LocalDateTime pausedAt;
     private String pauseReason;

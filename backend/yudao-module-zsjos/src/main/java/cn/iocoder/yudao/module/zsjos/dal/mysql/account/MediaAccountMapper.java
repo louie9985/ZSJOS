@@ -48,6 +48,12 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                 .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId));
     }
 
+    default List<MediaAccountDO> selectByStudent(Long studentPersonId) {
+        return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
+                .eq(MediaAccountDO::getStudentPersonId, studentPersonId)
+                .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId));
+    }
+
     default List<MediaAccountDO> selectRecentByParticipantAndStudent(Long userId, Long studentPersonId) {
         return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
                 .eq(MediaAccountDO::getStudentPersonId, studentPersonId)
@@ -82,7 +88,7 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
             + "AND EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.tenant_id=p.tenant_id "
             + "AND sr.person_id=p.id AND sr.deleted=b'0' "
             + "AND ((sr.owner_user_id=#{userId} AND sr.status IN ('active','paused','completed')) "
-            + "OR ((sr.content_director_user_id=#{userId} OR sr.career_planner_user_id=#{userId}) "
+            + "OR ((sr.content_director_user_id=#{userId} OR sr.career_planner_user_id=#{userId} OR sr.operator_user_id=#{userId}) "
             + "AND sr.status='active' AND sr.acceptance_status='accepted'))) ORDER BY p.id DESC LIMIT 100</script>")
     List<Long> selectVisibleStudentIds(@Param("userId") Long userId, @Param("keyword") String keyword,
                                        @Param("tenantId") Long tenantId);

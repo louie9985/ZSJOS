@@ -37,9 +37,15 @@ public class MyStudentRespVO {
         private LocalDateTime acceptedAt;
         private Integer version;
         private Boolean owner;
+        private Long ownerUserId;
+        private String ownerUserName;
         private Long contentDirectorUserId;
         private String contentDirectorUserName;
         private Long careerPlannerUserId;
         private String careerPlannerUserName;
+        private Long operatorUserId;
+        private String operatorUserName;
+        private String directorStage;
+        private LocalDateTime directorInterviewAt;
     }
 }

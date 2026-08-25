@@ -5,8 +5,9 @@ describe('new media workflow pages', () => {
   const page = readFileSync('src/pages/MediaFeaturePage.tsx', 'utf8')
   const host = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
   const style = readFileSync('src/styles/pages/media-feature.css', 'utf8')
-  it('registers independent page entry points for all seven routes', () => {
-    for (const name of ['AccountsPage', 'ContentPage', 'ProductionTicketsPage', 'PositioningPage', 'StudentOpsPage', 'ReviewsPage']) expect(page).toContain(`export function ${name}`)
+  it('registers independent page entry points for active new-media routes', () => {
+    for (const name of ['AccountsPage', 'ContentPage', 'ProductionTicketsPage', 'PositioningPage', 'StudentOpsPage']) expect(page).toContain(`export function ${name}`)
+    expect(page).not.toContain('export function ReviewsPage')
     expect(host).not.toContain('MediaWorkflowPage')
   })
   it('uses the master-detail UI recipe and server projected actions', () => {
@@ -19,7 +20,8 @@ describe('new media workflow pages', () => {
     expect(page).toContain('actionLabels')
     expect(page).toContain('actionText(action)')
     expect(page).not.toContain('<Typography.Paragraph type="secondary">数据范围和操作入口')
-    for (const label of ['编辑账号', '周诊断', '挽救处理', '申请换绑']) expect(page).toContain(label)
+    for (const label of ['编辑账号', '挽救处理', '申请换绑']) expect(page).toContain(label)
+    expect(page).not.toContain('DIAGNOSE_ACCOUNT')
     expect(page).toContain('AccountActionModal')
   })
   it('opens message deep links at the requested business object', () => {

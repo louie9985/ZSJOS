@@ -597,6 +597,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   const [loading, setLoading] = useState(false),
     [detailLoading, setDetailLoading] = useState(false);
   const listGeneration = useRef(0);
+  const forcedListSequence = useRef(0);
   const detailGeneration = useRef(0);
   const dictionaryGeneration = useRef(0);
   const inflightLists = useRef(new Set<string>());
@@ -664,9 +665,12 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
   }, []);
   useEffect(() => { void loadDictionaries(); }, [loadDictionaries]);
   const load = useCallback(
-    async (targetPage = pageNo) => {
-      const requestKey = `${targetPage}:${keyword}:${serviceStatus || ''}:${JSON.stringify(advancedFilter)}`;
-      if (inflightLists.current.has(requestKey)) return;
+    async (targetPage = pageNo, options: { force?: boolean; reloadDetail?: boolean } = {}) => {
+      const baseRequestKey = `${targetPage}:${keyword}:${serviceStatus || ''}:${JSON.stringify(advancedFilter)}`;
+      if (!options.force && inflightLists.current.has(baseRequestKey)) return;
+      const requestKey = options.force
+        ? `${baseRequestKey}:force:${++forcedListSequence.current}`
+        : baseRequestKey;
       inflightLists.current.add(requestKey);
       const generation = ++listGeneration.current;
       setLoading(true);
@@ -683,7 +687,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         setRows(page.list);
         setTotal(page.total);
         setPageNo(targetPage);
-        if (!requestedPersonId) {
+        if (options.reloadDetail !== false && !requestedPersonId) {
           const target = selected && page.list.some((item) => item.personId === selected.personId)
             ? selected.personId
             : page.list[0]?.personId;
@@ -703,6 +707,16 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
     void load(1);
   }, [advancedFilter, keyword, serviceStatus]);
   const selectedService = selected?.services.find(item => item.serviceRelationId === selectedServiceId) || selected?.services[0];
+  const refreshCurrentStudent = useCallback(async () => {
+    if (!selected) {
+      await load(pageNo, { force: true });
+      return;
+    }
+    await Promise.all([
+      load(pageNo, { force: true, reloadDetail: false }),
+      loadStudent(selected.personId, selectedService?.serviceRelationId),
+    ]);
+  }, [load, loadStudent, pageNo, selected, selectedService?.serviceRelationId]);
   const canStudentRepurchase = Boolean(selectedService && hasPermission(permissions, 'zsjos:sales-order:student-repurchase')
     && selectedService.owner && selectedService.acceptanceStatus === 'accepted'
     && ['active', 'paused', 'completed'].includes(selectedService.status));
@@ -741,7 +755,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       context={studentContactContext}
       openTaskId={taskTarget?.openContactTask ? taskTarget.taskId : undefined}
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
-      onRefresh={async () => { await load(pageNo); }}
+      onRefresh={refreshCurrentStudent}
     >
       {(studentToolbarActions) => <LeadDetail
       lead={{
@@ -756,7 +770,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       mode="student-readonly"
       autoExpandFollowUp={false}
       onDirtyChange={() => undefined}
-      onChanged={() => void loadStudent(selected.personId)}
+      onChanged={() => void refreshCurrentStudent()}
       studentToolbarActions={canStudentRepurchase
          ? [...studentToolbarActions, { key: 'student-repurchase', icon: <PlusOutlined />, label: '录入复购', onClick: () => setRepurchaseOpen(true) }]
          : studentToolbarActions}
@@ -837,7 +851,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
             查看当前负责的学员及课程权益
           </Typography.Text>
         </div>
-        <Button icon={<ReloadOutlined />} onClick={() => { void load(1); void loadDictionaries(); }}>刷新</Button>
+        <Button icon={<ReloadOutlined />} onClick={() => { void refreshCurrentStudent(); void loadDictionaries(); }}>刷新</Button>
       </header>
       <div className="lead-inbox-layout">
         <aside className="lead-inbox-list-pane">
@@ -915,7 +929,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
         lead={{ id: selected.personId, submittedName: selected.name || '', submittedMobile: selected.mobile, submittedWechatId: selected.wechatId,
           provinceCode: leadDetail?.provinceCode, provinceName: leadDetail?.provinceName, cityCode: leadDetail?.cityCode, cityName: leadDetail?.cityName }}
         repurchase studentRepurchase open={repurchaseOpen}
-        onClose={() => setRepurchaseOpen(false)} onSubmitted={async () => { setRepurchaseOpen(false); await load(pageNo); }}
+        onClose={() => setRepurchaseOpen(false)} onSubmitted={async () => { setRepurchaseOpen(false); await refreshCurrentStudent(); }}
       />}
     </section>
   );
@@ -932,7 +946,16 @@ function StudentContactForm({
   const [attachmentUploads, setAttachmentUploads] = useState<Array<{ uid: string; name: string; status: "uploading" | "done" | "error"; url?: string; fileId?: number }>>([]);
   const [extensionReasons, setExtensionReasons] = useState<DictData[]>([]);
   const taskType = context.currentTask?.type;
+  const [fieldDicts, setFieldDicts] = useState<Record<string, DictData[]>>({});
   useEffect(() => { void Promise.all([api.dictDataByType(DICT_TYPE.STUDENT_CONTACT_UNSUCCESSFUL_REASON), api.dictDataByType("zsjos_student_contact_extension_reason")]).then(([a,b]) => { setReasons(a); setExtensionReasons(b); }).catch(() => { setReasons([]); setExtensionReasons([]); }); }, []);
+  useEffect(() => {
+    const fields = context.formFields || [];
+    const types = [...new Set(fields.filter(field => field.type === "dict" && field.dictType).map(field => field.dictType as string))];
+    if (!types.length) return;
+    void Promise.all(types.map(async type => [type, await api.dictDataByType(type)] as const))
+      .then(rows => setFieldDicts(Object.fromEntries(rows)))
+      .catch(() => setFieldDicts({}));
+  }, [context.formFields]);
   if (!context.currentTask) return <Alert type="info" showIcon title="当前没有待处理联系任务" />;
   const submit = async (values: Record<string, unknown>) => {
     if (attachmentUploads.some(item => item.status !== "done" || item.fileId == null)) {
@@ -950,7 +973,9 @@ function StudentContactForm({
       const timeout = nextTaskType === "student_first_contact" ? context.firstContactTimeoutMinutes : nextTaskType === "student_study_plan" ? context.studyPlanTimeoutMinutes : 0;
       const extensionRequired = Boolean(timeout && next.getTime() > Date.now() + timeout * 60000);
       const attachmentFileIds = attachmentUploads.map(item => item.fileId as number);
-      const payload = { ...values, nextContactAt, taskId: context.currentTask!.id, idempotencyKey: key(), attachmentFileIds, extensionAttachmentFileIds: extensionRequired ? attachmentFileIds : [], extensionReasonValue: extensionRequired ? values.extensionReasonValue : undefined, extensionDescription: extensionRequired ? values.extensionDescription : undefined };
+      const configuredKeys = new Set((context.formFields || []).map(field => field.key));
+      const data = Object.fromEntries(Object.entries(values).filter(([field]) => configuredKeys.has(field)));
+      const payload = { ...values, data, nextContactAt, taskId: context.currentTask!.id, idempotencyKey: key(), attachmentFileIds, extensionAttachmentFileIds: extensionRequired ? attachmentFileIds : [], extensionReasonValue: extensionRequired ? values.extensionReasonValue : undefined, extensionDescription: extensionRequired ? values.extensionDescription : undefined };
       if (taskType === "student_first_contact") await api.studentFirstContact(relationId, payload);
       else if (taskType === "student_study_plan") await api.studentStudyPlan(relationId, payload);
       else await api.studentContact(relationId, payload);
@@ -962,6 +987,20 @@ function StudentContactForm({
     <Form.Item name="successful" label="是否成功联系上学员" rules={[{ required: true }]}><Radio.Group options={[{ label: "是", value: true }, { label: "否", value: false }]} /></Form.Item>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => getFieldValue("successful") === false ? <Form.Item name="unsuccessfulReasonValue" label="未联系原因" rules={[{ required: true }]}><Select options={reasons.map(row => ({ label: row.label, value: row.value }))} placeholder={reasons.length ? "选择管理员配置的原因" : "暂无可用原因，请联系管理员"} /></Form.Item> : null}</Form.Item>
     <Form.Item noStyle shouldUpdate>{({ getFieldValue }) => taskType === "student_first_contact" && getFieldValue("successful") === true ? <Form.Item name="completedChecklistKeys" label="首联任务清单" rules={[{ required: true, type: "array", min: 1 }]}><Checkbox.Group options={context.firstContactChecklist.map(item => ({ label: item.title, value: item.key }))} /></Form.Item> : null}</Form.Item>
+    {(context.formFields || []).map(field => {
+      const rules = field.required ? [{ required: true, message: `请填写${field.title}` }] : [];
+      const dictOptions = field.dictType ? (fieldDicts[field.dictType] || []).map(item => ({ label: item.label, value: item.value })) : [];
+      let control: ReactNode = <Input />;
+      if (field.type === "textarea") control = <Input.TextArea rows={3} />;
+      else if (field.type === "number") control = <Input type="number" />;
+      else if (field.type === "date") control = <DatePicker style={{ width: "100%" }} />;
+      else if (field.type === "datetime") control = <DatePicker showTime style={{ width: "100%" }} />;
+      else if (field.type === "radio") control = <Radio.Group />;
+      else if (field.type === "checkbox") control = <Checkbox />;
+      else if (field.type === "checkbox_group") control = <Checkbox.Group />;
+      else if (field.type === "dict") control = <Select options={dictOptions} loading={Boolean(field.dictType && !fieldDicts[field.dictType])} placeholder={dictOptions.length ? "请选择" : "暂无可用字典项，请重试"} mode={field.multiple ? "multiple" : undefined} />;
+      return <Form.Item key={field.key} name={field.key} label={field.title} rules={rules} extra={field.description}>{control}</Form.Item>;
+    })}
     {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => form.setFieldValue("remark", `${form.getFieldValue("remark") || ""}${note}`)}>{note}</Button>)}</Space></Form.Item>}
     <Form.Item name="remark" label="备注" rules={[{ required: true }]}><Input.TextArea rows={4} maxLength={2000} showCount /></Form.Item>
     <Form.Item name="nextContactAt" label="下次联系时间" rules={[{ required: true }]}><DatePicker showTime format="YYYY-MM-DD HH:mm" style={{ width: "100%" }} /></Form.Item>
@@ -994,6 +1033,9 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
   const [deliveryOpen, setDeliveryOpen] = useState(false);
   const [deliverySaving, setDeliverySaving] = useState(false);
   const [deliveryForm] = Form.useForm();
+  const [examDateForm] = Form.useForm();
+  const [examDateOpen, setExamDateOpen] = useState(false);
+  const [examDateSaving, setExamDateSaving] = useState(false);
   const deliveryIdempotencyKey = useRef<string | undefined>(undefined);
   const available = context.availableActions || [];
   const stageAction = available.find(action => ["FIRST_CONTACT", "STUDY_PLAN", "FOLLOW_UP"].includes(action));
@@ -1077,6 +1119,18 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     finally { setAssignmentSaving(false); }
   };
   const currentDeliveryStage = context.deliveryStages?.find(item => item.current);
+  const saveExamDate = async (values: { examDate: unknown }) => {
+    if (!values.examDate) return;
+    setExamDateSaving(true);
+    try {
+      const timestamp = Number((values.examDate as { valueOf: () => number }).valueOf());
+      const date = new Date(timestamp);
+      const iso = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+      await api.studentExamDate(service.serviceRelationId, { examDate: iso, version: context.version, idempotencyKey: key() });
+      message.success("考试时间已更新"); setExamDateOpen(false); await onRefresh();
+    } catch (error) { message.error(errorMessage(error)); }
+    finally { setExamDateSaving(false); }
+  };
   const submitDeliveryStage = async (values: { remark: string; data: string }) => {
     if (!currentDeliveryStage) return;
     let parsed: Record<string, unknown> = {};
@@ -1114,8 +1168,11 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     available.includes("EDIT_BASIC_INFO") && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
     available.includes("ASSIGN_CONTENT_DIRECTOR") && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
     available.includes("ASSIGN_CAREER_PLANNER") && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
-    service.status === "active" && currentDeliveryStage?.available
-      && !["first_contact", "study_plan"].includes(currentDeliveryStage.code)
+    available.includes("UPDATE_EXAM_DATE") && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? new Date(context.examDate) : undefined }); setExamDateOpen(true); } },
+    available.includes("EXAM_NOTICE_DONE") && { key: "student-exam-notice-done", icon: <CheckOutlined />, label: "已考前通知", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
+    available.includes("POST_EXAM_DONE") && { key: "student-post-exam-done", icon: <CheckOutlined />, label: "已考后回访", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
+    (available.includes("COMPLETE_STAGE") || available.includes("END_SERVICE")) && currentDeliveryStage
+      && !["first_contact", "study_plan", "supervision"].includes(currentDeliveryStage.code)
       && { key: "student-delivery-stage", icon: <CheckOutlined />, label: currentDeliveryStage.label, onClick: () => {
         const templates: Record<string, Record<string, unknown>> = {
           supervision: {}, exam_confirmation: { examIntention: "", examDate: "" },
@@ -1140,6 +1197,11 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
         <Form.Item name="mobile" label="手机号" rules={[{ pattern: /^1[3-9]\d{9}$/, message: "请输入正确的手机号" }]}><Input maxLength={32} /></Form.Item>
         <Form.Item name="wechatId" label="微信号" rules={[{ max: 64 }]}><Input /></Form.Item>
         <Form.Item name="reason" label="修改原因" rules={[{ required: true, whitespace: true, max: 500 }]}><Input.TextArea rows={3} showCount maxLength={500} /></Form.Item>
+      </Form>
+    </Modal>
+    <Modal title="修改考试时间" open={examDateOpen} confirmLoading={examDateSaving} okText="保存" onCancel={() => setExamDateOpen(false)} onOk={() => void examDateForm.submit()} destroyOnHidden>
+      <Form form={examDateForm} layout="vertical" onFinish={saveExamDate}>
+        <Form.Item name="examDate" label="考试时间" rules={[{ required: true, message: "请选择考试日期" }]}><DatePicker style={{ width: "100%" }} /></Form.Item>
       </Form>
     </Modal>
     <Modal title={assignmentType === "content_director" ? "分配编导" : "分配职业规划师"} open={Boolean(assignmentType)} confirmLoading={assignmentSaving} okText="确认分配" onCancel={() => setAssignmentType(undefined)} onOk={() => void assign()} destroyOnHidden>

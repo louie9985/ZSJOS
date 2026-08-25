@@ -9,20 +9,32 @@ import org.apache.ibatis.annotations.Select;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Collection;
 
+import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.STAGE_EXAM_PREPARATION;
+
 @Mapper
 public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
+    @Select("SELECT * FROM zsjos_service_relation WHERE status='active' AND acceptance_status='accepted' "
+            + "AND delivery_stage='supervision' AND exam_date IS NOT NULL AND exam_notice_sent_at IS NULL "
+            + "AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
+    List<ServiceRelationDO> selectExamNoticeCandidates(@Param("tenantId") Long tenantId);
     @Select("SELECT * FROM zsjos_service_relation WHERE id=#{id} AND tenant_id=#{tenantId} AND deleted=b'0' FOR UPDATE")
     ServiceRelationDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+    @Select("SELECT * FROM zsjos_service_relation WHERE person_id=#{personId} AND status='active' "
+            + "AND acceptance_status='accepted' AND tenant_id=#{tenantId} AND deleted=b'0' ORDER BY id FOR UPDATE")
+    List<ServiceRelationDO> selectActiveAcceptedByPersonForUpdate(@Param("personId") Long personId,
+                                                                   @Param("tenantId") Long tenantId);
 
     default List<ServiceRelationDO> selectActiveByCollaborator(Long userId) {
         return selectList(new LambdaQueryWrapperX<ServiceRelationDO>()
                 .eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))
+                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
+                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
@@ -49,7 +61,8 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))
+                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
+                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))
                 .orderByDesc(ServiceRelationDO::getActivatedAt));
     }
 
@@ -59,7 +72,8 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eq(ServiceRelationDO::getStatus, "active")
                 .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                 .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))) > 0;
+                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
+                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))) > 0;
     }
 
     default int accept(Long id, Long userId, LocalDateTime now, Integer version) {
@@ -75,6 +89,31 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
 
+    default boolean existsActiveByOperatorAndPerson(Long userId, Long personId) {
+        return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .eq(ServiceRelationDO::getOperatorUserId, userId)) > 0;
+    }
+
+    default boolean existsActiveByDirectorOrOperatorAndPerson(Long userId, Long personId) {
+        return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .and(query -> query.eq(ServiceRelationDO::getContentDirectorUserId, userId)
+                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))) > 0;
+    }
+
+    default boolean existsActiveByDirectorAndPerson(Long userId, Long personId) {
+        return selectCount(new LambdaQueryWrapperX<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getPersonId, personId)
+                .eq(ServiceRelationDO::getStatus, "active")
+                .eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
+                .eq(ServiceRelationDO::getContentDirectorUserId, userId)) > 0;
+    }
+
     default int advanceDeliveryStage(Long id, Long userId, String expectedStage, String nextStage,
                                      String deliveryDataJson, Integer version) {
         return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
@@ -86,6 +125,30 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                 .eq(ServiceRelationDO::getVersion, version)
                 .set(ServiceRelationDO::getDeliveryStage, nextStage)
                 .set(ServiceRelationDO::getDeliveryDataJson, deliveryDataJson)
+                .set(ServiceRelationDO::getVersion, version + 1));
+    }
+
+    default int updateExamDate(Long id, Long userId, LocalDate examDate, Integer version,
+                               String stage, LocalDateTime now) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id)
+                .eq(ServiceRelationDO::getStatus, "active").eq(ServiceRelationDO::getVersion, version)
+                .set(ServiceRelationDO::getExamDate, examDate)
+                .set(ServiceRelationDO::getExamDateVersion, version + 1)
+                .set(ServiceRelationDO::getLastNotifiedExamDate, null)
+                .set(ServiceRelationDO::getExamNoticeSentAt, null)
+                .set(ServiceRelationDO::getDeliveryStage, stage)
+                .set(ServiceRelationDO::getVersion, version + 1)
+                .set(ServiceRelationDO::getUpdateTime, now));
+    }
+
+    default int markExamNoticeSent(Long id, LocalDate examDate, LocalDateTime sentAt, Integer version) {
+        return update(null, new LambdaUpdateWrapper<ServiceRelationDO>()
+                .eq(ServiceRelationDO::getId, id).eq(ServiceRelationDO::getVersion, version)
+                .eq(ServiceRelationDO::getExamDate, examDate).isNull(ServiceRelationDO::getExamNoticeSentAt)
+                .set(ServiceRelationDO::getLastNotifiedExamDate, examDate)
+                .set(ServiceRelationDO::getExamNoticeSentAt, sentAt)
+                .set(ServiceRelationDO::getDeliveryStage, STAGE_EXAM_PREPARATION)
                 .set(ServiceRelationDO::getVersion, version + 1));
     }
 
@@ -212,7 +275,8 @@ public interface ServiceRelationMapper extends BaseMapperX<ServiceRelationDO> {
                         .or(collaborator -> collaborator.eq(ServiceRelationDO::getAcceptanceStatus, "accepted")
                                 .in(ServiceRelationDO::getStatus, List.of("active", "paused", "completed"))
                                 .and(users -> users.eq(ServiceRelationDO::getContentDirectorUserId, userId)
-                                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId))));
+                                        .or().eq(ServiceRelationDO::getCareerPlannerUserId, userId)
+                                        .or().eq(ServiceRelationDO::getOperatorUserId, userId))));
         query.orderByDesc(ServiceRelationDO::getActivatedAt).orderByDesc(ServiceRelationDO::getId);
         return selectList(query);
     }

@@ -34,11 +34,15 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
+import cn.iocoder.yudao.module.zsjos.service.director.DirectorConfigService;
+import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
+import cn.iocoder.yudao.module.zsjos.controller.admin.director.vo.DirectorFormTemplateVO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -50,6 +54,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.io.IOException;
 import java.util.*;
 
@@ -60,6 +66,8 @@ import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContac
 @Service
 @Slf4j
 public class StudentContactServiceImpl implements StudentContactService {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Shanghai");
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private StudentContactRecordMapper recordMapper;
     @Resource private StudentContactExtensionMapper extensionMapper;
@@ -81,6 +89,9 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private BusinessEventMapper eventMapper;
     @Resource private StudentContactNotifyPublisher studentContactNotifyPublisher;
+    @Resource private DirectorFormTemplateService directorFormTemplateService;
+    @Resource private DirectorConfigService directorConfigService;
+    @Resource private PositioningCardMapper positioningCardMapper;
 
     @Override
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
@@ -143,6 +154,20 @@ public class StudentContactServiceImpl implements StudentContactService {
                 || ownerCanAssign || permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT))) {
             availableActions.add(CONTEXT_ACTION_ASSIGN_CAREER_PLANNER);
         }
+        boolean director = Objects.equals(relation.getContentDirectorUserId(), userId);
+        String directorStage = StrUtil.blankToDefault(relation.getDirectorStage(), "precheck");
+        if (operational && accepted && director && "precheck".equals(directorStage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_PRECHECK)) {
+            availableActions.add(CONTEXT_ACTION_DIRECTOR_PRECHECK);
+        }
+        if (operational && accepted && director && "interview".equals(directorStage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_INTERVIEW)) {
+            availableActions.add(CONTEXT_ACTION_DIRECTOR_INTERVIEW);
+        }
+        if (operational && accepted && director
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) {
+            availableActions.add(CONTEXT_ACTION_ASSIGN_OPERATOR);
+        }
         result.setAvailableActions(availableActions);
         if (task != null) {
             StudentContactContextRespVO.CurrentTaskVO row = new StudentContactContextRespVO.CurrentTaskVO();
@@ -150,12 +175,24 @@ public class StudentContactServiceImpl implements StudentContactService {
             row.setOverdue(task.getDueAt() != null && task.getDueAt().isBefore(LocalDateTime.now())); result.setCurrentTask(row);
         }
         Map<Long, AdminUserRespDTO> users = adminUserApi.getUserMap(List.of(
+                relation.getOwnerUserId() == null ? -1L : relation.getOwnerUserId(),
                 relation.getContentDirectorUserId() == null ? -1L : relation.getContentDirectorUserId(),
-                relation.getCareerPlannerUserId() == null ? -1L : relation.getCareerPlannerUserId()));
+                relation.getCareerPlannerUserId() == null ? -1L : relation.getCareerPlannerUserId(),
+                relation.getOperatorUserId() == null ? -1L : relation.getOperatorUserId()));
+        result.setOwnerUserId(relation.getOwnerUserId());
+        result.setOwnerUserName(name(users.get(relation.getOwnerUserId())));
         result.setContentDirectorUserId(relation.getContentDirectorUserId());
         result.setContentDirectorUserName(name(users.get(relation.getContentDirectorUserId())));
         result.setCareerPlannerUserId(relation.getCareerPlannerUserId());
         result.setCareerPlannerUserName(name(users.get(relation.getCareerPlannerUserId())));
+        result.setOperatorUserId(relation.getOperatorUserId());
+        result.setOperatorUserName(name(users.get(relation.getOperatorUserId())));
+        result.setDirectorStage(directorStage);
+        result.setDirectorInterviewAt(relation.getDirectorInterviewAt());
+        result.setDirectorInterviewAppointmentHours(directorConfigService.interviewAppointmentHours());
+        result.setDirectorTrialDays(directorConfigService.trialDays());
+        result.setDefaultDirectorInterviewAt(LocalDateTime.now(BUSINESS_ZONE)
+                .plusHours(directorConfigService.interviewAppointmentHours()));
         String stage = relation.getDeliveryStage();
         if (stage == null || stage.isBlank()) stage = STAGE_FIRST_CONTACT;
         result.setDeliveryStage(stage);
@@ -164,6 +201,29 @@ public class StudentContactServiceImpl implements StudentContactService {
                 && !Set.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_COMPLETED).contains(stage)
                 && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT);
         result.setDeliveryStages(deliveryStages(stage, canSubmitDeliveryStage));
+        result.setExamDate(relation.getExamDate());
+        result.setFormFields(director ? formFields(config, "director_" + directorStage, null)
+                : formFields(config, stage, task));
+        result.setDirectorForms(directorForms(relation, config));
+        boolean operatorConflict = relation.getPersonId() != null
+                && relationMapper.selectActiveByPersonIds(List.of(relation.getPersonId())).stream()
+                .map(ServiceRelationDO::getOperatorUserId).filter(Objects::nonNull).distinct().limit(2).count() > 1;
+        result.setOperatorAssignmentConflict(operatorConflict);
+        if (operational && owner && accepted && permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_EXAM_DATE)
+                && Set.of(STAGE_SUPERVISION, STAGE_EXAM_PREPARATION).contains(stage)) {
+            availableActions.add(CONTEXT_ACTION_UPDATE_EXAM_DATE);
+        }
+        if (operational && owner && accepted && Set.of(STAGE_EXAM_PREPARATION, STAGE_POST_EXAM).contains(stage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
+            availableActions.add(stage.equals(STAGE_EXAM_PREPARATION) ? CONTEXT_ACTION_EXAM_NOTICE_DONE : CONTEXT_ACTION_POST_EXAM_DONE);
+        } else if (operational && owner && accepted && Set.of(STAGE_RESULT, STAGE_CERTIFICATE).contains(stage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
+            availableActions.add(CONTEXT_ACTION_COMPLETE_STAGE);
+        } else if (operational && owner && accepted && STAGE_CONTINUOUS_FOLLOW_UP.equals(stage)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DELIVERY_STAGE_SUBMIT)) {
+            availableActions.add(CONTEXT_ACTION_END_SERVICE);
+        }
+        result.setAvailableActions(availableActions);
         return result;
     }
 
@@ -243,7 +303,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         return submit(relationId, request.getTaskId(), TYPE_FIRST_CONTACT, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(),
                 request.getCompletedChecklistKeys(), request.getNextContactAt(), request.getExtensionReasonValue(),
-                request.getExtensionDescription(), request.getExtensionAttachmentFileIds(), request.getIdempotencyKey(), userId);
+                request.getExtensionDescription(), request.getExtensionAttachmentFileIds(), request.getData(), request.getIdempotencyKey(), userId);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -252,7 +312,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         return submit(relationId, request.getTaskId(), TYPE_STUDY_PLAN, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null,
                 request.getNextContactAt(), request.getExtensionReasonValue(), request.getExtensionDescription(),
-                request.getExtensionAttachmentFileIds(), request.getIdempotencyKey(), userId);
+                request.getExtensionAttachmentFileIds(), request.getData(), request.getIdempotencyKey(), userId);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -260,7 +320,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     public Long submitContact(Long relationId, StudentContactSubmitReqVO request, Long userId) {
         return submit(relationId, request.getTaskId(), TYPE_CONTACT, request.getSuccessful(),
                 request.getUnsuccessfulReasonValue(), request.getRemark(), request.getAttachmentFileIds(), null,
-                request.getNextContactAt(), null, null, null, request.getIdempotencyKey(), userId);
+                request.getNextContactAt(), null, null, null, request.getData(), request.getIdempotencyKey(), userId);
     }
 
     @Override @Transactional(rollbackFor = Exception.class)
@@ -315,13 +375,32 @@ public class StudentContactServiceImpl implements StudentContactService {
         return record.getId();
     }
 
+    @Override @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "update-exam-date")
+    public void updateExamDate(Long relationId, StudentExamDateUpdateReqVO request, Long userId) {
+        ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId, TenantContextHolder.getRequiredTenantId());
+        if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        if (!Objects.equals(relation.getOwnerUserId(), userId)
+                && !permissionApi.hasAnyPermissions(userId, PERMISSION_UPDATE_EXAM_DATE)) throw exception(STUDENT_PERMISSION_DENIED);
+        if (!"accepted".equals(relation.getAcceptanceStatus())
+                || !Set.of(STAGE_SUPERVISION, STAGE_EXAM_PREPARATION).contains(relation.getDeliveryStage())) {
+            throw exception(STUDENT_CONTACT_TASK_INVALID);
+        }
+        if (request.getExamDate().isBefore(LocalDate.now())) throw exception(STUDENT_CONTACT_FORM_INVALID);
+        String nextStage = STAGE_SUPERVISION;
+        if (relation.getExamDate() != null && relation.getExamNoticeSentAt() == null) nextStage = relation.getDeliveryStage();
+        if (relationMapper.updateExamDate(relationId, userId, request.getExamDate(), request.getVersion(), nextStage, LocalDateTime.now()) != 1) {
+            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        }
+    }
+
     private Long submit(Long relationId, Long taskId, String expectedType, Boolean successful, String unsuccessfulReason,
                           String remark, List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
                           String extensionReason, String extensionDescription, List<Long> extensionAttachments,
-                          String idempotencyKey, Long userId) {
+                          Map<String, Object> data, String idempotencyKey, Long userId) {
         ServiceRelationDO relation = requireOwnedForUpdate(relationId, userId);
         String requestFingerprint = contactFingerprint(expectedType, successful, unsuccessfulReason, remark,
-                attachments, checklistKeys, nextAt, extensionReason, extensionDescription, extensionAttachments);
+                attachments, checklistKeys, nextAt, extensionReason, extensionDescription, extensionAttachments, data);
         StudentContactRecordDO replay = recordMapper.selectByIdempotencyKey(idempotencyKey);
         if (replay != null) {
             validateReplay(replay, relationId, taskId, userId, requestFingerprint);
@@ -346,6 +425,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         record.setUnsuccessfulReasonLabelSnapshot(reasonLabel); record.setRemark(remark.trim());
         record.setAttachmentFileIdsJson(JsonUtils.toJsonString(attachments == null ? List.of() : attachments));
         record.setChecklistResultJson(JsonUtils.toJsonString(checklistKeys == null ? List.of() : checklistKeys));
+        record.setDeliveryDataJson(JsonUtils.toJsonString(data == null ? Map.of() : data));
         record.setNextContactAt(nextAt); record.setOperatorUserId(userId); record.setSubmittedAt(LocalDateTime.now());
         record.setIdempotencyKey(idempotencyKey); record.setRequestFingerprint(requestFingerprint);
         try { recordMapper.insert(record); } catch (DuplicateKeyException duplicate) {
@@ -383,15 +463,21 @@ public class StudentContactServiceImpl implements StudentContactService {
         if (relation == null || !Set.of("active", "paused", "completed").contains(relation.getStatus())) {
             throw exception(STUDENT_SERVICE_NOT_EXISTS);
         }
+        boolean operatorAssignment = COLLABORATOR_OPERATOR.equals(type);
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
+        boolean director = Objects.equals(relation.getContentDirectorUserId(), userId);
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
         boolean assign = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
-        if ((!owner || !assign) && !correction) throw exception(STUDENT_PERMISSION_DENIED);
+        boolean directorCanAssignOperator = operatorAssignment && director
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN);
+        if (((!owner || !assign) && !directorCanAssignOperator) && !correction) throw exception(STUDENT_PERMISSION_DENIED);
         if (!"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_SERVICE_NOT_ACCEPTED);
         String scene = scene(type);
         if (scene == null) throw exception(STUDENT_COLLABORATOR_INVALID);
         Set<Long> ids = new LinkedHashSet<>();
-        userRelationMapper.selectListBySourceUserIds(scene, List.of(relation.getOwnerUserId())).stream()
+        Long sourceUserId = operatorAssignment ? relation.getContentDirectorUserId() : relation.getOwnerUserId();
+        if (sourceUserId == null) throw exception(STUDENT_COLLABORATOR_INVALID);
+        userRelationMapper.selectListBySourceUserIds(scene, List.of(sourceUserId)).stream()
                 .filter(row -> CommonStatusEnum.ENABLE.getStatus().equals(row.getStatus()))
                 .map(LeadAssignmentRelationDO::getTargetUserId).forEach(ids::add);
         return adminUserApi.getUserList(ids).stream().filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
@@ -404,12 +490,17 @@ public class StudentContactServiceImpl implements StudentContactService {
     public void assignCollaborator(Long relationId, StudentCollaboratorAssignReqVO request, Long userId) {
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId, TenantContextHolder.getRequiredTenantId());
         if (relation == null || !"active".equals(relation.getStatus())) throw exception(STUDENT_SERVICE_NOT_EXISTS);
+        boolean operatorAssignment = COLLABORATOR_OPERATOR.equals(request.getCollaboratorType());
         boolean owner = Objects.equals(relation.getOwnerUserId(), userId);
+        boolean director = Objects.equals(relation.getContentDirectorUserId(), userId);
         boolean operational = "active".equals(relation.getStatus());
         boolean correction = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
         boolean assign = permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_ASSIGN);
         boolean ownerCanAssign = operational && owner && assign;
-        if (!ownerCanAssign && !correction || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
+        boolean directorCanAssignOperator = operatorAssignment && director
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN);
+        if ((!ownerCanAssign && !directorCanAssignOperator && !correction)
+                || !"accepted".equals(relation.getAcceptanceStatus())) throw exception(STUDENT_PERMISSION_DENIED);
         StudentCollaboratorAssignmentLogDO replay = assignmentLogMapper.selectByIdempotencyKey(request.getIdempotencyKey());
         if (replay != null) {
             if (!Objects.equals(replay.getServiceRelationId(), relationId)
@@ -418,23 +509,29 @@ public class StudentContactServiceImpl implements StudentContactService {
                     || !Objects.equals(replay.getOperatorUserId(), userId)) throw exception(STUDENT_COLLABORATOR_INVALID);
             return;
         }
-        Long previous = COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())
-                ? relation.getContentDirectorUserId() : relation.getCareerPlannerUserId();
-        if (previous != null && !ownerCanAssign && !correction) throw exception(STUDENT_COLLABORATOR_ALREADY_ASSIGNED);
-        if (previous != null && (request.getCorrectionReason() == null || request.getCorrectionReason().isBlank())) {
-            throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
-        }
+        if (!Objects.equals(relation.getVersion(), request.getVersion())) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
         boolean candidate = getCollaboratorCandidates(relationId, request.getCollaboratorType(), userId).stream()
                 .anyMatch(row -> row.getId().equals(request.getUserId()));
         if (!candidate) throw exception(STUDENT_COLLABORATOR_INVALID);
-        if (!Objects.equals(relation.getVersion(), request.getVersion())) throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        if (operatorAssignment) {
+            assignUnifiedOperator(relation, request, userId);
+            return;
+        }
+        Long previous = COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())
+                ? relation.getContentDirectorUserId() : COLLABORATOR_CAREER.equals(request.getCollaboratorType())
+                ? relation.getCareerPlannerUserId() : relation.getOperatorUserId();
+        if (previous != null && !ownerCanAssign && !directorCanAssignOperator && !correction) {
+            throw exception(STUDENT_COLLABORATOR_ALREADY_ASSIGNED);
+        }
+        if (previous != null && (request.getCorrectionReason() == null || request.getCorrectionReason().isBlank())) {
+            throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
+        }
         if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) relation.setContentDirectorUserId(request.getUserId());
-        else relation.setCareerPlannerUserId(request.getUserId());
+        else if (COLLABORATOR_CAREER.equals(request.getCollaboratorType())) relation.setCareerPlannerUserId(request.getUserId());
+        else relation.setOperatorUserId(request.getUserId());
         relation.setVersion(relation.getVersion() + 1); relationMapper.updateById(relation);
-        StudentCollaboratorAssignmentLogDO log = new StudentCollaboratorAssignmentLogDO();
-        log.setServiceRelationId(relationId); log.setCollaboratorType(request.getCollaboratorType());
-        log.setPreviousUserId(previous); log.setAssignedUserId(request.getUserId()); log.setOperatorUserId(userId);
-        log.setReason(request.getCorrectionReason()); log.setIdempotencyKey(request.getIdempotencyKey()); assignmentLogMapper.insert(log);
+        writeAssignmentLog(relationId, request.getCollaboratorType(), previous, request.getUserId(), userId,
+                request.getCorrectionReason(), request.getIdempotencyKey());
         if (COLLABORATOR_DIRECTOR.equals(request.getCollaboratorType())) {
             SalesOrderDO order = orderMapper.selectById(relation.getOrderId());
             LeadDO lead = order == null || order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());
@@ -668,7 +765,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         return TYPE_CONTACT;
     }
     private String action(String type) { return TYPE_FIRST_CONTACT.equals(type) ? ACTION_FIRST_CONTACT : TYPE_STUDY_PLAN.equals(type) ? ACTION_STUDY_PLAN : ACTION_CONTACT; }
-    private String scene(String type) { return COLLABORATOR_DIRECTOR.equals(type) ? RELATION_PLANNER_DIRECTOR : COLLABORATOR_CAREER.equals(type) ? RELATION_PLANNER_CAREER : null; }
+    private String scene(String type) { return COLLABORATOR_DIRECTOR.equals(type) ? RELATION_PLANNER_DIRECTOR
+            : COLLABORATOR_CAREER.equals(type) ? RELATION_PLANNER_CAREER
+            : COLLABORATOR_OPERATOR.equals(type) ? RELATION_DIRECTOR_OPERATOR : null; }
     private String name(AdminUserRespDTO user) { return user == null ? null : user.getNickname(); }
     @Override
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "contact")
@@ -705,7 +804,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     private String contactFingerprint(String type, Boolean successful, String unsuccessfulReason, String remark,
                                       List<Long> attachments, List<String> checklistKeys, LocalDateTime nextAt,
                                       String extensionReason, String extensionDescription,
-                                      List<Long> extensionAttachments) {
+                                      List<Long> extensionAttachments, Map<String, Object> data) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("type", type); payload.put("successful", successful);
         payload.put("unsuccessfulReason", unsuccessfulReason); payload.put("remark", remark);
@@ -714,6 +813,7 @@ public class StudentContactServiceImpl implements StudentContactService {
         payload.put("nextAt", nextAt == null ? null : nextAt.toString());
         payload.put("extensionReason", extensionReason); payload.put("extensionDescription", extensionDescription);
         payload.put("extensionAttachments", extensionAttachments == null ? List.of() : extensionAttachments);
+        payload.put("data", data == null ? Map.of() : data);
         return DigestUtil.sha256Hex(JsonUtils.toJsonString(payload));
     }
     private String deliveryFingerprint(Long relationId, StudentDeliveryStageSubmitReqVO request) {
@@ -732,20 +832,20 @@ public class StudentContactServiceImpl implements StudentContactService {
 
     private List<String> deliveryStageCodes() {
         return List.of(STAGE_FIRST_CONTACT, STAGE_STUDY_PLAN, STAGE_SUPERVISION,
-                STAGE_EXAM_CONFIRMATION, STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
-                STAGE_CERTIFICATE, STAGE_COMPLETED);
+                STAGE_EXAM_PREPARATION, STAGE_POST_EXAM, STAGE_RESULT,
+                STAGE_CERTIFICATE, STAGE_CONTINUOUS_FOLLOW_UP, STAGE_COMPLETED);
     }
 
     private String stageLabel(String code) {
         return switch (code) {
-            case STAGE_FIRST_CONTACT -> "首次联系";
+            case STAGE_FIRST_CONTACT -> "首联";
             case STAGE_STUDY_PLAN -> "制定学习计划";
             case STAGE_SUPERVISION -> "常规督学";
-            case STAGE_EXAM_CONFIRMATION -> "考期确认与报名资料";
             case STAGE_EXAM_PREPARATION -> "考前通知与冲刺";
             case STAGE_POST_EXAM -> "考后回访";
             case STAGE_RESULT -> "成绩通知";
             case STAGE_CERTIFICATE -> "证书通知与邮寄";
+            case STAGE_CONTINUOUS_FOLLOW_UP -> "持续回访";
             case STAGE_COMPLETED -> "服务完成";
             default -> code;
         };
@@ -766,6 +866,291 @@ public class StudentContactServiceImpl implements StudentContactService {
         return result;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-precheck")
+    public void saveDirectorPrecheckDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
+        saveDirectorStage(relationId, "precheck", false, request, userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-precheck")
+    public void submitDirectorPrecheck(Long relationId, DirectorStageSaveReqVO request, Long userId) {
+        saveDirectorStage(relationId, "precheck", true, request, userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-interview")
+    public void saveDirectorInterviewDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
+        saveDirectorStage(relationId, "interview", false, request, userId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-interview")
+    public void submitDirectorInterview(Long relationId, DirectorStageSaveReqVO request, Long userId) {
+        saveDirectorStage(relationId, "interview", true, request, userId);
+    }
+
+    private void saveDirectorStage(Long relationId, String stage, boolean submit,
+                                   DirectorStageSaveReqVO request, Long userId) {
+        String permission = "precheck".equals(stage) ? PERMISSION_DIRECTOR_PRECHECK : PERMISSION_DIRECTOR_INTERVIEW;
+        if (!permissionApi.hasAnyPermissions(userId, permission)) throw exception(STUDENT_PERMISSION_DENIED);
+        ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId,
+                TenantContextHolder.getRequiredTenantId());
+        if (relation == null || !"active".equals(relation.getStatus())
+                || !"accepted".equals(relation.getAcceptanceStatus())
+                || !Objects.equals(relation.getContentDirectorUserId(), userId)) {
+            throw exception(STUDENT_PERMISSION_DENIED);
+        }
+        String current = StrUtil.blankToDefault(relation.getDirectorStage(), "precheck");
+        String fingerprint = DigestUtil.sha256Hex(JsonUtils.toJsonString(Map.of(
+                "stage", stage, "submit", submit,
+                "interviewAt", request.getInterviewAt() == null ? "" : request.getInterviewAt().toString(),
+                "data", request.getData())));
+        String previousJson = "precheck".equals(stage) ? relation.getDirectorPrecheckDraftJson()
+                : relation.getDirectorInterviewDraftJson();
+        if (!Objects.equals(relation.getVersion(), request.getVersion())
+                && directorCommandReplay(previousJson, request.getIdempotencyKey(), fingerprint)) return;
+        if (!current.equals(stage) || !Objects.equals(relation.getVersion(), request.getVersion())) {
+            throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
+        }
+        boolean precheck = "precheck".equals(stage);
+        if (precheck && request.getData() != null && !request.getData().isEmpty()) {
+            throw exception(STUDENT_CONTACT_FORM_INVALID);
+        }
+        StudentContactContextRespVO.DirectorFormVO existing = directorForm(stage, previousJson, null, relation);
+        DirectorFormTemplateVO.Snapshot templateSnapshot = null;
+        if (!precheck) {
+            templateSnapshot = "empty".equals(existing.getState())
+                    ? directorFormTemplateService.validateAndSnapshot(DirectorFormTemplateService.SCENE_INTERVIEW,
+                            null, request.getData(), submit)
+                    : directorFormTemplateService.validateAndSnapshotVersion(DirectorFormTemplateService.SCENE_INTERVIEW,
+                            existing.getTemplateVersionId(), request.getData(), submit, existing.getDictSnapshots());
+        }
+        if (submit) {
+            LocalDateTime businessNow = LocalDateTime.now(BUSINESS_ZONE);
+            if (precheck
+                    && (request.getInterviewAt() == null || !request.getInterviewAt().isAfter(businessNow))) {
+                log.warn("[saveDirectorStage][invalid interviewAt] relationId={}, stage={}, interviewAt={}, businessNow={}, zone={}",
+                        relationId, stage, request.getInterviewAt(), businessNow, BUSINESS_ZONE);
+                throw exception(STUDENT_DIRECTOR_INTERVIEW_AT_INVALID);
+            }
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("configId", null);
+        payload.put("configVersion", null);
+        payload.put("templateId", templateSnapshot == null ? null : templateSnapshot.getTemplateId());
+        payload.put("templateVersionId", templateSnapshot == null ? null : templateSnapshot.getTemplateVersionId());
+        payload.put("templateVersionNo", templateSnapshot == null ? null : templateSnapshot.getTemplateVersionNo());
+        payload.put("fields", templateSnapshot == null ? List.of() : templateSnapshot.getFields());
+        payload.put("values", templateSnapshot == null ? Map.of() : templateSnapshot.getValues());
+        payload.put("dictSnapshots", templateSnapshot == null ? Map.of() : templateSnapshot.getDictSnapshots());
+        payload.put("savedAt", LocalDateTime.now());
+        payload.put("savedByUserId", userId);
+        if (submit) payload.put("submittedAt", LocalDateTime.now());
+        payload.put("idempotencyKey", request.getIdempotencyKey());
+        payload.put("requestFingerprint", fingerprint);
+        String json = JsonUtils.toJsonString(payload);
+        if ("precheck".equals(stage)) {
+            relation.setDirectorPrecheckDraftJson(json);
+            if (submit) {
+                relation.setDirectorPrecheckSnapshotJson(json);
+                relation.setDirectorInterviewAt(request.getInterviewAt());
+                relation.setDirectorStage("interview");
+            }
+        } else {
+            relation.setDirectorInterviewDraftJson(json);
+            if (submit) {
+                relation.setDirectorInterviewSnapshotJson(json);
+                relation.setDirectorStage("positioning_ready");
+            }
+        }
+        relation.setDirectorFormConfigId(templateSnapshot == null ? null : templateSnapshot.getTemplateId());
+        relation.setDirectorFormConfigVersion(templateSnapshot == null ? null : templateSnapshot.getTemplateVersionNo());
+        relation.setVersion(relation.getVersion() + 1);
+        relationMapper.updateById(relation);
+    }
+
+    private boolean directorCommandReplay(String json, String idempotencyKey, String fingerprint) {
+        if (StrUtil.isBlank(json)) return false;
+        Map<?, ?> payload = JsonUtils.parseObject(json, Map.class);
+        if (payload == null || !Objects.equals(idempotencyKey, payload.get("idempotencyKey"))) return false;
+        if (!Objects.equals(fingerprint, payload.get("requestFingerprint"))) {
+            throw exception(STUDENT_CONTACT_FORM_INVALID);
+        }
+        return true;
+    }
+
+    private StudentContactContextRespVO.DirectorFormsVO directorForms(ServiceRelationDO relation,
+                                                                        StudentContactConfigVersionDO config) {
+        StudentContactContextRespVO.DirectorFormsVO forms = new StudentContactContextRespVO.DirectorFormsVO();
+        forms.setPrecheck(directorForm("precheck", relation.getDirectorPrecheckDraftJson(),
+                relation.getDirectorPrecheckSnapshotJson(), relation));
+        forms.setInterview(directorForm("interview", relation.getDirectorInterviewDraftJson(),
+                relation.getDirectorInterviewSnapshotJson(), relation));
+        return forms;
+    }
+
+    private StudentContactContextRespVO.DirectorFormVO directorForm(String stage, String draftJson,
+            String snapshotJson, ServiceRelationDO relation) {
+        StudentContactContextRespVO.DirectorFormVO result = new StudentContactContextRespVO.DirectorFormVO();
+        String sourceJson = StrUtil.isNotBlank(snapshotJson) ? snapshotJson : draftJson;
+        result.setState(StrUtil.isNotBlank(snapshotJson) ? "submitted" : StrUtil.isNotBlank(draftJson) ? "draft" : "empty");
+        result.setInterviewAt("precheck".equals(stage) ? relation.getDirectorInterviewAt() : null);
+        if (StrUtil.isBlank(sourceJson)) {
+            if ("precheck".equals(stage)) {
+                result.setFields(List.of());
+            } else {
+                var version = directorFormTemplateService.requirePublished(
+                        DirectorFormTemplateService.SCENE_INTERVIEW, null);
+                result.setTemplateId(version.getTemplateId());
+                result.setTemplateVersionId(version.getId());
+                result.setTemplateVersionNo(version.getVersionNo());
+                result.setFields(directorFormTemplateService.fields(version).stream()
+                        .filter(DirectorFormTemplateVO.Field::getEnabled).map(this::toContextField).toList());
+            }
+            result.setValues(Map.of());
+            return result;
+        }
+        Map<?, ?> payload = JsonUtils.parseObject(sourceJson, Map.class);
+        if (payload == null) throw exception(STUDENT_CONTACT_FORM_INVALID);
+        result.setConfigId(numberAsLong(payload.get("configId")));
+        result.setConfigVersion(numberAsInteger(payload.get("configVersion")));
+        result.setTemplateId(numberAsLong(payload.get("templateId")));
+        result.setTemplateVersionId(numberAsLong(payload.get("templateVersionId")));
+        result.setTemplateVersionNo(numberAsInteger(payload.get("templateVersionNo")));
+        Object rawFields = payload.get("fields");
+        if (rawFields instanceof Collection<?> values) {
+            result.setFields(values.stream()
+                    .map(value -> JsonUtils.parseObject(JsonUtils.toJsonString(value),
+                            StudentContactContextRespVO.FormFieldVO.class))
+                    .filter(Objects::nonNull)
+                    .sorted(Comparator.comparing(StudentContactContextRespVO.FormFieldVO::getSort,
+                            Comparator.nullsLast(Integer::compareTo))).toList());
+        } else result.setFields(List.of());
+        Map<String, Object> formValues = new LinkedHashMap<>();
+        if (payload.get("values") instanceof Map<?, ?> values) {
+            values.forEach((key, value) -> formValues.put(String.valueOf(key), value));
+        }
+        result.setValues(formValues);
+        Map<String, Object> dictSnapshots = new LinkedHashMap<>();
+        if (payload.get("dictSnapshots") instanceof Map<?, ?> snapshots) {
+            snapshots.forEach((key, value) -> dictSnapshots.put(String.valueOf(key), value));
+        }
+        result.setDictSnapshots(dictSnapshots);
+        result.setSavedAt(dateTime(payload.get("savedAt")));
+        result.setSavedByUserId(numberAsLong(payload.get("savedByUserId")));
+        result.setSubmittedAt(dateTime(payload.get("submittedAt")));
+        return result;
+    }
+
+    private StudentContactContextRespVO.FormFieldVO toContextField(DirectorFormTemplateVO.Field source) {
+        return JsonUtils.parseObject(JsonUtils.toJsonString(source), StudentContactContextRespVO.FormFieldVO.class);
+    }
+
+    private Long numberAsLong(Object value) {
+        return value instanceof Number number ? number.longValue() : null;
+    }
+
+    private Integer numberAsInteger(Object value) {
+        return value instanceof Number number ? number.intValue() : null;
+    }
+
+    private Map<String, Object> snapshotDictValues(List<StudentContactContextRespVO.FormFieldVO> fields,
+                                                   Map<String, Object> values) {
+        Map<String, Object> snapshots = new LinkedHashMap<>();
+        if (values == null) return snapshots;
+        for (StudentContactContextRespVO.FormFieldVO field : fields) {
+            if (StrUtil.isBlank(field.getDictType())) continue;
+            Object raw = values.get(field.getKey());
+            List<String> selected = raw instanceof Collection<?> collection
+                    ? collection.stream().filter(Objects::nonNull).map(String::valueOf).toList()
+                    : raw == null ? List.of() : List.of(String.valueOf(raw));
+            if (selected.isEmpty()) continue;
+            List<DictDataRespDTO> options;
+            try {
+                dictDataApi.validateDictDataList(field.getDictType(), selected);
+                options = dictDataApi.getDictDataList(field.getDictType());
+            } catch (RuntimeException ex) {
+                throw exception(STUDENT_CONTACT_FORM_DICT_INVALID);
+            }
+            Map<String, String> labels = options.stream().collect(java.util.stream.Collectors.toMap(
+                    DictDataRespDTO::getValue, DictDataRespDTO::getLabel, (left, right) -> left));
+            if (selected.stream().anyMatch(value -> !labels.containsKey(value))) {
+                throw exception(STUDENT_CONTACT_FORM_DICT_INVALID);
+            }
+            List<Map<String, String>> entries = selected.stream().map(value -> {
+                Map<String, String> entry = new LinkedHashMap<>();
+                entry.put("value", value);
+                entry.put("labelSnapshot", labels.get(value));
+                entry.put("dictType", field.getDictType());
+                return entry;
+            }).toList();
+            snapshots.put(field.getKey(), entries.size() == 1 && !(raw instanceof Collection<?>)
+                    ? entries.get(0) : entries);
+        }
+        return snapshots;
+    }
+
+    private LocalDateTime dateTime(Object value) {
+        if (value == null) return null;
+        try {
+            return JsonUtils.parseObject(JsonUtils.toJsonString(value), LocalDateTime.class);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private void assignUnifiedOperator(ServiceRelationDO selected, StudentCollaboratorAssignReqVO request, Long userId) {
+        List<ServiceRelationDO> relations = relationMapper.selectActiveAcceptedByPersonForUpdate(selected.getPersonId(),
+                TenantContextHolder.getRequiredTenantId());
+        boolean correction = relations.stream().map(ServiceRelationDO::getOperatorUserId).filter(Objects::nonNull)
+                .anyMatch(operatorId -> !Objects.equals(operatorId, request.getUserId()));
+        if (correction && StrUtil.isBlank(request.getCorrectionReason())) {
+            throw exception(STUDENT_COLLABORATOR_CORRECTION_REASON_REQUIRED);
+        }
+        for (ServiceRelationDO relation : relations) {
+            Long previous = relation.getOperatorUserId();
+            boolean selectedRelation = Objects.equals(relation.getId(), selected.getId());
+            if (!Objects.equals(previous, request.getUserId())) {
+                relation.setOperatorUserId(request.getUserId());
+                relation.setVersion(relation.getVersion() + 1);
+                relationMapper.updateById(relation);
+            }
+            if (selectedRelation || !Objects.equals(previous, request.getUserId())) {
+                String key = selectedRelation ? request.getIdempotencyKey()
+                        : request.getIdempotencyKey() + ":" + relation.getId();
+                writeAssignmentLog(relation.getId(), COLLABORATOR_OPERATOR, previous, request.getUserId(), userId,
+                        request.getCorrectionReason(), key);
+            }
+        }
+        positioningCardMapper.updateCurrentOperatorByServiceRelations(
+                relations.stream().map(ServiceRelationDO::getId).toList(), request.getUserId());
+        PersonDO student = personMapper.selectById(selected.getPersonId());
+        Map<String, Object> context = new LinkedHashMap<>();
+        context.put("operatorUserId", request.getUserId());
+        context.put("studentName", student == null || student.getName() == null ? "" : student.getName());
+        studentContactNotifyPublisher.publish(NOTIFY_OPERATOR_ASSIGNED, selected.getId(),
+                "student-operator-assigned:" + selected.getPersonId() + ":" + request.getIdempotencyKey(),
+                null, LocalDateTime.now(), context);
+    }
+
+    private void writeAssignmentLog(Long relationId, String type, Long previous, Long assigned, Long operator,
+                                    String reason, String idempotencyKey) {
+        StudentCollaboratorAssignmentLogDO log = new StudentCollaboratorAssignmentLogDO();
+        log.setServiceRelationId(relationId);
+        log.setCollaboratorType(type);
+        log.setPreviousUserId(previous);
+        log.setAssignedUserId(assigned);
+        log.setOperatorUserId(operator);
+        log.setReason(reason);
+        log.setIdempotencyKey(idempotencyKey);
+        assignmentLogMapper.insert(log);
+    }
+
     private List<Long> normalizeAttachmentIds(List<Long> ids) {
         if (ids == null || ids.isEmpty()) return List.of();
         return ids.stream().filter(Objects::nonNull).distinct().sorted().toList();
@@ -774,7 +1159,6 @@ public class StudentContactServiceImpl implements StudentContactService {
     private void validateDeliveryData(String stage, Map<String, Object> values) {
         if (values == null) throw exception(STUDENT_CONTACT_FORM_INVALID);
         List<String> required = switch (stage) {
-            case STAGE_EXAM_CONFIRMATION -> List.of("examIntention", "examDate");
             case STAGE_EXAM_PREPARATION -> List.of("examNoticeSent", "admissionTicketNoticeSent");
             case STAGE_POST_EXAM -> List.of("examFeedback");
             case STAGE_RESULT -> List.of("result");
@@ -785,5 +1169,20 @@ public class StudentContactServiceImpl implements StudentContactService {
                 || Boolean.FALSE.equals(values.get(key)) || String.valueOf(values.get(key)).isBlank())) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
+    }
+
+    private List<StudentContactContextRespVO.FormFieldVO> formFields(StudentContactConfigVersionDO config,
+                                                                       String stage, BusinessTaskDO task) {
+        if (config == null || StrUtil.isBlank(config.getFormsJson())) return defaultDirectorFields(stage);
+        Map<?, ?> forms = JsonUtils.parseObject(config.getFormsJson(), Map.class);
+        Object raw = forms == null ? null : forms.get(task == null ? stage : task.getTaskType());
+        if (!(raw instanceof Collection<?> values)) return defaultDirectorFields(stage);
+        return values.stream().map(value -> JsonUtils.parseObject(JsonUtils.toJsonString(value), StudentContactContextRespVO.FormFieldVO.class))
+                .filter(Objects::nonNull).sorted(Comparator.comparing(StudentContactContextRespVO.FormFieldVO::getSort,
+                Comparator.nullsLast(Integer::compareTo))).toList();
+    }
+
+    private List<StudentContactContextRespVO.FormFieldVO> defaultDirectorFields(String stage) {
+        return List.of();
     }
 }

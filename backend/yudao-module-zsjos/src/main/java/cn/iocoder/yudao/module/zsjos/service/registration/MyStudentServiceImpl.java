@@ -65,6 +65,7 @@ public class MyStudentServiceImpl implements MyStudentService {
         relationMapper.selectActiveByPersonIds(personIds).stream()
                 .filter(row -> Objects.equals(row.getContentDirectorUserId(), userId)
                         || Objects.equals(row.getCareerPlannerUserId(), userId)
+                        || Objects.equals(row.getOperatorUserId(), userId)
                         || participantPersonIds.contains(row.getPersonId()))
                 .forEach(row -> visibleRelations.put(row.getId(), row));
         Map<Long, List<ServiceRelationDO>> groups = visibleRelations.values().stream()
@@ -147,7 +148,8 @@ public class MyStudentServiceImpl implements MyStudentService {
         Map<Long, SalesOrderItemDO> items = itemIds.isEmpty() ? Map.of() : orderItemMapper.selectBatchIds(itemIds).stream()
                 .collect(Collectors.toMap(SalesOrderItemDO::getId, Function.identity()));
         Set<Long> collaboratorIds = relations.stream()
-                .flatMap(relation -> java.util.stream.Stream.of(relation.getContentDirectorUserId(), relation.getCareerPlannerUserId()))
+                .flatMap(relation -> java.util.stream.Stream.of(relation.getOwnerUserId(), relation.getContentDirectorUserId(),
+                        relation.getCareerPlannerUserId(), relation.getOperatorUserId()))
                 .filter(Objects::nonNull).collect(Collectors.toSet());
         Map<Long, AdminUserRespDTO> collaborators = collaboratorIds.isEmpty() || adminUserApi == null ? Map.of() : Optional.ofNullable(adminUserApi.getUserMap(collaboratorIds)).orElseGet(Map::of);
         Set<Long> leadIds = orders.values().stream().map(SalesOrderDO::getLeadId)
@@ -180,12 +182,20 @@ public class MyStudentServiceImpl implements MyStudentService {
             row.setStatus(relation.getStatus()); row.setActivatedAt(relation.getActivatedAt());
             row.setAcceptanceStatus(relation.getAcceptanceStatus()); row.setAcceptedAt(relation.getAcceptedAt());
             row.setVersion(relation.getVersion()); row.setOwner(Objects.equals(userId, relation.getOwnerUserId()));
+            row.setOwnerUserId(relation.getOwnerUserId());
+            AdminUserRespDTO owner = relation.getOwnerUserId() == null ? null : collaborators.get(relation.getOwnerUserId());
+            row.setOwnerUserName(owner == null ? null : owner.getNickname());
             row.setContentDirectorUserId(relation.getContentDirectorUserId());
             AdminUserRespDTO director = relation.getContentDirectorUserId() == null ? null : collaborators.get(relation.getContentDirectorUserId());
             row.setContentDirectorUserName(director == null ? null : director.getNickname());
             row.setCareerPlannerUserId(relation.getCareerPlannerUserId());
             AdminUserRespDTO planner = relation.getCareerPlannerUserId() == null ? null : collaborators.get(relation.getCareerPlannerUserId());
             row.setCareerPlannerUserName(planner == null ? null : planner.getNickname());
+            row.setOperatorUserId(relation.getOperatorUserId());
+            AdminUserRespDTO operator = relation.getOperatorUserId() == null ? null : collaborators.get(relation.getOperatorUserId());
+            row.setOperatorUserName(operator == null ? null : operator.getNickname());
+            row.setDirectorStage(relation.getDirectorStage());
+            row.setDirectorInterviewAt(relation.getDirectorInterviewAt());
             return row;
         }).toList());
         return result;

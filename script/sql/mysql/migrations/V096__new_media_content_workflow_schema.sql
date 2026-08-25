@@ -189,19 +189,6 @@ CREATE TABLE IF NOT EXISTS `zsjos_cooperation_assessment` (
   KEY `idx_tenant_student_assessed` (`tenant_id`,`student_person_id`,`assessed_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员配合度评估';
 
-CREATE TABLE IF NOT EXISTS `zsjos_review_report` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `review_no` varchar(64) NOT NULL, `review_type` varchar(32) NOT NULL,
-  `subject_type` varchar(32) NOT NULL, `subject_id` bigint NOT NULL, `author_user_id` bigint NOT NULL,
-  `report_json` json NOT NULL, `evidence_refs_json` json DEFAULT NULL, `status` varchar(24) NOT NULL,
-  `submitted_at` datetime DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
-  `config_version_id` bigint DEFAULT NULL, `creator` varchar(64) DEFAULT '',
-  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
-  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_review_no` (`tenant_id`,`review_no`,`deleted`),
-  KEY `idx_tenant_subject_type` (`tenant_id`,`subject_type`,`subject_id`,`review_type`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='新媒体复盘报告';
-
 CREATE TABLE IF NOT EXISTS `zsjos_exception_ticket` (
   `id` bigint NOT NULL AUTO_INCREMENT, `exception_no` varchar(64) NOT NULL, `account_id` bigint NOT NULL,
   `category_value` varchar(100) NOT NULL, `category_label_snapshot` varchar(100) NOT NULL,
@@ -242,21 +229,6 @@ CREATE TABLE IF NOT EXISTS `zsjos_account_stage_log` (
   KEY `idx_tenant_account_judged` (`tenant_id`,`account_id`,`judged_at`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账号S阶段流转日志';
 
-CREATE TABLE IF NOT EXISTS `zsjos_account_weekly_diagnosis` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `account_id` bigint NOT NULL, `week_no` varchar(24) NOT NULL,
-  `stat_start` date NOT NULL, `stat_end` date NOT NULL, `owner_operator_user_id` bigint NOT NULL,
-  `basic_json` json NOT NULL, `production_funnel_json` json NOT NULL, `platform_data_json` json NOT NULL,
-  `content_perf_json` json NOT NULL, `lead_funnel_json` json NOT NULL, `root_cause_json` json NOT NULL,
-  `next_week_plan_json` json NOT NULL, `suggested_grade` varchar(24) DEFAULT NULL,
-  `confirmed_grade` varchar(24) DEFAULT NULL, `confirmed_by_user_id` bigint DEFAULT NULL,
-  `confirmation_basis` varchar(2000) DEFAULT NULL, `confirmed_at` datetime DEFAULT NULL,
-  `config_version_id` bigint NOT NULL, `version` int NOT NULL DEFAULT 0,
-  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_account_week` (`tenant_id`,`account_id`,`week_no`,`deleted`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='账号周诊断';
-
 CREATE TABLE IF NOT EXISTS `zsjos_standard_form` (
   `id` bigint NOT NULL AUTO_INCREMENT, `form_type_value` varchar(100) NOT NULL,
   `form_type_label_snapshot` varchar(100) NOT NULL, `biz_type` varchar(32) NOT NULL, `biz_id` bigint NOT NULL,
@@ -291,4 +263,4 @@ WHERE tenant.deleted=b'0' AND tenant.status=0
     WHERE existing.tenant_id=tenant.id AND existing.version_no=1 AND existing.deleted=b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`,`description`,`checksum`)
-VALUES ('V096','Add new-media content production workflow schema','new-media-content-workflow-schema-v1');
+VALUES ('V096','Add new-media content production workflow schema without review or diagnosis tables','new-media-content-workflow-schema-v2');

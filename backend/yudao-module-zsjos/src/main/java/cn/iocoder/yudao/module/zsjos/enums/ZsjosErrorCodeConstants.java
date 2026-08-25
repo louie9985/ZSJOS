@@ -241,6 +241,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode STUDENT_CONTACT_CONFIG_INVALID = new ErrorCode(1_900_010_025, "教务联系配置尚未正确发布");
     ErrorCode STUDENT_CONTACT_TASK_INVALID = new ErrorCode(1_900_010_026, "当前联系任务不存在、已处理或类型不匹配");
     ErrorCode STUDENT_CONTACT_FORM_INVALID = new ErrorCode(1_900_010_027, "联系表单内容不完整或下次联系时间无效");
+    ErrorCode STUDENT_CONTACT_FORM_DICT_INVALID = new ErrorCode(1_900_010_039, "联系表单字典字段无效或选项已停用");
+    ErrorCode STUDENT_CONTACT_CONFIG_DICT_INVALID = new ErrorCode(1_900_010_040, "业务表单枚举字段必须关联有效字典");
+    ErrorCode STUDENT_DIRECTOR_INTERVIEW_AT_INVALID = new ErrorCode(1_900_010_038, "访谈预约时间必须晚于当前北京时间");
     ErrorCode STUDENT_CONTACT_REASON_INVALID = new ErrorCode(1_900_010_028, "未联系原因或延期原因不存在、已停用或类型不匹配");
     ErrorCode STUDENT_CONTACT_SUPERVISOR_INVALID = new ErrorCode(1_900_010_029, "学习规划师直属部门负责人未配置、已停用、为本人或缺少处理权限");
     ErrorCode STUDENT_CONTACT_EXTENSION_ACTIVE = new ErrorCode(1_900_010_030, "该任务已有待处理的延期申请");
@@ -292,16 +295,15 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_STUDENT_LINK_CONFLICT = new ErrorCode(1_900_014_007, "兼职账号或学员已绑定其他身份");
     ErrorCode POSITIONING_REFERENCE_INVALID = new ErrorCode(1_900_014_008, "定位卡关联账号或学员不存在或不属于当前租户");
     ErrorCode PARTNER_STUDENT_REFERENCE_INVALID = new ErrorCode(1_900_014_009, "兼职主体或学员不存在或不属于当前租户");
+    ErrorCode DIRECTOR_FORM_TEMPLATE_NOT_EXISTS = new ErrorCode(1_900_014_010, "编导表单模板不存在或未发布");
+    ErrorCode DIRECTOR_FORM_TEMPLATE_INVALID = new ErrorCode(1_900_014_011, "编导表单模板字段配置无效");
+    ErrorCode DIRECTOR_FORM_TEMPLATE_VERSION_CONFLICT = new ErrorCode(1_900_014_012, "编导表单模板已被修改，请刷新后重试");
+    ErrorCode DIRECTOR_FORM_VALUE_INVALID = new ErrorCode(1_900_014_013, "编导表单内容不完整或包含无效选项");
+    ErrorCode DIRECTOR_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_014_014, "编导时效配置已被修改，请刷新后重试");
 
-    ErrorCode MEDIA_CONFIG_INVALID = new ErrorCode(1_900_015_001, "新媒体工作流配置尚未正确发布");
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
 
-    ErrorCode MEDIA_REVIEW_NOT_EXISTS = new ErrorCode(1_900_017_001, "复盘报告不存在");
-    ErrorCode MEDIA_REVIEW_STATE_INVALID = new ErrorCode(1_900_017_002, "当前复盘状态不允许该操作");
-    ErrorCode MEDIA_REVIEW_VERSION_CONFLICT = new ErrorCode(1_900_017_003, "复盘报告已被其他人修改，请刷新后重试");
-    ErrorCode MEDIA_REVIEW_SUPERVISOR_INVALID = new ErrorCode(1_900_017_004, "复盘作者直属部门负责人未配置、已停用或为本人");
-    ErrorCode MEDIA_REVIEW_REASON_REQUIRED = new ErrorCode(1_900_017_005, "复盘退回原因不能为空且不能超过 500 个字符");
     ErrorCode MEDIA_EXCEPTION_NOT_EXISTS = new ErrorCode(1_900_018_001, "异常工单不存在");
     ErrorCode MEDIA_EXCEPTION_STATE_INVALID = new ErrorCode(1_900_018_002, "当前异常工单状态不允许该操作");
     ErrorCode MEDIA_EXCEPTION_VERSION_CONFLICT = new ErrorCode(1_900_018_003, "异常工单已被其他人修改，请刷新后重试");

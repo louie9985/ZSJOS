@@ -101,6 +101,12 @@ SOURCE script/sql/mysql/migrations/V122__repair_partner_lead_source_and_cashback
 SOURCE script/sql/mysql/migrations/V123__retire_student_group_handoff_stage.sql;
 SOURCE script/sql/mysql/migrations/V124__repair_registration_planner_student_notification_template.sql;
 SOURCE script/sql/mysql/migrations/V125__student_business_number.sql;
+SOURCE script/sql/mysql/migrations/V126__student_service_forms_exam_date_and_menu.sql;
+SOURCE script/sql/mysql/migrations/V127__repair_student_business_form_config_menu.sql;
+SOURCE script/sql/mysql/migrations/V128__media_director_student_flow.sql;
+SOURCE script/sql/mysql/migrations/V129__seed_director_form_dictionaries.sql;
+SOURCE script/sql/mysql/migrations/V130__director_configurable_forms_and_menus.sql;
+SOURCE script/sql/mysql/migrations/V131__repair_director_operator_action_permissions.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

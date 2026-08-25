@@ -9,6 +9,7 @@ import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @TableName("zsjos_positioning_card")
 @KeySequence("zsjos_positioning_card_seq")
@@ -20,7 +21,15 @@ public class PositioningCardDO extends TenantBaseDO {
     private String cardNo;
     private Long accountId;
     private Long studentPersonId;
+    private Long serviceRelationId;
     private Long directorUserId;
+    private Long operatorUserId;
+    private Long templateId;
+    private Long templateVersionId;
+    private String fieldsSnapshotJson;
+    private String valuesSnapshotJson;
+    private String dictSnapshotJson;
+    private LocalDate trialEndDate;
     private Integer versionNo;
     private String layer1Json;
     private String layer2Json;

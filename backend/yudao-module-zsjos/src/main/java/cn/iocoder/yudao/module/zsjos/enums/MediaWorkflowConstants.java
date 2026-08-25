@@ -74,7 +74,6 @@ public final class MediaWorkflowConstants {
     public static final String ACTION_BIND_STUDENT = "BIND_STUDENT";
     public static final String ACTION_UNBIND_STUDENT = "UNBIND_STUDENT";
     public static final String ACTION_EDIT_ACCOUNT = "EDIT_ACCOUNT";
-    public static final String ACTION_DIAGNOSE_ACCOUNT = "DIAGNOSE_ACCOUNT";
     public static final String ACTION_RESCUE_ACCOUNT = "RESCUE_ACCOUNT";
     public static final String ACTION_REQUEST_ACCOUNT_REBIND = "REQUEST_ACCOUNT_REBIND";
     public static final String ACTION_COMPLETE_TOPIC = "COMPLETE_TOPIC";

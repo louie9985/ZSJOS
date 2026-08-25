@@ -28,6 +28,9 @@ public class WebProperties {
      */
     @NotNull(message = "PARTNER API 不能为空")
     private Api partnerApi = new Api("/part-api", "**.controller.app.partner.**");
+    /** Public, deliberately unauthenticated API surface. */
+    @NotNull(message = "Public API 不能为空")
+    private Api publicApi = new Api("/public-api", "**.controller.pub.**");
     /**
      * App API 子路径对应的用户类型。未配置的 App API 仍使用 MEMBER。
      */

@@ -8,6 +8,7 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @Data
 public class StudentFirstContactSubmitReqVO {
@@ -21,5 +22,6 @@ public class StudentFirstContactSubmitReqVO {
     private String extensionReasonValue;
     @Size(max = 1000) private String extensionDescription;
     private List<Long> extensionAttachmentFileIds;
+    private Map<String, Object> data;
     @NotBlank private String idempotencyKey;
 }

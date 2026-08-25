@@ -579,6 +579,7 @@ export type LeadOverviewSlots = {
   latestActivity?: React.ReactNode
   timeline?: React.ReactNode
   taskStatus?: React.ReactNode
+  mainBeforeColumns?: React.ReactNode
   sidebarBeforeStatus?: React.ReactNode
 }
 
@@ -600,6 +601,7 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
       <div className="lead-overview-grid">
         {/* 左侧主区 9 列 */}
         <div className="lead-overview-main">
+          {slots?.mainBeforeColumns}
           {/* 二级布局 8:4 */}
           <div className="lead-overview-main-inner">
             {/* 8 列：客户档案 + 下方小卡片 */}

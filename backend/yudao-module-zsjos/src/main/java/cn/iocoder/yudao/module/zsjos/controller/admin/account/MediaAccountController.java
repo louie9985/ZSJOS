@@ -5,10 +5,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSav
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.AccountDiagnosisSaveReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.AccountDiagnosisRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountStudentCandidateRespVO;
-import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import java.util.List;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountService;
@@ -101,14 +98,6 @@ public class MediaAccountController {
 
     @PutMapping("/{id}") @PreAuthorize("@ss.hasPermission('zsjos:media-account:edit')")
     public CommonResult<Boolean> update(@PathVariable Long id, @Valid @RequestBody MediaAccountUpdateReqVO req) { mediaAccountService.update(id, req, getLoginUserId()); return success(true); }
-
-    @PostMapping("/{id}/diagnoses") @PreAuthorize("@ss.hasPermission('zsjos:media-account:diagnose')")
-    public CommonResult<Long> diagnose(@PathVariable Long id, @Valid @RequestBody AccountDiagnosisSaveReqVO req) { return success(mediaAccountService.diagnose(id, req, getLoginUserId())); }
-
-    @GetMapping("/{id}/diagnoses") @PreAuthorize("@ss.hasPermission('zsjos:media-account:query')")
-    public CommonResult<List<AccountDiagnosisRespVO>> diagnoses(@PathVariable Long id) { return success(mediaAccountService.diagnoses(id, getLoginUserId()).stream().map(x -> BeanUtils.toBean(x, AccountDiagnosisRespVO.class)).toList()); }
-    @GetMapping("/diagnosis-config/published") @PreAuthorize("@ss.hasPermission('zsjos:media-account:diagnose')")
-    public CommonResult<Long> publishedDiagnosisConfig() { return success(mediaAccountService.getPublishedDiagnosisConfigId()); }
 
     @PostMapping("/{id}/rescue") @PreAuthorize("@ss.hasPermission('zsjos:media-account:rescue')")
     public CommonResult<Boolean> rescue(@PathVariable Long id, @RequestParam Integer version, @RequestParam String status) { mediaAccountService.updateRescue(id, version, status); return success(true); }

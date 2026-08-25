@@ -20,5 +20,7 @@ public class StudentContactConfigVersionDO extends TenantBaseDO {
     private String checklistJson;
     private String quickNotesJson;
     private String collaboratorTabsJson;
+    /** Published dynamic business forms keyed by stage/task type. */
+    private String formsJson;
     private Integer version;
 }

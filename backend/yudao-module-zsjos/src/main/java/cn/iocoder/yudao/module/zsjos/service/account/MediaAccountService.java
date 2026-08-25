@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.zsjos.service.account;
 
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.AccountDiagnosisSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.AccountStageLogDO;
@@ -10,9 +9,6 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountStudentL
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.AccountStageLogMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountStudentLinkMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.account.AccountWeeklyDiagnosisMapper;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.AccountWeeklyDiagnosisDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.config.MediaConfigVersionMapper;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
@@ -56,9 +52,7 @@ public class MediaAccountService {
     @Resource private PersonMapper personMapper;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
-    @Resource private AccountWeeklyDiagnosisMapper diagnosisMapper;
     @Resource private BpmProcessInstanceApi processInstanceApi;
-    @Resource private MediaConfigVersionMapper configVersionMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
     @Resource private MediaAccountFieldConfigService fieldConfigService;
 
@@ -139,6 +133,17 @@ public class MediaAccountService {
         return toResp(require(id), userId);
     }
 
+    /** Builds the account projection after the enclosing student scope has already been authorized. */
+    public MediaAccountRespVO projectStudentReadOnly(MediaAccountDO account) {
+        MediaAccountRespVO response = BeanUtils.toBean(account, MediaAccountRespVO.class);
+        response.setAvailableActions(List.of());
+        response.setDetailValues(account.getDetailValuesJson() == null ? Map.of()
+                : JsonUtils.parseObject(account.getDetailValuesJson(), Map.class));
+        response.setDetailSnapshots(account.getDetailSnapshotJson() == null ? List.of()
+                : JsonUtils.parseArray(account.getDetailSnapshotJson(), MediaAccountDetailSnapshotVO.class));
+        return response;
+    }
+
     public PageResult<MediaAccountRespVO> page(MediaAccountPageReqVO req, Long userId) {
         MediaDataScopeService.Scope scope = dataScopeService.resolve(userId, "zsjos:media-account:query-all");
         PageResult<MediaAccountDO> page = mapper.selectPage(req, scope.userIds(), scope.all());
@@ -193,24 +198,6 @@ public class MediaAccountService {
                 .setRiskLevelValue(req.getRiskLevelValue()).setRiskLevelLabelSnapshot(req.getRiskLevelLabelSnapshot())
                 .setHealthJson(req.getHealthJson());
         if (mapper.updateProfile(account, req.getVersion()) == 0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
-    }
-
-    @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "diagnose")
-    @Transactional(rollbackFor = Exception.class)
-    public Long diagnose(Long accountId, AccountDiagnosisSaveReqVO req, Long userId) {
-        require(accountId);
-        AccountWeeklyDiagnosisDO row = BeanUtils.toBean(req, AccountWeeklyDiagnosisDO.class);
-        row.setAccountId(accountId); row.setOwnerOperatorUserId(userId); row.setVersion(0);
-        diagnosisMapper.insert(row); return row.getId();
-    }
-
-    public List<AccountWeeklyDiagnosisDO> diagnoses(Long accountId, Long userId) {
-        get(accountId, userId); return diagnosisMapper.selectByAccount(accountId);
-    }
-    public Long getPublishedDiagnosisConfigId() {
-        var config = configVersionMapper.selectPublished();
-        if (config == null) throw exception(MEDIA_CONFIG_INVALID);
-        return config.getId();
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#id", action = "rescue")
@@ -348,7 +335,6 @@ public class MediaAccountService {
             actions.add(account.getStudentPersonId() == null ? ACTION_BIND_STUDENT : ACTION_UNBIND_STUDENT);
         }
         if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:edit")) actions.add(ACTION_EDIT_ACCOUNT);
-        if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:diagnose")) actions.add(ACTION_DIAGNOSE_ACCOUNT);
         if (permissionApi.hasAnyPermissions(userId, "zsjos:media-account:rescue")) actions.add(ACTION_RESCUE_ACCOUNT);
         if (account.getStudentPersonId() != null && !"pending".equals(account.getRebindStatus())
                 && objectPermissionProvider.hasPermission(account.getId(), "rebind", userId)

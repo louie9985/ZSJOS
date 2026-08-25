@@ -2941,3 +2941,32 @@
 - Verification evidence: Person-focused Maven tests passed 9/9; the full ZSJOS module suite passed 523/523; server dependency packaging compiled all 28 modules, while the ordinary Spring Boot repackage was blocked by the existing locked `yudao-server.jar` and the repackage-skipped package completed successfully; V125 static checks passed for no delete/update, counter table, tenant/date unique key, version registries, bootstrap inclusion, and Core/bootstrap presence; `git diff --check` reported only Windows line-ending notices.
 - Dependency or integration impact: No new npm/Maven dependency, branch/worktree operation, commit, push, real database migration, service restart, permission change, or business-data mutation. V125 must be applied through the controlled migration workflow before existing environments create numbers using the new counter table.
 - Remaining work: Obtain explicit approval before applying V125 to a real database; restart/redeploy through the normal service workflow; verify concurrent production behavior and the live student-number display. Existing locked-JAR repackage limitation remains an environment issue.
+
+### Workstream scope update: 2026-08-24 14:15:00 +08:00
+
+- Workstream ID: `20260810-main-existing`
+- Goal: Make every successful My Students operation immediately refresh the current student, selected service, available actions, task context, contact records, and list projection without requiring a browser refresh.
+- Non-goals: Changing backend workflow states, API contracts, permissions, database rows outside normal user commands, notifications, dependencies, services, branches, commits, or pushes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `d1724e2fb94c87ed5bfda0ee76151df8f28f0c09`
+- Target branch: `main`
+- Ownership scope: Workbench My Students refresh orchestration in `frontend/workbench/src/pages/RegistrationPages.tsx`, focused page regression tests, directly affected registration API documentation, and this handoff file. Existing overlapping user changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: Existing React state, Workbench typed API client, and Ant Design feedback states only. No new dependency.
+- Integration order: Register scope -> separate forced list refresh from deterministic current-student reload -> route all successful planner operations through the refresh path -> add regression coverage/docs -> run focused/full Workbench checks and browser verification where available -> append delivery evidence.
+- Verification plan: Focused My Students guard tests, full Workbench tests, typecheck, production build, `git diff --check`, and desktop/mobile browser validation if a compatible authenticated runtime is available. No service lifecycle or external-state action.
+
+### 2026-08-24 14:04:27 +08:00 (delivery append)
+
+- Workstream ID: `20260810-main-existing`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `02961f62360e96a85c734c0b87c34a43dea77309`
+- User goal: Make every learning-planner operation on My Students immediately refresh the page state, including acceptance and later contact actions, so the next available action appears without a manual browser refresh.
+- Key decisions: Keep list and detail refreshes independent; force the list request past same-filter in-flight deduplication; reload the selected Person directly with the selected `serviceRelationId`; run both refreshes in parallel so list failure or deep-link pagination does not suppress current task/action refresh; preserve existing error/retry projections.
+- Execution or analysis result: Added a shared `refreshCurrentStudent` path and routed acceptance, first contact, study plan, ordinary follow-up, delivery-stage completion, basic-information updates, collaborator assignment, repurchase submission, Lead detail changes, and manual refresh through it. The current service remains selected while contact context, task, records, service projection, and list row are re-fetched. Directly affected API documentation and focused regression coverage were updated.
+- Changed files: `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/pages/student-sales-history.guard.test.ts`; `docs/api/registration-fulfillment-api.md`; this handoff file.
+- Verification evidence: Focused My Students guard suite passed 7/7; full Workbench suite passed 342/342; `npm run typecheck` passed; production build passed with the existing large-chunk warning; `git diff --check` reported only Windows line-ending notices. Browser connected to the existing Workbench on port 5174, but the available session was unauthenticated and showed the login page, so state-changing acceptance/follow-up behavior and desktop/mobile target-flow rendering could not be exercised safely.
+- Dependency or integration impact: No new dependency, backend/API/schema/permission/notification change, branch/worktree operation, commit, push, service restart, or synthetic business-data mutation. HEAD advanced externally from the registered base to `02961f62360e96a85c734c0b87c34a43dea77309` during verification; this work did not alter or revert the unrelated `handoff/main.md` change.
+- Remaining work: In an authenticated test environment, verify acceptance immediately replaces `接收` with `首联`, then verify successful first contact, study plan, ordinary follow-up, delivery completion, collaborator assignment, basic-info update, and repurchase submission refresh the current student at desktop and mobile widths.

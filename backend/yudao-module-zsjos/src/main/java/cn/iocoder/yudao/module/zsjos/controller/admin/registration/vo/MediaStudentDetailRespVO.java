@@ -14,6 +14,8 @@ public class MediaStudentDetailRespVO {
     private List<ContentVO> contents;
     private List<TicketVO> productionTickets;
     private List<OperationVO> operationTimeline;
+    private List<TaskStageVO> studentTaskLine;
+    /** Compatibility projection for older workbench clients; new clients use studentTaskLine and account.taskLine. */
     private List<TaskStageVO> taskLine;
     private PendingStatsVO pendingStats;
 
@@ -29,6 +31,7 @@ public class MediaStudentDetailRespVO {
         private LocalDateTime lastActivityAt;
         private List<String> availableActions;
         private List<MediaAccountDetailSnapshotVO> detailSnapshots;
+        private List<TaskStageVO> taskLine;
     }
 
     @Data

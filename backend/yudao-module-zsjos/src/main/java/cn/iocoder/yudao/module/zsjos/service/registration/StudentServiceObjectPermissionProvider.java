@@ -13,6 +13,7 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.PERMISSION_COLLABORATOR_CORRECT;
+import static cn.iocoder.yudao.module.zsjos.service.studentcontact.StudentContactConstants.PERMISSION_DIRECTOR_OPERATOR_ASSIGN;
 
 @Component
 public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermissionProvider {
@@ -35,8 +36,14 @@ public class StudentServiceObjectPermissionProvider implements ZsjosObjectPermis
         if (!"active".equals(relation.getStatus())) return false;
         if ("read".equals(action) && "accepted".equals(relation.getAcceptanceStatus())) {
             return Objects.equals(relation.getContentDirectorUserId(), userId)
-                    || Objects.equals(relation.getCareerPlannerUserId(), userId);
+                    || Objects.equals(relation.getCareerPlannerUserId(), userId)
+                    || Objects.equals(relation.getOperatorUserId(), userId);
         }
+        if ("assign".equals(action) && Objects.equals(relation.getContentDirectorUserId(), userId)
+                && permissionApi.hasAnyPermissions(userId, PERMISSION_DIRECTOR_OPERATOR_ASSIGN)) return true;
+        if (Set.of("director-precheck", "director-interview").contains(action)
+                && "accepted".equals(relation.getAcceptanceStatus())
+                && Objects.equals(relation.getContentDirectorUserId(), userId)) return true;
         return "assign".equals(action) && permissionApi.hasAnyPermissions(userId, PERMISSION_COLLABORATOR_CORRECT);
     }
 

@@ -9,6 +9,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.StudentContactC
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactConfigCommandMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.StudentContactConfigVersionMapper;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -23,12 +25,16 @@ import java.util.TreeMap;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_CONTACT_CONFIG_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.STUDENT_CONTACT_CONFIG_DICT_INVALID;
 
 @Service
 public class StudentContactConfigServiceImpl implements StudentContactConfigService {
     private static final Set<String> TABS = Set.of("first-contact", "study-plan", "contacts");
+    private static final Set<String> FORM_TYPES = Set.of("text", "textarea", "number", "date", "datetime",
+            "select", "multi_select", "radio", "checkbox_group", "checkbox", "dict", "attachment");
     @Resource private StudentContactConfigVersionMapper mapper;
     @Resource private StudentContactConfigCommandMapper commandMapper;
+    @Resource private DictDataApi dictDataApi;
 
     @Override public StudentContactConfigRespVO get() {
         StudentContactConfigRespVO result = new StudentContactConfigRespVO();
@@ -60,6 +66,7 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         copy.setStudyPlanTimeoutMinutes(published.getStudyPlanTimeoutMinutes());
         copy.setChecklistJson(published.getChecklistJson()); copy.setQuickNotesJson(published.getQuickNotesJson());
         copy.setCollaboratorTabsJson(published.getCollaboratorTabsJson()); copy.setVersion(0);
+        copy.setFormsJson(published.getFormsJson());
         mapper.insert(copy);
         if (commandMapper.updateResult(claim.command().getId(), copy.getId()) != 1) {
             throw exception(STUDENT_CONTACT_CONFIG_INVALID);
@@ -76,6 +83,8 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         payload.put("checklist", request.getChecklist());
         payload.put("quickNotes", request.getQuickNotes());
         payload.put("collaboratorTabs", new TreeMap<>(request.getCollaboratorTabs()));
+        Map<String, List<StudentContactConfigSaveReqVO.FormFieldReqVO>> forms = request.getForms() == null ? Map.of() : request.getForms();
+        payload.put("forms", new TreeMap<>(forms));
         CommandClaim claim = claimCommand("update", request.getIdempotencyKey(), request.getId(),
                 request.getVersion(), fingerprint(payload));
         if (!claim.created()) return;
@@ -86,6 +95,7 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         draft.setChecklistJson(JsonUtils.toJsonString(request.getChecklist()));
         draft.setQuickNotesJson(JsonUtils.toJsonString(request.getQuickNotes()));
         draft.setCollaboratorTabsJson(JsonUtils.toJsonString(request.getCollaboratorTabs()));
+        draft.setFormsJson(JsonUtils.toJsonString(forms));
         if (mapper.updateDraft(draft, request.getVersion()) != 1) {
             throw exception(STUDENT_CONTACT_CONFIG_INVALID);
         }
@@ -119,6 +129,36 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
                 || request.getCollaboratorTabs().values().stream().flatMap(List::stream).anyMatch(tab -> !TABS.contains(tab))) {
             throw exception(STUDENT_CONTACT_CONFIG_INVALID);
         }
+        Map<String, List<StudentContactConfigSaveReqVO.FormFieldReqVO>> forms = request.getForms() == null ? Map.of() : request.getForms();
+        forms.forEach((stage, fields) -> {
+            if (fields == null || fields.stream().anyMatch(java.util.Objects::isNull)
+                    || fields.stream().map(StudentContactConfigSaveReqVO.FormFieldReqVO::getKey).distinct().count() != fields.size()) {
+                throw exception(STUDENT_CONTACT_CONFIG_INVALID);
+            }
+            fields.forEach(field -> {
+                if (!FORM_TYPES.contains(field.getType())) {
+                    throw exception(STUDENT_CONTACT_CONFIG_INVALID);
+                }
+                boolean enumField = Set.of("select", "multi_select", "radio", "checkbox_group", "dict").contains(field.getType());
+                if (enumField && (field.getDictType() == null || field.getDictType().isBlank())) {
+                    throw exception(STUDENT_CONTACT_CONFIG_DICT_INVALID);
+                }
+                if (enumField) {
+                    List<DictDataRespDTO> options;
+                    try { options = dictDataApi.getDictDataList(field.getDictType()); }
+                    catch (RuntimeException ex) { throw exception(STUDENT_CONTACT_CONFIG_DICT_INVALID); }
+                    if (options == null || options.stream().noneMatch(option -> option.getStatus() == null || option.getStatus() == 0)) {
+                        throw exception(STUDENT_CONTACT_CONFIG_DICT_INVALID);
+                    }
+                    if (Set.of("select", "radio", "dict").contains(field.getType()) && Boolean.TRUE.equals(field.getMultiple())) {
+                        throw exception(STUDENT_CONTACT_CONFIG_DICT_INVALID);
+                    }
+                    if (Set.of("multi_select", "checkbox_group").contains(field.getType()) && Boolean.FALSE.equals(field.getMultiple())) {
+                        throw exception(STUDENT_CONTACT_CONFIG_DICT_INVALID);
+                    }
+                }
+            });
+        });
     }
 
     private CommandClaim claimCommand(String operation, String idempotencyKey, Long configId,
@@ -160,6 +200,9 @@ public class StudentContactConfigServiceImpl implements StudentContactConfigServ
         result.setChecklist(JsonUtils.parseArray(source.getChecklistJson(), StudentContactConfigRespVO.ChecklistItemVO.class));
         result.setQuickNotes(JsonUtils.parseArray(source.getQuickNotesJson(), String.class));
         Map<String, List<String>> tabs = JsonUtils.parseObject(source.getCollaboratorTabsJson(), Map.class);
-        result.setCollaboratorTabs(tabs == null ? Map.of() : tabs); return result;
+        result.setCollaboratorTabs(tabs == null ? Map.of() : tabs);
+        Map<String, List<StudentContactConfigRespVO.FormFieldVO>> forms = JsonUtils.parseObject(source.getFormsJson(), Map.class);
+        result.setForms(forms == null ? Map.of() : forms);
+        return result;
     }
 }

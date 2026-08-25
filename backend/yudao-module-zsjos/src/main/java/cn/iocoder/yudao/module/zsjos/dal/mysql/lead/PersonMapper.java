@@ -71,7 +71,7 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
         query.apply("EXISTS (SELECT 1 FROM zsjos_service_relation sr WHERE sr.person_id=zsjos_person.id "
                 + "AND sr.tenant_id=zsjos_person.tenant_id AND sr.deleted=b'0' "
                 + "AND ((sr.owner_user_id={0} AND sr.status IN ('active','paused','completed')) "
-                + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0}) "
+                + "OR ((sr.content_director_user_id={0} OR sr.career_planner_user_id={0} OR sr.operator_user_id={0}) "
                 + "AND sr.status='active' AND sr.acceptance_status='accepted')))" , userId);
         return selectPage(reqVO, query.orderByDesc(lastActivityExpression()).orderByDesc("id"));
     }

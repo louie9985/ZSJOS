@@ -21,6 +21,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.service.lead.PersonIdentityWriteService;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
+import cn.iocoder.yudao.module.zsjos.service.director.DirectorConfigService;
+import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.director.DirectorFormTemplateVersionDO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import org.junit.jupiter.api.AfterEach;
@@ -61,10 +64,19 @@ class StudentContactServiceImplTest {
     @Mock private PersonMapper personMapper;
     @Mock private PersonIdentityWriteService personIdentityWriteService;
     @Mock private BusinessEventMapper eventMapper;
+    @Mock private DirectorConfigService directorConfigService;
+    @Mock private DirectorFormTemplateService directorFormTemplateService;
 
     @BeforeEach
     void grantDeliveryStagePermissionForServiceContractTests() {
         lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PERMISSION_DELIVERY_STAGE_SUBMIT))).thenReturn(true);
+        lenient().when(directorConfigService.interviewAppointmentHours()).thenReturn(96);
+        lenient().when(directorConfigService.trialDays()).thenReturn(14);
+        DirectorFormTemplateVersionDO interviewVersion = new DirectorFormTemplateVersionDO()
+                .setId(11L).setTemplateId(10L).setVersionNo(1).setStatus("published");
+        lenient().when(directorFormTemplateService.requirePublished(
+                DirectorFormTemplateService.SCENE_INTERVIEW, null)).thenReturn(interviewVersion);
+        lenient().when(directorFormTemplateService.fields(interviewVersion)).thenReturn(List.of());
     }
 
     @AfterEach
@@ -124,7 +136,7 @@ class StudentContactServiceImplTest {
         ServiceRelationDO relation = relation("accepted");
         relation.setContentDirectorUserId(51L); relation.setCareerPlannerUserId(52L);
         when(relationMapper.selectById(10L)).thenReturn(relation);
-        when(adminUserApi.getUserMap(List.of(51L, 52L))).thenReturn(new HashMap<>());
+        when(adminUserApi.getUserMap(List.of(7L, 51L, 52L, -1L))).thenReturn(new HashMap<>());
 
         assertEquals(List.of(CONTEXT_ACTION_FOLLOW_UP, CONTEXT_ACTION_ASSIGN_CONTENT_DIRECTOR,
                 CONTEXT_ACTION_ASSIGN_CAREER_PLANNER), service.getContext(10L, 7L).getAvailableActions());
@@ -142,11 +154,11 @@ class StudentContactServiceImplTest {
     @Test
     void deliveryStageProjectionIsOrderedAndOnlyCurrentStageIsAvailable() {
         List<StudentContactContextRespVO.DeliveryStageVO> stages = ReflectionTestUtils.invokeMethod(
-                service, "deliveryStages", STAGE_EXAM_CONFIRMATION, true);
+                service, "deliveryStages", STAGE_SUPERVISION, true);
 
         assertEquals(9, stages.size());
         int currentIndex = java.util.stream.IntStream.range(0, stages.size())
-                .filter(index -> STAGE_EXAM_CONFIRMATION.equals(stages.get(index).getCode()))
+                .filter(index -> STAGE_SUPERVISION.equals(stages.get(index).getCode()))
                 .findFirst().orElseThrow();
         assertEquals("current", stages.get(currentIndex).getStatus());
         assertEquals(true, stages.get(currentIndex).getAvailable());
@@ -158,7 +170,7 @@ class StudentContactServiceImplTest {
         assertEquals(false, completed.get(completed.size() - 1).getAvailable());
 
         List<StudentContactContextRespVO.DeliveryStageVO> unauthorized = ReflectionTestUtils.invokeMethod(
-                service, "deliveryStages", STAGE_EXAM_CONFIRMATION, false);
+                service, "deliveryStages", STAGE_SUPERVISION, false);
         assertEquals(false, unauthorized.get(currentIndex).getAvailable());
     }
 
@@ -205,7 +217,7 @@ class StudentContactServiceImplTest {
         TenantContextHolder.setTenantId(1L);
         ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_EXAM_PREPARATION);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
-        StudentDeliveryStageSubmitReqVO request = deliveryRequest(STAGE_EXAM_CONFIRMATION, "replay-key");
+        StudentDeliveryStageSubmitReqVO request = deliveryRequest(STAGE_EXAM_PREPARATION, "replay-key");
         StudentContactRecordDO replay = new StudentContactRecordDO(); replay.setId(99L); replay.setServiceRelationId(10L);
         replay.setRequestFingerprint(ReflectionTestUtils.invokeMethod(service, "deliveryFingerprint", 10L, request));
         when(recordMapper.selectByIdempotencyKey("replay-key")).thenReturn(replay);
@@ -220,7 +232,7 @@ class StudentContactServiceImplTest {
         ServiceRelationDO relation = relation("accepted"); relation.setDeliveryStage(STAGE_SUPERVISION);
         when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
         when(recordMapper.selectByIdempotencyKey("stage-key")).thenReturn(null);
-        when(relationMapper.advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_SUPERVISION), eq(STAGE_EXAM_CONFIRMATION),
+        when(relationMapper.advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_SUPERVISION), eq(STAGE_EXAM_PREPARATION),
                 anyString(), eq(2))).thenReturn(1);
         doAnswer(invocation -> {
             StudentContactRecordDO row = invocation.getArgument(0);
@@ -233,7 +245,7 @@ class StudentContactServiceImplTest {
         assertEquals(100L, id);
         verify(recordMapper).insert(any(StudentContactRecordDO.class));
         verify(relationMapper).advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_SUPERVISION),
-                eq(STAGE_EXAM_CONFIRMATION), anyString(), eq(2));
+                eq(STAGE_EXAM_PREPARATION), anyString(), eq(2));
     }
 
     @Test

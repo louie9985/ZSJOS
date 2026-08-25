@@ -50,6 +50,16 @@ describe('study planner student sales history', () => {
     expect(page).not.toContain("availableActions?.includes('CONTACT')")
   })
 
+  it('reloads the selected student after every successful planner command', () => {
+    const page = readFileSync('src/pages/RegistrationPages.tsx', 'utf8')
+    expect(page).toContain('const refreshCurrentStudent = useCallback(async () => {')
+    expect(page).toContain('load(pageNo, { force: true, reloadDetail: false })')
+    expect(page).toContain('loadStudent(selected.personId, selectedService?.serviceRelationId)')
+    expect(page).toContain('onRefresh={refreshCurrentStudent}')
+    expect(page.match(/await onRefresh\(\)/g)?.length).toBeGreaterThanOrEqual(4)
+    expect(page).toContain('await refreshCurrentStudent();')
+  })
+
   it('uses Person identity and keeps the contact history tab free of commands', () => {
     const page = readFileSync('src/pages/RegistrationPages.tsx', 'utf8')
     expect(page).toContain('submittedName: selected.name ?? leadDetail.submittedName')

@@ -79,7 +79,7 @@ in-app message and the standard post-commit WebSocket hint for that director.
 - `GET /zsjos/student/my/{personId}`
 - `GET /zsjos/student/my/by-service/{relationId}`
 
-“我的学员”响应按 Person 聚合，但 `services` 中每一项同时返回该服务真实订单所关联的 `leadId`（仅内部技术链接）和 `leadNo`（用户可见业务编号）。Workbench 使用当前服务项的 Lead 复用统一 `LeadDetail`，不得以 Person 下其他服务或其他 Lead 作为回退。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。
+“我的学员”响应按 Person 聚合，但 `services` 中每一项同时返回该服务真实订单所关联的 `leadId`（仅内部技术链接）和 `leadNo`（用户可见业务编号）。Workbench 使用当前服务项的 Lead 复用统一 `LeadDetail`，不得以 Person 下其他服务或其他 Lead 作为回退。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。接收、首联、学习计划、普通跟进、交付阶段、基础信息修改、协作者分配和复购录入成功后，Workbench 必须强制刷新列表投影并独立重载当前 Person 的当前 `serviceRelationId`；详情刷新不得依赖列表请求去重或当前分页命中，且刷新后必须保持当前课程服务选中。
 
 Results are read-only, grouped by Person, scoped to active service relationships directly owned by or
 routed to the current user, and aggregate order/course services without exposing sales actions. Both
@@ -126,3 +126,56 @@ The overview exposes optional one-time content-director and career-planner assig
 - `GET /zsjos/media-students/page` returns the current director or operator scope. Directors are resolved from active service relations and account responsibility; operators are resolved only from accounts and media workflow tasks they participate in.
 - `GET /zsjos/media-students/{personId}` returns course services plus third-party accounts, positioning history, content production history, talk records, the media operation timeline, and the positioning-to-operation-to-graduation task line.
 - Both endpoints require `zsjos:media-student:query-my`. Page visibility never grants object access: detail and command endpoints recheck the current service relation, account responsibility, or task assignment.
+# 编导学员级阶段
+
+编导通过 `GET /zsjos/student/service/{relationId}/contact-context` 获取服务关系负责人、编导、
+运营负责人、`directorStage`、访谈预约时间、动态字段和服务端 `availableActions`。学习规划师
+展示值来自服务关系 `ownerUserId/ownerUserName`，不得使用职业规划师字段替代。
+
+阶段命令拆分为四个接口，阶段由 URL 固定，客户端不能伪造阶段：
+
+- `POST /zsjos/student/service/{relationId}/precheck/draft`
+- `POST /zsjos/student/service/{relationId}/precheck/submit`
+- `POST /zsjos/student/service/{relationId}/interview/draft`
+- `POST /zsjos/student/service/{relationId}/interview/submit`
+
+```json
+{
+  "interviewAt": "2026-08-28T10:00:00",
+  "data": {},
+  "version": 1,
+  "idempotencyKey": "client-command-id"
+}
+```
+
+预审不加载业务表单，`data` 必须为空；提交接口要求 `interviewAt`。采访草稿固定当前发布模板版本，
+提交时服务端校验必填字段，并把模板 ID、模板版本、字段定义和值写入不可变快照。预审提交后进入 `interview`，
+采访提交后进入 `positioning_ready`。所有写入均校验当前编导、服务状态和服务关系版本。
+
+运营候选人与指派复用协作者接口，类型为 `operator`：候选人来自服务端配置的
+`content_director_operator` 人员关系，source 为当前编导、target 为运营。运营归属写入同一学员
+全部有效服务关系的 `operatorUserId`，并同步未归档定位卡的当前运营；运营只能读取被
+指派学员全部账号与定位卡，并在具备定位卡操作权限时逐账号确认或退回。
+#### Director form dictionary snapshots (V129)
+
+Director interview and account-positioning enum fields use System dictionaries. Configuration
+fields of type `select`, `multi_select`, `radio`, `checkbox_group` or `dict` must provide a
+valid enabled `dictType`; the server validates both configuration and submitted values.
+Submitted service-relation form payloads retain `dictSnapshots` with the selected value,
+dictionary type and label at submission time. Historical detail must display the snapshot
+label and must not re-resolve the current dictionary after an administrator renames or disables
+an item. The V129 seed is repeatable and is not executed by application startup.
+## 编导可配置表单
+
+资料预审接口只接受空 `data`，用于确认资料和保存或提交采访预约。采访接口使用当前已发布的
+`director_interview` 模板；首次草稿冻结模板版本，草稿和提交均保存字段、值及字典标签快照。
+后续保存和提交始终按该 `templateVersionId` 的已发布或已归档版本校验；发布新模板不会迁移
+已有草稿。未改变的历史字典选项继续保留原 `labelSnapshot`，即使当前字典已经改名或停用。
+采访 `region` 字段从 System `/system/area/tree` 选择，业务值保存地区 `code` 与服务端生成的
+`labelSnapshot`。旧草稿中的原始地区文本可以继续读取和保存草稿，但正式提交前必须重新选择
+当前有效地区；服务端不信任客户端传入的地区标签。
+
+模板管理接口为 `/admin-api/zsjos/director-interview-template/**`、
+`/admin-api/zsjos/positioning-template/**` 和 `/admin-api/zsjos/director-config`。定位卡业务端通过
+`GET /admin-api/zsjos/positioning-card/published-template` 获取当前发布模板，创建草稿时保存
+`personId + accountId + serviceRelationId + templateVersionId + trialEndDate` 及完整快照。

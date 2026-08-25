@@ -17,6 +17,11 @@ public class StudentContactConfigRespVO {
         private List<ChecklistItemVO> checklist;
         private List<String> quickNotes;
         private Map<String, List<String>> collaboratorTabs;
+        private Map<String, List<FormFieldVO>> forms;
+    }
+    @Data public static class FormFieldVO {
+        private String key; private String title; private String type; private Boolean required;
+        private Integer sort; private String description; private String dictType; private Boolean multiple;
     }
     @Data public static class ChecklistItemVO {
         private String key;

@@ -10,6 +10,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.Positioning
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Mapper
 public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
@@ -47,6 +48,23 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .set(PositioningCardDO::getIpReviewerUserId, card.getIpReviewerUserId())
                 .set(PositioningCardDO::getVersion, version + 1));
     }
+    default int updateDraftSnapshot(PositioningCardDO card, Integer version, String fromStatus) {
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
+                .eq(PositioningCardDO::getId, card.getId()).eq(PositioningCardDO::getVersion, version)
+                .eq(PositioningCardDO::getStatus, fromStatus)
+                .set(PositioningCardDO::getFieldsSnapshotJson, card.getFieldsSnapshotJson())
+                .set(PositioningCardDO::getValuesSnapshotJson, card.getValuesSnapshotJson())
+                .set(PositioningCardDO::getDictSnapshotJson, card.getDictSnapshotJson())
+                .set(PositioningCardDO::getTrialEndDate, card.getTrialEndDate())
+                .set(PositioningCardDO::getVersion, version + 1));
+    }
+    default int updateCurrentOperatorByServiceRelations(Collection<Long> serviceRelationIds, Long operatorUserId) {
+        if (serviceRelationIds == null || serviceRelationIds.isEmpty()) return 0;
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
+                .in(PositioningCardDO::getServiceRelationId, serviceRelationIds)
+                .ne(PositioningCardDO::getStatus, "archived")
+                .set(PositioningCardDO::getOperatorUserId, operatorUserId));
+    }
     default PageResult<PositioningCardDO> selectPage(PositioningCardPageReqVO req, Collection<Long> userIds,
                                                      Collection<Long> accountIds, boolean all) {
         LambdaQueryWrapperX<PositioningCardDO> query = new LambdaQueryWrapperX<>();
@@ -60,6 +78,16 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>().eq(PositioningCardDO::getId, id)
                 .eq(PositioningCardDO::getVersion, version).eq(PositioningCardDO::getStatus, from)
                 .set(PositioningCardDO::getStatus, to).set(PositioningCardDO::getVersion, version + 1));
+    }
+    default int transitionOperatorReview(Long id, Integer version, String from, String to, Long operatorUserId,
+                                         LocalDateTime reviewedAt, String comment) {
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>().eq(PositioningCardDO::getId, id)
+                .eq(PositioningCardDO::getVersion, version).eq(PositioningCardDO::getStatus, from)
+                .set(PositioningCardDO::getStatus, to)
+                .set(PositioningCardDO::getOperatorReviewedByUserId, operatorUserId)
+                .set(PositioningCardDO::getOperatorReviewedAt, reviewedAt)
+                .set(PositioningCardDO::getOperatorReviewComment, comment)
+                .set(PositioningCardDO::getVersion, version + 1));
     }
     default int advanceVersionNo(Long id, Integer expectedVersion, Integer expectedVersionNo, Integer nextVersionNo) {
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>().eq(PositioningCardDO::getId, id)

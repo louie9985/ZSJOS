@@ -28,6 +28,17 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    @Select("SELECT COUNT(*) AS total FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0'")
+    long countForMediaScreen(@Param("tenantId") Long tenantId);
+
+    @Select("SELECT source_dept_id AS bucket, COUNT(*) AS total FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' GROUP BY source_dept_id ORDER BY total DESC")
+    List<Map<String, Object>> countMediaScreenDepartments(@Param("tenantId") Long tenantId);
+
+    @Select("SELECT owner_user_id AS bucket, COUNT(*) AS total FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND owner_user_id IS NOT NULL GROUP BY owner_user_id ORDER BY total DESC")
+    List<Map<String, Object>> countMediaScreenMembers(@Param("tenantId") Long tenantId);
+
+    @Select("SELECT DATE(submitted_at) AS bucket, COUNT(*) AS total FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0' AND submitted_at >= #{from} AND submitted_at < #{to} GROUP BY DATE(submitted_at) ORDER BY bucket")
+    List<Map<String, Object>> countMediaScreenTrend(@Param("tenantId") Long tenantId, @Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
     default LeadDO selectByPersonId(Long personId) {
         return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getPersonId, personId)
                 .orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId).last("LIMIT 1"));

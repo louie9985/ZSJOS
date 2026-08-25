@@ -60,38 +60,47 @@ INSERT INTO eam_category(parent_id,name,code,sort,status,management_mode,unit,re
 (0,'办公用品和耗材','SUPPLIES',4,0,2,'个','V3','eam-v3','eam-v3',1),
 (0,'专业书籍','BOOK',5,0,2,'册','V3','eam-v3','eam-v3',1),
 (0,'教学用具','TEACHING',6,0,2,'件','V3','eam-v3','eam-v3',1),
-(0,'其他','OTHER',7,0,1,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'电脑','IT-COMPUTER',1,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'移动终端','IT-MOBILE',2,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'显示器','IT-DISPLAY',3,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'打印/投影设备','IT-PRINT-PROJECT',4,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'网络及通讯设备','IT-NETWORK',5,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'音视频设备','IT-AUDIO-VIDEO',6,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'外设耗材','IT-PERIPHERAL',7,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='IT'),'其他IT硬件设备','IT-OTHER',8,0,1,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='DIGITAL'),'平台账号','DIGITAL-PLATFORM',1,0,1,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='DIGITAL'),'订阅服务','DIGITAL-SUBSCRIPTION',2,0,1,'项','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='DIGITAL'),'企业手机号','DIGITAL-MOBILE',3,0,1,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='DIGITAL'),'其他数字资产','DIGITAL-OTHER',4,0,1,'项','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='FURNITURE'),'办公桌椅','FURNITURE-DESK-CHAIR',1,0,1,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='FURNITURE'),'会客家具','FURNITURE-RECEPTION',2,0,1,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='FURNITURE'),'文件柜','FURNITURE-CABINET',3,0,1,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='FURNITURE'),'饮水机','FURNITURE-WATER',4,0,1,'台','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='FURNITURE'),'其他办公家具及设备','FURNITURE-OTHER',5,0,1,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'文具','SUPPLIES-STATIONERY',1,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'胶粘用品','SUPPLIES-ADHESIVE',2,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'电池','SUPPLIES-BATTERY',3,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'档案及证书物料','SUPPLIES-ARCHIVE',4,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'印刷物料','SUPPLIES-PRINT',5,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'日杂用品','SUPPLIES-DAILY',6,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='SUPPLIES'),'其他办公用品和耗材','SUPPLIES-OTHER',7,0,2,'个','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='TEACHING'),'厨房秤','TEACHING-KITCHEN-SCALE',1,0,2,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='TEACHING'),'沙盘','TEACHING-SANDBOX',2,0,2,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='TEACHING'),'膳食宝塔','TEACHING-PAGODA',3,0,2,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='TEACHING'),'膳食餐盘','TEACHING-PLATE',4,0,2,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='TEACHING'),'食品真相揭秘箱','TEACHING-FOOD-BOX',5,0,2,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='TEACHING'),'其他教学用具','TEACHING-OTHER',6,0,2,'件','V3','eam-v3','eam-v3',1),
-((SELECT id FROM eam_category WHERE code='OTHER'),'其他资产','OTHER-ASSET',1,0,1,'个','V3','eam-v3','eam-v3',1);
+(0,'其他','OTHER',7,0,1,'个','V3','eam-v3','eam-v3',1);
+
+SET @eam_category_it_id = (SELECT id FROM eam_category WHERE code='IT' AND parent_id=0 AND tenant_id=@eam_tenant_id LIMIT 1);
+SET @eam_category_digital_id = (SELECT id FROM eam_category WHERE code='DIGITAL' AND parent_id=0 AND tenant_id=@eam_tenant_id LIMIT 1);
+SET @eam_category_furniture_id = (SELECT id FROM eam_category WHERE code='FURNITURE' AND parent_id=0 AND tenant_id=@eam_tenant_id LIMIT 1);
+SET @eam_category_supplies_id = (SELECT id FROM eam_category WHERE code='SUPPLIES' AND parent_id=0 AND tenant_id=@eam_tenant_id LIMIT 1);
+SET @eam_category_teaching_id = (SELECT id FROM eam_category WHERE code='TEACHING' AND parent_id=0 AND tenant_id=@eam_tenant_id LIMIT 1);
+SET @eam_category_other_id = (SELECT id FROM eam_category WHERE code='OTHER' AND parent_id=0 AND tenant_id=@eam_tenant_id LIMIT 1);
+
+INSERT INTO eam_category(parent_id,name,code,sort,status,management_mode,unit,remark,creator,updater,tenant_id) VALUES
+(@eam_category_it_id,'电脑','IT-COMPUTER',1,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'移动终端','IT-MOBILE',2,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'显示器','IT-DISPLAY',3,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'打印/投影设备','IT-PRINT-PROJECT',4,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'网络及通讯设备','IT-NETWORK',5,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'音视频设备','IT-AUDIO-VIDEO',6,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'外设耗材','IT-PERIPHERAL',7,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_it_id,'其他IT硬件设备','IT-OTHER',8,0,1,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_digital_id,'平台账号','DIGITAL-PLATFORM',1,0,1,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_digital_id,'订阅服务','DIGITAL-SUBSCRIPTION',2,0,1,'项','V3','eam-v3','eam-v3',1),
+(@eam_category_digital_id,'企业手机号','DIGITAL-MOBILE',3,0,1,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_digital_id,'其他数字资产','DIGITAL-OTHER',4,0,1,'项','V3','eam-v3','eam-v3',1),
+(@eam_category_furniture_id,'办公桌椅','FURNITURE-DESK-CHAIR',1,0,1,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_furniture_id,'会客家具','FURNITURE-RECEPTION',2,0,1,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_furniture_id,'文件柜','FURNITURE-CABINET',3,0,1,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_furniture_id,'饮水机','FURNITURE-WATER',4,0,1,'台','V3','eam-v3','eam-v3',1),
+(@eam_category_furniture_id,'其他办公家具及设备','FURNITURE-OTHER',5,0,1,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'文具','SUPPLIES-STATIONERY',1,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'胶粘用品','SUPPLIES-ADHESIVE',2,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'电池','SUPPLIES-BATTERY',3,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'档案及证书物料','SUPPLIES-ARCHIVE',4,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'印刷物料','SUPPLIES-PRINT',5,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'日杂用品','SUPPLIES-DAILY',6,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_supplies_id,'其他办公用品和耗材','SUPPLIES-OTHER',7,0,2,'个','V3','eam-v3','eam-v3',1),
+(@eam_category_teaching_id,'厨房秤','TEACHING-KITCHEN-SCALE',1,0,2,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_teaching_id,'沙盘','TEACHING-SANDBOX',2,0,2,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_teaching_id,'膳食宝塔','TEACHING-PAGODA',3,0,2,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_teaching_id,'膳食餐盘','TEACHING-PLATE',4,0,2,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_teaching_id,'食品真相揭秘箱','TEACHING-FOOD-BOX',5,0,2,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_teaching_id,'其他教学用具','TEACHING-OTHER',6,0,2,'件','V3','eam-v3','eam-v3',1),
+(@eam_category_other_id,'其他资产','OTHER-ASSET',1,0,1,'个','V3','eam-v3','eam-v3',1);
 
 INSERT INTO eam_category_field(category_id,field_key,field_name,field_type,option_source,dict_type,required,admin_visible,collection_visible,collection_required,sort,creator,updater,tenant_id)
 SELECT id,'device_model','机型',5,'SYSTEM_DICT','eam_device_model',b'0',b'1',b'1',b'0',10,'eam-v3','eam-v3',1 FROM eam_category WHERE code='IT-COMPUTER'
@@ -139,7 +148,7 @@ UNION ALL SELECT id,'price','定价（元）',3,NULL,NULL,b'0',b'1',b'1',b'0',60
 UNION ALL SELECT id,'size','规格尺寸',1,NULL,NULL,b'0',b'1',b'1',b'0',10,'eam-v3','eam-v3',1 FROM eam_category WHERE code='TEACHING'
 UNION ALL SELECT id,'material','材质',1,NULL,NULL,b'0',b'1',b'1',b'0',20,'eam-v3','eam-v3',1 FROM eam_category WHERE code='TEACHING';
 
-INSERT INTO eam_code_rule(category_id,prefix,use_category_code,date_format,serial_length,separator,current_serial,creator,updater,tenant_id)
+INSERT INTO eam_code_rule(category_id,prefix,use_category_code,date_format,serial_length,`separator`,current_serial,creator,updater,tenant_id)
 VALUES (NULL,'EAM',b'1','yyyyMMdd',4,'-',0,'eam-v3','eam-v3',@eam_tenant_id);
 
 SET FOREIGN_KEY_CHECKS = 1;

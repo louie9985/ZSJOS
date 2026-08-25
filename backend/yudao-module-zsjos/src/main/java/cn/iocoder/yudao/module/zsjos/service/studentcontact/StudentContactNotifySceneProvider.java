@@ -31,7 +31,9 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
     public List<NotifySceneRespDTO> getScenes() {
         return List.of(scene(NOTIFY_FIRST_CONTACT, "学员首次联系时限提醒"),
                 scene(NOTIFY_STUDY_PLAN, "学员学习计划时限提醒"),
-                scene(NOTIFY_CONTACT, "学员普通联系提醒"));
+                scene(NOTIFY_CONTACT, "学员普通联系提醒"),
+                scene(NOTIFY_EXAM_NOTICE, "学员考前通知提醒"),
+                scene(NOTIFY_OPERATOR_ASSIGNED, "学员运营指派通知"));
     }
 
     @Override
@@ -40,6 +42,7 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
         Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
         if (roles.contains(NOTIFY_ROLE_PLANNER)) add(recipients, payload.get("plannerUserId"));
         if (roles.contains(NOTIFY_ROLE_SUPERVISOR)) add(recipients, payload.get("supervisorUserId"));
+        if (roles.contains(NOTIFY_ROLE_OPERATOR)) add(recipients, payload.get("operatorUserId"));
         return recipients;
     }
 
@@ -54,6 +57,7 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
                 : order == null ? "" : order.getOrderNo());
         variables.put("contact.stage", payload.get("reminder.stage"));
         variables.put("contact.dueAt", payload.get("reminder.dueAt"));
+        variables.put("exam.date", payload.get("examDate"));
         return variables;
     }
 
@@ -61,9 +65,11 @@ public class StudentContactNotifySceneProvider implements NotifySceneProvider {
         return new NotifySceneRespDTO(code, name, List.of(
                 new NotifySceneVariableRespDTO("student.identifier", "客资编号或订单号", false),
                 new NotifySceneVariableRespDTO("contact.stage", "提醒阶段", false),
-                new NotifySceneVariableRespDTO("contact.dueAt", "任务截止时间", false)),
+                new NotifySceneVariableRespDTO("contact.dueAt", "任务截止时间", false),
+                new NotifySceneVariableRespDTO("exam.date", "考试日期", false)),
                 List.of(new NotifySceneRoleRespDTO(NOTIFY_ROLE_PLANNER, "学习规划师"),
-                        new NotifySceneRoleRespDTO(NOTIFY_ROLE_SUPERVISOR, "教务主管")),
+                        new NotifySceneRoleRespDTO(NOTIFY_ROLE_SUPERVISOR, "教务主管"),
+                        new NotifySceneRoleRespDTO(NOTIFY_ROLE_OPERATOR, "运营负责人")),
                 List.of(NotifyActionType.MESSAGE_DETAIL, NotifyActionType.BUSINESS_DETAIL), true);
     }
 

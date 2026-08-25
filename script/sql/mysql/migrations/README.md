@@ -313,11 +313,11 @@ Workbench form, which collects a single delivery deadline. The migration is forw
 repeatable, and changes no existing business rows; tightening the column again requires
 an explicit backfill and separate schema decision.
 
-### V106 media review and graduation closure
+### V106 media graduation closure
 
-Adds review-approval columns, the graduation-application table, one server-owned button
-permission, and the in-app templates/rules for review and graduation result scenes. The
-migration is additive, repeatable, and forward-only.
+Adds the graduation-application table and the in-app template/rule for graduation result
+notifications. Review-report columns, permissions, templates and rules are intentionally absent.
+The migration is additive, repeatable, and forward-only.
 
 ### V107 new-media role operation permissions
 
@@ -326,10 +326,9 @@ new-media operator, and filming editor roles. The migration is additive and repe
 does not remove existing role grants, create accounts, or change business rows. Service-level
 object authorization and responsibility checks remain authoritative.
 
-### V108 new-media supervisor review permissions
+### V108 new-media supervisor graduation permissions
 
-Adds review approval plus graduation initiation to `delivery_manager`. It is additive,
-repeatable, and limited to existing roles; it does
+Adds graduation initiation to `delivery_manager`. It is additive, repeatable, and limited to existing roles; it does
 not create users, publish BPM, or change business rows.
 
 ### V109 local media BPM publisher permission
@@ -423,3 +422,67 @@ removed that grant when the page was temporarily director-only; V113 established
 the shared director/operator student-center contract. The migration changes only
 role-menu metadata, is repeatable, and does not broaden the backend object scope.
 Apply after V119; no business rows are changed.
+
+### V126 Student service forms, exam dates and menu
+
+V126 adds tenant-scoped dynamic form JSON to the published student-contact configuration,
+immutable student form snapshot storage, and additive exam-date/reminder state on service
+relations, plus the server-owned `/zsjos/business-form-config` menu and permission metadata.
+It does not invent historical exam dates or execute reminders during migration. The migration
+is repeatable and must be applied through the normal controlled migration process; no database
+execution is performed by the application change.
+
+### V127 Repair student business form configuration menu grant
+
+V127 repairs the V126 Admin menu metadata and grants the business-form configuration page to
+enabled `system_administrator` and `super_admin` roles in each tenant. It is repeatable,
+forward-only, and changes no business data. Apply after V126 through the controlled migration
+process.
+
+### V128 Media director student flow foundation
+
+V128 adds the student-level director stage, interview appointment, immutable dynamic-form
+snapshot columns, and the student-level operator owner to `zsjos_service_relation`. Each of
+the six columns is guarded independently so a partially upgraded database can be rerun safely.
+It registers director and operator positioning-card permissions and adjusts only the confirmed
+default role grants: directors receive precheck/interview/assignment and director card actions;
+operators receive confirmation/rejection and lose director card commands. The migration is
+repeatable and forward-only; it does not backfill invented historical workflow states, assign
+operators, or execute notifications. Apply after V127 through the controlled migration process.
+Rollback is limited to a separately reviewed forward migration; no destructive rollback is
+provided.
+
+### V129 Director form dictionaries
+
+V129 seeds the System dictionary types and initial values used by the Demo-based director
+interview and account-positioning forms. It inserts only missing dictionary types/items and
+preserves administrator edits to existing labels, ordering and enabled status. It records the
+`zsjos_schema_version` marker and changes no student form snapshots or business rows. Apply
+after V128 through the controlled migration process. Rollback is limited to a separately
+reviewed forward migration because existing tenants may already use these dictionary values.
+
+### V130 Configurable director forms and menu wiring
+
+V130 depends on the V129 System dictionaries. It adds tenant-owned interview/positioning
+template and version tables, director SLA configuration, immutable positioning snapshot
+columns, the default Demo templates, and the server-owned `编导业务配置` menu tree. It grants
+the configuration directory, pages, and buttons only to `system_administrator` and
+`super_admin`. Re-execution only fills missing schema or seed rows and does not overwrite
+administrator-edited dictionaries, existing templates, drafts, or business snapshots.
+Rollback requires a reviewed forward migration; published versions and snapshot columns must
+not be dropped while referenced.
+
+### V131 Director and operator action permission repair
+
+V131 is a forward-only repair for databases where the V128 schema exists but its
+media-student action menus or role relations were not installed. It adds only missing action
+menus and grants: `content_director` receives precheck, interview, operator assignment and its
+approved positioning actions; `new_media_operator` receives positioning query, confirm and
+reject. Confirmed legacy positioning write grants are soft-deleted only for
+`new_media_operator`. All five buttons are repaired under the shared media-student page `7022`;
+the shared positioning-card query button is added there as well, and all six action IDs are appended only to tenant packages already containing that page. The script is repeatable, does not change business rows, and rollback
+also restores the `content_director_operator` relationship-scene definition for each tenant
+without inventing any source/target user relation. Candidate operators remain entirely controlled
+through the relationship-maintenance page. Rollback requires restoring the affected
+`system_role_menu` relations from an environment-specific audit; scene removal is allowed only
+after confirming that no configured relationship still references it.

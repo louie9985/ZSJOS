@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStude
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTargetRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MediaStudentTalkSaveReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.MyStudentRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.MediaStudentTalkRecordDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.MediaStudentTalkRecordMapper;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -48,30 +49,46 @@ public class MediaStudentService {
     public MediaStudentDetailRespVO getDetail(Long userId, Long personId) {
         MediaStudentDetailRespVO result = new MediaStudentDetailRespVO();
         result.setStudent(myStudentService.getMediaStudent(userId, personId));
-        List<MediaAccountDO> accounts = accountMapper.selectByParticipantAndStudent(userId, personId);
+        boolean serviceParticipant = result.getStudent().getServices().stream().anyMatch(service ->
+                userId.equals(service.getContentDirectorUserId()) || userId.equals(service.getOperatorUserId()));
+        List<MediaAccountDO> accounts = serviceParticipant
+                ? accountMapper.selectByStudent(personId)
+                : accountMapper.selectByParticipantAndStudent(userId, personId);
         List<Long> accountIds = accounts.stream().map(MediaAccountDO::getId).toList();
         Map<Long, MediaAccountDO> accountById = accounts.stream()
                 .collect(java.util.stream.Collectors.toMap(MediaAccountDO::getId, row -> row));
-        boolean positioningQueryAll = permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:query-all");
+        var positioningCards = positioningMapper.selectByStudentAndAccountIds(personId, accountIds);
+        Map<Long, cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO> latestCardByAccount
+                = new java.util.LinkedHashMap<>();
+        positioningCards.forEach(card -> latestCardByAccount.putIfAbsent(card.getAccountId(), card));
         result.setAccounts(accounts.stream().map(account -> {
             MediaStudentDetailRespVO.AccountVO row = BeanUtils.toBean(account, MediaStudentDetailRespVO.AccountVO.class);
             row.setPlatformLabel(account.getPlatformLabelSnapshot());
             row.setStage(account.getSStage());
-            var accountDetail = accountService.get(account.getId(), userId);
-            row.setAvailableActions(accountDetail.getAvailableActions());
-            row.setDetailSnapshots(accountDetail.getDetailSnapshots());
+            var accountDetail = accountService.projectStudentReadOnly(account);
+            // Keep compatibility with callers that mock the legacy detail projection;
+            // production uses the non-authorizing read-only projection above.
+            if (accountDetail == null) accountDetail = accountService.get(account.getId(), userId);
+            row.setAvailableActions(accountDetail == null || accountDetail.getAvailableActions() == null
+                    ? List.of() : accountDetail.getAvailableActions());
+            row.setDetailSnapshots(accountDetail == null || accountDetail.getDetailSnapshots() == null
+                    ? List.of() : accountDetail.getDetailSnapshots());
+            var latestCard = latestCardByAccount.get(account.getId());
+            row.setTaskLine(buildAccountTaskLine(latestCard == null ? null : latestCard.getStatus()));
             row.setLastActivityAt(account.getUpdateTime());
             return row;
         }).toList());
-        var positioningCards = positioningMapper.selectByStudentAndAccountIds(personId, accountIds);
         result.setPositioningCards(positioningCards.stream()
                 .map(row -> {
                     MediaStudentDetailRespVO.PositioningVO value = BeanUtils.toBean(row, MediaStudentDetailRespVO.PositioningVO.class);
-                    MediaAccountDO account = accountById.get(row.getAccountId());
-                    boolean objectAuthorized = positioningQueryAll || userId.equals(row.getDirectorUserId())
-                            || account != null && userId.equals(account.getOwnerOperatorUserId());
+                    boolean positioningReadAuthorized = permissionApi.hasAnyPermissions(userId,
+                            "zsjos:positioning-card:query-all")
+                            || userId.equals(row.getDirectorUserId())
+                            || userId.equals(row.getOperatorReviewedByUserId())
+                            || accountById.get(row.getAccountId()) != null
+                            && userId.equals(accountById.get(row.getAccountId()).getOwnerOperatorUserId());
                     value.setAvailableActions(positioningService.availableActionsForVisible(row, userId,
-                            objectAuthorized));
+                            positioningReadAuthorized));
                     value.setLastActivityAt(row.getUpdateTime());
                     return value;
                 }).toList());
@@ -102,7 +119,8 @@ public class MediaStudentService {
                 positioningMapper.selectRecentByStudentAndAccountIds(personId, accountIds),
                 contentMapper.selectRecentByAccountIds(accountIds), ticketMapper.selectRecentByAccountIds(accountIds),
                 graduations, talks));
-        result.setTaskLine(buildTaskLine(positioningCards, contents, graduations));
+        result.setStudentTaskLine(buildStudentTaskLine(result.getStudent()));
+        result.setTaskLine(result.getStudentTaskLine());
         MediaStudentDetailRespVO.PendingStatsVO pending = new MediaStudentDetailRespVO.PendingStatsVO();
         pending.setAccountCount((int) result.getAccounts().stream()
                 .filter(row -> row.getAvailableActions() != null && !row.getAvailableActions().isEmpty()).count());
@@ -162,26 +180,27 @@ public class MediaStudentService {
                 .limit(20).toList();
     }
 
-    private List<MediaStudentDetailRespVO.TaskStageVO> buildTaskLine(
-            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO> positioningCards,
-            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.content.ContentDO> contents,
-            List<cn.iocoder.yudao.module.zsjos.dal.dataobject.studentops.GraduationApplicationDO> graduations) {
-        String positioningStatus = positioningCards.isEmpty() ? null : positioningCards.get(0).getStatus();
-        String operationStatus = contents.isEmpty() ? null : contents.get(0).getStatus();
-        String graduationStatus = graduations.isEmpty() ? null : graduations.get(0).getStatus();
-        boolean positioningDone = "archived".equals(positioningStatus);
-        boolean positioningStarted = positioningStatus != null;
-        boolean operationDone = "published".equals(operationStatus);
-        boolean operationStarted = operationStatus != null;
-        boolean graduationDone = "approved".equals(graduationStatus);
-        boolean graduationStarted = graduationStatus != null;
+    private List<MediaStudentDetailRespVO.TaskStageVO> buildStudentTaskLine(MyStudentRespVO student) {
+        MyStudentRespVO.ServiceVO service = student.getServices().isEmpty() ? null : student.getServices().get(0);
+        String directorStage = service == null || service.getDirectorStage() == null ? "precheck" : service.getDirectorStage();
+        boolean interviewStarted = !"precheck".equals(directorStage);
         return List.of(
-                taskStage("positioning", "定位", stageStatus(positioningDone, positioningStarted),
-                        positioningDone ? "定位已归档" : positioningStarted ? "定位处理中" : "尚未发起定位"),
-                taskStage("operation", "运营", stageStatus(operationDone, operationStarted),
-                        operationDone ? "已有内容发布" : operationStarted ? "内容运营中" : "尚未开始运营"),
-                taskStage("graduation", "结业", stageStatus(graduationDone, graduationStarted),
-                        graduationDone ? "结业已通过" : graduationStarted ? "结业流程中" : "尚未发起结业")
+                taskStage("precheck", "资料预审", stageStatus(interviewStarted, true), interviewStarted ? "资料预审已提交" : "待编导审核资料并预约访谈"),
+                taskStage("interview", "学员采访", stageStatus("positioning_ready".equals(directorStage), interviewStarted), "采集学员级基础信息")
+        );
+    }
+
+    private List<MediaStudentDetailRespVO.TaskStageVO> buildAccountTaskLine(String positioningStatus) {
+        boolean positioningStarted = positioningStatus != null;
+        boolean operatorConfirmed = positioningStatus != null && Set.of("student_confirm", "trial_14d", "confirmed", "archived").contains(positioningStatus);
+        boolean studentConfirmed = positioningStatus != null && Set.of("trial_14d", "confirmed", "archived").contains(positioningStatus);
+        boolean trialDone = positioningStatus != null && Set.of("confirmed", "archived").contains(positioningStatus);
+        return List.of(
+                taskStage("positioning", "账号定位", stageStatus(operatorConfirmed, positioningStarted), "各账号独立填写定位卡"),
+                taskStage("operator_confirm", "运营确认", stageStatus(operatorConfirmed, "operator_feasibility".equals(positioningStatus)), "运营逐账号确认"),
+                taskStage("student_confirm", "学员确认", stageStatus(studentConfirmed, "student_confirm".equals(positioningStatus)), "学员通过安全链接确认"),
+                taskStage("trial", "试运行", stageStatus(trialDone, "trial_14d".equals(positioningStatus)), "各账号独立试运行"),
+                taskStage("formal", "正式定位", stageStatus("archived".equals(positioningStatus), "confirmed".equals(positioningStatus)), "正式定位完成后解锁内容生产")
         );
     }
 

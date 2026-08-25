@@ -6,7 +6,7 @@ SELECT 'new_media_workflow_schema' AS check_name,
            AND table_name IN ('zsjos_media_account','zsjos_content','zsjos_content_version','zsjos_production_ticket',
                               'zsjos_production_ticket_item','zsjos_positioning_card','zsjos_positioning_card_version',
                               'zsjos_positioning_exec_card','zsjos_interview_record',
-                              'zsjos_cooperation_assessment','zsjos_review_report','zsjos_exception_ticket',
+                              'zsjos_cooperation_assessment','zsjos_exception_ticket',
                               'zsjos_workbench_capacity','zsjos_partner_student_link'))=14
           AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V096'), 'PASS','FAIL') AS result;
 SELECT 'new_media_version_and_signature_contract' AS check_name,
@@ -21,6 +21,13 @@ SELECT 'new_media_workflow_permissions' AS check_name,
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN
              ('zsjos:content:advance','zsjos:production-ticket:transition','zsjos:positioning-card:advance') AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:content:acceptance-review' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'V129 director form dictionaries' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V129')
+          AND (SELECT COUNT(*) FROM system_dict_type
+               WHERE type IN ('zsjos_director_certificate','zsjos_gender','zsjos_identity_tag','zsjos_persona_type','zsjos_target_audience','zsjos_content_pillar')
+                 AND deleted=b'0')=6
+          AND EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_target_audience' AND value='B' AND deleted=b'0'),
           'PASS','FAIL') AS result;
 SELECT 'partner_student_active_unique_keys' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V098')
@@ -1320,4 +1327,53 @@ SELECT 'V125 student business number migration' AS check_name,
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
                       WHERE module_code='core' AND version='V125'
                         AND checksum=SHA2('V125__student_business_number.sql',256)),
+          'PASS','FAIL') AS result;
+SELECT 'V128 media director student flow' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V128')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_service_relation'
+                 AND column_name IN ('operator_user_id','director_stage','director_interview_at',
+                   'director_form_config_id','director_form_config_version',
+                   'director_precheck_draft_json','director_precheck_snapshot_json',
+                   'director_interview_draft_json','director_interview_snapshot_json'))=9
+          AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:operator-confirm' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:operator-reject' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'V130 configurable director forms' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V130')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_positioning_card'
+                 AND column_name IN ('service_relation_id','operator_user_id','template_id','template_version_id',
+                   'fields_snapshot_json','values_snapshot_json','dict_snapshot_json','trial_end_date'))=8
+          AND (SELECT COUNT(*) FROM zsjos_director_form_template
+               WHERE scene IN ('director_interview','positioning_card') AND published_version_id IS NOT NULL AND deleted=b'0')>=2
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73480,73460,73481,73482) AND deleted=b'0')=4,
+          'PASS','FAIL') AS result;
+SELECT 'V131 director/operator action permissions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V131')
+          AND (SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND permission IN (
+            'zsjos:student:director-precheck','zsjos:student:director-interview',
+            'zsjos:student:director-operator-assign','zsjos:positioning-card:operator-confirm',
+            'zsjos:positioning-card:operator-reject','zsjos:positioning-card:query') AND parent_id=7022)=6
+          AND NOT EXISTS (
+            SELECT 1 FROM system_role_menu rm JOIN system_role r ON r.id=rm.role_id
+            JOIN system_menu m ON m.id=rm.menu_id
+            WHERE r.code='new_media_operator' AND r.deleted=b'0' AND rm.deleted=b'0'
+              AND m.permission IN ('zsjos:positioning-card:create','zsjos:positioning-card:edit',
+                'zsjos:positioning-card:feasibility-review','zsjos:positioning-card:sign',
+                'zsjos:positioning-card:submit-review','zsjos:positioning-card:confirm-trial',
+                'zsjos:positioning-card:archive'))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package
+            WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'7022','$')
+              AND (NOT JSON_CONTAINS(menu_ids,'73471','$')
+                OR NOT JSON_CONTAINS(menu_ids,'73472','$')
+                OR NOT JSON_CONTAINS(menu_ids,'73473','$')
+                OR NOT JSON_CONTAINS(menu_ids,'73474','$')
+                OR NOT JSON_CONTAINS(menu_ids,'73475','$')
+                OR NOT JSON_CONTAINS(menu_ids,'73476','$')))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant tenant
+            WHERE tenant.deleted=b'0' AND NOT EXISTS (
+              SELECT 1 FROM zsjos_user_relation_scene scene
+              WHERE scene.tenant_id=tenant.id AND scene.code='content_director_operator'
+                AND scene.deleted=b'0' AND scene.status=0)),
           'PASS','FAIL') AS result;

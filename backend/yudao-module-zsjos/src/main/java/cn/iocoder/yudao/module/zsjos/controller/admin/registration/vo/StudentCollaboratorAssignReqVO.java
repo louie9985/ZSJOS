@@ -8,7 +8,7 @@ import lombok.Data;
 
 @Data
 public class StudentCollaboratorAssignReqVO {
-    @NotBlank @Pattern(regexp = "content_director|career_planner") private String collaboratorType;
+    @NotBlank @Pattern(regexp = "content_director|career_planner|operator") private String collaboratorType;
     @NotNull private Long userId;
     @NotNull private Integer version;
     @Size(max = 500) private String correctionReason;

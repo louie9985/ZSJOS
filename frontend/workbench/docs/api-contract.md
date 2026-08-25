@@ -42,7 +42,6 @@
 ### 工作台扩展
 
 - `/zsjos/student-ops` 提供异常工单处理和配合度评估入口。
-- `/zsjos/reviews` 提供每日、7/14/28日及结业复盘报告提交和归档。
 - `/zsjos/positioning/workspace` 提供采访导入确认、定位版本历史和三方执行卡签字。
 
 新媒体业务接口由 `yudao-module-zsjos` 提供，前缀为 `/admin-api`：
@@ -54,13 +53,11 @@
 - `POST /zsjos/media-account/{id}/unbind-student`：解绑学员并保留历史。
 - `POST /zsjos/media-account/{id}/advance-stage`、`rollback-stage`：推进或回退 S0-S6 阶段，必须携带版本号。
 - `PUT /zsjos/media-account/{id}`：编辑账号资料，必须携带版本号。
-- `POST /zsjos/media-account/{id}/diagnoses`：保存周诊断快照。
-- `GET /zsjos/media-account/diagnosis-config/published`：查询当前已发布的诊断配置版本 ID。
 - `POST /zsjos/media-account/{id}/rescue`：更新挽救状态，必须携带版本号。
 - `POST /zsjos/media-account/{id}/request-rebind`：发起账号换绑 BPM，必须携带目标学员和版本号。
 - `POST /zsjos/content/create`、`GET /zsjos/content/get`、`GET /zsjos/content/page`：内容查询；状态命令分别使用 `complete-topic`、`submit-production`、`submit-acceptance`、`approve-acceptance`、`reject-acceptance`、`start-revision`、`resubmit-production`。
 - `POST /zsjos/production-ticket/create`、`GET /zsjos/production-ticket/get`、`GET /zsjos/production-ticket/page`：拍剪工单查询；状态命令分别使用 `accept`、`start-production`、`submit`、`start-check`、`approve`、`reject`、`reaccept`。
-- `POST /zsjos/positioning-card/create`、`GET /zsjos/positioning-card/get`、`GET /zsjos/positioning-card/page`：定位卡查询；命令使用 `submit-review`、`operator-approve`、`operator-reject`、`confirm-trial`、`archive`。
+- `POST /zsjos/positioning-card/create`、`GET /zsjos/positioning-card/get`、`GET /zsjos/positioning-card/page`：定位卡查询；命令使用 `submit-review`、`operator-confirm`、`operator-reject`、`confirm-trial`、`archive`。运营确认和退回分别受独立功能权限控制，`query-all` 只扩大读取范围。
 
 所有详情和分页响应均为 RespVO，并返回服务端计算的 `availableActions`。定位卡普通路径为 `co_creating -> operator_feasibility`；标记专业风险时仅在编导提交审核时创建 `zsjos_media_positioning_ip` BPM，完成 IP 专业审核后再进入运营可行性复核。IP、运营复核和学员拒绝均回到 `co_creating`，由原 `content_director` 修改后重新提交。定位岗位统一使用 `content_director`。所有写操作同时受菜单/按钮权限、对象权限和乐观锁版本约束；分页额外受责任人和部门数据范围约束。
 
@@ -68,7 +65,8 @@
 
 - `GET /zsjos/media-account-field-config/published` 返回当前租户已发布的版本化字段定义。默认字段为 `uid`、`nickname`；选择类字段的选项来自定义指定的 System 字典类型。
 - 账号保存 `detailConfigVersionId`、`detailValues` 与字段名称/字典标签快照。历史记录展示保存时快照，不重新解析当前字典；旧记录没有值时显示“未记录”。
-- `GET /zsjos/media-students/{personId}` 返回账号、定位、内容、交谈记录、按业务更新时间排序的操作时间线、`定位 -> 运营 -> 结业` 任务线和待处理统计；服务端先验证当前用户是否在该学员的媒体业务范围内。页面按所选课程服务的真实 `leadId` 读取完整学员档案，并复用“我的学员”的客户档案、来源渠道、地区、成交课程、备注附件等概览结构；销售联系和客资流转不会混入媒体概览。
+- `GET /zsjos/media-students/{personId}` 返回账号、定位、内容、交谈记录、按业务更新时间排序的操作时间线、学员级 `studentTaskLine`、逐账号 `accounts[].taskLine` 和待处理统计；服务端先验证当前用户是否在该学员的媒体业务范围内。页面按所选课程服务的真实 `leadId` 读取完整学员档案，并复用“我的学员”的客户档案、来源渠道、地区、成交课程、备注附件等概览结构；销售联系和客资流转不会混入媒体概览。
+- 编导采访字段由 `directorForms.interview.fields` 渲染。字典字段加载 `/system/dict-data/simple-list`，地区字段加载 `/system/area/tree` 并使用 `Cascader`；请求仅提交地区 ID，服务端返回并冻结 `{code,labelSnapshot}`。旧字符串地区在草稿中提示为历史值，正式提交前必须重新选择。
 - `GET /zsjos/media-students/target?bizType=...&bizId=...` 将受权业务对象解析为 `personId`、`targetTab` 和记录 ID，供待办与通知构造受控深链。未绑定学员的历史对象不得回退到退役页面。
 
 认证失败既可能使用 HTTP 401，也可能使用 HTTP 200 包裹业务码 `401`。工作台对两种响应执行同一套单次刷新与请求回放；刷新失败通过全局事件立即卸载工作台并进入登录页。HTTP 403 保留当前会话并显示无权限，网络错误和服务端错误保留独立的重试状态。

@@ -482,6 +482,13 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 
 ### Registration fulfillment and students (V073)
 
+### Student service stages and configurable forms (V126)
+
+- 学员服务阶段由服务关系维护固定状态机：首联、制定学习计划、常规督学、考前通知与冲刺、考后回访、成绩通知、证书通知与邮寄、持续回访、结束服务；“考期确认与报名资料”不再是活动阶段，历史记录保留原快照。
+- 业务表单字段由租户发布版本维护，字段值提交时保存字段定义与字典 label 快照；历史详情不得重新解析当前字典。
+- 服务关系保存日粒度 `examDate` 和考试日期版本。负责人或管理员修改考试日期时，已发通知的关系回退到常规督学并按新日期版本重新计算提醒；考后回访及之后阶段禁止普通修改。
+- 考前提醒由 ZSJOS 定时扫描产生 System 站内信和 Workbench WebSocket 提示，通知幂等键包含服务关系、考试日期版本和日期。
+
 - `registrationReview` first approval creates one tenant/order-unique public-pool case. Finance pending or `revision_required` cases remain editable. Completion requires an `effective` order, every manual item checked, every required attachment present, at least one selected route, and a currently eligible assignee for each route. Planner eligibility is role code `study_planner`; director eligibility is post code `content_director`; both are restricted to the selected System department subtree. Completed route rows retain department and assignee snapshots. Planner/director My Students visibility is derived from these completed route relations, while public-pool permission remains independent.
 - Feature permissions (`query-pool`, `update`, `complete`) and registration object checks are cumulative. Public-pool access is never inferred from role or department. The planner candidate query uses System public APIs and never reads System tables.
 - Completion atomically records checklist facts, one service relation for each order item, and Person identity `student`. My Students is scoped by active service relations plus selected tenant-matched route relations and grouped by Person. `leadNo` remains the only user-visible Lead identifier; for a user who directly owns an active service relation, internal `leadId` is derived from that relation's actual order and may be returned only as the technical link used to load the existing Lead detail. Another Lead that merely shares the Person is never used as a fallback.

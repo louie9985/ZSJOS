@@ -35,6 +35,7 @@ public interface StudentContactConfigVersionMapper extends BaseMapperX<StudentCo
                 .set(StudentContactConfigVersionDO::getChecklistJson, value.getChecklistJson())
                 .set(StudentContactConfigVersionDO::getQuickNotesJson, value.getQuickNotesJson())
                 .set(StudentContactConfigVersionDO::getCollaboratorTabsJson, value.getCollaboratorTabsJson())
+                .set(StudentContactConfigVersionDO::getFormsJson, value.getFormsJson())
                 .set(StudentContactConfigVersionDO::getVersion, expectedVersion + 1));
     }
 

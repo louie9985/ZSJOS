@@ -27,7 +27,6 @@ import {
   type MediaAccount,
   type MediaContent,
   type MediaException,
-  type MediaReview,
   type PositioningCard,
   type ProductionTicket,
   type SimpleUser,
@@ -40,15 +39,13 @@ export type MediaFeature =
   | "content"
   | "tickets"
   | "positioning"
-  | "student-ops"
-  | "reviews";
+  | "student-ops";
 type Row = (
   | MediaAccount
   | MediaContent
   | ProductionTicket
   | PositioningCard
   | MediaException
-  | MediaReview
 ) & { id: number; version: number; availableActions: string[] };
 const labels: Record<string, string> = {
   s0: "S0",
@@ -89,7 +86,6 @@ const titles: Record<MediaFeature, string> = {
   tickets: "拍剪工单",
   positioning: "账号定位",
   "student-ops": "学员运营",
-  reviews: "复盘中心",
 };
 const actionLabels: Record<string, string> = {
   ADVANCE_STAGE: "推进阶段",
@@ -97,7 +93,6 @@ const actionLabels: Record<string, string> = {
   BIND_STUDENT: "绑定学员",
   UNBIND_STUDENT: "解除绑定",
   EDIT_ACCOUNT: "编辑账号",
-  DIAGNOSE_ACCOUNT: "周诊断",
   RESCUE_ACCOUNT: "挽救处理",
   REQUEST_ACCOUNT_REBIND: "申请换绑",
   COMPLETE_TOPIC: "完成选题",
@@ -166,10 +161,7 @@ async function loadRows(
     const result = await api.positioningCard.page({ pageNo, pageSize: 20 });
     return { list: result.list as Row[], total: result.total };
   }
-  const result =
-    feature === "student-ops"
-      ? await api.studentOps.exceptions()
-      : await api.mediaReview.list();
+  const result = await api.studentOps.exceptions();
   return { list: result as Row[], total: result.length };
 }
 async function loadDetail(feature: MediaFeature, preferredId: number) {
@@ -227,7 +219,7 @@ async function runAction(
       APPROVE_POSITIONING_FEASIBILITY: () =>
         api.positioningCard.operatorApprove(row.id, row.version),
       REJECT_POSITIONING_FEASIBILITY: () =>
-        api.positioningCard.operatorReject(row.id, row.version),
+        api.positioningCard.operatorReject(row.id, row.version, reason || ""),
       CONFIRM_POSITIONING_TRIAL: () =>
         api.positioningCard.confirmTrial(row.id, row.version),
       ARCHIVE_POSITIONING: () =>
@@ -237,15 +229,7 @@ async function runAction(
   }
   if (feature === "student-ops")
     return api.studentOps.resolve(row.id, row.version, "已处理");
-  if (action === "submit") return api.mediaReview.submit(row.id, row.version);
-  if (action === "approve") return api.mediaReview.approve(row.id, row.version);
-  if (action === "reject")
-    return api.mediaReview.reject(
-      row.id,
-      row.version,
-      reason || "请补充复盘证据",
-    );
-  return api.mediaReview.archive(row.id, row.version);
+  return undefined;
 }
 
 export default function MediaFeaturePage({
@@ -282,7 +266,6 @@ export default function MediaFeaturePage({
   const [createForm] = Form.useForm<Record<string, unknown>>();
   const [accountAction, setAccountAction] = useState<string>();
   const [accountActionLoading, setAccountActionLoading] = useState(false);
-  const [diagnosisConfigId, setDiagnosisConfigId] = useState<number>();
   const [accountActionForm] = Form.useForm<Record<string, unknown>>();
   const createPermission =
     feature === "accounts"
@@ -295,9 +278,7 @@ export default function MediaFeaturePage({
             ? "zsjos:positioning-card:create"
             : feature === "student-ops"
                 ? "zsjos:student-ops:create-exception"
-                : feature === "reviews"
-                  ? "zsjos:review:create"
-                  : "";
+                : "";
   const canCreate =
     Boolean(createPermission) && hasPermission(permissions, createPermission);
   const load = useCallback(
@@ -405,7 +386,6 @@ export default function MediaFeaturePage({
         await api.positioningCard.create(values as never);
       if (feature === "student-ops")
         await api.studentOps.createException(values);
-      if (feature === "reviews") await api.mediaReview.create(values as never);
       message.success("创建成功");
       setCreateOpen(false);
       await load(1);
@@ -432,14 +412,6 @@ export default function MediaFeaturePage({
         "status",
         account.rescueStatus === "in_progress" ? "recovered" : "in_progress",
       );
-    if (action === "DIAGNOSE_ACCOUNT") {
-      try {
-        setDiagnosisConfigId(await api.mediaAccount.publishedDiagnosisConfig());
-      } catch (cause) {
-        message.error(errorText(cause));
-        return;
-      }
-    }
     setAccountAction(action);
     if (!students.length || !users.length) {
       const results = await Promise.allSettled([
@@ -497,27 +469,7 @@ export default function MediaFeaturePage({
           riskLevelLabelSnapshot: account.riskLevelLabelSnapshot,
           healthJson: account.healthJson,
         });
-      else if (accountAction === "DIAGNOSE_ACCOUNT") {
-        if (!diagnosisConfigId) throw new Error("当前没有已发布的诊断配置");
-        const range = values.statRange as Array<{
-          format: (pattern: string) => string;
-        }>;
-        const snapshot = (value: unknown) =>
-          JSON.stringify({ text: String(value || "").trim() });
-        await api.mediaAccount.diagnose(account.id, {
-          weekNo: String(values.weekNo),
-          statStart: range[0].format("YYYY-MM-DD"),
-          statEnd: range[1].format("YYYY-MM-DD"),
-          basicJson: snapshot(values.basic),
-          productionFunnelJson: snapshot(values.productionFunnel),
-          platformDataJson: snapshot(values.platformData),
-          contentPerfJson: snapshot(values.contentPerf),
-          leadFunnelJson: snapshot(values.leadFunnel),
-          rootCauseJson: snapshot(values.rootCause),
-          nextWeekPlanJson: snapshot(values.nextWeekPlan),
-          configVersionId: diagnosisConfigId,
-        });
-      } else if (accountAction === "RESCUE_ACCOUNT")
+      else if (accountAction === "RESCUE_ACCOUNT")
         await api.mediaAccount.rescue(
           account.id,
           account.version,
@@ -646,20 +598,7 @@ export default function MediaFeaturePage({
                         value: (r: Row) => statusText(r.status),
                       },
                     ]
-                  : [
-                      {
-                        label: "复盘编号",
-                        value: (r: Row) => (r as MediaReview).reviewNo,
-                      },
-                      {
-                        label: "复盘类型",
-                        value: (r: Row) => (r as MediaReview).reviewType,
-                      },
-                      {
-                        label: "状态",
-                        value: (r: Row) => statusText(r.status),
-                      },
-                    ],
+                  : [],
     [feature],
   );
   return (
@@ -959,42 +898,6 @@ function AccountActionModal({
                 options={userOptions}
               />
             </Form.Item>
-          </>
-        )}
-        {action === "DIAGNOSE_ACCOUNT" && (
-          <>
-            <Form.Item
-              name="weekNo"
-              label="诊断周期"
-              rules={[{ required: true }]}
-            >
-              <Input placeholder="例如 2026-W34" />
-            </Form.Item>
-            <Form.Item
-              name="statRange"
-              label="统计日期"
-              rules={[{ required: true }]}
-            >
-              <DatePicker.RangePicker style={{ width: "100%" }} />
-            </Form.Item>
-            {[
-              ["basic", "账号基础情况"],
-              ["productionFunnel", "生产漏斗"],
-              ["platformData", "平台数据"],
-              ["contentPerf", "内容表现"],
-              ["leadFunnel", "线索漏斗"],
-              ["rootCause", "问题根因"],
-              ["nextWeekPlan", "下周计划"],
-            ].map(([name, label]) => (
-              <Form.Item
-                key={name}
-                name={name}
-                label={label}
-                rules={[{ required: true, message: `请填写${label}` }]}
-              >
-                <Input.TextArea rows={2} maxLength={1000} />
-              </Form.Item>
-            ))}
           </>
         )}
         {action === "RESCUE_ACCOUNT" && (
@@ -1297,41 +1200,6 @@ function CreateMediaModal({
             </Form.Item>
           </>
         )}
-        {feature === "reviews" && (
-          <>
-            <Form.Item
-              name="reviewType"
-              label="复盘类型"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="subjectType"
-              label="复盘对象类型"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="subjectId"
-              label="复盘对象 ID"
-              rules={[{ required: true }]}
-            >
-              <InputNumber min={1} style={{ width: "100%" }} />
-            </Form.Item>
-            <Form.Item
-              name="reportJson"
-              label="复盘报告 JSON"
-              rules={[{ required: true }]}
-            >
-              <Input.TextArea rows={5} />
-            </Form.Item>
-            <Form.Item name="evidenceRefsJson" label="证据引用 JSON">
-              <Input.TextArea rows={3} />
-            </Form.Item>
-          </>
-        )}
       </Form>
     </Modal>
   );
@@ -1359,7 +1227,4 @@ export function PositioningPage({
 }
 export function StudentOpsPage() {
   return <MediaFeaturePage feature="student-ops" />;
-}
-export function ReviewsPage() {
-  return <MediaFeaturePage feature="reviews" />;
 }

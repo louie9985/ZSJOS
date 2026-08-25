@@ -122,8 +122,10 @@ Verification is proportional to risk, but evidence is mandatory:
 ## 7. Database initialization and synchronization
 
 - MySQL initialization artifacts belong under `script/sql/mysql/`; `bootstrap.sql` is the fresh-environment entry point.
-- The bootstrap is non-destructive: it MUST NOT drop databases or tables, delete business rows in bulk, or rewrite an applied migration.
-- Existing environments are upgraded only through numbered files under `script/sql/mysql/migrations/`; each migration must be repeatable and record its version in `zsjos_schema_version` where applicable.
+- The bootstrap is non-destructive: it MUST NOT drop databases or tables or delete business rows in bulk.
+- When a database change is needed during active development, the preferred workflow is to apply the intended schema/data adjustment directly to the development database and update the corresponding bootstrap/SQL initialization script in the same change. Do not add another numbered migration merely to avoid editing the current development baseline when the change does not need to preserve compatibility with already-deployed environments.
+- Numbered migrations under `script/sql/mysql/migrations/` remain required when an already-deployed environment must be upgraded without rebuilding its baseline. Such migrations must be repeatable and record their version in `zsjos_schema_version` where applicable.
+- Before delivery, the final bootstrap and SQL scripts MUST initialize a fresh production database successfully from the baseline through the latest version, and the schema/data result MUST be checked against the development database. Any intentionally edited baseline or compatibility migration MUST document its deployment scope and rollback limitation.
 - Dictionary types and dictionary data are separate concerns. The bootstrap may include system-owned dictionary data, but ZSJOS business dictionary data requires a separately reviewed file and explicit confirmation before synchronization.
 - The bootstrap must create empty `zsjos_lead_category` and `zsjos_lead_source_channel` types without inventing business options.
 - Fresh-environment seeds must not include local leads, products, SKUs, orders, uploaded files, test accounts, tokens, or machine-specific configuration.

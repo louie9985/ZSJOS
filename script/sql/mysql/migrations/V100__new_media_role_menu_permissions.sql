@@ -20,7 +20,7 @@ FROM system_role r JOIN system_menu m ON m.id IN (6970,6971,6972,6973,6974,6975,
 WHERE r.code='new_media_operator' AND r.status=0 AND r.deleted=b'0' AND m.deleted=b'0'
   AND NOT EXISTS (SELECT 1 FROM system_role_menu x WHERE x.role_id=r.id AND x.menu_id=m.id AND x.tenant_id=r.tenant_id AND x.deleted=b'0');
 
--- Content director: account/content/positioning/review plus director-owned students.
+-- Content director: account/content/positioning plus director-owned students.
 INSERT IGNORE INTO system_role_menu (`role_id`,`menu_id`,`creator`,`create_time`,`updater`,`update_time`,`deleted`,`tenant_id`)
 SELECT r.id,m.id,'migration-V100',NOW(),'migration-V100',NOW(),b'0',r.tenant_id
 FROM system_role r JOIN system_menu m ON m.id IN (6970,6971,6972,6973,6974,6975,6976,6987,6988,6989,6990,6991,6980,6981,6982,6995,6996,6997,6985,7022)

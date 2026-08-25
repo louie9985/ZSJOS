@@ -38,7 +38,7 @@ import {
   WorkPlanConfigPage
 } from '../pages/ConfigurationPages'
 import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
-import { ProductionTicketsPage, StudentOpsPage, ReviewsPage } from '../pages/MediaFeaturePage'
+import { ProductionTicketsPage, StudentOpsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
 import EamRepairPage from '../pages/EamRepairPage'
 import EamInventoryPage from '../pages/EamInventoryPage'
@@ -149,7 +149,6 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_STUDENT_OPS) return <StudentOpsPage/>
-  if (menu?.path === APP_ROUTES.MEDIA_REVIEWS) return <ReviewsPage/>
   if (menu?.path === APP_ROUTES.EAM_REPAIR) return <EamRepairPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EAM_INVENTORY) return <EamInventoryPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EAM_ASSET) return <EamAssetPage permissions={permissions}/>

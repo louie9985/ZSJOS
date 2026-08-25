@@ -83,7 +83,7 @@ class MediaStudentServiceTest {
         assertEquals(5L, result.getPositioningCards().getFirst().getId());
         assertEquals(List.of(), result.getPositioningCards().getFirst().getAvailableActions());
         assertEquals(6L, result.getProductionTickets().getFirst().getId());
-        assertEquals(3, result.getTaskLine().size());
+        assertEquals(2, result.getStudentTaskLine().size());
         assertEquals(0, result.getPendingStats().getPositioningCount());
         assertEquals(1, result.getPendingStats().getContentCount());
         assertEquals(1, result.getPendingStats().getProductionCount());

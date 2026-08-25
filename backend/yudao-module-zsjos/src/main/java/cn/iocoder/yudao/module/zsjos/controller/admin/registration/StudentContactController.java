@@ -30,13 +30,13 @@ public class StudentContactController {
     private StudentContactService service;
 
     @GetMapping("/{relationId}/contact-context")
-    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student:query-my', 'zsjos:media-student:query-my')")
     public CommonResult<StudentContactContextRespVO> getContext(@PathVariable Long relationId) {
         return success(service.getContext(relationId, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @GetMapping("/{relationId}/contact-records")
-    @PreAuthorize("@ss.hasPermission('zsjos:student:query-my')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student:query-my', 'zsjos:media-student:query-my')")
     public CommonResult<PageResult<StudentContactRecordRespVO>> getRecords(@PathVariable Long relationId,
                                                                             @Valid PageParam page) {
         return success(service.getRecords(relationId, page, SecurityFrameworkUtils.getLoginUserId()));
@@ -86,15 +86,55 @@ public class StudentContactController {
         return success(service.submitDeliveryStage(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
     }
 
+    @PutMapping("/{relationId}/exam-date")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:exam-date-update')")
+    public CommonResult<Boolean> updateExamDate(@PathVariable Long relationId,
+                                                 @Valid @RequestBody StudentExamDateUpdateReqVO request) {
+        service.updateExamDate(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
+    @PostMapping("/{relationId}/precheck/draft")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:director-precheck')")
+    public CommonResult<Boolean> saveDirectorPrecheckDraft(@PathVariable Long relationId,
+                                                            @Valid @RequestBody DirectorStageSaveReqVO request) {
+        service.saveDirectorPrecheckDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
+    @PostMapping("/{relationId}/precheck/submit")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:director-precheck')")
+    public CommonResult<Boolean> submitDirectorPrecheck(@PathVariable Long relationId,
+                                                         @Valid @RequestBody DirectorStageSaveReqVO request) {
+        service.submitDirectorPrecheck(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
+    @PostMapping("/{relationId}/interview/draft")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:director-interview')")
+    public CommonResult<Boolean> saveDirectorInterviewDraft(@PathVariable Long relationId,
+                                                             @Valid @RequestBody DirectorStageSaveReqVO request) {
+        service.saveDirectorInterviewDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
+    @PostMapping("/{relationId}/interview/submit")
+    @PreAuthorize("@ss.hasPermission('zsjos:student:director-interview')")
+    public CommonResult<Boolean> submitDirectorInterview(@PathVariable Long relationId,
+                                                          @Valid @RequestBody DirectorStageSaveReqVO request) {
+        service.submitDirectorInterview(relationId, request, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
     @GetMapping("/{relationId}/collaborator-candidates")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct', 'zsjos:student:director-operator-assign')")
     public CommonResult<List<StudyPlannerSimpleRespVO>> getCollaboratorCandidates(
             @PathVariable Long relationId, @RequestParam String type) {
         return success(service.getCollaboratorCandidates(relationId, type, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/{relationId}/collaborators")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:student-collaborator:assign', 'zsjos:student-collaborator:correct', 'zsjos:student:director-operator-assign')")
     public CommonResult<Boolean> assignCollaborator(@PathVariable Long relationId,
                                                      @Valid @RequestBody StudentCollaboratorAssignReqVO request) {
         service.assignCollaborator(relationId, request, SecurityFrameworkUtils.getLoginUserId());

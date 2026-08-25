@@ -69,8 +69,9 @@ public class YudaoSecurityAutoConfiguration {
      */
     @Bean
     public TokenAuthenticationFilter authenticationTokenFilter(GlobalExceptionHandler globalExceptionHandler,
-                                                               OAuth2TokenCommonApi oauth2TokenApi) {
-        return new TokenAuthenticationFilter(securityProperties, globalExceptionHandler, oauth2TokenApi);
+                                                               OAuth2TokenCommonApi oauth2TokenApi,
+                                                               cn.iocoder.yudao.framework.web.config.WebProperties webProperties) {
+        return new TokenAuthenticationFilter(securityProperties, globalExceptionHandler, oauth2TokenApi, webProperties);
     }
 
     @Bean("ss") // 使用 Spring Security 的缩写，方便使用

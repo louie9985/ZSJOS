@@ -11,7 +11,12 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardD
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants;
+import cn.iocoder.yudao.module.zsjos.service.director.DirectorConfigService;
+import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
+import cn.iocoder.yudao.module.zsjos.controller.admin.director.vo.DirectorFormTemplateVO;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerStudentLinkDO;
@@ -32,6 +37,9 @@ class PositioningCardServiceTest {
     @Mock private BpmProcessInstanceApi processInstanceApi;
     @Mock private MediaAccountMapper accountMapper;
     @Mock private PersonMapper personMapper;
+    @Mock private ServiceRelationMapper relationMapper;
+    @Mock private DirectorFormTemplateService directorFormTemplateService;
+    @Mock private DirectorConfigService directorConfigService;
     @Mock private cn.iocoder.yudao.module.system.api.permission.PermissionApi permissionApi;
     @Mock private PostApi postApi;
     @Mock private AdminUserApi adminUserApi;
@@ -61,6 +69,16 @@ class PositioningCardServiceTest {
         when(accountMapper.selectById(10L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO()
                 .setId(10L).setStudentPersonId(20L).setDirectorUserId(99L));
         when(personMapper.selectById(20L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO().setId(20L));
+        when(relationMapper.selectActiveByPersonIds(java.util.List.of(20L))).thenReturn(java.util.List.of(
+                new ServiceRelationDO().setId(30L).setPersonId(20L).setContentDirectorUserId(99L)
+                        .setAcceptanceStatus("accepted").setDirectorStage("positioning_ready")));
+        DirectorFormTemplateVO.Snapshot snapshot = new DirectorFormTemplateVO.Snapshot();
+        snapshot.setTemplateId(40L); snapshot.setTemplateVersionId(41L); snapshot.setTemplateVersionNo(1);
+        snapshot.setFields(java.util.List.of()); snapshot.setValues(java.util.Map.of());
+        snapshot.setDictSnapshots(java.util.Map.of());
+        when(directorFormTemplateService.validateAndSnapshot(DirectorFormTemplateService.SCENE_POSITIONING,
+                null, null, false)).thenReturn(snapshot);
+        when(directorConfigService.trialDays()).thenReturn(14);
         doAnswer(invocation -> { invocation.<PositioningCardDO>getArgument(0).setId(7L); return 1; })
                 .when(mapper).insert(any(PositioningCardDO.class));
         PositioningCardSaveReqVO req = new PositioningCardSaveReqVO();
@@ -117,11 +135,15 @@ class PositioningCardServiceTest {
         PositioningCardDO operator = card(false, MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY, 2);
         operator.setId(2L);
         when(mapper.selectById(2L)).thenReturn(operator);
-        when(mapper.transition(2L, 2, MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY,
-                MediaWorkflowConstants.POSITIONING_CO_CREATING)).thenReturn(1);
+        when(mapper.transitionOperatorReview(eq(2L), eq(2),
+                eq(MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY),
+                eq(MediaWorkflowConstants.POSITIONING_CO_CREATING), isNull(), any(),
+                eq("未填写退回原因"))).thenReturn(1);
         service.operatorReject(2L, 2);
-        verify(mapper).transition(2L, 2, MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY,
-                MediaWorkflowConstants.POSITIONING_CO_CREATING);
+        verify(mapper).transitionOperatorReview(eq(2L), eq(2),
+                eq(MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY),
+                eq(MediaWorkflowConstants.POSITIONING_CO_CREATING), isNull(), any(),
+                eq("未填写退回原因"));
     }
 
     @Test
@@ -129,8 +151,9 @@ class PositioningCardServiceTest {
         PositioningCardDO card = card(false, MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY, 2);
         card.setCardNo("PC-202608210001");
         when(mapper.selectById(1L)).thenReturn(card);
-        when(mapper.transition(1L, 2, MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY,
-                MediaWorkflowConstants.POSITIONING_STUDENT_CONFIRM)).thenReturn(1);
+        when(mapper.transitionOperatorReview(eq(1L), eq(2),
+                eq(MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY),
+                eq(MediaWorkflowConstants.POSITIONING_STUDENT_CONFIRM), isNull(), any(), isNull())).thenReturn(1);
         PartnerStudentLinkDO link = new PartnerStudentLinkDO();
         link.setPartnerId(30L);
         link.setStudentPersonId(20L);
