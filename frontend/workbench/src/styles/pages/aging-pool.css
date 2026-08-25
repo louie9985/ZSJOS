@@ -25,7 +25,7 @@
 }
 
 .aging-pool-item.active {
-  background: var(--crm-primary-soft);
+  background: var(--crm-color-primary-bg);
 }
 
 .aging-pool-item .ant-list-item-meta-description>div {

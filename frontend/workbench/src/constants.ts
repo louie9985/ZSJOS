@@ -438,9 +438,15 @@ export const BORDER_RADIUS_OPTIONS: Array<{ label: string; value: BorderRadiusPr
   { label: '全圆', value: 'full' }
 ]
 
+/**
+ * 圆角四档。**必须与 `styles/tokens.css` 的 `--crm-radius-*` 逐档一致** ——
+ * 这里的值注入 antd 的 borderRadius token（管 antd 组件），tokens.css 的值管自有 CSS，
+ * 两边不一致就会出现「antd 卡片圆角 8px、自绘面板 10px」的割裂。
+ * small 档曾是 4/6/8 而 CSS 是 6/8/10，由 styles.guard.test.ts 的双源比对守卫防止再次漂移。
+ */
 export const BORDER_RADIUS_VALUES: Record<BorderRadiusPreset, { sm: number; md: number; lg: number }> = {
   sharp: { sm: 2, md: 3, lg: 4 },
-  small: { sm: 4, md: 6, lg: 8 },
+  small: { sm: 6, md: 8, lg: 10 },
   round: { sm: 8, md: 10, lg: 12 },
   full: { sm: 12, md: 14, lg: 16 }
 }
@@ -493,15 +499,27 @@ export const FONT_SCALE_SIZE: Record<FontScale, number> = {
  * 布局模式：
  * - side: 侧边双列（一级窄栏 + 二级栏），默认
  * - top:  顶部一级 + 侧边二级（内容区多出 144px 宽度）
- * 所有布局都固定显示一级入口和二级平级页面，不提供下拉或浮层子菜单。
+ * - top-only: 纯顶栏（一二级菜单全部横排在顶部）
+ * - single-sider: 左单列（一级展开/收起包含二级子项）
+ * - mini-float: 左 mini 图标 + hover 浮层弹出二级
+ * 菜单层级来自服务端；不同布局按自身交互呈现递归目录、下拉或浮层。
  */
-export type LayoutMode = 'side' | 'top'
+export type LayoutMode = 'side' | 'top' | 'top-only' | 'single-sider' | 'mini-float'
 
-export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top']
+export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top', 'top-only', 'single-sider', 'mini-float']
+
+/**
+ * mini-float 图标栏宽度。
+ * 须与 Menu 的 collapsedWidth token 一起设定，避免图标因 antd 默认宽度过大而被裁切。
+ */
+export const MINI_RAIL_W = 56
 
 export const LAYOUT_MODE_OPTIONS: Array<{ label: string; value: LayoutMode }> = [
   { label: '左双列', value: 'side' },
-  { label: '顶+左', value: 'top' }
+  { label: '顶+左', value: 'top' },
+  { label: '纯顶栏', value: 'top-only' },
+  { label: '左单列', value: 'single-sider' },
+  { label: 'Mini浮层', value: 'mini-float' }
 ]
 
 export const THEME_METAS: ThemeMeta[] = [

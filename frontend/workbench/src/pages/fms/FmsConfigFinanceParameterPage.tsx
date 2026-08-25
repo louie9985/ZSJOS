@@ -168,7 +168,7 @@ export default function FmsConfigFinanceParameterPage({ permissions }: { permiss
                       options={levelOptions.map(l => ({ label: `${l} 级`, value: l }))}
                       style={{ width: 160 }}
                     />
-                    <span style={{ color: 'var(--crm-text-warning)' }}>科目级次和编码长度调大后不能再调小，请谨慎操作</span>
+                    <span style={{ color: 'var(--crm-color-warning)' }}>科目级次和编码长度调大后不能再调小，请谨慎操作</span>
                   </div>
                 </Form.Item>
                 <Form.Item label="编码长度" required>

@@ -21,6 +21,17 @@
   --crm-color-warning: #faad14;
   --crm-color-error: #ff4d4f;
 
+  /* ---- 状态色的淡背景与描边 ----
+   * 与主色族的 4 件套结构对齐。运行时由 ThemeVars 取 antd 的 colorSuccessBg /
+   * colorSuccessBorder 等派生 token 覆盖，故暗色 preset 下自动反色。
+   * 业务勿再用 color-mix 手搓淡背景：手搓的百分比在暗色主题下是错的。 */
+  --crm-color-success-bg: #f6ffed;
+  --crm-color-success-border: #b7eb8f;
+  --crm-color-warning-bg: #fffbe6;
+  --crm-color-warning-border: #ffe58f;
+  --crm-color-error-bg: #fff2f0;
+  --crm-color-error-border: #ffccc7;
+
   /* ---- 表面色阶（由深到浅，形成 5 级视觉层次）----
    * layout → sunken → chrome → container → elevated
    * 每级色差 ~3-5%，肉眼可辨但不突兀                   */
@@ -85,7 +96,7 @@
   --crm-scrollbar-thumb-active: var(--crm-text-secondary);
 
   /* ==================== Tier 2 尺度 ==================== */
-  /* 间距阶梯。当前值对齐 styles.css 现行实际渲染（偏紧），Step 3 起随密度档切换。 */
+  /* 间距阶梯：组件内部的微观间距（图标与文字、标签与值、按钮组）。随密度档切换。 */
   --crm-sp-1: 4px;
   --crm-sp-2: 6px;
   --crm-sp-3: 8px;
@@ -93,24 +104,62 @@
   --crm-sp-5: 16px;
   --crm-sp-6: 24px;
 
-  /* 语义间距别名，避免业务 CSS 直接依赖阶梯序号。随密度档切换。 */
-  --crm-page-pad: 12px;    /* 页面外边距，现 .workspace-page / .message-inbox-page */
-  --crm-card-pad: 14px;    /* 卡片内边距，现 .claim-pool-card / .lead-follow-up-card */
+  /* 语义间距别名：页面级的宏观结构留白。随密度档切换。
+     与 sp-* 的分工 —— sp-* 管组件内部，别名管页面骨架；
+     写业务样式时若能说出「这是页面外边距 / 卡片内边距」就用别名，说不出就用 sp-*。 */
+  --crm-page-pad: 12px;    /* 页面外边距，.workspace-page 唯一出口 */
+  --crm-card-pad: 14px;    /* 业务自绘卡片内边距。须与 constants.ts 的
+                              DENSITY_SCALE.cardPad 一致（antd Card 由那里注入），
+                              两边由 scaleTokens.test.ts 的双源比对守卫 */
   --crm-pane-pad: 16px;    /* 详情区内边距，统一四个主从页各自的取值 */
   --crm-gap: 10px;         /* 主从布局列间距，现 .lead-inbox-layout */
   --crm-gap-sm: 8px;
 
-  /* 圆角。现行 styles.css 用 47 处 !important 统一改成 10px，Step 3 收敛到此处。 */
+  /* 圆角。须与 constants.ts 的 BORDER_RADIUS_VALUES 逐档一致（守卫比对）。 */
   --crm-radius-sm: 6px;
   --crm-radius-md: 8px;
   --crm-radius-lg: 10px;
 
   /* 字号 */
+  --crm-font-xs: 11px;
   --crm-font-sm: 12px;
   --crm-font-base: 14px;
   --crm-font-lg: 15px;
   /* 读数字号：倒计时一类需要一眼看清的数字，比正文层级明显高一档 */
   --crm-font-display: 22px;
+  --crm-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* 图标字号。**不随字号档缩放** —— 图标尺寸变化会破坏 antd Menu / Button
+     的内部对齐（图标与文字基线、collapsedWidth 的居中计算都按固定尺寸算）。 */
+  --crm-icon-sm: 12px;
+  --crm-icon-md: 16px;
+  --crm-icon-lg: 18px;
+  --crm-icon-xl: 30px;
+
+  /* 字重：按语义命名而非数值，避免业务在 500/600 之间随手选 */
+  --crm-weight-normal: 400;
+  --crm-weight-medium: 500;    /* 强调、次级标题 */
+  --crm-weight-semibold: 600;  /* 标题 */
+  --crm-weight-bold: 700;      /* 品牌、关键数字 */
+
+  /* 行高 */
+  --crm-lh-tight: 1.2;   /* 标题、单行省略 */
+  --crm-lh-base: 1.5;    /* 正文 */
+  --crm-lh-loose: 1.8;   /* 长文阅读 */
+
+  /* 动效：三档时长 + 统一缓动。
+     全局关闭见文件末尾的 data-crm-no-motion。 */
+  --crm-duration-fast: 0.15s;  /* 色彩、背景 */
+  --crm-duration-base: 0.2s;   /* 默认 */
+  --crm-duration-slow: 0.25s;  /* 位移、阴影等大范围变化 */
+  --crm-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* 堆叠层级。antd 的 Modal / Drawer 是 1000，Message / Notification 是 2010；
+     above-modal 取 1100 以压过前者又不挡后者。 */
+  --crm-z-base: 1;
+  --crm-z-raised: 10;
+  --crm-z-sticky: 100;
+  --crm-z-above-modal: 1100;
 
   /* 列表行高 */
   --crm-row-h: 48px;
@@ -118,6 +167,9 @@
   /* ==================== Tier 3 布局 ==================== */
   --crm-header-h: 48px;
 
+  /* 侧栏宽度。**须与 constants.ts 的 LAYOUT_SIZES 一致** ——
+     antd Sider 的 width prop 只接受 number，读不到 CSS 变量，
+     故 JS 侧另有一份真值，由 styles.guard.test.ts 的双源比对守卫。 */
   --crm-sider-1-w: 72px;
   --crm-sider-1-collapsed: 56px;
   --crm-sider-2-w: 180px;
@@ -127,17 +179,26 @@
   /* 主从页列表列宽，四个主从页统一（原 320/320/320/300） */
   --crm-list-pane-w: 320px;
 
-  /* 页面限宽。现散落各页：1120 / 1360 / 960→1200 */
-  --crm-page-max-form: 1120px;
-  --crm-page-max-table: 1360px;
-  --crm-page-max-narrow: 1200px;
+  /* 页面限宽。默认不限宽（多数页面是表格/主从页，越宽越好用），
+     仅表单类与阅读类页面显式取用下列档位。 */
+  --crm-page-max-form: 1120px;   /* 表单页：lead-submission / user-profile */
+  --crm-page-max-table: 1360px;  /* 宽表格页：lead-assignment */
+  --crm-page-max-narrow: 1200px; /* 窄内容页：today-tasks */
+  --crm-read-max: 880px;         /* 正文阅读宽度：message-inbox 详情 */
 }
 
 /* ==================== 密度分档 ==================== */
 /* default 档即上面 :root 的取值，无需重复声明。
-   档位由 ThemeVars.tsx 写在 html[data-crm-density] 上。 */
+   档位由 ThemeVars.tsx 写在 html[data-crm-density] 上。
+   三档必须覆盖**同一个变量集合**，否则某个属性会卡在别档的取值上（有守卫）。 */
 
 html[data-crm-density='loose'] {
+  --crm-sp-1: 6px;
+  --crm-sp-2: 8px;
+  --crm-sp-3: 12px;
+  --crm-sp-4: 16px;
+  --crm-sp-5: 20px;
+  --crm-sp-6: 32px;
   --crm-page-pad: 16px;
   --crm-card-pad: 18px;
   --crm-pane-pad: 20px;
@@ -148,6 +209,12 @@ html[data-crm-density='loose'] {
 }
 
 html[data-crm-density='compact'] {
+  --crm-sp-1: 2px;
+  --crm-sp-2: 4px;
+  --crm-sp-3: 6px;
+  --crm-sp-4: 8px;
+  --crm-sp-5: 12px;
+  --crm-sp-6: 16px;
   --crm-page-pad: 8px;
   --crm-card-pad: 10px;
   --crm-pane-pad: 12px;
@@ -162,6 +229,7 @@ html[data-crm-density='compact'] {
    这里只管自有 CSS。两侧取值须保持一致。 */
 
 html[data-crm-font='small'] {
+  --crm-font-xs: 10px;
   --crm-font-sm: 11px;
   --crm-font-base: 13px;
   --crm-font-lg: 14px;
@@ -169,6 +237,7 @@ html[data-crm-font='small'] {
 }
 
 html[data-crm-font='large'] {
+  --crm-font-xs: 12px;
   --crm-font-sm: 13px;
   --crm-font-base: 15px;
   --crm-font-lg: 16px;
@@ -215,6 +284,12 @@ html[data-crm-no-motion] *::after {
  */
 @media (max-width: 768px) {
   html[data-crm-density='compact'] {
+    --crm-sp-1: 4px;
+    --crm-sp-2: 6px;
+    --crm-sp-3: 8px;
+    --crm-sp-4: 12px;
+    --crm-sp-5: 16px;
+    --crm-sp-6: 24px;
     --crm-page-pad: 12px;
     --crm-card-pad: 14px;
     --crm-pane-pad: 16px;

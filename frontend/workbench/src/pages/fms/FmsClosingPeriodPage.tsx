@@ -206,10 +206,10 @@ export default function FmsClosingPeriodPage({ permissions }: { permissions: str
             </Button>
           )}
           {!overview.closed && !isBeforeCurrentPeriod && !overview.canClose && (
-            <span style={{ color: 'var(--crm-text-warning)' }}>完成上方检查后才可结账</span>
+            <span style={{ color: 'var(--crm-color-warning)' }}>完成上方检查后才可结账</span>
           )}
           {!overview.closed && isBeforeCurrentPeriod && (
-            <span style={{ color: 'var(--crm-text-warning)' }}>结账目标不能早于当前会计期间 {currentMonthLabel}</span>
+            <span style={{ color: 'var(--crm-color-warning)' }}>结账目标不能早于当前会计期间 {currentMonthLabel}</span>
           )}
         </Space>
       </Card>

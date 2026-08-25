@@ -69,7 +69,7 @@
 }
 
 .eam-code-preview {
-  font-family: var(--crm-font-mono, ui-monospace, monospace);
+  font-family: var(--crm-font-mono);
 }
 
 .eam-code-preview-accent {

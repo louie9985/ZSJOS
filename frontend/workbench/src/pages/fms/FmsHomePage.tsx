@@ -156,7 +156,7 @@ export default function FmsHomePage({ permissions }: { permissions: string[] }) 
                 <div
                   onClick={() => selectMetric(m.key)}
                   style={{ cursor: 'pointer', padding: 'var(--crm-sp-2)', borderRadius: 'var(--crm-radius-md)',
-                    border: selectedMetricKey === m.key ? '1px solid var(--crm-cta-bg)' : '1px solid var(--crm-border)' }}
+                    border: selectedMetricKey === m.key ? '1px solid var(--crm-color-primary)' : '1px solid var(--crm-border)' }}
                 >
                   <div style={{ color: 'var(--crm-text-secondary)', fontSize: 13 }}>{m.name}</div>
                   <div style={{ fontSize: 18, fontWeight: 600 }}>{formatMoney(m.amount) || '0.00'}</div>

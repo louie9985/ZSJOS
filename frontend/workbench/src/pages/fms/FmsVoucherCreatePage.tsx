@@ -563,7 +563,7 @@ export default function FmsVoucherCreatePage({ permissions }: { permissions: str
       </div>
 
       {/* 凭证表单 */}
-      <div className="fms-table-area" style={{ borderTop: '3px solid var(--crm-cta-bg)' }}>
+      <div className="fms-table-area" style={{ borderTop: '3px solid var(--crm-color-primary)' }}>
         <div style={{ textAlign: 'center', fontSize: 22, fontWeight: 600, fontFamily: 'STKaiti, KaiTi, serif', letterSpacing: 5, marginBlockEnd: 12 }}>
           记账凭证
         </div>
@@ -593,8 +593,8 @@ export default function FmsVoucherCreatePage({ permissions }: { permissions: str
           footer={() => (
             <Space style={{ width: '100%', justifyContent: 'flex-end' }}>
               <span>合计：</span>
-              <span style={{ width: 180, textAlign: 'right', color: 'var(--crm-cta-bg)', fontWeight: 600 }}>{formatAmount(totalDebit)}</span>
-              <span style={{ width: 180, textAlign: 'right', color: 'var(--crm-cta-bg)', fontWeight: 600 }}>{formatAmount(totalCredit)}</span>
+              <span style={{ width: 180, textAlign: 'right', color: 'var(--crm-color-primary)', fontWeight: 600 }}>{formatAmount(totalDebit)}</span>
+              <span style={{ width: 180, textAlign: 'right', color: 'var(--crm-color-primary)', fontWeight: 600 }}>{formatAmount(totalCredit)}</span>
             </Space>
           )}
         />

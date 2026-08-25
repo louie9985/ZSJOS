@@ -82,6 +82,16 @@ export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record
     '--crm-color-warning': token.colorWarning,
     '--crm-color-error': token.colorError,
 
+    // ---- 状态色的淡背景与描边 ----
+    // 取 antd 派生的 Bg / Border 色阶，而非在业务侧用 color-mix 手搓百分比：
+    // 手搓的比例是按浅色底调的，暗色 preset 下 8% 的红压在深色底上几乎不可见。
+    '--crm-color-success-bg': token.colorSuccessBg,
+    '--crm-color-success-border': token.colorSuccessBorder,
+    '--crm-color-warning-bg': token.colorWarningBg,
+    '--crm-color-warning-border': token.colorWarningBorder,
+    '--crm-color-error-bg': token.colorErrorBg,
+    '--crm-color-error-border': token.colorErrorBorder,
+
     // ---- 表面色阶 ----
     '--crm-bg-container': hasBackground ? glass(token.colorBgContainer, containerPct) : token.colorBgContainer,
     '--crm-bg-chrome': hasBackground ? glass(chromeBase, chromePct) : chromeBase,
