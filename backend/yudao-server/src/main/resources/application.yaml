@@ -282,6 +282,8 @@ yudao:
       - /admin-api/mp/open/** # 微信公众号开放平台，微信回调接口，不需要登录
       - /public-api/zsjos/media-screen/**
   media-screen:
+    # Public media-screen access is fail-closed. Override these values in the runtime environment;
+    # see docs/operations/media-screen-deployment.md. Never commit real tenant/IP allowlists here.
     enabled: false
     trusted-proxies: []
     clients: []
@@ -293,6 +295,8 @@ yudao:
       stale-if-error-seconds: 60
     limits:
       max-history-days: 366
+  positioning:
+    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
   api-encrypt:
     enable: false # 是否开启 API 加密。默认关闭，避免低版本 JDK 8（8u120 以下）启动时 bcprov 的 JCE 认证报错
     algorithm: AES # 加密算法，支持 AES、RSA 等

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildLeadFlowEvents, pipelineStepIndex } from './LeadDetailOverview'
-import type { ManagedLead } from '../services/api'
+import { buildLeadFlowEvents, pipelineStepIndex, studentProfileIdentity } from './LeadDetailOverview'
+import type { ManagedLead, MyStudent } from '../services/api'
 
 const lead = (overrides: Partial<ManagedLead> = {}): ManagedLead => ({
   id: 1,
@@ -39,5 +39,34 @@ describe('Lead lifecycle presentation', () => {
     expect(pipelineStepIndex(lead({ salesOrderSubmittedAt: 300, activeSalesOrderStatus: 'revision_required' }))).toBe(3)
     expect(pipelineStepIndex(lead({ salesOrderSubmittedAt: 300, status: 'terminated' }))).toBe(2)
     expect(pipelineStepIndex(lead({ convertedAt: 400, status: 'won', followUpStatus: 'won' }))).toBe(4)
+  })
+})
+
+describe('student profile identity', () => {
+  const student: MyStudent = {
+    personId: 14,
+    personNo: 'S202608250014',
+    name: '学员姓名',
+    mobile: '13800000000',
+    wechatId: 'student-wechat',
+    services: []
+  }
+
+  it('uses Person contact fields while retaining a real Lead number', () => {
+    expect(studentProfileIdentity(lead(), student)).toEqual({
+      name: '学员姓名',
+      mobile: '13800000000',
+      wechatId: 'student-wechat',
+      numberLabel: '客资编号',
+      number: 'L202608180001'
+    })
+  })
+
+  it('uses the Person number when the selected service has no Lead', () => {
+    expect(studentProfileIdentity(undefined, student)).toMatchObject({
+      name: '学员姓名',
+      numberLabel: '学员编号',
+      number: 'S202608250014'
+    })
   })
 })

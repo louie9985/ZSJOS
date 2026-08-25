@@ -11,6 +11,7 @@ import java.time.LocalDate;
 import java.util.Map;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.invalidParamException;
 
 @RestController
 @RequestMapping("/zsjos/media-screen")
@@ -31,7 +32,9 @@ public class MediaScreenController {
                                                     @RequestParam(required = false) LocalDate date,
                                                     @RequestParam(defaultValue = "0") int includePartTimers) {
         validateFlag(includePartTimers); LocalDate requested = date == null ? LocalDate.now() : date;
-        if (requested.isAfter(LocalDate.now()) || requested.isBefore(LocalDate.now().minusDays(properties.getLimits().getMaxHistoryDays()))) throw new IllegalArgumentException("历史日期超出允许范围");
+        if (requested.isAfter(LocalDate.now()) || requested.isBefore(LocalDate.now().minusDays(properties.getLimits().getMaxHistoryDays()))) {
+            throw invalidParamException("历史日期超出允许范围");
+        }
         return success(service.history(tenantId, requested, includePartTimers == 1));
     }
 
@@ -39,5 +42,7 @@ public class MediaScreenController {
     public CommonResult<Map<String, Object>> maintenance(@RequestParam @NotNull Long tenantId) {
         return success(service.maintenance(tenantId));
     }
-    private static void validateFlag(int value) { if (value != 0 && value != 1) throw new IllegalArgumentException("includePartTimers 只能为 0 或 1"); }
+    private static void validateFlag(int value) {
+        if (value != 0 && value != 1) throw invalidParamException("includePartTimers 只能为 0 或 1");
+    }
 }

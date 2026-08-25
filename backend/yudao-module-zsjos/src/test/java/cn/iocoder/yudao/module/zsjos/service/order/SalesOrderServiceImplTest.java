@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageR
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderRepurchaseReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderTerminateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderTeamPageReqVO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskPageReqDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmTaskRespDTO;
 import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessNodeStatusRespDTO;
@@ -395,6 +396,26 @@ class SalesOrderServiceImplTest {
         assertEquals("SO-100", result.getList().getFirst().getOrderNo());
         assertEquals(2, result.getList().getFirst().getApprovalRoundNo());
         verify(orderMapper).selectMyPage(20L, reqVO, null);
+        verifyNoInteractions(itemMapper, fileApi);
+    }
+
+    @Test
+    void teamPageUsesResolvedDepartmentMembersAndDoesNotLoadHeavyDetails() {
+        SalesOrderTeamPageReqVO reqVO = new SalesOrderTeamPageReqVO();
+        reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setStatus(STATUS_PENDING_APPROVAL);
+        SalesOrderDO order = new SalesOrderDO();
+        order.setId(100L); order.setCurrentApprovalRoundId(200L); order.setOrderNo("SO-100");
+        order.setStatus(STATUS_PENDING_APPROVAL); order.setStudentName("测试学员"); order.setTotalAmount(BigDecimal.TEN);
+        SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setRoundNo(2);
+        Set<Long> teamUserIds = Set.of(20L, 21L);
+        when(permissionService.teamUserIds(30L)).thenReturn(teamUserIds);
+        when(orderMapper.selectTeamPage(teamUserIds, reqVO, null)).thenReturn(new PageResult<>(List.of(order), 1L));
+        when(roundMapper.selectBatchIds(List.of(200L))).thenReturn(List.of(round));
+
+        var result = service.getTeamPage(reqVO, 30L);
+
+        assertEquals(1L, result.getTotal()); assertEquals("SO-100", result.getList().getFirst().getOrderNo());
+        verify(orderMapper).selectTeamPage(teamUserIds, reqVO, null);
         verifyNoInteractions(itemMapper, fileApi);
     }
 

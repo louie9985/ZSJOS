@@ -26,6 +26,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 18 | 工作计划 | `/zsjos/work-plans` | `WorkPlanPage` | `zsjos/workPlan/index` |
 | 20 | 申诉处理 | `/zsjos/appeals` | `LeadAppealPage` | `zsjos/leadAppeal/index` |
 | 21 | 我的订单 | `/zsjos/sales-orders/my` | `MySalesOrderPage` | `zsjos/mySalesOrder/index` |
+| 21.1 | 团队订单 | `/zsjos/sales-orders/team` | `MySalesOrderPage(team)` | `zsjos/mySalesOrder/index` |
 | 22 | 成交订单审批 | `/zsjos/sales-order-approvals` | `SalesOrderApprovalPage` | `zsjos/salesOrderApproval/index` |
 | 23 | 历史客户复购 | `/zsjos/orders/external-repurchase` | `ExternalRepurchasePage` | `zsjos/externalRepurchase/index` |
 | 24 | 导出任务 | `/zsjos/export-task` | `ExportTaskPage` | `zsjos/exportTask/index` |
@@ -53,7 +54,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
 | 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
 
-“我的学员”按 Person 聚合并按服务关系切换。详情复用 `/zsjos/leads/manage` 的统一 `LeadDetail`，以只读模式展示客资概览、销售跟进记录和订单记录，并在同一详情壳中追加当前课程服务、首次联系、学习计划和学员联系记录。每个服务关系使用其真实订单关联的 Lead，不能用同一 Person 的其他 Lead 回退。学习规划师确认接收后，在概览中可随时选择性分配编导或职业规划师；两项均不创建任务且不阻塞联系链。教务标签由服务端发布配置决定，前端仅渲染服务端返回的 `visibleTabs`。
+“我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 
 Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落地为 `src/views/zsjos/registration-pool.vue` 和 `src/views/zsjos/my-students.vue`，与服务端菜单的 `component` 值直接对应。
 
@@ -72,6 +73,7 @@ The subordinate-sales left pane uses the shared 20-row append lazy-loading patte
 ### Media student center
 
 - `/zsjos/media-students` is rendered by `MediaStudentsPage` and requires `zsjos:media-student:query-my`.
-- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its five fixed tabs are overview, third-party platform accounts, positioning history, content production history, and talk records.
+- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its three tabs are overview, third-party platform accounts (including positioning cards), and content production history. The former student-information/talk-record tab is not part of the media workspace; old `tab=student` links fall back to overview.
 - Directors see their service-relation or account responsibility scope. Operators see only students related to accounts, content, positioning, or tasks they currently own. Each detail and command is re-authorized independently by the backend.
+- 定位卡运营确认和退回继续使用 `zsjos:positioning-card:operator-confirm`、`zsjos:positioning-card:operator-reject`；生成或重新生成学员外链使用独立按钮权限 `zsjos:positioning-card:student-link-generate`。V134 将该按钮挂在媒体学员页下并授予现有 `new_media_operator` 角色，服务端仍独立校验当前运营归属、最新版和状态。
 - Account, content, and positioning notifications deep-link to the student center with `personId`, `tab`, and the relevant record ID. Historical records without a student binding show an explicit unavailable target instead of opening a retired route.

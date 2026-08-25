@@ -19,9 +19,6 @@ const businessTarget = computed(() => {
   if (item.bizType === 'lead') return `/lead/${item.bizId}`
   if (item.bizType === 'cashback') return '/earnings'
   if (item.bizType === 'withdrawal') return `/withdrawal/${item.bizId}`
-  if (item.bizType === 'positioning-card' && item.sceneCode === 'media.positioning.student_confirmation') {
-    return `/positioning/confirm/${item.bizId}`
-  }
   return undefined
 })
 

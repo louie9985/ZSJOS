@@ -32,4 +32,23 @@ class StudentServiceObjectPermissionProviderTest {
         relation.setStatus("completed");
         assertFalse(provider.hasPermission(10L, "delivery-stage", 7L));
     }
+
+    @Test
+    void assignedOperatorCanOnlyReadAcceptedServiceAcrossReadableStatuses() {
+        ServiceRelationDO relation = new ServiceRelationDO();
+        relation.setId(10L); relation.setOwnerUserId(7L); relation.setOperatorUserId(9L);
+        relation.setAcceptanceStatus("accepted"); relation.setStatus("active");
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+
+        for (String status : new String[]{"active", "paused", "completed"}) {
+            relation.setStatus(status);
+            assertTrue(provider.hasPermission(10L, "read", 9L));
+            assertFalse(provider.hasPermission(10L, "contact", 9L));
+        }
+
+        relation.setStatus("active"); relation.setAcceptanceStatus("pending");
+        assertFalse(provider.hasPermission(10L, "read", 9L));
+        relation.setAcceptanceStatus("accepted"); relation.setOperatorUserId(10L);
+        assertFalse(provider.hasPermission(10L, "read", 9L));
+    }
 }

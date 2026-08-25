@@ -79,7 +79,7 @@ in-app message and the standard post-commit WebSocket hint for that director.
 - `GET /zsjos/student/my/{personId}`
 - `GET /zsjos/student/my/by-service/{relationId}`
 
-“我的学员”响应按 Person 聚合，但 `services` 中每一项同时返回该服务真实订单所关联的 `leadId`（仅内部技术链接）和 `leadNo`（用户可见业务编号）。Workbench 使用当前服务项的 Lead 复用统一 `LeadDetail`，不得以 Person 下其他服务或其他 Lead 作为回退。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。接收、首联、学习计划、普通跟进、交付阶段、基础信息修改、协作者分配和复购录入成功后，Workbench 必须强制刷新列表投影并独立重载当前 Person 的当前 `serviceRelationId`；详情刷新不得依赖列表请求去重或当前分页命中，且刷新后必须保持当前课程服务选中。
+“我的学员”响应按 Person 聚合，Person 与当前 `serviceRelationId` 共同构成详情主体。`services` 中每一项仅在该服务真实订单关联 Lead 时返回 `leadId`（内部技术链接）和 `leadNo`（用户可见业务编号）；复购等合法服务可以没有 Lead。Workbench 的统一学员详情在无 Lead 时仍展示 Person 档案、成交课程、联系上下文和获准标签/动作，并用 `personNo` 标识学员；不得伪造 Lead、借用同 Person 下其他服务的 Lead，或降级为缺少业务操作的简化详情。学习规划师视角以订单商品快照展示“成交产品”，不展示销售“意向产品”；最近联系、联系历史、下次联系时间和联系任务时效均按当前 `serviceRelationId` 使用学员联系接口，不读取或展示 Lead 销售跟进。真实 Lead 存在时，订单等获准历史仍为只读页签。`contact-context.availableActions` 明确投影 `ACCEPT`、`FIRST_CONTACT`、`STUDY_PLAN`、`FOLLOW_UP`、`EDIT_BASIC_INFO`、`ASSIGN_CONTENT_DIRECTOR`、`ASSIGN_CAREER_PLANNER`；未接收的负责人只可能获得 `ACCEPT`，已接收后才投影当前唯一阶段动作和获准辅助操作。前端投影与 Controller 功能权限、服务关系对象权限必须同时成立。接收、首联、学习计划、普通跟进、交付阶段、基础信息修改、协作者分配和复购录入成功后，Workbench 必须强制刷新列表投影并独立重载当前 Person 的当前 `serviceRelationId`；详情刷新不得依赖列表请求去重或当前分页命中，且刷新后必须保持当前课程服务选中。
 
 Results are read-only, grouped by Person, scoped to active service relationships directly owned by or
 routed to the current user, and aggregate order/course services without exposing sales actions. Both
@@ -124,15 +124,33 @@ The overview exposes optional one-time content-director and career-planner assig
 ## Content director students
 
 - `GET /zsjos/media-students/page` returns the current director or operator scope. Directors are resolved from active service relations and account responsibility; operators are resolved only from accounts and media workflow tasks they participate in.
-- `GET /zsjos/media-students/{personId}` returns course services plus third-party accounts, positioning history, content production history, talk records, the media operation timeline, and the positioning-to-operation-to-graduation task line.
+- `GET /zsjos/media-students/{personId}` returns Person/course context plus third-party accounts, positioning history, content production history, the media operation timeline, and the positioning-to-operation-to-graduation task line. The Workbench media surface renders only overview, account/positioning, and content tabs; it does not load Lead detail, contact history, or the separately retained legacy talk-record APIs, and it filters legacy `talk` events from the visible timeline.
 - Both endpoints require `zsjos:media-student:query-my`. Page visibility never grants object access: detail and command endpoints recheck the current service relation, account responsibility, or task assignment.
+
+Positioning cards use one mutable working draft plus immutable submitted field snapshots. Draft saves are
+excluded from `positioningCards` and the operation timeline. Submission locks the active service relation
+and requires an assigned, enabled operator before creating the next submission. Operator approval advances
+only the latest submission to `student_link_pending`; the assigned operator can then generate or regenerate
+the student link with `POST /zsjos/positioning-card/{id}/student-link` and permission
+`zsjos:positioning-card:student-link-generate`.
+
+The anonymous student contract is `GET /public-api/zsjos/positioning-confirmation/detail` and
+`POST /public-api/zsjos/positioning-confirmation/decision`. Both carry the opaque token only in
+`X-Positioning-Token`; the share route stores it after `#token=`. Public responses expose account display
+data, submission time, field/value/label snapshots and decision state, but no card number, internal IDs,
+user IDs, or token. A decision, regeneration, or non-current submission invalidates the active link.
+`request_changes` requires a 1-500 character comment and returns the card to the director draft stage;
+`agree` advances the existing `trial_14d` flow.
 # 编导学员级阶段
 
 编导通过 `GET /zsjos/student/service/{relationId}/contact-context` 获取服务关系负责人、编导、
 运营负责人、`directorStage`、访谈预约时间、动态字段和服务端 `availableActions`。学习规划师
 展示值来自服务关系 `ownerUserId/ownerUserName`，不得使用职业规划师字段替代。
+被指派运营也可读取该上下文，且必须匹配服务关系当前 `operatorUserId`；服务端不下发接收、
+首联、学习计划、普通跟进或基础资料修改动作。`/contact-records` 的只读授权边界保持兼容，
+但媒体 Workbench 不请求或展示联系历史。运营的媒体业务操作仍通过账号、定位卡、内容和拍剪接口完成。
 
-阶段命令拆分为四个接口，阶段由 URL 固定，客户端不能伪造阶段：
+阶段命令拆分为四个接口，阶段由 URL 固定，客户端不能伪造阶段。草稿接口的 `version` 是对应阶段的独立草稿版本，不是服务关系全局版本；草稿保存不改变服务关系全局版本，正式提交才推进业务版本：
 
 - `POST /zsjos/student/service/{relationId}/precheck/draft`
 - `POST /zsjos/student/service/{relationId}/precheck/submit`

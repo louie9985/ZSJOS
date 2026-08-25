@@ -96,11 +96,10 @@ const router = createRouter({
       component: () => import('@/pages/messages/index.vue')
     },
     {
-      path: '/positioning/confirm/:id',
-      alias: '/positioning/:id/confirmation',
+      path: '/positioning/share',
       name: 'PositioningConfirmation',
       component: () => import('@/pages/positioning/confirmation.vue'),
-      meta: { permission: 'zsjos:positioning-card:student-confirm' }
+      meta: { requiresAuth: false }
     },
     {
       path: '/messages/:id',

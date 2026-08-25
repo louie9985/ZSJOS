@@ -583,8 +583,19 @@ export type LeadOverviewSlots = {
   sidebarBeforeStatus?: React.ReactNode
 }
 
-export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, slots }: {
-  lead: ManagedLead
+export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) {
+  return {
+    name: student?.name || lead?.submittedName || '未填写姓名',
+    mobile: student?.mobile || lead?.submittedMobile,
+    wechatId: student?.wechatId || lead?.submittedWechatId,
+    numberLabel: lead ? '客资编号' : '学员编号',
+    number: lead?.leadNo || student?.personNo || '未记录'
+  }
+}
+
+export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, slots }: {
+  lead?: ManagedLead
+  student?: MyStudent
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
   showFollowUp: boolean
@@ -594,8 +605,9 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
   studentService?: MyStudent['services'][number]
   slots?: LeadOverviewSlots
 }) {
-  const sourceDispatchTag = leadSourceDispatchTag(lead)
+  const sourceDispatchTag = lead ? leadSourceDispatchTag(lead) : undefined
   const service = studentContext?.service || studentService
+  const identity = studentProfileIdentity(lead, student)
   return (
     <div className="lead-detail-overview-v2">
       <div className="lead-overview-grid">
@@ -614,28 +626,28 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                 <div className="lead-profile-fields">
                   <div className="lead-profile-row">
                     <span className="lead-field-label">姓名</span>
-                    <span className="lead-field-value">{lead.submittedName}</span>
+                    <span className="lead-field-value">{identity.name}</span>
                   </div>
                   <div className="lead-profile-row">
-                    <span className="lead-field-label">客资编号</span>
-                    <span className="lead-field-value">{lead.leadNo}</span>
+                    <span className="lead-field-label">{identity.numberLabel}</span>
+                    <span className="lead-field-value">{identity.number}</span>
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">手机号</span>
-                    {lead.submittedMobile
-                      ? <span className="lead-field-copyable"><span className="lead-field-value">{lead.submittedMobile}</span><CopyButton value={lead.submittedMobile} /></span>
+                    {identity.mobile
+                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.mobile}</span><CopyButton value={identity.mobile} /></span>
                       : <span className="lead-field-value lead-field-empty">未填写</span>
                     }
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">微信号</span>
-                    {lead.submittedWechatId
-                      ? <span className="lead-field-copyable"><span className="lead-field-value">{lead.submittedWechatId}</span><CopyButton value={lead.submittedWechatId} /></span>
+                    {identity.wechatId
+                      ? <span className="lead-field-copyable"><span className="lead-field-value">{identity.wechatId}</span><CopyButton value={identity.wechatId} /></span>
                       : <span className="lead-field-value lead-field-empty">未填写</span>
                     }
                   </div>
                 </div>
-                <div className="lead-profile-meta">
+                {lead && <div className="lead-profile-meta">
                   <div className="lead-profile-row">
                     <span className="lead-field-label">来源</span>
                     <span className="lead-field-value lead-source-value">
@@ -663,7 +675,7 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                     <span className="lead-field-label">地区</span>
                     <span className="lead-field-value">{[lead.provinceName, lead.cityName].filter(Boolean).join(' / ') || '-'}</span>
                   </div>
-                </div>
+                </div>}
               </section>
 
               {/* 6:6 等分 */}
@@ -680,9 +692,9 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                         {service.orderNo && <span className="lead-product-sku">订单号：{service.orderNo}</span>}
                       </div>
                     </div>
-                  ) : lead.intendedProducts?.length ? (
+                  ) : lead?.intendedProducts?.length ? (
                     <div className="lead-product-list">
-                      {[...lead.intendedProducts].sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0)).map(product => (
+                      {[...lead!.intendedProducts!].sort((a, b) => (b.primary ? 1 : 0) - (a.primary ? 1 : 0)).map(product => (
                         <ProductCard key={product.id} product={product} />
                       ))}
                     </div>
@@ -691,15 +703,15 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                   )}
                 </section>
 
-                {(slots?.latestActivity || studentContext || showFollowUp) && <section className="lead-card">
-                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : <LatestFollowUp leadId={lead.id} />)}
+                {(slots?.latestActivity || studentContext || (showFollowUp && lead)) && <section className="lead-card">
+                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead && <LatestFollowUp leadId={lead.id} />)}
                 </section>}
               </div>
 
               {/* 满宽：备注与附件 */}
-              <section className="lead-card">
+              {lead && <section className="lead-card">
                 <RemarksAndAttachments lead={lead} />
-              </section>
+              </section>}
             </div>
 
             {/* 4 列：时效进度 + 客资流转 */}
@@ -708,7 +720,7 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                 <div className="lead-card-header"><Typography.Text strong>联系任务时效</Typography.Text></div>
                 <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div>
               </section>}
-              {!studentContext && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
+              {!studentContext && lead && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
                 <section className="lead-card">
                   <div className="lead-card-header">
                     <Typography.Text strong>时效进度</Typography.Text>
@@ -727,26 +739,28 @@ export default function LeadDetailOverview({ lead, categoryLabel, channelLabel, 
                 </section>
               )}
 
-              <section className="lead-card">
-                {slots?.timeline || <FlowTimeline lead={lead} />}
-              </section>
+              {(slots?.timeline || lead) && <section className="lead-card">
+                {slots?.timeline || (lead && <FlowTimeline lead={lead} />)}
+              </section>}
             </div>
           </div>
         </div>
 
         {/* 右侧边栏 3 列：提示 → 工具条 → 状态卡 → 跟进图表 */}
         <aside className="lead-overview-aside">
-          {!studentContext && <AsideAlerts lead={lead} />}
+          {!studentContext && lead && <AsideAlerts lead={lead} />}
           {/* 磨砂工具条 */}
           {toolbar}
           {slots?.sidebarBeforeStatus}
           {/* 状态卡：Pipeline + 色条标签墙 */}
           <section className="lead-card lead-status-card">
             <div className="lead-status-card-body">
-              {slots?.taskStatus || <>{studentContext ? <StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} /> : <LeadStatusPipeline lead={lead} />}<div className="lead-status-divider" />{studentContext ? <StudentTaskLabels context={studentContext.contactContext} /> : <LeadStatusLabels lead={lead} />}</>}
+              {slots?.taskStatus || (studentContext
+                ? <><StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} /><div className="lead-status-divider" /><StudentTaskLabels context={studentContext.contactContext} /></>
+                : lead ? <><LeadStatusPipeline lead={lead} /><div className="lead-status-divider" /><LeadStatusLabels lead={lead} /></> : null)}
             </div>
           </section>
-          {!studentContext && showFollowUp && <LeadFollowUpCharts leadId={lead.id} />}
+          {!studentContext && showFollowUp && lead && <LeadFollowUpCharts leadId={lead.id} />}
         </aside>
       </div>
     </div>

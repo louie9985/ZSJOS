@@ -100,6 +100,53 @@ class DirectorFormTemplateServiceTest {
                 Map.of("region", Map.of("code", 110000)), false, Map.of()));
     }
 
+    @Test
+    void incompleteValuesAreAllowedInDraftButRejectedOnSubmit() {
+        DirectorFormTemplateVO.Field choices = new DirectorFormTemplateVO.Field();
+        choices.setKey("choices"); choices.setTitle("选择"); choices.setType("checkbox_group");
+        choices.setEnabled(true); choices.setRequired(true); choices.setSystemField(false); choices.setSort(1);
+        choices.setDictType("zsjos_test"); choices.setMultiple(true); choices.setMinSelections(3);
+        choices.setMaxLength(null);
+        DirectorFormTemplateVO.Field description = new DirectorFormTemplateVO.Field();
+        description.setKey("description"); description.setTitle("说明"); description.setType("text");
+        description.setEnabled(true); description.setRequired(true); description.setSystemField(false);
+        description.setSort(2); description.setMaxLength(3);
+        prepareFieldsVersion(List.of(choices, description));
+        DictDataRespDTO option = new DictDataRespDTO();
+        option.setValue("one"); option.setLabel("一项"); option.setStatus(0);
+        when(dictDataApi.getDictDataList("zsjos_test")).thenReturn(List.of(option));
+        Map<String, Object> values = Map.of("choices", List.of("one"), "description", "unfinished");
+
+        DirectorFormTemplateVO.Snapshot draft = service.validateAndSnapshotVersion(
+                DirectorFormTemplateService.SCENE_POSITIONING, 13L, values, false, Map.of());
+
+        assertEquals(values, draft.getValues());
+        assertThrows(ServiceException.class, () -> service.validateAndSnapshotVersion(
+                DirectorFormTemplateService.SCENE_POSITIONING, 13L, values, true, Map.of()));
+    }
+
+    @Test
+    void emptyRequiredValuesAreAllowedOnlyInDraft() {
+        DirectorFormTemplateVO.Field field = textField("requiredText", true);
+        prepareFieldsVersion(List.of(field));
+
+        DirectorFormTemplateVO.Snapshot draft = service.validateAndSnapshotVersion(
+                DirectorFormTemplateService.SCENE_POSITIONING, 13L, Map.of(), false, Map.of());
+
+        assertEquals(Map.of(), draft.getValues());
+        assertThrows(ServiceException.class, () -> service.validateAndSnapshotVersion(
+                DirectorFormTemplateService.SCENE_POSITIONING, 13L, Map.of(), true, Map.of()));
+    }
+
+    @Test
+    void draftStillRejectsValuesWithTheWrongFieldType() {
+        prepareFieldsVersion(List.of(textField("description", false)));
+
+        assertThrows(ServiceException.class, () -> service.validateAndSnapshotVersion(
+                DirectorFormTemplateService.SCENE_POSITIONING, 13L,
+                Map.of("description", 123), false, Map.of()));
+    }
+
     private void prepareVersion(String status) {
         DirectorFormTemplateVO.Field field = new DirectorFormTemplateVO.Field();
         field.setKey("choice");
@@ -134,5 +181,21 @@ class DirectorFormTemplateServiceTest {
         when(versionMapper.selectById(12L)).thenReturn(version);
         when(templateMapper.selectById(20L)).thenReturn(new DirectorFormTemplateDO().setId(20L)
                 .setScene(DirectorFormTemplateService.SCENE_INTERVIEW));
+    }
+
+    private void prepareFieldsVersion(List<DirectorFormTemplateVO.Field> fields) {
+        DirectorFormTemplateVersionDO version = new DirectorFormTemplateVersionDO().setId(13L)
+                .setTemplateId(30L).setVersionNo(1).setStatus("published")
+                .setFieldsJson(JsonUtils.toJsonString(fields));
+        when(versionMapper.selectById(13L)).thenReturn(version);
+        when(templateMapper.selectById(30L)).thenReturn(new DirectorFormTemplateDO().setId(30L)
+                .setScene(DirectorFormTemplateService.SCENE_POSITIONING));
+    }
+
+    private DirectorFormTemplateVO.Field textField(String key, boolean required) {
+        DirectorFormTemplateVO.Field field = new DirectorFormTemplateVO.Field();
+        field.setKey(key); field.setTitle("说明"); field.setType("text"); field.setEnabled(true);
+        field.setRequired(required); field.setSystemField(false); field.setSort(1);
+        return field;
     }
 }

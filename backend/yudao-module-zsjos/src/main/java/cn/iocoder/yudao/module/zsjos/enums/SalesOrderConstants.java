@@ -36,6 +36,7 @@ public interface SalesOrderConstants {
 
     String PERMISSION_CREATE = "zsjos:sales-order:create";
     String PERMISSION_QUERY = "zsjos:sales-order:query";
+    String PERMISSION_QUERY_TEAM = "zsjos:sales-order:query-team";
     String PERMISSION_REVIEW = "zsjos:sales-order:review";
     String PERMISSION_SUPERVISOR_CONFIRM = "zsjos:sales-order:supervisor-confirm";
 

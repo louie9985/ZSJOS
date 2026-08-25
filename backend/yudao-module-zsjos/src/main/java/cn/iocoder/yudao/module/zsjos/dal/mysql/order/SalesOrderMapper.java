@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderMyPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.SalesOrderTeamPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.FinanceOrderExportReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterQuery;
@@ -84,6 +85,54 @@ public interface SalesOrderMapper extends BaseMapperX<SalesOrderDO> {
     }
     default PageResult<SalesOrderDO> selectMyPage(Long userId, SalesOrderMyPageReqVO reqVO) {
         return selectMyPage(userId, reqVO, null);
+    }
+    default PageResult<SalesOrderDO> selectTeamPage(Collection<Long> userIds, SalesOrderTeamPageReqVO reqVO,
+                                                     List<Long> matchedOrderIds) {
+        if (userIds == null || userIds.isEmpty()) return PageResult.empty();
+        LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
+                .in(SalesOrderDO::getSubmitterUserId, userIds)
+                .eqIfPresent(SalesOrderDO::getStatus, reqVO.getStatus());
+        if (isNotBlank(reqVO.getKeyword())) {
+            String keyword = reqVO.getKeyword().trim();
+            query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, keyword)
+                    .or().like(SalesOrderDO::getStudentName, keyword)
+                    .or().like(SalesOrderDO::getStudentMobile, keyword));
+        }
+        if (matchedOrderIds != null) {
+            if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L);
+            else query.in(SalesOrderDO::getId, matchedOrderIds);
+        }
+        query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId);
+        return selectPage(reqVO, query);
+    }
+    default List<SalesOrderDO> selectTeamCursor(Collection<Long> userIds, String status, String keyword,
+                                                 List<Long> matchedOrderIds, LocalDateTime cursorTime,
+                                                 Long cursorId, int limit) {
+        if (userIds == null || userIds.isEmpty()) return List.of();
+        LambdaQueryWrapperX<SalesOrderDO> query = new LambdaQueryWrapperX<SalesOrderDO>()
+                .in(SalesOrderDO::getSubmitterUserId, userIds).eqIfPresent(SalesOrderDO::getStatus, status);
+        if (isNotBlank(keyword)) {
+            String value = keyword.trim();
+            query.and(wrapper -> wrapper.like(SalesOrderDO::getOrderNo, value)
+                    .or().like(SalesOrderDO::getStudentName, value)
+                    .or().like(SalesOrderDO::getStudentMobile, value));
+        }
+        if (matchedOrderIds != null) {
+            if (matchedOrderIds.isEmpty()) query.eq(SalesOrderDO::getId, -1L);
+            else query.in(SalesOrderDO::getId, matchedOrderIds);
+        }
+        if (cursorTime != null && cursorId != null) {
+            query.and(wrapper -> wrapper.lt(SalesOrderDO::getUpdateTime, cursorTime)
+                    .or(nested -> nested.eq(SalesOrderDO::getUpdateTime, cursorTime)
+                            .lt(SalesOrderDO::getId, cursorId)));
+        }
+        return selectList(query.orderByDesc(SalesOrderDO::getUpdateTime).orderByDesc(SalesOrderDO::getId)
+                .last("LIMIT " + limit));
+    }
+    default long selectTeamCount(Collection<Long> userIds, String status) {
+        if (userIds == null || userIds.isEmpty()) return 0;
+        return selectCount(new LambdaQueryWrapperX<SalesOrderDO>()
+                .in(SalesOrderDO::getSubmitterUserId, userIds).eqIfPresent(SalesOrderDO::getStatus, status));
     }
     default List<SalesOrderDO> selectByLeadId(Long leadId) {
         return selectList(new LambdaQueryWrapperX<SalesOrderDO>().eq(SalesOrderDO::getLeadId, leadId)

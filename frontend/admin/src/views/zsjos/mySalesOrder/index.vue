@@ -1,9 +1,27 @@
 <template>
   <WorkbenchListPage
-    title="我的订单"
-    endpoint="/zsjos/sales-order/my-page"
-    description="当前用户成交订单"
+    :title="isTeam ? '团队订单' : '我的订单'"
+    :endpoint="isTeam ? '/zsjos/sales-order/team-page' : '/zsjos/sales-order/my-page'"
+    :description="isTeam ? '当前部门及下属部门的成交订单' : '当前用户成交订单'"
+    :query="queryParams"
   >
+    <template #actions="{ reload }">
+      <el-input
+        v-model="queryParams.keyword"
+        placeholder="订单号 / 学员姓名 / 手机号"
+        clearable
+        class="!w-240px"
+        @keyup.enter="reload"
+      />
+      <el-select v-model="queryParams.status" placeholder="全部状态" clearable class="!w-160px">
+        <el-option label="待审核" value="pending_approval" />
+        <el-option label="已驳回待修改" value="revision_required" />
+        <el-option label="已通过" value="effective" />
+        <el-option label="已被重提" value="superseded" />
+      </el-select>
+      <el-button type="primary" @click="reload">查询</el-button>
+      <el-button @click="resetQuery(reload)">重置</el-button>
+    </template>
     <template #row-actions="{ row, reload }">
       <el-button link type="primary" @click="showDetail(row, reload)">查看</el-button>
     </template>
@@ -27,14 +45,14 @@
     <template #footer>
       <el-button @click="detailOpen = false">关闭</el-button>
       <el-button
-        v-if="detail?.canRevise"
+        v-if="!isTeam && detail?.canRevise"
         v-hasPermi="['zsjos:sales-order:create']"
         type="primary"
         @click="openRevision"
         >补正并重新提交</el-button
       >
       <el-button
-        v-if="detail?.canTerminate"
+        v-if="!isTeam && detail?.canTerminate"
         v-hasPermi="['zsjos:sales-order:create']"
         type="danger"
         @click="terminateOpen = true"
@@ -76,7 +94,7 @@
       <el-form-item
         v-for="(item, index) in revision.items"
         :key="index"
-        :label="`课程 ${index + 1} 金额`"
+        :label="`课程 ${Number(index) + 1} 金额`"
       >
         <el-input-number v-model="item.actualAmount" :min="0" :precision="2" class="w-100%" />
       </el-form-item>
@@ -105,6 +123,13 @@ import { useMessage } from '@/hooks/web/useMessage'
 import WorkbenchListPage from '../components/WorkbenchListPage.vue'
 
 const message = useMessage()
+const isTeam = window.location.pathname.includes('/sales-orders/team')
+const queryParams = reactive({ keyword: '', status: '' })
+const resetQuery = (reload: () => void) => {
+  queryParams.keyword = ''
+  queryParams.status = ''
+  reload()
+}
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -122,7 +147,7 @@ const loadDetail = async () => {
   detailLoading.value = true
   detailError.value = ''
   try {
-    detail.value = await Api.getMySalesOrder(selectedId.value)
+    detail.value = await (isTeam ? Api.getTeamSalesOrder(selectedId.value) : Api.getMySalesOrder(selectedId.value))
   } catch (error: any) {
     detail.value = undefined
     detailError.value = error?.msg || error?.message || '订单详情加载失败'

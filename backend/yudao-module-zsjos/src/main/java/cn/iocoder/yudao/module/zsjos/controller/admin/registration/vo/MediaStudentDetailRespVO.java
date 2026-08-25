@@ -11,6 +11,7 @@ public class MediaStudentDetailRespVO {
     private MyStudentRespVO student;
     private List<AccountVO> accounts;
     private List<PositioningVO> positioningCards;
+    private List<PositioningVO> positioningDrafts;
     private List<ContentVO> contents;
     private List<TicketVO> productionTickets;
     private List<OperationVO> operationTimeline;
@@ -39,8 +40,15 @@ public class MediaStudentDetailRespVO {
         private Long id;
         private Long accountId;
         private String cardNo;
+        private Long submissionId;
         private String status;
         private Integer versionNo;
+        private Integer submissionNo;
+        private LocalDateTime submittedAt;
+        private LocalDateTime studentDecidedAt;
+        private String studentDecision;
+        private String studentDecisionComment;
+        private Boolean current;
         private Boolean professionalRisk;
         private Integer version;
         private LocalDateTime lastActivityAt;

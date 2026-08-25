@@ -15,7 +15,10 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -35,8 +38,7 @@ public class DirectorFormTemplateService {
             {"hobbies", "textarea"}, {"videoEditing", "radio"}, {"videoShooting", "radio"},
             {"liveExperience", "radio"}, {"shootingEquipment", "checkbox_group"}, {"equipmentModel", "text"},
             {"mediaTime", "radio"}, {"continuousTime", "text"}, {"appearanceWillingness", "radio"},
-            {"purchaseMotivations", "checkbox_group"}, {"deliveryRisks", "checkbox_group"},
-            {"sixDimensionCommunicated", "checkbox"}
+            {"purchaseMotivations", "checkbox_group"}, {"deliveryRisks", "checkbox_group"}
     });
     private static final Map<String, String> POSITIONING_SYSTEM_FIELDS = orderedMap(new String[][]{
             {"identityTags", "checkbox_group"}, {"strongStoryHook", "text"}, {"existingMaterials", "checkbox_group"},
@@ -195,14 +197,14 @@ public class DirectorFormTemplateService {
             Object raw = values.get(field.getKey());
             if (submit && Boolean.TRUE.equals(field.getRequired()) && empty(raw)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
             if (empty(raw)) continue;
-            validateScalar(field, raw);
+            validateScalar(field, raw, submit);
             Object normalized = "region".equals(field.getType()) ? normalizeRegion(raw, submit) : raw;
             persisted.put(field.getKey(), normalized);
             if (field.getDictType() != null) {
                 dictSnapshots.put(field.getKey(), snapshotDictionary(field, raw, priorSnapshots.get(field.getKey())));
             }
         }
-        validateBusinessRules(scene, persisted, submit);
+        if (submit) validateBusinessRules(scene, persisted);
         DirectorFormTemplateVO.Snapshot result = new DirectorFormTemplateVO.Snapshot();
         result.setTemplateId(version.getTemplateId()); result.setTemplateVersionId(version.getId());
         result.setTemplateVersionNo(version.getVersionNo()); result.setFields(fields);
@@ -248,31 +250,60 @@ public class DirectorFormTemplateService {
         return result;
     }
 
-    private void validateScalar(DirectorFormTemplateVO.Field field, Object raw) {
+    private void validateScalar(DirectorFormTemplateVO.Field field, Object raw, boolean submit) {
         if ("region".equals(field.getType())) {
             if (!(raw instanceof Map<?, ?>) && !(raw instanceof String && !((String) raw).isBlank())) {
                 throw exception(DIRECTOR_FORM_VALUE_INVALID);
             }
             return;
         }
+        if (Set.of("text", "textarea").contains(field.getType()) && !(raw instanceof String)) {
+            throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        }
         if (Set.of("multi_select", "checkbox_group").contains(field.getType())
-                && !(raw instanceof Collection<?>)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
-        if (Set.of("select", "radio").contains(field.getType())
-                && raw instanceof Collection<?>) throw exception(DIRECTOR_FORM_VALUE_INVALID);
-        if (raw instanceof Collection<?> collection) {
+                && (!(raw instanceof Collection<?> collection)
+                || collection.stream().anyMatch(value -> !(value instanceof String)))) {
+            throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        }
+        if (Set.of("select", "radio").contains(field.getType()) && !(raw instanceof String)) {
+            throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        }
+        if (submit && raw instanceof Collection<?> collection) {
             int size = collection.size();
             if (field.getMinSelections() != null && size < field.getMinSelections()
                     || field.getMaxSelections() != null && size > field.getMaxSelections()) throw exception(DIRECTOR_FORM_VALUE_INVALID);
         }
         if ("number".equals(field.getType())) {
             if (!(raw instanceof Number number)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
-            if (field.getMinValue() != null && number.doubleValue() < field.getMinValue()
-                    || field.getMaxValue() != null && number.doubleValue() > field.getMaxValue()) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+            if (submit && (field.getMinValue() != null && number.doubleValue() < field.getMinValue()
+                    || field.getMaxValue() != null && number.doubleValue() > field.getMaxValue())) {
+                throw exception(DIRECTOR_FORM_VALUE_INVALID);
+            }
         }
-        if (field.getMaxLength() != null && String.valueOf(raw).length() > field.getMaxLength()) {
+        if (submit && field.getMaxLength() != null && String.valueOf(raw).length() > field.getMaxLength()) {
             throw exception(DIRECTOR_FORM_VALUE_INVALID);
         }
         if ("checkbox".equals(field.getType()) && !(raw instanceof Boolean)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        if ("date".equals(field.getType())) validateDate(raw);
+        if ("datetime".equals(field.getType())) validateDateTime(raw);
+    }
+
+    private void validateDate(Object raw) {
+        if (!(raw instanceof String text)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        try {
+            LocalDate.parse(text);
+        } catch (DateTimeParseException ex) {
+            throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        }
+    }
+
+    private void validateDateTime(Object raw) {
+        if (!(raw instanceof String text)) throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        try {
+            DateTimeFormatter.ISO_DATE_TIME.parse(text);
+        } catch (DateTimeParseException ex) {
+            throw exception(DIRECTOR_FORM_VALUE_INVALID);
+        }
     }
 
     /** Historical drafts may retain their raw text, but a new submission must use a current System area. */
@@ -305,16 +336,13 @@ public class DirectorFormTemplateService {
         return snapshot;
     }
 
-    private void validateBusinessRules(String scene, Map<String, Object> values, boolean submit) {
+    private void validateBusinessRules(String scene, Map<String, Object> values) {
         if (SCENE_INTERVIEW.equals(scene)) {
             mutuallyExclusive(values.get("certificates"), "none");
             mutuallyExclusive(values.get("shootingEquipment"), "none");
-            if (submit && values.get("certificates") instanceof Collection<?> certificates
+            if (values.get("certificates") instanceof Collection<?> certificates
                     && !certificates.isEmpty() && !certificates.contains("none")
                     && empty(values.get("certificatePractice"))) throw exception(DIRECTOR_FORM_VALUE_INVALID);
-            if (submit && !Boolean.TRUE.equals(values.get("sixDimensionCommunicated"))) {
-                throw exception(DIRECTOR_FORM_VALUE_INVALID);
-            }
         }
     }
 

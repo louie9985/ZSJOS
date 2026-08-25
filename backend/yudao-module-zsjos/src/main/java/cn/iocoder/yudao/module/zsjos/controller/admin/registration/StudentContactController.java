@@ -96,10 +96,9 @@ public class StudentContactController {
 
     @PostMapping("/{relationId}/precheck/draft")
     @PreAuthorize("@ss.hasPermission('zsjos:student:director-precheck')")
-    public CommonResult<Boolean> saveDirectorPrecheckDraft(@PathVariable Long relationId,
+    public CommonResult<Integer> saveDirectorPrecheckDraft(@PathVariable Long relationId,
                                                             @Valid @RequestBody DirectorStageSaveReqVO request) {
-        service.saveDirectorPrecheckDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId());
-        return success(true);
+        return success(service.saveDirectorPrecheckDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/{relationId}/precheck/submit")
@@ -112,10 +111,9 @@ public class StudentContactController {
 
     @PostMapping("/{relationId}/interview/draft")
     @PreAuthorize("@ss.hasPermission('zsjos:student:director-interview')")
-    public CommonResult<Boolean> saveDirectorInterviewDraft(@PathVariable Long relationId,
+    public CommonResult<Integer> saveDirectorInterviewDraft(@PathVariable Long relationId,
                                                              @Valid @RequestBody DirectorStageSaveReqVO request) {
-        service.saveDirectorInterviewDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId());
-        return success(true);
+        return success(service.saveDirectorInterviewDraft(relationId, request, SecurityFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/{relationId}/interview/submit")

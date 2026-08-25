@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.positioning;
 
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardDraftRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardPageReqVO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
@@ -18,12 +19,11 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardSubmissionMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerStudentLinkMapper;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
-import cn.iocoder.yudao.module.zsjos.service.director.DirectorConfigService;
 import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateService;
 import cn.iocoder.yudao.module.zsjos.controller.admin.director.vo.DirectorFormTemplateVO;
 import jakarta.annotation.Resource;
@@ -44,6 +44,7 @@ import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 @Service
 public class PositioningCardService {
     @Resource private PositioningCardMapper mapper;
+    @Resource private PositioningCardSubmissionMapper submissionMapper;
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private PermissionApi permissionApi;
     @Resource private PostApi postApi;
@@ -53,11 +54,8 @@ public class PositioningCardService {
     @Resource private MediaAccountMapper accountMapper;
     @Resource private ServiceRelationMapper relationMapper;
     @Resource private PersonMapper personMapper;
-    @Resource private PartnerStudentLinkMapper partnerStudentLinkMapper;
-    @Resource private PartnerAccountMapper partnerAccountMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
     @Resource private DirectorFormTemplateService directorFormTemplateService;
-    @Resource private DirectorConfigService directorConfigService;
 
     public PageResult<PositioningCardRespVO> page(PositioningCardPageReqVO req, Long userId) {
         MediaDataScopeService.Scope scope = dataScopeService.resolve(userId, "zsjos:positioning-card:query-all");
@@ -72,7 +70,7 @@ public class PositioningCardService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public Long create(PositioningCardSaveReqVO req, Long userId) {
+    public PositioningCardDraftRespVO create(PositioningCardSaveReqVO req, Long userId) {
         var account = accountMapper.selectById(req.getAccountId());
         if (account == null || req.getStudentPersonId() == null
                 || personMapper.selectById(req.getStudentPersonId()) == null
@@ -82,20 +80,30 @@ public class PositioningCardService {
             throw exception(POSITIONING_REFERENCE_INVALID);
         }
         var relations = relationMapper.selectActiveByPersonIds(List.of(req.getStudentPersonId()));
-        var relation = req.getServiceRelationId() == null
+        var candidate = req.getServiceRelationId() == null
                 ? relations.stream().filter(row -> userId.equals(row.getContentDirectorUserId()))
                     .filter(row -> "accepted".equals(row.getAcceptanceStatus())).findFirst().orElse(null)
                 : relations.stream().filter(row -> req.getServiceRelationId().equals(row.getId())).findFirst().orElse(null);
+        var relation = candidate == null ? null : relationMapper.selectByIdForUpdate(candidate.getId(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
         if (relation == null || !userId.equals(relation.getContentDirectorUserId())
+                || !Objects.equals(relation.getPersonId(), req.getStudentPersonId())
+                || !"active".equals(relation.getStatus())
                 || !"accepted".equals(relation.getAcceptanceStatus())
                 || !"positioning_ready".equals(relation.getDirectorStage())) {
             throw exception(POSITIONING_REFERENCE_INVALID);
         }
         var snapshot = directorFormTemplateService.validateAndSnapshot(
                 DirectorFormTemplateService.SCENE_POSITIONING, req.getTemplateId(), req.getValues(), false);
-        java.time.LocalDate trialEndDate = req.getTrialEndDate() == null
-                ? java.time.LocalDate.now().plusDays(directorConfigService.trialDays()) : req.getTrialEndDate();
-        if (trialEndDate.isBefore(java.time.LocalDate.now())) throw exception(POSITIONING_REFERENCE_INVALID);
+        java.time.LocalDate trialEndDate = req.getTrialEndDate();
+        PositioningCardDO existing = mapper.selectLatestCreatingDraft(relation.getId(), req.getAccountId(),
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId());
+        if (existing != null) {
+            if (!sameDraft(existing, snapshot, trialEndDate, req)) {
+                throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+            }
+            return new PositioningCardDraftRespVO(existing.getId(), existing.getVersion());
+        }
         PositioningCardDO card = new PositioningCardDO();
         card.setCardNo("PC-" + UUID.randomUUID().toString().replace("-", "").substring(0, 16))
                 .setAccountId(req.getAccountId()).setStudentPersonId(req.getStudentPersonId()).setDirectorUserId(userId)
@@ -110,30 +118,86 @@ public class PositioningCardService {
                 .setProfessionalRisk(Boolean.TRUE.equals(req.getProfessionalRisk()))
                 .setStatus(POSITIONING_CO_CREATING).setVersion(0);
         mapper.insert(card);
-        return card.getId();
+        return new PositioningCardDraftRespVO(card.getId(), card.getVersion());
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "submit-review")
     @Transactional(rollbackFor = Exception.class)
-    public void updateDraft(Long id, PositioningCardSaveReqVO req, Long userId) {
+    public PositioningCardDraftRespVO updateDraft(Long id, PositioningCardSaveReqVO req, Long userId) {
         PositioningCardDO card = require(id);
         requireStatus(card, POSITIONING_CO_CREATING);
-        if (!Objects.equals(card.getDirectorUserId(), userId) || !Objects.equals(card.getAccountId(), req.getAccountId())
-                || !Objects.equals(card.getVersion(), req.getVersion())) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        if (!Objects.equals(card.getDirectorUserId(), userId) || !Objects.equals(card.getAccountId(), req.getAccountId())) {
+            throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        }
         Map<String, Object> previousDictSnapshots = StrUtil.isBlank(card.getDictSnapshotJson()) ? Map.of()
                 : JsonUtils.parseObject(card.getDictSnapshotJson(), Map.class);
         var snapshot = directorFormTemplateService.validateAndSnapshotVersion(
                 DirectorFormTemplateService.SCENE_POSITIONING, card.getTemplateVersionId(), req.getValues(), false,
                 previousDictSnapshots);
-        java.time.LocalDate trialEndDate = req.getTrialEndDate() == null ? card.getTrialEndDate() : req.getTrialEndDate();
-        if (trialEndDate == null || trialEndDate.isBefore(java.time.LocalDate.now())) throw exception(POSITIONING_REFERENCE_INVALID);
+        java.time.LocalDate trialEndDate = req.getTrialEndDate();
+        String layer1Json = draftJson(req.getLayer1Json(), card.getLayer1Json());
+        String layer2Json = draftJson(req.getLayer2Json(), card.getLayer2Json());
+        String formulaJson = draftJson(req.getFormulaJson(), card.getFormulaJson());
+        String feasibilityJson = draftJson(req.getFeasibilityJson(), card.getFeasibilityJson());
+        String contentFormJson = draftJson(req.getContentFormJson(), card.getContentFormJson());
+        String complianceJson = draftJson(req.getComplianceJson(), card.getComplianceJson());
+        Boolean professionalRisk = req.getProfessionalRisk() == null ? card.getProfessionalRisk() : req.getProfessionalRisk();
+        if (!Objects.equals(card.getVersion(), req.getVersion())) {
+            if (req.getVersion() != null && Objects.equals(card.getVersion(), req.getVersion() + 1)
+                    && sameUpdatedDraft(card, snapshot, trialEndDate, layer1Json, layer2Json, formulaJson,
+                    feasibilityJson, contentFormJson, complianceJson, professionalRisk)) {
+                return new PositioningCardDraftRespVO(card.getId(), card.getVersion());
+            }
+            throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        }
         card.setFieldsSnapshotJson(JsonUtils.toJsonString(snapshot.getFields()))
                 .setValuesSnapshotJson(JsonUtils.toJsonString(snapshot.getValues()))
                 .setDictSnapshotJson(JsonUtils.toJsonString(snapshot.getDictSnapshots()))
-                .setTrialEndDate(trialEndDate).setVersion(card.getVersion() + 1);
+                .setTrialEndDate(trialEndDate).setLayer1Json(layer1Json).setLayer2Json(layer2Json)
+                .setFormulaJson(formulaJson).setFeasibilityJson(feasibilityJson).setContentFormJson(contentFormJson)
+                .setComplianceJson(complianceJson).setProfessionalRisk(professionalRisk)
+                .setVersion(card.getVersion() + 1);
         if (mapper.updateDraftSnapshot(card, req.getVersion(), POSITIONING_CO_CREATING) == 0) {
             throw exception(POSITIONING_CARD_VERSION_CONFLICT);
         }
+        return new PositioningCardDraftRespVO(card.getId(), card.getVersion());
+    }
+
+    private boolean sameDraft(PositioningCardDO card, DirectorFormTemplateVO.Snapshot snapshot,
+                              java.time.LocalDate trialEndDate, PositioningCardSaveReqVO req) {
+        Map<String, Object> existingValues = StrUtil.isBlank(card.getValuesSnapshotJson()) ? Map.of()
+                : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class);
+        return Objects.equals(card.getTemplateVersionId(), snapshot.getTemplateVersionId())
+                && Objects.equals(existingValues, snapshot.getValues())
+                && Objects.equals(card.getTrialEndDate(), trialEndDate)
+                && Objects.equals(card.getProfessionalRisk(), Boolean.TRUE.equals(req.getProfessionalRisk()))
+                && Objects.equals(card.getLayer1Json(), jsonOrEmpty(req.getLayer1Json()))
+                && Objects.equals(card.getLayer2Json(), jsonOrEmpty(req.getLayer2Json()))
+                && Objects.equals(card.getFormulaJson(), jsonOrEmpty(req.getFormulaJson()))
+                && Objects.equals(card.getFeasibilityJson(), jsonOrEmpty(req.getFeasibilityJson()))
+                && Objects.equals(card.getContentFormJson(), jsonOrEmpty(req.getContentFormJson()))
+                && Objects.equals(card.getComplianceJson(), jsonOrEmpty(req.getComplianceJson()));
+    }
+
+    private boolean sameUpdatedDraft(PositioningCardDO card, DirectorFormTemplateVO.Snapshot snapshot,
+                                     java.time.LocalDate trialEndDate, String layer1Json, String layer2Json,
+                                     String formulaJson, String feasibilityJson, String contentFormJson,
+                                     String complianceJson, Boolean professionalRisk) {
+        Map<String, Object> existingValues = StrUtil.isBlank(card.getValuesSnapshotJson()) ? Map.of()
+                : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class);
+        return Objects.equals(existingValues, snapshot.getValues())
+                && Objects.equals(card.getTrialEndDate(), trialEndDate)
+                && Objects.equals(card.getLayer1Json(), layer1Json)
+                && Objects.equals(card.getLayer2Json(), layer2Json)
+                && Objects.equals(card.getFormulaJson(), formulaJson)
+                && Objects.equals(card.getFeasibilityJson(), feasibilityJson)
+                && Objects.equals(card.getContentFormJson(), contentFormJson)
+                && Objects.equals(card.getComplianceJson(), complianceJson)
+                && Objects.equals(card.getProfessionalRisk(), professionalRisk);
+    }
+
+    private String draftJson(String requested, String existing) {
+        return requested == null ? existing : jsonOrEmpty(requested);
     }
 
     private String jsonOrEmpty(String value) {
@@ -147,6 +211,19 @@ public class PositioningCardService {
         PositioningCardDO card = tenantId == null ? mapper.selectById(id) : mapper.selectByIdForUpdate(id, tenantId);
         if (card == null) throw exception(POSITIONING_CARD_NOT_EXISTS);
         if (!POSITIONING_CO_CREATING.equals(card.getStatus())) throw exception(POSITIONING_CARD_STATE_INVALID);
+        if (!Objects.equals(card.getVersion(), version)) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        var relation = tenantId == null ? relationMapper.selectById(card.getServiceRelationId())
+                : relationMapper.selectByIdForUpdate(card.getServiceRelationId(), tenantId);
+        if (relation == null || !"active".equals(relation.getStatus())
+                || !"accepted".equals(relation.getAcceptanceStatus())
+                || relation.getOperatorUserId() == null) {
+            throw exception(POSITIONING_OPERATOR_REQUIRED);
+        }
+        AdminUserRespDTO assignedOperator = adminUserApi.getUser(relation.getOperatorUserId());
+        if (assignedOperator == null || !CommonStatusEnum.ENABLE.getStatus().equals(assignedOperator.getStatus())) {
+            throw exception(POSITIONING_OPERATOR_REQUIRED);
+        }
+        card.setOperatorUserId(relation.getOperatorUserId());
         if (card.getTemplateId() != null) {
             Map<String, Object> values = StrUtil.isBlank(card.getValuesSnapshotJson()) ? Map.of()
                     : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class);
@@ -159,7 +236,11 @@ public class PositioningCardService {
             }
         }
         if (!Boolean.TRUE.equals(card.getProfessionalRisk())) {
-            transition(card, version, POSITIONING_OPERATOR_FEASIBILITY);
+            createSubmission(card, userId, POSITIONING_OPERATOR_FEASIBILITY);
+            if (mapper.transitionWithOperator(card.getId(), version, POSITIONING_CO_CREATING,
+                    POSITIONING_OPERATOR_FEASIBILITY, card.getOperatorUserId()) == 0) {
+                throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+            }
             workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, userId, POSITIONING_CO_CREATING,
                     POSITIONING_OPERATOR_FEASIBILITY, null, transitionKey(card, version,
                             POSITIONING_OPERATOR_FEASIBILITY));
@@ -184,6 +265,7 @@ public class PositioningCardService {
         }
         card.setStatus(POSITIONING_IP_REVIEW);
         card.setVersion(version + 1);
+        createSubmission(card, userId, POSITIONING_IP_REVIEW);
         if (mapper.updateByVersion(card, version, POSITIONING_CO_CREATING) == 0) {
             throw exception(POSITIONING_CARD_VERSION_CONFLICT);
         }
@@ -205,10 +287,17 @@ public class PositioningCardService {
         PositioningCardDO card = require(id);
         requireStatus(card, POSITIONING_OPERATOR_FEASIBILITY);
         Long operator = currentAdminUserId();
-        transitionOperatorReview(card, version, POSITIONING_STUDENT_CONFIRM, operator, null);
+        PositioningCardSubmissionDO submission = requireLatestSubmission(card, POSITIONING_OPERATOR_FEASIBILITY);
+        requireAssignedOperator(card, submission, operator);
+        LocalDateTime now = LocalDateTime.now();
+        if (submissionMapper.markOperatorDecision(submission.getId(), submission.getVersion(),
+                POSITIONING_OPERATOR_FEASIBILITY, POSITIONING_STUDENT_LINK_PENDING, operator, now, null) == 0) {
+            throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        }
+        transitionOperatorReview(card, version, POSITIONING_STUDENT_LINK_PENDING, operator, null);
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, operator, POSITIONING_OPERATOR_FEASIBILITY,
-                POSITIONING_STUDENT_CONFIRM, null, transitionKey(card, version, POSITIONING_STUDENT_CONFIRM));
-        notifyStudentConfirmation(card, operator, version);
+                POSITIONING_STUDENT_LINK_PENDING, null,
+                transitionKey(card, version, POSITIONING_STUDENT_LINK_PENDING));
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "operator-reject")
@@ -217,6 +306,12 @@ public class PositioningCardService {
         PositioningCardDO card = require(id);
         requireStatus(card, POSITIONING_OPERATOR_FEASIBILITY);
         Long operator = currentAdminUserId();
+        PositioningCardSubmissionDO submission = requireLatestSubmission(card, POSITIONING_OPERATOR_FEASIBILITY);
+        requireAssignedOperator(card, submission, operator);
+        if (submissionMapper.markOperatorDecision(submission.getId(), submission.getVersion(),
+                POSITIONING_OPERATOR_FEASIBILITY, "operator_rejected", operator, LocalDateTime.now(), reason) == 0) {
+            throw exception(POSITIONING_CARD_VERSION_CONFLICT);
+        }
         transitionOperatorReview(card, version, POSITIONING_CO_CREATING, operator, reason);
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, operator, POSITIONING_OPERATOR_FEASIBILITY,
                 POSITIONING_CO_CREATING, reason, transitionKey(card, version, POSITIONING_CO_CREATING));
@@ -231,7 +326,7 @@ public class PositioningCardService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void studentConfirm(Long id, Integer version) {
+    public void studentConfirmFromLink(Long id, Integer version) {
         PositioningCardDO card = require(id);
         requireStatus(card, POSITIONING_STUDENT_CONFIRM);
         transition(card, version, POSITIONING_TRIAL_14D);
@@ -241,13 +336,23 @@ public class PositioningCardService {
     }
 
     @Transactional(rollbackFor = Exception.class)
-    public void studentReject(Long id, Integer version) {
+    public void studentRejectFromLink(Long id, Integer version, String reason) {
         PositioningCardDO card = require(id);
         requireStatus(card, POSITIONING_STUDENT_CONFIRM);
         transition(card, version, POSITIONING_CO_CREATING);
         workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, id, null, POSITIONING_STUDENT_CONFIRM,
-                POSITIONING_CO_CREATING, null, transitionKey(card, version, POSITIONING_CO_CREATING));
+                POSITIONING_CO_CREATING, reason, transitionKey(card, version, POSITIONING_CO_CREATING));
         notifyEmployeeResult(card, "media.positioning.student_rejected", version, POSITIONING_CO_CREATING);
+    }
+
+    /** Compatibility for non-HTTP internal callers while the Partner confirmation entry is retired. */
+    public void studentConfirm(Long id, Integer version) {
+        studentConfirmFromLink(id, version);
+    }
+
+    /** Compatibility for non-HTTP internal callers while the Partner confirmation entry is retired. */
+    public void studentReject(Long id, Integer version) {
+        studentRejectFromLink(id, version, "学员提出修改");
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#id", action = "confirm-trial")
@@ -299,6 +404,11 @@ public class PositioningCardService {
             if (mapper.transition(card.getId(), card.getVersion(), POSITIONING_IP_REVIEW, target) == 0) {
                 throw exception(POSITIONING_CARD_VERSION_CONFLICT);
             }
+            PositioningCardSubmissionDO submission = requireLatestSubmission(card, POSITIONING_IP_REVIEW);
+            String submissionTarget = POSITIONING_OPERATOR_FEASIBILITY.equals(target)
+                    ? POSITIONING_OPERATOR_FEASIBILITY : "ip_rejected";
+            if (submissionMapper.markStatus(submission.getId(), submission.getVersion(), POSITIONING_IP_REVIEW,
+                    submissionTarget) == 0) throw exception(POSITIONING_CARD_VERSION_CONFLICT);
             workflowEventService.transition(BIZ_TYPE_POSITIONING_CARD, card.getId(), card.getIpReviewerUserId(),
                     POSITIONING_IP_REVIEW, target, reason, transitionKey(card, card.getVersion(), target));
             String scene = POSITIONING_OPERATOR_FEASIBILITY.equals(target)
@@ -322,19 +432,6 @@ public class PositioningCardService {
         workflowEventService.notify("media.positioning.operator_review", BIZ_TYPE_POSITIONING_CARD, card.getId(),
                 operatorUserId, operator,
                 "positioning-operator-review:" + card.getId() + ":" + version + ":" + branch, payload(card));
-    }
-
-    private void notifyStudentConfirmation(PositioningCardDO card, Long operator, Integer version) {
-        var link = partnerStudentLinkMapper.selectActiveByStudent(card.getStudentPersonId());
-        if (link == null) return;
-        var partnerAccount = partnerAccountMapper.selectByPartnerId(link.getPartnerId());
-        if (partnerAccount == null) return;
-        Map<String, Object> values = new java.util.LinkedHashMap<>(payload(card));
-        values.put("partnerAccountId", partnerAccount.getId());
-        values.put("deepLink", "/positioning/confirm/" + card.getId());
-        workflowEventService.notify("media.positioning.student_confirmation", BIZ_TYPE_POSITIONING_CARD,
-                card.getId(), null, operator, "positioning-student-confirmation:" + card.getId() + ":" + version,
-                values);
     }
 
     private void notifyEmployeeResult(PositioningCardDO card, String scene, Integer version, String target) {
@@ -402,6 +499,11 @@ public class PositioningCardService {
                 : JsonUtils.parseObject(card.getValuesSnapshotJson(), Map.class));
         response.setDictSnapshot(StrUtil.isBlank(card.getDictSnapshotJson()) ? Map.of()
                 : JsonUtils.parseObject(card.getDictSnapshotJson(), Map.class));
+        PositioningCardSubmissionDO submission = submissionMapper.selectLatestByCard(card.getId());
+        if (submission != null) {
+            response.setSubmissionNo(submission.getSubmissionNo());
+            response.setSubmittedAt(submission.getSubmittedAt());
+        }
         if (!objectPermissionProvider.hasPermission(card.getId(), "read", userId)) {
             response.setAvailableActions(List.of()); return response;
         }
@@ -424,6 +526,11 @@ public class PositioningCardService {
                     && objectPermissionProvider.hasPermission(card.getId(), "operator-reject", userId)) {
                 actions.add(ACTION_REJECT_POSITIONING_FEASIBILITY);
             }
+        } else if ((POSITIONING_STUDENT_LINK_PENDING.equals(card.getStatus())
+                || POSITIONING_STUDENT_CONFIRM.equals(card.getStatus()))
+                && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:student-link-generate")
+                && objectPermissionProvider.hasPermission(card.getId(), "student-link-generate", userId)) {
+            actions.add(ACTION_GENERATE_POSITIONING_STUDENT_LINK);
         } else if (POSITIONING_TRIAL_14D.equals(card.getStatus())
                 && permissionApi.hasAnyPermissions(userId, "zsjos:positioning-card:confirm-trial")
                 && objectPermissionProvider.hasPermission(card.getId(), "confirm-trial", userId)) {
@@ -434,6 +541,40 @@ public class PositioningCardService {
             actions.add(ACTION_ARCHIVE_POSITIONING);
         }
         return actions;
+    }
+
+    private PositioningCardSubmissionDO createSubmission(PositioningCardDO card, Long userId, String status) {
+        PositioningCardSubmissionDO latest = submissionMapper.selectLatestByCard(card.getId());
+        PositioningCardSubmissionDO submission = new PositioningCardSubmissionDO();
+        submission.setCardId(card.getId()).setAccountId(card.getAccountId())
+                .setStudentPersonId(card.getStudentPersonId()).setServiceRelationId(card.getServiceRelationId())
+                .setSubmissionNo(latest == null ? 1 : latest.getSubmissionNo() + 1)
+                .setDirectorUserId(userId).setOperatorUserId(card.getOperatorUserId())
+                .setTemplateId(card.getTemplateId()).setTemplateVersionId(card.getTemplateVersionId())
+                .setFieldsSnapshotJson(card.getFieldsSnapshotJson()).setValuesSnapshotJson(card.getValuesSnapshotJson())
+                .setDictSnapshotJson(card.getDictSnapshotJson()).setLayer1Json(card.getLayer1Json())
+                .setLayer2Json(card.getLayer2Json()).setFormulaJson(card.getFormulaJson())
+                .setFeasibilityJson(card.getFeasibilityJson()).setContentFormJson(card.getContentFormJson())
+                .setComplianceJson(card.getComplianceJson()).setTrialEndDate(card.getTrialEndDate())
+                .setProfessionalRisk(card.getProfessionalRisk()).setStatus(status)
+                .setSubmittedAt(LocalDateTime.now()).setVersion(0);
+        submissionMapper.insert(submission);
+        return submission;
+    }
+
+    public PositioningCardSubmissionDO requireLatestSubmission(PositioningCardDO card, String expectedStatus) {
+        PositioningCardSubmissionDO submission = submissionMapper.selectLatestByCard(card.getId());
+        if (submission == null) throw exception(POSITIONING_SUBMISSION_NOT_EXISTS);
+        if (!expectedStatus.equals(submission.getStatus())) throw exception(POSITIONING_CARD_STATE_INVALID);
+        return submission;
+    }
+
+    private void requireAssignedOperator(PositioningCardDO card, PositioningCardSubmissionDO submission,
+                                         Long operatorUserId) {
+        if (!Objects.equals(card.getOperatorUserId(), operatorUserId)
+                || !Objects.equals(submission.getOperatorUserId(), operatorUserId)) {
+            throw exception(POSITIONING_CARD_PERMISSION_DENIED);
+        }
     }
 
     /**

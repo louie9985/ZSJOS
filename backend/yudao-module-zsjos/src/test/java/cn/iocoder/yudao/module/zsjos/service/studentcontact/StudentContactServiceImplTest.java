@@ -3,9 +3,13 @@ package cn.iocoder.yudao.module.zsjos.service.studentcontact;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactContextRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentContactSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentFirstContactSubmitReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentDeliveryStageSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentServiceAcceptReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.StudentStudyPlanSubmitReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.DirectorStageSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
@@ -26,6 +30,8 @@ import cn.iocoder.yudao.module.zsjos.service.director.DirectorFormTemplateServic
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.director.DirectorFormTemplateVersionDO;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -143,6 +149,53 @@ class StudentContactServiceImplTest {
     }
 
     @Test
+    void assignedOperatorReadsConfiguredContextAndHistoryWithoutPlannerActions() {
+        ServiceRelationDO relation = relation("accepted");
+        relation.setOperatorUserId(9L);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        StudentContactConfigVersionDO config = config();
+        config.setCollaboratorTabsJson("{\"operator\":[\"contacts\"]}");
+        when(configService.requirePublished()).thenReturn(config);
+        when(adminUserApi.getUserMap(anyList())).thenReturn(new HashMap<>());
+        when(recordMapper.selectPageByRelationId(any(PageParam.class), eq(10L)))
+                .thenReturn(new PageResult<>(List.of(), 0L));
+
+        for (String status : List.of("active", "paused", "completed")) {
+            relation.setStatus(status);
+            StudentContactContextRespVO context = service.getContext(10L, 9L);
+            assertEquals(List.of("overview", "contacts"), context.getVisibleTabs());
+            assertEquals(List.of(), context.getAvailableActions());
+        }
+        assertEquals(0L, service.getRecords(10L, new PageParam(), 9L).getTotal());
+    }
+
+    @Test
+    void unrelatedUserCannotReadStudentContactContext() {
+        when(relationMapper.selectById(10L)).thenReturn(relation("accepted"));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.getContext(10L, 9L));
+
+        assertEquals(STUDENT_PERMISSION_DENIED.getCode(), error.getCode());
+        verifyNoInteractions(configService);
+    }
+
+    @Test
+    void assignedOperatorCannotExecutePlannerContactCommands() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted");
+        relation.setOperatorUserId(9L);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+
+        assertPermissionDenied(() -> service.accept(10L, new StudentServiceAcceptReqVO(), 9L));
+        assertPermissionDenied(() -> service.submitFirstContact(10L, new StudentFirstContactSubmitReqVO(), 9L));
+        assertPermissionDenied(() -> service.submitStudyPlan(10L, new StudentStudyPlanSubmitReqVO(), 9L));
+        assertPermissionDenied(() -> service.submitContact(10L, new StudentContactSubmitReqVO(), 9L));
+        assertPermissionDenied(() -> service.updateBasicInfo(10L, basicInfoRequest("13800000000"), 9L));
+        verifyNoInteractions(recordMapper, personIdentityWriteService, eventMapper);
+    }
+
+    @Test
     void nextTaskTypeKeepsFailuresAndAdvancesSuccesses() {
         assertEquals(TYPE_FIRST_CONTACT, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_FIRST_CONTACT, false));
         assertEquals(TYPE_STUDY_PLAN, ReflectionTestUtils.invokeMethod(service, "nextType", TYPE_FIRST_CONTACT, true));
@@ -246,6 +299,25 @@ class StudentContactServiceImplTest {
         verify(recordMapper).insert(any(StudentContactRecordDO.class));
         verify(relationMapper).advanceDeliveryStage(eq(10L), eq(7L), eq(STAGE_SUPERVISION),
                 eq(STAGE_EXAM_PREPARATION), anyString(), eq(2));
+    }
+
+    @Test
+    void directorDraftReturnsTheAuthoritativeDraftVersionWithoutAdvancingRelationVersion() {
+        TenantContextHolder.setTenantId(1L);
+        ServiceRelationDO relation = relation("accepted");
+        relation.setContentDirectorUserId(7L); relation.setDirectorStage("precheck");
+        when(permissionApi.hasAnyPermissions(7L, PERMISSION_DIRECTOR_PRECHECK)).thenReturn(true);
+        when(relationMapper.selectByIdForUpdate(10L, 1L)).thenReturn(relation);
+        DirectorStageSaveReqVO request = new DirectorStageSaveReqVO();
+        relation.setDirectorPrecheckDraftVersion(2);
+        request.setData(Map.of()); request.setVersion(2); request.setIdempotencyKey("draft-key");
+
+        Integer version = service.saveDirectorPrecheckDraft(10L, request, 7L);
+
+        assertEquals(3, version);
+        verify(relationMapper).updateById(argThat((ServiceRelationDO row) -> row.getVersion() == 2
+                && row.getDirectorPrecheckDraftVersion() == 3
+                && row.getDirectorPrecheckDraftJson().contains("draft-key")));
     }
 
     @Test
@@ -390,5 +462,10 @@ class StudentContactServiceImplTest {
         request.setData(Map.of());
         request.setIdempotencyKey(key);
         return request;
+    }
+
+    private void assertPermissionDenied(org.junit.jupiter.api.function.Executable command) {
+        ServiceException error = assertThrows(ServiceException.class, command);
+        assertEquals(STUDENT_PERMISSION_DENIED.getCode(), error.getCode());
     }
 }

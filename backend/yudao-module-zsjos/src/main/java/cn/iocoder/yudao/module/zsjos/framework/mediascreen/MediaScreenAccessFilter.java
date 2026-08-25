@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.framework.mediascreen;
 
+import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -25,16 +27,32 @@ public class MediaScreenAccessFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         if (!request.getRequestURI().startsWith(PREFIX)) { chain.doFilter(request, response); return; }
-        if (!properties.isEnabled() || !"GET".equalsIgnoreCase(request.getMethod())) {
-            response.sendError(HttpServletResponse.SC_SERVICE_UNAVAILABLE); return;
+        if (!properties.isEnabled()) {
+            writeError(response, HttpServletResponse.SC_SERVICE_UNAVAILABLE, "媒体大屏服务未开启"); return;
+        }
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            response.setHeader("Allow", "GET");
+            writeError(response, HttpServletResponse.SC_METHOD_NOT_ALLOWED, "媒体大屏仅支持 GET 请求"); return;
         }
         String ip = resolveIp(request);
         Long tenantId;
         try { tenantId = Long.valueOf(request.getParameter("tenantId")); }
-        catch (Exception ex) { response.sendError(HttpServletResponse.SC_FORBIDDEN); return; }
-        if (!allowed(ip, tenantId)) { response.sendError(HttpServletResponse.SC_FORBIDDEN); return; }
+        catch (Exception ex) {
+            writeError(response, HttpServletResponse.SC_BAD_REQUEST, "tenantId 必须是正整数查询参数"); return;
+        }
+        if (tenantId <= 0) {
+            writeError(response, HttpServletResponse.SC_BAD_REQUEST, "tenantId 必须是正整数查询参数"); return;
+        }
+        if (!allowed(ip, tenantId)) {
+            writeError(response, HttpServletResponse.SC_FORBIDDEN, "当前客户端无权访问该租户的媒体大屏"); return;
+        }
         TenantContextHolder.setTenantId(tenantId);
         try { chain.doFilter(request, response); } finally { TenantContextHolder.clear(); }
+    }
+
+    private static void writeError(HttpServletResponse response, int status, String message) {
+        response.setStatus(status);
+        ServletUtils.writeJSON(response, CommonResult.error(status, message));
     }
 
     private String resolveIp(HttpServletRequest request) {

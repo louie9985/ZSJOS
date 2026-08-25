@@ -110,7 +110,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         boolean operational = "active".equals(relation.getStatus());
         if (owner) result.setVisibleTabs(List.of("overview", "first-contact", "study-plan", "contacts"));
         else {
-            String type = Objects.equals(relation.getContentDirectorUserId(), userId) ? COLLABORATOR_DIRECTOR : COLLABORATOR_CAREER;
+            String type = Objects.equals(relation.getContentDirectorUserId(), userId) ? COLLABORATOR_DIRECTOR
+                    : Objects.equals(relation.getCareerPlannerUserId(), userId) ? COLLABORATOR_CAREER
+                    : COLLABORATOR_OPERATOR;
             Map<?, ?> tabs = JsonUtils.parseObject(config.getCollaboratorTabsJson(), Map.class);
             List<String> visible = new ArrayList<>(List.of("overview"));
             Object configured = tabs == null ? null : tabs.get(type);
@@ -731,7 +733,8 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         if (!Objects.equals(relation.getOwnerUserId(), userId)
                 && !Objects.equals(relation.getContentDirectorUserId(), userId)
-                && !Objects.equals(relation.getCareerPlannerUserId(), userId)) {
+                && !Objects.equals(relation.getCareerPlannerUserId(), userId)
+                && !Objects.equals(relation.getOperatorUserId(), userId)) {
             throw exception(STUDENT_PERMISSION_DENIED);
         }
         return relation;
@@ -869,8 +872,8 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-precheck")
-    public void saveDirectorPrecheckDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
-        saveDirectorStage(relationId, "precheck", false, request, userId);
+    public Integer saveDirectorPrecheckDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
+        return saveDirectorStage(relationId, "precheck", false, request, userId);
     }
 
     @Override
@@ -883,8 +886,8 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "director-interview")
-    public void saveDirectorInterviewDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
-        saveDirectorStage(relationId, "interview", false, request, userId);
+    public Integer saveDirectorInterviewDraft(Long relationId, DirectorStageSaveReqVO request, Long userId) {
+        return saveDirectorStage(relationId, "interview", false, request, userId);
     }
 
     @Override
@@ -894,8 +897,8 @@ public class StudentContactServiceImpl implements StudentContactService {
         saveDirectorStage(relationId, "interview", true, request, userId);
     }
 
-    private void saveDirectorStage(Long relationId, String stage, boolean submit,
-                                   DirectorStageSaveReqVO request, Long userId) {
+    private Integer saveDirectorStage(Long relationId, String stage, boolean submit,
+                                      DirectorStageSaveReqVO request, Long userId) {
         String permission = "precheck".equals(stage) ? PERMISSION_DIRECTOR_PRECHECK : PERMISSION_DIRECTOR_INTERVIEW;
         if (!permissionApi.hasAnyPermissions(userId, permission)) throw exception(STUDENT_PERMISSION_DENIED);
         ServiceRelationDO relation = relationMapper.selectByIdForUpdate(relationId,
@@ -912,16 +915,21 @@ public class StudentContactServiceImpl implements StudentContactService {
                 "data", request.getData())));
         String previousJson = "precheck".equals(stage) ? relation.getDirectorPrecheckDraftJson()
                 : relation.getDirectorInterviewDraftJson();
-        if (!Objects.equals(relation.getVersion(), request.getVersion())
-                && directorCommandReplay(previousJson, request.getIdempotencyKey(), fingerprint)) return;
-        if (!current.equals(stage) || !Objects.equals(relation.getVersion(), request.getVersion())) {
+        Integer draftVersion = "precheck".equals(stage) ? relation.getDirectorPrecheckDraftVersion()
+                : relation.getDirectorInterviewDraftVersion();
+        if (draftVersion == null) draftVersion = 0;
+        if (!Objects.equals(draftVersion, request.getVersion())
+                && directorCommandReplay(previousJson, request.getIdempotencyKey(), fingerprint)) {
+            return draftVersion;
+        }
+        if (!current.equals(stage) || !Objects.equals(draftVersion, request.getVersion())) {
             throw exception(STUDENT_SERVICE_VERSION_CONFLICT);
         }
         boolean precheck = "precheck".equals(stage);
         if (precheck && request.getData() != null && !request.getData().isEmpty()) {
             throw exception(STUDENT_CONTACT_FORM_INVALID);
         }
-        StudentContactContextRespVO.DirectorFormVO existing = directorForm(stage, previousJson, null, relation);
+        StudentContactContextRespVO.DirectorFormVO existing = directorForm(stage, previousJson, null, relation, draftVersion);
         DirectorFormTemplateVO.Snapshot templateSnapshot = null;
         if (!precheck) {
             templateSnapshot = "empty".equals(existing.getState())
@@ -970,8 +978,12 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         relation.setDirectorFormConfigId(templateSnapshot == null ? null : templateSnapshot.getTemplateId());
         relation.setDirectorFormConfigVersion(templateSnapshot == null ? null : templateSnapshot.getTemplateVersionNo());
-        relation.setVersion(relation.getVersion() + 1);
+        int nextDraftVersion = draftVersion + 1;
+        if ("precheck".equals(stage)) relation.setDirectorPrecheckDraftVersion(nextDraftVersion);
+        else relation.setDirectorInterviewDraftVersion(nextDraftVersion);
+        if (submit) relation.setVersion(relation.getVersion() + 1);
         relationMapper.updateById(relation);
+        return nextDraftVersion;
     }
 
     private boolean directorCommandReplay(String json, String idempotencyKey, String fingerprint) {
@@ -988,15 +1000,16 @@ public class StudentContactServiceImpl implements StudentContactService {
                                                                         StudentContactConfigVersionDO config) {
         StudentContactContextRespVO.DirectorFormsVO forms = new StudentContactContextRespVO.DirectorFormsVO();
         forms.setPrecheck(directorForm("precheck", relation.getDirectorPrecheckDraftJson(),
-                relation.getDirectorPrecheckSnapshotJson(), relation));
+                relation.getDirectorPrecheckSnapshotJson(), relation, relation.getDirectorPrecheckDraftVersion()));
         forms.setInterview(directorForm("interview", relation.getDirectorInterviewDraftJson(),
-                relation.getDirectorInterviewSnapshotJson(), relation));
+                relation.getDirectorInterviewSnapshotJson(), relation, relation.getDirectorInterviewDraftVersion()));
         return forms;
     }
 
     private StudentContactContextRespVO.DirectorFormVO directorForm(String stage, String draftJson,
-            String snapshotJson, ServiceRelationDO relation) {
+            String snapshotJson, ServiceRelationDO relation, Integer draftVersion) {
         StudentContactContextRespVO.DirectorFormVO result = new StudentContactContextRespVO.DirectorFormVO();
+        result.setVersion(draftVersion == null ? 0 : draftVersion);
         String sourceJson = StrUtil.isNotBlank(snapshotJson) ? snapshotJson : draftJson;
         result.setState(StrUtil.isNotBlank(snapshotJson) ? "submitted" : StrUtil.isNotBlank(draftJson) ? "draft" : "empty");
         result.setInterviewAt("precheck".equals(stage) ? relation.getDirectorInterviewAt() : null);

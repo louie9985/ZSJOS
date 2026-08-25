@@ -117,6 +117,14 @@ SELECT 'study_planner_repurchase_schema_gate' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73440
                      AND permission='zsjos:sales-order:student-repurchase' AND parent_id=73020
                      AND type=3 AND status=0 AND deleted=b'0'), 'PASS','FAIL') AS result;
+SELECT 'sales_order_team_management' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V136'
+                  AND checksum='V136__sales_order_team_management.sql')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V136'
+                     AND checksum=SHA2('V136__sales_order_team_management.sql',256))
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73510
+                     AND permission='zsjos:sales-order:query-team' AND parent_id=6735
+                     AND path='sales-orders/team' AND type=2 AND status=0 AND deleted=b'0'), 'PASS','FAIL') AS result;
 SELECT 'new_media_business_notifications' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V102')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V102')
@@ -1335,7 +1343,8 @@ SELECT 'V128 media director student flow' AS check_name,
                  AND column_name IN ('operator_user_id','director_stage','director_interview_at',
                    'director_form_config_id','director_form_config_version',
                    'director_precheck_draft_json','director_precheck_snapshot_json',
-                   'director_interview_draft_json','director_interview_snapshot_json'))=9
+                   'director_interview_draft_json','director_interview_snapshot_json',
+                   'director_precheck_draft_version','director_interview_draft_version'))=11
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:operator-confirm' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE permission='zsjos:positioning-card:operator-reject' AND deleted=b'0'),
           'PASS','FAIL') AS result;
@@ -1348,6 +1357,50 @@ SELECT 'V130 configurable director forms' AS check_name,
           AND (SELECT COUNT(*) FROM zsjos_director_form_template
                WHERE scene IN ('director_interview','positioning_card') AND published_version_id IS NOT NULL AND deleted=b'0')>=2
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73480,73460,73481,73482) AND deleted=b'0')=4,
+          'PASS','FAIL') AS result;
+SELECT 'V137 Workbench menu rendering mode compatibility' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+            WHERE version='V137'
+              AND checksum=SHA2('V137__repair_workbench_menu_render_mode_version_collision.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V137'
+              AND checksum=SHA2('V137__repair_workbench_menu_render_mode_version_collision.sql',256))
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+            WHERE table_schema=DATABASE() AND table_name='system_menu'
+              AND column_name='workbench_render_mode'),
+          'PASS','FAIL') AS result;
+SELECT 'V133 director interview presentation' AS check_name,
+       IF((EXISTS (SELECT 1 FROM zsjos_schema_version
+                    WHERE version='V133'
+                      AND checksum=SHA2('V133__director_interview_form_presentation.sql',256))
+            OR EXISTS (SELECT 1 FROM zsjos_schema_version
+                    WHERE version='V132'
+                      AND checksum=SHA2('V132__director_interview_form_presentation.sql',256)))
+          AND EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_certificate_practice' AND value='unknown' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_video_skill' AND value='partial' AND deleted=b'0')
+          AND EXISTS (
+            SELECT 1 FROM zsjos_director_form_template t
+            JOIN zsjos_director_form_template_version v ON v.id=t.published_version_id
+            WHERE t.scene='director_interview' AND t.deleted=b'0' AND v.deleted=b'0' AND v.status='published')
+          AND NOT EXISTS (
+            SELECT 1
+              FROM zsjos_director_form_template_version v
+              JOIN zsjos_director_form_template t ON t.published_version_id=v.id
+             WHERE t.scene='director_interview' AND t.deleted=b'0' AND v.deleted=b'0'
+               AND (v.status<>'published'
+                 OR (SELECT COUNT(*) FROM JSON_TABLE(v.fields_json, '$[*]' COLUMNS(
+                       field_key VARCHAR(100) PATH '$.key')) required_fields
+                     WHERE required_fields.field_key IN ('certificates','certificatePractice','examPreparation',
+                       'age','gender','region','currentOccupation','workTime','workExperience','familyMembers','hobbies',
+                       'videoEditing','videoShooting','liveExperience','shootingEquipment','equipmentModel',
+                       'mediaTime','continuousTime','appearanceWillingness','purchaseMotivations','deliveryRisks'))<>21
+                 OR EXISTS (SELECT 1 FROM JSON_TABLE(v.fields_json, '$[*]' COLUMNS(
+                       field_key VARCHAR(100) PATH '$.key', field_group VARCHAR(100) PATH '$.group')) grouped_fields
+                     WHERE grouped_fields.field_key='sixDimensionCommunicated'
+                       OR grouped_fields.field_key IN ('certificates','certificatePractice','examPreparation') AND NOT (grouped_fields.field_group<=>'证书与备考')
+                       OR grouped_fields.field_key IN ('age','gender','region','currentOccupation','workTime','workExperience','familyMembers','hobbies') AND NOT (grouped_fields.field_group<=>'基本信息')
+                       OR grouped_fields.field_key IN ('videoEditing','videoShooting','liveExperience','shootingEquipment','equipmentModel') AND NOT (grouped_fields.field_group<=>'自媒体运营基础能力')
+                       OR grouped_fields.field_key IN ('mediaTime','continuousTime','appearanceWillingness','purchaseMotivations','deliveryRisks') AND NOT (grouped_fields.field_group<=>'时间与出镜')))),
           'PASS','FAIL') AS result;
 SELECT 'V131 director/operator action permissions' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V131')
@@ -1376,4 +1429,38 @@ SELECT 'V131 director/operator action permissions' AS check_name,
               SELECT 1 FROM zsjos_user_relation_scene scene
               WHERE scene.tenant_id=tenant.id AND scene.code='content_director_operator'
                 AND scene.deleted=b'0' AND scene.status=0)),
+          'PASS','FAIL') AS result;
+SELECT 'V134 positioning confirmation handoff' AS check_name,
+       IF((EXISTS (SELECT 1 FROM zsjos_schema_version
+                    WHERE version='V134'
+                      AND checksum=SHA2('V134__positioning_confirmation_handoff.sql',256))
+            OR EXISTS (SELECT 1 FROM zsjos_schema_version
+                    WHERE version='V133'
+                      AND checksum=SHA2('V133__positioning_confirmation_handoff.sql',256)))
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+            AND table_name='zsjos_positioning_card_submission')
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+            AND table_name='zsjos_positioning_confirmation_link')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_positioning_card_submission'
+                 AND column_name IN ('layer1_json','layer2_json','formula_json','feasibility_json',
+                                     'content_form_json','compliance_json'))=6
+          AND EXISTS (SELECT 1 FROM system_menu
+            WHERE permission='zsjos:positioning-card:student-link-generate' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+SELECT 'V135 applied schema compatibility repair' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V135')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V135')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_service_relation'
+                 AND column_name IN ('director_precheck_draft_version','director_interview_draft_version'))=2
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_positioning_card_submission'
+                 AND column_name IN ('layer1_json','layer2_json','formula_json','feasibility_json',
+                                     'content_form_json','compliance_json'))=6
+          AND NOT EXISTS (SELECT 1 FROM zsjos_positioning_card_submission
+            WHERE creator IN ('V133','V134') AND deleted=b'0'
+              AND (layer1_json IS NULL OR layer2_json IS NULL OR formula_json IS NULL
+                OR feasibility_json IS NULL OR content_form_json IS NULL OR compliance_json IS NULL)),
           'PASS','FAIL') AS result;

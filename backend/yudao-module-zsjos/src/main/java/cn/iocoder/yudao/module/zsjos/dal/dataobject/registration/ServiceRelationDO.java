@@ -35,8 +35,10 @@ public class ServiceRelationDO extends TenantBaseDO {
     private Long directorFormConfigId;
     private Integer directorFormConfigVersion;
     private String directorPrecheckDraftJson;
+    private Integer directorPrecheckDraftVersion;
     private String directorPrecheckSnapshotJson;
     private String directorInterviewDraftJson;
+    private Integer directorInterviewDraftVersion;
     private String directorInterviewSnapshotJson;
     private String serviceSnapshot;
     /** Current delivery stage is owned by the service relation, not inferred from labels or contact text. */

@@ -365,6 +365,38 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
+    public PageResult<SalesOrderListItemRespVO> getTeamPage(SalesOrderTeamPageReqVO reqVO, Long userId) {
+        Set<Long> teamUserIds = permissionService.teamUserIds(userId);
+        if (teamUserIds.isEmpty()) return PageResult.empty();
+        List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
+        if (matchedOrderIds != null) reqVO.setStatus(null);
+        PageResult<SalesOrderDO> page = orderMapper.selectTeamPage(teamUserIds, reqVO, matchedOrderIds);
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
+        return new PageResult<>(page.getList().stream()
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList(), page.getTotal());
+    }
+
+    @Override
+    public CursorPageResult<SalesOrderListItemRespVO> getTeamCursorPage(SalesOrderTeamCursorReqVO reqVO, Long userId) {
+        Set<Long> teamUserIds = permissionService.teamUserIds(userId);
+        if (teamUserIds.isEmpty()) return new CursorPageResult<>(List.of(), null, false);
+        List<Long> matchedOrderIds = advancedFilterService.matchOrderIds(reqVO.getAdvancedFilter());
+        String keyword = StrUtil.blankToDefault(reqVO.getKeyword(), null);
+        SalesOrderCursorCodec.Cursor cursor = SalesOrderCursorCodec.decode(reqVO.getCursor(), userId, reqVO.getStatus(), keyword);
+        int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
+        List<SalesOrderDO> rows = orderMapper.selectTeamCursor(teamUserIds, reqVO.getStatus(), keyword, matchedOrderIds,
+                cursor == null ? null : cursor.time(), cursor == null ? null : cursor.id(), limit + 1);
+        boolean hasMore = rows.size() > limit;
+        List<SalesOrderDO> list = hasMore ? rows.subList(0, limit) : rows;
+        Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(list);
+        List<SalesOrderListItemRespVO> result = list.stream()
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList();
+        String next = hasMore && !list.isEmpty()
+                ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getUpdateTime(), list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
+        return new CursorPageResult<>(result, next, hasMore);
+    }
+
+    @Override
     public PageResult<FinanceOrderExportRowRespVO> getFinanceExportPage(FinanceOrderExportReqVO reqVO, Long userId) {
         if (!permissionService.isFinanceCenterMember(userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
         PageResult<SalesOrderDO> page = orderMapper.selectFinanceExportPage(reqVO,
@@ -394,6 +426,16 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 orderMapper.selectMyCount(userId, STATUS_REVISION_REQUIRED),
                 orderMapper.selectMyCount(userId, STATUS_EFFECTIVE),
                 orderMapper.selectMyCount(userId, STATUS_SUPERSEDED));
+    }
+
+    @Override
+    public SalesOrderStatusCountsRespVO getTeamStatusCounts(Long userId) {
+        Set<Long> teamUserIds = permissionService.teamUserIds(userId);
+        return new SalesOrderStatusCountsRespVO(orderMapper.selectTeamCount(teamUserIds, null),
+                orderMapper.selectTeamCount(teamUserIds, STATUS_PENDING_APPROVAL),
+                orderMapper.selectTeamCount(teamUserIds, STATUS_REVISION_REQUIRED),
+                orderMapper.selectTeamCount(teamUserIds, STATUS_EFFECTIVE),
+                orderMapper.selectTeamCount(teamUserIds, STATUS_SUPERSEDED));
     }
 
     @Override

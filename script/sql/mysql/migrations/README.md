@@ -486,3 +486,58 @@ without inventing any source/target user relation. Candidate operators remain en
 through the relationship-maintenance page. Rollback requires restoring the affected
 `system_role_menu` relations from an environment-specific audit; scene removal is allowed only
 after confirming that no configured relationship still references it.
+
+### V132 Workbench menu rendering mode
+
+V132 adds the server-owned `workbench_render_mode` metadata column to `system_menu`. The change is
+additive and repeatable, defaults existing rows to `native`, and does not alter menu permissions or
+business rows. Rollback requires a reviewed forward repair because removing the column would discard
+administrator-selected rendering metadata.
+
+### V133 director interview form presentation
+
+V133 follows V132 in the baseline and normalizes active director interview templates, removes the retired
+six-dimension field, adds the required dictionary choices, and guards the director draft-version columns.
+It preserves published history and service-relation snapshots, serializes execution with a named lock, and
+is repeatable. Apply it only through the controlled migration sequence; rollback requires a reviewed forward
+template version because rewriting published historical snapshots is prohibited.
+
+### V134 positioning confirmation handoff
+
+Adds immutable positioning submission field snapshots, digest-only long-lived single-decision links, and
+the operator button permission for generating or regenerating a student confirmation URL. It backfills only
+non-deleted legacy `student_confirm` cards that contain the required relationship and ownership identifiers;
+their unknown historical submit time remains null. Successful compatibility rows advance to
+`student_link_pending`. The migration deletes no business data and cannot restore the retired Partner-H5
+confirmation entry after a new link or decision. Review the target and in-flight count before separately
+approved execution, then run `verify-bootstrap.sql`.
+
+### V135 applied director and positioning schema repair
+
+Repairs databases that applied earlier revisions of V133 or V134 before the director draft-version columns
+and complete positioning submission section snapshots were added. It uses guarded DDL to add the two
+service-relation version columns and six nullable submission snapshot columns. Existing compatibility
+submissions are repaired only when they remain owned by V134 and have a matching active positioning card;
+only missing values are copied from that authoritative source. The migration does not rewrite V133/V134
+markers, statuses, permissions, links, or non-null snapshot values. It is repeatable and forward-only.
+Dropping the columns after runtime use would lose version and snapshot facts. Apply V135 after V134, then
+run `verify-bootstrap.sql` and require the V128, V134, and V135 checks to pass.
+
+### V136 sales order team management
+
+V136 adds the server-owned `团队订单` page and `zsjos:sales-order:query-team` permission, granting it only
+to existing active `sales_manager` role rows. The page stores the Workbench child path
+`sales-orders/team`; both Workbench and Admin consume the same team-order read APIs. The backend resolves
+the current user's department subtree at query time and filters by submitter, so no member snapshot or
+role-name authorization rule is stored. The migration is repeatable, non-destructive, and changes no order
+or approval rows. Apply after V135 through the controlled migration process. Rollback requires a reviewed
+forward repair and must preserve administrator-created menu grants.
+
+### V137 Workbench menu rendering-mode collision repair
+
+V137 is required for environments that already recorded the former local V132/V133/V134 migrations before
+the remote Workbench rendering migration claimed V132. It preserves every applied marker and repeatably
+adds `system_menu.workbench_render_mode` only when absent, then records its own V137 legacy and module
+markers. Fresh environments also run V137 as a guarded no-op after V132-V136. It changes no menu grants or
+business rows; rollback requires a reviewed forward repair because removing the column loses configured
+rendering metadata.

@@ -300,6 +300,10 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode DIRECTOR_FORM_TEMPLATE_VERSION_CONFLICT = new ErrorCode(1_900_014_012, "编导表单模板已被修改，请刷新后重试");
     ErrorCode DIRECTOR_FORM_VALUE_INVALID = new ErrorCode(1_900_014_013, "编导表单内容不完整或包含无效选项");
     ErrorCode DIRECTOR_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_014_014, "编导时效配置已被修改，请刷新后重试");
+    ErrorCode POSITIONING_OPERATOR_REQUIRED = new ErrorCode(1_900_014_015, "请先指派有效运营负责人，再提交定位卡");
+    ErrorCode POSITIONING_SUBMISSION_NOT_EXISTS = new ErrorCode(1_900_014_016, "定位卡尚无可确认的提交版本");
+    ErrorCode POSITIONING_CONFIRMATION_LINK_INVALID = new ErrorCode(1_900_014_017, "确认链接无效或已失效");
+    ErrorCode POSITIONING_STUDENT_COMMENT_REQUIRED = new ErrorCode(1_900_014_018, "修改意见不能为空且不能超过 500 个字符");
 
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
