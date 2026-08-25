@@ -2945,3 +2945,17 @@
 - Verification evidence: Workbench Vitest 59 个测试文件、366 个测试通过；`npm run typecheck` 通过；`npm run build` 通过，仅报告既有大 chunk 警告；`git diff --check` 通过；未执行真实业务浏览器验证，后端/有效登录态不可用。
 - Dependency/integration impact: 无新增依赖、数据库、权限、BPM、分支或服务变更；`.env.local` 仅包含局域网代理地址与端口，不含密码或令牌。
 - Remaining work: 完成提交和推送后核对远端哈希；未跟踪 probe 文件保留在本地，不纳入发布。
+
+## Delivery Entry - 2026-08-25 18:55:40 +08:00
+
+- Workstream ID: `main-workbench-ui-commit-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `c5d5b19c`（功能提交已推送）
+- User goal: 完成当前 Git 改动的云端提交。
+- Key decisions: 首次 SSH 推送被远端关闭后仅重试一次；不强制推送、不改写历史；保留本地未跟踪 probe 调试文件，不发布它们。
+- Execution result: `c5d5b19c feat(workbench): refine business detail presentation` 已成功推送至 `origin/main`。
+- Changed files: 功能提交包含前述 26 个正式文件；本条仅追加交付日志。
+- Verification evidence: 推送返回 `759accf4..c5d5b19c main -> main`；提交前 Workbench 59 个测试文件/366 个测试、类型检查、生产构建均通过；首次推送失败原因为 SSH 连接被远端关闭，重试成功。
+- Dependency/integration impact: 远端 `main` 已包含本次 Workbench UI、时间格式、销售订单详情、抢单池和代理配置改动；无数据库、权限、BPM、服务或分支变更。
+- Remaining work: 推送本收尾日志提交后，确认本地与远端哈希一致；`frontend/workbench/probe.html` 和 `frontend/workbench/src/__probe__/` 仍为本地未跟踪调试文件。
