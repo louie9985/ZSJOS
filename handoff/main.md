@@ -2151,3 +2151,16 @@
 - Verification evidence: EAM Maven 模块 40 个测试通过；Workbench Vitest 59 个测试文件、359 个测试通过；Workbench `npm run typecheck` 和 `npm run build` 通过，构建仅报告既有大 chunk 警告；`git diff --check` 通过。Admin `pnpm ts:check` 仍有仓库既有错误，涉及 BPM/CRM/MES 及未改动的 EAM 页面，当前改动的资产/分类页面未出现在报错中。未执行数据库、服务重启或鉴权浏览器验证。
 - Dependency/integration impact: 未新增本次任务之外的依赖；现有 Workbench FMS 依赖改动属于当前工作区既有内容；无数据库执行、权限变更、BPM 发布、分支或工作树操作。
 - Remaining work: 完成暂存、提交、推送后核对本地与 `origin/main` 哈希及工作区状态；Admin 既有类型错误和真实后端鉴权验证留作后续工作。
+
+## Delivery Entry - 2026-08-25 10:12:10 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `b63f6a6d` (feature commit)
+- User goal: 完成当前 Git 改动的云端提交。
+- Key decisions: 以单个汇总提交发布全部非忽略改动；不提交 Playwright 快照/截图；不强制推送、不切换分支、不执行数据库或服务变更。
+- Execution result: 创建 `b63f6a6d feat: complete EAM FMS HRM workbench migration`，包含 187 个文件、25423 行新增和 647 行删除；已成功推送至 `origin/main`。
+- Changed files: 业务提交覆盖本次工作区全部已跟踪及新增非临时文件；Playwright 运行产物保持忽略。
+- Verification evidence: `git diff --cached --check` 在提交前通过；EAM 40 个 Maven 测试、Workbench 59 个测试文件/359 个测试、Workbench 类型检查和生产构建均通过；Admin 类型检查仍保留既有错误，未执行数据库和鉴权浏览器验证。
+- Dependency/integration impact: 远端 `main` 已包含本次 EAM/FMS/HRM/Workbench 集成；无强制推送、数据库执行、权限/BPM 发布或服务重启。
+- Remaining work: 推送本收尾日志提交后，确认本地与远端哈希一致、跟踪工作区干净；Admin 既有类型错误和真实后端验证另行处理。
