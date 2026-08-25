@@ -1,5 +1,12 @@
 /* Global antd surface overrides that must sit outside .crm-shell (portals). */
 
+/* Native table elements can otherwise fall back to the browser's 16px default
+   instead of inheriting the active Ant Design font scale from .ant-table. */
+.ant-table table {
+  font-size: inherit;
+  line-height: inherit;
+}
+
 .lead-detail-card .ant-card-head {
   min-height: 42px;
   padding: 0 var(--crm-sp-5);

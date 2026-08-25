@@ -122,7 +122,6 @@ describe('spacing and sizing anchors', () => {
     // 重复声明，重复项已删。详情区仍逐个锚定，它们各自是独立的滚动容器。
     const anchors = [
       /\.workspace-page \{[^}]*padding: var\(--crm-page-pad\)/,
-      /\.eam-category-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.lead-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.message-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.sales-order-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
@@ -151,12 +150,13 @@ describe('spacing and sizing anchors', () => {
     expect(offenders).toEqual([])
   })
 
-  it('keeps my sales orders on the approved compact top and start edges', () => {
+  it('aligns my sales orders with the standard master-detail page shell', () => {
     const salesOrder = business.find(([path]) => path.endsWith('sales-order.css'))?.[1] ?? ''
 
-    // 刻意比通用页面更紧，故显式覆盖父类的 page-pad
-    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*padding: var\(--crm-sp-1\) var\(--crm-page-pad\)/)
+    expect(salesOrder).toMatch(/\.sales-order-inbox-page \{[^}]*display: flex[^}]*height: 100%/)
+    expect(salesOrder).not.toMatch(/\.sales-order-inbox-page \{[^}]*padding:/)
     expect(salesOrder).toMatch(/\.sales-order-inbox-actions \{[^}]*display: flex[^}]*align-items: center/)
+    expect(salesOrder).toMatch(/\.sales-order-inbox-actions \{[^}]*border-bottom: 1px solid var\(--crm-border\)/)
   })
 
   it('unifies the master-detail list column width', () => {
@@ -172,7 +172,6 @@ describe('spacing and sizing anchors', () => {
       'business-inbox-layout',
       'media-students-inbox-layout'
       ,'media-feature-inbox-layout'
-      ,'eam-category-layout'
     ]
     const offenders = layouts.filter(name => {
       const body = joined.split(`.${name} {`)[1]?.split('}')[0] ?? ''

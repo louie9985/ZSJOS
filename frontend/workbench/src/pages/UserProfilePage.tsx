@@ -3,11 +3,11 @@ import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Modal, Radio, S
 import { UploadOutlined, WechatOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import EmployeeAvatar from '../components/EmployeeAvatar'
+import DateTimeText from '../components/DateTimeText'
 import { APP_ROUTES } from '../constants'
 import { api, type SocialUser, type UserProfile } from '../services/api'
 
 const WECOM_TYPE = 30
-const formatTime = (value?: string | number) => value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '—'
 const errorText = (error: unknown) => error instanceof Error ? error.message : '请求失败，请稍后重试'
 
 export const parseWecomCallback = (search: string) => {
@@ -82,7 +82,7 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
     if (!social || socialLoading) return
     Modal.confirm({ title: '解绑企业微信？', content: '解绑后将取消当前账号与企业微信的关联。', okText: '确认解绑', cancelText: '取消', onOk: async () => { await api.unbindSocialUser(WECOM_TYPE, social.openid); setSocial(undefined); message.success('企业微信已解绑') } })
   }
-  const infoItems = useMemo(() => [{ key: 'username', label: '用户名', children: profile?.username || '—' }, { key: 'dept', label: '部门', children: profile?.dept?.name || '—' }, { key: 'posts', label: '岗位', children: profile?.posts?.map(post => post.name).join('、') || '—' }, { key: 'createTime', label: '创建日期', children: formatTime(profile?.createTime) }], [profile])
+  const infoItems = useMemo(() => [{ key: 'username', label: '用户名', children: profile?.username || '—' }, { key: 'dept', label: '部门', children: profile?.dept?.name || '—' }, { key: 'posts', label: '岗位', children: profile?.posts?.map(post => post.name).join('、') || '—' }, { key: 'createTime', label: '创建日期', children: <DateTimeText value={profile?.createTime} emptyText="—" precision="second"/> }], [profile])
   if (loading) return <section className="workspace-page user-profile-page"><Card><Skeleton active /></Card></section>
   if (error) return <section className="workspace-page user-profile-page"><Alert type="error" showIcon message="个人资料加载失败" description={error} action={<Button onClick={() => void load()}>重试</Button>} /></section>
   return <section className="workspace-page user-profile-page"><Card title="个人中心"><Tabs items={[

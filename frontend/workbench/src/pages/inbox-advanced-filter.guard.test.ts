@@ -56,4 +56,14 @@ describe('business inbox advanced-filter guard', () => {
       '/student/my/search-page'
     ]) expect(source).toContain(endpoint)
   })
+
+  it('keeps the claim pool on a fixed twelve-card server page', () => {
+    const source = read('pages/LeadClaimPoolPage.tsx')
+    expect(source).toContain('const PAGE_SIZE = 12')
+    expect(source).toContain('setItems(result.list)')
+    expect(source).toContain('setPageNo(targetPage)')
+    expect(source).toContain('<Pagination current={pageNo} pageSize={PAGE_SIZE}')
+    expect(source).not.toContain('IntersectionObserver')
+    expect(source).not.toContain('mergeUniqueLeads')
+  })
 })

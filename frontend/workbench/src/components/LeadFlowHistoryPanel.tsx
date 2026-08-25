@@ -56,7 +56,7 @@ function FlowItem({ item }: { item: LeadFlowHistory }) {
   return <div className="lead-flow-history-node">
     <div className="lead-flow-history-marker" aria-hidden><span/></div>
     <div className="lead-flow-history-node-content">
-      <time className="lead-flow-history-time">{formatTimestamp(item.occurredAt)}</time>
+      <time className="lead-flow-history-time">{formatTimestamp(item.occurredAt, '-', 'second')}</time>
       <article className="lead-flow-history-item">
         <header className="lead-flow-history-item-header">
           <div className="lead-flow-history-title-row">

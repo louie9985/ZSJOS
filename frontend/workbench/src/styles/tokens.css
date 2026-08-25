@@ -120,13 +120,14 @@
   --crm-radius-md: 8px;
   --crm-radius-lg: 10px;
 
-  /* 字号 */
-  --crm-font-xs: 11px;
+  /* 字号 fallback。运行时由 ThemeVars 直接桥接 Ant Design font token；
+     这里的 default 档对应 fontSize=13、fontSizeSM=12、fontSizeLG=14、fontSizeXL=18。 */
+  --crm-font-xs: 12px;
   --crm-font-sm: 12px;
-  --crm-font-base: 14px;
-  --crm-font-lg: 15px;
+  --crm-font-base: 13px;
+  --crm-font-lg: 14px;
   /* 读数字号：倒计时一类需要一眼看清的数字，比正文层级明显高一档 */
-  --crm-font-display: 22px;
+  --crm-font-display: 18px;
   --crm-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* 图标字号。**不随字号档缩放** —— 图标尺寸变化会破坏 antd Menu / Button
@@ -225,24 +226,24 @@ html[data-crm-density='compact'] {
   --crm-row-h: 40px;
 }
 
-/* ==================== 字号档 ==================== */
-/* antd 组件字号由 ConfigProvider 的 fontSize token 控制（见 ThemeProvider），
-   这里只管自有 CSS。两侧取值须保持一致。 */
+/* ==================== 字号档 fallback ==================== */
+/* antd 组件与自有 CSS 都由 ThemeProvider 使用同一套 token 驱动。
+   data 属性只提供 JS 尚未执行时的首屏 fallback，运行时值由 ThemeVars 覆盖。 */
 
 html[data-crm-font='small'] {
   --crm-font-xs: 10px;
-  --crm-font-sm: 11px;
-  --crm-font-base: 13px;
+  --crm-font-sm: 10px;
+  --crm-font-base: 12px;
   --crm-font-lg: 14px;
-  --crm-font-display: 20px;
+  --crm-font-display: 16px;
 }
 
 html[data-crm-font='large'] {
   --crm-font-xs: 12px;
-  --crm-font-sm: 13px;
-  --crm-font-base: 15px;
+  --crm-font-sm: 12px;
+  --crm-font-base: 14px;
   --crm-font-lg: 16px;
-  --crm-font-display: 24px;
+  --crm-font-display: 18px;
 }
 
 /* ==================== 圆角分档 ==================== */

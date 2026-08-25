@@ -1,5 +1,85 @@
 # Main Workstream
 
+## Workstream Registration - 2026-08-25 17:20:00 +08:00
+
+- Workstream ID: `main-workbench-sales-order-detail-rail`
+- Goal: redesign `/zsjos/sales-orders/my` detail around a dense flat information canvas with an independent right-side approval status and countersign rail, following the confirmed reference composition.
+- Non-goals: change sales-order APIs, BPM contracts or history, permissions, route/menu configuration, approval actions, business state transitions, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/components/SalesOrderDetailCards.tsx`, its focused tests, `frontend/workbench/src/pages/sales-order-approval-unified.guard.test.ts`, `frontend/workbench/src/styles/pages/sales-order.css`, directly affected `frontend/workbench/docs/ui-guidelines.md`, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing React, Ant Design 6, `DetailFieldGrid`, Workbench theme tokens, and current aggregate sales-order approval fields; no new dependency.
+- Integration order: separate summary from actions -> introduce 9:3 detail layout -> move status/actions into approval sidebar -> convert approval nodes to a vertical rail -> retain dense flat business sections -> update focused guards/docs -> verify.
+- Verification plan: focused component and source-guard tests, full Workbench tests, typecheck, production build, `git diff --check`, and desktop/mobile browser checks against the local page when a usable session is available.
+
+## Delivery Entry - 2026-08-25 17:18:00 +08:00
+
+- Workstream ID: `main-workbench-sales-order-detail-rail`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` (no commit created)
+- User goal: redesign the `/zsjos/sales-orders/my` detail so related order information is no longer forced into separate large cards and countersign approval status uses a more appropriate visual component.
+- Key decisions: use the Workbench 12-column 9:3 detail contract; keep the main business area as a dense unframed canvas; use Ant Design `Timeline` for the right-side approval rail; place current status and authorized actions above the rail; embed sales-supervisor countersign state within its owning registration or finance node; keep course rows as a table and vouchers as attachment previews; do not invent BPM participants or history absent from the current aggregate API.
+- Execution or analysis result: separated the order summary from approval actions; added status alerts for pending, supervisor-countersign, revision, terminated, effective, and superseded states; grouped customer profile, order overview, student profile, payment, repurchase, courses, service notes, and vouchers by information shape; made payment a full-width section; moved the approval sidebar ahead of business information when the detail container becomes narrow; preserved existing API, dictionary error/retry, permission, copy, approval, revision, termination, table, and mobile drawer behavior.
+- Changed files: `frontend/workbench/src/components/SalesOrderDetailCards.tsx`; `frontend/workbench/src/components/SalesOrderDetailCards.test.tsx`; `frontend/workbench/src/pages/sales-order-approval-unified.guard.test.ts`; `frontend/workbench/src/styles/pages/sales-order.css`; `frontend/workbench/docs/ui-guidelines.md`; `handoff/main.md`.
+- Verification evidence: focused component/source/style tests passed 3 files/34 tests without Ant Design deprecation warnings; full Workbench tests passed 62 files/382 tests; `npm run typecheck` passed; `npm run build` passed with the existing chunk-size warning; scoped `git diff --check` passed; the local page reloaded at `http://127.0.0.1:5174/zsjos/sales-orders/my` and emitted no browser console warnings/errors, but redirected to the unified login screen because the in-app Browser had no authenticated session.
+- Dependency or integration impact: no new dependency, API/schema/permission/BPM/database change, branch/worktree operation, commit, push, deployment, or modification of unrelated dirty-worktree files.
+- Remaining work: authenticated desktop and mobile visual verification of the real order detail remains required after a usable local session is available; specifically confirm the sticky 9:3 sidebar at wide widths, approval-first stacking at narrow widths, long status/reason wrapping, and voucher/table overflow behavior with representative data.
+
+## Workstream Registration - 2026-08-25 16:45:00 +08:00
+
+- Workstream ID: `main-workbench-sales-order-detail-composition`
+- Goal: redesign the `/zsjos/sales-orders/my` order detail composition so countersign approval status uses a workflow node view and related business information is grouped by meaning instead of fragmented cards.
+- Non-goals: change sales-order APIs, BPM contracts, permissions, route/menu configuration, approval actions, business state transitions, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/components/SalesOrderDetailCards.tsx`, its focused tests, `frontend/workbench/src/styles/pages/sales-order.css`, directly affected UI guidance, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing React, Ant Design, `DetailFieldGrid`, Workbench theme tokens, and current aggregate sales-order approval fields; no new dependency.
+- Integration order: replace approval table with node flow -> regroup customer/order/student/payment/service sections -> keep course table and voucher preview semantics -> add focused rendering/style guards -> run Workbench verification.
+- Verification plan: focused component/style tests, Workbench typecheck/build, `git diff --check`, and authenticated desktop/mobile browser checks when a usable local session is available.
+
+## Workstream Registration - 2026-08-25 15:55:00 +08:00
+
+- Workstream ID: `main-workbench-sales-order-lead-layout`
+- Goal: align `/zsjos/sales-orders/my` page layout and visual styling with `/zsjos/leads/manage`.
+- Non-goals: change sales-order APIs, data contracts, permissions, route/menu configuration, business state transitions, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/styles/pages/sales-order.css`, its focused style guard, directly affected UI guidance, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Workbench React/Ant Design/theme tokens; no new dependency.
+- Integration order: align page shell and status strip -> align list/detail visual states -> update guard/docs -> run focused and Workbench verification.
+- Verification plan: focused style guard, Workbench tests, typecheck, production build, `git diff --check`, and authenticated browser checks when a usable local session is available.
+
+## Workstream Registration - 2026-08-25 15:30:00 +08:00
+
+- Workstream ID: `main-workbench-datetime-display`
+- Goal: unify Workbench user-visible date/time formatting so dense pages do not deform because second-level timestamps consume excessive width.
+- Non-goals: change backend/API time contracts, persisted values, date/time picker behavior, timezone ownership, business sorting, permissions, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/services/time.ts`, its focused test contract, a shared date/time text component and style, directly affected Workbench timestamp renderers, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing React, Ant Design Tooltip, and Workbench time formatting service; no new dependency.
+- Integration order: update shared formatting contract -> add stable no-wrap time text -> replace inconsistent locale timestamp renderers -> statically review scope and append delivery entry.
+- Verification plan: per user instruction, do not run tests, typecheck, build, or browser checks; perform source/diff inspection only and report the unverified risk.
+
+## Workstream Scope Update - 2026-08-25 15:42:00 +08:00
+
+- Workstream ID: `main-workbench-datetime-display`
+- Ownership scope addition: `frontend/workbench/docs/ui-guidelines.md`, to record the directly affected shared time-display convention before delivery.
+- Reason: the new shared formatter and `DateTimeText` component establish a reusable Workbench UI rule that future table and detail implementations must follow consistently.
+
 ## Active workstream: restore Workbench layout preview SVGs
 
 - Workstream ID: `main-restore-workbench-layout-svg`
@@ -2635,3 +2715,233 @@
 - Verification evidence: 未合并路径为空；`HEAD...origin/main` 为 `0 0`；两者均解析为 `00d9dbec11411bcac0e2eba6f597d76c72b9230a`；`git diff --check` 通过。
 - Dependency or integration impact: 本地 `main` 已同步远端的 ZSJOS 导师/学员流程、媒体大屏、Workbench、Admin、框架配置和 SQL 迁移变更；未执行迁移、服务操作、提交或推送。
 - Remaining work: 本交付记录保持为本地未提交改动；如需同步到远端，应另行确认提交和推送。
+
+## Workstream Registration - 2026-08-25 15:41:44 +08:00
+
+- Workstream ID: `main-workbench-antd-font-tokens-20260825`
+- Goal: 让 Workbench 自有页面字号梯度直接跟随 Ant Design token，同时保持当前菜单字号观感。
+- Non-goals: 不改页面结构、导航层级、间距密度、字体视觉品牌或用户已有的无关改动；不运行测试、类型检查或构建。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` 加现有未提交改动。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/components/Theme/themeTokens.ts`、`frontend/workbench/src/styles/tokens.css` 及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 当前 Workbench 的 Ant Design 6.5.3、ThemeProvider/ThemeVars token 桥接；无新增依赖。
+- Integration order: 登记工作流 -> 将 Ant 字号 token 桥接为 CRM CSS 变量 -> 保留字号档位的 fallback -> 做静态 diff 检查 -> 追加交付证据。
+- Verification plan: 仅检查目标 diff、工作区状态和 `git diff --check`；按用户要求不运行 `npm test`、`npm run typecheck` 或 `npm run build`。
+
+## Delivery Entry - 2026-08-25 15:43:17 +08:00
+
+- Workstream ID: `main-workbench-antd-font-tokens-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 菜单字号保持合适，Workbench 其他页面字体大小梯度按 Ant Design token 统一。
+- Key decisions: 在 `buildCrmVars` 中桥接 `fontSizeSM`、`fontSize`、`fontSizeLG`、`fontSizeXL` 到现有 `--crm-font-*` 语义变量；保留字号档位的 CSS fallback；不新增菜单覆盖、不改页面结构和间距。
+- Execution or analysis result: 自有 CSS 使用的字号变量会随当前 Ant 主题、字号档位和主题 preset 的运行时 token 更新；菜单继续使用 Ant Menu 的全局 base token。
+- Changed files: `frontend/workbench/src/components/Theme/themeTokens.ts`、`frontend/workbench/src/styles/tokens.css`、`handoff/main.md`。
+- Verification evidence: 已完成目标 diff 检查、工作区状态检查和 `git diff --check`；按用户要求未运行测试、类型检查、构建或浏览器验证。
+- Dependency or integration impact: 无新增依赖、数据库、权限、分支、提交、服务或外部状态变更；保留工作区原有的 `constants.ts`、`withDensity.test.ts`、探针文件等未提交改动。
+- Remaining work: 用户自行运行 Workbench 测试和浏览器视觉检查，重点确认菜单字号与各页面标题/正文层级。
+
+## Delivery Entry - 2026-08-25 15:49:21 +08:00
+
+- Workstream ID: `main-workbench-datetime-display`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` (no commit created)
+- User goal: prevent Workbench pages from deforming because date/time fields display year, month, day, hour, minute, and second strings that are too long.
+- Key decisions: make the shared timestamp formatter default to minute precision; support explicit `date`, `minute`, and `second` precision in the fixed `Asia/Shanghai` product timezone; add a shared no-wrap `DateTimeText` with tabular digits, ellipsis, and full-second Tooltip for minute displays; keep workflow history, approval details, user profile details, and audit logs explicitly second-precise; standardize affected list columns at 160px and audit columns at 180px.
+- Execution or analysis result: all existing `formatTimestamp` consumers now receive compact minute output by default; inconsistent `toLocaleString` timestamp renderers in the affected HRM and profile pages were replaced; date-only and timezone-less backend strings are normalized to the product timezone; direct second-level display remains available where traceability requires it; the Workbench UI guide now records the shared convention.
+- Changed files: `frontend/workbench/src/services/time.ts`; `frontend/workbench/src/services/time.test.ts`; `frontend/workbench/src/components/DateTimeText.tsx`; `frontend/workbench/src/styles/components/date-time-text.css`; `frontend/workbench/src/styles/index.css`; `frontend/workbench/src/components/LeadFlowHistoryPanel.tsx`; `frontend/workbench/src/pages/HrmLeavePage.tsx`; `frontend/workbench/src/pages/HrmRecruitChannelPage.tsx`; `frontend/workbench/src/pages/HrmSalaryChangeTemplatePage.tsx`; `frontend/workbench/src/pages/HrmSalaryGroupPage.tsx`; `frontend/workbench/src/pages/ManagementPages.tsx`; `frontend/workbench/src/pages/UserProfilePage.tsx`; `frontend/workbench/docs/ui-guidelines.md`; `handoff/main.md`.
+- Verification evidence: scoped `git diff --check` passed; static scan found no remaining direct `new Date(...).toLocaleString('zh-CN')` Workbench timestamp renderers; manually inspected the formatter, component, styles, changed renderers, and final diff. Per the user's explicit instruction, no test, typecheck, build, or browser verification was run.
+- Dependency or integration impact: no new dependency, backend/API/schema/database/permission change, branch/worktree operation, commit, push, deployment, or external-state mutation. Existing unrelated theme-token, density, constants, and probe-file changes were preserved.
+- Remaining work: automated tests, TypeScript checking, production build, and desktop/mobile browser verification remain unverified by explicit user request; their residual risk is limited to compile-time integration and visual behavior of the new shared component.
+
+## Workstream Registration - 2026-08-25 15:59:35 +08:00
+
+- Workstream ID: `main-workbench-hrm-dept-simple-list-20260825`
+- Goal: 修复 React Workbench 组织管理页面因调用受 `system:dept:query` 保护的部门完整列表接口而加载失败的问题。
+- Non-goals: 不调整后端权限、菜单权限、部门新增/编辑/删除接口、Vue 管理端、其他页面、依赖或现有无关改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` 加现有未提交改动。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/services/api.ts` 中 `api.hrm.dept.list` 的请求路径，以及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 System `/system/dept/simple-list` 接口；无新增依赖。
+- Integration order: 登记工作流 -> 替换请求路径 -> 检查目标 diff -> 追加交付记录。
+- Verification plan: 按用户要求不运行测试、类型检查、构建或浏览器验证；仅检查目标 diff。
+
+## Delivery Entry - 2026-08-25 16:00:31 +08:00
+
+- Workstream ID: `main-workbench-hrm-dept-simple-list-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 将 React Workbench 组织管理页面的部门列表请求快速改为 `simple-list`，无需测试验证。
+- Key decisions: 仅替换 `api.hrm.dept.list` 的 GET 路径；保留现有调用接口和宽类型，避免扩大修改范围；不改部门写操作、权限配置或后端。
+- Execution or analysis result: `/hrm/dept` 页面加载部门树时现在请求 `/system/dept/simple-list`，不再依赖 `/system/dept/list` 所要求的 `system:dept:query` 权限。
+- Changed files: `frontend/workbench/src/services/api.ts`；`handoff/main.md`。
+- Verification evidence: 已检查目标 diff，确认业务代码仅有一行请求路径变化；`git diff --check -- frontend/workbench/src/services/api.ts handoff/main.md` 通过。按用户要求未运行测试、类型检查、构建或浏览器验证。
+- Dependency or integration impact: 无新增依赖、后端/API 定义、数据库、菜单权限、分支、提交、服务或外部状态变更；`simple-list` 仅返回启用部门及精简字段。
+- Remaining work: 测试、构建和实际页面验证均按用户要求未执行。
+
+## Workstream Registration - 2026-08-25 16:15:43 +08:00
+
+- Workstream ID: `main-workbench-claim-pool-pagination-20260825`
+- Goal: 将 React Workbench 抢单池调整为桌面端每页三行四列，并用分页承载超过 12 条的客资。
+- Non-goals: 不修改后端、接口契约、权限、数据排序、抢单业务行为、其他页面或现有无关改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` 加现有未提交改动。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/LeadClaimPoolPage.tsx`、`frontend/workbench/src/styles/pages/claim-pool.css`、直接相关测试及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有抢单池分页 API 与 Ant Design `Pagination`；无新增依赖。
+- Integration order: 登记工作流 -> 将无限滚动改为固定 12 条服务端分页 -> 调整分页布局 -> 运行专项测试、类型检查、构建与桌面/移动浏览器检查 -> 追加交付记录。
+- Verification plan: 检查每页请求固定 `pageSize=12`、翻页覆盖当前列表、筛选回到第一页、抢单后刷新当前结果；运行专项测试、`npm run typecheck`、`npm run build`、`git diff --check`，并在可用登录态下检查桌面和移动宽度。
+
+## Delivery Entry - 2026-08-25 16:22:25 +08:00
+
+- Workstream ID: `main-workbench-claim-pool-pagination-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 将客资抢单池改为桌面端三行四列，超过 12 条使用分页，且不修改后端。
+- Key decisions: 保留现有响应式卡片网格和 `pageSize=12` 服务端契约；移除无限滚动与跨页合并；翻页用当前返回页覆盖卡片，搜索、高级筛选和抢单后刷新仍回到第一页；分页只在总数超过 12 条时显示；分页请求失败时保留目标页码以便准确重试。
+- Execution or analysis result: 宽屏每页最多显示 12 张卡片并按现有四列断点形成三行，窄屏继续按现有断点降为三、二、一列；超过 12 条后显示 Ant Design 分页，不再继续下滑追加。
+- Changed files: `frontend/workbench/src/pages/LeadClaimPoolPage.tsx`；`frontend/workbench/src/pages/inbox-advanced-filter.guard.test.ts`；`frontend/workbench/src/styles/pages/claim-pool.css`；`handoff/main.md`。
+- Verification evidence: Workbench 全量 Vitest 通过（61 个测试文件、378 项测试）；最终专项测试通过（24 项）；`npm run typecheck` 通过；最终 `npm run build` 通过，只有既有大分包体积警告；目标文件 `git diff --check` 通过。浏览器确认本地服务可访问，但 in-app Browser 未登录，Chrome 现有账号又缺少抢单池菜单权限，访问目标 URL 被授权路由重定向到今日待办，因此未取得真实抢单池桌面和移动截图。
+- Dependency or integration impact: 无新增依赖、后端/API/权限/数据库改动、分支操作、提交、推送或服务变更；保留工作区已有无关未提交改动。
+- Remaining work: 使用具备抢单池菜单权限的登录账号补做真实数据页面的桌面与移动宽度视觉检查；当前剩余风险仅为该授权页面的实际视觉呈现。
+
+## Workstream Registration - 2026-08-25 16:31:47 +08:00
+
+- Workstream ID: `main-workbench-claim-card-visual-polish-20260825`
+- Goal: 按用户确认方案压缩抢单池卡片高度，并调整颜色层级、字段排版、附件空态和操作区视觉。
+- Non-goals: 不修改后端、接口契约、字段内容、数据遮罩、权限、分页行为、其他页面或现有无关改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` 加现有未提交改动。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/LeadClaimPoolPage.tsx`、`frontend/workbench/src/styles/pages/claim-pool.css`、直接相关测试及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Workbench CRM 主题 token、Ant Design Card/Tag/Button；无新增依赖。
+- Integration order: 登记工作流 -> 增加最小样式钩子 -> 紧凑化卡片与字段层级 -> 运行测试、类型检查、构建和可用范围内的浏览器检查 -> 追加交付记录。
+- Verification plan: 检查固定高度和无附件预留高度均已移除，桌面保持四列、移动保持可读和 44px 操作触点；运行专项测试、全量测试、`npm run typecheck`、`npm run build`、`git diff --check`，并在具备授权页面时检查桌面和移动视口。
+
+## Workstream Registration - 2026-08-25 16:23:46 +08:00
+
+- Workstream ID: `main-workbench-hrm-dept-parity-20260825`
+- Goal: 将 React Workbench 的 HRM 组织管理补齐为与 Vue Admin 一致的组织统计列表、部门详情、部门员工列表和员工档案下钻链路，并同步调整页面样式。
+- Non-goals: 不修改 Vue Admin、后端接口、数据库、菜单或权限配置，不改全局主题、字号、时间显示及其他 HRM 页面，不清理现有无关未提交改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` 加现有未提交改动。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/pages/HrmDeptPage.tsx`、`frontend/workbench/src/pages/HrmEmployeePage.tsx`、`frontend/workbench/src/services/api.ts` 的 HRM 部门/员工契约、`frontend/workbench/src/styles/pages/hrm.css` 的组织管理局部样式、直接相关新增测试及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 System 部门/用户精简接口、HRM 部门员工统计/分页/详情接口、Ant Design 与共享 `HrmProTable`；无新增依赖。
+- Integration order: 登记工作流 -> 补齐数据契约与聚合测试 -> 实现组织列表和两级下钻 -> 调整局部样式 -> 测试/类型检查/构建 -> 桌面与移动浏览器验证 -> 追加交付记录。
+- Verification plan: 验证直属/含下级人数聚合、名称树过滤、部门搜索与重置、部门详情和员工分页/搜索、员工详情复用、权限按钮、加载/空/错误/重试状态；运行 Workbench 全量测试、`npm run typecheck`、`npm run build`、目标 diff 检查，并在可用登录态下检查桌面和移动宽度。
+
+## Workstream Registration - 2026-08-25 16:26:28 +08:00
+
+- Workstream ID: `main-workbench-table-font-inheritance-20260825`
+- Goal: 修复 Workbench Ant Design 表格原生 `table`、`th`、`td` 回退到浏览器默认 16px、比系统 13px 字号明显偏大的问题。
+- Non-goals: 不调整字号档、表格内边距、字重、业务组件、主题配置、依赖或现有无关未提交改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9` 加现有未提交改动。
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/styles/antd-overrides.css` 及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Ant Design 主题字号 token 与全局覆盖样式；无新增依赖。
+- Integration order: 登记工作流 -> 补齐原生表格字体继承 -> 浏览器读取 computed style -> 检查目标 diff -> 追加交付记录。
+- Verification plan: 在当前已登录 Workbench 页面确认 `.ant-table`、原生 `table`、`th`、`td` 的最终字号一致，并执行目标文件 `git diff --check`；不扩大到无关测试或构建。
+
+## Delivery Entry - 2026-08-25 16:28:56 +08:00
+
+- Workstream ID: `main-workbench-table-font-inheritance-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 修复 Ant Design 表格字体异常大于 Workbench 系统字体的问题。
+- Key decisions: 在全局 Ant Design 覆盖中仅让 `.ant-table table` 的 `font-size` 与 `line-height` 继承 `.ant-table` 已生成的主题值；不改字号档、表格 padding、字重或业务组件。
+- Execution or analysis result: 原生 `table` 不再保留浏览器默认 16px 字号，表头与表体单元格将继承 Ant Design 当前 `12/13/14px` 主题字号档。
+- Changed files: `frontend/workbench/src/styles/antd-overrides.css`；`handoff/main.md`。
+- Verification evidence: 修改前在已登录 Chrome 页面实测 `.ant-table` 为 `13px/21px`，原生 `table`、`th`、`td` 为 `16px/normal`；Vite 热更新后确认当前页面样式表已加载 `.ant-table table { font-size: inherit; line-height: inherit; }`；目标文件 `git diff --check` 通过。热更新触发本地页面回到登录页，未继续读取登录后单元格 computed style；未运行测试、类型检查或构建。
+- Dependency or integration impact: 无新增依赖、业务组件、API、数据库、权限、分支、提交、推送或服务改动；保留工作区其他未提交改动。
+- Remaining work: 使用登录态重新打开任一表格页面后，可补读原生 `table`、`th`、`td` 的 computed style，预期与 `.ant-table` 同为当前主题字号。
+
+## Delivery Entry - 2026-08-25 16:32:07 +08:00
+
+- Workstream ID: `main-workbench-sales-order-lead-layout`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 将 `/zsjos/sales-orders/my` 的页面布局和显示样式按 `/zsjos/leads/manage` 设计。
+- Key decisions: 保留订单状态筛选、订单字段、游标加载、详情操作、权限和移动端抽屉；移除成交单页专属紧凑页面边距；顶部状态栏、订单卡片选中态、列表间距和详情面板视觉对齐客资管理页；同步更新 UI 规范和样式守卫。
+- Execution or analysis result: 成交单页现在继承 `.workspace-page` 标准留白；状态 Tabs 使用客资页相近的主题色选中背景和底部边界；列表卡片增加统一阴影、圆角、浅色选中背景和左侧强调条；详情区改为统一背景层级和圆角；移动端移除额外紧凑边距。
+- Changed files: `frontend/workbench/src/styles/pages/sales-order.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `frontend/workbench/docs/ui-guidelines.md`; `handoff/main.md`。
+- Verification evidence: 样式守卫专项测试通过 25/25；目标文件 `git diff --check` 通过。全量 `npm test -- --run` 未通过，61 个文件/378 项测试通过，但已有未提交的 `frontend/workbench/src/pages/HrmDeptPage.test.ts` 找不到其依赖的 `HrmDeptPage.tsx`；`npm run typecheck` 和 `npm run build` 同样因该缺失文件失败。未执行真实业务页浏览器视觉检查，因为本地 in-app Browser 当前停在登录页且没有可用登录态。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限/菜单、分支、提交、推送、部署或服务状态变更；保留其他工作流的既有未提交改动。
+- Remaining work: 使用有效登录态补做桌面与移动宽度的真实页面视觉检查；修复或恢复工作区原有 `HrmDeptPage.tsx` 后，再重跑 Workbench 全量测试、类型检查和构建。
+
+## Delivery Entry - 2026-08-25 16:36:48 +08:00
+
+- Workstream ID: `main-workbench-claim-card-visual-polish-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 将抢单池卡片改为紧凑自适应样式，并调整颜色和字段排版。
+- Key decisions: 使用现有 CRM token 建立白色容器、中性色正文、弱化标签和品牌蓝状态/主意向/操作层级；卡片取消固定高度但保持同一网格行等高；联系人和来源/分类使用轻分隔，地区改为紧凑浅底信息条；备注最多两行内部滚动；附件缩略图改为 48px，无附件不再预留高度；移动端抢单按钮保持 44px 触点。
+- Execution or analysis result: 卡片从固定 548/580px 改为内容驱动，去除截图中的大面积空白；字段标签、值、状态、课程和附件形成明确扫描层级，桌面四列及既有分页逻辑保持不变。
+- Changed files: `frontend/workbench/src/pages/LeadClaimPoolPage.tsx`；`frontend/workbench/src/styles/pages/claim-pool.css`；`handoff/main.md`。
+- Verification evidence: 抢单池分页专项测试通过 24/24；`npm run typecheck` 通过；`npm run build` 通过，只有既有大分包体积警告；目标文件 `git diff --check` 通过；静态扫描确认不存在 548/580px 固定卡片高度、旧 `claim-pool-sentinel` 或不兼容的备注高度计算。全量测试为 61 个文件通过、1 个文件失败，378/380 项通过；两项失败均来自并发修改的 `src/styles/pages/hrm.css`（`.hrm-dept-page` 重复 page padding、负间距未通过 token 守卫），未修改该无关文件。浏览器连接当前不可用，且上一轮现有账号缺少抢单池菜单权限，因此未取得改后桌面和移动截图。
+- Dependency or integration impact: 无新增依赖、后端/API/权限/数据库、分支、提交、推送或服务变更；保留所有并发和既有无关未提交改动。
+- Remaining work: 使用具备抢单池菜单权限的登录态补做真实数据页面的桌面和移动视觉检查；修复无关 HRM 样式守卫失败后可恢复全量测试全绿。
+
+## Delivery Entry - 2026-08-25 16:42:50 +08:00
+
+- Workstream ID: `main-workbench-hrm-dept-parity-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 修复 React Workbench HRM 组织管理未完整复刻 Vue Admin 的问题，补齐组织、部门、员工下钻并同步修改显示样式。
+- Key decisions: 使用现有 System 部门精简列表和 HRM 员工统计/分页/详情接口，不复制后端能力或静态数据；组织列表按树聚合直属人数与含下级人数；使用 `deptId`、`employeeId` 查询参数承载部门详情和员工档案下钻；复用员工详情内容组件；部门新增/编辑补齐 Vue Admin 已有字段；样式限定在组织管理局部，使用现有 Workbench token，并为移动端改为单列布局。
+- Execution or analysis result: 组织管理现已显示部门树、在职/全职/非全职统计及名称搜索；部门名称可下钻到负责人、上级部门、人数摘要、基本信息和员工列表；员工姓名可继续下钻到员工档案；搜索、重置、分页、刷新/前进/后退、加载、空、错误、重试和权限按钮状态均已接入；部门状态语义修正为 `0=开启`、`1=停用`；筛选区、树形宽表、详情摘要、页签、信息区和移动端样式已按附件中的 Vue Admin 信息层级调整。
+- Changed files: `frontend/workbench/src/pages/HrmDeptPage.tsx`；`frontend/workbench/src/pages/HrmDeptPage.test.ts`；`frontend/workbench/src/pages/HrmEmployeePage.tsx`；`frontend/workbench/src/services/api.ts`；`frontend/workbench/src/styles/pages/hrm.css`；`handoff/main.md`。
+- Verification evidence: Workbench 全量 Vitest 通过（62 个测试文件、380 项测试）；组织树专项测试通过（2 项）；`npm run typecheck` 通过；`npm run build` 通过，仅有既有大分包体积警告；目标文件 `git diff --check` 通过；样式守卫包含在全量测试中并通过。浏览器确认本地 Vite 页面可访问，且尝试复用 Chrome 现有登录态；当前账号的服务端菜单不包含 `/hrm/dept`，授权路由将目标页重定向到今日待办，因此未绕过权限，也未取得真实组织页的桌面和移动截图。
+- Dependency or integration impact: 无新增依赖、后端/API 实现、数据库、菜单、权限配置、分支、提交、推送或共享服务变更；保留工作区全部已有和并行的无关未提交改动。`api.hrm.dept.list` 继续使用既有 `/system/dept/simple-list`，新增消费既有 `/hrm/employee/dept-statistics`。
+- Remaining work: 使用具备 Workbench 组织管理菜单权限的账号补做真实数据页面的桌面与移动宽度视觉检查；当前剩余风险仅为授权页面的实际响应式呈现。
+
+## Delivery Entry - 2026-08-25 16:50:25 +08:00
+
+- Workstream ID: `main-workbench-sales-order-detail-composition`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `6cc39f1d28ee3273bbfc3f8832a814b91905b1a9`（未创建提交）
+- User goal: 重排 `/zsjos/sales-orders/my` 订单详情，使用更适合会签审批的组件，并合并原本被拆散的信息卡片。
+- Key decisions: 用并列审批节点流替代表格；销售主管会签嵌套在对应审批中心节点下；客户档案、订单概览、学员资料、成交与付款、复购说明按主题合并为信息区；课程明细继续使用表格；备注与服务使用描述字段区；缴费凭证继续使用图片预览和 PDF 链接；不扩展后端 BPM/审批数据契约。
+- Execution or analysis result: 新增 `SalesOrderApprovalFlow` 组件结构和节点状态展示；保留现有审批/驳回/主管确认/修改/终止操作与异常 Alert；将订单详情从多个 Ant Card 改为审批流程、主题信息区、课程表格和底部内容区；桌面端双列信息区、移动端单列响应式布局已接入。
+- Changed files: `frontend/workbench/src/components/SalesOrderDetailCards.tsx`; `frontend/workbench/src/components/SalesOrderDetailCards.test.tsx`; `frontend/workbench/src/pages/sales-order-approval-unified.guard.test.ts`; `frontend/workbench/src/styles/pages/sales-order.css`; `frontend/workbench/docs/ui-guidelines.md`; `handoff/main.md`。
+- Verification evidence: 专项组件与样式测试通过 28/28；Workbench 全量 Vitest 通过 62 个测试文件、381 项测试；`npm run typecheck` 通过；`npm run build` 通过，仅有既有大分包体积警告；目标文件 `git diff --check` 通过。浏览器真实业务页面未验证，当前 in-app Browser 没有可用登录态。
+- Dependency or integration impact: 无新增依赖、后端/API/BPM/数据库/权限/菜单、分支、提交、推送、部署或服务变更；保留工作区其他未提交改动。当前接口仍只提供节点级审批快照，多人会签历史未被前端虚构。
+- Remaining work: 使用有效登录态补做 `/zsjos/sales-orders/my` 桌面和移动宽度视觉检查；如需显示完整多人会签人员和 BPM 历史，另行扩展后端公开契约。
+
+## Delivery Entry - 2026-08-25 18:52:30 +08:00
+
+- Workstream ID: `main-workbench-ui-commit-20260825`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `759accf4` (pre-commit HEAD)
+- User goal: 将当前 Git 改动直接提交并推送到云端。
+- Key decisions: 保留当前 Workbench 时间显示、销售订单详情、抢单池、字号/密度、主题和代理配置改动；提交已跟踪的 `.env.local` 代理配置；仅纳入正式新增的 `DateTimeText` 组件及样式；排除未跟踪的 `probe.html` 与 `src/__probe__/` 调试实验文件；不切换分支、不重写历史、不强制推送。
+- Execution result: Workbench 改动已完成验证并准备提交。
+- Changed files: 当前已跟踪 Workbench 改动、`frontend/workbench/src/components/DateTimeText.tsx`、`frontend/workbench/src/styles/components/date-time-text.css` 和本交付记录；不包含 probe 调试产物。
+- Verification evidence: Workbench Vitest 59 个测试文件、366 个测试通过；`npm run typecheck` 通过；`npm run build` 通过，仅报告既有大 chunk 警告；`git diff --check` 通过；未执行真实业务浏览器验证，后端/有效登录态不可用。
+- Dependency/integration impact: 无新增依赖、数据库、权限、BPM、分支或服务变更；`.env.local` 仅包含局域网代理地址与端口，不含密码或令牌。
+- Remaining work: 完成提交和推送后核对远端哈希；未跟踪 probe 文件保留在本地，不纳入发布。

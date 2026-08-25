@@ -53,6 +53,10 @@ const CHROME_TINT = 30
 
 export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record<string, string> {
   const { hasBackground, glassOpacity = 60, glassBlur = 20 } = options
+  const fontSize = token.fontSize ?? 14
+  const fontSizeSM = token.fontSizeSM ?? fontSize
+  const fontSizeLG = token.fontSizeLG ?? fontSize
+  const fontSizeXL = token.fontSizeXL ?? fontSizeLG
   // 从用户设置的基础不透明度推导各层级
   const containerPct = glassOpacity
   const chromePct = Math.min(100, glassOpacity + 18)
@@ -110,6 +114,13 @@ export function buildCrmVars(token: GlobalToken, options: CrmVarOptions): Record
     '--crm-text': token.colorText,
     '--crm-text-secondary': token.colorTextSecondary,
     '--crm-text-tertiary': token.colorTextTertiary,
+
+    // ---- 字号：直接桥接 Ant Design font token，避免自有 CSS 与组件字号漂移 ----
+    '--crm-font-xs': `${fontSizeSM}px`,
+    '--crm-font-sm': `${fontSizeSM}px`,
+    '--crm-font-base': `${fontSize}px`,
+    '--crm-font-lg': `${fontSizeLG}px`,
+    '--crm-font-display': `${fontSizeXL}px`,
 
     // ---- 填充 ----
     '--crm-fill-secondary': token.colorFillSecondary,

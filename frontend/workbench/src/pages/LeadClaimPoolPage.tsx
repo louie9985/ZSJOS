@@ -4,11 +4,11 @@ import {
   PictureOutlined,
   WechatOutlined
 } from '@ant-design/icons'
-import { Alert, App, Button, Card, Empty, Image, Skeleton, Spin, Tag, Typography } from 'antd'
+import { Alert, App, Button, Card, Empty, Image, Pagination, Skeleton, Spin, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { api, type AdvancedFilterGroup, type PendingLead } from '../services/api'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
-import { mergeUniqueLeads, resolvedDisplayLabel, tryStartLeadPageRequest } from '../services/leadManagement'
+import { resolvedDisplayLabel, tryStartLeadPageRequest } from '../services/leadManagement'
 import { formatTimestamp } from '../services/time'
 
 const PAGE_SIZE = 12
@@ -31,7 +31,7 @@ function ClaimCard({ lead, canClaim, claiming, onClaim }: {
           <Typography.Title level={5}>{lead.maskedName || '未命名客户'}</Typography.Title>
           <Typography.Text type="secondary">{lead.leadNo} · {formatTimestamp(lead.submittedAt)}</Typography.Text>
         </div>
-        <Tag color="blue">待抢单</Tag>
+        <Tag className="claim-card-status" color="blue">待抢单</Tag>
       </div>
 
       <div className="claim-card-contacts">
@@ -50,7 +50,7 @@ function ClaimCard({ lead, canClaim, claiming, onClaim }: {
         <Typography.Text type="secondary">意向课程</Typography.Text>
         <div className="claim-card-tags claim-card-scroll-region">
           {lead.intendedProducts.length ? lead.intendedProducts.map((course, index) =>
-            <Tag key={`${course}-${index}`} color={course === lead.primaryIntendedProduct ? 'blue' : undefined}>
+            <Tag className="claim-card-course-tag" key={`${course}-${index}`} color={course === lead.primaryIntendedProduct ? 'blue' : undefined}>
               {course}{course === lead.primaryIntendedProduct ? ' · 主意向' : ''}
             </Tag>
           ) : <Typography.Text>-</Typography.Text>}
@@ -87,7 +87,7 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
   const { message } = App.useApp()
   const [items, setItems] = useState<PendingLead[]>([])
   const [total, setTotal] = useState(0)
-  const [pageNo, setPageNo] = useState(0)
+  const [pageNo, setPageNo] = useState(1)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [keyword, setKeyword] = useState('')
@@ -95,9 +95,8 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
   const [claiming, setClaiming] = useState<number>()
   const requestVersion = useRef(0)
   const activeRequests = useRef(new Set<string>())
-  const sentinelRef = useRef<HTMLDivElement>(null)
 
-  const loadPage = useCallback(async (targetPage: number, replace: boolean, version: number) => {
+  const loadPage = useCallback(async (targetPage: number, version: number) => {
     const requestKey = tryStartLeadPageRequest(activeRequests.current, version, targetPage)
     if (!requestKey) return
     setLoading(true)
@@ -105,7 +104,7 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
     try {
       const result = await api.claimPoolPage({ pageNo: targetPage, pageSize: PAGE_SIZE, keyword: keyword || undefined, advancedFilter })
       if (version !== requestVersion.current) return
-      setItems(current => replace ? result.list : mergeUniqueLeads(current, result.list))
+      setItems(result.list)
       setTotal(result.total)
       setPageNo(targetPage)
     } catch (loadError) {
@@ -120,24 +119,17 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
 
   const refresh = useCallback(() => {
     const version = ++requestVersion.current
-    setPageNo(0)
-    void loadPage(1, true, version)
+    setPageNo(1)
+    void loadPage(1, version)
   }, [loadPage])
 
   useEffect(() => { refresh() }, [refresh])
 
-  const hasMore = items.length < total
-  useEffect(() => {
-    const sentinel = sentinelRef.current
-    if (!sentinel || !hasMore || loading) return
-    const observer = new IntersectionObserver(entries => {
-      if (entries[0]?.isIntersecting) {
-        void loadPage(pageNo + 1, false, requestVersion.current)
-      }
-    }, { rootMargin: '240px 0px' })
-    observer.observe(sentinel)
-    return () => observer.disconnect()
-  }, [hasMore, loadPage, loading, pageNo])
+  const changePage = useCallback((targetPage: number) => {
+    const version = ++requestVersion.current
+    setPageNo(targetPage)
+    void loadPage(targetPage, version)
+  }, [loadPage])
 
   const claim = useCallback(async (id: number) => {
     setClaiming(id)
@@ -166,15 +158,19 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
     if (!items.length) return <div className="claim-pool-state"><Empty description="当前没有可抢客资" /></div>
     return <>
       {error && <Alert className="claim-pool-inline-error" type="error" showIcon message={error}
-        action={<Button size="small" onClick={() => void loadPage(pageNo + 1, false, requestVersion.current)}>重试</Button>}/>} 
-      <div className="claim-pool-grid">
-        {items.map(lead => <ClaimCard key={lead.id} lead={lead} canClaim={canClaim} claiming={claiming === lead.id} onClaim={claim}/>) }
-      </div>
-      <div ref={sentinelRef} className="claim-pool-sentinel">
-        {loading ? <><Spin size="small" /> 加载中</> : hasMore ? '继续下滑加载' : `已加载全部 ${total} 条客资`}
-      </div>
+        action={<Button size="small" onClick={() => changePage(pageNo)}>重试</Button>}/>
+      }
+      <Spin spinning={loading}>
+        <div className="claim-pool-grid">
+          {items.map(lead => <ClaimCard key={lead.id} lead={lead} canClaim={canClaim} claiming={claiming === lead.id} onClaim={claim}/>) }
+        </div>
+      </Spin>
+      {total > PAGE_SIZE && <div className="claim-pool-pagination">
+        <Pagination current={pageNo} pageSize={PAGE_SIZE} total={total} showSizeChanger={false}
+          showTotal={count => `共 ${count} 条`} onChange={changePage}/>
+      </div>}
     </>
-  }, [canClaim, claim, claiming, error, hasMore, items, loadPage, loading, pageNo, refresh, total])
+  }, [canClaim, changePage, claim, claiming, error, items, loading, pageNo, refresh, total])
 
   return <section className="workspace-page claim-pool-page">
     <div className="claim-pool-toolbar">

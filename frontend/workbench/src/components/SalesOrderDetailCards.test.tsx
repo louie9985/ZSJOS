@@ -37,6 +37,42 @@ function order(overrides: Partial<SalesOrder> = {}): SalesOrder {
 }
 
 describe('SalesOrderDetailCards Lead profile', () => {
+  it('renders approval centers as workflow nodes with nested supervisor sign-off', () => {
+    const html = renderToStaticMarkup(<SalesOrderDetailCards mode="approval-done" order={order({
+      taskDefinitionKey: 'financeReview',
+      registrationApproval: { status: 'approved', reviewerUserName: '报名审核员', endTime: 1 },
+      financeApproval: { status: 'pending', reviewerUserName: '财务审核员', createTime: 2 },
+      financeSupervisorConfirmation: {
+        id: 3, status: 'pending', requesterUserId: 20, requesterUserName: '销售专员', requestReason: '需要主管确认'
+      }
+    })}/>)
+
+    expect(html).toContain('审批流程')
+    expect(html).toContain('报名履约中心')
+    expect(html).toContain('财务结算中心')
+    expect(html).toContain('销售主管会签')
+    expect(html).toContain('当前节点')
+    expect(html).toContain('ant-timeline')
+    expect(html).toContain('sales-order-approval-sidebar')
+    expect(html).not.toContain('审核中心')
+  })
+
+  it('separates the dense business canvas from status and available actions', () => {
+    const html = renderToStaticMarkup(<SalesOrderDetailCards mode="mine" order={order({
+      status: 'revision_required',
+      decisionReason: '付款凭证不清晰',
+      canRevise: true
+    })} onRevise={() => undefined}/>)
+
+    expect(html).toContain('sales-order-detail-layout')
+    expect(html).toContain('sales-order-detail-main')
+    expect(html).toContain('sales-order-approval-sidebar')
+    expect(html).toContain('sales-order-approval-actions')
+    expect(html).toContain('订单已驳回，等待补正')
+    expect(html).toContain('付款凭证不清晰')
+    expect(html).toContain('修改并重新提交')
+  })
+
   it('renders the authoritative business profile and copy controls', () => {
     const html = renderToStaticMarkup(<SalesOrderDetailCards mode="approval-done" order={order({
       leadId: 1,

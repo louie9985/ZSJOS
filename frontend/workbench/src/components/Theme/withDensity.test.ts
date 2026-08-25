@@ -47,9 +47,9 @@ describe('withDensity', () => {
   })
 
   it('injects the font size matching the scale', () => {
-    expect(withDensity({}, 'default', 'small').theme?.token?.fontSize).toBe(13)
-    expect(withDensity({}, 'default', 'default').theme?.token?.fontSize).toBe(14)
-    expect(withDensity({}, 'default', 'large').theme?.token?.fontSize).toBe(15)
+    expect(withDensity({}, 'default', 'small').theme?.token?.fontSize).toBe(12)
+    expect(withDensity({}, 'default', 'default').theme?.token?.fontSize).toBe(13)
+    expect(withDensity({}, 'default', 'large').theme?.token?.fontSize).toBe(14)
   })
 
   it('preserves preset tokens and non-theme config while overlaying', () => {
@@ -61,7 +61,7 @@ describe('withDensity', () => {
     expect(result.componentSize).toBe('small')
     expect(result.theme?.token?.colorPrimary).toBe('#ed4192')
     expect(result.theme?.token?.borderRadius).toBe(2)
-    expect(result.theme?.token?.fontSize).toBe(15)
+    expect(result.theme?.token?.fontSize).toBe(14)
   })
 
   it('does not mutate the input config', () => {

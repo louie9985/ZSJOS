@@ -324,11 +324,17 @@ export const FONT_SCALE_OPTIONS: Array<{ label: string; value: FontScale }> = [
   { label: '大', value: 'large' }
 ]
 
-/** 同步注入 antd 的 fontSize token，使组件字号与 CSS 变量一致 */
+/**
+ * 同步注入 antd 的 fontSize token，使组件字号与 CSS 变量一致。
+ *
+ * default 取 13 而非 antd 默认的 14：这是密集型业务后台（表格、主从列表、
+ * 详情字段为主），14px 在信息密度高的页面里偏大。三档取值须与
+ * `styles/tokens.css` 的 `--crm-font-base` 逐档一致（有守卫）。
+ */
 export const FONT_SCALE_SIZE: Record<FontScale, number> = {
-  small: 13,
-  default: 14,
-  large: 15
+  small: 12,
+  default: 13,
+  large: 14
 }
 
 /**
@@ -353,11 +359,13 @@ export const DENSITY_SCALE: Record<Density, { cardPad: number; cardPadSM: number
  * antd v5 的 Table 没有独立字号 token，单元格字号继承全局 fontSize，
  * 但 cellPaddingBlock / cellPaddingInline 是写死的常量、不随 fontSize 派生。
  * 结果切「字号大」时字变大而行高不动，字被挤胀 —— 故在此按档位显式给出。
+ *
+ * 随 FONT_SCALE_SIZE 整体下调：default 13px 对应 block 7 / inline 14。
  */
 export const FONT_SCALE_TABLE: Record<FontScale, { cellBlock: number; cellInline: number }> = {
-  small: { cellBlock: 6, cellInline: 12 },
-  default: { cellBlock: 8, cellInline: 16 },
-  large: { cellBlock: 10, cellInline: 20 }
+  small: { cellBlock: 5, cellInline: 10 },
+  default: { cellBlock: 7, cellInline: 14 },
+  large: { cellBlock: 9, cellInline: 18 }
 }
 
 // ========== Layout Mode ==========
