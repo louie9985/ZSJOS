@@ -49,6 +49,17 @@
       <el-form-item v-if="formData.type === 2" label="组件名字" prop="componentName">
         <el-input v-model="formData.componentName" clearable placeholder="例如说：SystemUser" />
       </el-form-item>
+      <el-form-item
+        v-if="formData.type !== 3"
+        label="Workbench 呈现方式"
+        prop="workbenchRenderMode"
+      >
+        <el-select v-model="formData.workbenchRenderMode" class="w-full">
+          <el-option label="React 原生页面" value="native" />
+          <el-option label="嵌入 Vue Admin 内容页" value="admin_embed" />
+          <el-option label="仅 Vue Admin 导航" value="admin_only" />
+        </el-select>
+      </el-form-item>
       <el-form-item v-if="formData.type !== 1" label="权限标识" prop="permission">
         <template #label>
           <Tooltip
@@ -140,6 +151,7 @@ const formData = ref({
   icon: '',
   component: '',
   componentName: '',
+  workbenchRenderMode: 'native',
   status: CommonStatusEnum.ENABLE,
   visible: true,
   keepAlive: true,
@@ -242,6 +254,7 @@ const resetForm = () => {
     icon: '',
     component: '',
     componentName: '',
+    workbenchRenderMode: 'native',
     status: CommonStatusEnum.ENABLE,
     visible: true,
     keepAlive: true,

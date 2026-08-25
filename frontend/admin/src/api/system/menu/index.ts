@@ -11,6 +11,7 @@ export interface MenuVO {
   icon: string
   component: string
   componentName?: string
+  workbenchRenderMode?: 'native' | 'admin_embed' | 'admin_only'
   status: number
   visible: boolean
   keepAlive: boolean

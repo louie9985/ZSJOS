@@ -105,6 +105,15 @@ npm run typecheck
 npm run build
 ```
 
+For local same-origin Workbench/Admin development, run Vue Admin with
+`pnpm dev-embed` (it listens on `5175` with `VITE_BASE_PATH=/admin-embed/`) and open the
+Workbench on `5174`. The Workbench Vite proxy forwards `/admin-embed` to the Admin dev
+server, `/admin-api` and `/infra/ws` to the backend, so the browser sees one origin and the
+two clients share token storage. Set `VITE_ADMIN_EMBED_PROXY_TARGET` and
+`VITE_BACKEND_PROXY_TARGET` when those local ports or hosts differ. Production reverse
+proxying should expose `/` for Workbench, `/admin-embed/` for Admin, `/admin-api/` for the
+backend, and `/infra/ws` with WebSocket upgrade enabled.
+
 Ports, credentials, tenant values, and service addresses are environment configuration,
 not durable architecture facts. Check the active `.env*`, application YAML, proxy, and
 running processes before diagnosing a local startup issue.

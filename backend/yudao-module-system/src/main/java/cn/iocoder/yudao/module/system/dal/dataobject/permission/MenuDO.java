@@ -80,6 +80,12 @@ public class MenuDO extends BaseDO {
      */
     private String componentName;
     /**
+     * Workbench 的呈现方式，仅控制前端壳层如何打开菜单，不改变菜单权限。
+     * native：使用 React Workbench 页面；admin_embed：在 Workbench 中嵌入 Vue Admin；
+     * admin_only：仅在 Vue Admin 中显示。
+     */
+    private String workbenchRenderMode;
+    /**
      * 状态
      *
      * 枚举 {@link CommonStatusEnum}

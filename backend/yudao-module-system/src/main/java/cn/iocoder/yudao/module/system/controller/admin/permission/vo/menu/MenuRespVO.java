@@ -50,6 +50,9 @@ public class MenuRespVO {
     @Schema(description = "组件名", example = "SystemUser")
     private String componentName;
 
+    @Schema(description = "Workbench 呈现方式：native、admin_embed、admin_only", example = "native")
+    private String workbenchRenderMode;
+
     @Schema(description = "状态,见 CommonStatusEnum 枚举", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "状态不能为空")
     private Integer status;

@@ -83,6 +83,9 @@ public class AuthPermissionInfoRespVO {
         @Schema(description = "组件名", example = "SystemUser")
         private String componentName;
 
+        @Schema(description = "Workbench 呈现方式：native、admin_embed、admin_only", example = "native")
+        private String workbenchRenderMode;
+
         @Schema(description = "菜单图标,仅菜单类型为菜单或者目录时，才需要传", example = "/menu/list")
         private String icon;
 

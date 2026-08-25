@@ -14,14 +14,12 @@
 @import './pages/work-plan.css';
 @import './pages/message-inbox.css';
 @import './pages/sales-order.css';
+@import './pages/admin-embed.css';
 @import './pages/user-profile.css';
 @import './pages/management.css';
 @import './pages/registration.css';
 @import './pages/media-students.css';
 @import './pages/media-feature.css';
-@import './pages/eam.css';
-@import './pages/hrm.css';
-@import './pages/fms.css';
 @import './components/lead-detail.css';
 @import './components/lead-detail-v2.css';
 @import './components/detail-field-grid.css';

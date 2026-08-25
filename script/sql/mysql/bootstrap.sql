@@ -107,6 +107,7 @@ SOURCE script/sql/mysql/migrations/V128__media_director_student_flow.sql;
 SOURCE script/sql/mysql/migrations/V129__seed_director_form_dictionaries.sql;
 SOURCE script/sql/mysql/migrations/V130__director_configurable_forms_and_menus.sql;
 SOURCE script/sql/mysql/migrations/V131__repair_director_operator_action_permissions.sql;
+SOURCE script/sql/mysql/migrations/V132__workbench_menu_render_mode.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

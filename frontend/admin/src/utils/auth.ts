@@ -8,29 +8,64 @@ const AccessTokenKey = 'ACCESS_TOKEN'
 const RefreshTokenKey = 'REFRESH_TOKEN'
 const ClientIdKey = 'CLIENT_ID'
 
+// Workbench 与 Admin 同源共享的明文 localStorage 协议。旧版 wsCache 数据继续作为迁移回退。
+const sharedStorage = localStorage
+const legacyAccessTokenKey = 'zsjos_access_token'
+const legacyRefreshTokenKey = 'zsjos_refresh_token'
+const legacyClientIdKey = 'zsjos_client_id'
+
+const readShared = (key: string, legacyKey: string) => {
+  const value = sharedStorage.getItem(key)
+  if (value) {
+    // 旧版 Admin 用 web-storage-cache 把同名 key 写成 JSON 包装对象；读取后立即迁移成明文协议。
+    const cachedValue = wsCache.get(key)
+    if (typeof cachedValue === 'string' && cachedValue !== value) {
+      sharedStorage.setItem(key, cachedValue)
+      return cachedValue
+    }
+    return value
+  }
+  const legacyValue = sharedStorage.getItem(legacyKey)
+  if (legacyValue) {
+    sharedStorage.setItem(key, legacyValue)
+    sharedStorage.removeItem(legacyKey)
+    return legacyValue
+  }
+  return undefined
+}
+
 // 获取token
 export const getAccessToken = () => {
-  // 此处与TokenKey相同，此写法解决初始化时Cookies中不存在TokenKey报错
-  const accessToken = wsCache.get(AccessTokenKey)
-  return accessToken ? accessToken : wsCache.get('ACCESS_TOKEN')
+  return (
+    readShared(AccessTokenKey, legacyAccessTokenKey) ||
+    wsCache.get(AccessTokenKey) ||
+    wsCache.get('ACCESS_TOKEN')
+  )
 }
 
 // 刷新token
 export const getRefreshToken = () => {
-  return wsCache.get(RefreshTokenKey)
+  return readShared(RefreshTokenKey, legacyRefreshTokenKey) || wsCache.get(RefreshTokenKey)
 }
 
-export const getClientId = () => wsCache.get(ClientIdKey)
+export const getClientId = () =>
+  readShared(ClientIdKey, legacyClientIdKey) || wsCache.get(ClientIdKey)
 
 // 设置token
 export const setToken = (token: TokenType) => {
-  wsCache.set(RefreshTokenKey, token.refreshToken)
-  wsCache.set(AccessTokenKey, token.accessToken)
-  wsCache.set(ClientIdKey, token.clientId || 'zsjos-pc')
+  sharedStorage.setItem(RefreshTokenKey, token.refreshToken)
+  sharedStorage.setItem(AccessTokenKey, token.accessToken)
+  sharedStorage.setItem(ClientIdKey, token.clientId || 'zsjos-pc')
 }
 
 // 删除token
 export const removeToken = () => {
+  sharedStorage.removeItem(AccessTokenKey)
+  sharedStorage.removeItem(RefreshTokenKey)
+  sharedStorage.removeItem(ClientIdKey)
+  sharedStorage.removeItem(legacyAccessTokenKey)
+  sharedStorage.removeItem(legacyRefreshTokenKey)
+  sharedStorage.removeItem(legacyClientIdKey)
   wsCache.delete(AccessTokenKey)
   wsCache.delete(RefreshTokenKey)
   wsCache.delete(ClientIdKey)

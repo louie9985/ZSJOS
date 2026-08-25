@@ -49,6 +49,10 @@ public class MenuSaveVO {
     @Schema(description = "组件名", example = "SystemUser")
     private String componentName;
 
+    @Schema(description = "Workbench 呈现方式：native、admin_embed、admin_only", example = "native")
+    @Size(max = 32, message = "Workbench 呈现方式不能超过32个字符")
+    private String workbenchRenderMode;
+
     @Schema(description = "状态,见 CommonStatusEnum 枚举", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     @NotNull(message = "状态不能为空")
     private Integer status;

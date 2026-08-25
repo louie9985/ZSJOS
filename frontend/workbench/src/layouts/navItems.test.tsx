@@ -73,24 +73,24 @@ describe('buildNavMenuItems', () => {
   })
 
   it('renders deep directories as nested submenus instead of flattening them', () => {
-    const navigation = primary(1, '资产管理', '/eam', [])
+    const navigation = primary(1, '运营管理', '/ops', [])
     navigation.pages = [{
       key: '2',
-      label: '资产台账',
+      label: '运营台账',
       icon: 'mdi:folder',
-      menu: menu(2, '资产台账', '/eam/ledger'),
+      menu: menu(2, '运营台账', '/ops/ledger'),
       children: [{
-        key: '/eam/ledger/assets',
-        label: '资产列表',
+        key: '/ops/ledger/items',
+        label: '运营列表',
         icon: 'mdi:file',
-        menu: menu(3, '资产列表', '/eam/ledger/assets'),
+        menu: menu(3, '运营列表', '/ops/ledger/items'),
         children: []
       }]
     }]
 
     const [item] = items([navigation])
     expect(item.children[0].key).toBe('2')
-    expect(item.children[0].children[0].key).toBe('/eam/ledger/assets')
+    expect(item.children[0].children[0].key).toBe('/ops/ledger/items')
   })
 })
 
@@ -98,8 +98,8 @@ describe('hierarchical menu builders', () => {
   it('keeps server directory levels in the merged sider tree', () => {
     const root = menu(1, '工作台', '/zsjos')
     root.children = [
-      { ...menu(2, '财务', '/zsjos/fms'), parentId: 1, children: [
-        { ...menu(3, '科目', '/zsjos/fms/subjects'), parentId: 2 }
+      { ...menu(2, '配置', '/zsjos/config'), parentId: 1, children: [
+        { ...menu(3, '项目', '/zsjos/config/items'), parentId: 2 }
       ] }
     ]
     const navigation = [{
@@ -107,19 +107,19 @@ describe('hierarchical menu builders', () => {
     }] as unknown as PrimaryNavigationItem[]
 
     const [item] = buildHierarchicalNavMenuItems(navigation) as any[]
-    expect(item.children[0].key).toBe('/zsjos/fms')
-    expect(item.children[0].children[0].key).toBe('/zsjos/fms/subjects')
+    expect(item.children[0].key).toBe('/zsjos/config')
+    expect(item.children[0].children[0].key).toBe('/zsjos/config/items')
   })
 
   it('builds secondary menu from the active server root without flattening', () => {
     const root = menu(1, '工作台', '/zsjos')
     root.children = [{
-      ...menu(2, '财务', '/zsjos/fms'),
+      ...menu(2, '配置', '/zsjos/config'),
       parentId: 1,
-      children: [{ ...menu(3, '科目', '/zsjos/fms/subjects'), parentId: 2 }]
+      children: [{ ...menu(3, '项目', '/zsjos/config/items'), parentId: 2 }]
     }]
     const [item] = buildHierarchicalSecondaryItems(root) as any[]
-    expect(item.key).toBe('/zsjos/fms')
-    expect(item.children[0].key).toBe('/zsjos/fms/subjects')
+    expect(item.key).toBe('/zsjos/config')
+    expect(item.children[0].key).toBe('/zsjos/config/items')
   })
 })

@@ -2913,6 +2913,7 @@ CREATE TABLE IF NOT EXISTS `system_menu` (
   `icon` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '#' COMMENT '菜单图标',
   `component` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '组件路径',
   `component_name` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '组件名',
+  `workbench_render_mode` varchar(32) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'native' COMMENT 'Workbench呈现方式：native、admin_embed、admin_only',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '菜单状态',
   `visible` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否可见',
   `keep_alive` bit(1) NOT NULL DEFAULT b'1' COMMENT '是否缓存',

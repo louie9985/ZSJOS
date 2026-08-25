@@ -4,8 +4,10 @@ import { useAppStore } from '@/store/modules/app'
 import { Backtop } from '@/components/Backtop'
 import { Setting } from '@/layout/components/Setting'
 import { useRenderLayout } from './components/useRenderLayout'
+import AppView from './components/AppView.vue'
 import { useDesign } from '@/hooks/web/useDesign'
 import { getLayoutRenderMode } from '@/utils/layout'
+import { isWorkbenchEmbed } from '@/utils/workbenchEmbed'
 
 const { getPrefixCls } = useDesign()
 
@@ -20,6 +22,7 @@ const mobile = computed(() => appStore.getMobile)
 const collapse = computed(() => appStore.getCollapse)
 
 const layout = computed(() => appStore.getLayout)
+const workbenchEmbed = isWorkbenchEmbed()
 
 const handleClickOutside = () => {
   appStore.setCollapse(true)
@@ -56,18 +59,18 @@ export default defineComponent({
           'w-[100%] h-[100%] relative'
         ]}
       >
-        {mobile.value && !collapse.value ? (
+        {!workbenchEmbed && mobile.value && !collapse.value ? (
           <div
             class="absolute left-0 top-0 z-99 h-full w-full bg-[var(--el-color-black)] opacity-30"
             onClick={handleClickOutside}
           ></div>
         ) : undefined}
 
-        {renderLayout()}
+        {workbenchEmbed ? <AppView></AppView> : renderLayout()}
 
-        <Backtop></Backtop>
+        {!workbenchEmbed ? <Backtop></Backtop> : undefined}
 
-        <Setting></Setting>
+        {!workbenchEmbed ? <Setting></Setting> : undefined}
       </section>
     )
   }
@@ -79,5 +82,10 @@ $prefix-cls: #{$namespace}-layout;
 
 .#{$prefix-cls} {
   background-color: var(--app-content-bg-color);
+}
+
+:global(.admin-workbench-embed) {
+  height: 100%;
+  overflow: auto;
 }
 </style>

@@ -21,8 +21,9 @@ const isExternalPath = (path: string) => /^https?:\/\//i.test(path)
 
 export function filterRenderableMenus(menus: WorkbenchMenu[], renderablePaths: ReadonlySet<string>): WorkbenchMenu[] {
   return menus.flatMap(menu => {
+    if (menu.workbenchRenderMode === 'admin_only') return []
     const children = filterRenderableMenus(menu.children, renderablePaths)
-    if (children.length === 0 && !renderablePaths.has(menu.path)) return []
+    if (children.length === 0 && menu.workbenchRenderMode !== 'admin_embed' && !renderablePaths.has(menu.path)) return []
     return [{ ...menu, children }]
   })
 }

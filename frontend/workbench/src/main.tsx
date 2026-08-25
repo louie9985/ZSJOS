@@ -28,7 +28,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, type PermissionInfo } from './services/api'
+import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, migrateLegacyAuthStorage, type PermissionInfo } from './services/api'
 import {
   buildTwoLevelNavigation,
   canOpenLeadDetailDeepLink,
@@ -54,9 +54,6 @@ import EmployeeAvatar, { DefaultEmployeeAvatarProvider } from './components/Empl
 import ThemeProvider from './components/Theme/ThemeProvider'
 import SettingsDrawer from './components/SettingsDrawer'
 import TabBar from './components/TabBar'
-import { FmsAccountSetProvider } from './components/FmsAccountSetProvider'
-import FmsAccountSetGuide from './components/FmsAccountSetGuide'
-import FmsAccountSetSwitch from './components/FmsAccountSetSwitch'
 import { useTheme } from './components/Theme/ThemeContext'
 import LoginPage from './layouts/LoginPage'
 import BackendMenuIcon from './layouts/BackendMenuIcon'
@@ -145,10 +142,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     [info.menus]
   )
   const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
-  const fmsEnabled = useMemo(
-    () => (info.permissions || []).some(permission => permission.startsWith('fms:')),
-    [info.permissions]
-  )
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const leadDetailDeepLink = useMemo(() => {
     return canOpenLeadDetailDeepLink(location.pathname, location.search, info.permissions || [])
@@ -240,7 +233,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 
   const shellContent = (
     <Layout className={layoutClass} style={shellStyle}>
-    <FmsAccountSetGuide/>
     <LeadAssignmentHost
       canAccept={(info.permissions || []).includes('zsjos:lead:accept')}
       onCountChange={setPendingAssignmentCount}
@@ -378,7 +370,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
           />
         )}
         <Space size={8} className="header-actions">
-          <FmsAccountSetSwitch/>
           <SalesDispatchStatusControl/>
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
@@ -426,18 +417,21 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   </Layout>
   )
 
-  return <FmsAccountSetProvider enabled={fmsEnabled}>
+  return <>
     <RealtimeProvider><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
       {showWatermark
         ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
         : <div className="crm-watermark-wrapper">{shellContent}</div>
       }
     </NotifyMessageProvider></SalesDispatchStatusProvider></RealtimeProvider>
-  </FmsAccountSetProvider>
+  </>
 }
 
 function Root() {
-  const [logged, setLogged] = useState(Boolean(localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)))
+  const [logged, setLogged] = useState(() => {
+    migrateLegacyAuthStorage()
+    return Boolean(localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN))
+  })
   const [info, setInfo] = useState<PermissionInfo>()
   const [error, setError] = useState('')
   const [permissionAttempt, setPermissionAttempt] = useState(0)

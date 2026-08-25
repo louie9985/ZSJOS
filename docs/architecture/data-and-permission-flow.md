@@ -37,6 +37,24 @@ The workbench HTTP client centralizes:
 - Authentication storage cleanup on logout or failed recovery; failed recovery also emits one global event that unmounts the workbench and returns directly to login.
 - Unwrapping the backend's standard response envelope.
 
+### Workbench/Admin shared rendering and session contract
+
+System menu metadata includes `workbenchRenderMode` (`native`, `admin_embed`, or
+`admin_only`). This field is presentation metadata only: the same server-returned menu,
+button permissions, tenant checks, and backend authorization apply in both clients.
+`admin_embed` menus are opened by the React Workbench as a same-origin Vue Admin iframe
+under `/admin-embed/`; Vue Admin runs in a content-only layout with its navigation chrome
+hidden. `admin_only` menus are omitted from Workbench navigation and remain available only
+through the Vue Admin route tree. Tokens are never placed in the iframe URL or sent through
+`postMessage`.
+
+The two browser applications share the same-origin `localStorage` keys
+`ACCESS_TOKEN`, `REFRESH_TOKEN`, and `CLIENT_ID`. Existing Workbench keys are migrated on
+first load. When one context receives a 401, it first checks whether the shared access token
+has changed before starting a refresh, which prevents an embedded Admin page from replacing
+a token refreshed by the Workbench context. A refresh failure still clears shared session
+storage and returns the user to login.
+
 The Today Tasks page may show the ZSJOS business-task panel to users with
 `zsjos:business-task:query`. It requests and renders the separate BPM task panel only when the
 permission response also contains `bpm:task:query`; access to Today Tasks alone never implies the

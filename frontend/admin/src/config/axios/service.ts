@@ -158,6 +158,15 @@ service.interceptors.response.use(
       return Promise.reject(msg)
     } else if (code === 401) {
       // 如果未认证，并且未进行刷新令牌，说明可能是访问令牌过期了
+      const sharedAccessToken = getAccessToken()
+      const sentAuthorization = String(
+        config.headers?.Authorization || config.headers?.authorization || ''
+      )
+      // Workbench iframe 可能刚刚完成刷新；优先复用共享存储中的新 token。
+      if (sharedAccessToken && sentAuthorization !== 'Bearer ' + sharedAccessToken) {
+        config.headers!.Authorization = 'Bearer ' + sharedAccessToken
+        return service(config)
+      }
       if (!isRefreshToken) {
         isRefreshToken = true
         // 1. 如果获取不到刷新令牌，则只能执行登出操作
