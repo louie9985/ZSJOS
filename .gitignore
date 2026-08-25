@@ -63,3 +63,6 @@ application-my.yaml
 
 .codex/
 /frontend/h5/node_modules/
+
+# 浏览器调试产物（截图 / 控制台日志 / 页面快照）
+.playwright-cli/

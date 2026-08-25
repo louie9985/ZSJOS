@@ -1,5 +1,63 @@
 # Main Workstream
 
+## Active workstream: restore Workbench layout preview SVGs
+
+- Workstream ID: `main-restore-workbench-layout-svg`
+- Goal: restore the missing settings-drawer SVG previews for all five supported Workbench navigation layouts.
+- Non-goals: redesign the previews, change layout behavior, menu hierarchy, permissions, routes, themes, dependencies, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `refactor/workbench-design-tokens`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `2a84c80c3a4d296b76f027e57a981c6d0562bded` plus existing user changes
+- Target branch: `refactor/workbench-design-tokens`
+- Ownership scope: `frontend/workbench/src/components/SettingsDrawer.tsx`, its focused regression test, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Ant Design theme token and historical Workbench SVG implementation; no new dependency.
+- Integration order: restore historical SVG branches -> add focused regression guard -> run tests/typecheck/build -> browser-check the settings drawer when authenticated access is available.
+- Verification plan: focused regression test, full Workbench tests, typecheck, production build, and scoped diff check.
+
+## Delivery Entry - 2026-08-25 14:39:20 +08:00
+
+- Workstream ID: `main-restore-workbench-layout-svg`
+- Branch: `refactor/workbench-design-tokens`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `2a84c80c3a4d296b76f027e57a981c6d0562bded` (no commit created)
+- User goal: restore the missing SVG previews for the Workbench's multiple navigation layout modes.
+- Key decisions: restore the historical SVG markup for `top-only`, `single-sider`, and `mini-float` exactly as previously implemented; retain the existing `side` and `top` previews; do not redesign previews or change navigation behavior, permissions, menus, routes, themes, or dependencies.
+- Execution or analysis result: all five settings-drawer layout choices now render distinct 48 x 36 SVG previews, and a focused source guard locks the five supported mode branches.
+- Changed files: `frontend/workbench/src/components/SettingsDrawer.tsx`; `frontend/workbench/src/components/SettingsDrawer.guard.test.ts`; `handoff/main.md`. Browser verification also produced the untracked screenshot `.playwright-cli/element-2026-08-25T06-37-55-377Z.png` inside the already-existing untracked `.playwright-cli/` directory.
+- Verification evidence: focused Vitest run passed 2 files/3 tests; full Workbench test run passed 61 files/369 tests; `npm run typecheck` passed; `npm run build` passed; scoped `git diff --check` passed. Playwright verified the five preview DOMs at 48 x 36: `side` 3 rects, `top` 3 rects, `top-only` 2 rects, `single-sider` 2 rects, and `mini-float` 3 rects; screenshot review confirmed consistent sizing, visible graphics, and no overlap.
+- Dependency or integration impact: no new dependency, API/schema/permission/database change, branch/worktree operation, commit, push, deployment, or modification to unrelated dirty-worktree files.
+- Remaining work: None.
+
+## Delivery Entry - 2026-08-25 14:08:00 +08:00
+
+- Workstream ID: `main-restore-workbench-layouts`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `00d9dbec11411a85f58a0dd2a6c5d5d3df6ea6a0` (no commit created)
+- User goal: restore the Workbench's original multiple navigation layouts and hierarchical menu interactions; do not treat the prior flat two-level presentation as a product requirement.
+- Key decisions: restore the five historical modes `side`, `top`, `top-only`, `single-sider`, and `mini-float`; restore recursive server-menu rendering for top dropdowns, collapsible side trees, popup flyouts, the active secondary sidebar, and mobile drawer; keep permission response and route identity server-owned; update the incorrect flat-navigation constraints and docs.
+- Execution result: restored layout constants and mode options; reconnected historical `buildNavMenuItems` and hierarchical secondary builders in `main.tsx`; restored single-sider open-key state, top-only recursive menu, mini-float rail/popup, and mobile recursive drawer; synchronized Workbench and architecture navigation guidance.
+- Changed files: `frontend/workbench/src/constants.ts`; `frontend/workbench/src/constants.test.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/layouts/MobileNavDrawer.tsx`; `frontend/workbench/src/layouts/navItems.tsx`; `frontend/workbench/AGENTS.md`; `frontend/workbench/docs/navigation.md`; `frontend/workbench/docs/api-contract.md`; `docs/architecture/data-and-permission-flow.md`; `handoff/main.md`.
+- Verification evidence: Workbench `npm run typecheck` passed; `npm test -- --run` passed 59 files/360 tests; `npm run build` passed with the existing chunk-size warning; `git diff --check` passed; Playwright loaded the local Workbench login shell at desktop and mobile viewport sizes. Authenticated navigation clicks were not run because no local login session/backend account was available.
+- Dependency or integration impact: no new dependency, API/schema/permission change, branch/worktree operation, commit, push, deployment, or database mutation. Dev server started at `http://127.0.0.1:5175/`; port 5174 was already occupied.
+- Remaining work: perform authenticated browser verification for all five modes and representative deep menu paths after a backend/session is available.
+
+## Active workstream: restore Workbench navigation layouts
+
+- Workstream ID: `main-restore-workbench-layouts`
+- Goal: restore the Workbench's original five navigation layout modes and hierarchical menu interactions, including dropdown, popup, and collapsible directory menus.
+- Non-goals: change server-owned menu permissions, backend menu data, business pages, authentication, branches, commits, deployment, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: current `main` HEAD plus existing user changes
+- Target branch: `main`
+- Ownership scope: Workbench layout constants, layout rendering, navigation helpers/tests, directly affected navigation/architecture documentation, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing React + Vite + TypeScript + Ant Design Workbench primitives and server-owned menu response; no new dependency.
+- Integration order: restore layout modes -> restore hierarchical rendering -> synchronize constraints/docs -> focused tests/typecheck/build/browser checks.
+- Verification plan: Workbench tests, typecheck, production build, diff checks, and browser checks at desktop/mobile widths when a local server/backend is available.
+
 ## Active delivery: rewrite ruoyi-vue-pro as a ZSJOS-specific skill
 
 - Workstream ID: `main-zsj-os-ruoyi-skill-rewrite`
@@ -2549,3 +2607,31 @@
 - Verification evidence: static counts confirm 7 root rows, 31 child rows, and 6 parent lookups; scans found zero `((SELECT id FROM eam_category` VALUES expressions and zero unescaped `serial_length,separator,current_serial` occurrences; scoped `git diff --check` passed with the existing LF-to-CRLF warning. Database execution was intentionally skipped because the reset is destructive.
 - Dependency or integration impact: no dependency, schema, dictionary, permission, branch, commit, service, or external-state change; only the local destructive reset script execution structure changed.
 - Remaining work: before rerunning, inspect or restore the EAM data already affected by the earlier 421-row and 13-row deletions; run only `reset_eam_v3.sql` after backup and row-count checks, not the entire `migrations/eam` directory.
+
+## Workstream Registration - 2026-08-25 13:28:19 +08:00
+
+- Workstream ID: `main-remote-fast-forward-20260825`
+- Goal: 将最新 `origin/main` 合并到当前本地 `main`。
+- Non-goals: 不创建额外分支或合并提交，不提交、不推送、不执行 SQL、数据库迁移或服务启停。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `c5c22c4dd4fab5496a05aa184eb872c6633207d2`
+- Target branch: `main`
+- Ownership scope: Git 快进合并状态及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: `origin/main` 提交 `00d9dbec11411bcac0e2eba6f597d76c72b9230a`。
+- Integration order: 刷新远端引用，确认可快进，快进合并，核对冲突和本地/远端提交关系。
+- Verification plan: 检查未合并路径、领先/落后计数、HEAD 与 `origin/main` 哈希及 `git diff --check`。
+
+## Delivery Entry - 2026-08-25 13:28:19 +08:00
+
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a`
+- User goal: 拉取最新代码并合并到本地。
+- Key decisions: 使用当前跟踪分支 `origin/main`；在确认工作区干净且本地无独有提交后执行 `git merge --ff-only origin/main`；不创建合并提交，不执行代码、SQL 或运行时变更。
+- Execution or analysis result: 本地 `main` 从 `c5c22c4d` 快进到 `00d9dbec`，合入远端 1 个提交；未产生冲突或本地合并提交。
+- Changed files: 远端提交涉及 126 个文件；本任务主动修改仅为 `handoff/main.md` 的本交付记录。
+- Verification evidence: 未合并路径为空；`HEAD...origin/main` 为 `0 0`；两者均解析为 `00d9dbec11411bcac0e2eba6f597d76c72b9230a`；`git diff --check` 通过。
+- Dependency or integration impact: 本地 `main` 已同步远端的 ZSJOS 导师/学员流程、媒体大屏、Workbench、Admin、框架配置和 SQL 迁移变更；未执行迁移、服务操作、提交或推送。
+- Remaining work: 本交付记录保持为本地未提交改动；如需同步到远端，应另行确认提交和推送。

@@ -109,7 +109,7 @@ Rules:
 - The permission response is the workbench menu source of truth.
 - The client preserves backend names, order, visibility, icons, route identity, and authorization semantics.
 - Relative child paths are resolved against their parent. Administrator menu paths are not replaced by demo routes.
-- Workbench navigation always presents server roots as first-level categories and recursively collected visible leaves as flat second-level pages. Desktop layout variants and mobile navigation do not render nested dropdown, popup, or collapsible directory menus; flattening does not change permission or original route identity.
+- Workbench navigation preserves the server-owned recursive menu hierarchy. Its five layout modes may render sidebars, top-level dropdowns, collapsible directory menus, or popup flyouts; layout presentation does not change permission or original route identity.
 - Role names are not used to manufacture menus or grant access.
 - Backend component names are metadata only. React renders an explicitly registered local page or a safe placeholder.
 - The 36 active ZSJOS-facing page menus have matching React Workbench and Vue Admin renderers; the auditable mapping is maintained in `docs/frontend/zsjos-menu-coverage.md`. Both clients preserve the server path and permission identity instead of maintaining aliases or a duplicate menu tree.

@@ -16,7 +16,7 @@ extend the repository root instructions.
 - React components **MUST NOT** call Axios directly. Authentication, `tenant-id`, token refresh, response unwrapping, and HTTP errors belong in typed modules under `src/services`.
 - Request and response types **MUST** be explicit. `any` is allowed only at a narrow external-data boundary and should be validated or normalized immediately.
 - Menus, names, ordering, visibility, icons, and permissions **MUST** originate from the permission response. The client may normalize paths and derive display navigation, but **MUST NOT** infer access from role names.
-- Workbench navigation **MUST** render server-owned root menus as first-level categories and every visible descendant leaf as a flat second-level page. Layout variants and mobile navigation **MUST NOT** reintroduce nested dropdown, popup, or collapsible directory menus.
+- Workbench navigation **MUST** preserve server-owned menu hierarchy and visible descendant order. The five supported layout modes may present that hierarchy as sidebars, top-level dropdowns, collapsible directories, or popup flyouts; layout choice must not change authorization or route identity.
 - Dictionary-backed controls **MUST** submit stable dictionary values and display backend labels.
 - Administrator-maintained options **MUST NOT** silently fall back to hard-coded production data.
 
