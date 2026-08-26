@@ -2,11 +2,13 @@
 import { ref, onMounted } from 'vue'
 import { showConfirmDialog, showSuccessToast, showToast } from 'vant'
 import { getMyCards, addCard, deleteCard, setDefaultCard, type BankCard } from '@/api/withdrawal'
+import { applyDevBankCardOverrides } from '@/api/mock'
 import { maskCardNumber } from '@/utils/format'
 
 defineOptions({ name: 'BankCards' })
 
 const loading = ref(true)
+const loadError = ref('')
 const cards = ref<BankCard[]>([])
 const showAdd = ref(false)
 const submitting = ref(false)
@@ -16,8 +18,11 @@ onMounted(loadCards)
 
 async function loadCards() {
   loading.value = true
+  loadError.value = ''
   try {
-    cards.value = await getMyCards()
+    cards.value = applyDevBankCardOverrides(await getMyCards())
+  } catch (cause) {
+    loadError.value = cause instanceof Error ? cause.message : '银行卡加载失败'
   } finally {
     loading.value = false
   }
@@ -71,13 +76,14 @@ async function handleSetDefault(card: BankCard) {
     </van-nav-bar>
 
     <van-skeleton :loading="loading" :row="4" style="padding: 16px;">
-      <div v-if="cards.length === 0 && !loading" style="text-align: center; padding: 60px 20px;">
+      <van-empty v-if="loadError" :description="loadError" image="error"><van-button size="small" type="primary" @click="loadCards">重新加载</van-button></van-empty>
+      <div v-else-if="cards.length === 0 && !loading" style="text-align: center; padding: 60px 20px;">
         <van-empty description="暂无银行卡">
           <van-button type="primary" round size="small" @click="showAdd = true">添加银行卡</van-button>
         </van-empty>
       </div>
 
-      <div v-for="card in cards" :key="card.id" class="card bank-card-item">
+      <div v-for="card in loadError ? [] : cards" :key="card.id" class="card bank-card-item">
         <div class="bank-card-item__header">
           <span class="bank-card-item__bank">{{ card.bankName }}</span>
           <van-tag v-if="card.defaultCard" type="primary" size="medium">默认</van-tag>
@@ -85,6 +91,7 @@ async function handleSetDefault(card: BankCard) {
         <div class="bank-card-item__number">{{ card.maskedCardNumber }}</div>
         <div class="bank-card-item__name">{{ card.accountName }}</div>
         <div class="bank-card-item__actions">
+          <van-button size="mini" plain icon="edit" @click="$router.push(`/profile/bank-cards/${card.id}/edit`)">编辑</van-button>
           <van-button v-if="!card.defaultCard" size="mini" plain @click="handleSetDefault(card)">设为默认</van-button>
           <van-button size="mini" plain type="danger" @click="handleDelete(card)">删除</van-button>
         </div>

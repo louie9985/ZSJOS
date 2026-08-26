@@ -5,10 +5,11 @@ import { createIdempotencyKey } from '@/utils/idempotency'
 
 export interface UploadFile {
   id: string
-  file?: File
+  file: File
   url: string
   status: 'uploading' | 'done' | 'error'
   result?: UploadResult
+  error?: string
 }
 
 /**
@@ -34,9 +35,12 @@ export function useUpload(maxCount = 9) {
       const result = await uploadLeadAttachment(file)
       item.status = 'done'
       item.result = result
+      item.error = undefined
+      URL.revokeObjectURL(url)
       item.url = result.fileUrl
-    } catch {
+    } catch (cause) {
       item.status = 'error'
+      item.error = cause instanceof Error ? cause.message : '图片上传失败'
     } finally {
       uploading.value = fileList.value.some(f => f.status === 'uploading')
     }
@@ -46,6 +50,10 @@ export function useUpload(maxCount = 9) {
     const idx = fileList.value.findIndex(f => f.id === id)
     if (idx >= 0) {
       const item = fileList.value[idx]
+      if (item.status === 'uploading') {
+        showToast('图片正在上传，请稍候')
+        return
+      }
       if (item.url.startsWith('blob:')) {
         URL.revokeObjectURL(item.url)
       }
@@ -55,17 +63,21 @@ export function useUpload(maxCount = 9) {
 
   async function retryFile(id: string) {
     const item = fileList.value.find(f => f.id === id)
-    if (!item || !item.file) return
+    if (!item) return
 
     item.status = 'uploading'
+    item.result = undefined
+    item.error = undefined
     uploading.value = true
     try {
       const result = await uploadLeadAttachment(item.file)
       item.status = 'done'
       item.result = result
+      if (item.url.startsWith('blob:')) URL.revokeObjectURL(item.url)
       item.url = result.fileUrl
-    } catch {
+    } catch (cause) {
       item.status = 'error'
+      item.error = cause instanceof Error ? cause.message : '图片上传失败'
     } finally {
       uploading.value = fileList.value.some(f => f.status === 'uploading')
     }
@@ -89,6 +101,12 @@ export function useUpload(maxCount = 9) {
     uploading.value = false
   }
 
+  function getUploadedFiles(): UploadResult[] {
+    return fileList.value
+      .filter(f => f.status === 'done' && f.result)
+      .map(f => f.result!)
+  }
+
   return {
     fileList,
     uploading,
@@ -96,6 +114,7 @@ export function useUpload(maxCount = 9) {
     removeFile,
     retryFile,
     getUploadedIds,
+    getUploadedFiles,
     hasError,
     reset
   }

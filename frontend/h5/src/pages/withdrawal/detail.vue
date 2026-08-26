@@ -71,9 +71,16 @@ const statusMap: Record<string, { text: string; color: string }> = {
 
         <div class="card">
           <van-cell-group :border="false">
+            <van-cell title="申请编号" :value="detail.withdrawalNo || '--'" />
+            <van-cell v-if="detail.accountNameSnapshot" title="开户名" :value="detail.accountNameSnapshot" />
             <van-cell title="收款银行" :value="detail.bankNameSnapshot" />
+            <van-cell v-if="detail.branchNameSnapshot" title="开户支行" :value="detail.branchNameSnapshot" />
             <van-cell title="卡号" :value="detail.maskedCardNumber" />
             <van-cell title="申请时间" :value="formatDateTime(detail.submittedAt)" />
+            <van-cell v-if="detail.approvedAmount != null" title="审核金额" :value="`¥${formatAmount(detail.approvedAmount)}`" />
+            <van-cell v-if="detail.reviewedAt" title="审核时间" :value="formatDateTime(detail.reviewedAt)" />
+            <van-cell v-if="detail.rejectionReason" title="驳回原因" :label="detail.rejectionReason" />
+            <van-cell v-if="detail.paidAt" title="打款时间" :value="formatDateTime(detail.paidAt)" />
           </van-cell-group>
         </div>
 

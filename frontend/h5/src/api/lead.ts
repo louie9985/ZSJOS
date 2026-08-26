@@ -10,29 +10,33 @@ export interface LeadCatalog {
 }
 
 export interface CategoryNode {
-  categoryId: string
-  categoryName: string
+  id: number
+  name: string
   children?: CategoryNode[]
 }
 
+export interface CategoryPathNode { id: number; name: string }
+export interface ProductAttrValue { value: string; label: string }
+export interface ProductAttr { attrKey: string; attrName: string; required: boolean; values: ProductAttrValue[] }
+
 export interface SpuItem {
-  categoryId: string
+  categoryId: number
   categoryName: string
-  categoryPath: string
-  level1CategoryId: string
+  categoryPath: CategoryPathNode[]
+  level1CategoryId: number
   level1CategoryName: string
-  level2CategoryId?: string
+  level2CategoryId?: number
   level2CategoryName?: string
   spuRef: string
   spuName: string
-  attrs?: string
+  attrs: ProductAttr[]
 }
 
 export interface SkuItem {
   spuRef: string
   skuRef: string
   skuName: string
-  attrValues?: string
+  attrValues: Record<string, string>
   price?: number
 }
 
@@ -60,12 +64,15 @@ export interface IntendedProduct {
 }
 
 export interface LeadCreateResult {
-  leadId: number
+  leadId: number | null
   leadNo?: string | null
   reviewId?: number | null
   outcome: 'activated' | 'review_pending' | 'duplicate_rejected' | 'duplicate_auto_closed'
   assignmentStatus: string
   pendingAssigneeUserId?: number | null
+  existingLeadStatus?: string | null
+  existingQualificationStatus?: string | null
+  existingOperationalStatus?: string | null
 }
 
 export interface LeadListItem {
@@ -73,20 +80,143 @@ export interface LeadListItem {
   leadNo?: string | null
   submittedName: string
   submittedMobile?: string
+  submittedWechatId?: string
+  sourceType?: string
+  sourceLabel?: string
   sourceChannel: string
   leadCategory: string
+  leadCategoryLabelSnapshot?: string
   status: string
   assignmentStatus: string
+  handlingStage?: string
+  qualificationStatus?: string
+  followUpStatus?: string
+  operationalStatus?: string
+  sourceUserName?: string
   ownerUserName?: string
+  pendingAssigneeUserName?: string
+  pendingExpiresAt?: ApiDateValue
+  dispatchMode?: string
+  assignmentAttemptCount?: number
+  publicPoolAt?: ApiDateValue
   submittedAt: ApiDateValue
+  lastActivityAt?: ApiDateValue
+  nextFollowUpAt?: ApiDateValue
+  qualifiedAt?: ApiDateValue
+  convertedAt?: ApiDateValue
+  salesOrderSubmittedAt?: ApiDateValue
+  currentAssignmentFirstFollowUpAt?: ApiDateValue
+  currentAssignmentFirstFollowUpDeadlineAt?: ApiDateValue
+  qualificationStartedAt?: ApiDateValue
+  qualificationDeadlineAt?: ApiDateValue
+  suspendedAt?: ApiDateValue
+  qualifiedByUserName?: string
+  validDescription?: string
+  recycleSourceOwnerUserName?: string
+  appealDeadlineAt?: ApiDateValue
+  closedAt?: ApiDateValue
+  closeReason?: string
+  createTime?: ApiDateValue
+  updateTime?: ApiDateValue
+  relationTypes?: string[]
+  overviewVisible?: boolean
+  visibleTabs?: string[]
+  identityMaskMode?: string
   provinceCode: string
   provinceName: string
   cityCode: string
   cityName: string
   remark?: string
   intendedProducts: LeadProductItem[]
-  attachments: unknown[]
+  attachments: LeadAttachmentItem[]
   availableActions: LeadAction[]
+  invalidReason?: string
+  invalidReasonLabelSnapshot?: string
+  invalidDescription?: string
+  invalidEvidence?: Array<{
+    infraFileId: number
+    fileUrl?: string | null
+    originalName: string
+    contentType: string
+    fileSize: number
+    sort?: number
+  }>
+  activeSalesOrderId?: number
+  activeSalesOrderStatus?: string
+  primaryProduct?: LeadProductItem
+  opportunity?: { id: number; status: string; nextFollowUpAt?: ApiDateValue; wonAt?: ApiDateValue }
+}
+
+export interface LeadFollowUpItem {
+  id: number
+  leadId: number
+  assignmentHistoryId?: number
+  opportunityId?: number
+  recordScope?: string
+  occurredAt: ApiDateValue
+  firstInAssignment: boolean
+  result: string
+  resultLabel: string
+  method: string
+  methodLabel: string
+  categoryBefore?: string
+  categoryBeforeLabel?: string
+  categoryAfter?: string
+  categoryAfterLabel?: string
+  remark?: string
+  nextFollowUpAt?: ApiDateValue
+  images: Array<{
+    infraFileId: number
+    originalName: string
+    contentType: string
+    fileSize: number
+    sort: number
+    url?: string
+  }>
+}
+
+export interface LeadTimelineItem {
+  id: number
+  title: string
+  description?: string
+  occurredAt: ApiDateValue
+}
+
+export interface LeadCashbackActivityItem {
+  id: number
+  typeText: string
+  statusText: string
+  amount: number
+  availableAt?: ApiDateValue
+}
+
+export interface LeadRightsActivityItem {
+  id: number
+  recordNo: string
+  status: string
+  statusText: string
+  content: string
+  result?: string
+  createdAt: ApiDateValue
+  attachments?: LeadAttachmentItem[]
+}
+
+export interface LeadOrderActivityItem {
+  id: number
+  orderNo: string
+  status: string
+  statusText: string
+  purchaseTypeText?: string
+  totalAmount: number
+  createdAt: ApiDateValue
+}
+
+export interface PartnerLeadActivity {
+  followUps: LeadFollowUpItem[]
+  timeline: LeadTimelineItem[]
+  cashbackItems: LeadCashbackActivityItem[]
+  complaints: LeadRightsActivityItem[]
+  orders: LeadOrderActivityItem[]
 }
 
 export interface LeadAction {
@@ -99,7 +229,18 @@ export interface LeadProductItem {
   spuName: string
   skuRef?: string
   skuName?: string
+  selectedAttrValues?: string
+  price?: number
+  categoryName?: string
   primary: boolean
+}
+
+export interface LeadAttachmentItem {
+  id: number
+  fileUrl?: string | null
+  originalName: string
+  contentType: string
+  fileSize: number
 }
 
 export interface UploadResult {
@@ -119,6 +260,16 @@ export interface SupplementParams {
   idempotencyKey: string
 }
 
+export interface LeadFilterOption {
+  value: string
+  label: string
+}
+
+export interface PartnerLeadFilterOptions {
+  appealStatuses: LeadFilterOption[]
+  orderReviewStatuses: LeadFilterOption[]
+}
+
 /** 获取字典数据 */
 export function getDictByType(type: string) {
   return referenceRequest.get<never, DictItem[]>('/system/dict-data/type', { params: { type } })
@@ -129,11 +280,46 @@ export interface LeadComplaintItem {
   leadId: number
   leadNo?: string | null
   reason: string
+  complainantUserName?: string
+  salesUserName?: string
+  evidence?: LeadAppealEvidence[]
   status: 'pending' | 'handled'
   result?: 'founded' | 'unfounded'
   handlerOpinion?: string
+  handlerUserName?: string
+  handlerEvidence?: LeadAppealEvidence[]
   handledAt?: ApiDateValue
   createTime: ApiDateValue
+}
+
+export interface LeadAppealEvidence {
+  infraFileId: number
+  fileUrl?: string
+  originalName: string
+  contentType?: string
+  fileSize?: number
+  sort?: number
+}
+
+export interface LeadAppealItem {
+  id: number
+  leadId: number
+  leadNo?: string | null
+  roundNo: number
+  reviewStage?: string
+  status: string
+  reason: string
+  applicantUserName?: string
+  invalidReasonSnapshot?: string
+  invalidDescriptionSnapshot?: string
+  invalidEvidenceSnapshot?: LeadAppealEvidence[]
+  reviewerUserName?: string
+  decisionReason?: string
+  decisionEvidence?: LeadAppealEvidence[]
+  submittedAt: ApiDateValue
+  decidedAt?: ApiDateValue
+  evidence?: LeadAppealEvidence[]
+  canSubmitNextRound?: boolean
 }
 
 interface AreaApiNode {
@@ -170,13 +356,25 @@ export function getLeadCatalog() {
   return request.get<never, LeadCatalog>('/zsjos/lead/product/catalog')
 }
 
+/** Partner 高级筛选状态选项 */
+export function getPartnerLeadFilterOptions() {
+  return request.get<never, PartnerLeadFilterOptions>('/zsjos/lead/partner-filter-options')
+}
+
 /** 上传客资附件 */
-export function uploadLeadAttachment(file: File) {
+export async function uploadLeadAttachment(file: File) {
   const formData = new FormData()
   formData.append('file', file)
-  return request.post<never, UploadResult>('/zsjos/lead/attachment/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+  const result = await request.post<never, UploadResult>('/zsjos/lead/attachment/upload', formData, {
+    timeout: 120000
   })
+  if (!Number.isSafeInteger(result.infraFileId) || result.infraFileId <= 0) {
+    throw new TypeError('图片上传结果缺少有效的文件编号')
+  }
+  if (typeof result.fileUrl !== 'string' || !result.fileUrl.trim()) {
+    throw new TypeError('图片上传结果缺少预览地址')
+  }
+  return result
 }
 
 /** 提交客资 */
@@ -190,10 +388,14 @@ export function getMyLeadPage(params: {
   pageSize: number
   keyword?: string
   status?: string
+  simpleStatus?: string
   assignmentStatus?: string
   sourceChannel?: string
   leadCategory?: string
-  submittedAt?: ApiDateValue
+  submittedAt?: [string, string]
+  mainProductRef?: string
+  appealStatus?: string
+  orderReviewStatus?: string
 }) {
   return request.get<never, { list: LeadListItem[]; total: number }>(
     '/zsjos/lead/inbox/submitted/page',
@@ -204,6 +406,11 @@ export function getMyLeadPage(params: {
 /** 获取客资详情 */
 export function getLeadDetail(id: number) {
   return request.get<never, LeadListItem>('/zsjos/lead/get', { params: { id } })
+}
+
+/** 查询 Partner 本人可见的客资业务流转聚合 */
+export function getPartnerLeadActivity(id: number) {
+  return request.get<never, PartnerLeadActivity>(`/zsjos/lead/${id}/partner-activity`)
 }
 
 /** 补充客资 */
@@ -228,7 +435,7 @@ export function getMyComplaints(params: { pageNo: number; pageSize: number; stat
 
 /** 查询客资申诉记录 */
 export function getLeadAppeals(leadId: number) {
-  return request.get<never, unknown[]>(`/zsjos/lead/appeal/lead/${leadId}/list`)
+  return request.get<never, LeadAppealItem[]>(`/zsjos/lead/appeal/lead/${leadId}/list`)
 }
 
 /** 上传申诉附件 */

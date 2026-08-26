@@ -2,7 +2,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { showToast, showSuccessToast } from 'vant'
-import { getAreaTree, getLeadCatalog, createLead, type LeadCatalog, type LeadCreateResult } from '@/api/lead'
+import { getAreaTree, getLeadCatalog, createLead, type LeadCatalog, type LeadCreateResult, type UploadResult } from '@/api/lead'
 import { useDict } from '@/composables/useDict'
 import type { DictItem } from '@/stores/app'
 import type { AreaNode } from '@/components/AreaPicker.vue'
@@ -44,6 +44,8 @@ const leadCategories = ref<DictItem[]>([])
 
 // 图片上传
 const uploaderRef = ref<InstanceType<typeof ImageUploader>>()
+const confirmedAttachments = ref<UploadResult[]>([])
+const submissionIdempotencyKey = ref<string>()
 
 // 提交结果
 const submitResult = ref<LeadCreateResult>()
@@ -106,21 +108,32 @@ function validateStep3(): boolean {
 function nextStep() {
   if (currentStep.value === 0 && !validateStep1()) return
   if (currentStep.value === 1 && !validateStep2()) return
-  if (currentStep.value === 2 && !validateStep3()) return
+  if (currentStep.value === 2) {
+    if (!validateStep3()) return
+    confirmedAttachments.value = uploaderRef.value?.getUploadedFiles() || []
+  }
   currentStep.value++
 }
 
 function prevStep() {
+  if (currentStep.value === 3) submissionIdempotencyKey.value = undefined
   if (currentStep.value > 0) currentStep.value--
 }
 
 // --- Submit ---
 async function handleSubmit() {
   if (submitting.value) return
+  if (!validateStep3()) {
+    currentStep.value = 2
+    return
+  }
+  const attachments = uploaderRef.value?.getUploadedFiles() || []
+  confirmedAttachments.value = attachments
   submitting.value = true
 
   try {
-    const attachmentIds = uploaderRef.value?.getUploadedIds() || []
+    const idempotencyKey = submissionIdempotencyKey.value || createIdempotencyKey()
+    submissionIdempotencyKey.value = idempotencyKey
     const result = await createLead({
       name: form.name.trim(),
       mobile: form.mobile.trim() || undefined,
@@ -137,9 +150,9 @@ async function handleSubmit() {
       sourceChannel: form.sourceChannel,
       leadCategory: form.leadCategory,
       remark: form.remark.trim() || undefined,
-      attachments: attachmentIds.map(id => ({ infraFileId: id })),
+      attachments: attachments.map(file => ({ infraFileId: file.infraFileId })),
       dispatchMode: 'auto',
-      idempotencyKey: createIdempotencyKey()
+      idempotencyKey
     })
     submitResult.value = result
     currentStep.value = 4 // 结果页
@@ -163,6 +176,8 @@ function submitAnother() {
   form.leadCategory = ''
   form.remark = ''
   uploaderRef.value?.reset()
+  confirmedAttachments.value = []
+  submissionIdempotencyKey.value = undefined
   submitResult.value = undefined
   currentStep.value = 0
 }
@@ -175,10 +190,11 @@ function goDetail() {
 
 const outcomeInfo = computed(() => {
   if (!submitResult.value) return null
+  const result = submitResult.value
   const map: Record<string, { icon: string; color: string; title: string; desc: string }> = {
     activated: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: formatLeadNo(submitResult.value.leadNo) },
     review_pending: { icon: 'info-o', color: 'var(--h5-warning)', title: '疑似重复，已进入复核', desc: `复核单号：#${submitResult.value.reviewId}` },
-    duplicate_rejected: { icon: 'close', color: 'var(--h5-danger)', title: '提交被拒绝', desc: '已有相同活动客资，本次提交未创建' },
+    duplicate_rejected: { icon: 'close', color: 'var(--h5-danger)', title: '提交被拒绝', desc: `已有相同活动客资：${result.existingLeadStatus || '本次提交未创建'}` },
     duplicate_auto_closed: { icon: 'info-o', color: 'var(--h5-info)', title: '历史重复', desc: formatLeadNo(submitResult.value.leadNo) }
   }
   return map[submitResult.value.outcome] || map.activated
@@ -229,11 +245,7 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             placeholder="请输入手机号"
             maxlength="11"
             clearable
-          >
-            <template #extra>
-              <span class="field-hint">手机号/微信至少填一个</span>
-            </template>
-          </van-field>
+          />
           <van-field
             v-model="form.wechatId"
             label="微信号"
@@ -241,6 +253,7 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             maxlength="64"
             clearable
           />
+          <div class="field-hint">手机号和微信号至少填一个</div>
           <div class="field-label">客户地区 <span class="required">*</span></div>
           <AreaPicker v-model="form.area" :area-tree="areaTree" />
         </div>
@@ -364,6 +377,16 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
               <span class="confirm-label">备注</span>
               <span class="confirm-value">{{ form.remark }}</span>
             </div>
+            <div class="confirm-row">
+              <span class="confirm-label">图片附件</span>
+              <span class="confirm-value">{{ confirmedAttachments.length }} 张</span>
+            </div>
+            <div v-if="confirmedAttachments.length" class="confirm-attachments">
+              <div v-for="file in confirmedAttachments" :key="file.infraFileId" class="confirm-attachment">
+                <img :src="file.fileUrl" :alt="file.originalName" />
+                <span>{{ file.originalName }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -374,6 +397,9 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
           <van-icon :name="outcomeInfo?.icon || 'checked'" :color="outcomeInfo?.color" size="60" />
           <div class="submit-result__title">{{ outcomeInfo?.title }}</div>
           <div class="submit-result__desc">{{ outcomeInfo?.desc }}</div>
+          <div v-if="submitResult?.existingQualificationStatus || submitResult?.existingOperationalStatus" class="submit-result__detail">
+            有效性：{{ submitResult.existingQualificationStatus || '--' }} · 运行状态：{{ submitResult.existingOperationalStatus || '--' }}
+          </div>
           <div class="submit-result__actions">
             <van-button type="primary" round @click="submitAnother">继续提交</van-button>
             <van-button v-if="submitResult?.leadId" round plain @click="goDetail">查看详情</van-button>
@@ -414,6 +440,7 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
 .field-hint {
   font-size: 11px;
   color: var(--h5-text-placeholder);
+  padding: 2px 16px 8px;
 }
 .required {
   color: var(--h5-danger);
@@ -466,6 +493,32 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
   text-align: right;
   max-width: 60%;
   word-break: break-all;
+}
+.confirm-attachments {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+.confirm-attachment {
+  min-width: 0;
+}
+.confirm-attachment img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.confirm-attachment span {
+  display: block;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--h5-text-secondary);
+  font-size: 11px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 结果页 */

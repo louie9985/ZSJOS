@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showSuccessToast, showToast } from 'vant'
-import { getLeadAppeals, submitAppeal, uploadAppealAttachment, type UploadResult } from '@/api/lead'
+import { getLeadAppeals, submitAppeal, uploadAppealAttachment, type LeadAppealItem } from '@/api/lead'
 import { formatDateTime } from '@/utils/format'
 import { createIdempotencyKey } from '@/utils/idempotency'
 
@@ -15,29 +15,44 @@ const leadId = Number(route.params.id)
 const reason = ref('')
 const submitting = ref(false)
 const loading = ref(true)
-const appeals = ref<any[]>([])
+const loadError = ref('')
+const appeals = ref<LeadAppealItem[]>([])
 
 // 图片上传状态
 const fileList = ref<{ id: string; url: string; status: string; infraFileId?: number }[]>([])
 const uploading = ref(false)
 
 onMounted(async () => {
+  loadError.value = ''
   try {
-    appeals.value = await getLeadAppeals(leadId) as any[]
-  } catch {
+    appeals.value = await getLeadAppeals(leadId)
+  } catch (cause) {
     appeals.value = []
+    loadError.value = cause instanceof Error ? cause.message : '申诉记录加载失败'
   } finally {
     loading.value = false
   }
 })
 
-const appealCount = () => appeals.value.length
-const canAppeal = () => appealCount() < 3
+async function loadAppeals() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    appeals.value = await getLeadAppeals(leadId)
+  } catch (cause) {
+    appeals.value = []
+    loadError.value = cause instanceof Error ? cause.message : '申诉记录加载失败'
+  } finally {
+    loading.value = false
+  }
+}
 
-const levelMap: Record<number, string> = {
-  1: '销售主管复核',
-  2: '质控仲裁',
-  3: '最终裁定'
+const lastAppeal = () => appeals.value[appeals.value.length - 1]
+const canAppeal = () => appeals.value.length === 0 || lastAppeal()?.canSubmitNextRound === true
+
+const stageMap: Record<string, string> = {
+  sales_manager: '销售主管复核', quality: '质控仲裁', chairman: '最终裁定',
+  sales_manager_reviewing: '销售主管复核', quality_reviewing: '质控仲裁', chairman_reviewing: '最终裁定'
 }
 
 const statusMap: Record<string, { text: string; color: string }> = {
@@ -108,12 +123,15 @@ async function handleSubmit() {
     <van-nav-bar title="申诉" left-arrow @click-left="$router.back()" />
 
     <van-skeleton :loading="loading" :row="4" style="padding: 16px;">
+      <van-empty v-if="loadError" :description="loadError" image="error">
+        <van-button size="small" type="primary" @click="loadAppeals">重新加载</van-button>
+      </van-empty>
       <!-- 历史申诉记录 -->
-      <div v-if="appeals.length > 0" class="card">
-        <div class="section-title">申诉记录（{{ appeals.length }}/3）</div>
-        <div v-for="(appeal, idx) in appeals" :key="idx" class="appeal-record">
+      <div v-else-if="appeals.length > 0" class="card">
+        <div class="section-title">申诉记录（{{ appeals.length }}）</div>
+        <div v-for="appeal in appeals" :key="appeal.id" class="appeal-record">
           <div class="appeal-record__header">
-            <span class="appeal-record__round">第 {{ idx + 1 }} 次 · {{ levelMap[idx + 1] || '' }}</span>
+            <span class="appeal-record__round">第 {{ appeal.roundNo }} 次<span v-if="appeal.reviewStage"> · {{ stageMap[appeal.reviewStage] || appeal.reviewStage }}</span></span>
             <span
               class="appeal-record__status"
               :style="{ color: statusMap[appeal.status]?.color }"
@@ -122,17 +140,20 @@ async function handleSubmit() {
             </span>
           </div>
           <div class="appeal-record__reason">{{ appeal.reason }}</div>
+          <div v-if="appeal.applicantUserName || appeal.reviewerUserName" class="appeal-record__meta">申请人：{{ appeal.applicantUserName || '--' }} · 处理人：{{ appeal.reviewerUserName || '待处理' }}</div>
+          <div v-if="appeal.evidence?.length" class="appeal-record__meta">申诉证据：{{ appeal.evidence.length }} 个</div>
+          <div v-if="appeal.invalidReasonSnapshot || appeal.invalidDescriptionSnapshot" class="appeal-record__meta">原判定：{{ appeal.invalidReasonSnapshot || '无原因' }}{{ appeal.invalidDescriptionSnapshot ? ` · ${appeal.invalidDescriptionSnapshot}` : '' }}</div>
+          <div v-if="appeal.invalidEvidenceSnapshot?.length" class="appeal-record__meta">原判定证据：{{ appeal.invalidEvidenceSnapshot.length }} 个</div>
+          <div v-if="appeal.decisionReason" class="appeal-record__decision">裁决：{{ appeal.decisionReason }}</div>
+          <div v-if="appeal.decisionEvidence?.length" class="appeal-record__meta">裁决证据：{{ appeal.decisionEvidence.length }} 个</div>
           <div class="appeal-record__time">{{ formatDateTime(appeal.submittedAt) }}</div>
         </div>
       </div>
 
       <!-- 提交新申诉 -->
-      <div v-if="canAppeal()" class="card">
+      <div v-else-if="canAppeal()" class="card">
         <div class="section-title">
-          发起第 {{ appealCount() + 1 }} 次申诉
-          <span style="font-size: 12px; color: var(--h5-text-secondary); font-weight: normal;">
-            （{{ levelMap[appealCount() + 1] }}）
-          </span>
+          发起第 {{ (lastAppeal()?.roundNo || 0) + 1 }} 次申诉
         </div>
 
         <van-field
@@ -173,7 +194,7 @@ async function handleSubmit() {
       <!-- 已用完申诉次数 -->
       <div v-if="!canAppeal() && !loading" class="card" style="text-align: center; padding: 32px;">
         <van-icon name="info-o" size="40" color="var(--h5-text-placeholder)" />
-        <p style="margin-top: 8px; color: var(--h5-text-secondary);">已用完 3 次申诉机会</p>
+        <p style="margin-top: 8px; color: var(--h5-text-secondary);">当前没有可提交的下一轮申诉</p>
       </div>
     </van-skeleton>
   </div>

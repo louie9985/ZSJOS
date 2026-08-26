@@ -3,6 +3,7 @@ import { showToast } from 'vant'
 import { useUserStore } from '@/stores/user'
 import { getToken, getTenantId, getRefreshToken, getClientId } from '@/utils/storage'
 import router from '@/router'
+import { isMissingImplementation, resolveFeatureMock } from './mock'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -110,12 +111,28 @@ request.interceptors.response.use(
       return recoverAndReplay(config)
     }
 
+    const mock = resolveFeatureMock(response.config, response.status, msg)
+    if (mock) return mock.data as AxiosResponse
+
+    if (isMissingImplementation(response.status, msg)) {
+      showToast({ message: '后端接口暂未提供', type: 'fail' })
+      return Promise.reject(new Error('后端接口暂未提供'))
+    }
+
     // 业务错误
     showToast({ message: msg || '操作失败', type: 'fail' })
     return Promise.reject(new Error(msg || '业务错误'))
   },
   async (error) => {
     const { response, config } = error
+
+    const mock = resolveFeatureMock(config || {}, response?.status, response?.data?.msg)
+    if (mock) return mock.data
+
+    if (isMissingImplementation(response?.status, response?.data?.msg)) {
+      showToast({ message: '后端接口暂未提供', type: 'fail' })
+      return Promise.reject(new Error('后端接口暂未提供'))
+    }
 
     // 401: Token 过期
     if (response?.status === 401 && config) {

@@ -953,6 +953,21 @@
 - Integration order: preserve overlapping changes; make parent approval wait for every parallel add-sign child; retain immediate rejection semantics; stop cancelling pending supervisor confirmation on center approval; normalize supervisor approve/reject wording; update tests and docs; run focused and proportional verification; append delivery entry
 - Verification plan: focused BPM tests for parent-first and supervisor-first approval plus rejection behavior; focused ZSJOS tests proving center approval retains the pending supervisor and center rejection cancels it; focused Workbench guards; Workbench full tests, typecheck and production build; browser checks at desktop/mobile when an authenticated runtime is available; scoped diff/whitespace validation
 
+## Workstream Registration 2026-08-25 10:52:37 +08:00
+
+- Workstream ID: main
+- Goal: migrate the confirmed PartTimeCRM partner-H5 leaderboard, advanced lead discovery/detail, feedback, message enhancements, bank-card editing, and withdrawal-history presentation into the ZSJOS partner H5 against current ZSJOS contracts, with development-only mocks and a backend gap contract for unavailable data
+- Non-goals: modify backend, database, employee frontend, administration frontend, media screen, PartTimeCRM, production permissions, branches, dependencies, or unrelated H5 behavior
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: `frontend/h5/src` routes, domain API clients, development mock adapter, and confirmed partner pages; `docs/api/partner-app-api.md`; new partner-H5 feature-gap API document; this handoff file. Existing overlapping user edits are preserved.
+- Owner: Codex / root
+- Dependencies: current Vue 3, Vant, Axios, Pinia, ZSJOS Partner API and permission contracts; no new dependency
+- Integration order: preserve current API-prefix/upload edits -> typed feature clients and development mocks -> routes and pages -> API/gap documentation -> typecheck, production build, and mobile browser verification
+- Verification plan: H5 typecheck and production build; route/API and production-mock static audits; browser checks at 390x844 and desktop width for loading, success, empty/error, filters, navigation, and responsive overflow where authentication permits
+
 ## Delivery 2026-08-16 18:00:49 +08:00
 
 - Branch: main
@@ -3697,3 +3712,514 @@
 - Dependencies: existing ZSJOS business-event/object-permission/tenant/menu contracts, System menu and dictionary APIs, Infra upload component, V136 team-order menu, V139 supervisor-action migration, and current Workbench design tokens; no new dependency.
 - Integration order: stabilize backend command/idempotency and positioning contracts -> synchronize forward SQL/bootstrap -> repair Workbench/Admin contracts and shared Lead presentation -> add focused tests and documentation -> run backend/frontend/SQL/browser verification -> append delivery evidence.
 - Verification plan: focused ZSJOS and EAM tests plus module compilation; Workbench tests/typecheck/build; Admin typecheck/lint/build; static and repeatability checks for migrations/bootstrap; browser checks for Lead management, public sea and team orders at desktop/mobile widths when an authenticated runtime is available; no live permission or historical-data mutation without a separate audited confirmation.
+## Workstream Registration 2026-08-24 00:00:00 +08:00
+
+- Workstream ID: h5-api-alignment-mock
+- Goal: align the local partner H5 with the remote /part-api business prefix and /app-api reference-data prefix; add development-only read Mock fallback and a Mock gap document
+- Non-goals: no backend, database, deployment, account, permission, or shared-service changes; no changes to existing unrelated H5 dependency artifacts
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: frontend/h5 source, environment/API documentation, and this handoff entry
+- Owner: Codex / root
+- Dependencies: remote backend at 192.168.2.17:48080; current user changes to H5 API prefixes are preserved
+- Integration order: API base/reference clients -> read-only Mock fallback -> page behavior and documentation -> H5 verification
+- Verification plan: typecheck, production build, focused adapter tests, endpoint/route audit, and read/write fallback behavior checks
+
+## Delivery 2026-08-24 12:10:00 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: align the local H5 with the remote `/part-api` business API and `/app-api` reference data API; use development-only read Mock fallback for confirmed backend gaps without modifying the backend.
+- Key decisions: keep `/part-api` for authenticated partner operations and `/app-api` for dictionaries/area data; unwrap `CommonResult` in both clients; trigger Mock only for GET requests returning 404/405/501 or explicit not-implemented messages; keep 401/403/validation/network/5xx failures real; never Mock writes, uploads, login, refresh, or permission checks.
+- Execution or analysis result: connected `request.ts` and `reference.ts` to the centralized development-only Mock resolver, added Vite environment typings, and documented the endpoint matrix, Mock structures, backend gaps, and removal criteria. Static route audit confirms the H5 contracts correspond to the current ZSJOS partner Controllers.
+- Changed files: `frontend/h5/src/api/mock.ts`; `frontend/h5/src/api/request.ts`; `frontend/h5/src/api/reference.ts`; `frontend/h5/env.d.ts`; `frontend/h5/docs/mock-data.md`; `handoff/main.md`.
+- Verification evidence: `npx vue-tsc --noEmit --incremental false` PASS; `git diff --check -- frontend/h5/src frontend/h5/env.d.ts frontend/h5/docs` PASS; static Controller route audit PASS; `npm run build` reached Vite transformation after typecheck but failed when Vite/unplugin attempted to rewrite the existing generated `components.d.ts` with Windows `UNKNOWN` file-open error, then a second run hit the same environment file-write issue at `tsconfig.tsbuildinfo`. Generated files were restored to their HEAD content; no source build error was reported.
+- Dependency or integration impact: no backend, database, deployment, account, permission, dependency, or remote service changes; existing H5 environment/proxy changes and extensive `node_modules` worktree changes were preserved.
+- Remaining work: run `npm run build` in an environment where generated declaration/build-info files are writable; verify authenticated page responses against the remote account and replace each Mock entry only after the corresponding backend contract is confirmed.
+
+## Workstream Registration 2026-08-24 14:45:00 +08:00
+
+- Workstream ID: lead-submit-ui-fixes
+- Goal: fix H5 mobile-number input overlap and enable multiple intended courses in the Vue Admin lead-submission dialog
+- Non-goals: no backend/API/database changes, no changes to React Workbench or unrelated lead flows, no dependency changes
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: `frontend/h5/src/pages/lead/submit.vue`, `frontend/admin/src/views/zsjos/components/LeadCreateDialog.vue`, and this handoff entry
+- Owner: Codex root
+- Dependencies: existing Vant, Element Plus, catalog API, and `LeadCreateReqVO` multi-product contract
+- Integration order: H5 field layout -> Vue Admin product-list form and request mapping -> focused type/build/browser checks -> delivery entry
+- Verification plan: H5 typecheck/build and mobile browser layout check; Admin focused typecheck/build plus scoped diff/whitespace validation; confirm multi-item payload mapping statically
+
+## Delivery 2026-08-24 15:50:35 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 修复手机号输入内容被“手机号/微信至少填一个”遮挡，以及提交客资无法选择多个意向课程
+- Key decisions: H5 保留原有联系方式互斥校验，仅将提示移出手机号输入框右侧；Vue Admin 复用现有课程目录和 `intendedProducts` API，将单课程字段改为最多 20 条可增删列表，使用单一主意向和重复课程校验；不改后端、数据库、依赖和 React Workbench
+- Execution or analysis result: H5 提示现在显示在手机号和微信号字段下方，输入区域不再被占用；Vue Admin 支持添加、删除、切换主意向并提交全部课程；删除主意向时自动选择剩余第一条
+- Changed files: `frontend/h5/src/pages/lead/submit.vue`; `frontend/admin/src/views/zsjos/components/LeadCreateDialog.vue`; `handoff/main.md`
+- Verification evidence: H5 `node node_modules/vue-tsc/bin/vue-tsc.js --noEmit --incremental false` PASS; H5 direct Vite production build PASS (527 modules); Admin direct Vite `env.local` build PASS (8855 modules, existing lightningcss warning); Admin direct Vue typecheck reached repository-wide existing errors outside changed file and reported no error in `LeadCreateDialog.vue`; `git diff --check` PASS; browser opened H5 `/lead/submit` and confirmed existing auth guard redirects to `/login?redirect=/lead/submit`, so authenticated form interaction could not be exercised without a test account; pnpm wrapper checks were not usable because current lockfile mirror tarball policy and dependency-link state fail before scripts run
+- Dependency or integration impact: no dependency, backend, database, account, permission, API, or external service changes; existing generated/node_modules worktree changes were preserved
+- Remaining work: authenticated browser regression should verify the H5 11-digit display and Admin multi-course payload in a test environment with a valid account; no code work remains for the requested fixes
+
+## Workstream Registration 2026-08-24 16:17:44 +08:00
+
+- Workstream ID: partner-lead-attachment-ui
+- Goal: make the partner H5 lead-submission attachment flow contract-complete for later frontend/backend integration, including reliable upload state, confirmation, retry-safe submission, and detail display
+- Non-goals: no backend, database, Admin, Workbench, permission, deployment, server-side orphan cleanup, or duplicate-review behavior changes
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: H5 lead API types/upload request, shared H5 image uploader/composable, H5 lead submit/detail pages, and this handoff entry
+- Owner: Codex root
+- Dependencies: existing Axios/Vant stack and current backend contracts `POST /part-api/zsjos/lead/attachment/upload`, `POST /part-api/zsjos/lead/create`, and `GET /part-api/zsjos/lead/get`; no new dependency
+- Integration order: typed upload contract and request timeout -> upload state/lifecycle -> submit confirmation and idempotent retry -> detail rendering -> type/build/browser verification -> delivery entry
+- Verification plan: direct H5 Vue typecheck, production build, static multipart/payload contract inspection, mobile and desktop browser checks where authentication permits, and scoped diff/whitespace validation
+
+## Workstream Registration 2026-08-24 17:05:00 +08:00
+
+- Workstream ID: media-screen-frontend
+- Goal: add an independent ZSJOS React/Vite new-media lead-count screen that consumes the existing external CRM media-screen API used by the part-time H5, while preserving the source screen's complete UI and interactions
+- Non-goals: no ZSJOS Java backend, database tables, migrations, copied aggregation logic, authentication changes, menu registration, or changes to `D:\code\parttimecrm`
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: `frontend/media-screen/`, directly affected frontend architecture/development documentation, and this handoff entry
+- Owner: Codex root
+- Dependencies: existing external `/api/media-screen/stats` and `/api/media-screen/history` contracts; existing React, Vite, TypeScript, and lucide dependencies from the source screen
+- Integration order: migrate source screen -> extract typed external API client and configurable proxy -> add local documentation -> type/build/browser verification -> delivery entry
+- Verification plan: focused typecheck/build, proxy target inspection, source-feature parity audit, real browser checks at desktop/mobile widths where the external backend is available, and scoped diff/whitespace validation
+
+## Delivery 2026-08-24 16:27:07 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 仅修改兼职 H5 前端，使后续前后端合并时提交客资的图片可以可靠上传、关联到客资，并在确认页和详情页展示
+- Key decisions: 沿用现有伙伴端上传与提交接口，不新增依赖或后端行为；由浏览器生成 multipart boundary；上传请求使用独立 120 秒超时并校验文件编号和预览地址；提交前阻止上传中或失败附件，失败重试复用同一幂等键，返回编辑后重新生成；提交载荷只传后端约定的 `infraFileId`
+- Execution or analysis result: 完成图片格式、大小和最多 9 张校验，补齐上传中、成功、失败、重试、删除和本地 Blob URL 生命周期；确认页展示本次全部成功附件；客资提交关联全部文件编号；详情页按后端返回的附件地址展示缩略图并支持图片预览；保留手机号提示移出输入框的既有修复
+- Changed files: frontend/h5/src/api/lead.ts; frontend/h5/src/composables/useUpload.ts; frontend/h5/src/components/ImageUploader.vue; frontend/h5/src/pages/lead/submit.vue; frontend/h5/src/pages/lead/detail.vue; handoff/main.md
+- Verification evidence: H5 `node node_modules/vue-tsc/bin/vue-tsc.js --noEmit --incremental false` PASS；H5 direct Vite production build PASS（527 modules）；静态契约检查确认 `/part-api` + `/zsjos/lead/attachment/upload`、multipart 字段 `file`、`/zsjos/lead/create` 和 `attachments: [{ infraFileId }]` 与当前伙伴 Controller/VO 一致； scoped `git diff --check` PASS，仅有行尾提示；桌面 1280x800 和移动 390x844 浏览器检查均无 console error，并按预期跳转到 `/login?redirect=/lead/submit`
+- Dependency or integration impact: 未新增依赖，未修改后端、数据库、Admin、Workbench、账号、权限、分支或外部服务；构建产物未纳入变更
+- Remaining work: 当前无有效伙伴测试账号，未执行真实认证后的文件上传、客资提交和详情回显闭环；前后端部署合并后需使用非敏感测试账号完成该联调。重复客资复核重新激活时的伙伴附件校验与服务端孤立文件清理仍属于后端剩余项，不在本次前端范围
+
+## Delivery 2026-08-24 18:09:09 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 在 ZSJOS 中新增独立的新媒体客资数量大屏前端，完整迁移兼职端现有页面和交互，数据继续来自兼职 H5 所连接的外部后端
+- Key decisions: 仅新增 `frontend/media-screen` React/Vite 前端，不接入工作台菜单、不使用 iframe、不复制后端统计和快照逻辑；页面通过类型化 API 模块访问外部 CRM；开发环境将 `/api` 代理到可配置的外部地址，生产环境保留同源 `/api` 供部署层转发；保留实时数据、历史快照、兼职人员开关和自动刷新行为
+- Execution or analysis result: 完成实时汇总、部门和成员排行、兼职陪跑、今日之星、趋势、配色及历史快照页面迁移；实现首次加载、空数据、403 IP 白名单拒绝、网络或接口失败、历史无冻结快照、保留旧数据并自动重试等状态；移动宽度改为纵向响应式布局，避免横向截断；补充环境示例、部署说明和架构边界文档
+- Changed files: `frontend/media-screen/.env.example`; `frontend/media-screen/.gitignore`; `frontend/media-screen/README.md`; `frontend/media-screen/index.html`; `frontend/media-screen/package-lock.json`; `frontend/media-screen/package.json`; `frontend/media-screen/public/favicon.svg`; `frontend/media-screen/src/App.tsx`; `frontend/media-screen/src/api.ts`; `frontend/media-screen/src/main.tsx`; `frontend/media-screen/src/styles.css`; `frontend/media-screen/src/vite-env.d.ts`; `frontend/media-screen/tsconfig.json`; `frontend/media-screen/tsconfig.node.json`; `frontend/media-screen/vite.config.ts`; `docs/architecture/system-overview.md`; `docs/architecture/ownership-and-change-boundaries.md`; `handoff/main.md`
+- Verification evidence: `npm install` PASS；`npm run build` PASS，TypeScript 检查和 Vite 生产构建完成（1580 modules transformed）；真实浏览器通过 `http://127.0.0.1:3009` 获取外部后端统计数据；网络请求仅包含 `/api/maintenance/status` 和 `/api/media-screen/stats`，未调用 ZSJOS 业务接口；`includePartTimers` 在 URL 中从 1 切换为 0 后保持且数据同步变化；历史快照真实加载成功；模拟 403 显示 IP 白名单拒绝及重试状态；1440x900 与 390x844 浏览器布局检查通过；`git diff --check` PASS（仅现有行尾转换提示）；`node_modules` 和 `dist` 已由局部 `.gitignore` 忽略
+- Dependency or integration impact: 未新增计划外 npm 依赖；未修改 ZSJOS 后端、数据库、迁移、账号、权限、菜单、分支或外部 CRM；生产部署需要将该前端的同源 `/api` 转发到外部 CRM 后端
+- Remaining work: 部署环境确认外部 CRM 正式地址、IP 白名单和 `/api` 反向代理规则；1920x1080 未单独留存截图，但同一响应式桌面布局已在 1440x900 真实浏览器验证
+- Verification follow-up: 随后补充完成 1920x1080 真实浏览器检查，页面汇总、趋势、今日之星、四个排行分区和顶栏均正常显示，无可见重叠或截断；截图保存于 `output/playwright/media-screen-1920.png`
+- Remaining work correction: 仅剩部署环境确认外部 CRM 正式地址、IP 白名单和 `/api` 反向代理规则
+
+## Delivery 2026-08-24 21:29:18 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 按 ZSJOS 后端实际 API 和 JSON 契约改造迁移后的新媒体客资数量大屏；后端缺失的数据整理 API 文档供后端补充；避免大屏继续读取 PartTimeCRM 本地服务
+- Key decisions: 将大屏请求从 PartTimeCRM 的 `/api/*` 契约切换到 ZSJOS 标准 `/admin-api/zsjos/media-screen/*` 契约；Vite 开发代理默认改为 ZSJOS 本地后端 `http://127.0.0.1:48080`，不再默认连接 `127.0.0.1:8000`；前端只负责 CommonResult 解析和视图模型消费，不在浏览器拼接分页数据或直接访问数据库；统计聚合、兼职口径和历史快照由后端契约负责
+- Execution or analysis result: `frontend/media-screen/src/api.ts` 新增可配置 API 前缀，改用 ZSJOS stats/history/maintenance 路径，并区分 401、403 和业务错误；`vite.config.ts` 和 `.env.example` 切换 `/admin-api` 代理及 48080 默认目标；README、架构文档同步说明共享数据库通过 ZSJOS 后端访问；新增 `docs/api/media-screen.md`，定义实时统计、历史快照、维护状态、兼职开关、字段口径、访问控制和错误响应，并明确当前 ZSJOS 分支尚未发现这些接口
+- Changed files: `frontend/media-screen/src/api.ts`; `frontend/media-screen/src/vite.config.ts`; `frontend/media-screen/src/vite-env.d.ts`; `frontend/media-screen/.env.example`; `frontend/media-screen/README.md`; `docs/api/media-screen.md`; `docs/architecture/system-overview.md`; `docs/architecture/ownership-and-change-boundaries.md`; `handoff/main.md`
+- Verification evidence: `frontend/media-screen npm run build` PASS（TypeScript 与 Vite 构建，1580 modules）；scoped `git diff --check` PASS（仅既有 LF/CRLF 提示）；静态审计确认源码和文档不再使用旧 `/api/media-screen/*` 或默认 `127.0.0.1:8000`；3009 实际请求 `/admin-api/zsjos/media-screen/stats?includePartTimers=1`，因本机 48080 尚未运行而返回代理 500，未回落到 PartTimeCRM；Playwright 页面显示“请求失败（500），正在重试…”，错误重试状态正常
+- Dependency or integration impact: 未新增依赖；未修改 `D:\code\parttimecrm`、ZSJOS Java 后端、数据库、迁移、账号、权限或外部服务；后端需要按 `docs/api/media-screen.md` 实现专用只读接口，并配置共享数据库、访问认证/IP 白名单；联调时将 `VITE_MEDIA_SCREEN_BACKEND_TARGET` 指向实际 ZSJOS 后端地址
+- Remaining work: 后端补齐并部署 `/admin-api/zsjos/media-screen/stats`、`history`、`maintenance/status` 后，使用共享数据库做真实数据、字段口径、历史快照、兼职开关和权限回归；当前因接口尚未存在，真实成功数据联调未完成
+
+## Delivery 2026-08-25 11:23:29 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 参考 `D:\code\parttimecrm` 的兼职 H5，在 ZSJOS 架构内迁移排行榜、客资高级筛选与详情增强、系统反馈、消息增强、银行卡编辑和提现记录增强；仅改兼职 H5，后端缺口形成 API 文档，不修改任何后端代码
+- Key decisions: 复用 ZSJOS 现有 H5 路由、Vant 组件、请求封装和真实基础接口；用户可见客资编号只使用 `leadNo`；高级筛选、详情扩展、排行榜、反馈和消息增强采用独立缺口契约，避免把后端未支持的筛选条件静默传给旧接口；开发 Mock 仅在 DEV 且接口明确未实现时回退，401、403、参数错误和普通业务失败保持真实；生产构建不包含 Mock 模块或样例数据
+- Execution or analysis result: 新增排行榜完整页和首页摘要；客资列表支持关键词、状态、分配、来源、分类、日期、课程、申诉和订单筛选；客资详情补充无效原因、跟进、时间线、返现、申诉、投诉和订单区块，扩展接口失败不影响基础详情；新增系统反馈列表、创建、详情、附件和补充说明；消息页增加服务端分组、未读过滤和全部已读；银行卡支持受约束编辑和换卡号二次确认；提现列表与详情补充申请编号、完整状态和审核/打款信息；新增后端缺口 API 文档并同步伙伴端接口说明
+- Changed files: `frontend/h5/src/api/feedback.ts`; `frontend/h5/src/api/leaderboard.ts`; `frontend/h5/src/api/lead.ts`; `frontend/h5/src/api/message.ts`; `frontend/h5/src/api/mock.ts`; `frontend/h5/src/api/reference.ts`; `frontend/h5/src/api/request.ts`; `frontend/h5/src/api/withdrawal.ts`; `frontend/h5/src/pages/feedback/create.vue`; `frontend/h5/src/pages/feedback/detail.vue`; `frontend/h5/src/pages/feedback/index.vue`; `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/pages/profile/bank-card-edit.vue`; `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/lead/list.vue`; `frontend/h5/src/pages/messages/detail.vue`; `frontend/h5/src/pages/messages/index.vue`; `frontend/h5/src/pages/profile/bank-cards.vue`; `frontend/h5/src/pages/profile/index.vue`; `frontend/h5/src/pages/withdrawal/detail.vue`; `frontend/h5/src/pages/withdrawal/index.vue`; `frontend/h5/src/router/index.ts`; `frontend/h5/components.d.ts`; `frontend/h5/vite.config.ts`; `docs/api/partner-app-api.md`; `docs/api/partner-h5-feature-gap-api.md`; `handoff/main.md`
+- Verification evidence: `frontend/h5 npm run build` PASS，`vue-tsc -b` 和 Vite 生产构建完成（553 modules transformed）；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示；生产产物静态扫描未发现 `FB-MOCK`、`P-MOCK`、`MOCK-SPU`、演示用户或演示反馈样例；路由和接口路径审计 PASS，新增代码未发现 `/parttime/*`、`/common/bug-reports` 或 WebSocket 路径；390x844 移动宽度无横向溢出，1440x900 桌面宽度为 540px 居中画布，控制台无错误，受保护路由按预期跳转 `/login?redirect=...`
+- Dependency or integration impact: 未新增依赖，未修改后端、数据库、员工端、管理端、媒体大屏、PartTimeCRM、账号、权限、分支或外部服务；保留工作区已有未提交修改和生成文件状态
+- Remaining work: 当前无可用兼职测试账号，排行榜、反馈、客资扩展、消息增强、银行卡编辑和提现增强尚未完成登录后的真实浏览器联调；后端需按 `docs/api/partner-h5-feature-gap-api.md` 补齐缺失接口和字段，部署后再验证成功、空数据、失败、重试、无权限及写操作闭环
+
+## Delivery 2026-08-25 11:58:37 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 仅修改 ZSJOS 兼职 H5 前端接口和页面代码以匹配现有外部后端，解决客资跟进记录不显示问题；现有后端无法提供的数据不得由前端伪造
+- Key decisions: 客资跟进改用销售端已有的 `/zsjos/lead/{id}/follow-ups/page` 分页契约并按真实 `LeadFollowUpRespVO` 字段展示；基础详情与跟进请求解耦；删除没有现有后端 Controller/Service 依据的排行榜入口、路由、页面、API 和 Mock，前端不计算或模拟排行榜；不使用 Admin Token 或权限绕过
+- Execution or analysis result: 客资详情已展示跟进时间、方式、结果、分类变化、备注、下次跟进时间和图片，并处理加载、成功、空数据、失败和重试状态；基础详情成功后结束其加载状态，再独立请求跟进记录；旧 `partner-activity` 和排行榜引用已从 H5 源码及生产产物中移除
+- Changed files: `frontend/h5/src/api/lead.ts`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/router/index.ts`; `frontend/h5/src/api/mock.ts`; 删除 `frontend/h5/src/api/leaderboard.ts`; 删除 `frontend/h5/src/pages/leaderboard/index.vue`; `handoff/main.md`
+- Verification evidence: `frontend/h5 npm run build` PASS，`vue-tsc -b` 与 Vite 生产构建完成（549 modules transformed）；构建后静态扫描确认源码和产物中无 `leaderboard`、`partner-activity`，且跟进分页契约存在于源码和产物；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示；390x844 浏览器检查确认 `/lead/1` 按预期跳转 `/login?redirect=/lead/1`，页面宽度 390、无横向溢出且控制台无错误
+- Dependency or integration impact: 未新增依赖；未修改外部后端、数据库、销售端、管理端、员工端、账号、权限、分支或外部服务；继续使用 H5 现有 `/part-api` 基础前缀访问相同业务路径
+- Remaining work: 当前没有可用兼职测试账号，无法验证外部后端是否允许 PARTNER 通过 `/part-api/zsjos/lead/{id}/follow-ups/page` 访问，因此真实跟进数据的 200/403/404 和字段回显仍需联调；现有后端没有排行榜接口，若未来确认必须恢复排行榜，需要后端先提供权限和聚合契约
+
+## Workstream Registration 2026-08-25 12:54:36 +08:00
+
+- Workstream ID: partner-h5-missing-feature-mock
+- Goal: 恢复兼职 H5 排行榜，并为后端尚未提供的兼职端功能保留可操作前端结构、明确不可用状态和开发环境演示 Mock，同时修正客资详情扩展数据契约
+- Non-goals: 不修改后端、数据库、销售端、管理端、员工端、权限、部署配置或外部服务；不在生产环境启用 Mock；不以销售端 Admin 接口替代兼职端接口
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: `frontend/h5/src/api/leaderboard.ts`; `frontend/h5/src/api/lead.ts`; `frontend/h5/src/api/mock.ts`; `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/router/index.ts`; directly affected H5 generated component declarations; `docs/api/partner-app-api.md`; `docs/api/partner-h5-feature-gap-api.md`; this handoff record
+- Owner: Codex root
+- Dependencies: existing Vue 3, Vant, Axios, Vue Router and current `/part-api` deployment prefix; proposed backend contracts `GET /zsjos/partner/leaderboard/config`, `GET /zsjos/partner/leaderboard`, and `GET /zsjos/lead/{id}/partner-activity`; no new dependency
+- Integration order: typed API contracts -> development-only Mock -> leaderboard route/page/home summary -> lead detail aggregation -> API documentation -> type/build/browser verification -> delivery entry
+- Verification plan: H5 typecheck and production build; scoped diff and contract scan; production artifact scan proving demo samples are excluded; mobile 390x844 and desktop browser checks where authentication permits; document unverified authenticated backend flows
+
+## Delivery 2026-08-25 13:07:02 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 恢复并实现兼职 H5 排行榜；后端缺失功能不再删除，保留前端结构、明确不可用状态和接口文档，并在开发环境使用 Mock 演示；仅修改前端接口与代码适配后端，不修改后端
+- Key decisions: 排行榜使用独立配置和分页查询契约，排名、并列、差距、本人排名与姓名脱敏均由服务端负责；首页排行榜与其他首页数据独立加载；客资跟进不再调用销售端 Admin 分页接口，统一改为 Partner 本人可见的业务流转聚合契约；所有 Mock 始终先请求真实接口，仅 DEV 下对 404/405/501 或明确未实现错误回退，401/403/参数错误/业务失败/500 不回退
+- Execution or analysis result: 恢复 `/leaderboard` 路由、首页快捷入口和摘要；完整榜单支持后台开关、周期与指标切换、Top 3、分页列表、本人排名、规则、加载/空/失败/重试状态；客资详情补齐跟进、状态时间线、收益、申诉、投诉和订单六类区块；缺失接口在生产显示明确不可用状态，开发 Mock 显示演示标识；接口文档补充完整请求、响应、字段责任、销售接口边界和缺口呈现规则
+- Changed files: `frontend/h5/src/api/leaderboard.ts`; `frontend/h5/src/api/lead.ts`; `frontend/h5/src/api/mock.ts`; `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/router/index.ts`; `docs/api/partner-app-api.md`; `docs/api/partner-h5-feature-gap-api.md`; `handoff/main.md`
+- Verification evidence: `frontend/h5 npm run build` PASS，Vue 类型检查和 Vite 生产构建完成（553 modules transformed）；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示；源码契约扫描确认兼职 H5 不再调用 `follow-ups/page`，只调用 `/zsjos/lead/{id}/partner-activity`；生产产物扫描未发现 `FB-MOCK`、`P-MOCK`、`MOCK-SPU`、演示申诉记录、排行榜演示成员 ID 或演示数值；390x844 浏览器宽度 document/body 均为 390、无横向溢出，1440x900 桌面宽度为 540px 居中画布、无横向溢出，两者均无 console error；受保护路由按预期跳转 `/login?redirect=/leaderboard` 和 `/login?redirect=/lead/10001`
+- Dependency or integration impact: 未新增依赖，未修改后端、数据库、Admin、Workbench、销售端、员工端、账号、权限、部署、分支或外部服务；继续使用现有 `/part-api` 部署前缀；保留工作区已有未提交修改
+- Remaining work: 当前无可用兼职测试账号，排行榜和客资业务流转尚未完成登录后的真实接口与 Mock 浏览器交互；后端需按 `docs/api/partner-h5-feature-gap-api.md` 补齐排行榜、Partner 客资聚合及其他缺失接口，部署后验证真实成功、空数据、分页、401、403、对象越权、失败重试和写操作闭环
+
+## Workstream Registration 2026-08-25 13:19:02 +08:00
+
+- Workstream ID: partner-h5-mock-missing-route-match
+- Goal: 让兼职 H5 在开发环境识别 ZSJOS 后端固定返回的“请求地址不存在”错误，并对已登记的缺失功能接口启用现有 Mock
+- Non-goals: 不修改后端、数据库、其他前端、Mock 数据内容、生产环境 Mock 策略或真实业务错误处理
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- Target branch: main
+- Ownership scope: `frontend/h5/src/api/mock.ts`; this handoff record
+- Owner: Codex root
+- Dependencies: existing request interceptor and development-only feature Mock; no new dependency
+- Integration order: add exact backend missing-route message -> focused behavior check -> H5 production build -> delivery entry
+- Verification plan: verify “请求地址不存在” matches, verify 401/403/500 and ordinary errors do not match, run H5 production build and scoped diff check
+
+## Delivery 2026-08-25 13:24:06 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 7d4a9ae2f959ccfaee2a389bfac2a7b94cccae25
+- User goal: 修复兼职 H5 排行榜缺失接口返回“请求地址不存在”时没有加载开发 Mock 的问题，只修改前端
+- Key decisions: 仅将 ZSJOS 后端真实缺失路由文案“请求地址不存在”加入现有缺失接口识别列表；保留真实接口优先、仅开发环境回退 Mock 的策略；不扩大到 401、403、500、参数错误或普通业务失败
+- Execution or analysis result: 排行榜配置接口返回 `请求地址不存在:part-api/zsjos/partner/leaderboard/config` 时，开发环境现在能够进入已有排行榜 Mock；其他错误处理和生产环境行为不变
+- Changed files: `frontend/h5/src/api/mock.ts`; `handoff/main.md`
+- Verification evidence: focused predicate check PASS：缺失路由命中，未登录、无权限、服务异常和参数错误均不命中；`frontend/h5 npm run build` PASS，Vue 类型检查和 Vite 生产构建完成（553 modules transformed）；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示
+- Dependency or integration impact: 未新增依赖；未修改后端、数据库、管理端、销售端、员工端、部署配置、账号、权限、分支或外部服务
+- Remaining work: 需要在已登录的 `npm run dev` 页面刷新排行榜，确认真实缺失接口后出现“开发环境演示数据”和榜单内容；生产构建仍按约定禁用 Mock
+
+## Workstream Registration 2026-08-25 14:15:32 +08:00
+
+- Workstream ID: partner-h5-message-mock-route-conflict
+- Goal: 修复消息增强缺失接口被后端通用 `/{id}` 路由误判为参数类型错误，导致开发 Mock 不触发
+- Non-goals: 不修改后端路由、数据库、其他前端、真实消息接口、全局参数错误处理或生产 Mock 策略
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a
+- Target branch: main
+- Ownership scope: `frontend/h5/src/api/mock.ts`; this handoff record
+- Owner: Codex root
+- Dependencies: existing message enhancement Mock and request interceptor; no new dependency
+- Integration order: endpoint-specific mismatch recognition -> focused positive/negative checks -> H5 build -> delivery entry
+- Verification plan: verify `groups` and `enhanced-page` route-conflict messages trigger only their matching Mock; verify unrelated parameter errors do not trigger; run H5 production build and scoped diff check
+
+## Delivery 2026-08-25 14:16:58 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a
+- User goal: 修复消息页请求 `/messages/groups` 被后端 `/{id}` 路由误匹配后返回参数类型错误，导致开发 Mock 不加载
+- Key decisions: 在 H5 Mock 层按具体请求路径和错误内容识别两类已知缺失接口：`/zsjos/messages/groups` + `id` 转换为 `groups`，以及 `/zsjos/messages/enhanced-page` + `id` 转换为 `enhanced-page`；不把所有参数类型错误视为接口缺失
+- Execution or analysis result: 消息分组和增强分页在开发环境可回退已有 Mock；普通消息接口、其他参数错误、权限错误和服务器错误继续走真实错误处理
+- Changed files: `frontend/h5/src/api/mock.ts`; `handoff/main.md`
+- Verification evidence: 定向判断检查通过（两类路由冲突命中，普通 group 参数错误和非目标消息路径不命中）；`frontend/h5 npm run build` PASS，Vue 类型检查和 Vite 生产构建完成（556 modules transformed）；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示
+- Dependency or integration impact: 未新增依赖；未修改后端 Controller、数据库、其他端、部署配置、账号、权限、分支或外部服务
+- Remaining work: 需要在已登录 `npm run dev` 消息页刷新并确认分组和增强消息展示；后端补齐正式消息增强接口后，应移除对应 Mock 依赖并完成真实联调
+
+## Delivery 2026-08-25 13:56:02 +08:00
+
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a
+- User goal: 保存当前本地修改，拉取远程最新代码并合并到本地
+- Key decisions: 使用 `stash@{0}` 保存已跟踪和未跟踪内容；确认本地仅落后且未分叉后，将 `main` 快进到 `origin/main`；远程已删除被误跟踪的 H5 `node_modules`，因此仅恢复非依赖业务、文档和验证文件，并保留暂存快照中的依赖生成物；三方合并同时保留远程新增的排行榜、反馈、定位卡和筛选能力，以及本地统一中文客资状态行为
+- Execution or analysis result: 本地 `main` 从 `7d4a9ae2` 更新到远程 `00d9dbec`；33 个已跟踪非依赖修改完成三方应用，8 个冲突已合并；42 个非依赖未跟踪文件完整恢复；所有本地修改保持未暂存状态；原始暂存快照保留为额外恢复点
+- Changed files: 远程 12 个提交涉及的仓库文件；恢复的既有本地业务代码、文档、环境文件和验证产物；冲突合并文件为 `docs/architecture/system-overview.md`、`frontend/h5/src/api/reference.ts`、`frontend/h5/src/pages/home/index.vue`、`frontend/h5/src/pages/lead/detail.vue`、`frontend/h5/src/pages/lead/list.vue`、`frontend/h5/src/pages/messages/detail.vue`、`frontend/h5/tsconfig.tsbuildinfo`、`handoff/main.md`
+- Verification evidence: `HEAD...origin/main` 为 `0 0`；未解决冲突数为 0；42 个非依赖未跟踪文件与暂存快照逐项比较差异数为 0；H5 `npm run build` PASS，Vue 类型检查和 Vite 生产构建完成（556 modules transformed）；最终 Git 差异检查待本条记录追加后执行
+- Dependency or integration impact: 未新增或升级依赖，未创建提交、分支或工作树，未停止正在运行的开发服务；按现有 `pnpm-lock.yaml` 恢复了本地 H5 `node_modules`；`stash@{0}` 继续保存拉取前的完整快照，包含未重新引入版本控制的依赖生成物
+- Remaining work: 确认合并后的本地修改无需回退后，可另行删除 `stash@{0}`；正在运行的 H5 开发服务可能继续更新生成文件
+
+## Workstream Registration 2026-08-25 15:10:00 +08:00
+
+- Workstream ID: media-screen-public-api-adapter
+- Goal: 将独立新媒体客资大屏改为消费 ZSJOS 免登录公共聚合接口，按真实第一版字段适配页面，并隔离后端缺失能力的开发演示数据
+- Non-goals: 不修改后端、数据库、PartTimeCRM、工作台菜单或权限；不在生产环境启用 Mock；不推算后端未提供的业务指标
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a
+- Target branch: main
+- Ownership scope: `frontend/media-screen/**`; `docs/api/media-screen.md`; this handoff record
+- Owner: Codex root
+- Dependencies: existing React 19, Vite 7, TypeScript 5.8 and lucide-react; ZSJOS public media-screen API; no new dependency
+- Integration order: public API client and typed adapter -> development-only Mock -> flat capability-aware screen -> docs -> automated and browser verification -> delivery entry
+- Verification plan: Node built-in adapter tests, TypeScript checks, production build, contract scans, desktop browser checks for success/empty/403/503/network/history states, and network inspection for public-only unauthenticated requests
+
+## Delivery 2026-08-25 15:20:54 +08:00
+
+- Workstream ID: media-screen-public-api-adapter
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a
+- User goal: 将 PartTimeCRM 新媒体客资大屏迁移版本改为只消费 ZSJOS 免登录公共接口，按第一版真实字段逐项适配，后端缺失能力仅用开发 Mock 明确展示，不修改后端、数据库或 PartTimeCRM
+- Key decisions: 页面保持独立公开全屏；租户 ID 必须由 Vite 环境提供；请求只走 `/public-api/zsjos/media-screen/*` 且显式省略凭据；部门和成员使用扁平独立排行；`todayStar` 降格为“成员榜首”；近 7 日趋势保留日期语义；兼职陪跑因口径不足暂列 unsupported；Mock 仅在 DEV 且显式开启时填充 unsupported，生产构建移除演示值；历史 `available=false` 固定显示无快照
+- Execution or analysis result: 重写类型化 API 客户端并支持 Yudao `msg`/兼容 `message`、HTTP 与业务错误分类；新增纯适配层和集中开发 Mock；重构大屏为能力感知的 KPI、部门排行、成员排行、成员榜首、兼职陪跑、近 7 日趋势与历史快照页面；增加维护、403、503、网络失败保留旧数据、配置缺失和重试状态；开发代理切至公共前缀；更新运行说明和完整接口对齐/后端缺口文档
+- Changed files: `frontend/media-screen/src/api.ts`; `frontend/media-screen/src/adapter.ts`; `frontend/media-screen/src/mock.ts`; `frontend/media-screen/src/App.tsx`; `frontend/media-screen/src/styles.css`; `frontend/media-screen/src/vite-env.d.ts`; `frontend/media-screen/tests/adapter.test.ts`; `frontend/media-screen/package.json`; `frontend/media-screen/package-lock.json`; `frontend/media-screen/tsconfig.json`; `frontend/media-screen/vite.config.ts`; `frontend/media-screen/.env.example`; `frontend/media-screen/README.md`; generated `frontend/media-screen/dist/`; `docs/api/media-screen.md`; `handoff/main.md`
+- Verification evidence: Node adapter tests PASS 7/7；TypeScript checks and Vite production build PASS（1582 modules，JS 214.25 kB / gzip 68.31 kB）；生产产物扫描无 `/admin-api`、`127.0.0.1:8000`、`Authorization` 和演示成员数据；1920x1080、1440x900 浏览器宽高无滚动溢出，390x844 无横向溢出或按钮内容溢出；浏览器分别验证实时成功、真实空排行、403、503、维护状态、断网自动重试并保留旧真实数据、历史 `available=false`、开发 Mock 开关、Mock 不掩盖 403、兼职 URL 参数刷新保持；临时后端请求日志确认仅访问三个 `/public-api/zsjos/media-screen/*` 路径，携带 `tenantId=7` 与合法 `includePartTimers=0|1`，`authorization` 为 null；缺少租户配置的浏览器会话无动态接口请求；最终临时 3010/3011/3012/49151 服务均已停止，原有 3009 服务未动
+- Dependency or integration impact: 未新增业务依赖、未修改后端、数据库、PartTimeCRM、工作台菜单、权限、分支、提交或部署；按现有 lockfile 恢复本地 npm 依赖后构建，`npm install` 报告现有依赖树有 2 个 high severity audit 项，本任务未擅自升级；生产部署必须提供租户 ID 并转发同源 `/public-api`
+- Remaining work: 远程 `192.168.2.17:48080` 的新版本部署、功能开关、IP/CIDR 白名单和租户绑定尚未确认，因此真实远程成功响应与最终业务字段验收仍阻塞；后端还需确认 `zsjos.media-screen` 与当前 YAML `yudao.media-screen` 配置前缀差异，并按 `docs/api/media-screen.md` 补齐统计和持久化历史快照能力
+## Workstream Registration 2026-08-25 16:45:01 +08:00
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Goal: 按已确认方案将兼职端优先适配 ZSJOS 已有 Partner 真实接口，并将确实缺失的能力隔离为开发 Mock 和生产不可用状态
+- Non-goals: 不修改后端、数据库、管理端、销售端、员工端、权限配置或无关公共代码；不调用 Admin API；不在生产环境伪造数据
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a plus existing uncommitted user changes
+- Target branch: main
+- Ownership scope: `frontend/h5/src/api/lead.ts`; `frontend/h5/src/api/message.ts`; `frontend/h5/src/api/mock.ts`; `frontend/h5/src/pages/lead/list.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/messages/index.vue`; `docs/api/partner-h5-feature-gap-api.md`; this handoff record
+- Owner: Codex `/root`
+- Dependencies: existing Partner controllers, H5 Axios wrapper, Vant/Vue stack and current development-only Mock; no new dependency
+- Integration order: align existing list/message parameters -> split lead detail real and missing data -> retain missing feature Mock boundaries -> synchronize API gap documentation -> typecheck/build and focused contract checks
+- Verification plan: inspect request paths against Partner controllers; run focused static checks; run `vue-tsc`; run Vite production build; run scoped `git diff --check`; report real-environment items that cannot be verified
+
+## Delivery 2026-08-25 16:58:00 +08:00
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 执行兼职端最合适的前端适配方案，优先消费 ZSJOS 已有 Partner 真实接口，后端缺失功能保留入口和开发 Mock，并更新 API 缺口文档，全程不修改后端
+- Key decisions: 客资关键词、状态、业务环节、来源、分类、分配状态和提交时间走已有 Partner 分页；课程、申诉状态、订单状态仅在增强接口可用或开发 Mock 时启用；客资详情的当前处理概况取自已有 `/lead/get`，申诉记录独立调用已有 Partner 申诉接口，跟进、完整时间线、按客资收益、投诉和订单明细继续隔离在缺失聚合接口；消息仅选未读改用已有 `readStatus=false`，全部已读通过未读分页加批量已读循环完成，分组才使用缺失增强接口；Mock 回退收窄到已确认缺失端点，不再为已有基础接口兜底
+- Execution or analysis result: 兼职端现有真实数据利用率已提升；销售端已有跟进数据仍不会由 H5 越权调用 Admin API，页面会显示当前处理状态并保留跟进扩展区；排行榜、系统反馈、消息分组、高级客资筛选、完整客资流转和银行卡编辑仍保留现有开发 Mock/生产不可用边界；API 缺口文档已同步真实接口复用和剩余后端契约
+- Changed files: `frontend/h5/src/api/lead.ts`; `frontend/h5/src/api/message.ts`; `frontend/h5/src/api/mock.ts`; `frontend/h5/src/pages/lead/list.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/messages/index.vue`; `docs/api/partner-h5-feature-gap-api.md`; `handoff/main.md`
+- Verification evidence: H5 `vue-tsc -b` PASS；Vite production build PASS（556 modules transformed）；定向契约断言 PASS：未读使用 `readStatus=false`、无 `/messages/read-all`、客资列表使用 `simpleStatus`、申诉使用 Partner 接口、H5 源码无 `/admin-api`；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示；浏览器在 390x844 验证登录页无控制台错误且无横向溢出；临时 10126 开发服务和验证标签页已关闭
+- Dependency or integration impact: 未新增依赖，未修改后端、数据库、管理端、销售端、员工端、权限、分支、提交或外部服务；保留工作区全部既有未提交修改；直接运行 `pnpm run build` 会因本机 pnpm 11 的 `esbuild` ignored-build policy 在安装检查阶段失败，因此改用项目本地 `vue-tsc` 和 `vite build` 完成等价检查
+- Remaining work: 缺少已登录兼职账号和可确认的真实业务样本，登录后客资、排行榜、反馈、消息、银行卡和提现页面的真实响应及交互未完成浏览器联调；后端仍需按 `docs/api/partner-h5-feature-gap-api.md` 补齐排行榜、系统反馈、客资增强筛选、客资完整流转、消息分组和银行卡编辑接口，补齐后再移除对应 Mock 并做真实成功、空数据、失败、无权限和手机端验收
+
+## Delivery 2026-08-25 17:32:00 +08:00
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 实施兼职端前后端字段适配与接口缺口方案，只修改 H5 和接口文档
+- Key decisions: 课程目录按真实分类/SPU/SKU/属性/价格结构适配；客资详情、申诉、投诉、收益、提现、消息、资料和定位页消费已有后端字段；高级筛选和消息分组文档统一为扩展已有分页接口；Partner 身份投影问题明确记录为后端修正项，不在前端绕过权限
+- Execution or analysis result: 完成 H5 类型和页面字段消费，课程选择支持分类、SKU 和价格，申诉使用 `roundNo/reviewStage/canSubmitNextRound`，投诉/收益/提现/消息/资料/定位补充真实字段；清理独立 `advanced-page/enhanced-page` 前端调用；同步三份兼职端接口/缺口文档
+- Changed files: `frontend/h5/src/api/lead.ts`; `frontend/h5/src/api/message.ts`; `frontend/h5/src/api/withdrawal.ts`; `frontend/h5/src/components/ProductPicker.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/lead/appeal.vue`; `frontend/h5/src/pages/lead/complaints.vue`; `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/src/pages/withdrawal/detail.vue`; `frontend/h5/src/pages/profile/edit.vue`; `frontend/h5/src/pages/positioning/confirmation.vue`; `frontend/h5/src/pages/lead/submit.vue`; `frontend/h5/src/pages/messages/index.vue`; `frontend/h5/src/pages/messages/detail.vue`; `frontend/h5/src/api/mock.ts`; `docs/api/partner-h5-feature-gap-api.md`; `docs/api/partner-app-api.md`; `frontend/h5/兼职端API接口.md`; `handoff/main.md`
+- Verification evidence: 本地 `vue-tsc -b --pretty false` PASS；直接调用本地 Vite production build PASS（556 modules）；`git diff --check` 无错误，仅有既有换行格式提示；H5 源码未发现 `/admin-api` 调用
+- Dependency or integration impact: 未新增依赖，未修改后端、数据库、管理端、销售端、权限、分支、提交或外部服务；保留工作区既有未提交修改
+- Remaining work: 真实登录账号和后端缺口接口尚未联调；后端需按 `docs/api/partner-h5-feature-gap-api.md` 修正 Partner 身份投影并补齐业务流转聚合、排行榜、系统反馈、筛选增强、消息分组和银行卡编辑接口
+
+## Scope Expansion 2026-08-25
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Goal: 完成已确认 Partner 字段的 H5 类型/展示适配，并同步后端缺口开发文档
+- Added ownership scope: `frontend/h5/src/components/ProductPicker.vue`; `frontend/h5/src/pages/lead/appeal.vue`; `frontend/h5/src/pages/lead/complaints.vue`; `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/src/pages/withdrawal/detail.vue`; `frontend/h5/src/pages/profile/edit.vue`; `frontend/h5/src/pages/positioning/confirmation.vue`; `frontend/h5/src/pages/lead/submit.vue`; `frontend/h5/src/api/cashback.ts`; `frontend/h5/src/api/profile.ts`; `frontend/h5/src/api/positioning.ts`; `docs/api/partner-app-api.md`; `frontend/h5/兼职端API接口.md`
+- Non-goals unchanged: 不修改后端 Java、数据库、管理端、销售端、员工端或新增依赖
+- Verification: `vue-tsc -b`、Vite production build、scoped diff check
+
+## Delivery 2026-08-25 18:01:55 +08:00
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 完成兼职端字段适配方案实施，确保开发 Mock 使用真实状态，兼容现有 Partner 动作编码，并同步后端接口缺口文档
+- Key decisions: 申诉 Mock 改用后端真实 `sales_manager_reviewing` 状态并由 `canSubmitNextRound` 控制；移除参数类型错误触发 Mock 的旁路，避免用 Mock 掩盖后端路由/参数问题；H5 兼容现有后端 `SUBMITTER_URGE`、`SUBMITTER_COMPLAINT` 与目标契约编码；去除固定三轮和静态审核阶段回退
+- Execution or analysis result: 完成 Mock、客资详情动作入口、申诉页和三份接口文档的兼容性修订；只改 H5 与文档，未修改后端 Java、数据库、管理端或销售端
+- Changed files: `frontend/h5/src/api/mock.ts`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/lead/appeal.vue`; `docs/api/partner-h5-feature-gap-api.md`; `docs/api/partner-app-api.md`; `frontend/h5/兼职端API接口.md`; `handoff/main.md`
+- Verification evidence: `node node_modules/vue-tsc/bin/vue-tsc.js -b --pretty false` PASS；`node node_modules/vite/bin/vite.js build` PASS（556 modules transformed）；`git diff --check` 无实际错误，仅有既有 LF/CRLF 提示；H5 源码未发现 `/admin-api`、`advanced-page` 或 `enhanced-page` 调用
+- Dependency or integration impact: 无新增依赖；继续保留开发环境 Mock 与生产不可用边界；现有工作区其他未提交修改未回退或覆盖
+- Remaining work: 仍需真实登录 Partner 账号联调后端响应；后端需按缺口文档修正身份投影并补齐聚合、排行榜、反馈、高级筛选、消息分组和银行卡编辑接口
+
+## Delivery 2026-08-25 18:08:00 +08:00
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 完成方案收尾并保证真实错误不被 Mock 或静态文案掩盖
+- Key decisions: 排行榜仅在明确缺失接口时显示“后端尚未提供”，权限/参数/服务器错误保留原错误；客资聚合错误区分 Mock 缺口和实际权限/读取失败；申诉加载失败显示可重试状态，不再静默成空列表；移除固定三轮文案
+- Execution or analysis result: 修正排行榜、客资详情、申诉页的错误状态与重试表现；确认 H5 动作同时兼容当前后端 `SUBMITTER_URGE`/`SUBMITTER_COMPLAINT` 和后续契约编码
+- Changed files: `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/lead/appeal.vue`; `handoff/main.md`
+- Verification evidence: `vue-tsc -b --pretty false` PASS；Vite production build PASS（556 modules transformed）；`git diff --check` 无实际错误，仅有既有换行提示
+- Dependency or integration impact: 无新增依赖、无后端或数据库变更；保留既有未提交修改
+- Remaining work: 需要登录 Partner 账号验证真实 401/403/参数错误/500 和后端补齐接口后的成功响应
+
+## Delivery 2026-08-25 20:43:36 +08:00
+
+- Workstream ID: partner-h5-existing-api-adaptation
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 按 A1/A2/B/C 三类方案继续完成兼职端前端适配、Mock 占位和接口缺口文档
+- Key decisions: `visibleTabs` 只有缺失时才兼容全可见，后端明确返回空数组时不绕过权限；客资流转各区块按页签独立控制；申诉按后端 `sales_manager/quality/chairman` 阶段映射；高级筛选和消息分组在缺口接口返回 404/405/501 时提供分页 Mock；银行卡开发编辑结果使用开发会话覆盖值保持列表与编辑页一致；Mock 明确排除 401/403/500
+- Execution or analysis result: 补充 A1 字段展示、申诉证据/阶段、课程分类树和属性筛选、收益状态数量及订单关联、排行榜错误区分、Mock 分页过滤和银行卡开发状态；文档增加 A1/A2/B/C 分类责任表和 Mock 边界说明
+- Changed files: `frontend/h5/src/api/mock.ts`; `frontend/h5/src/api/lead.ts`; `frontend/h5/src/components/ProductPicker.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/lead/appeal.vue`; `frontend/h5/src/pages/earnings/index.vue`; `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/profile/bank-cards.vue`; `frontend/h5/src/pages/profile/bank-card-edit.vue`; `docs/api/partner-h5-feature-gap-api.md`; `handoff/main.md`
+- Verification evidence: `node node_modules/vue-tsc/bin/vue-tsc.js -b --pretty false` PASS；`node node_modules/vite/bin/vite.js build` PASS（556 modules transformed）；`git diff --check` 无实际错误，仅有既有 LF/CRLF 提示
+- Dependency or integration impact: 未新增依赖；未修改后端、数据库、管理端、销售端；保留工作区其他未提交修改
+- Remaining work: 仍需远程后端按 B/C 文档实现接口或模型，并使用真实 Partner 账号验证 A2 身份投影、真实成功/空数据/401/403/参数错误/500 和手机端交互
+
+## Workstream Registration 2026-08-25 18:20:00 +08:00
+
+- Workstream ID: media-screen-original-visual-history
+- Goal: 以 ParttimeCRM 媒体大屏为唯一视觉基准，还原 ZSJOS 实时大屏和完整历史页面，同时保留公共 API、真实数据语义和开发 Mock 边界
+- Non-goals: 不修改 ParttimeCRM、后端、数据库、工作台菜单、权限、远程部署或其他前端；不在生产环境展示 Mock；不伪造部门成员关系或历史快照
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a plus existing user changes
+- Target branch: main
+- Ownership scope: `frontend/media-screen/**`; `docs/api/media-screen.md`; this handoff record
+- Owner: Codex root
+- Dependencies: existing React 19, Vite 7, TypeScript 5.8, lucide-react and the remote public media-screen API; no new dependency
+- Integration order: typed time/history adapter -> development-only unsupported metrics -> original realtime structure -> original full-screen history overlay -> original themes/styles -> docs -> automated and browser verification
+- Verification plan: Node adapter tests, TypeScript and production build, production artifact scan, remote API checks, and Playwright comparison at 1920x1080, 1440x900 and 390x844 including history states
+
+## Delivery 2026-08-25 18:50:00 +08:00
+
+- Workstream ID: media-screen-original-visual-history
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 以 ParttimeCRM 新媒体客资大屏为唯一视觉和交互基准，还原 ZSJOS 独立实时大屏及完整历史页面，同时继续消费免登录公共接口并保持真实数据、缺失能力和开发 Mock 边界
+- Key decisions: 实时页恢复原版状态栏、A/B/C/D 主题、亮度、汇总主区、统计条、榜首卡和三列排行；主卡改为真实客资总数与近 7 日日期趋势；部门和成员保持独立扁平排行；`todayStar` 仅作为成员榜首；生产缺失指标显示 `--` 或待补齐；历史页恢复原版全屏日期选择、汇总、主榜、兼职榜和指标排序，运行时任何环境都不使用 Mock 或实时数据冒充冻结快照
+- Execution or analysis result: 原版 App 和样式已迁入并接回 `/public-api/zsjos/media-screen/*` 类型化客户端；时间适配兼容 epoch milliseconds 和 ISO 字符串并统一为北京时间；历史适配支持 `available=false` 空状态和未来完整快照结构；远程真实数据可显示总量、部门排行、成员排行、成员榜首、近 7 日趋势和维护状态；后端缺失能力及当前全量 Lead、销售部门/成员、兼职榜复制口径已同步到 API 文档
+- Changed files: `frontend/media-screen/src/App.tsx`; `frontend/media-screen/src/styles.css`; `frontend/media-screen/src/api.ts`; `frontend/media-screen/src/adapter.ts`; `frontend/media-screen/tests/adapter.test.ts`; generated `frontend/media-screen/dist/`; `docs/api/media-screen.md`; `handoff/main.md`
+- Verification evidence: `npm test` PASS 9/9；TypeScript checks and Vite production build PASS（1582 modules，CSS 33.11 kB，JS 235.15 kB）；生产产物扫描无演示成员/数值、旧 `/admin-api`、ParttimeCRM 地址、`127.0.0.1:8000` 或 `Authorization`；远程三个公共接口 HTTP 200 / `code=0`，实时为 44 条客资、3 条部门排行、3 条成员排行和 3 个趋势日期点，维护未开启，历史 `available=false`；Playwright 在 1920×1080、1440×900、390×844 验证实时页和历史页无页面级横向溢出，移动历史表格仅面板内滚动；真实历史无快照状态、网络拦截的完整历史布局、断网保留旧真实数据并显示重试中、恢复联网重新刷新均通过；网络仅请求公共接口且请求头无 `Authorization`；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示
+- Dependency or integration impact: 未新增依赖，未修改 ParttimeCRM、后端、数据库、菜单、权限、部署配置、分支、提交或正在运行的 3009 服务；浏览器完整历史测试仅使用临时网络拦截，拦截已移除且测试数据未进入应用源码或构建
+- Remaining work: 后端仍需补齐今日/周/月/有效统计、真实新媒体成员口径、部门成员嵌套、真实兼职陪跑、昨日冠军、分时/14 日趋势及持久化历史快照；生产部署需提供租户 ID 并将同源 `/public-api` 转发到远程 ZSJOS 后端
+
+## Workstream Continuation 2026-08-25 19:10:00 +08:00
+
+- Workstream ID: media-screen-original-visual-history
+- Goal: 将实时页从后端第一版租户级扁平统计切换为最终新媒体富接口契约，前端先完成今日累计走势、部门成员嵌套和兼职陪跑四指标展示，并交付远程后端实现文档
+- Non-goals: 不修改 ParttimeCRM、后端、数据库、菜单、权限或部署配置；不继续用 `totalLeads`、近 7 日趋势或租户级扁平排行冒充新媒体实时数据；不在生产环境展示 Mock
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- Base commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a plus existing user changes
+- Target branch: main
+- Ownership scope: unchanged: `frontend/media-screen/**`; `docs/api/media-screen.md`; this handoff record
+- Owner: Codex root
+- Dependencies: existing frontend dependencies and the future enriched response of the existing public stats endpoint; no new dependency
+- Integration order: final stats types -> strict adapter -> development-only complete layout fixture -> original realtime rendering -> API contract -> tests/build/browser verification
+- Verification plan: focused adapter tests for rich/legacy/partial responses and Mock boundaries; TypeScript and production build; forbidden-string scan; Playwright desktop/mobile checks with a test-only intercepted rich response; verify current remote legacy response is shown as pending rather than misrepresented
+
+## Delivery 2026-08-25 19:55:00 +08:00
+
+- Workstream ID: media-screen-original-visual-history
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: 前端先按最终新媒体统计口径改造实时大屏，再整理完整 API 文档交给远程后端实现
+- Key decisions: 主卡只读取 `summary.today` 并展示今日/昨日同时段累计走势；普通卡只读取后端权威 `departments[].metrics/members[]` 嵌套结构；兼职陪跑只读取独立 `partTimeCompanionDepartment` 并支持员工名下兼职明细；旧 `totalLeads`、近几日 `trend[]`、租户级 `departmentRanking/memberRanking` 和复制的 `partTimer.items` 不再作为目标模块回退；当前远程旧响应生产显示待补齐，开发 Mock 仅显式开启且只补 unsupported；历史继续严格使用冻结结构和 `available` 状态
+- Execution or analysis result: 实时视觉已恢复“今日客资数”、今日/昨日走势、今日之星、新媒体部门四指标成员排行和员工陪跑排行；类型化客户端与纯适配层已支持最终富响应并拒绝旧扁平响应冒充新媒体数据；集中开发 Mock 可展示新媒体一部、二部、三部和兼职陪跑完整布局；后端交付文档已重写为可实施契约，包含请求、完整 JSON、字段说明、统计时间边界、组织范围、兼职开关、累计趋势、一致性规则、历史冻结结构、错误状态和验收清单
+- Changed files: `frontend/media-screen/src/api.ts`; `frontend/media-screen/src/adapter.ts`; `frontend/media-screen/src/mock.ts`; `frontend/media-screen/src/App.tsx`; `frontend/media-screen/tests/adapter.test.ts`; `frontend/media-screen/README.md`; generated `frontend/media-screen/dist/`; `docs/api/media-screen.md`; `handoff/main.md`
+- Verification evidence: `npm test` PASS 11/11，覆盖富响应、真实空数据、旧扁平响应拒绝、缺字段、时间、历史、Mock 边界；TypeScript checks and Vite production build PASS（1582 modules，CSS 33.11 kB，JS 237.22 kB）；生产产物扫描无演示成员/兼职、Mock 标识、旧 `/admin-api`、ParttimeCRM 地址、`127.0.0.1:8000` 或 `Authorization`；Playwright 验证当前远程第一版显示今日/周/月/有效和走势待补齐且不再显示 44 条租户总量；测试专用富响应在 1920×1080 完整渲染三部门、兼职陪跑、四指标、今日/昨日趋势、今日之星及兼职明细；1440×900 和 390×844 无页面级横向溢出；真实历史 `available=false` 仍显示无快照；控制台 0 error/0 warning；请求只访问公共接口，包含正确租户和兼职参数，请求头无 `Authorization`；scoped `git diff --check` PASS，仅有既有 LF/CRLF 提示
+- Dependency or integration impact: 未新增依赖，未修改 ParttimeCRM、后端、数据库、菜单、权限、部署配置、分支或提交；临时 3009 验证服务已停止；测试响应只存在 Playwright 网络拦截且拦截和浏览器会话均已关闭
+- Remaining work: 远程后端需按 `docs/api/media-screen.md` 扩展现有 `/stats` 和 `/history`；在后端部署前生产页面会保持明确待补齐状态，若需本地查看完整布局可在开发环境显式设置 `VITE_MEDIA_SCREEN_ENABLE_MOCK=true` 后重启；后端部署后需用真实组织和业务数据复核汇总一致性、兼职开关和历史冻结口径
+
+## Delivery Correction 2026-08-25 19:57:00 +08:00
+
+- Workstream ID: media-screen-original-visual-history
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 00d9dbec11411bcac0e2eba6f597d76c72b9230a (no commit created)
+- User goal: Same as the immediately preceding delivery
+- Key decisions: None; this entry corrects the final production bundle size after a no-behavior simplification
+- Execution or analysis result: Final adapter expression simplified without changing behavior
+- Changed files: `frontend/media-screen/src/adapter.ts`; `handoff/main.md`
+- Verification evidence: Final `npm test` PASS 11/11；final TypeScript checks and Vite production build PASS（1582 modules，CSS 33.11 kB，JS 237.18 kB）；final production artifact scan and scoped `git diff --check` PASS
+- Dependency or integration impact: None beyond the preceding delivery
+- Remaining work: Same as the immediately preceding delivery
+
+## Delivery 2026-08-25 21:47:56 +08:00
+
+- Workstream ID: main
+- Branch: main
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: 执行兼职端 A 类前端字段适配与错误边界修改任务包
+- Key decisions: 仅调整 H5 前端；恢复 `visibleTabs` 空数组的兼容全可见逻辑；课程必选属性未选齐时禁止确认，无码 SKU 时仍允许提交未知规格；排行榜错误优先按 HTTP 状态区分权限、缺失接口和加载失败；详情页消费后端 `primaryProduct` 作为主意向课程兜底
+- Execution or analysis result: 完成申诉阶段映射、课程属性/SKU选择、客资详情字段展示、收益状态计数、Mock 缺失接口边界及排行榜错误状态处理
+- Changed files: `frontend/h5/src/components/ProductPicker.vue`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`
+- Verification evidence: H5 `vue-tsc -b --pretty false` PASS；Vite production build PASS（556 modules transformed）；`git diff --check` 无实际错误；H5 未发现 `/admin-api`、`advanced-page`、`enhanced-page`
+- Dependency or integration impact: 未新增依赖；未修改后端 Java、数据库、管理端、销售端；保留工作区既有其他未提交修改
+- Remaining work: 仍需使用真实 Partner 账号联调后端字段投影、权限状态和真实课程目录响应；B/C 类接口继续由远程后端按文档实现
+
+## Delivery Correction 2026-08-25 21:49:00 +08:00
+
+- Workstream ID: main
+- Branch: main
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `00d9dbec11411bcac0e2eba6f597d76c72b9230a` (no commit created)
+- User goal: 修正排行榜登录失效错误的状态识别
+- Key decisions: 当请求层因刷新令牌失败只返回“登录已失效”文本时，前端按 401 归类，避免错误显示为通用排行榜加载失败
+- Execution or analysis result: 排行榜配置错误文案继续按 401/403/500、缺失接口和其他失败分别处理
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `handoff/main.md`
+- Verification evidence: `vue-tsc -b --pretty false` PASS；Vite production build PASS（556 modules transformed）；`git diff --check` 无实际错误
+- Dependency or integration impact: 未新增依赖，未修改后端及其他端
+- Remaining work: None beyond真实接口联调
+
+## Delivery 2026-08-26 10:57:56 +08:00
+
+- Branch: main
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: 保存当前本地修改，拉取远程最新代码并合并到本地
+- Key decisions: 使用新的 `codex-before-pull-retry-2026-08-26` stash 保存本轮最新已跟踪和未跟踪内容；远程查询确认 `origin/main` 对应 `9c447a28` 且本地仅单向落后 15 个提交后执行 `--ff-only` 快进；恢复本地修改时保留远程匿名令牌定位确认流程，保留本地反馈消息跳转和消息类型展示，并同时保留 `/public-api`、`/part-api`、`/app-api` 开发代理；不恢复已被远程替换的登录态定位确认路由
+- Execution or analysis result: `main` 从 `00d9dbec` 快进到 `9c447a28`；本轮最新本地修改已恢复为未暂存状态；5 个冲突已解决；主 stash 的 70 个未跟踪文件均已在磁盘确认存在；全部 stash 保留作为恢复点
+- Changed files: 远程 15 个提交涉及的仓库文件；恢复的既有本地 H5、管理端、媒体大屏、API/架构文档、浏览器验证产物及本交付记录；冲突合并文件为 `docs/architecture/system-overview.md`、`frontend/h5/src/pages/messages/detail.vue`、`frontend/h5/src/pages/positioning/confirmation.vue`、`frontend/h5/vite.config.ts`、`handoff/main.md`
+- Verification evidence: `HEAD...origin/main` 为 `0 0`；未解决冲突数为 0；暂存区文件数为 0；主 stash 的 70 个未跟踪文件磁盘缺失数为 0；H5 `npm run build` PASS，Vue 类型检查和 Vite 生产构建完成（557 modules transformed）；最终 `git diff --check` 待本条记录追加后执行
+- Dependency or integration impact: 未新增或升级依赖，未创建提交、分支或工作树，未推送，未停止运行中的服务；GitHub 443 在操作期间间歇性失败，但成功的 `ls-remote` 返回与本地 `origin/main` 和最终 HEAD 相同的 `9c447a28`
+- Remaining work: 确认合并结果稳定后可另行清理 `codex-before-pull-retry-2026-08-26` 等备份 stash；运行中的 H5 服务可能继续更新 `components.d.ts`
+
+## Workstream Registration 2026-08-26 11:00:00 +08:00
+
+- Workstream ID: main-frontend-scope-reconcile
+- Goal: 将未提交工作区收敛为仅保留 `frontend/h5/**` 与 `frontend/media-screen/**` 的前端改动
+- Non-goals: 不修改后端、数据库、权限、依赖、远程分支、提交历史或 H5/媒体大屏现有内容
+- Branch: main
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928`
+- Target branch: main
+- Ownership scope: 非 H5/媒体大屏的当前未提交文件恢复，以及本交付记录
+- Owner: Codex root
+- Dependencies: None
+- Integration order: 登记范围 -> 恢复管理端和文档文件 -> 检查工作区与后端路径 -> 追加交付证据
+- Verification plan: 检查 `git status`、确认 `frontend/admin/**` 和 `docs/**` 无差异、确认 `backend/**` 无差异，并执行 scoped `git diff --check`
+
+## Delivery 2026-08-26 14:53:48 +08:00
+
+- Branch: main
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: 撤回非 H5 与新媒体客资数量大屏前端的本地改动，使管理端和文档恢复到当前 `origin/main`
+- Key decisions: 恢复 `frontend/admin/pnpm-workspace.yaml`、`frontend/admin/src/views/zsjos/components/LeadCreateDialog.vue`、`docs/api/partner-app-api.md`、`docs/architecture/ownership-and-change-boundaries.md`、`docs/architecture/system-overview.md`；保留 `frontend/h5/**` 与 `frontend/media-screen/**` 的现有改动；按仓库规则保留本交付记录
+- Execution or analysis result: 管理端和上述文档相对 `origin/main` 已无差异；后端目录无差异；未跟踪文件仅位于 H5 与媒体大屏目录
+- Changed files: 上述五个恢复目标文件；`handoff/main.md` 本交付记录
+- Verification evidence: `git status` 仅显示 H5、媒体大屏和 handoff；`git diff --name-status -- frontend/admin docs` 无输出；`git diff --name-status -- backend` 无输出；非允许范围未跟踪文件检查无输出；scoped `git diff --check` 仅报告现有 LF/CRLF 转换提示，无实际空白错误
+- Dependency or integration impact: 未修改后端、数据库、权限、依赖、分支、提交或远程分支；未删除 H5/媒体大屏文件
+- Remaining work: 提交前仍需人工审核 H5/媒体大屏中的生成文件、`.env.local` 和缓存文件是否纳入提交

@@ -14,7 +14,9 @@ const tabs = [
   { key: 'all', label: '全部' },
   { key: 'pending_review', label: '待审核' },
   { key: 'approved', label: '已批准' },
-  { key: 'paid', label: '已打款' }
+  { key: 'rejected', label: '已拒绝' },
+  { key: 'paid', label: '已打款' },
+  { key: 'cancelled', label: '已取消' }
 ]
 
 const filterParams = () => {
@@ -63,6 +65,7 @@ const statusMap: Record<string, { text: string; color: string }> = {
               {{ statusMap[item.status]?.text || item.status }}
             </span>
           </div>
+          <div class="withdrawal-item__no">申请编号：{{ item.withdrawalNo || '--' }}</div>
           <div class="withdrawal-item__footer">
             <span>{{ item.bankNameSnapshot }} · {{ item.maskedCardNumber }}</span>
             <span>{{ formatDateTime(item.submittedAt) }}</span>
@@ -101,7 +104,9 @@ const statusMap: Record<string, { text: string; color: string }> = {
 .withdrawal-item__footer {
   display: flex;
   justify-content: space-between;
+  gap: 10px;
   font-size: 12px;
   color: var(--h5-text-secondary);
 }
+.withdrawal-item__footer span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.withdrawal-item__no{margin-bottom:6px;color:var(--h5-text-placeholder);font-size:11px;overflow-wrap:anywhere}
 </style>

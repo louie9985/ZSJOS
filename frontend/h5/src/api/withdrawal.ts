@@ -29,10 +29,17 @@ export interface WithdrawalApplyParams {
 
 export interface WithdrawalItem {
   id: number
+  withdrawalNo?: string
   status: 'pending_review' | 'approved' | 'rejected' | 'paid' | 'cancelled'
   applicationAmount: number
+  accountNameSnapshot?: string
+  approvedAmount?: number
   submittedAt: ApiDateValue
+  reviewedAt?: ApiDateValue
+  rejectionReason?: string
+  paidAt?: ApiDateValue
   bankNameSnapshot: string
+  branchNameSnapshot?: string
   maskedCardNumber: string
 }
 
@@ -59,6 +66,16 @@ export function deleteCard(id: number) {
 /** 设置默认银行卡 */
 export function setDefaultCard(id: number) {
   return request.put<never, void>(`/zsjos/withdrawal/my-cards/${id}/default`)
+}
+
+/** 受控编辑本人银行卡；cardNumber 仅在换卡号时传递完整值 */
+export function updateCard(id: number, data: {
+  accountName: string
+  bankName: string
+  branchName: string
+  cardNumber?: string
+}) {
+  return request.put<never, void>(`/zsjos/withdrawal/my-cards/${id}`, data)
 }
 
 /** 提交提现申请 */

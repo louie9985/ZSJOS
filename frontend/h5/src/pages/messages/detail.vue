@@ -19,6 +19,7 @@ const businessTarget = computed(() => {
   if (item.bizType === 'lead') return `/lead/${item.bizId}`
   if (item.bizType === 'cashback') return '/earnings'
   if (item.bizType === 'withdrawal') return `/withdrawal/${item.bizId}`
+  if (item.bizType === 'feedback') return `/feedback/${item.bizId}`
   return undefined
 })
 
@@ -57,6 +58,7 @@ onMounted(loadDetail)
           <span>{{ detail.templateNickname || '中世健' }}</span>
           <time>{{ formatDateTime(detail.createTime) }}</time>
         </div>
+        <div class="message-detail__type">消息类型：{{ detail.bizType || '系统' }}<span v-if="detail.readTime"> · 已读于 {{ formatDateTime(detail.readTime) }}</span></div>
         <p v-if="detail.templateSummary" class="message-detail__summary">{{ detail.templateSummary }}</p>
         <div class="message-detail__content">{{ detail.templateContent }}</div>
         <van-button

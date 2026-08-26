@@ -25,7 +25,6 @@ const load=async()=>{loading.value=true;error.value='';try{if(!token())throw new
 const decide=async(decision:'agree'|'request_changes')=>{if(decision==='request_changes'&&!comment.value.trim()){showToast('请填写修改意见');return}submitting.value=true;try{await decidePositioning(token(),decision,decision==='request_changes'?comment.value.trim():undefined);completed.value=decision;revisionOpen.value=false}catch(cause){showToast(cause instanceof Error?cause.message:'提交失败')}finally{submitting.value=false}}
 onMounted(load)
 </script>
-
 <template>
   <main class="positioning-share-page">
     <van-nav-bar title="账号定位卡确认" />

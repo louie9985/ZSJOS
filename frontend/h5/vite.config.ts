@@ -7,12 +7,13 @@ import UnoCSS from 'unocss/vite'
 import postcssPxtorem from 'postcss-pxtorem'
 import { resolve } from 'node:path'
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     vue(),
     UnoCSS(),
     Components({
-      resolvers: [VantResolver()]
+      resolvers: [VantResolver()],
+      dts: command === 'serve'
     })
   ],
   resolve: {
@@ -21,10 +22,15 @@ export default defineConfig({
     }
   },
   server: {
+    host: '0.0.0.0',
     port: 10086,
     strictPort: true,
     proxy: {
       '/public-api': {
+        target: 'http://192.168.2.17:48080',
+        changeOrigin: true
+      },
+      '/part-api': {
         target: 'http://192.168.2.17:48080',
         changeOrigin: true
       },
@@ -45,4 +51,4 @@ export default defineConfig({
       ]
     }
   }
-})
+}))

@@ -95,6 +95,19 @@ const statusColor: Record<string, string> = {
             <div class="earnings-summary__value">¥{{ formatAmount(summary?.pendingAmount) }}</div>
             <div class="earnings-summary__label">待结算</div>
           </div>
+          <div class="earnings-summary__item">
+            <div class="earnings-summary__value">¥{{ formatAmount(summary?.withdrawingAmount) }}</div>
+            <div class="earnings-summary__label">提现中</div>
+          </div>
+          <div class="earnings-summary__item">
+            <div class="earnings-summary__value">¥{{ formatAmount(summary?.withdrawnAmount) }}</div>
+            <div class="earnings-summary__label">已提现</div>
+          </div>
+        </div>
+        <div v-if="summary?.counts" class="earnings-summary__counts">
+          <span>待结算 {{ summary.counts.pending_settlement || 0 }} 笔</span>
+          <span>可提现 {{ summary.counts.available || 0 }} 笔</span>
+          <span>已提现 {{ summary.counts.withdrawn || 0 }} 笔</span>
         </div>
         <van-button
           v-if="summary && summary.availableAmount > 0"
@@ -134,6 +147,16 @@ const statusColor: Record<string, string> = {
               {{ statusLabel[item.status] || item.status }}
             </span>
           </div>
+          <div class="earnings-item__detail">
+            <span v-if="item.cashbackNo">返现单：{{ item.cashbackNo }}</span>
+            <span v-if="item.baseAmount != null">基数 ¥{{ formatAmount(item.baseAmount) }}</span>
+            <span v-if="item.rateSnapshot != null">比例 {{ item.rateSnapshot }}%</span>
+            <span v-if="item.observationDaysSnapshot != null">观察期 {{ item.observationDaysSnapshot }} 天</span>
+            <span v-if="item.availableAt">可用：{{ formatDate(item.availableAt) }}</span>
+            <span v-if="item.settledAt">结算：{{ formatDate(item.settledAt) }}</span>
+            <span v-if="item.cancelReason">取消原因：{{ item.cancelReason }}</span>
+            <span v-if="item.orderId">关联订单：{{ item.orderId }}</span>
+          </div>
           <div class="earnings-item__footer">
             {{ formatLeadNo(item.leadNo) }} · {{ formatDate(item.generatedAt) }}
           </div>
@@ -160,6 +183,8 @@ const statusColor: Record<string, string> = {
 .earnings-summary__grid {
   display: flex;
   justify-content: space-around;
+  flex-wrap: wrap;
+  gap: 12px 4px;
   text-align: center;
 }
 .earnings-summary__value {
@@ -225,4 +250,6 @@ const statusColor: Record<string, string> = {
   color: var(--h5-text-placeholder);
   margin-top: 6px;
 }
+.earnings-summary__counts{display:flex;flex-wrap:wrap;justify-content:center;gap:4px 12px;margin-top:10px;font-size:11px;opacity:.85}
+.earnings-item__detail{display:flex;flex-wrap:wrap;gap:4px 10px;margin-top:8px;color:var(--h5-text-secondary);font-size:11px;line-height:1.5}
 </style>

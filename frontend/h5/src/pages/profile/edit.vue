@@ -26,6 +26,7 @@ async function handleSave() {
     await updateProfile({
       nickname: form.value.nickname.trim(),
       email: form.value.email?.trim() || undefined,
+      avatar: form.value.avatar?.trim() || undefined,
       sex: form.value.sex
     })
     showSuccessToast('保存成功')
@@ -39,9 +40,11 @@ async function handleSave() {
     <van-nav-bar title="个人资料" left-arrow @click-left="$router.back()" />
     <van-skeleton :loading="loading" :row="4" style="padding: 16px;">
       <div class="card">
+        <van-field v-model="form.avatar" label="头像地址" placeholder="可填写图片地址" clearable />
         <van-field v-model="form.nickname" label="昵称" placeholder="请输入昵称" required clearable />
         <van-field v-model="form.mobile" label="手机号" type="tel" readonly />
         <van-field v-model="form.email" label="邮箱" type="email" placeholder="请输入邮箱" clearable />
+        <van-cell title="性别"><template #value><van-radio-group v-model="form.sex" direction="horizontal"><van-radio :name="0">未知</van-radio><van-radio :name="1">男</van-radio><van-radio :name="2">女</van-radio></van-radio-group></template></van-cell>
       </div>
       <div style="padding: 24px 16px;">
         <van-button type="primary" block round :loading="submitting" @click="handleSave">保存</van-button>

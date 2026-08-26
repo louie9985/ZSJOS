@@ -475,7 +475,7 @@ GET /part-api/zsjos/lead/get?id={leadId}
 
 只能查看本人有提交人历史权限的客资。
 
-所有页面只把非空 `leadNo` 展示为客资编号；缺失时显示“客资编号暂未生成”，不能回退展示 `id` 或 `leadId`。动作只消费启用的大写编码 `SUBMITTER_SUPPLEMENT`、`URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`。
+所有页面只把非空 `leadNo` 展示为客资编号；缺失时显示“客资编号暂未生成”，不能回退展示 `id` 或 `leadId`。现有后端的催办/投诉动作编码为 `SUBMITTER_URGE`、`SUBMITTER_COMPLAINT`，H5 兼容这两个编码，同时支持后续统一契约 `URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`；前端不根据状态自行补显示写操作按钮。
 
 ### 补充本人客资
 
@@ -888,3 +888,20 @@ GET /part-api/zsjos/messages/unread-count
 分页空数据：data.list 为空数组，不能当成异常
 上传失败：保留重试入口，不要提交无效 infraFileId
 ```
+
+## 十四、字段适配与后端缺口说明
+
+### 已有接口字段适配
+
+H5 按 ZSJOS Partner 响应 VO 使用真实字段：课程目录使用分类节点 `id/name`、分类路径对象数组、属性数组、SKU `attrValues` 和 `price`；客资详情使用处理时限、来源、微信号、关闭信息、商机及课程 SKU/属性/价格；申诉使用 `roundNo`、`reviewStage`、证据、处理人、裁决信息和 `canSubmitNextRound`；投诉使用双方证据、销售/处理人和处理时间；收益、提现、消息、个人资料和定位页使用后端已返回的完整字段。生产环境不使用这些字段的静态替代值。
+
+### 需要后端继续开发或修正
+
+- 修正客资列表和详情 Partner 投影：传入当前登录 Partner 身份，正确生成 `relationTypes`、`visibleTabs`、`identityMaskMode` 和 `availableActions`，并在权限允许时返回 `CREATE_APPEAL`。
+- 新增 `GET /part-api/zsjos/lead/{leadId}/partner-activity`，提供兼职可见的跟进、流转、客资收益、投诉和订单聚合。
+- 扩展 `/part-api/zsjos/lead/inbox/submitted/page` 支持 `mainProductRef`、`appealStatus`、`orderReviewStatus`，或提供等价独立接口。
+- 新增消息分组接口并支持服务端分组筛选；新增排行榜配置/数据、系统反馈全流程和银行卡编辑接口。
+
+详细请求参数、响应字段、权限、错误和数据范围要求见：
+
+`docs/api/partner-h5-feature-gap-api.md`

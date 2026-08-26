@@ -39,11 +39,14 @@ const openLead = (leadId: number) => router.push(`/lead/${leadId}`)
             <van-tag :type="resultType(item)">{{ resultText(item) }}</van-tag>
           </div>
           <p class="complaint-card__reason">{{ item.reason }}</p>
+          <div v-if="item.salesUserName || item.handlerUserName" class="complaint-card__meta">销售：{{ item.salesUserName || '--' }} · 处理人：{{ item.handlerUserName || '待处理' }}</div>
+          <div v-if="item.evidence?.length" class="complaint-card__meta">投诉证据：{{ item.evidence.length }} 个</div>
           <div v-if="item.handlerOpinion" class="complaint-card__result">
             <span>处理意见</span>
             <p>{{ item.handlerOpinion }}</p>
           </div>
-          <time>{{ formatDateTime(item.createTime) }}</time>
+          <div v-if="item.handlerEvidence?.length" class="complaint-card__meta">处理证据：{{ item.handlerEvidence.length }} 个</div>
+          <time>{{ item.handledAt ? `处理于 ${formatDateTime(item.handledAt)}` : formatDateTime(item.createTime) }}</time>
         </article>
         <van-empty v-if="!loading && error" :description="error" image="error">
           <van-button type="primary" round size="small" @click="refresh">重新加载</van-button>

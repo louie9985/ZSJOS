@@ -70,6 +70,11 @@ const router = createRouter({
       component: () => import('@/pages/earnings/index.vue'),
       meta: { permission: 'zsjos:cashback:my-query' }
     },
+    {
+      path: '/leaderboard',
+      name: 'Leaderboard',
+      component: () => import('@/pages/leaderboard/index.vue')
+    },
     // --- 提现 ---
     {
       path: '/withdrawal',
@@ -106,6 +111,22 @@ const router = createRouter({
       name: 'MessageDetail',
       component: () => import('@/pages/messages/detail.vue')
     },
+    // --- 系统反馈 ---
+    {
+      path: '/feedback',
+      name: 'FeedbackList',
+      component: () => import('@/pages/feedback/index.vue')
+    },
+    {
+      path: '/feedback/create',
+      name: 'FeedbackCreate',
+      component: () => import('@/pages/feedback/create.vue')
+    },
+    {
+      path: '/feedback/:id',
+      name: 'FeedbackDetail',
+      component: () => import('@/pages/feedback/detail.vue')
+    },
     // --- 个人 ---
     {
       path: '/profile',
@@ -126,6 +147,12 @@ const router = createRouter({
       path: '/profile/bank-cards',
       name: 'BankCards',
       component: () => import('@/pages/profile/bank-cards.vue'),
+      meta: { permission: 'zsjos:withdrawal:apply' }
+    },
+    {
+      path: '/profile/bank-cards/:id/edit',
+      name: 'BankCardEdit',
+      component: () => import('@/pages/profile/bank-card-edit.vue'),
       meta: { permission: 'zsjos:withdrawal:apply' }
     },
     {

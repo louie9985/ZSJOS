@@ -85,6 +85,8 @@ async function handleLogout() {
     </van-cell-group>
 
     <van-cell-group class="card" :border="false">
+      <van-cell title="消息中心" icon="bell" is-link to="/messages" />
+      <van-cell title="系统反馈" icon="comment-o" is-link to="/feedback" />
       <van-cell title="主题切换" icon="brush-o" is-link to="/profile/theme">
         <template #value>
           <span style="font-size: 12px;">
