@@ -12,9 +12,10 @@ export type UserProfile = {
 export type UserProfileUpdate = { nickname?: string; email?: string; mobile?: string; sex?: number; avatar?: string }
 export type SocialUser = { id: number; type: number; openid: string; nickname?: string; avatar?: string }
 export type MenuRenderMode = 'native' | 'admin_embed' | 'admin_only'
-export type RawMenu = { id: number; name: string; path?: string; icon?: string; component?: string; componentName?: string; workbenchRenderMode?: MenuRenderMode; visible?: boolean; keepAlive?: boolean; alwaysShow?: boolean; type?: number; sort?: number; parentId: number; children?: RawMenu[] }
+export type RawMenu = { id: number; sourceMenuId?: number; layoutKey?: string; name: string; path?: string; icon?: string; component?: string; componentName?: string; workbenchRenderMode?: MenuRenderMode; visible?: boolean; keepAlive?: boolean; alwaysShow?: boolean; type?: number; sort?: number; parentId: number; children?: RawMenu[] }
 export type WorkbenchMenu = Omit<RawMenu, 'children' | 'path'> & { path: string; hidden: boolean; noCache: boolean; alwaysShow: boolean; children: WorkbenchMenu[] }
-export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; defaultAvatar?: string }
+export type WorkbenchLayoutMeta = { globalVersionId?: number; globalVersionNo?: number; winningRoleId?: number; roleVersionId?: number; roleVersionNo?: number; fallback: boolean; fallbackReason?: string }
+export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; workbenchMenus?: RawMenu[]; workbenchLayoutMeta?: WorkbenchLayoutMeta; defaultAvatar?: string }
 export type DictData = { label: string; value: string; dictType: string; colorType?: string; cssClass?: string }
 export type MediaAccountDetailSnapshot = { key: string; label: string; type: string; value: unknown; displayValue?: string; dictType?: string }
 export type MediaAccountField = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multi_select' | 'boolean'; required: boolean; enabled: boolean; sort: number; dictType?: string; searchable: boolean }
@@ -660,10 +661,10 @@ export const resolveMenuPath = (parentPath: string, path?: string) => {
   return `${parentPath}${childPath}`.replace(/\/{2,}/g, '/')
 }
 
-export function buildMenuTree(rawMenus: RawMenu[], parentPath = '/'): WorkbenchMenu[] {
+export function buildMenuTree(rawMenus: RawMenu[], parentPath = '/', pathsAreAbsolute = false): WorkbenchMenu[] {
   return rawMenus.map(menu => {
-    const path = resolveMenuPath(parentPath, menu.path)
-    const children = buildMenuTree(menu.children || [], path)
+    const path = pathsAreAbsolute && menu.path ? menu.path : resolveMenuPath(parentPath, menu.path)
+    const children = buildMenuTree(menu.children || [], path, pathsAreAbsolute)
     return {
       ...menu,
       path,

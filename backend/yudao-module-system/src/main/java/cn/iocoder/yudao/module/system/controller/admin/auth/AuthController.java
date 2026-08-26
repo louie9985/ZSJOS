@@ -21,6 +21,8 @@ import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.permission.RoleService;
 import cn.iocoder.yudao.module.system.service.social.SocialClientService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.workbenchlayout.WorkbenchLayoutService;
+import cn.iocoder.yudao.module.system.service.workbenchlayout.model.WorkbenchMenuProjection;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -62,6 +64,8 @@ public class AuthController {
     private SocialClientService socialClientService;
     @Resource
     private ConfigApi configApi;
+    @Resource
+    private WorkbenchLayoutService workbenchLayoutService;
 
     @Resource
     private SecurityProperties securityProperties;
@@ -107,8 +111,9 @@ public class AuthController {
         // 1.2 获得角色列表
         Set<Long> roleIds = permissionService.getUserRoleIdListByUserId(getLoginUserId());
         if (CollUtil.isEmpty(roleIds)) {
-            return success(withDefaultAvatar(
-                    AuthConvert.INSTANCE.convert(user, Collections.emptyList(), Collections.emptyList())));
+            AuthPermissionInfoRespVO result = AuthConvert.INSTANCE.convert(
+                    user, Collections.emptyList(), Collections.emptyList());
+            return success(withDefaultAvatar(withWorkbenchLayout(result, Collections.emptySet(), Collections.emptyList())));
         }
         List<RoleDO> roles = roleService.getRoleList(roleIds);
         roles.removeIf(role -> !CommonStatusEnum.ENABLE.getStatus().equals(role.getStatus())); // 移除禁用的角色
@@ -119,7 +124,17 @@ public class AuthController {
         menuList = menuService.filterDisableMenus(menuList);
 
         // 2. 拼接结果返回
-        return success(withDefaultAvatar(AuthConvert.INSTANCE.convert(user, roles, menuList)));
+        AuthPermissionInfoRespVO result = AuthConvert.INSTANCE.convert(user, roles, new java.util.ArrayList<>(menuList));
+        return success(withDefaultAvatar(withWorkbenchLayout(result, convertSet(roles, RoleDO::getId), menuList)));
+    }
+
+    private AuthPermissionInfoRespVO withWorkbenchLayout(AuthPermissionInfoRespVO permissionInfo,
+                                                         Set<Long> roleIds, List<MenuDO> menuList) {
+        WorkbenchMenuProjection projection = workbenchLayoutService.getProjection(roleIds, menuList);
+        permissionInfo.setWorkbenchLayoutMeta(projection.getMeta());
+        permissionInfo.setWorkbenchMenus(Boolean.TRUE.equals(projection.getMeta().getFallback())
+                ? permissionInfo.getMenus() : projection.getMenus());
+        return permissionInfo;
     }
 
     AuthPermissionInfoRespVO withDefaultAvatar(AuthPermissionInfoRespVO permissionInfo) {

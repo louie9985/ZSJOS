@@ -1,4 +1,5 @@
 import { Drawer, Menu } from 'antd'
+import { NAV_INLINE_INDENT } from '../constants'
 import type { PrimaryNavigationItem } from '../services/menu'
 import { buildNavMenuItems } from './navItems'
 
@@ -25,6 +26,7 @@ export default function MobileNavDrawer({ open, onClose, navigation, activePrima
   >
     <Menu
       mode="inline"
+      inlineIndent={NAV_INLINE_INDENT}
       defaultOpenKeys={activePrimaryKey ? [activePrimaryKey] : []}
       selectedKeys={activePagePath ? [activePagePath] : []}
       items={items}

@@ -63,6 +63,40 @@ describe('workbench menu conversion', () => {
     ])
   })
 
+  it('keeps projected page URLs absolute when navigation groups change', () => {
+    const projected = buildMenuTree([
+      menu({
+        id: -1,
+        name: '薪酬服务',
+        path: '/__workbench-group/payroll',
+        children: [menu({
+          id: 14,
+          sourceMenuId: 14,
+          parentId: -1,
+          name: '我的工资条',
+          path: '/hrm/portal/salary/slip'
+        })]
+      })
+    ], '/', true)
+
+    expect(projected[0].children[0].path).toBe('/hrm/portal/salary/slip')
+    expect(buildTwoLevelNavigation(projected)[0].pages[0].key).toBe('/hrm/portal/salary/slip')
+  })
+
+  it('uses the authorized tree for direct routes even when the projection hides the page', () => {
+    const authorized = buildMenuTree([
+      menu({ id: 14, name: '我的工资条', path: '/hrm/portal/salary/slip' })
+    ])
+    const navigation = buildTwoLevelNavigation([])
+
+    expect(findMenuByPath(authorized, '/hrm/portal/salary/slip')?.id).toBe(14)
+    expect(getInaccessiblePathFallback(
+      navigation,
+      '/hrm/portal/salary/slip',
+      authorized
+    )).toBeUndefined()
+  })
+
   it('removes hidden roots and hidden descendant subtrees', () => {
     const routes = buildMenuTree([
       menu({

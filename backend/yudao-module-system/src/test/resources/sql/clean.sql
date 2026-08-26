@@ -4,6 +4,8 @@ DELETE FROM "system_dict_data";
 DELETE FROM "system_role";
 DELETE FROM "system_role_menu";
 DELETE FROM "system_menu";
+DELETE FROM "system_workbench_layout_version";
+DELETE FROM "system_workbench_layout";
 DELETE FROM "system_user_role";
 DELETE FROM "system_dict_type";
 DELETE FROM "system_user_session";

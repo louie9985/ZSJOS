@@ -1899,3 +1899,37 @@ SET menu.`workbench_render_mode` = 'admin_embed'
 WHERE target.`type` IN (1, 2)
   AND menu.`deleted` = b'0';
 
+-- V147 Workbench navigation layout administration. The page is Admin-only and
+-- intentionally receives no role grant; tenant administrators assign the three
+-- operation permissions through the existing role-management flow.
+INSERT IGNORE INTO `system_menu`
+  (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,
+   `workbench_render_mode`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,
+   `updater`,`update_time`,`deleted`)
+VALUES
+  (79900,'Workbench 菜单编排','',2,15,1,'workbench-layout','ep:operation',
+   'system/workbenchLayout/index','SystemWorkbenchLayout','admin_only',0,b'1',b'1',b'1',
+   'bootstrap-V147',NOW(),'bootstrap-V147',NOW(),b'0'),
+  (79901,'查询 Workbench 菜单编排','system:workbench-layout:query',3,1,79900,'','','',NULL,
+   'admin_only',0,b'1',b'1',b'1','bootstrap-V147',NOW(),'bootstrap-V147',NOW(),b'0'),
+  (79902,'更新 Workbench 菜单编排','system:workbench-layout:update',3,2,79900,'','','',NULL,
+   'admin_only',0,b'1',b'1',b'1','bootstrap-V147',NOW(),'bootstrap-V147',NOW(),b'0'),
+  (79903,'发布 Workbench 菜单编排','system:workbench-layout:publish',3,3,79900,'','','',NULL,
+   'admin_only',0,b'1',b'1',b'1','bootstrap-V147',NOW(),'bootstrap-V147',NOW(),b'0');
+
+UPDATE `system_tenant_package`
+SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79900),`updater`='bootstrap-V147',`update_time`=NOW()
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'1','$')
+  AND NOT JSON_CONTAINS(`menu_ids`,'79900','$');
+UPDATE `system_tenant_package`
+SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79901),`updater`='bootstrap-V147',`update_time`=NOW()
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'1','$')
+  AND NOT JSON_CONTAINS(`menu_ids`,'79901','$');
+UPDATE `system_tenant_package`
+SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79902),`updater`='bootstrap-V147',`update_time`=NOW()
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'1','$')
+  AND NOT JSON_CONTAINS(`menu_ids`,'79902','$');
+UPDATE `system_tenant_package`
+SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79903),`updater`='bootstrap-V147',`update_time`=NOW()
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'1','$')
+  AND NOT JSON_CONTAINS(`menu_ids`,'79903','$');

@@ -4818,3 +4818,147 @@
 - Verification evidence: before staging, local `HEAD` and freshly fetched `origin/main` both resolved to `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47`, ahead/behind was `0/0`, there were no unmerged paths, and the index was empty; prior workstream-specific test/build evidence remains recorded above. Final staged, commit and push checks follow immediately.
 - Dependency or integration impact: publishing the accumulated confirmed implementation, schema scripts, BPM removal, frontend, documentation and repository-rule changes to shared `origin/main`; no live database execution, deployment or service operation.
 - Remaining work: verify the resulting commit and remote branch after push; no additional source edit is planned.
+## Workstream Registration - 2026-08-26 10:40:22 +08:00
+
+- Workstream ID: `main-workbench-menu-text-overflow`
+- Goal: quickly improve full-text visibility for deep Workbench navigation menus across sidebar, popup, top-only, Mini, and mobile presentations.
+- Non-goals: change server menu data, names, ordering, hierarchy, paths, permissions, routes, dependencies, branches, commits, deployment, or unrelated files.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8`.
+- Target branch: `main`
+- Ownership scope: `frontend/workbench/src/constants.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/layouts/MobileNavDrawer.tsx`; `frontend/workbench/src/styles/layout.css`; `frontend/workbench/src/styles/tokens.css`; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing React, Ant Design 6 Menu, recursive server-owned navigation builders, and Workbench layout tokens; no new dependency.
+- Integration order: widen the secondary sidebar -> reduce recursive inline indentation -> apply bounded content-aware widths to submenu popups -> inspect the scoped diff -> append delivery evidence.
+- Verification plan: per user instruction, do not run tests, typecheck, build, or browser checks; review the scoped diff and leave desktop/mobile behavior for user manual testing.
+
+## Delivery Entry - 2026-08-26 10:42:57 +08:00
+
+- Workstream ID: `main-workbench-menu-text-overflow`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` (no commit created).
+- User goal: quickly fix incomplete text display in deep Workbench dropdown menus and leave manual verification to the user.
+- Key decisions: preserve the recursive server-owned menu tree; widen only the secondary sidebar from 180px to 220px; use a shared 16px inline indent; let submenu popups size to content between 220px and 320px while remaining viewport-bounded; keep the mobile drawer width unchanged.
+- Execution or analysis result: deep inline menus retain more label width in the secondary, single-sidebar, and mobile layouts; collapsed, Mini, and top-only recursive submenu popups now use the bounded content-aware width class.
+- Changed files: `frontend/workbench/src/constants.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/layouts/MobileNavDrawer.tsx`; `frontend/workbench/src/styles/layout.css`; `frontend/workbench/src/styles/tokens.css`; `handoff/main.md`.
+- Verification evidence: reviewed the scoped diff and confirmed `git diff --check` passes. Per user instruction, no tests, typecheck, production build, or browser checks were run.
+- Dependency or integration impact: no dependency, API, menu data, permission, route, schema, database, branch/worktree, commit, push, deployment, or service-state change.
+- Remaining work: user manual verification across representative deep menus in left-double, left-single, Mini, top-only, collapsed, and mobile navigation modes.
+
+## Workstream Scope Update - 2026-08-26 10:50:00 +08:00
+
+- Workstream ID: `main-workbench-menu-text-overflow`
+- Goal update: reduce the first-pass menu width and make the secondary sidebar viewport-adaptive while further reducing recursive indentation.
+- Ownership scope update: add `frontend/workbench/src/styles/styles.guard.test.ts` solely to keep the existing JS/CSS sidebar-width single-source guard compatible with the approved CSS `clamp()` width.
+- Verification plan update: per user instruction, continue with scoped diff and whitespace inspection only; no test, typecheck, build, or browser execution.
+
+## Delivery Entry - 2026-08-26 10:50:30 +08:00
+
+- Workstream ID: `main-workbench-menu-text-overflow`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` (no commit created).
+- User goal: reduce the oversized first-pass Workbench menu width, make the secondary sidebar adaptive, and further reduce deep-menu indentation.
+- Key decisions: use Ant Design Sider's supported CSS string width with `clamp(180px, 14vw, 200px)` instead of runtime resize listeners; reduce shared inline indentation from 16px to 12px; reduce content-aware popup bounds from 220-320px to 180-280px; keep the mobile drawer width unchanged.
+- Execution or analysis result: the secondary sidebar now scales with viewport width without jumping based on the active menu's text; deep inline labels retain more usable width; top-only, Mini, and collapsed submenu popups remain content-aware with a smaller footprint.
+- Changed files: `frontend/workbench/src/constants.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/layouts/MobileNavDrawer.tsx`; `frontend/workbench/src/styles/layout.css`; `frontend/workbench/src/styles/tokens.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `handoff/main.md`.
+- Verification evidence: inspected Ant Design 6 Sider's installed type and implementation to confirm string width support; reviewed the scoped diff; `git diff --check` passed. Per user instruction, no tests, typecheck, production build, or browser checks were run.
+- Dependency or integration impact: no dependency, API, server menu data, hierarchy, permission, route, schema, database, branch/worktree, commit, push, deployment, or service-state change.
+- Remaining work: user manual verification at representative viewport widths and with deeply nested menus.
+
+## Workstream Registration - 2026-08-26 19:28:32 +08:00
+
+- Workstream ID: `main-workbench-navigation-layout-v147`
+- Goal: add a tenant-owned Workbench navigation projection with global layouts, role-difference overrides, immutable publishing history, employee preview, Vue Admin drag-and-drop configuration, and one shared Workbench desktop/mobile navigation result while preserving the original menu tree as the route and authorization source.
+- Non-goals: execute SQL against any database; publish an initial tenant layout; modify existing `system_menu` parent-child relationships, menu/button grants, tenant packages, role assignments, page URLs/components/names/icons, business data, dependencies, branches, commits, pushes, deployments, shared services, or unrelated dirty-worktree changes; add realtime layout switching, page aliases, or frontend-owned production menu data.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` plus the preserved uncommitted `main-workbench-menu-text-overflow` changes.
+- Target branch: `main`
+- Ownership scope: Workbench layout DO/Mapper/VO/Service/Controller/error codes/tests and authentication projection under `backend/yudao-module-system`; Vue Admin typed API and `系统管理 -> Workbench 菜单编排` view; Workbench permission-response types/navigation selection and focused tests; `script/sql/mysql/migrations/V147__workbench_navigation_layout.sql`; directly corresponding schema/bootstrap/system seed/verifier/migration documentation; directly affected permission-flow, navigation, and menu-coverage documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: `V147` is reserved for this workstream and depends on the separately developed `V146`; existing `system_menu`, role-menu, tenant-package, user-role, permission-cache, JSON utilities, Vue Admin `vuedraggable`/`sortablejs`, and Workbench recursive menu renderer; no new dependency.
+- Integration order: establish System persistence and JSON contract -> implement structural validation, global/role merge, preview, publishing, history, and fallback -> expose the authenticated projection without changing `menus` -> build the Vue Admin editor -> make Workbench navigation consume `workbenchMenus` while routes continue to consume `menus` -> add `V147` and synchronize baseline/verifiers after reviewing the available `V146` integration state -> update directly affected documentation -> run focused and full checks.
+- Verification plan: System focused unit/database tests for tenant isolation, permissions, optimistic locking, validation, immutable versions, restore, global/role merge, role priority and fallback; authenticated response contract checks; Admin typecheck/lint/build plus desktop/mobile browser interaction checks; Workbench tests/typecheck/build plus desktop/mobile navigation and direct-route checks; SQL syntax/order/repeatability/static baseline/verifier checks without database execution; scoped diff and ownership review.
+- Coordination note: `V139-V146` remain owned by other workstreams and will not be created, edited, or reused here. Business implementation may proceed before `V146` lands, but final migration-order, bootstrap, and schema-version verification remains conditional on reviewing the integrated `V146` artifact.
+
+## Workstream Scope Update - 2026-08-26 20:07:36 +08:00
+
+- Workstream ID: `main-workbench-navigation-layout-v147`
+- Decision update: to satisfy the confirmed requirement that every tenant can configure its roles, `V147` and the fresh-environment seed may append menu IDs `79900-79903` only to active tenant packages that already contain the System Management root menu `1`; this does not create any role-menu grant.
+- Non-goal clarification: the workstream still does not change existing role permissions, role assignments, menu hierarchy, business data, or packages that do not expose System Management.
+- Dependency update: `V147` remains dependent on the separately owned `V146`; the migration file and baseline can be prepared now, while the executable `bootstrap.sql` ordering and continuous schema-version check remain pending until `V139-V146` are integrated.
+
+## Delivery Entry - 2026-08-26 20:46:05 +08:00
+
+- Workstream ID: `main-workbench-navigation-layout-v147`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` (no commit created).
+- User goal: implement tenant-owned, independently publishable Workbench navigation composition with global and role-difference layouts, Vue Admin drag-and-drop administration, immutable version history, employee preview, and one shared desktop/mobile navigation projection while preserving the original menu tree for routing and authorization.
+- Key decisions: keep `system_menu` and `menus` authoritative for route identity, components, URLs, page names/icons, permission union, and direct access; expose `workbenchMenus` and `workbenchLayoutMeta` only as a server-owned navigation projection; persist validated JSON snapshots in System with optimistic draft revisions and immutable publish versions; select one enabled role override by unique tenant priority while retaining all-role permission union; reserve menu IDs `79900-79903`; make the Admin page `admin_only`; append those nodes only to tenant packages that already contain System Management without creating role grants; keep V147 dependent on V146 and defer executable bootstrap/verifier wiring until V139-V146 land.
+- Execution or analysis result: added tenant-isolated layout/current-version persistence, structural validation, fallback, global/role merge, role priority selection, preview, impact analysis, publishing, history, and restore-to-draft services and APIs under `/system/workbench-layout/**`; authentication now returns the original `menus` plus the final Workbench projection and metadata; Vue Admin now provides permission-aware drag-and-drop editing, fixed uncategorized handling, employee preview, impact/publish, history, and restore flows using the existing draggable dependency; all Workbench desktop modes and the mobile drawer now prefer the same projection while route resolution still uses the original authorized tree; V147 and fresh schema/seed artifacts were prepared without publishing a layout or executing SQL.
+- Changed files: System authentication projection, error codes, Workbench layout Controller/VO, DO/Mapper, enum, Service/resolver/model and focused tests under `backend/yudao-module-system`; `frontend/admin/src/api/system/workbenchLayout/index.ts`; `frontend/admin/src/views/system/workbenchLayout/index.vue`; `frontend/admin/src/views/system/workbenchLayout/WorkbenchLayoutTree.vue`; Workbench `src/services/api.ts`, `src/services/menu.test.ts`, `src/main.tsx`, `src/layouts/MobileNavDrawer.tsx`, and `docs/navigation.md`; `script/sql/mysql/migrations/V147__workbench_navigation_layout.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/01-bootstrap-system-seed.sql`; SQL README files; `docs/architecture/data-and-permission-flow.md`; `docs/frontend/zsjos-menu-coverage.md`; this handoff record. Existing menu-width changes in Workbench constants/styles and their guard test were preserved and remain owned by `main-workbench-menu-text-overflow`.
+- Verification evidence: System focused tests passed 20/20, including tenant isolation, `FOR UPDATE`, immutable publishing, restore-to-draft, enabled-role priority uniqueness, permissions, authentication projection, and fallback; `yudao-server -am -DskipTests package` passed. Vue Admin scoped ESLint and `build:local` passed (only existing `*zoom` CSS warnings); full Admin `ts:check` remains blocked by unrelated existing BPM/EAM/MES/AI/CRM errors, with no Workbench-layout file error. Workbench menu-focused tests passed 52/52; the full suite passed 389/390, with the sole existing `/talk-records` guard conflict outside this workstream; typecheck and production build remain blocked by existing `MediaStudentsPage.tsx` and `MySalesOrderPage.tsx` type-contract errors. Full System tests passed all new layout coverage and retain unrelated failures in `OAuth2ApproveServiceImplTest` (2 millisecond-precision assertions), `OAuth2TokenServiceImplTest` (1 legacy-token cleanup assertion), and `MenuServiceImplTest` (3 existing H2 SQL syntax errors). SQL static checks confirmed identical baseline schemas, both V146 prerequisite markers, unique menu IDs/permissions, `admin_only`, no role grant, no pre-published layout, no destructive table/business-data statement, stable salary-slip URL `/hrm/portal/salary/slip`, and no premature V147 bootstrap/verifier entry. `python3 script/sql/mysql/tools/zsjos_db.py check` failed only because the current chain is V1-V138 plus V147 and V139-V146 have not landed. Final `git diff --check` passed; the failed Workbench build's generated tsbuildinfo change was removed and no build artifact remains.
+- Dependency or integration impact: no new npm/Maven dependency, real database execution, role-menu grant, initial published layout, business-data mutation, page URL/component/name/icon change, branch/worktree operation, commit, push, deployment, or shared-service change. V147 cannot be executed or wired into fresh bootstrap until the separately owned V139-V146 migrations, especially both V146 version markers, are integrated and reviewed.
+- Remaining work: after V139-V146 land, review the actual V146 artifact, add V147 to `bootstrap.sql` in continuous order, enable the V147 verifier/schema-version expectation, rerun migration continuity and fresh-bootstrap/schema-difference checks, and obtain separate approval before any development/shared database execution. Authenticated desktop/mobile browser verification of Admin drag-and-drop, preview/publish/history, all five Workbench navigation modes, direct salary-slip access, unauthorized behavior, and fallback remains unverified because no suitable authenticated backend/session was available and no shared service was started.
+
+## Workstream Registration - 2026-08-26 21:20:10 +08:00
+
+- Workstream ID: `main-origin-sync-20260826-2120`
+- Goal: 将 `origin/main` 的最新三个提交快进到本地 `main`，并完整恢复、合并现有未提交的 Workbench 导航布局改动。
+- Non-goals: 不提交、不推送、不执行 SQL、不修改数据库或服务、不切换分支、不清理或覆盖无关本地改动。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` 加 23 个已跟踪文件和 28 个未跟踪文件的本地改动。
+- Target branch: `main` at `origin/main` commit `27f2087b48b8a2c3fe7c94fc1aa6c1ff68c3d0e9`.
+- Ownership scope: Git 快进与临时 stash；`handoff/main.md` 和 `script/sql/mysql/migrations/README.md` 的冲突解决；不改变其他本地工作流所有权。
+- Owner: Codex `/root`
+- Dependencies: 已获取的 `origin/main`；现有 V147 工作流依赖远端落地的 V139-V146。
+- Integration order: 保护本地改动 -> 快进远端三提交 -> 恢复本地改动 -> 合并双方 handoff 历史和 V139-V147 迁移说明 -> 验证并清理临时 stash。
+- Verification plan: 核对 `HEAD == origin/main`、ahead/behind `0/0`、无未解决冲突和冲突标记、`git diff --check` 通过、原 stash 的 51 个路径均已恢复且索引为空。
+
+## Delivery Entry - 2026-08-26 21:20:10 +08:00
+
+- Workstream ID: `main-origin-sync-20260826-2120`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `27f2087b48b8a2c3fe7c94fc1aa6c1ff68c3d0e9`（快进到 `origin/main`，未创建提交）。
+- User goal: 拉取最新代码并合并到本地。
+- Key decisions: 用包含未跟踪文件的临时 stash 保护本地工作；快进后恢复全部改动；`handoff/main.md` 完整保留双方并行历史；迁移 README 按 V139-V147 连续顺序保留双方说明，并将 V147 的前置状态更新为 V139-V146 已落地但仍需完成连续性复核和 bootstrap/verifier 接线。
+- Execution or analysis result: 本地 `main` 从 `0caaf679` 快进到 `27f2087b`，纳入 `9c447a28`、`b4b8e7fa`、`27f2087b`；恢复本地 51 个改动路径；10 个重叠文件中 8 个由 Git 自动合并，2 个文档冲突已解决。
+- Changed files: 远端三个提交的 308 个路径；本地原有 23 个已跟踪文件和 28 个未跟踪文件保持未提交；冲突解决涉及 `handoff/main.md` 和 `script/sql/mysql/migrations/README.md`，本条追加到 handoff。
+- Verification evidence: `HEAD` 与 `origin/main` 均为 `27f2087b48b8a2c3fe7c94fc1aa6c1ff68c3d0e9`，ahead/behind 为 `0/0`；无未解决路径和冲突标记；`git diff --check` 通过；stash 与恢复后文件清单均为 51 个且无缺失；V139-V147 文件及 README 标题顺序连续；索引为空。此次仅执行 Git 同步和机械冲突验证，未运行构建或测试。
+- Dependency or integration impact: 远端业务、H5、媒体大屏、Workbench 和 V139-V146 迁移代码已进入本地；V147 本地实现得以保留，其后续 bootstrap/verifier 接线仍属于原工作流。无提交、推送、依赖安装、数据库执行、服务操作或分支切换。
+- Remaining work: V147 工作流应基于已落地的 V139-V146 完成迁移连续性复核和 bootstrap/verifier 接线；本次拉取合并无剩余 Git 冲突。
+
+## Workstream Registration - 2026-08-26 21:24:30 +08:00
+
+- Workstream ID: `main-commit-push-20260826-2124`
+- Goal: 将当前根仓库全部 Git 改动提交到本地 `main` 并推送至 `origin/main`。
+- Non-goals: 不新增业务修改、不执行 SQL/数据库/服务操作、不切换分支、不变基、不强制推送、不改写历史。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `27f2087b48b8a2c3fe7c94fc1aa6c1ff68c3d0e9` 加当前 23 个已跟踪文件和 28 个未跟踪文件的改动。
+- Target branch: `origin/main`.
+- Ownership scope: 当前根仓库全部 Workbench 菜单布局、System/Admin/Workbench、V147 SQL、文档、菜单宽度和 handoff 改动，以及对应 Git 提交和推送状态。
+- Owner: Codex `/root`
+- Dependencies: 已同步的 `origin/main` 和既有工作流验证证据；无新增依赖。
+- Integration order: 核对远端与敏感内容 -> 补跑合并后聚焦测试 -> 追加交付记录 -> 暂存全部改动 -> 检查暂存内容 -> 提交并推送 -> 核对本地/远端哈希。
+- Verification plan: Workbench 菜单聚焦测试、敏感关键词扫描、`git diff --cached --check`、提交成功、推送成功、`HEAD == origin/main`、ahead/behind `0/0`、工作区干净。
+
+## Delivery Entry - 2026-08-26 21:24:30 +08:00
+
+- Workstream ID: `main-commit-push-20260826-2124`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `27f2087b48b8a2c3fe7c94fc1aa6c1ff68c3d0e9`（提交前；本条将随新提交发布）。
+- User goal: 将当前 Git 改动直接提交到云端，不再请求确认。
+- Key decisions: 将用户明确授权的全部根仓库改动纳入一个功能提交；不强推、不改写历史；不执行 V147 或其他 SQL；保留 V147 后续 bootstrap/verifier 集成工作作为独立剩余事项。
+- Execution or analysis result: 当前提交范围已完成远端同步和冲突解决，准备整体暂存、创建功能提交并推送到 `origin/main`。
+- Changed files: 当前 51 个路径，包括 System Workbench 布局 Controller/VO/Service/DAL/测试、认证投影、Admin 编排页面、Workbench 导航消费和菜单宽度、V147/基线 SQL、架构/菜单/SQL 文档及 handoff。
+- Verification evidence: 提交前 `HEAD == origin/main == 27f2087b`，ahead/behind 为 `0/0`；`git diff --check` 通过；合并后 Workbench `src/services/menu.test.ts` 16/16 通过；新增内容敏感关键词扫描未发现密码、令牌或密钥。原工作流另有 System 聚焦测试 20/20、后端 package、Admin scoped ESLint/build 和 Workbench 菜单测试证据；未重新运行全量构建。
+- Dependency or integration impact: 推送后共享 `main` 将包含可配置 Workbench 导航布局及 V147 源文件；没有依赖安装、数据库执行、角色授权、初始布局发布、服务操作、分支切换或强制推送。
+- Remaining work: 推送后核对远端哈希；V147 在执行前仍需完成 V139-V146 连续迁移复核以及 bootstrap/verifier 接线和相应验证。

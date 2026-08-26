@@ -190,4 +190,20 @@ public interface ErrorCodeConstants {
     ErrorCode AREA_LEVEL_EXCEEDED = new ErrorCode(1_002_030_005, "地区最多维护到区县级");
     ErrorCode AREA_LEAF_SELECTABLE_INVALID = new ErrorCode(1_002_030_006, "仅省级地区可配置为直接选择");
 
+    // ========== Workbench 菜单编排 1-002-031-000 ==========
+    ErrorCode WORKBENCH_LAYOUT_SCOPE_INVALID = new ErrorCode(1_002_031_000, "Workbench 布局作用域不正确");
+    ErrorCode WORKBENCH_LAYOUT_NOT_EXISTS = new ErrorCode(1_002_031_001, "Workbench 布局草稿不存在");
+    ErrorCode WORKBENCH_LAYOUT_REVISION_CONFLICT = new ErrorCode(1_002_031_002,
+            "Workbench 布局已被其他管理员更新，请刷新后重试");
+    ErrorCode WORKBENCH_LAYOUT_SNAPSHOT_INVALID = new ErrorCode(1_002_031_003,
+            "Workbench 布局快照无效：{}");
+    ErrorCode WORKBENCH_LAYOUT_GLOBAL_REQUIRED = new ErrorCode(1_002_031_004,
+            "请先发布租户全局 Workbench 布局");
+    ErrorCode WORKBENCH_LAYOUT_PUBLISH_BLOCKED = new ErrorCode(1_002_031_005,
+            "Workbench 布局不能发布：{}");
+    ErrorCode WORKBENCH_LAYOUT_PRIORITY_DUPLICATE = new ErrorCode(1_002_031_006,
+            "角色布局优先级 {} 已被角色【{}】使用");
+    ErrorCode WORKBENCH_LAYOUT_VERSION_NOT_EXISTS = new ErrorCode(1_002_031_007,
+            "Workbench 布局历史版本不存在");
+
 }

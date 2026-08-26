@@ -626,3 +626,25 @@ instead of role names. The former stage-advance/rollback menu permissions are di
 and their grants retired; the compatibility endpoints return the explicit retired-operation error to users
 with the new maintenance permission. V146 is repeatable and forward-only. Recovery disables the new menus
 and notification rule while retaining account snapshots and revision history.
+### V147 Workbench navigation layout
+
+V147 depends on V146 and adds `system_workbench_layout` for the current draft and
+published pointer plus `system_workbench_layout_version` for immutable publish history.
+Both tables are tenant-scoped. A tenant has one global scope and at most one scope per
+role; enabled published role priorities are unique within the tenant. The migration does
+not write a layout row, publish a default layout, or alter any existing application-menu
+parent, page URL, component, permission, role assignment, or business row.
+
+Menu IDs `79900-79903` create `系统管理 -> Workbench 菜单编排` and the query, update,
+and publish permissions. The page uses `workbench_render_mode=admin_only`. Existing active
+tenant packages receive these IDs only when they already contain the System Management
+root menu `1`; no role receives an automatic grant. Fixed-ID, permission, and route
+ownership conflicts fail before schema or menu writes. Table creation is additive, menu
+and package writes are repeatable, and both schema-version markers are recorded. Rollback
+requires a reviewed forward migration because published snapshots are permanent; do not
+drop either table while any tenant layout or history exists.
+
+`V139-V146` are now present in the integrated migration chain. V147 still requires a
+continuous migration review against those landed files before it is added to the
+fresh-bootstrap order or enabled in final marker verification; do not execute V147 until
+that integration review is complete.

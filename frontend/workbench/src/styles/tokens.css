@@ -169,11 +169,11 @@
   --crm-header-h: 48px;
 
   /* 侧栏宽度。**须与 constants.ts 的 LAYOUT_SIZES 一致** ——
-     antd Sider 的 width prop 只接受 number，读不到 CSS 变量，
-     故 JS 侧另有一份真值，由 styles.guard.test.ts 的双源比对守卫。 */
+     antd Sider 的 width prop 由 JS 传入，CSS 侧保留同值镜像，
+     两边由 styles.guard.test.ts 的双源比对守卫。 */
   --crm-sider-1-w: 72px;
   --crm-sider-1-collapsed: 56px;
-  --crm-sider-2-w: 180px;
+  --crm-sider-2-w: clamp(180px, 14vw, 200px);
   --crm-sider-2-collapsed: 48px;
   --crm-sider-single-w: 220px;
   --crm-aside-w: 320px;

@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.controller.admin.auth.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import cn.iocoder.yudao.module.system.service.workbenchlayout.model.WorkbenchMenuProjection;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -27,6 +28,12 @@ public class AuthPermissionInfoRespVO {
 
     @Schema(description = "菜单树", requiredMode = Schema.RequiredMode.REQUIRED)
     private List<MenuVO> menus;
+
+    @Schema(description = "Workbench 最终导航投影；路由授权仍以 menus 为准")
+    private List<MenuVO> workbenchMenus;
+
+    @Schema(description = "Workbench 布局版本、胜出角色和回退信息")
+    private WorkbenchMenuProjection.Meta workbenchLayoutMeta;
 
     @Schema(description = "全平台默认员工头像；未配置时为空", example = "https://www.iocoder.cn/default-avatar.png")
     private String defaultAvatar;
@@ -70,6 +77,12 @@ public class AuthPermissionInfoRespVO {
 
         @Schema(description = "父菜单 ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "1024")
         private Long parentId;
+
+        @Schema(description = "投影页面对应的原始菜单 ID；分组为空", example = "1024")
+        private Long sourceMenuId;
+
+        @Schema(description = "Workbench 专属分组的稳定键；页面为空")
+        private String layoutKey;
 
         @Schema(description = "菜单名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "芋道")
         private String name;

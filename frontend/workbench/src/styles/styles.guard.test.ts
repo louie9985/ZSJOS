@@ -269,10 +269,15 @@ describe('spacing and sizing anchors', () => {
 describe('token single source of truth', () => {
   const constantsSrc = readFileSync('src/constants.ts', 'utf8')
 
+  /** 读 tokens.css 某个选择器块里的原始值。 */
+  const readValue = (selector: string, name: string) => {
+    const body = tokens.split(selector)[1]?.split('}')[0] ?? ''
+    return body.match(new RegExp(`${name}:\\s*([^;]+)`))?.[1].trim()
+  }
+
   /** 读 tokens.css 某个选择器块里的 px 取值 */
   const readPx = (selector: string, name: string) => {
-    const body = tokens.split(selector)[1]?.split('}')[0] ?? ''
-    return body.match(new RegExp(`${name}:\\s*(\\d+)px`))?.[1]
+    return readValue(selector, name)?.match(/^(\d+)px$/)?.[1]
   }
 
   it('keeps border radius identical between constants.ts and tokens.css', () => {
@@ -303,13 +308,14 @@ describe('token single source of truth', () => {
   })
 
   it('keeps sider widths identical between constants.ts and tokens.css', () => {
-    // antd Sider 的 width prop 只接受 number，故 JS 侧持有真值，CSS 侧是镜像
+    // antd Sider 接受 number 或 CSS 字符串；JS 侧持有真值，CSS 侧是镜像
     const block = constantsSrc.split('LAYOUT_SIZES = {')[1]?.split('}')[0] ?? ''
     const num = (key: string) => block.match(new RegExp(`${key}:\\s*(\\d+)`))?.[1]
+    const cssString = (key: string) => block.match(new RegExp(`${key}:\\s*'([^']+)'`))?.[1]
     const pairs: Array<[string, string | undefined, string | undefined]> = [
       ['sider-1-w', num('PRIMARY_SIDER_W'), readPx(':root', '--crm-sider-1-w')],
       ['sider-1-collapsed', num('PRIMARY_SIDER_COLLAPSED'), readPx(':root', '--crm-sider-1-collapsed')],
-      ['sider-2-w', num('SECONDARY_SIDER_W'), readPx(':root', '--crm-sider-2-w')],
+      ['sider-2-w', cssString('SECONDARY_SIDER_W'), readValue(':root', '--crm-sider-2-w')],
       ['sider-2-collapsed', num('SECONDARY_SIDER_COLLAPSED'), readPx(':root', '--crm-sider-2-collapsed')],
       ['sider-single-w', num('SINGLE_SIDER_W'), readPx(':root', '--crm-sider-single-w')],
       ['aside-w', num('AI_SIDER_W'), readPx(':root', '--crm-aside-w')]

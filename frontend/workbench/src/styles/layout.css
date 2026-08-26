@@ -334,6 +334,13 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   line-height: var(--crm-header-h);
 }
 
+/* 递归子菜单按内容扩展，同时限制到视口内，避免长名称被默认窄浮层截断。 */
+.workbench-nav-popup>.ant-menu {
+  min-width: 180px;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 24px));
+}
+
 /* ==================== 纯顶栏模式 ==================== */
 /* .layout-top-only: 一二级菜单全部在顶栏 */
 .layout-top-only .primary-sider,

@@ -65,3 +65,11 @@ in the command line or repository files.
 The schema baseline was exported from the local database structure and excludes
 the `yudao_demo*` tables and all table data. Future structure changes must be
 added as numbered migrations and reflected in the baseline generator/review.
+
+`V147__workbench_navigation_layout.sql` is reserved for the tenant-owned Workbench
+navigation projection and has a hard dependency on `V146` in both schema-version
+registries. It creates two tenant tables, the Admin-only configuration page, and three
+operation permissions. It appends those menu IDs only to packages that already contain
+System Management and creates no role grant or published layout. Because `V139-V146` are
+owned by concurrent workstreams and are not yet present here, final bootstrap ordering and
+the V147 verification row must be integrated only after those files land.

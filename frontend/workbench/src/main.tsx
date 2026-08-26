@@ -41,7 +41,7 @@ import {
   getPrimaryTarget,
   type PrimaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
+import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
@@ -70,6 +70,7 @@ import './styles/index.css'
 
 const { Sider, Header, Content } = Layout
 type MenuItem = Required<MenuProps>['items'][number]
+const NAV_POPUP_CLASS_NAME = 'workbench-nav-popup'
 
 class RuntimeBoundary extends React.Component<React.PropsWithChildren, { error?: Error }> {
   state: { error?: Error } = {}
@@ -142,37 +143,41 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     return () => mq.removeEventListener('change', sync)
   }, [])
 
-  const menus = useMemo(
+  const authorizedMenus = useMemo(
     () => filterRenderableMenus(buildMenuTree(info.menus || []), RENDERABLE_APP_ROUTES),
     [info.menus]
   )
-  const navigation = useMemo(() => buildTwoLevelNavigation(menus), [menus])
+  const navigationMenus = useMemo(() => {
+    if (!info.workbenchMenus || info.workbenchLayoutMeta?.fallback) return authorizedMenus
+    return filterRenderableMenus(buildMenuTree(info.workbenchMenus, '/', true), RENDERABLE_APP_ROUTES)
+  }, [authorizedMenus, info.workbenchLayoutMeta?.fallback, info.workbenchMenus])
+  const navigation = useMemo(() => buildTwoLevelNavigation(navigationMenus), [navigationMenus])
   const initialTarget = useMemo(() => getInitialTarget(navigation), [navigation])
   const leadDetailDeepLink = useMemo(() => {
     return canOpenLeadDetailDeepLink(location.pathname, location.search, info.permissions || [])
   }, [info.permissions, location.pathname, location.search])
   const inaccessiblePathFallback = useMemo(
-    () => leadDetailDeepLink ? undefined : getInaccessiblePathFallback(navigation, location.pathname, menus),
-    [leadDetailDeepLink, navigation, location.pathname, menus]
+    () => leadDetailDeepLink ? undefined : getInaccessiblePathFallback(navigation, location.pathname, authorizedMenus),
+    [leadDetailDeepLink, navigation, location.pathname, authorizedMenus]
   )
   const activePrimary = useMemo(
     () => findPrimaryByPath(navigation, location.pathname),
     [navigation, location.pathname]
   )
   const currentMenu = useMemo(
-    () => findMenuByPath(menus, location.pathname),
-    [menus, location.pathname]
+    () => findMenuByPath(authorizedMenus, location.pathname),
+    [authorizedMenus, location.pathname]
   )
   const activeAdminEmbedPath = currentMenu?.workbenchRenderMode === 'admin_embed'
     ? currentMenu.path
     : undefined
 
   const handleAdminRouteChange = useCallback((path: string) => {
-    const menu = findMenuByPath(menus, path)
+    const menu = findMenuByPath(authorizedMenus, path)
     if (menu?.workbenchRenderMode === 'admin_embed' && path !== location.pathname) {
       navigate(path)
     }
-  }, [location.pathname, menus, navigate])
+  }, [authorizedMenus, location.pathname, navigate])
 
   useEffect(() => {
     if (!tabsEnabled) setTabs([])
@@ -182,13 +187,13 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     const currentPaths = new Set(tabs.map(tab => tab.key))
     previousTabsRef.current.forEach(tab => {
       if (currentPaths.has(tab.key)) return
-      const menu = findMenuByPath(menus, tab.key)
+      const menu = findMenuByPath(authorizedMenus, tab.key)
       if (menu?.workbenchRenderMode === 'admin_embed') {
         adminEmbedFrameRef.current?.closeRoute(tab.key)
       }
     })
     previousTabsRef.current = tabs
-  }, [menus, tabs])
+  }, [authorizedMenus, tabs])
 
   useEffect(() => {
     if (inaccessiblePathFallback) navigate(inaccessiblePathFallback, { replace: true })
@@ -233,12 +238,12 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const showTopSecondary = layoutMode === 'top-only'
 
   const singleSiderItems: MenuItem[] = useMemo(
-    () => showSingleSider ? buildNavMenuItems(navigation) : [],
+    () => showSingleSider ? buildNavMenuItems(navigation, { popupClassName: NAV_POPUP_CLASS_NAME }) : [],
     [navigation, showSingleSider]
   )
   const miniSiderItems: MenuItem[] = useMemo(
     () => showMiniSider
-      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: 'mini-flyout' })
+      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: `${NAV_POPUP_CLASS_NAME} mini-flyout` })
       : [],
     [navigation, showMiniSider]
   )
@@ -246,7 +251,8 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     () => showTopSecondary
       ? buildNavMenuItems(navigation, {
           childIcons: false,
-          expandSuffix: <DownOutlined style={{ fontSize: 10, marginLeft: 2 }}/>
+          expandSuffix: <DownOutlined style={{ fontSize: 10, marginLeft: 2 }}/>,
+          popupClassName: NAV_POPUP_CLASS_NAME
         })
       : [],
     [navigation, showTopSecondary]
@@ -324,9 +330,10 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         <div className="secondary-menu-scroll">
           <Menu
             mode="inline"
+            inlineIndent={NAV_INLINE_INDENT}
             inlineCollapsed={secondaryCollapsed}
             selectedKeys={currentMenu ? [currentMenu.path] : []}
-            items={buildHierarchicalSecondaryItems(activePrimary?.menu)}
+            items={buildHierarchicalSecondaryItems(activePrimary?.menu, { popupClassName: NAV_POPUP_CLASS_NAME })}
             onClick={({ key }) => go(String(key))}
             className="transparent-menu"
           />
@@ -341,6 +348,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         <div className="sider-menu-scroll">
           <Menu
             mode="inline"
+            inlineIndent={NAV_INLINE_INDENT}
             inlineCollapsed={primaryCollapsed}
             selectedKeys={currentMenu ? [currentMenu.path] : []}
             openKeys={singleSiderOpenKeys}

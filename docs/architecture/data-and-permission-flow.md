@@ -25,8 +25,18 @@ login form
   -> POST /admin-api/system/auth/login
   -> access token + refresh token + expiry
   -> GET /admin-api/system/auth/get-permission-info
-  -> current user + roles + permissions + menus
+  -> current user + roles + permissions + menus + workbenchMenus + workbenchLayoutMeta
 ```
+
+`menus` remains the complete authorized menu tree and is the only source used for route
+registration, direct-URL access checks, component identity, and operation permissions.
+`workbenchMenus` is a tenant-owned navigation projection over those authorized pages; it may
+reorder or navigation-hide a page but cannot change the page URL, component, permission, or
+backend authorization. `workbenchLayoutMeta` identifies the published global version, the
+highest-priority enabled role override that won for the employee, its version, and any fallback.
+If the global layout is missing or a stored snapshot cannot be read or parsed, System returns
+the original authorized menu tree as `workbenchMenus` with fallback metadata so login remains
+available and no permission is enlarged.
 
 The workbench HTTP client centralizes:
 
@@ -138,17 +148,23 @@ ordinary `zsjos:media-calendar:query` scope is the current user as director or o
 role-to-menu assignments
   -> backend permission calculation
   -> get-permission-info.menus
-  -> client path normalization
-  -> primary roots + visible leaf pages
-  -> React navigation and local component registry
+  -> route registration, direct access, and local component registry
+
+tenant global layout + highest-priority enabled employee-role override
+  -> get-permission-info.workbenchMenus
+  -> five desktop navigation modes + mobile drawer
 ```
 
 Rules:
 
-- The permission response is the workbench menu source of truth.
-- The client preserves backend names, order, visibility, icons, route identity, and authorization semantics.
+- The permission response remains the Workbench route and navigation source of truth; clients do not persist a second production menu tree.
+- System-owned source menus preserve page names, icons, paths, components, visibility ceilings, route identity, and authorization semantics. Published Workbench layouts own only navigation grouping, ordering, and navigation visibility.
 - Relative child paths are resolved against their parent. Administrator menu paths are not replaced by demo routes.
-- Workbench navigation preserves the server-owned recursive menu hierarchy. Its five layout modes may render sidebars, top-level dropdowns, collapsible directory menus, or popup flyouts; layout presentation does not change permission or original route identity.
+- Without a published global layout, Workbench navigation preserves the original recursive menu hierarchy. After publication, every desktop layout and the mobile drawer consume the same `workbenchMenus` projection.
+- A role override applies to the employee's complete authorized page union, not only pages granted by that role. When multiple enabled role overrides apply, the lowest unique tenant priority wins; authorization still uses the union of all enabled roles.
+- Layout groups have stable independent keys. Pages retain the original `sourceMenuId`, occur at most once, and keep their resolved public URL even when moved to another level. Up to three group levels are allowed, so a page may appear at the fourth rendered level.
+- The fixed top-level `未分类` group receives newly authorized pages that are absent from the published snapshot and is omitted at runtime when empty. Ordinary empty groups, invalid references, duplicate pages, cycles, and over-depth trees block publication.
+- Navigation hiding does not revoke route access. A role may restore a page hidden only by the global layout, while a disabled, source-hidden, or `admin_only` System menu remains unavailable regardless of the layout.
 - Role names are not used to manufacture menus or grant access.
 - Backend component names are metadata only. React renders an explicitly registered local page or a safe placeholder.
 - The 36 active ZSJOS-facing page menus have matching React Workbench and Vue Admin renderers; the auditable mapping is maintained in `docs/frontend/zsjos-menu-coverage.md`. Both clients preserve the server path and permission identity instead of maintaining aliases or a duplicate menu tree.
@@ -156,6 +172,17 @@ Rules:
 - The canonical appeal and opportunity-public-sea routes are `/zsjos/appeals` and `/zsjos/lead-aging-pool`. The clients intentionally do not redirect the obsolete `/zsjos/leads/appeals` or `/zsjos/opportunity-public-sea` paths.
 - A valid active read-only impersonation session is injected by the shared clients as `X-ZSJOS-Impersonation-Session` only on ZSJOS requests and excluded from impersonation lifecycle requests. The clients clear malformed, inactive, or server-rejected sessions and synchronize their visible state. A request rejected with `IMPERSONATION_SESSION_INVALID` remains failed and is not replayed under the administrator identity. Storage is also cleared with authentication state; server-side authorization and write rejection remain authoritative.
 - Direct URL access must still resolve against the authorized menu set; hiding a menu item alone is not authorization.
+
+### Workbench navigation layout administration
+
+Vue Admin owns `/system/workbench-layout/**` and the Admin-only page
+`/system/workbench-layout`. Query, draft update/history restore, and publication are separated
+as `system:workbench-layout:query`, `system:workbench-layout:update`, and
+`system:workbench-layout:publish`. Candidate pages come from the current tenant package rather
+than the configuring administrator's business-page grants. Global and individual role scopes
+publish independently; a role cannot publish before the global layout. Draft saves use
+`draftRevision` optimistic locking, publish remarks are required, and historical versions can
+only be restored as a new draft. No layout is pre-published by database initialization.
 
 The administration message center keeps personal station-message navigation server-owned. The
 “全部消息” and “未读消息” routes are children of the existing message-center menu and inherit only

@@ -399,15 +399,17 @@ export const LAYOUT_MODES: readonly LayoutMode[] = ['side', 'top', 'top-only', '
  */
 export const MINI_RAIL_W = 56
 
+/** 多级行内菜单缩进；收窄默认缩进，为深层中文菜单保留可读宽度。 */
+export const NAV_INLINE_INDENT = 12
+
 /**
- * 布局尺寸真值。antd Sider 的 width / collapsedWidth prop 只接受 number，
- * 读不到 CSS 变量，故 JS 侧持有真值，`styles/tokens.css` 的 `--crm-sider-*`
- * 为 CSS 侧镜像（calc 需要），两边由 styles.guard.test.ts 比对。
+ * 布局尺寸真值。antd Sider 的 width / collapsedWidth prop 接受 number 或 CSS 字符串，
+ * `styles/tokens.css` 的 `--crm-sider-*` 为 CSS 侧镜像，两边由 styles.guard.test.ts 比对。
  */
 export const LAYOUT_SIZES = {
   PRIMARY_SIDER_W: 72,
   PRIMARY_SIDER_COLLAPSED: 56,
-  SECONDARY_SIDER_W: 180,
+  SECONDARY_SIDER_W: 'clamp(180px, 14vw, 200px)',
   SECONDARY_SIDER_COLLAPSED: 48,
   /** 左单列模式：一栏同时容纳一二级，故比 primary 宽 */
   SINGLE_SIDER_W: 220,

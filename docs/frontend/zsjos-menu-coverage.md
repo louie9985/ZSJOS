@@ -1,6 +1,11 @@
 # ZSJOS 双前端菜单覆盖矩阵
 
-本矩阵记录父子菜单解析后的正式 URL。数据库中直接挂在 `/zsjos`“工作台”父菜单下的页面保存相对子路径，例如正式 URL `/zsjos/my-students` 对应菜单 `path=my-students`。React Workbench 只渲染授权菜单；隐藏菜单仍可在授权后直达，但不出现在导航。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
+本矩阵记录父子菜单解析后的正式 URL。数据库中直接挂在 `/zsjos`“工作台”父菜单下的页面保存相对子路径，例如正式 URL `/zsjos/my-students` 对应菜单 `path=my-students`。React Workbench 的路由与直接访问使用原授权 `menus`，导航使用 System 计算的 `workbenchMenus` 投影；编排只改变分组、顺序和导航显隐，不改变本表的正式 URL、组件或权限身份。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
+
+Vue Admin 的 `/system/workbench-layout`（`system/workbenchLayout/index`）是
+`workbenchRenderMode=admin_only` 的系统配置页，不属于员工业务页面，也不计入下表的
+双前端覆盖数量。其候选页面来自租户套餐，发布后由所有 Workbench 桌面布局与移动抽屉
+统一消费；未发布或解析失败时回退原授权菜单树。
 
 H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计入下表 38 个页面路由。V071 只把已失去有效父菜单的兼职权限按钮归为根级、无 path/component 的不可路由元数据，不重建已由 V069 退役的 `partner-portal` 页面。
 

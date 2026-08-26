@@ -3458,6 +3458,56 @@ CREATE TABLE IF NOT EXISTS `system_users` (
   KEY `idx_dept_id` (`dept_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户信息表';
 
+-- system_workbench_layout
+CREATE TABLE IF NOT EXISTS `system_workbench_layout` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '布局编号',
+  `scope_type` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '作用域：GLOBAL、ROLE',
+  `scope_id` bigint NOT NULL COMMENT '全局为0，角色为角色编号',
+  `draft_snapshot_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '类型校验后的草稿快照JSON',
+  `draft_revision` int NOT NULL DEFAULT '0' COMMENT '草稿乐观锁版本',
+  `draft_restored_from_version_id` bigint DEFAULT NULL COMMENT '草稿恢复来源版本编号',
+  `published_version_id` bigint DEFAULT NULL COMMENT '当前发布版本编号',
+  `published_version_no` int DEFAULT NULL COMMENT '当前发布版本号',
+  `published_enabled` bit(1) DEFAULT NULL COMMENT '当前角色覆盖是否启用',
+  `published_priority` int DEFAULT NULL COMMENT '当前启用角色覆盖优先级',
+  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_tenant_workbench_scope` (`tenant_id`,`scope_type`,`scope_id`),
+  UNIQUE KEY `uk_tenant_workbench_priority` (`tenant_id`,`published_priority`),
+  KEY `idx_workbench_published_version` (`tenant_id`,`published_version_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workbench导航布局';
+
+-- system_workbench_layout_version
+CREATE TABLE IF NOT EXISTS `system_workbench_layout_version` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '发布版本编号',
+  `layout_id` bigint NOT NULL COMMENT '布局编号',
+  `scope_type` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '作用域：GLOBAL、ROLE',
+  `scope_id` bigint NOT NULL COMMENT '全局为0，角色为角色编号',
+  `version_no` int NOT NULL COMMENT '作用域内发布版本号',
+  `snapshot_json` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '不可变发布快照JSON',
+  `enabled` bit(1) NOT NULL COMMENT '该版本角色覆盖是否启用',
+  `priority` int DEFAULT NULL COMMENT '该版本角色覆盖优先级',
+  `publish_remark` varchar(500) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '发布说明',
+  `restored_from_version_id` bigint DEFAULT NULL COMMENT '恢复来源版本编号',
+  `publisher_user_id` bigint NOT NULL COMMENT '发布人用户编号',
+  `publish_time` datetime NOT NULL COMMENT '发布时间',
+  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_tenant_layout_version` (`tenant_id`,`layout_id`,`version_no`),
+  KEY `idx_workbench_version_scope` (`tenant_id`,`scope_type`,`scope_id`,`version_no`),
+  KEY `idx_workbench_version_published` (`tenant_id`,`publish_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Workbench导航布局发布历史';
+
 -- zsjos_module_schema_version
 CREATE TABLE IF NOT EXISTS `zsjos_module_schema_version` (
   `module_code` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '模块编码',
