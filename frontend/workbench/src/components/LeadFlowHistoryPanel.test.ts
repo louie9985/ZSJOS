@@ -37,6 +37,8 @@ describe('Lead flow-history attachment presentation', () => {
     expect(flowHistorySource).toContain('<span>备注</span>')
     expect(flowHistorySource).not.toContain('原因 / 备注')
     expect(flowHistorySource).toContain('附件')
+    expect(flowHistorySource).toContain('{items.map(item => <FlowItem')
+    expect(flowHistorySource).not.toContain('items.sort(')
   })
 
   it('keeps compact fields on one row with labels left and values right', () => {

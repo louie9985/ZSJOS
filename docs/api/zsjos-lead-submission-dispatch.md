@@ -129,6 +129,10 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 每分钟按租户扫描已到判定截止时间的 `submitted + owned` 客资，并在行锁下再次校验后改为 `suspended`。截止时间已到但扫描尚未提交时，当前销售仍可判定；扫描先提交后，跟进、判定、资料修改、转派和建单均由服务端拒绝。恢复与转派创建新判定轮次；回收进入 `recycle_pending` 并清除销售；释放进入抢单池，被抢后重新创建首跟任务。
 
+销售主管通过独立的 `zsjos:subordinate-sales:lead-*` 按钮权限处置管理范围内的未成交客资。
+判有效前释放进入抢单池并清除当前归属；判有效后释放创建商机公海周期，保留正式归属，
+可同步指定符合范围的实际跟进销售。挂起状态额外允许恢复，成交和关闭状态不允许这些操作。
+
 普通主管必须是原销售部门或其上级部门负责人，只能转派给本人管理部门及子部门的启用销售专员。`zsjos:lead:qualification:manage-all` 允许当前租户内跨部门处置，但不绕过租户隔离。超时挂起和主管处置通过既有业务通知机制通知相关销售、操作主管及原销售部门负责人链。
 
 旧的 `POST /zsjos/lead/{id}/admin-transfer` 不接受 `suspended` 或 `recycle_pending` 客资，异常客资必须通过上述专用处置接口，避免绕过理由、轮次重启和分配历史规则。

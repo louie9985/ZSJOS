@@ -94,15 +94,45 @@ public class SubordinateSalesController {
         return success(service.pauseAllDispatch(getLoginUserId()));
     }
 
-    @PostMapping("/leads/batch-transfer")
-    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:batch-transfer')")
-    public CommonResult<SubordinateBatchResultVO> batchTransfer(@Valid @RequestBody SubordinateBatchTransferReqVO reqVO) {
-        return success(service.batchTransfer(reqVO, getLoginUserId()));
+    @PostMapping("/leads/{leadId}/transfer")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-transfer')")
+    public CommonResult<Boolean> transferLead(@PathVariable Long leadId,
+                                               @Valid @RequestBody SubordinateLeadActionReqVO reqVO) {
+        service.transferLead(leadId, reqVO, getLoginUserId()); return success(true);
     }
 
-    @PostMapping("/leads/batch-public-sea")
-    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:batch-public-sea')")
-    public CommonResult<SubordinateBatchResultVO> batchPublicSea(@Valid @RequestBody SubordinateBatchPublicSeaReqVO reqVO) {
-        return success(service.batchReleasePublicSea(reqVO, getLoginUserId()));
+    @PostMapping("/leads/{leadId}/restore")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-restore')")
+    public CommonResult<Boolean> restoreLead(@PathVariable Long leadId,
+                                              @Valid @RequestBody SubordinateLeadActionReqVO reqVO) {
+        service.restoreLead(leadId, reqVO, getLoginUserId()); return success(true);
+    }
+
+    @PostMapping("/leads/{leadId}/recycle")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-recycle')")
+    public CommonResult<Boolean> recycleLead(@PathVariable Long leadId,
+                                              @Valid @RequestBody SubordinateLeadActionReqVO reqVO) {
+        service.recycleLead(leadId, reqVO, getLoginUserId()); return success(true);
+    }
+
+    @PostMapping("/leads/{leadId}/release-claim-pool")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-release-claim-pool')")
+    public CommonResult<Boolean> releaseLeadToClaimPool(@PathVariable Long leadId,
+                                                        @Valid @RequestBody SubordinateLeadActionReqVO reqVO) {
+        service.releaseLeadToClaimPool(leadId, reqVO, getLoginUserId()); return success(true);
+    }
+
+    @PostMapping("/leads/{leadId}/release-public-sea")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-release-public-sea')")
+    public CommonResult<Boolean> releaseLeadToPublicSea(@PathVariable Long leadId,
+                                                        @Valid @RequestBody SubordinateLeadActionReqVO reqVO) {
+        service.releaseLeadToPublicSea(leadId, reqVO, getLoginUserId()); return success(true);
+    }
+
+    @PostMapping("/leads/batch-{action:transfer|restore|recycle|release-claim-pool|release-public-sea}")
+    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:lead-' + #action)")
+    public CommonResult<SubordinateBatchResultVO> batchLeadAction(@PathVariable String action,
+            @Valid @RequestBody SubordinateBatchLeadActionReqVO reqVO) {
+        return success(service.batchLeadAction(action, reqVO, getLoginUserId()));
     }
 }

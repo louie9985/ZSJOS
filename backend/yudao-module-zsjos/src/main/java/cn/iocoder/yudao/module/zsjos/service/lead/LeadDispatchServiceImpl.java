@@ -309,13 +309,21 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
     public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason) {
+        adminTransfer(leadId, salesUserId, operatorUserId, reason, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "admin-transfer")
+    public void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason,
+                              String idempotencyKey) {
         requireSalesUser(salesUserId);
         LeadDO lead = requireLead(leadId);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
             throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
         }
-        doAdminTransfer(lead, salesUserId, operatorUserId, reason);
+        doAdminTransfer(lead, salesUserId, operatorUserId, reason, idempotencyKey);
     }
 
     @Override
@@ -334,11 +342,12 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 || !Objects.equals(lead.getOwnerUserId(), expectedOwnerUserId)) {
             return TransferAttemptResult.invalidated("客资状态或归属已变化");
         }
-        doAdminTransfer(lead, salesUserId, operatorUserId, reason);
+        doAdminTransfer(lead, salesUserId, operatorUserId, reason, null);
         return TransferAttemptResult.success();
     }
 
-    private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason) {
+    private void doAdminTransfer(LeadDO lead, Long salesUserId, Long operatorUserId, String reason,
+                                 String idempotencyKey) {
         Long leadId = lead.getId();
         LocalDateTime transferredAt = LocalDateTime.now();
         agingPoolService.terminateForOwnerTransfer(leadId, salesUserId, operatorUserId, transferredAt);
@@ -377,7 +386,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         Map<String, Object> transferContext = eventContext(lead, null, salesUserId, null);
         transferContext.put("previousOwnerUserId", from);
         transferContext.put("newOwnerUserId", salesUserId);
-        notifyEventPublisher.publish(TRANSFERRED, leadId, "lead-transferred:" + history.getId(),
+        notifyEventPublisher.publish(TRANSFERRED, leadId,
+                idempotencyKey == null ? "lead-transferred:" + history.getId() : "lead-transferred:" + idempotencyKey,
                 operatorUserId, transferredAt, transferContext);
     }
 

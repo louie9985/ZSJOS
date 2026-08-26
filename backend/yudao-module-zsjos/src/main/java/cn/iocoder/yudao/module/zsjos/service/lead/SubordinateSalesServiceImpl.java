@@ -183,19 +183,65 @@ public class SubordinateSalesServiceImpl implements SubordinateSalesService {
     }
 
     @Override
-    public SubordinateBatchResultVO batchTransfer(SubordinateBatchTransferReqVO reqVO, Long managerUserId) {
+    public void transferLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
         String reason = requireReason(reqVO.getReason());
         requireEligibleTarget(reqVO.getTargetUserId(), managerUserId);
-        return executeBatch(reqVO.getLeadIds(), leadId ->
-                commandService.transferOne(leadId, reqVO.getTargetUserId(), managerUserId, reason));
+        commandService.transferOne(leadId, reqVO.getTargetUserId(), managerUserId, reason, reqVO.getIdempotencyKey());
     }
 
     @Override
-    public SubordinateBatchResultVO batchReleasePublicSea(SubordinateBatchPublicSeaReqVO reqVO, Long managerUserId) {
+    public void restoreLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
+        commandService.restoreOne(leadId, managerUserId, requireReason(reqVO.getReason()), reqVO.getIdempotencyKey());
+    }
+
+    @Override
+    public void recycleLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
+        commandService.recycleOne(leadId, managerUserId, requireReason(reqVO.getReason()), reqVO.getIdempotencyKey());
+    }
+
+    @Override
+    public void releaseLeadToClaimPool(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
+        commandService.releaseClaimPoolOne(leadId, managerUserId, requireReason(reqVO.getReason()), reqVO.getIdempotencyKey());
+    }
+
+    @Override
+    public void releaseLeadToPublicSea(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId) {
         String reason = requireReason(reqVO.getReason());
         if (reqVO.getCollaboratorUserId() != null) requireEligibleTarget(reqVO.getCollaboratorUserId(), managerUserId);
-        return executeBatch(reqVO.getLeadIds(), leadId ->
-                commandService.releasePublicSeaOne(leadId, reqVO.getCollaboratorUserId(), managerUserId, reason));
+        commandService.releasePublicSeaOne(leadId, reqVO.getCollaboratorUserId(), managerUserId, reason,
+                reqVO.getIdempotencyKey());
+    }
+
+    @Override
+    public SubordinateBatchResultVO batchLeadAction(String action, SubordinateBatchLeadActionReqVO reqVO,
+                                                     Long managerUserId) {
+        String reason = requireReason(reqVO.getReason());
+        if ("transfer".equals(action)) requireEligibleTarget(reqVO.getTargetUserId(), managerUserId);
+        if ("release-public-sea".equals(action) && reqVO.getCollaboratorUserId() != null) {
+            requireEligibleTarget(reqVO.getCollaboratorUserId(), managerUserId);
+        }
+        String fingerprint = SubordinateSalesCommandService.fingerprint(action, reqVO.getLeadIds(),
+                reqVO.getTargetUserId(), reqVO.getCollaboratorUserId(), reason);
+        SubordinateBatchResultVO replay = commandService.beginBatch(
+                "batch-" + action, managerUserId, reqVO.getIdempotencyKey(), fingerprint);
+        if (replay != null) return replay;
+        commandService.validateManagedLeads(reqVO.getLeadIds(), managerUserId);
+        SubordinateBatchResultVO result = executeBatch(reqVO.getLeadIds(), leadId -> {
+            String itemKey = reqVO.getIdempotencyKey() + ":" + leadId;
+            switch (action) {
+                case "transfer" -> commandService.transferOne(
+                        leadId, reqVO.getTargetUserId(), managerUserId, reason, itemKey);
+                case "restore" -> commandService.restoreOne(leadId, managerUserId, reason, itemKey);
+                case "recycle" -> commandService.recycleOne(leadId, managerUserId, reason, itemKey);
+                case "release-claim-pool" -> commandService.releaseClaimPoolOne(
+                        leadId, managerUserId, reason, itemKey);
+                case "release-public-sea" -> commandService.releasePublicSeaOne(
+                        leadId, reqVO.getCollaboratorUserId(), managerUserId, reason, itemKey);
+                default -> throw exception(SUBORDINATE_LEAD_STATE_INVALID);
+            }
+        });
+        commandService.completeBatch(managerUserId, reqVO.getIdempotencyKey(), result);
+        return result;
     }
 
     private List<SubordinateSalesRespVO> buildRows(List<AdminUserRespDTO> users) {

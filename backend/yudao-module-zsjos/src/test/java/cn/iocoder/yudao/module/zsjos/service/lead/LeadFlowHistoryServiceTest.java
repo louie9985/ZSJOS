@@ -78,10 +78,10 @@ class LeadFlowHistoryServiceTest {
 
         List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
 
-        assertEquals(List.of("aging:11", "assignment:10", "event:9", "lead:7"),
+        assertEquals(List.of("aging:11", "lead:7", "assignment:10", "event:9"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
-        assertEquals("待接单", result.get(2).getAssignmentStatusBefore());
-        assertEquals("已归属", result.get(2).getAssignmentStatusAfter());
+        assertEquals("待接单", result.get(3).getAssignmentStatusBefore());
+        assertEquals("已归属", result.get(3).getAssignmentStatusAfter());
     }
 
     @Test
@@ -95,7 +95,8 @@ class LeadFlowHistoryServiceTest {
         when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(transfer));
         when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(20L, from, 30L, to));
 
-        LeadFlowHistoryRespVO result = service.getHistory(7L).getFirst();
+        LeadFlowHistoryRespVO result = service.getHistory(7L).stream()
+                .filter(item -> "event:1".equals(item.getId())).findFirst().orElseThrow();
 
         assertEquals("主管转派", result.getFlowNode());
         assertEquals("已挂起", result.getLeadStatusBefore());
@@ -116,8 +117,21 @@ class LeadFlowHistoryServiceTest {
 
         List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
 
-        assertEquals("自动分配", result.get(0).getSource());
-        assertEquals("指定派单", result.get(1).getSource());
+        assertEquals("客资提交", result.get(0).getFlowNode());
+        assertEquals("自动分配", result.get(1).getSource());
+        assertEquals("指定派单", result.get(2).getSource());
+    }
+
+    @Test
+    void keepsSubmissionBeforeAssignmentWhenTimestampsMatchOrAssignmentPredatesSubmission() {
+        LeadAssignmentHistoryDO sameTime = assignment(2L, "dispatch", submittedAt);
+        LeadAssignmentHistoryDO earlier = assignment(1L, "transfer", submittedAt.minusMinutes(1));
+        when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(sameTime, earlier));
+
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+
+        assertEquals(List.of("lead:7", "assignment:2", "assignment:1"),
+                result.stream().map(LeadFlowHistoryRespVO::getId).toList());
     }
 
     @Test

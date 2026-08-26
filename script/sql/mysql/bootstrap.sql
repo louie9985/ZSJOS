@@ -114,6 +114,7 @@ SOURCE script/sql/mysql/migrations/V135__repair_applied_director_and_positioning
 SOURCE script/sql/mysql/migrations/V136__sales_order_team_management.sql;
 SOURCE script/sql/mysql/migrations/V137__repair_workbench_menu_render_mode_version_collision.sql;
 SOURCE script/sql/mysql/migrations/V138__hrm_fms_eam_workbench_admin_embed.sql;
+SOURCE script/sql/mysql/migrations/V139__lead_supervisor_actions_and_public_sea_route.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

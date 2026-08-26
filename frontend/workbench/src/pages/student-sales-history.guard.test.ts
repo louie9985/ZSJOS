@@ -23,7 +23,8 @@ describe('study planner student sales history', () => {
 
   it('keeps student mode read-only', () => {
     const detail = readFileSync('src/components/LeadDetail.tsx', 'utf8')
-    expect(detail).toContain("mode === 'manager-readonly' || mode === 'student-readonly'")
+    expect(detail).toContain("const readOnly = mode === 'student-readonly'")
+    expect(detail).toContain("item.code.startsWith('SUPERVISOR_')")
     expect(detail).toContain('const actions = readOnly ? new Map')
     expect(detail).toContain("mode !== 'student-readonly' || tab !== 'follow-ups'")
   })

@@ -75,6 +75,7 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
+  if (menu?.path === APP_ROUTES.TEAM_SALES_ORDERS) return <MySalesOrderPage team/>
   if (menu?.path === APP_ROUTES.SALES_ORDER_APPROVALS) return <SalesOrderApprovalPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.EXTERNAL_REPURCHASE) return <ExternalRepurchasePage/>
   if (menu?.path === APP_ROUTES.EXPORT_TASKS) return <ExportTaskPage/>

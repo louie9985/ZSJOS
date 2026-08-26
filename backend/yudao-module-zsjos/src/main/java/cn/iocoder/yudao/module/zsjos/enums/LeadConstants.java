@@ -18,6 +18,7 @@ public interface LeadConstants {
     String STATUS_SUBMITTED = "submitted";
     String STATUS_SUSPENDED = "suspended";
     String STATUS_VALID = "valid";
+    String STATUS_CONVERTED = "converted";
     String STATUS_INVALID = "invalid";
     String STATUS_WON = "won";
     String STATUS_CLOSED = "closed";
@@ -56,6 +57,16 @@ public interface LeadConstants {
     String ACTION_QUALIFICATION_TRANSFER = "QUALIFICATION_TRANSFER";
     String ACTION_QUALIFICATION_RECYCLE = "QUALIFICATION_RECYCLE";
     String ACTION_QUALIFICATION_RELEASE = "QUALIFICATION_RELEASE";
+    String ACTION_SUPERVISOR_RESTORE = "SUPERVISOR_RESTORE";
+    String ACTION_SUPERVISOR_TRANSFER = "SUPERVISOR_TRANSFER";
+    String ACTION_SUPERVISOR_RECYCLE = "SUPERVISOR_RECYCLE";
+    String ACTION_SUPERVISOR_RELEASE_CLAIM_POOL = "SUPERVISOR_RELEASE_CLAIM_POOL";
+    String ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA = "SUPERVISOR_RELEASE_PUBLIC_SEA";
+    String PERMISSION_SUPERVISOR_RESTORE = "zsjos:subordinate-sales:lead-restore";
+    String PERMISSION_SUPERVISOR_TRANSFER = "zsjos:subordinate-sales:lead-transfer";
+    String PERMISSION_SUPERVISOR_RECYCLE = "zsjos:subordinate-sales:lead-recycle";
+    String PERMISSION_SUPERVISOR_RELEASE_CLAIM_POOL = "zsjos:subordinate-sales:lead-release-claim-pool";
+    String PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA = "zsjos:subordinate-sales:lead-release-public-sea";
     String INBOX_AUDIENCE_SUBMITTER = "submitter";
     String INBOX_AUDIENCE_OWNER = "owner";
     String INBOX_AUDIENCE_REVIEWER = "reviewer";

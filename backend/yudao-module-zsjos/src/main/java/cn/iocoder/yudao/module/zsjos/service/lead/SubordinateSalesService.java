@@ -19,6 +19,11 @@ public interface SubordinateSalesService {
     void updateAccountStatus(Long salesUserId, SubordinateAccountStatusReqVO reqVO, Long managerUserId);
     void updateDispatchMode(Long salesUserId, SubordinateDispatchModeReqVO reqVO, Long managerUserId);
     SubordinatePauseAllRespVO pauseAllDispatch(Long managerUserId);
-    SubordinateBatchResultVO batchTransfer(SubordinateBatchTransferReqVO reqVO, Long managerUserId);
-    SubordinateBatchResultVO batchReleasePublicSea(SubordinateBatchPublicSeaReqVO reqVO, Long managerUserId);
+    void transferLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);
+    void restoreLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);
+    void recycleLead(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);
+    void releaseLeadToClaimPool(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);
+    void releaseLeadToPublicSea(Long leadId, SubordinateLeadActionReqVO reqVO, Long managerUserId);
+    SubordinateBatchResultVO batchLeadAction(String action, SubordinateBatchLeadActionReqVO reqVO,
+                                             Long managerUserId);
 }

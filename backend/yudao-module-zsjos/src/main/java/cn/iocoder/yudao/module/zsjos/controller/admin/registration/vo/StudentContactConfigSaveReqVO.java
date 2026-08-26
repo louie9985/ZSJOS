@@ -28,7 +28,7 @@ public class StudentContactConfigSaveReqVO {
     @Data public static class FormFieldReqVO {
         @NotBlank @Pattern(regexp = "^[a-z][a-z0-9_]{2,63}$") private String key;
         @NotBlank @Size(max = 100) private String title;
-        @NotBlank @Pattern(regexp = "text|textarea|number|date|datetime|radio|checkbox_group|checkbox|dict|attachment") private String type;
+        @NotBlank @Pattern(regexp = "text|textarea|number|date|datetime|select|multi_select|radio|checkbox_group|checkbox|dict|attachment") private String type;
         @NotNull private Boolean required;
         @NotNull private Integer sort;
         @Size(max = 500) private String description;

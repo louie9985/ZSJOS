@@ -132,6 +132,10 @@ export class DirectorAutoSaveCoordinator {
           job.failure = cause
           job.terminal = this.isTerminalError(cause)
           this.failed = job
+          this.onState({
+            status: job.terminal ? 'conflict' : 'error',
+            error: job.terminal ? '草稿版本已变化，请重新加载后继续' : cause instanceof Error ? cause.message : '草稿保存失败，请重试'
+          })
           throw cause
         }
       }

@@ -70,6 +70,10 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - `/zsjos/accounts`、`/zsjos/content`、`/zsjos/positioning` 的页面菜单由 V113 退役。稳定的查询和操作权限字符串保留，并调整到学员菜单下；账号、内容和定位只能从具体学员的相应标签进入。
 The subordinate-sales left pane uses the shared 20-row append lazy-loading pattern with a scroll-root sentinel, stable server ordering, deduplication, stale-request rejection, and retryable load-more failure. The `一键下班` command is rendered only from `zsjos:subordinate-sales:pause-all`; its scope is entirely server-owned. The home page and header consume one dispatch-status provider so mode, heartbeat, page-offline state, retry, and eligibility remain synchronized without duplicate polling.
 
+The subordinate Lead detail and batch toolbar render restore, transfer, recycle, claim-pool release,
+and public-sea release only from their server-returned button permissions. The canonical public-sea
+page remains `/zsjos/lead-aging-pool`; the retired `/zsjos/opportunity-public-sea` path is not aliased.
+
 ### Media student center
 
 - `/zsjos/media-students` is rendered by `MediaStudentsPage` and requires `zsjos:media-student:query-my`.

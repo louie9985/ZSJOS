@@ -77,7 +77,22 @@ public class LeadFlowHistoryService {
                         Comparator.nullsLast(Comparator.reverseOrder()))
                 .thenComparing(LeadFlowHistoryService::rawId, Comparator.reverseOrder())
                 .thenComparing(LeadFlowHistoryRespVO::getId, Comparator.reverseOrder()));
+        moveSubmissionBeforeFirstAssignment(result);
         return result;
+    }
+
+    private static void moveSubmissionBeforeFirstAssignment(List<LeadFlowHistoryRespVO> items) {
+        int submissionIndex = -1;
+        int firstAssignmentIndex = -1;
+        for (int index = 0; index < items.size(); index++) {
+            LeadFlowHistoryRespVO item = items.get(index);
+            if (item.getId() != null && item.getId().startsWith("lead:")) submissionIndex = index;
+            if (firstAssignmentIndex < 0 && "客资分配".equals(item.getBusinessObject())) firstAssignmentIndex = index;
+        }
+        if (submissionIndex > firstAssignmentIndex && firstAssignmentIndex >= 0) {
+            LeadFlowHistoryRespVO submission = items.remove(submissionIndex);
+            items.add(firstAssignmentIndex, submission);
+        }
     }
 
     private LeadFlowHistoryRespVO submission(LeadDO lead, Map<Long, AdminUserRespDTO> users, PartnerDO partner) {

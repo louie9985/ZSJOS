@@ -55,7 +55,7 @@ const PAGE_SIZE = 20;
 type ReasonAction =
   | { type: "account"; sales: SubordinateSales; value: boolean }
   | { type: "dispatch"; sales: SubordinateSales; value: boolean };
-type BatchAction = "transfer" | "publicSea";
+type BatchAction = "transfer" | "restore" | "recycle" | "claimPool" | "publicSea";
 
 function Metrics({ sales }: { sales: SubordinateSales }) {
   const metrics = [
@@ -217,6 +217,7 @@ function SalesDetail({
   const [error, setError] = useState("");
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchType, setBatchType] = useState<BatchAction>("transfer");
+  const batchIdempotencyKey = useRef<string>();
   const [candidates, setCandidates] = useState<AssignmentUser[]>([]);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchResult, setBatchResult] = useState<SubordinateBatchResult>();
@@ -278,8 +279,10 @@ function SalesDetail({
       return;
     }
     setBatchType(type);
+    batchIdempotencyKey.current = crypto.randomUUID();
     form.resetFields();
     setBatchOpen(true);
+    if (type !== "transfer" && type !== "publicSea") return;
     try {
       setCandidates(await api.subordinateTransferCandidates());
     } catch (loadError) {
@@ -293,22 +296,19 @@ function SalesDetail({
     setBatchSaving(true);
     try {
       const ids = selected.map(Number);
-      const result =
-        batchType === "transfer"
-          ? await api.batchTransferSubordinateLeads(
-              ids,
-              values.targetUserId,
-              values.reason.trim(),
-            )
-          : await api.batchReleaseSubordinateLeads(
-              ids,
-              values.collaboratorUserId,
-              values.reason.trim(),
-            );
+      const action = ({ transfer: 'transfer', restore: 'restore', recycle: 'recycle',
+        claimPool: 'release-claim-pool', publicSea: 'release-public-sea' } as const)[batchType]
+      const result = await api.batchSupervisorLeadAction(action, ids, {
+        reason: values.reason.trim(),
+        targetUserId: values.targetUserId,
+        collaboratorUserId: values.collaboratorUserId,
+        idempotencyKey: batchIdempotencyKey.current ||= crypto.randomUUID(),
+      });
       setBatchResult(result);
       setResultOpen(true);
       setBatchOpen(false);
       setSelected([]);
+      batchIdempotencyKey.current = undefined;
       await loadLeads();
       onChanged();
     } catch (saveError) {
@@ -511,29 +511,35 @@ function SalesDetail({
                 <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={leadKeyword} value={advancedFilter} onKeyword={setLeadKeyword} onChange={setAdvancedFilter}/>
                 <div className="subordinate-batch-bar">
                   <Typography.Text>已选 {selected.length} 条</Typography.Text>
-                  <Space>
+                  <Space wrap>
                     <Button
                       disabled={
                         !selected.length ||
                         !permissions.includes(
-                          "zsjos:subordinate-sales:batch-transfer",
+                          "zsjos:subordinate-sales:lead-transfer",
                         )
                       }
                       onClick={() => void openBatch("transfer")}
                     >
                       转派
                     </Button>
+                    <Button disabled={!selected.length || !permissions.includes("zsjos:subordinate-sales:lead-restore")}
+                      onClick={() => void openBatch("restore")}>恢复</Button>
+                    <Button disabled={!selected.length || !permissions.includes("zsjos:subordinate-sales:lead-recycle")}
+                      danger onClick={() => void openBatch("recycle")}>回收</Button>
+                    <Button disabled={!selected.length || !permissions.includes("zsjos:subordinate-sales:lead-release-claim-pool")}
+                      danger onClick={() => void openBatch("claimPool")}>释放至抢单池</Button>
                     <Button
                       disabled={
                         !selected.length ||
                         !permissions.includes(
-                          "zsjos:subordinate-sales:batch-public-sea",
+                          "zsjos:subordinate-sales:lead-release-public-sea",
                         )
                       }
                       danger
                       onClick={() => void openBatch("publicSea")}
                     >
-                      释放到公海
+                      释放至公海池
                     </Button>
                   </Space>
                 </div>
@@ -614,7 +620,8 @@ function SalesDetail({
       />
       <Modal
         open={batchOpen}
-        title={batchType === "transfer" ? "批量转派客资" : "批量释放到公海"}
+        title={({ transfer: "批量转派客资", restore: "批量恢复客资", recycle: "批量回收客资",
+          claimPool: "批量释放至抢单池", publicSea: "批量释放至公海池" })[batchType]}
         confirmLoading={batchSaving}
         onOk={() => void submitBatch()}
         onCancel={() => setBatchOpen(false)}
@@ -632,7 +639,7 @@ function SalesDetail({
                 users={candidates}
               />
             </Form.Item>
-          ) : (
+          ) : batchType === "publicSea" ? (
             <Form.Item name="collaboratorUserId" label="公海跟进销售（可不填）">
               <EmployeeSelect
                 allowClear
@@ -641,7 +648,7 @@ function SalesDetail({
                 users={candidates}
               />
             </Form.Item>
-          )}
+          ) : null}
           <Form.Item
             name="reason"
             label="操作原因"

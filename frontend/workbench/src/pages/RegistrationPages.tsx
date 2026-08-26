@@ -965,7 +965,8 @@ function StudentContactForm({
   useEffect(() => { void Promise.all([api.dictDataByType(DICT_TYPE.STUDENT_CONTACT_UNSUCCESSFUL_REASON), api.dictDataByType("zsjos_student_contact_extension_reason")]).then(([a,b]) => { setReasons(a); setExtensionReasons(b); }).catch(() => { setReasons([]); setExtensionReasons([]); }); }, []);
   useEffect(() => {
     const fields = context.formFields || [];
-    const types = [...new Set(fields.filter(field => field.type === "dict" && field.dictType).map(field => field.dictType as string))];
+    const enumTypes = new Set(["dict", "select", "multi_select", "radio", "checkbox_group"]);
+    const types = [...new Set(fields.filter(field => enumTypes.has(field.type) && field.dictType).map(field => field.dictType as string))];
     if (!types.length) return;
     void Promise.all(types.map(async type => [type, await api.dictDataByType(type)] as const))
       .then(rows => setFieldDicts(Object.fromEntries(rows)))
@@ -1010,10 +1011,10 @@ function StudentContactForm({
       else if (field.type === "number") control = <Input type="number" />;
       else if (field.type === "date") control = <DatePicker style={{ width: "100%" }} />;
       else if (field.type === "datetime") control = <DatePicker showTime style={{ width: "100%" }} />;
-      else if (field.type === "radio") control = <Radio.Group />;
+      else if (field.type === "radio") control = <Radio.Group options={dictOptions} />;
       else if (field.type === "checkbox") control = <Checkbox />;
-      else if (field.type === "checkbox_group") control = <Checkbox.Group />;
-      else if (field.type === "dict") control = <Select options={dictOptions} loading={Boolean(field.dictType && !fieldDicts[field.dictType])} placeholder={dictOptions.length ? "请选择" : "暂无可用字典项，请重试"} mode={field.multiple ? "multiple" : undefined} />;
+      else if (field.type === "checkbox_group") control = <Checkbox.Group options={dictOptions} />;
+      else if (["dict", "select", "multi_select"].includes(field.type)) control = <Select options={dictOptions} loading={Boolean(field.dictType && !fieldDicts[field.dictType])} placeholder={dictOptions.length ? "请选择" : "暂无可用字典项，请重试"} mode={field.multiple || field.type === "multi_select" ? "multiple" : undefined} />;
       return <Form.Item key={field.key} name={field.key} label={field.title} rules={rules} extra={field.description}>{control}</Form.Item>;
     })}
     {context.quickNotes.length > 0 && <Form.Item label="快捷备注"><Space wrap>{context.quickNotes.map(note => <Button key={note} size="small" onClick={() => { const current = String(form.getFieldValue("remark") || "").trimEnd(); form.setFieldValue("remark", current ? `${current}\n${note}` : note); }}>{note}</Button>)}</Space></Form.Item>}
@@ -1184,7 +1185,7 @@ function StudentPlannerOperations({ student, service, context, openTaskId, openT
     available.includes("EDIT_BASIC_INFO") && { key: "student-edit-basic-info", icon: <EditOutlined />, label: "修改信息", onClick: openBasicInfo },
     available.includes("ASSIGN_CONTENT_DIRECTOR") && { key: "student-assign-director", icon: <UserAddOutlined />, label: "分配编导", onClick: () => openAssignment("content_director") },
     available.includes("ASSIGN_CAREER_PLANNER") && { key: "student-assign-career", icon: <UserAddOutlined />, label: "分配职业规划师", onClick: () => openAssignment("career_planner") },
-    available.includes("UPDATE_EXAM_DATE") && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? new Date(context.examDate) : undefined }); setExamDateOpen(true); } },
+    available.includes("UPDATE_EXAM_DATE") && { key: "student-exam-date", icon: <EditOutlined />, label: "修改考试时间", onClick: () => { examDateForm.setFieldsValue({ examDate: context.examDate ? dayjs(context.examDate) : undefined }); setExamDateOpen(true); } },
     available.includes("EXAM_NOTICE_DONE") && { key: "student-exam-notice-done", icon: <CheckOutlined />, label: "已考前通知", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
     available.includes("POST_EXAM_DONE") && { key: "student-post-exam-done", icon: <CheckOutlined />, label: "已考后回访", onClick: () => { setDeliveryOpen(true); deliveryIdempotencyKey.current = key(); deliveryForm.setFieldsValue({ data: "{}" }); } },
     (available.includes("COMPLETE_STAGE") || available.includes("END_SERVICE")) && currentDeliveryStage

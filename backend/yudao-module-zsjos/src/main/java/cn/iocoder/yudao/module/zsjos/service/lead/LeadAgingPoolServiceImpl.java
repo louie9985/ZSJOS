@@ -191,6 +191,87 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    public void enterManually(Long leadId, Long collaboratorUserId, Long operatorUserId, String reason,
+                              String idempotencyKey) {
+        LeadAgingPoolCycleDO replay = cycleMapper.selectByIdempotencyKey(idempotencyKey);
+        if (replay != null) {
+            validateManualReplay(replay, leadId, collaboratorUserId, reason, idempotencyKey);
+            return;
+        }
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        replay = cycleMapper.selectByIdempotencyKey(idempotencyKey);
+        if (replay != null) {
+            validateManualReplay(replay, leadId, collaboratorUserId, reason, idempotencyKey);
+            return;
+        }
+        if (!isManualEntryBaseValid(lead)
+                || cycleMapper.selectActiveByLeadId(leadId) != null
+                || publicSeaRecordMapper.selectByLeadIdForUpdate(leadId,
+                TenantContextHolder.getRequiredTenantId()) != null) {
+            throw exception(LEAD_AGING_POOL_STATE_INVALID);
+        }
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+        if (opportunity == null || !Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+                .contains(opportunity.getStatus()) || hasActiveApproval(leadId)) {
+            throw exception(LEAD_AGING_POOL_STATE_INVALID);
+        }
+        AdminUserRespDTO owner = adminUserApi.getUser(lead.getOwnerUserId());
+        if (owner == null || owner.getDeptId() == null) throw exception(LEAD_AGING_POOL_OWNER_INVALID);
+        LocalDateTime now = LocalDateTime.now();
+        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        cycle.setLeadId(leadId); cycle.setCycleNo(cycleMapper.selectNextCycleNo(leadId));
+        cycle.setOriginalOwnerUserId(lead.getOwnerUserId()); cycle.setFrozenDeptId(owner.getDeptId());
+        cycle.setOwnershipStartedAt(Optional.ofNullable(lead.getOwnershipStartedAt()).orElse(now));
+        cycle.setDueAt(now); cycle.setEnteredAt(now); cycle.setIdempotencyKey(idempotencyKey); cycle.setVersion(0);
+        if (collaboratorUserId == null) {
+            cycle.setStatus(AGING_POOL_WAITING_ASSIGNMENT);
+        } else {
+            AdminUserRespDTO collaborator = requireEligibleSales(cycle, collaboratorUserId);
+            cycle.setCollaboratorUserId(collaborator.getId()); cycle.setAssignedAt(now);
+            cycle.setStatus(AGING_POOL_ASSIGNED);
+        }
+        cycleMapper.insert(cycle);
+        addEvent(cycle, AGING_POOL_EVENT_ENTERED, operatorUserId, null, null,
+                reason, idempotencyKey + ":entered", now);
+        if (cycle.getCollaboratorUserId() != null) {
+            addEvent(cycle, AGING_POOL_EVENT_ASSIGNED, operatorUserId, null, cycle.getCollaboratorUserId(),
+                    reason, idempotencyKey + ":assigned", now);
+        }
+        publish(AGING_POOL_DUE, cycle, "aging-pool-manual:" + idempotencyKey, operatorUserId, null, now);
+    }
+
+    @Override
+    public boolean canEnterManually(Long leadId) {
+        LeadDO lead = leadMapper.selectById(leadId);
+        if (!isManualEntryBaseValid(lead) || cycleMapper.selectActiveByLeadId(leadId) != null
+                || publicSeaRecordMapper.selectByLeadId(leadId) != null) return false;
+        OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
+        return opportunity != null && Set.of(OPPORTUNITY_STATUS_OPEN, OPPORTUNITY_STATUS_FOLLOWING)
+                .contains(opportunity.getStatus()) && !hasActiveApproval(leadId);
+    }
+
+    private boolean isManualEntryBaseValid(LeadDO lead) {
+        return lead != null && Set.of(STATUS_VALID, STATUS_CONVERTED).contains(lead.getStatus())
+                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus()) && lead.getOwnerUserId() != null
+                && lead.getClosedAt() == null;
+    }
+
+    private void validateManualReplay(LeadAgingPoolCycleDO replay, Long leadId, Long collaboratorUserId,
+                                      String reason, String idempotencyKey) {
+        LeadAgingPoolEventDO entered = eventMapper.selectByIdempotencyKey(idempotencyKey + ":entered");
+        if (!Objects.equals(replay.getLeadId(), leadId)
+                || !Objects.equals(replay.getCollaboratorUserId(), collaboratorUserId)
+                || entered == null || !Objects.equals(normalizeReason(entered.getReason()), normalizeReason(reason))) {
+            throw exception(LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT);
+        }
+    }
+
+    private static String normalizeReason(String reason) {
+        return reason == null ? null : reason.trim();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public int clearInvalidCollaborators(LocalDateTime now) {
         int changed = 0;
         for (LeadAgingPoolCycleDO snapshot : cycleMapper.selectList(LeadAgingPoolCycleDO::getStatus, AGING_POOL_ASSIGNED)) {

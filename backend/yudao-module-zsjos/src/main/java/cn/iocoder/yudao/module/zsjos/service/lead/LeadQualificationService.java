@@ -16,5 +16,7 @@ public interface LeadQualificationService {
     void transfer(Long leadId, Long userId, LeadTransferReqVO reqVO);
     void recycle(Long leadId, Long userId, LeadDispositionReqVO reqVO);
     void releaseToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO);
+    void supervisorRecycleOwned(Long leadId, Long userId, LeadDispositionReqVO reqVO);
+    void supervisorReleaseOwnedToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO);
     int processExpired();
 }

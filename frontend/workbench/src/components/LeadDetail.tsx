@@ -22,7 +22,7 @@ import FollowUpModal from './FollowUpModal'
 import { formatTimestamp } from '../services/time'
 import EmployeeSelect from './EmployeeSelect'
 
-type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release'
+type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release' | 'releasePublicSea'
 
 export type LeadDetailExtraTab = { key: string; label: string; children: ReactNode; forceRender?: boolean }
 
@@ -48,7 +48,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   studentToolbarActions?: ToolbarAction[]
   overviewContent?: ReactNode
 }) {
-  const readOnly = mode === 'manager-readonly' || mode === 'student-readonly'
+  const readOnly = mode === 'student-readonly'
+  const managerMode = mode === 'manager-readonly'
   const visibleTabs = (baseTabs || detailTabsFromProjection(lead.visibleTabs)).filter(tab => mode !== 'student-readonly' || tab !== 'follow-ups')
   const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
   const visibleTabKey = visibleTabs.join(',')
@@ -96,8 +97,10 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [invalidConfirmOpen, setInvalidConfirmOpen] = useState(false)
   const closeInvalid = () => { setInvalidConfirmOpen(false); setInvalidOpen(false) }
   const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
+  const projectedActions = lead.availableActions || []
   const actions = readOnly ? new Map<string, NonNullable<ManagedLead['availableActions']>[number]>()
-    : new Map((lead.availableActions || []).map(item => [item.code, item]))
+    : new Map(projectedActions.filter(item => !managerMode || item.code.startsWith('SUPERVISOR_'))
+      .map(item => [item.code, item]))
 
   useEffect(() => { onDirtyChange(readOnly ? false : followUpFormDirty || basicInfoDirty) },
     [basicInfoDirty, followUpFormDirty, onDirtyChange, readOnly])
@@ -169,9 +172,10 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     setQualificationReason('')
     setQualificationSalesUserId(undefined)
     setQualificationCandidates([])
-    if (action !== 'transfer') return
+    if (action !== 'transfer' && action !== 'releasePublicSea') return
     setQualificationCandidatesLoading(true)
-    try { setQualificationCandidates(await api.leadTransferCandidates(lead.id)) }
+    try { setQualificationCandidates(managerMode
+      ? await api.subordinateTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
     catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
     finally { setQualificationCandidatesLoading(false) }
   }
@@ -186,10 +190,19 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     if (!action) return
     await runDisposition(async ({ idempotencyKey, complete }) => {
       const command = { reason: qualificationReason.trim(), idempotencyKey }
-      if (action === 'restore') await api.restoreLead(lead.id, command)
-      if (action === 'transfer') await api.transferLead(lead.id, { ...command, salesUserId: qualificationSalesUserId! })
-      if (action === 'recycle') await api.recycleLead(lead.id, command)
-      if (action === 'release') await api.releaseLeadToClaimPool(lead.id, command)
+      if (managerMode) {
+        if (action === 'restore') await api.supervisorRestoreLead(lead.id, command.reason, idempotencyKey)
+        if (action === 'transfer') await api.supervisorTransferLead(lead.id, qualificationSalesUserId!, command.reason, idempotencyKey)
+        if (action === 'recycle') await api.supervisorRecycleLead(lead.id, command.reason, idempotencyKey)
+        if (action === 'release') await api.supervisorReleaseClaimPoolLead(lead.id, command.reason, idempotencyKey)
+        if (action === 'releasePublicSea') await api.supervisorReleasePublicSeaLead(
+          lead.id, qualificationSalesUserId, command.reason, idempotencyKey)
+      } else {
+        if (action === 'restore') await api.restoreLead(lead.id, command)
+        if (action === 'transfer') await api.transferLead(lead.id, { ...command, salesUserId: qualificationSalesUserId! })
+        if (action === 'recycle') await api.recycleLead(lead.id, command)
+        if (action === 'release') await api.releaseLeadToClaimPool(lead.id, command)
+      }
       complete()
       message.success('客资已处理')
       closeQualificationAction()
@@ -202,6 +215,11 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     actions.has('QUALIFICATION_TRANSFER') && { key: 'qualification-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('QUALIFICATION_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
     actions.has('QUALIFICATION_RECYCLE') && { key: 'qualification-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('QUALIFICATION_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
     actions.has('QUALIFICATION_RELEASE') && { key: 'qualification-release', icon: <ExportOutlined/>, label: '释放', danger: true, disabled: !actions.get('QUALIFICATION_RELEASE')?.enabled, onClick: () => void openQualificationAction('release') },
+    actions.has('SUPERVISOR_RESTORE') && { key: 'supervisor-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('SUPERVISOR_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore') },
+    actions.has('SUPERVISOR_TRANSFER') && { key: 'supervisor-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('SUPERVISOR_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
+    actions.has('SUPERVISOR_RECYCLE') && { key: 'supervisor-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('SUPERVISOR_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
+    actions.has('SUPERVISOR_RELEASE_CLAIM_POOL') && { key: 'supervisor-release-claim-pool', icon: <ExportOutlined/>, label: '释放至抢单池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_CLAIM_POOL')?.enabled, onClick: () => void openQualificationAction('release') },
+    actions.has('SUPERVISOR_RELEASE_PUBLIC_SEA') && { key: 'supervisor-release-public-sea', icon: <ExportOutlined/>, label: '释放至公海池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_PUBLIC_SEA')?.enabled, onClick: () => void openQualificationAction('releasePublicSea') },
   ].filter(Boolean) as ToolbarAction[]
 
   const toolbarActions: ToolbarAction[] = [
@@ -269,9 +287,10 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined} open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)} onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
       <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)} onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
       <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={handleStandaloneFollowUpSuccess}/>
-      <Modal open={Boolean(qualificationAction)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放到抢单池' }[qualificationAction || 'restore']} onCancel={closeQualificationAction} footer={<Space><Button onClick={closeQualificationAction}>取消</Button><IrreversiblePopconfirm action={`处理客资「${lead.submittedName}」`} danger={qualificationAction === 'recycle' || qualificationAction === 'release'} open={qualificationConfirmOpen} onOpenChange={setQualificationConfirmOpen} onConfirm={submitQualificationAction}><Button type="primary" danger={qualificationAction === 'recycle' || qualificationAction === 'release'} loading={dispositionSaving} onClick={prepareQualificationAction}>确认处理</Button></IrreversiblePopconfirm></Space>}>
+      <Modal open={Boolean(qualificationAction)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放至抢单池', releasePublicSea: '释放至公海池' }[qualificationAction || 'restore']} onCancel={closeQualificationAction} footer={<Space><Button onClick={closeQualificationAction}>取消</Button><IrreversiblePopconfirm action={`处理客资「${lead.submittedName}」`} danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} open={qualificationConfirmOpen} onOpenChange={setQualificationConfirmOpen} onConfirm={submitQualificationAction}><Button type="primary" danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} loading={dispositionSaving} onClick={prepareQualificationAction}>确认处理</Button></IrreversiblePopconfirm></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {qualificationAction === 'transfer' && <Form.Item label="目标销售" required><EmployeeSelect users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder={qualificationCandidatesLoading ? '正在加载可转派销售' : qualificationCandidates.length ? '选择目标销售' : '暂无可转派销售'} style={{ width: '100%' }}/></Form.Item>}
+          {qualificationAction === 'releasePublicSea' && <Form.Item label="实际跟进销售（可不填）"><EmployeeSelect allowClear users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder="不指定则进入待分配" style={{ width: '100%' }}/></Form.Item>}
           <Form.Item label="处置理由" required><Input.TextArea value={qualificationReason} onChange={event => setQualificationReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/></Form.Item>
         </Space>
       </Modal>

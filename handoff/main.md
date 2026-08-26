@@ -1,5 +1,20 @@
 # Main Workstream
 
+## Workstream Registration - 2026-08-25 21:10:00 +08:00
+
+- Workstream ID: `main-lead-supervisor-pools-timeline`
+- Goal: keep Lead submission before assignment in flow history, expose the confirmed supervisor pre-deal transfer/recycle/release/restore operations, and restore the canonical public-sea menu route.
+- Non-goals: change sales users' personal permissions, introduce role-name authorization, rewrite applied migrations or historical business records, add dependencies, execute migrations, change real grants, create branches, commit, push, deploy, or modify unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS Lead flow-history and subordinate-sales controller/service/VO/tests; Workbench Lead detail and subordinate-sales API/page/tests/styles; a forward-only MySQL menu/permission migration plus bootstrap/migration documentation; directly affected Lead API/navigation documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Lead qualification, dispatch, aging-pool, permission, audit, React, Ant Design, and test infrastructure; no new dependency.
+- Integration order: fix flow ordering -> centralize supervisor state/action commands -> expose permission-protected single and batch APIs -> wire detail/list controls -> repair canonical menu path -> update tests/docs -> verify.
+- Verification plan: focused backend unit/controller tests, ZSJOS module compile/tests as practical, focused and full Workbench tests, typecheck, production build, SQL static/idempotency review, scoped diff check, and desktop/mobile browser checks when an authenticated environment is available.
+
 ## Workstream Registration - 2026-08-25 20:00:00 +08:00
 
 - Workstream ID: `main-media-student-null-positioning-status`
@@ -3653,3 +3668,32 @@
 - Verification evidence: `PositioningConfirmationServiceTest` passed 8/8 including blank and non-HTTP configuration with zero service/mapper interactions; backend `mvn -q -pl yudao-server -am -DskipTests package` exited 0; focused Workbench student-link guard passed 1/1; running Vite module returned HTTP 200, contained the absolute-link validator, and no longer contained the Workbench-origin fallback; H5 production build passed; anonymous H5 route returned HTTP 200 and the public endpoint did not request login; scoped `git diff --check` passed with line-ending warnings only. Workbench typecheck/build still fail exclusively on pre-existing director-form, positioning projection, and team-sales-order type-contract errors outside this workstream.
 - Dependency or integration impact: no dependency, anonymous API shape, token format, permission, schema/database, branch/worktree, commit, push, production deployment, or live service change. The backend must be restarted or rolled out after setting the environment variable because Spring reads it at startup.
 - Remaining work: the currently running local backend was not restarted, so it will not consume the new local default until a separately approved restart; production operators must set the real H5 public origin in the actual backend deployment environment and complete the documented logged-out mobile verification. Existing unrelated Workbench type-contract failures remain outside this workstream.
+
+## Delivery Entry - 2026-08-25 22:35:00 +08:00
+
+- Workstream ID: `main-lead-supervisor-pools-timeline`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` (no commit created)
+- User goal: keep Lead submission before assignment in flow history, allow supervisor pre-deal transfer/recycle/targeted release and suspended restore, and restore the canonical public-sea route.
+- Key decisions: preserve the existing reverse-chronological history order except that submission is moved immediately before the first assignment; derive supervisor detail actions from server permissions and live managed-owner scope; release unqualified Leads to the claim pool while releasing valid/converted owned Leads into the existing aging/public-sea cycle without changing formal ownership; use optional eligible collaborator assignment; repair V039 through forward-only V139 and retain no legacy route alias.
+- Execution or analysis result: backend single and batch supervisor commands, state guards, row-lock transaction boundaries, assignment/business/public-sea events, notifications and supervisor audit writes are wired through existing Lead services; Workbench detail and subordinate list expose explicit target actions with loading/error/idempotency handling; the public-sea menu path is restored to relative `lead-aging-pool`; directly affected API, permission-flow and navigation documentation is synchronized.
+- Changed files: Lead subordinate-sales controller, request VOs, constants, flow-history/management/qualification/aging-pool/subordinate-sales services and focused tests under `backend/yudao-module-zsjos`; `frontend/workbench/src/components/LeadDetail.tsx`; `LeadFlowHistoryPanel.test.ts`; `frontend/workbench/src/pages/SubordinateSalesPage.tsx`; `student-sales-history.guard.test.ts`; `subordinate-lead-actions.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `script/sql/mysql/migrations/V139__lead_supervisor_actions_and_public_sea_route.sql`; `script/sql/mysql/bootstrap.sql`; migration README; affected Lead API, permission-flow and menu-coverage documents; this workstream record.
+- Verification evidence: focused backend suite passed 59/59, including timeline anomalies, action projection/state rules, public-sea entry, single/batch permission annotations and keyed single-command `REQUIRES_NEW` boundaries; Workbench focused suite passed 3 files/13 tests; earlier full Workbench run passed 63 files and 389/390 tests, with only the pre-existing `media-students.guard.test.ts` `/talk-records` expectation failing; backend module compile passed; SQL static scan found no `DELETE`, `DROP` or `TRUNCATE`, bootstrap references V139 after V138, and route checks agree on `/zsjos/lead-aging-pool`; `git diff --check` passed with line-ending warnings only. Workbench typecheck/build remain blocked solely by pre-existing `MediaStudentsPage.tsx` and `MySalesOrderPage.tsx` contract/type errors. Browser reached `http://127.0.0.1:5174/zsjos/subordinate-sales` and redirected to login without console errors; authenticated desktop/mobile behavior could not be verified.
+- Dependency or integration impact: no new dependency, historical migration rewrite, business-record rewrite, database execution, real permission mutation, branch/worktree operation, commit, push, deployment or shared service change. V139 must be applied through the approved migration process before existing environments receive the route repair and new button permissions. Existing unrelated `frontend/yudao-ui-admin-uniapp` worktree state remains untouched.
+- Remaining work: apply V139 in the intended environment with separate deployment approval, then verify authorized/unauthorized supervisor flows and desktop/mobile rendering with an authenticated session; separately repair the unrelated Workbench baseline type/build failures if a fully green frontend pipeline is required.
+
+## Workstream Registration - 2026-08-26 09:48:16 +08:00
+
+- Workstream ID: `main-20260826-new-code-remediation`
+- Goal: complete the approved remediation of Lead supervisor commands and timeline behavior, unify the public-sea page with Lead management presentation, repair Workbench order/type/tenant/form contracts, harden EAM and positioning behavior, and deliver forward-only SQL repairs for the confirmed review findings.
+- Non-goals: create or switch branches/worktrees, add dependencies, rewrite applied migrations V126/V130/V131/V134/V135, execute migrations against a live database, revoke real role permissions, clear historical snapshot data, restart shared services, commit, push, or modify unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0caaf679c1f3e2f14975c952122edb5e0677d1d8` plus the existing uncommitted Lead work recorded by `main-lead-supervisor-pools-timeline`.
+- Target branch: `main`
+- Ownership scope: affected Lead, sales-order, positioning, registration and EAM backend source/tests; Workbench Lead/public-sea/order/auth/form/autosave source/tests/styles; Admin EAM dynamic fields; `backend/yudao-server` positioning configuration; forward migration V139 and new migrations after V139; bootstrap/verification SQL; directly affected API, architecture, frontend and operations documentation; this workstream record.
+- Owner: Codex `/root`
+- Dependencies: existing ZSJOS business-event/object-permission/tenant/menu contracts, System menu and dictionary APIs, Infra upload component, V136 team-order menu, V139 supervisor-action migration, and current Workbench design tokens; no new dependency.
+- Integration order: stabilize backend command/idempotency and positioning contracts -> synchronize forward SQL/bootstrap -> repair Workbench/Admin contracts and shared Lead presentation -> add focused tests and documentation -> run backend/frontend/SQL/browser verification -> append delivery evidence.
+- Verification plan: focused ZSJOS and EAM tests plus module compilation; Workbench tests/typecheck/build; Admin typecheck/lint/build; static and repeatability checks for migrations/bootstrap; browser checks for Lead management, public sea and team orders at desktop/mobile widths when an authenticated runtime is available; no live permission or historical-data mutation without a separate audited confirmation.

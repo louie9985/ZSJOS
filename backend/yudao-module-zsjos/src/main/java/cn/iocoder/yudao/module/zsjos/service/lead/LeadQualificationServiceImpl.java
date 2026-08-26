@@ -315,6 +315,65 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    public void supervisorRecycleOwned(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
+        LeadDO lead = requireLeadForUpdate(leadId);
+        String key = dispositionKey(reqVO.getIdempotencyKey());
+        if (isIdempotent(key, leadId, userId, EVENT_LEAD_RECYCLED)) return;
+        if (!STATUS_SUBMITTED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
+            throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        Long fromOwner = lead.getOwnerUserId();
+        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管回收");
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "主管回收");
+        lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资回收");
+        LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_RECYCLE, fromOwner, null,
+                userId, reqVO.getReason(), now);
+        lead.setAssignmentStatus(ASSIGNMENT_RECYCLE_PENDING);
+        lead.setRecycleSourceOwnerUserId(fromOwner);
+        lead.setOwnerUserId(null);
+        clearCurrentAssignment(lead);
+        leadMapper.updateById(lead);
+        addEvent(EVENT_LEAD_RECYCLED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING,
+                reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
+                        "assignmentHistoryId", history.getId()));
+        publishDispositionNotification(QUALIFICATION_RECYCLED, lead, userId, key,
+                fromOwner, null, reqVO.getReason().trim(), now);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
+    public void supervisorReleaseOwnedToClaimPool(Long leadId, Long userId, LeadDispositionReqVO reqVO) {
+        LeadDO lead = requireLeadForUpdate(leadId);
+        String key = dispositionKey(reqVO.getIdempotencyKey());
+        if (isIdempotent(key, leadId, userId, EVENT_LEAD_RELEASED)) return;
+        if (!STATUS_SUBMITTED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
+            throw exception(LEAD_QUALIFICATION_DISPOSITION_INVALID);
+        }
+        LocalDateTime now = LocalDateTime.now();
+        Long fromOwner = lead.getOwnerUserId();
+        lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管释放到抢单池");
+        lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "主管释放到抢单池");
+        lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资释放到抢单池");
+        LeadAssignmentHistoryDO history = addHistory(leadId, ACTION_RELEASE, fromOwner, null,
+                userId, reqVO.getReason(), now);
+        lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
+        lead.setOwnerUserId(null);
+        lead.setRecycleSourceOwnerUserId(fromOwner);
+        lead.setPublicPoolAt(now);
+        clearCurrentAssignment(lead);
+        leadMapper.updateById(lead);
+        addEvent(EVENT_LEAD_RELEASED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_PUBLIC_POOL,
+                reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
+                        "assignmentHistoryId", history.getId()));
+        publishDispositionNotification(QUALIFICATION_RELEASED, lead, userId, key,
+                fromOwner, null, reqVO.getReason().trim(), now);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public int processExpired() {
         LocalDateTime now = LocalDateTime.now();
         int processed = 0;

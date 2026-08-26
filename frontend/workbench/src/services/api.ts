@@ -28,7 +28,7 @@ export type ProductionTicket = { id: number; ticketNo: string; accountId: number
 export type PositioningCard = { id: number; cardNo: string; accountId: number; studentPersonId?: number; serviceRelationId?: number; directorUserId?: number; operatorUserId?: number; templateId?: number; templateVersionId?: number; fieldsSnapshot?: StudentContactFormField[]; valuesSnapshot?: Record<string, unknown>; dictSnapshot?: Record<string, unknown>; trialEndDate?: string; status: string; professionalRisk?: boolean; versionNo?: number; version: number; availableActions: string[] }
 export type PositioningCardDraftRequest = { accountId: number; studentPersonId?: number; serviceRelationId?: number; templateId?: number; trialEndDate?: string; values?: Record<string, unknown>; version?: number; professionalRisk?: boolean; layer1Json?: string; layer2Json?: string; formulaJson?: string; feasibilityJson?: string; contentFormJson?: string; complianceJson?: string }
 export type PositioningCardDraftResult = { id: number; version: number }
-export type PositioningLinkResult = { sharePath: string }
+export type PositioningLinkResult = { sharePath: string; expiresAt: Timestamp }
 export type SalesUser = { id: number; nickname: string; maskedMobile?: string; deptName?: string; avatar?: string }
 export type AssignmentUser = SalesUser & { deptId?: number; status: number }
 export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]; validSalesCount: number; invalidSalesCount: number; updateTime?: Timestamp }
@@ -48,6 +48,7 @@ export type MediaStudentDetail = {
   student: MyStudent
   accounts: Array<{ id: number; accountNo: string; nickname?: string; platformLabel?: string; stage?: string; runStatus?: string; version: number; lastActivityAt?: Timestamp; availableActions: string[]; detailSnapshots: MediaAccountDetailSnapshot[]; taskLine: StudentTaskStage[] }>
   positioningCards: Array<{ id: number; accountId: number; cardNo: string; status: string; versionNo?: number; professionalRisk?: boolean; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
+  positioningDrafts: Array<{ id: number; accountId: number; cardNo: string; status: string; versionNo?: number; professionalRisk?: boolean; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
   contents: Array<{ id: number; accountId: number; contentNo: string; title?: string; status: string; currentVersionNo?: number; publishedAt?: Timestamp; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
   productionTickets: Array<{ id: number; accountId: number; ticketNo: string; status: string; deadlineAt?: Timestamp; revisionCount?: number; lastActivityAt?: Timestamp }>
   operationTimeline: Array<{ key: string; type: string; title: string; detail?: string; operatorName?: string; occurredAt: Timestamp }>
@@ -63,7 +64,7 @@ export type DirectorTemplateSnapshot = { templateId: number; templateVersionId: 
 export type DirectorTemplateVersion = { id: number; templateId: number; versionNo: number; status: 'draft' | 'published' | 'archived'; fields: StudentContactFormField[]; publishedByUserId?: number; publishedAt?: Timestamp; version: number }
 export type DirectorTemplate = { id: number; scene: 'director_interview' | 'positioning_card'; templateCode: string; name: string; defaultTemplate: boolean; status: string; version: number; published?: DirectorTemplateVersion; draft?: DirectorTemplateVersion; versions: DirectorTemplateVersion[] }
 export type DirectorConfig = { id: number; interviewAppointmentHours: number; positioningDueHours: number; trialDays: number; version: number }
-export type DirectorStageForm = { state: 'empty' | 'draft' | 'submitted'; configId?: number; configVersion?: number; templateId?: number; templateVersionId?: number; templateVersionNo?: number; fields: StudentContactFormField[]; values: Record<string, unknown>; dictSnapshots: Record<string, unknown>; savedAt?: Timestamp; savedByUserId?: number; submittedAt?: Timestamp; interviewAt?: Timestamp }
+export type DirectorStageForm = { state: 'empty' | 'draft' | 'submitted'; configId?: number; configVersion?: number; templateId?: number; templateVersionId?: number; templateVersionNo?: number; fields: StudentContactFormField[]; values: Record<string, unknown>; dictSnapshots: Record<string, unknown>; version: number; savedAt?: Timestamp; savedByUserId?: number; submittedAt?: Timestamp; interviewAt?: Timestamp }
 export type StudentContactAction = 'ACCEPT' | 'FIRST_CONTACT' | 'STUDY_PLAN' | 'FOLLOW_UP' | 'EDIT_BASIC_INFO' | 'ASSIGN_CONTENT_DIRECTOR' | 'ASSIGN_CAREER_PLANNER' | 'UPDATE_EXAM_DATE' | 'EXAM_NOTICE_DONE' | 'POST_EXAM_DONE' | 'COMPLETE_STAGE' | 'END_SERVICE' | 'DIRECTOR_PRECHECK' | 'DIRECTOR_INTERVIEW' | 'DIRECTOR_OPERATOR_ASSIGN'
 export type StudentDeliveryStage = { code: string; label: string; status: string; current?: boolean; available?: boolean }
 export type StudentContactContext = { serviceRelationId: number; acceptanceStatus?: string; acceptedAt?: string; version: number; firstContactChecklist: StudentContactChecklistItem[]; quickNotes: string[]; firstContactTimeoutMinutes?: number; studyPlanTimeoutMinutes?: number; visibleTabs: string[]; availableActions: StudentContactAction[]; currentTask?: { id: number; type: string; status: string; dueAt?: string; overdue?: boolean }; ownerUserId?: number; ownerUserName?: string; contentDirectorUserId?: number; contentDirectorUserName?: string; careerPlannerUserId?: number; careerPlannerUserName?: string; operatorUserId?: number; operatorUserName?: string; directorStage?: string; directorInterviewAt?: Timestamp; defaultDirectorInterviewAt?: Timestamp; directorInterviewAppointmentHours?: number; directorTrialDays?: number; deliveryStage?: string; deliveryStageLabel?: string; deliveryStages?: StudentDeliveryStage[]; examDate?: string; formFields?: StudentContactFormField[]; directorForms?: { precheck: DirectorStageForm; interview: DirectorStageForm }; operatorAssignmentConflict?: boolean }
@@ -461,6 +462,48 @@ export const clearAuthStorage = () => {
   localStorage.removeItem(STORAGE_KEYS.IMPERSONATION)
 }
 
+type SharedTenantCacheItem = { c: number; e: number; v: string }
+
+const positiveTenantId = (value: unknown) => {
+  const tenantId = Number(value)
+  return Number.isInteger(tenantId) && tenantId > 0 ? String(tenantId) : undefined
+}
+
+export const readSharedTenantId = (storage: Pick<Storage, 'getItem'> = localStorage) => {
+  const raw = storage.getItem(STORAGE_KEYS.TENANT_ID)
+  if (!raw) return undefined
+  try {
+    const parsed = JSON.parse(raw) as unknown
+    if (typeof parsed === 'object' && parsed !== null && 'v' in parsed) {
+      const cacheItem = parsed as SharedTenantCacheItem
+      if (Number.isFinite(cacheItem.e) && cacheItem.e <= Date.now()) return undefined
+      return positiveTenantId(JSON.parse(cacheItem.v))
+    }
+    return positiveTenantId(parsed)
+  } catch {
+    return positiveTenantId(raw)
+  }
+}
+
+export const writeSharedTenantId = (tenantId: string, storage: Pick<Storage, 'setItem'> = localStorage) => {
+  const normalized = positiveTenantId(tenantId)
+  if (!normalized) throw new AuthenticationError('租户信息无效，请重新登录')
+  const cacheItem: SharedTenantCacheItem = {
+    c: Date.now(),
+    e: 253402300799999,
+    v: JSON.stringify(Number(normalized))
+  }
+  storage.setItem(STORAGE_KEYS.TENANT_ID, JSON.stringify(cacheItem))
+  return normalized
+}
+
+const authenticatedTenantId = () => {
+  const tenantId = readSharedTenantId()
+  if (tenantId) return tenantId
+  expireAuthentication(localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN))
+  throw new AuthenticationError('租户信息缺失，请重新登录')
+}
+
 export const migrateLegacyAuthStorage = () => {
   const pairs = [
     [STORAGE_KEYS.ACCESS_TOKEN, 'zsjos_access_token'],
@@ -497,8 +540,8 @@ http.interceptors.request.use(config => {
     config.headers.delete('X-ZSJOS-Impersonation-Session')
     return config
   }
-  config.headers['tenant-id'] = APP_CONFIG.DEFAULT_TENANT_ID
   const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
+  config.headers['tenant-id'] = token ? authenticatedTenantId() : (readSharedTenantId() || APP_CONFIG.DEFAULT_TENANT_ID)
   if (token) config.headers.Authorization = `Bearer ${token}`
   const impersonation = localStorage.getItem(STORAGE_KEYS.IMPERSONATION)
   const impersonationId = resolveImpersonationSessionHeader(config.url, impersonation, expectedOrigin)
@@ -576,7 +619,8 @@ async function refreshToken(): Promise<RefreshResult> {
   try {
     const clientId = localStorage.getItem(STORAGE_KEYS.CLIENT_ID)
     const clientIdParam = clientId ? `&clientId=${encodeURIComponent(clientId)}` : ''
-    const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`, undefined, { headers: { 'tenant-id': APP_CONFIG.DEFAULT_TENANT_ID }, timeout: 30000 })
+    const tenantId = authenticatedTenantId()
+    const response = await axios.post(`${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`, undefined, { headers: { 'tenant-id': tenantId }, timeout: 30000 })
     const result = unwrap<{ accessToken: string; refreshToken: string; clientId?: string }>(response)
     if (!isCurrentRefreshSession(refresh, localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN))) {
       return { status: 'stale' }
@@ -619,6 +663,7 @@ export function buildMenuTree(rawMenus: RawMenu[], parentPath = '/'): WorkbenchM
 
 export const api = {
   login: async (username: string, password: string, platform: 'PC' | 'MOBILE' = 'PC') => {
+    writeSharedTenantId(readSharedTenantId() || APP_CONFIG.DEFAULT_TENANT_ID)
     const result = unwrap<{ accessToken: string; refreshToken: string; expiresTime: string; clientId?: string }>(await http.post('/system/auth/login', { username, password, platform }))
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken)
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken)
@@ -890,6 +935,11 @@ export const api = {
       : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/my-cursor', { params })),
   mySalesOrderStatusCounts: async () =>
     unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/my-status-counts')),
+  teamSalesOrderCursor: async (params: { cursor?: string; limit?: number; status?: SalesOrder['status']; keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+    params.advancedFilter ? unwrap<CursorPageResult<SalesOrderListItem>>(await http.post('/zsjos/sales-order/team-search-cursor', params))
+      : unwrap<CursorPageResult<SalesOrderListItem>>(await http.get('/zsjos/sales-order/team-cursor', { params })),
+  teamSalesOrderStatusCounts: async () =>
+    unwrap<SalesOrderStatusCounts>(await http.get('/zsjos/sales-order/team-status-counts')),
   salesOrderApprovalFilterProfile: async () => unwrap<SalesOrderApprovalFilterProfile>(await http.get('/zsjos/sales-order/approval/filter-profile')),
   salesOrderApprovalTaskTarget: async (taskId: string) => unwrap<SalesOrderApprovalTaskTarget>(
     await http.get('/zsjos/sales-order/approval/task-target', { params: { taskId } })),
@@ -1021,10 +1071,19 @@ export const api = {
     unwrap<boolean>(await http.put(`/zsjos/subordinate-sales/${salesUserId}/dispatch-mode`, { accepting, reason })),
   pauseAllSubordinateDispatch: async () =>
     unwrap<SubordinatePauseAllResult>(await http.put('/zsjos/subordinate-sales/dispatch-mode/pause-all')),
-  batchTransferSubordinateLeads: async (leadIds: number[], targetUserId: number, reason: string) =>
-    unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-transfer', { leadIds, targetUserId, reason })),
-  batchReleaseSubordinateLeads: async (leadIds: number[], collaboratorUserId: number | undefined, reason: string) =>
-    unwrap<SubordinateBatchResult>(await http.post('/zsjos/subordinate-sales/leads/batch-public-sea', { leadIds, collaboratorUserId, reason })),
+  supervisorTransferLead: async (id: number, targetUserId: number, reason: string, idempotencyKey: string) =>
+    unwrap<boolean>(await http.post(`/zsjos/subordinate-sales/leads/${id}/transfer`, { targetUserId, reason, idempotencyKey })),
+  supervisorRestoreLead: async (id: number, reason: string, idempotencyKey: string) =>
+    unwrap<boolean>(await http.post(`/zsjos/subordinate-sales/leads/${id}/restore`, { reason, idempotencyKey })),
+  supervisorRecycleLead: async (id: number, reason: string, idempotencyKey: string) =>
+    unwrap<boolean>(await http.post(`/zsjos/subordinate-sales/leads/${id}/recycle`, { reason, idempotencyKey })),
+  supervisorReleaseClaimPoolLead: async (id: number, reason: string, idempotencyKey: string) =>
+    unwrap<boolean>(await http.post(`/zsjos/subordinate-sales/leads/${id}/release-claim-pool`, { reason, idempotencyKey })),
+  supervisorReleasePublicSeaLead: async (id: number, collaboratorUserId: number | undefined, reason: string, idempotencyKey: string) =>
+    unwrap<boolean>(await http.post(`/zsjos/subordinate-sales/leads/${id}/release-public-sea`, { collaboratorUserId, reason, idempotencyKey })),
+  batchSupervisorLeadAction: async (action: 'transfer' | 'restore' | 'recycle' | 'release-claim-pool' | 'release-public-sea',
+    leadIds: number[], data: { reason: string; targetUserId?: number; collaboratorUserId?: number; idempotencyKey: string }) =>
+    unwrap<SubordinateBatchResult>(await http.post(`/zsjos/subordinate-sales/leads/batch-${action}`, { leadIds, ...data })),
   unreadNotifyCount: async () => unwrap<number>(await http.get('/system/notify-message/get-unread-count')),
   unreadNotifyMessages: async () => unwrap<NotifyMessage[]>(await http.get('/system/notify-message/get-unread-list')),
   myNotifyMessagePage: async (params: NotifyMessagePageParams) =>
@@ -1083,9 +1142,9 @@ export const api = {
   studentContact: async (relationId: number, data: Record<string, unknown>) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/contacts`, data)),
   studentDeliveryStage: async (relationId: number, data: { stage: string; successful: boolean; remark: string; attachmentFileIds?: number[]; data?: Record<string, unknown>; idempotencyKey: string }) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/delivery-stage`, data)),
   studentExamDate: async (relationId: number, data: { examDate: string; version: number; idempotencyKey: string }) => unwrap<boolean>(await http.put(`/zsjos/student/service/${relationId}/exam-date`, data)),
-  studentDirectorPrecheckDraft: async (relationId: number, data: { interviewAt?: string; data: Record<string, unknown>; version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/precheck/draft`, data)),
+  studentDirectorPrecheckDraft: async (relationId: number, data: { interviewAt?: string; data: Record<string, unknown>; version: number; idempotencyKey: string }) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/precheck/draft`, data)),
   studentDirectorPrecheckSubmit: async (relationId: number, data: { interviewAt?: string; data: Record<string, unknown>; version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/precheck/submit`, data)),
-  studentDirectorInterviewDraft: async (relationId: number, data: { interviewAt?: string; data: Record<string, unknown>; version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/interview/draft`, data)),
+  studentDirectorInterviewDraft: async (relationId: number, data: { interviewAt?: string; data: Record<string, unknown>; version: number; idempotencyKey: string }) => unwrap<number>(await http.post(`/zsjos/student/service/${relationId}/interview/draft`, data)),
   studentDirectorInterviewSubmit: async (relationId: number, data: { interviewAt?: string; data: Record<string, unknown>; version: number; idempotencyKey: string }) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/interview/submit`, data)),
   studentCollaboratorCandidates: async (relationId: number, type: 'content_director' | 'career_planner' | 'operator') => unwrap<StudyPlanner[]>(await http.get(`/zsjos/student/service/${relationId}/collaborator-candidates`, { params: { type } })),
   studentAssignCollaborator: async (relationId: number, data: { collaboratorType: string; userId: number; version: number; idempotencyKey: string; correctionReason?: string }) => unwrap<boolean>(await http.post(`/zsjos/student/service/${relationId}/collaborators`, data)),

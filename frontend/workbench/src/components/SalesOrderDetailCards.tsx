@@ -122,7 +122,7 @@ function SalesOrderApprovalRail({ nodes }: { nodes: ApprovalNode[] }) {
 export default function SalesOrderDetailCards({ order, approvalContext, mode, onApprove, onReject, onRequestSupervisor, onRevise, onTerminate }: {
   order: SalesOrder
   approvalContext?: SalesOrderListItem
-  mode: 'mine' | 'approval-todo' | 'approval-done'
+  mode: 'mine' | 'team' | 'approval-todo' | 'approval-done'
   onApprove?: () => void
   onReject?: () => void
   onRequestSupervisor?: () => void

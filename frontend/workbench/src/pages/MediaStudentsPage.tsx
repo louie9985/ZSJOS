@@ -215,7 +215,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     const accountId = Number(values.accountId)
     const trialEndDate = values.trialEndDate ? dayjs(values.trialEndDate as never).format('YYYY-MM-DD') : undefined
     return async (idempotencyKey: string, session: number) => {
-      try {
         if (activeDialog === 'precheck' || activeDialog === 'interview') {
           if (!identity || identity.session !== session || identity.stage !== activeDialog || identity.serviceRelationId !== serviceRelationId || !autoSaveCoordinator.current!.isCurrent(session)) throw new Error('当前表单会话已失效，请重新打开后再试')
           const version = stageDraftVersion.current
@@ -235,13 +234,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
           : await api.positioningCard.createDraft(request)
         if (!autoSaveCoordinator.current!.isCurrent(session)) return
         positioningDraft.current = result
-      } catch (cause) {
-        if (autoSaveCoordinator.current!.isCurrent(session)) {
-          const conflict = cause instanceof ApiError && [1900010024, 1900014003].includes(cause.code)
-          setAutoSave({ status: conflict ? 'conflict' : 'error', error: conflict ? '草稿已在其他窗口更新，请刷新后继续' : errorText(cause) })
-        }
-        throw cause
-      }
     }
   }
   const scheduleAutoSave = () => {

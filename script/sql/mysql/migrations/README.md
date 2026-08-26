@@ -550,3 +550,11 @@ menu trees. Their roots and every descendant page or directory (`type` 1/2) use
 rows (`type` 3), menu grants, and business data are intentionally unchanged. The
 migration is repeatable and forward-only; fresh bootstrap applies the same update
 after the System menu seed.
+
+### V139 Lead supervisor actions and canonical public-sea route
+
+Restores the server-owned public-sea page path to the Workbench canonical relative child path
+`lead-aging-pool` and adds five operation permissions for supervisor restore, transfer, recycle,
+claim-pool release, and public-sea release. The first installation grants them only to enabled
+`sales_manager` roles; reruns preserve administrator-managed grants. It changes no Lead, assignment,
+opportunity, public-sea, account, or audit rows and does not rewrite V039.

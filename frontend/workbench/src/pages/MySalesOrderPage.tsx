@@ -57,7 +57,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       let nextItems = result.list
       const requestedId = replace ? requestedOrderId.current : undefined
       if (requestedId && !result.list.some(item => item.id === requestedId)) {
-        const requestedOrder = await api.mySalesOrder(requestedId)
+        const requestedOrder = await (team ? api.salesOrder(requestedId) : api.mySalesOrder(requestedId))
         if (version !== listVersion.current) return
         nextItems = [salesOrderDetailToListItem(requestedOrder), ...result.list]
       }

@@ -13,6 +13,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityFollowUpRecordMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
@@ -36,6 +37,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class LeadAgingPoolServiceImplTest {
@@ -56,6 +59,7 @@ class LeadAgingPoolServiceImplTest {
     @Mock private SecurityFrameworkService securityFrameworkService;
     @Mock private AdvancedFilterService advancedFilterService;
     @Mock private LeadPublicSeaRecordMapper publicSeaRecordMapper;
+    @Mock private SalesOrderMapper orderMapper;
 
     @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null); }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
@@ -163,6 +167,35 @@ class LeadAgingPoolServiceImplTest {
         assertFalse(service.tryEnterDueLead(1L, now));
 
         verify(cycleMapper, never()).insert(org.mockito.ArgumentMatchers.any(LeadAgingPoolCycleDO.class));
+    }
+
+    @Test
+    void manualEntryPreservesOwnerAndStoresConfiguredCollaborator() {
+        LeadDO lead = new LeadDO();
+        lead.setId(1L); lead.setStatus(STATUS_VALID); lead.setAssignmentStatus(ASSIGNMENT_OWNED);
+        lead.setOwnerUserId(10L);
+        OpportunityDO opportunity = new OpportunityDO(); opportunity.setStatus(OPPORTUNITY_STATUS_FOLLOWING);
+        AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(30L);
+        AdminUserRespDTO collaborator = new AdminUserRespDTO(); collaborator.setId(20L); collaborator.setDeptId(30L);
+        collaborator.setStatus(0);
+        var candidate = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO();
+        candidate.setId(20L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(opportunityMapper.selectByLeadId(1L)).thenReturn(opportunity);
+        when(adminUserApi.getUser(10L)).thenReturn(owner);
+        when(adminUserApi.getUserListByDeptIds(java.util.List.of(30L))).thenReturn(java.util.List.of(collaborator));
+        when(assignmentService.getEligibleSalesUsers()).thenReturn(java.util.List.of(candidate));
+        when(cycleMapper.selectNextCycleNo(1L)).thenReturn(2);
+
+        service.enterManually(1L, 20L, 99L, "主管释放", "manual-1");
+
+        ArgumentCaptor<LeadAgingPoolCycleDO> captor = ArgumentCaptor.forClass(LeadAgingPoolCycleDO.class);
+        verify(cycleMapper).insert(captor.capture());
+        assertEquals(10L, captor.getValue().getOriginalOwnerUserId());
+        assertEquals(20L, captor.getValue().getCollaboratorUserId());
+        assertEquals(AGING_POOL_ASSIGNED, captor.getValue().getStatus());
+        assertEquals(10L, lead.getOwnerUserId());
+        verify(leadMapper, never()).updateById(any(LeadDO.class));
     }
 
     private static LeadAgingPoolCycleDO cycle(String status, Long collaboratorUserId) {

@@ -507,6 +507,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
         }
+        addSupervisorActions(actions, lead, currentUserId, suspended, recyclePending);
         if (Objects.equals(lead.getSourceUserId(), currentUserId)
                 && lead.getStatus() != null
                 && !Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {
@@ -555,6 +556,34 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_REPURCHASE, enabled));
         }
         return actions;
+    }
+
+    private void addSupervisorActions(List<LeadManagementRespVO.ActionVO> actions, LeadDO lead,
+                                      Long currentUserId, boolean suspended, boolean recyclePending) {
+        if (currentUserId == null) return;
+        Long scopedOwner = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
+        if (scopedOwner == null || !leadObjectPermissionService.getManagedUserIds(currentUserId).contains(scopedOwner)) return;
+        boolean submitted = STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
+        boolean valid = Set.of(STATUS_VALID, STATUS_CONVERTED).contains(lead.getStatus())
+                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
+        if ((submitted || suspended || recyclePending || valid)
+                && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_TRANSFER)) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_TRANSFER, true));
+        }
+        if ((submitted || suspended) && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RECYCLE)) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RECYCLE, true));
+        }
+        if ((submitted || suspended || recyclePending)
+                && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_CLAIM_POOL)) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_CLAIM_POOL, true));
+        }
+        if (valid && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA)
+                && agingPoolService.canEnterManually(lead.getId())) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));
+        }
+        if (suspended && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RESTORE)) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RESTORE, true));
+        }
     }
 
     private LeadManagementRespVO.LeadProductVO convertProduct(LeadIntendedProductDO source) {

@@ -47,6 +47,8 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: 'REFRESH_TOKEN',
   CLIENT_ID: 'CLIENT_ID',
   EXPIRES_TIME: 'EXPIRES_TIME',
+  // Vue Admin's CACHE_KEY.TenantId resolves to this same-origin key.
+  TENANT_ID: 'tenantId',
   LOGIN_FORM: 'zsjos_login_form',
   IMPERSONATION: 'zsjos.impersonation.session',
   THEME: 'crm-theme'
@@ -80,6 +82,7 @@ export const APP_ROUTES = {
   BPM_TODO: '/bpm/task/todo',
   LEAD_APPEALS: '/zsjos/appeals',
   MY_SALES_ORDERS: '/zsjos/sales-orders/my',
+  TEAM_SALES_ORDERS: '/zsjos/sales-orders/team',
   SALES_ORDER_APPROVALS: '/zsjos/sales-order-approvals',
   SALES_ORDER_SUPERVISOR_CONFIRMATIONS: '/zsjos/sales-order-supervisor-confirmations',
   EXTERNAL_REPURCHASE: '/zsjos/orders/external-repurchase',
@@ -127,6 +130,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.SUBORDINATE_SALES,
   APP_ROUTES.LEAD_APPEALS,
   APP_ROUTES.MY_SALES_ORDERS,
+  APP_ROUTES.TEAM_SALES_ORDERS,
   APP_ROUTES.SALES_ORDER_APPROVALS,
   APP_ROUTES.EXTERNAL_REPURCHASE,
   APP_ROUTES.EXPORT_TASKS,

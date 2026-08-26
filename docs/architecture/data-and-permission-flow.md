@@ -465,6 +465,12 @@ The server-owned `下属销售` menu is available only with `zsjos:subordinate-s
 
 The independent `zsjos:subordinate-sales:pause-all` command resolves that same live scope on the server and never accepts frontend target IDs, filters, or loaded rows. It persists only the sales dispatch preference as paused, including for disabled accounts, and records per-user changes in the existing subordinate-sales audit log. The first V092 installation grants this capability to enabled `sales_manager` roles, but the permission does not expand the manager hierarchy or subordinate visibility.
 
+Supervisor Lead commands use five independent `zsjos:subordinate-sales:lead-*` button permissions and
+the same live department-leader scope. Submitted or suspended Leads release to the claim pool; valid
+pre-deal Leads release to the canonical public sea while preserving formal ownership and optionally
+assigning an eligible collaborator. The backend rejects won, closed, wrong-pool, stale-owner, and
+out-of-scope operations independently of frontend visibility.
+
 The Workbench owns one shared sales-dispatch status lifecycle for the header control and global route-shell warning. The warning is mounted outside individual pages, so it remains visible while navigating between routes. Only the backend-projected eligible sales identity is warned; an eligible user sees status-load failure first, then page/realtime offline, then a paused preference. Managers and other non-sales users do not receive a recoverable intake warning merely because they hold management permissions. The header uses red tags for paused and offline states.
 
 The subordinate Lead detail reuses the same presentation component in read-only mode. `zsjos:subordinate-sales:query` may permit the detail entry, but each history tab additionally requires its dedicated `zsjos:lead-detail:*` feature permission and the unified Lead object check. The selected Lead owner must remain inside a department currently led by the caller; frontend tab visibility and absent write controls are defense in depth only.

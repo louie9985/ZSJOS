@@ -19,6 +19,9 @@ public interface LeadAgingPoolService {
     void exit(Long cycleId, Long userId, LeadAgingPoolExitReqVO reqVO);
     int scanDue(LocalDateTime now);
     boolean tryEnterDueLead(Long leadId, LocalDateTime now);
+    void enterManually(Long leadId, Long collaboratorUserId, Long operatorUserId, String reason,
+                       String idempotencyKey);
+    boolean canEnterManually(Long leadId);
     int clearInvalidCollaborators(LocalDateTime now);
     int emitAdvanceReminders(LocalDateTime now);
     int processPreQualificationNoProgress(LocalDateTime now);
