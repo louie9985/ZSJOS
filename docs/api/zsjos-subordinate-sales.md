@@ -42,6 +42,24 @@ Leads support transfer or claim-pool release; valid pre-deal Leads support trans
 public sea. Won and closed Leads reject every supervisor command. Public-sea release preserves formal
 ownership and may assign an eligible actual follow-up salesperson in the created public-sea cycle.
 
+`assignmentStatus=recycle_pending` is displayed as `回收待处理`. It means the supervisor has removed
+the current formal owner, retained that employee in `recycleSourceOwnerUserId`, and must next either
+transfer the Lead or release it to the claim pool. It is an assignment state, not a Lead main status.
+
+Error code `1900003058` remains the stable supervisor state-conflict code. Its message includes the
+attempted command, current Lead/assignment labels, the applicable state requirement, and whether a
+close timestamp exists. Unknown historical values are returned as `未知客资状态（原值）` or
+`未知分配状态（原值）`; clients must not replace these details with a generic failure.
+
+The subordinate Lead list returns both `status` and `assignmentStatus`. Workbench displays both,
+retains selected-row state across pages, and enables a batch command only when every selected Lead
+meets its basic state condition. Mixed selections are never silently filtered; the UI reports the
+number of inapplicable Leads, while the backend repeats the authoritative validation inside each
+Lead transaction to cover concurrent changes.
+
 Every reason is trimmed, required, and limited to 500 characters. Batch commands accept 1 to 200 IDs and return `{successCount, failureCount, items[]}`. Each item contains internal `leadId`, user-visible `leadNo`, `success`, stable `code`, and `message`; each Lead runs in an independent transaction.
 
 Manual public-sea release preserves Lead owner, main status, and assignment status. It does not use the claim-pool value `assignment_status=public_pool` and does not make the Lead claimable.
+
+This state-guidance behavior uses existing Lead columns and the supervisor permissions delivered by
+V139/V140/V142. It requires no new SQL migration, menu grant, dictionary entry, or data repair.

@@ -30,7 +30,7 @@ public class LeadAppealController {
     @Operation(summary = "获得客资申诉记录")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:appeal-read','zsjos:lead:appeal:create',"
             + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
-            + "'zsjos:lead:appeal:review-chairman')")
+            + "'zsjos:lead:appeal:review-chairman','zsjos:subordinate-partner:query')")
     public CommonResult<List<LeadAppealRespVO>> getList(@PathVariable Long leadId) {
         return success(appealService.getLeadAppeals(leadId, WebFrameworkUtils.getLoginUserId()));
     }

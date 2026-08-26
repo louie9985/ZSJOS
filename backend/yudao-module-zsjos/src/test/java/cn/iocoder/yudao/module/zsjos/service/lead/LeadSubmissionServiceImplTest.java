@@ -74,6 +74,7 @@ class LeadSubmissionServiceImplTest {
     @Mock private ZsjosProductSkuService productSkuService;
     @Mock private LeadCategorySnapshotService categorySnapshotService;
     @Mock private PartnerAccountMapper partnerAccountMapper;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
 
     @org.junit.jupiter.api.BeforeEach
     void setUpIdentity() {

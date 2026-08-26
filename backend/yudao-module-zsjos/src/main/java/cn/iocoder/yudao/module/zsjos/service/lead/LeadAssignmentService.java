@@ -26,6 +26,8 @@ public interface LeadAssignmentService {
 
     List<LeadAssignmentUserRespVO> getAdminEligibleTargetUsers(String sceneCode);
 
+    List<LeadAssignmentUserRespVO> getConfiguredTargetUsers(String sceneCode, Long sourceUserId);
+
     void saveAdminRelations(UserRelationSaveReqVO reqVO, Long operatorUserId);
 
     PageResult<LeadAssignmentLogRespVO> getAdminLogPage(LeadAssignmentLogPageReqVO reqVO);

@@ -63,6 +63,7 @@ import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
 import LeadManagementPage from './pages/LeadManagementPage'
+import { ProductionTicketAssignmentHost } from './pages/MediaFeaturePage'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from './services/impersonation'
 // 聚合样式表；内部 @import 顺序即层叠优先级，tokens.css 在最前
 import './styles/index.css'
@@ -426,6 +427,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         message={`只读借视图：当前以 ${impersonation.targetNameSnapshot} 的数据权限查看，所有 ZSJOS 写操作均会被服务端拒绝。`}
       />}
       <SalesDispatchStatusAlert />
+      <ProductionTicketAssignmentHost permissions={info.permissions || []} />
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
       <Layout className="content-layout">
         <Content>

@@ -7,7 +7,7 @@ import cn.iocoder.yudao.module.system.api.dept.PostApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchResultVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchTransferReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchLeadActionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateSalesRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateTaskPageReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -77,11 +77,12 @@ class SubordinateSalesServiceImplTest {
             return null;
         }).when(commandService).transferOne(org.mockito.ArgumentMatchers.anyLong(),
                 org.mockito.ArgumentMatchers.eq(30L), org.mockito.ArgumentMatchers.eq(10L),
-                org.mockito.ArgumentMatchers.eq("团队调整"));
-        SubordinateBatchTransferReqVO request = new SubordinateBatchTransferReqVO();
+                org.mockito.ArgumentMatchers.eq("团队调整"), org.mockito.ArgumentMatchers.anyString());
+        SubordinateBatchLeadActionReqVO request = new SubordinateBatchLeadActionReqVO();
         request.setLeadIds(List.of(1L, 2L)); request.setTargetUserId(30L); request.setReason("  团队调整  ");
+        request.setIdempotencyKey("batch-transfer-test");
 
-        SubordinateBatchResultVO result = service.batchTransfer(request, 10L);
+        SubordinateBatchResultVO result = service.batchLeadAction("transfer", request, 10L);
 
         assertEquals(1, result.getSuccessCount(), result.getItems().toString());
         assertEquals(1, result.getFailureCount());
@@ -89,15 +90,16 @@ class SubordinateSalesServiceImplTest {
         assertEquals("KZ202608141200000001", result.getItems().get(0).getLeadNo());
         assertEquals(String.valueOf(SUBORDINATE_LEAD_OWNER_CHANGED.getCode()), result.getItems().get(1).getCode());
         assertEquals("KZ202608141200000002", result.getItems().get(1).getLeadNo());
-        verify(commandService).transferOne(1L, 30L, 10L, "团队调整");
-        verify(commandService).transferOne(2L, 30L, 10L, "团队调整");
+        verify(commandService).transferOne(1L, 30L, 10L, "团队调整", "batch-transfer-test:1");
+        verify(commandService).transferOne(2L, 30L, 10L, "团队调整", "batch-transfer-test:2");
     }
 
     @Test
     void batchTransferRejectsBlankReasonBeforeMutation() {
-        SubordinateBatchTransferReqVO request = new SubordinateBatchTransferReqVO();
+        SubordinateBatchLeadActionReqVO request = new SubordinateBatchLeadActionReqVO();
         request.setLeadIds(List.of(1L)); request.setTargetUserId(30L); request.setReason("   ");
-        assertThrows(ServiceException.class, () -> service.batchTransfer(request, 10L));
+        request.setIdempotencyKey("blank-reason-test");
+        assertThrows(ServiceException.class, () -> service.batchLeadAction("transfer", request, 10L));
     }
 
     @Test

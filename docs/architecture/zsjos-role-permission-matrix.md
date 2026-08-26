@@ -17,6 +17,16 @@
 
 `system_administrator` 的精确 allowlist 由 V071 声明，分为：业务审计和只读借视图、导出任务查询与客资导出、客资全局管理/派单/重复复核/筛选/跟进规则、人员与兼职主体、产品和 SKU、用户关系、通知规则，以及 `zsjos:withdrawal:admin-query`。明确禁止 `zsjos:sales-order:review`、`zsjos:cashback:finance-query`、`zsjos:withdrawal:finance-query/review/payout` 和订单/财务订单/返现/提现导出。迁移文件是该长 allowlist 的可执行事实源。
 
+V143 adds `zsjos:subordinate-partner:query` as an administrator-configured employee read permission and
+`zsjos:partner:assign-owner` for Partner ownership maintenance. The latter is initially granted only to
+`system_administrator`; no ordinary role receives subordinate Partner visibility automatically.
+
+V146 inherits media-account capabilities by existing permission relationships rather than role names:
+holders of `zsjos:media-account:query` receive `zsjos:media-calendar:query`, holders of account edit
+receive `zsjos:media-account:maintenance`, and holders of account `query-all` receive
+`zsjos:media-calendar:query-all`. Runtime object scope still limits maintenance and ordinary calendar
+queries to the assigned director/operator unless the independent all-account permission is present.
+
 ## 全部角色目标
 
 | # | 角色编码 | ZSJOS 目标 |
@@ -24,15 +34,15 @@
 | 1 | `center_head` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 2 | `dept_manager` | 直属部门范围能力；对象权限仍要求本人是对应业务责任人 |
 | 3 | `content_director` | `/zsjos/media-students`、第三方账号/内容/定位操作（仅本人服务关系或账号责任对象） |
-| 4 | `new_media_operator` | `/zsjos/media-students`、第三方账号、内容生产、拍剪核对、账号定位复核和学员运营；学员范围仅限本人负责账号、内容、定位或任务关联对象 |
-| 5 | `filming_editor` | 仅分配给本人的拍剪工单及内容项操作；不包含编导专属学员页面 |
+| 4 | `new_media_operator` | `/zsjos/media-students`、第三方账号、内容生产、拍剪核对和账号定位复核；学员范围仅限本人负责账号、内容、定位或任务关联对象 |
+| 5 | `filming_editor` | 查询、接受/拒绝指定拍剪单、制作、提交、查看公共池和抢单；候选资格由用户关系与 `zsjos:production-ticket:accept` 权限交集决定 |
 | 6 | `sales_manager` | 通过 `query-owned` 查看本人及当前所管部门、子部门销售负责的客资，并具备跟进记录、流转记录只读能力及下属销售一键暂停接单能力；不得持有 `query-all` |
 | 7 | `sales_specialist` | 通过 `query-owned` 查看本人负责的客资，保留接单/抢单、跟进判定、自拓、建单、本人订单、公海申请和本人工作计划能力；不得持有 `query-all` |
 | 8 | `enrollment_manager` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 9 | `enrollment_specialist` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 10 | `finance_manager` | V071 精确 11 项完整财务权限 |
 | 11 | `finance_specialist` | 与财务主管完全相同的 V071 精确 11 项 |
-| 12 | `study_planner` | `/zsjos/my-students`、学习规划师联系/交付操作、专用学员复购和本人订单；不默认授予新媒体“学员运营”，不授予通用订单录入或外部历史客户复购，仅本人负责的服务关系 |
+| 12 | `study_planner` | `/zsjos/my-students`、学习规划师联系/交付操作、专用学员复购和本人订单；不授予通用订单录入或外部历史客户复购，仅本人负责的服务关系 |
 | 13 | `academic_specialist` | 零 ZSJOS 菜单，当前没有已落地职责 |
 | 14 | `delivery_manager` | 直属交付部门结业审批；对象责任关系由服务端动态解析 |
 | 15 | `exam_manager` | 零 ZSJOS 菜单，当前没有已落地职责 |
@@ -68,6 +78,6 @@
 - V071 只改变菜单元数据和角色菜单关系，不改变真实账号、用户角色关系、BPM 或业务数据；应用现有数据库需要单独确认。
 - V131 修复 V128 结构已存在但动作菜单关系缺失的环境：`content_director` 获得资料预审、采访、指派运营及已确认的定位动作；`new_media_operator` 仅保留定位查询、确认和退回，旧创建、编辑、可行性、签名、提交、试运行确认及归档授权被定向停用。
 
-V073 grants `system_administrator` only the registration-checklist query/update/publish permissions and grants `study_planner` My Students. V107 adds the confirmed planner-side student operations and graduation initiation buttons. V118 removes the accidental new-media `zsjos:student-ops:*` default grants from `study_planner`; those independent menu/button nodes remain available for explicit administrator assignment. V120 restores the shared `/zsjos/media-students` page grant for enabled `new_media_operator` roles after V103's historical director-only cleanup. Registration public-pool permissions remain intentionally separate; role names and departments never imply them.
+V073 grants `system_administrator` only the registration-checklist query/update/publish permissions and grants `study_planner` My Students. The retired new-media Student Operations permissions and graduation initiation buttons are no longer part of the baseline. V120 restores the shared `/zsjos/media-students` page grant for enabled `new_media_operator` roles after V103's historical director-only cleanup. Registration public-pool permissions remain intentionally separate; role names and departments never imply them.
 
 V083 grants `content_director` only My Students. Runtime route candidates use the stable content-director post code and the persisted department subtree; this menu grant does not change candidate eligibility or public-pool access.

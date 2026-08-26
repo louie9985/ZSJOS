@@ -35,6 +35,15 @@ Use this order when repository guidance conflicts:
 - Administrator-maintained data **MUST** come from a dictionary or business API in production flows.
 - The workbench may call existing system and business APIs. New ZSJOS-owned backend behavior belongs in `yudao-module-zsjos`, but existing system or CRM capabilities **MUST NOT** be copied there merely to centralize calls.
 
+### Administration and employee workbench contract
+
+- `frontend/admin` and `frontend/workbench` are independent frontend projects for materially different users, menus, and interaction workflows. The administration frontend **MUST** retain its Vue and `pnpm` conventions, and the employee workbench **MUST** retain its React and `npm` conventions unless an approved architecture change says otherwise.
+- The two frontends **MUST** share the established backend APIs, ADMIN authentication, tenant context, and server-owned menu and permission system. They **MUST NOT** duplicate backend business capabilities, introduce a client-specific authentication or authorization truth, maintain static production permissions, or infer access from role names.
+- Each frontend **MUST** render only server-authorized menus and operations that its own runtime supports. Their page sets, navigation, presentation, and interactions are not required to match mechanically. Approved `admin_embed`, documented dual-frontend menu coverage, and explicitly confirmed business exceptions remain valid and **MUST NOT** be treated as prohibited duplication.
+- A change to a backend, authentication, tenant, menu, or permission contract consumed by both frontends **MUST** identify and verify both consumers. Adapting or testing one frontend **MUST NOT** be treated as compatibility evidence for the other.
+- When stable framework-independent behavior is duplicated across both frontends, implementations **SHOULD** evaluate a shared package for protocol types, constants, normalization, pure utilities, design tokens, static assets, or transport and authentication cores with frontend-specific adapters. Vue and React components, stores, hooks, router integrations, and framework adapters **MUST** remain owned by their respective projects unless a separately approved cross-framework design establishes a safe boundary.
+- A shared-package proposal **MUST** describe the duplicated behavior, public boundary, versioning, package-manager and build integration, migration scope, and maintenance impact before implementation. It remains subject to the dependency confirmation rules below; duplication alone does not authorize a new workspace, dependency, or broad frontend refactor.
+
 ### Configurable permission contract
 
 - User-visible page or view access **MUST** be represented by server-owned menu permission configuration, and user-visible operations such as create, edit, delete, export, submit, approve, or audit **MUST** be represented by server-owned menu/button permission configuration by default.

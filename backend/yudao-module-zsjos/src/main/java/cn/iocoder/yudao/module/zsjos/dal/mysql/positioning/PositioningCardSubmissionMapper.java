@@ -20,6 +20,13 @@ public interface PositioningCardSubmissionMapper extends BaseMapperX<Positioning
                 .orderByDesc(PositioningCardSubmissionDO::getSubmissionNo).last("LIMIT 1"));
     }
 
+    @Select("SELECT s.* FROM zsjos_positioning_card_submission s "
+            + "JOIN zsjos_positioning_card c ON c.id=s.card_id AND c.tenant_id=s.tenant_id "
+            + "AND c.deleted=b'0' WHERE s.account_id=#{accountId} AND s.deleted=b'0' "
+            + "AND (s.status='confirmed' OR (s.status='student_agreed' AND c.status<>'archived')) "
+            + "ORDER BY s.submitted_at DESC,s.id DESC LIMIT 1")
+    PositioningCardSubmissionDO selectCurrentConfirmedByAccount(@Param("accountId") Long accountId);
+
     default List<PositioningCardSubmissionDO> selectByStudentAndAccountIds(Long personId,
                                                                             Collection<Long> accountIds) {
         if (accountIds == null || accountIds.isEmpty()) return List.of();
@@ -64,5 +71,14 @@ public interface PositioningCardSubmissionMapper extends BaseMapperX<Positioning
                 .set(PositioningCardSubmissionDO::getStudentDecisionComment, comment)
                 .set(PositioningCardSubmissionDO::getStudentDecidedAt, decidedAt)
                 .set(PositioningCardSubmissionDO::getVersion, version + 1));
+    }
+
+    default int supersedeConfirmedByAccount(Long accountId, Long currentSubmissionId) {
+        return update(null, new LambdaUpdateWrapper<PositioningCardSubmissionDO>()
+                .eq(PositioningCardSubmissionDO::getAccountId, accountId)
+                .eq(PositioningCardSubmissionDO::getStatus, "confirmed")
+                .ne(PositioningCardSubmissionDO::getId, currentSubmissionId)
+                .set(PositioningCardSubmissionDO::getStatus, "superseded")
+                .setSql("version = version + 1"));
     }
 }

@@ -1,1 +1,0 @@
-package cn.iocoder.yudao.module.zsjos.controller.admin.studentops.vo; import jakarta.validation.constraints.*; import lombok.Data; @Data public class GraduationCreateReqVO { @NotNull private Long serviceRelationId; @NotBlank @Size(max=1000) private String reason; @NotBlank private String snapshotJson; }

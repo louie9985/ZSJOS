@@ -22,6 +22,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 14 | 产品配置 | `/zsjos/product` | `ProductConfigPage` | `zsjos/product/index` |
 | 15 | 计划配置 | `/zsjos/work-plan-config` | `WorkPlanConfigPage` | `zsjos/workPlanConfig/index` |
 | 16 | 下属销售 | `/zsjos/subordinate-sales` | `SubordinateSalesPage` | `zsjos/subordinateSales/index` |
+| 16A | 下属兼职 | `/zsjos/subordinate-partners` | `SubordinatePartnerPage` | `zsjos/subordinatePartner/index` |
 | 17 | 今日待办 | `/zsjos/tasks/today` | `TodayTasksPage` | `zsjos/todayTask/index` |
 | 18 | 工作计划 | `/zsjos/work-plans` | `WorkPlanPage` | `zsjos/workPlan/index` |
 | 20 | 申诉处理 | `/zsjos/appeals` | `LeadAppealPage` | `zsjos/leadAppeal/index` |
@@ -50,9 +51,9 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 40.2 | 编导时效配置 | `/zsjos/director-config/sla` | `DirectorConfigPage` | `zsjos/directorConfig/index` |
 | 40 | 异常情况处理 | `/zsjos/student-contact-exceptions` | `StudentContactExceptionsPage` | `zsjos/studentContactExceptions/index` |
 | 41 | 拍剪工单 | `/zsjos/production-tickets` | `MediaWorkflowPage` | `zsjos-workbench/MediaProductionTicketsPage` |
-| 43 | 学员运营 | `/zsjos/student-ops` | `MediaWorkflowPage` | `zsjos-workbench/MediaStudentOpsPage` |
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
 | 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
+| 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage` | 不注册（员工只读总览） |
 
 “我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 
@@ -62,6 +63,8 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 
 - 申诉正式路径仅为 `/zsjos/appeals`，不提供 `/zsjos/leads/appeals` 兼容跳转。
 - 商机公海正式路径仅为 `/zsjos/lead-aging-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
+- 团队订单正式路径为 `/zsjos/sales-orders/team`，只消费服务端 `zsjos:sales-order:query-team`
+  页面授权；详情使用只读 `team` 模式，不投影修改、终止或审批操作。
 - `/zsjos/leads/manage` 是服务端隐藏菜单：具备菜单授权时可以直接访问，但不显示在 React 导航中。
 - 订单、学员、审批和业务通知可深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={overview|follow-ups|orders|appeals|complaints|flow-history}`；省略或传入非法 `tab` 时进入概览。该入口只加载指定详情，不扩大客资列表。通知按场景选择跟进、申诉、投诉或概览页签，当前不自动改投流转记录；前端只会激活服务端 `visibleTabs` 中的目标页签，不可见时回退概览。五个业务标签权限在 System 角色权限管理中独立配置，`flow-history` 对应 `zsjos:lead-detail:flow-read`，不得由角色名或前端 mode 推断。
 - 历史 `/zsjos/sales-order-supervisor-confirmations` 仅由 React 重定向到 `/zsjos/sales-order-approvals`，服务端不再发布独立主管确认页面菜单。
@@ -73,11 +76,17 @@ The subordinate-sales left pane uses the shared 20-row append lazy-loading patte
 The subordinate Lead detail and batch toolbar render restore, transfer, recycle, claim-pool release,
 and public-sea release only from their server-returned button permissions. The canonical public-sea
 page remains `/zsjos/lead-aging-pool`; the retired `/zsjos/opportunity-public-sea` path is not aliased.
+The public-sea page reuses the Lead-management status bar, list item, selected state, loading/empty/error
+states, complete `LeadDetail`, desktop master-detail layout, and mobile detail behavior. Its paging,
+statistics, A/B ownership fields, entry/expiry data, and `availableActions` remain public-sea-owned; it
+does not keep a separate Card/List/Pagination presentation or infer actions from roles.
 
 ### Media student center
 
 - `/zsjos/media-students` is rendered by `MediaStudentsPage` and requires `zsjos:media-student:query-my`.
-- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its three tabs are overview, third-party platform accounts (including positioning cards), and content production history. The former student-information/talk-record tab is not part of the media workspace; old `tab=student` links fall back to overview.
+- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its three tabs are overview, third-party platform accounts (including positioning cards and account-scoped status maintenance), and content production history. The former student-information/talk-record tab is not part of the media workspace; old `tab=student` links fall back to overview, while retired `tab=maintenance` and `tab=positioning` links resolve to the account tab.
 - Directors see their service-relation or account responsibility scope. Operators see only students related to accounts, content, positioning, or tasks they currently own. Each detail and command is re-authorized independently by the backend.
+- 账号状态维护使用服务端按钮权限 `zsjos:media-account:maintenance`，按钮节点挂在当前媒体学员页面菜单 `7022` 下；Workbench 在每个账号行展示该账号的状态摘要和服务端投影的维护/查看入口，完整快照与历史位于选中账号区域，不建立学员级“状态维护”页签。已退役的第三方账号页面 `6970` 不再承载该按钮或任何前端权限来源。
 - 定位卡运营确认和退回继续使用 `zsjos:positioning-card:operator-confirm`、`zsjos:positioning-card:operator-reject`；生成或重新生成学员外链使用独立按钮权限 `zsjos:positioning-card:student-link-generate`。V134 将该按钮挂在媒体学员页下并授予现有 `new_media_operator` 角色，服务端仍独立校验当前运营归属、最新版和状态。
+- 定位卡不再展示确认试跑或归档动作。学员确认即完成本轮；原编导在同时具备 `zsjos:positioning-card:edit` 和对象权限时收到服务端 `START_POSITIONING_REVISION` 动作。Workbench 按账号分别展示“当前生效定位”“审核中版本”“历史版本”，并只用 `effective` 版本开放拍剪工单入口。
 - Account, content, and positioning notifications deep-link to the student center with `personId`, `tab`, and the relevant record ID. Historical records without a student binding show an explicit unavailable target instead of opening a retired route.

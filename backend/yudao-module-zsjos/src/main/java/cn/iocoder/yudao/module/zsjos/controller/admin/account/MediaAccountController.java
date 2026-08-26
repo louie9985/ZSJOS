@@ -1,14 +1,21 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.account;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountStudentCandidateRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountLegacyStageRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceRevisionRespVO;
 import java.util.List;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountService;
+import cn.iocoder.yudao.module.zsjos.service.account.MediaAccountMaintenanceService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.annotation.Resource;
@@ -24,6 +31,7 @@ import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUti
 @RequestMapping("/zsjos/media-account")
 public class MediaAccountController {
     @Resource private MediaAccountService mediaAccountService;
+    @Resource private MediaAccountMaintenanceService maintenanceService;
 
     @PostMapping("/create")
     @Operation(summary = "创建第三方平台账号")
@@ -44,6 +52,37 @@ public class MediaAccountController {
         return success(mediaAccountService.page(reqVO, getLoginUserId()));
     }
 
+    @PutMapping("/{id}/maintenance")
+    @Operation(summary = "维护账号当前状态")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:maintenance')")
+    public CommonResult<Integer> maintain(@PathVariable Long id,
+                                          @Valid @RequestBody MediaAccountMaintenanceReqVO reqVO) {
+        return success(maintenanceService.maintain(id, reqVO, getLoginUserId()));
+    }
+
+    @GetMapping("/{id}/maintenance-history")
+    @Operation(summary = "分页查询账号维护版本")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-account:maintenance')")
+    public CommonResult<PageResult<MediaAccountMaintenanceRevisionRespVO>> maintenanceHistory(
+            @PathVariable Long id, @Valid PageParam page) {
+        return success(maintenanceService.history(id, page, getLoginUserId()));
+    }
+
+    @GetMapping("/{id}/legacy-stage-history")
+    @Operation(summary = "分页查询账号原阶段记录")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-account:query','zsjos:media-account:maintenance')")
+    public CommonResult<PageResult<MediaAccountLegacyStageRespVO>> legacyStageHistory(
+            @PathVariable Long id, @Valid PageParam page) {
+        return success(maintenanceService.legacyStageHistory(id, page, getLoginUserId()));
+    }
+
+    @GetMapping("/calendar")
+    @Operation(summary = "分页查询账号日历区间")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-calendar:query')")
+    public CommonResult<MediaAccountCalendarRespVO> calendar(@Valid MediaAccountCalendarPageReqVO reqVO) {
+        return success(maintenanceService.calendar(reqVO, getLoginUserId()));
+    }
+
     @GetMapping("/student-candidates")
     @PreAuthorize("@ss.hasPermission('zsjos:media-account:bind-student')")
     public CommonResult<List<MediaAccountStudentCandidateRespVO>> studentCandidates(
@@ -53,7 +92,7 @@ public class MediaAccountController {
 
     @PostMapping("/{id}/advance-stage")
     @Operation(summary = "推进账号阶段")
-    @PreAuthorize("@ss.hasPermission('zsjos:media-account:stage-advance')")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:maintenance')")
     public CommonResult<Boolean> stageAdvance(@PathVariable Long id, @RequestParam String toStage,
                                                @RequestParam Integer version,
                                                @RequestParam(required = false) String criteriaSnapshotJson,
@@ -67,7 +106,7 @@ public class MediaAccountController {
 
     @PostMapping("/{id}/rollback-stage")
     @Operation(summary = "回退账号阶段")
-    @PreAuthorize("@ss.hasPermission('zsjos:media-account:stage-rollback')")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-account:maintenance')")
     public CommonResult<Boolean> stageRollback(@PathVariable Long id, @RequestParam String toStage,
                                                @RequestParam Integer version,
                                                @RequestParam(required = false) String criteriaSnapshotJson,

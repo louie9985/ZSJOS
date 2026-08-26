@@ -1,0 +1,130 @@
+.media-calendar-page {
+  display: flex;
+  min-height: 0;
+  height: 100%;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.media-calendar-page .page-heading,
+.media-calendar-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+}
+
+.media-calendar-page .page-heading h4 { margin: 0; }
+.media-calendar-toolbar { flex-wrap: wrap; }
+.media-calendar-toolbar .ant-input-search { width: 240px; }
+.media-calendar-toolbar > .ant-select { min-width: 140px; }
+
+.media-calendar-shell {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  grid-template-columns: 260px minmax(0, 1fr);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.media-calendar-info-column {
+  z-index: 2;
+  border-right: 1px solid var(--crm-border);
+  background: var(--crm-bg-container);
+}
+
+.media-calendar-info-head,
+.media-calendar-header { height: 52px; }
+.media-calendar-info-head {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--crm-sp-4);
+  border-bottom: 1px solid var(--crm-border);
+  color: var(--crm-text-secondary);
+  font-weight: 600;
+}
+
+.media-calendar-info {
+  display: flex;
+  height: 52px;
+  min-width: 0;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--crm-sp-1);
+  padding: 0 var(--crm-sp-4);
+  border-bottom: 1px solid var(--crm-border);
+}
+.media-calendar-info strong,
+.media-calendar-info span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.media-calendar-info span { color: var(--crm-text-secondary); font-size: var(--crm-font-sm); }
+
+.media-calendar-scroll { min-width: 0; overflow: auto; }
+.media-calendar-grid { display: grid; width: max-content; }
+.media-calendar-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  border-bottom: 1px solid var(--crm-border);
+  background: var(--crm-bg-container);
+}
+.media-calendar-header > div {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  border-right: 1px solid var(--crm-border);
+  font-size: var(--crm-font-sm);
+}
+.media-calendar-header span { color: var(--crm-text-secondary); }
+.media-calendar-header .weekend,
+.media-calendar-cells .weekend { background: var(--crm-bg-sunken); }
+
+.media-calendar-rows { position: relative; width: max-content; }
+.media-calendar-row { position: relative; height: 52px; }
+.media-calendar-cells { height: 52px; }
+.media-calendar-cells > div { border-right: 1px solid var(--crm-border); border-bottom: 1px solid var(--crm-border); }
+.media-calendar-bar {
+  position: absolute;
+  top: 9px;
+  display: flex;
+  height: 34px;
+  align-items: center;
+  overflow: hidden;
+  padding: 0 var(--crm-sp-2);
+  border: 1px solid transparent;
+  border-radius: var(--crm-radius-sm);
+  color: inherit;
+  cursor: default;
+}
+.media-calendar-bar span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.media-calendar-bar.tone-success { border-color: var(--crm-color-success-border); background: var(--crm-color-success-bg); }
+.media-calendar-bar.tone-primary { border-color: var(--crm-color-primary-border); background: var(--crm-color-primary-bg); }
+.media-calendar-bar.tone-warning { border-color: var(--crm-color-warning-border); background: var(--crm-color-warning-bg); }
+.media-calendar-bar.tone-info { border-color: var(--crm-border-strong); background: var(--crm-bg-sunken); }
+.media-calendar-bar.tone-neutral { border-color: var(--crm-border); background: var(--crm-bg-chrome); }
+.media-calendar-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 2;
+  width: 2px;
+  background: var(--crm-color-primary);
+  pointer-events: none;
+}
+
+@media (max-width: 768px) {
+  .media-calendar-page { height: auto; min-height: 100%; }
+  .media-calendar-page .page-heading { align-items: flex-start; flex-direction: column; }
+  .media-calendar-toolbar { align-items: stretch; flex-direction: column; }
+  .media-calendar-toolbar .ant-input-search,
+  .media-calendar-toolbar > .ant-select { width: 100%; }
+  .media-calendar-shell { min-height: 520px; grid-template-columns: 190px minmax(0, 1fr); }
+}

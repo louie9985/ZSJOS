@@ -25,8 +25,15 @@ public class ProductionTicketObjectPermissionProvider implements ZsjosObjectPerm
             case "read" -> permissionApi.hasAnyPermissions(userId, "zsjos:production-ticket:query-all")
                     || Objects.equals(userId, ticket.getOwnerOperatorUserId())
                     || Objects.equals(userId, ticket.getAssigneeFilmingEditorUserId())
-                    || Objects.equals(userId, ticket.getReviewerUserId());
+                    || Objects.equals(userId, ticket.getReviewerUserId())
+                    || "public_pool".equals(ticket.getStatus()) && permissionApi.hasAnyPermissions(userId,
+                    "zsjos:production-ticket:pool-query", "zsjos:production-ticket:claim");
             case "accept", "produce", "submit" -> Objects.equals(userId, ticket.getAssigneeFilmingEditorUserId());
+            case "reject-assignment" -> "pending_accept".equals(ticket.getStatus())
+                    && Objects.equals(userId, ticket.getAssigneeFilmingEditorUserId());
+            case "claim" -> "public_pool".equals(ticket.getStatus())
+                    && ticket.getAssigneeFilmingEditorUserId() == null
+                    && permissionApi.hasAnyPermissions(userId, "zsjos:production-ticket:claim");
             case "check" -> Objects.equals(userId, ticket.getReviewerUserId());
             default -> false;
         };

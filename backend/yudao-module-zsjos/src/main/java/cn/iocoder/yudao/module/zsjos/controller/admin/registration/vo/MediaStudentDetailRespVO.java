@@ -5,6 +5,8 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceProblemVO;
+import java.time.LocalDate;
 
 @Data
 public class MediaStudentDetailRespVO {
@@ -27,6 +29,15 @@ public class MediaStudentDetailRespVO {
         private String nickname;
         private String platformLabel;
         private String stage;
+        private String stageLabelSnapshot;
+        private String currentStatusValue;
+        private String currentStatusLabelSnapshot;
+        private List<MediaAccountMaintenanceProblemVO> primaryProblems;
+        private String executionMeasureValue;
+        private String executionMeasureLabelSnapshot;
+        private String adjustmentDirection;
+        private LocalDate maintenanceStartDate;
+        private LocalDate maintenanceEndDate;
         private String runStatus;
         private Integer version;
         private LocalDateTime lastActivityAt;
@@ -48,6 +59,9 @@ public class MediaStudentDetailRespVO {
         private LocalDateTime studentDecidedAt;
         private String studentDecision;
         private String studentDecisionComment;
+        private Boolean latestRound;
+        private Boolean effective;
+        /** Compatibility alias for latestRound. */
         private Boolean current;
         private Boolean professionalRisk;
         private Integer version;

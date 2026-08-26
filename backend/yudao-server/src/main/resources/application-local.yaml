@@ -4,6 +4,7 @@ server:
 zsjos:
   positioning:
     public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:http://localhost:10086}
+    confirmation-link-ttl-hours: ${ZSJOS_POSITIONING_CONFIRMATION_LINK_TTL_HOURS:168}
 
 --- #################### 数据库相关配置 ####################
 spring:

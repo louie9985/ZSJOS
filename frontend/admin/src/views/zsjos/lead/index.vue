@@ -424,6 +424,20 @@ onMounted(async () => {
     await reloadDetail()
   }
 })
+
+watch(
+  () => route.query.leadId,
+  async (value, previous) => {
+    if (value === previous) return
+    await getList()
+    const requestedLeadId = Number(value)
+    if (Number.isFinite(requestedLeadId) && requestedLeadId > 0) {
+      detailId.value = requestedLeadId
+      detailVisible.value = true
+      await reloadDetail()
+    }
+  }
+)
 </script>
 
 <style scoped>

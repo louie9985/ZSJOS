@@ -27,5 +27,17 @@ class MediaAccountObjectPermissionProviderTest {
         assertTrue(provider.hasPermission(1L, "rescue", 230L));
         assertTrue(provider.hasPermission(1L, "rescue", 248L));
         assertFalse(provider.hasPermission(1L, "rescue", 251L));
+        assertTrue(provider.hasPermission(1L, "maintenance", 230L));
+        assertTrue(provider.hasPermission(1L, "maintenance", 248L));
+        assertFalse(provider.hasPermission(1L, "maintenance", 251L));
+    }
+
+    @Test
+    void queryAllPermissionCanMaintainWithoutParticipantRelationship() {
+        when(mapper.selectById(1L)).thenReturn(new MediaAccountDO().setId(1L)
+                .setOwnerOperatorUserId(230L).setDirectorUserId(248L));
+        when(permissionApi.hasAnyPermissions(251L, "zsjos:media-account:query-all")).thenReturn(true);
+
+        assertTrue(provider.hasPermission(1L, "maintenance", 251L));
     }
 }

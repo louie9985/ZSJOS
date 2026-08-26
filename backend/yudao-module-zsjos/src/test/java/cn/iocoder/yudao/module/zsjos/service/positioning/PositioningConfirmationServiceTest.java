@@ -23,6 +23,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.POSITIONING_STUDENT_CONFIRM;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.POSITIONING_STUDENT_LINK_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.POSITIONING_CONFIRMED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.POSITIONING_PUBLIC_H5_URL_INVALID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -65,6 +66,8 @@ class PositioningConfirmationServiceTest {
         assertEquals(64, inserted.getValue().getTokenHash().length());
         assertNotEquals(rawToken, inserted.getValue().getTokenHash());
         assertFalse(inserted.getValue().getTokenHash().contains(rawToken));
+        assertNotNull(result.getExpiresAt());
+        assertEquals(result.getExpiresAt(), inserted.getValue().getExpiresAt());
     }
 
     @Test
@@ -135,7 +138,7 @@ class PositioningConfirmationServiceTest {
     }
 
     @Test
-    void agreeConsumesLinkAndAdvancesToTrial() {
+    void agreeConsumesLinkAndMakesSubmissionEffective() {
         PositioningConfirmationLinkDO link = link("active");
         link.setTenantId(7L);
         PositioningCardDO card = card(POSITIONING_STUDENT_CONFIRM, 4);
@@ -145,14 +148,16 @@ class PositioningConfirmationServiceTest {
         when(cardMapper.selectByIdForUpdate(1L, 7L)).thenReturn(card);
         when(submissionMapper.selectByIdForUpdate(11L, 7L)).thenReturn(submission);
         when(submissionMapper.selectLatestByCard(1L)).thenReturn(submission);
+        when(accountMapper.selectByIdForUpdate(10L, 7L)).thenReturn(new MediaAccountDO().setId(10L));
         when(submissionMapper.markStudentDecision(eq(11L), eq(2), eq(POSITIONING_STUDENT_CONFIRM),
-                eq("student_agreed"), eq("agree"), isNull(), any())).thenReturn(1);
+                eq(POSITIONING_CONFIRMED), eq("agree"), isNull(), any())).thenReturn(1);
         when(linkMapper.consume(eq(21L), eq(0), any())).thenReturn(1);
         PublicPositioningDecisionReqVO request = new PublicPositioningDecisionReqVO();
         request.setDecision("agree");
 
         service.decide("raw-token", request);
 
+        verify(submissionMapper).supersedeConfirmedByAccount(10L, 11L);
         verify(cardService).studentConfirmFromLink(1L, 4);
         verify(cardService, never()).studentRejectFromLink(any(), any(), any());
     }
@@ -168,14 +173,22 @@ class PositioningConfirmationServiceTest {
     }
 
     @Test
-    void usedLinkIsViewableOnlyAsProcessed() {
+    void usedLinkIsIndistinguishableFromOtherInvalidLinks() {
         PositioningConfirmationLinkDO link = link("used");
         link.setTenantId(7L);
         when(linkMapper.selectByTokenHash(anyString())).thenReturn(link);
 
-        var result = service.publicDetail("raw-token");
+        assertThrows(ServiceException.class, () -> service.publicDetail("raw-token"));
+        verifyNoInteractions(cardMapper, submissionMapper, accountMapper);
+    }
 
-        assertEquals("processed", result.getState());
+    @Test
+    void expiredLinkIsRejectedBeforeSnapshotsAreRead() {
+        PositioningConfirmationLinkDO link = link("active").setExpiresAt(java.time.LocalDateTime.now().minusMinutes(1));
+        when(linkMapper.selectByTokenHash(anyString())).thenReturn(link);
+
+        assertThrows(ServiceException.class, () -> service.publicDetail("raw-token"));
+
         verifyNoInteractions(cardMapper, submissionMapper, accountMapper);
     }
 
@@ -191,6 +204,6 @@ class PositioningConfirmationServiceTest {
 
     private PositioningConfirmationLinkDO link(String status) {
         return new PositioningConfirmationLinkDO().setId(21L).setCardId(1L).setSubmissionId(11L)
-                .setTokenHash("hash").setStatus(status).setVersion(0);
+                .setTokenHash("hash").setStatus(status).setExpiresAt(java.time.LocalDateTime.now().plusDays(1)).setVersion(0);
     }
 }

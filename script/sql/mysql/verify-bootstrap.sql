@@ -6,8 +6,9 @@ SELECT 'new_media_workflow_schema' AS check_name,
            AND table_name IN ('zsjos_media_account','zsjos_content','zsjos_content_version','zsjos_production_ticket',
                               'zsjos_production_ticket_item','zsjos_positioning_card','zsjos_positioning_card_version',
                               'zsjos_positioning_exec_card','zsjos_interview_record',
-                              'zsjos_cooperation_assessment','zsjos_exception_ticket',
-                              'zsjos_workbench_capacity','zsjos_partner_student_link'))=14
+                              'zsjos_workbench_capacity','zsjos_partner_student_link'))=12
+          AND NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+                          AND table_name IN ('zsjos_cooperation_assessment','zsjos_exception_ticket','zsjos_graduation_application'))
           AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V096'), 'PASS','FAIL') AS result;
 SELECT 'new_media_version_and_signature_contract' AS check_name,
        IF(EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
@@ -75,6 +76,34 @@ SELECT 'student_delivery_stages' AS check_name,
                       WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
                         AND grant_row.menu_id IN (73020,73428) AND grant_row.deleted=b'0')<>2),
           'PASS','FAIL') AS result;
+SELECT 'production_ticket_dispatch_pool' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V145')
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_production_ticket' AND column_name='dispatch_context_snapshot_json')
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_production_ticket' AND column_name='idempotency_key')
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_production_ticket_command')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+                      AND table_name='zsjos_production_ticket' AND index_name='uk_tenant_create_idempotency'
+                      GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index)='tenant_id,idempotency_key')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+                      AND table_name='zsjos_production_ticket_command' AND index_name='uk_tenant_operator_idempotency'
+                      GROUP BY index_name HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index)='tenant_id,operator_user_id,idempotency_key')
+          AND (SELECT COUNT(*) FROM system_menu WHERE (id=73520 AND permission='zsjos:production-ticket:reject-assignment' AND parent_id=6977 AND deleted=b'0')
+                     OR (id=73521 AND permission='zsjos:production-ticket:pool-query' AND parent_id=6977 AND deleted=b'0')
+                     OR (id=73522 AND permission='zsjos:production-ticket:claim' AND parent_id=6977 AND deleted=b'0'))=3
+          AND EXISTS (SELECT 1 FROM zsjos_user_relation_scene WHERE code='new_media_operator_filming_editor' AND target_eligibility_type='permission' AND target_permission_code='zsjos:production-ticket:accept' AND deleted=b'0'), 'PASS','FAIL') AS result;
+SELECT 'media_account_maintenance_calendar' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V146')
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='zsjos_media_account_maintenance_revision')
+          AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_media_account'
+               AND column_name IN ('current_status_value','current_status_label_snapshot','s_stage_label_snapshot','primary_problems_json','execution_measure_value','execution_measure_label_snapshot','adjustment_direction','maintenance_start_date','maintenance_end_date'))=9
+          AND (SELECT COUNT(*) FROM system_dict_type WHERE type IN ('zsjos_media_account_current_status','zsjos_media_account_stage','zsjos_media_account_primary_problem','zsjos_media_account_execution_measure') AND deleted=b'0')=4
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73600,73601,73602,73603) AND status=0 AND deleted=b'0')=4
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73600 AND parent_id=0 AND path='/calendar' AND type=1 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73601 AND parent_id=73600 AND path='overview' AND permission='zsjos:media-calendar:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73603 AND parent_id=7022 AND type=3
+                      AND permission='zsjos:media-account:maintenance' AND status=0 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND status=0 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_notify_template WHERE code='ZSJOS_MEDIA_ACCOUNT_MAINTENANCE_CHANGED' AND deleted=b'0'), 'PASS','FAIL') AS result;
 SELECT 'generic_work_order_schema' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V115')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V115')
@@ -1463,4 +1492,102 @@ SELECT 'V135 applied schema compatibility repair' AS check_name,
             WHERE creator IN ('V133','V134') AND deleted=b'0'
               AND (layer1_json IS NULL OR layer2_json IS NULL OR formula_json IS NULL
                 OR feasibility_json IS NULL OR content_form_json IS NULL OR compliance_json IS NULL)),
+          'PASS','FAIL') AS result;
+SELECT 'V139 supervisor permissions and public-sea route' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V139')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V139')
+          AND EXISTS (SELECT 1 FROM system_menu
+            WHERE permission='zsjos:lead-aging-pool:query' AND type=2
+              AND path='lead-aging-pool' AND deleted=b'0')
+          AND (SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND permission IN (
+            'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+            'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+            'zsjos:subordinate-sales:lead-release-public-sea'))=5
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE deleted=b'0' AND permission IN (
+            'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+            'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+            'zsjos:subordinate-sales:lead-release-public-sea')
+            AND (type<>3 OR parent_id<>6814 OR status<>0))
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
+              AND (SELECT COUNT(DISTINCT menu_row.permission)
+                   FROM system_role_menu grant_row
+                   JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id AND menu_row.deleted=b'0'
+                   WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
+                     AND grant_row.deleted=b'0' AND menu_row.permission IN (
+                       'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+                       'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+                       'zsjos:subordinate-sales:lead-release-public-sea'))<>5),
+          'PASS','FAIL') AS result;
+SELECT 'V140 command, positioning, and menu repairs' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V140')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V140')
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+            AND table_name='zsjos_subordinate_sales_command')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+            AND table_name='zsjos_subordinate_sales_command'
+            AND index_name='uk_tenant_operator_idempotency' AND non_unique=0)
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+            AND table_name='zsjos_positioning_confirmation_link' AND column_name='expires_at')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+            AND table_name='zsjos_positioning_confirmation_link'
+            AND index_name='idx_token_status_expires')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73460
+            AND permission='zsjos:student-contact-config:forms' AND type=2 AND parent_id=73400
+            AND path='business-form-config' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73483
+            AND permission='zsjos:director-interview-template:query' AND type=2 AND parent_id=73480
+            AND path='interview-template' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE deleted=b'0'
+            AND permission IN ('zsjos:director-interview-template:update',
+                               'zsjos:director-interview-template:publish')
+            AND parent_id<>73483)
+          AND (SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND permission IN (
+            'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+            'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+            'zsjos:subordinate-sales:lead-release-public-sea'))=5
+          AND (SELECT character_maximum_length FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_positioning_card_submission'
+                 AND column_name='student_decision_comment')>=2000
+          AND NOT EXISTS (SELECT 1 FROM zsjos_positioning_confirmation_link
+                          WHERE status='active' AND deleted=b'0' AND expires_at IS NULL), 'PASS','FAIL') AS result;
+SELECT 'V141 media screen daily snapshot' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V141')
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+            AND table_name='zsjos_media_screen_daily_snapshot')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+            AND table_name='zsjos_media_screen_daily_snapshot'
+            AND index_name='uk_tenant_snapshot_member' AND non_unique=0), 'PASS','FAIL') AS result;
+SELECT 'V142 partial V139 V140 execution repair' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V142')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V142')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73460
+            AND permission='zsjos:student-contact-config:forms' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73483
+            AND permission='zsjos:director-interview-template:query' AND deleted=b'0')
+          AND NOT EXISTS (SELECT permission FROM system_menu WHERE deleted=b'0' AND permission IN (
+            'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+            'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+            'zsjos:subordinate-sales:lead-release-public-sea') GROUP BY permission HAVING COUNT(*)<>1)
+          AND NOT EXISTS (SELECT grant_row.tenant_id,grant_row.role_id,grant_row.menu_id
+            FROM system_role_menu grant_row
+            JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id
+            WHERE grant_row.deleted=b'0' AND menu_row.permission IN (
+              'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+              'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+              'zsjos:subordinate-sales:lead-release-public-sea')
+            GROUP BY grant_row.tenant_id,grant_row.role_id,grant_row.menu_id HAVING COUNT(*)>1)
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
+              AND (SELECT COUNT(DISTINCT menu_row.permission)
+                   FROM system_role_menu grant_row
+                   JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id AND menu_row.deleted=b'0'
+                   WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
+                     AND grant_row.deleted=b'0' AND menu_row.permission IN (
+                       'zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-transfer',
+                       'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
+                       'zsjos:subordinate-sales:lead-release-public-sea'))<>5),
           'PASS','FAIL') AS result;

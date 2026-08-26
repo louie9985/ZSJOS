@@ -27,11 +27,6 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="品牌型号" prop="brand">
-            <el-input v-model="formData.brand" placeholder="如 Apple M3 Pro" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
           <el-form-item label="管理模式">
             <el-input
               :model-value="selectedCategory?.managementMode === 2 ? '批量管理' : '单件管理'"
@@ -49,21 +44,6 @@
               :disabled="selectedCategory?.managementMode !== 2"
               class="!w-full"
             />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="规格参数" prop="specification">
-            <el-input v-model="formData.specification" placeholder="如 18G/512G" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="序列号" prop="sn">
-            <el-input v-model="formData.sn" placeholder="设备 SN" />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
-          <el-form-item label="条码" prop="barcode">
-            <el-input v-model="formData.barcode" placeholder="外部条码" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -109,12 +89,34 @@
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="12"><el-form-item label="资产来源"><el-select v-model="formData.source" clearable class="!w-full"><el-option v-for="item in getIntDictOptions('eam_asset_source')" :key="item.value" :label="item.label" :value="item.value" /></el-select></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="原值"><el-input-number v-model="formData.originalValue" :min="0" :precision="2" :controls="false" class="!w-full" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="净值"><el-input-number v-model="formData.netValue" :min="0" :precision="2" :controls="false" class="!w-full" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="保修到期日"><el-date-picker v-model="formData.warrantyDate" type="date" value-format="YYYY-MM-DD" clearable class="!w-full" /></el-form-item></el-col>
-        <el-col :span="12"><el-form-item label="预计寿命（月）"><el-input-number v-model="formData.expectedLife" :min="1" :precision="0" class="!w-full" /></el-form-item></el-col>
-        <el-col :span="24"><el-form-item label="上传附件"><el-upload action="/admin-api/infra/file/upload" :file-list="(formData.fileUrls || []).map((url) => ({ name: url.split('/').pop() || url, url }))" :on-success="(res) => formData.fileUrls = [...(formData.fileUrls || []), res.data]" :on-remove="(_file, files) => formData.fileUrls = files.map((item) => item.url || '')"><el-button>选择文件</el-button></el-upload></el-form-item></el-col>
+        <el-col :span="12">
+          <el-form-item label="资产来源">
+            <el-select v-model="formData.source" clearable class="!w-full">
+              <el-option
+                v-for="item in getIntDictOptions('eam_asset_source')"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+        </el-col>
+        <el-col :span="24">
+          <el-form-item label="上传附件">
+            <el-upload
+              action="/admin-api/infra/file/upload"
+              :file-list="
+                (formData.fileUrls || []).map((url) => ({ name: url.split('/').pop() || url, url }))
+              "
+              :on-success="(res) => (formData.fileUrls = [...(formData.fileUrls || []), res.data])"
+              :on-remove="
+                (_file, files) => (formData.fileUrls = files.map((item) => item.url || ''))
+              "
+            >
+              <el-button>选择文件</el-button>
+            </el-upload>
+          </el-form-item>
+        </el-col>
         <el-col :span="24">
           <el-form-item label="存放地点" prop="location">
             <el-input v-model="formData.location" placeholder="如 总部三楼研发区" />

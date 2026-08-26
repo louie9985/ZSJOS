@@ -1,5 +1,151 @@
 # Main Workstream
 
+## Delivery Entry - 2026-08-26 19:43:26 +08:00
+
+- Workstream ID: `main-notification-navigation-refresh`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: refresh stale target-page data when clicking notifications, including repeated navigation to an already-open route, across Workbench and Admin.
+- Key decisions: no backend/schema/API/SQL changes; keep active filters; reload targeted data on route-key or query changes; let message targets load even when outside the current filtered page; discard transient form state according to the confirmed product choice; avoid browser-wide reloads.
+- Execution or analysis result: Workbench registration, claim-pool, and media-student pages now refresh on repeated navigation; registration-pool deep links reload the requested case when navigation state changes. Admin notification inbox now reacts to `messageId` changes, and Admin Lead management reloads its list/detail when `leadId` changes. Workbench notification contract documentation now records the refresh behavior, and media-student guard coverage asserts the repeated-route refresh hook.
+- Changed files: `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/pages/LeadClaimPoolPage.tsx`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/admin/src/views/system/notify/my/NotifyMessageList.vue`; `frontend/admin/src/views/zsjos/lead/index.vue`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `frontend/workbench/docs/api-contract.md`; this handoff record. Existing unrelated dirty changes in the same worktree were preserved.
+- Verification evidence: Workbench notification-focused tests passed 21/21; Workbench full suite passed 404/404; Workbench typecheck passed; Workbench production build passed with the existing large-chunk warning; Admin target-file ESLint passed; Admin `pnpm build:local` passed with the existing CSS minifier warning; scoped `git diff --check` reported only line-ending conversion warnings. Authenticated browser verification was unavailable because no authenticated session was available.
+- Dependency or integration impact: no new dependency, backend/API contract, permission/menu, database/schema, SQL migration, branch/worktree operation, commit, push, deployment, or service restart.
+- Remaining work: perform authenticated desktop/mobile rapid-message-click verification in both frontends, especially filtered lists and repeated same-route detail navigation.
+
+## Workstream Registration - 2026-08-26 20:00:00 +08:00
+
+- Workstream ID: `main-notification-navigation-refresh`
+- Goal: ensure clicking a notification refreshes the target page data when the target route is already open in both Workbench and Admin, while preserving active filters and prioritizing the notification record.
+- Non-goals: change backend APIs, notification schema, permissions, menus, SQL, dependencies, branches/worktrees, commits, deployment, or unrelated dirty-worktree changes; browser-wide reloads.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: notification navigation action and target-page refresh behavior in `frontend/workbench` and `frontend/admin`; directly affected frontend documentation and focused tests; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing notification, business-detail, route, and permission APIs; no new dependency.
+- Integration order: add navigation refresh context -> update Workbench notification target pages -> update Admin notification/detail and Lead page watchers -> add focused guards/docs -> run frontend checks and scoped diff verification.
+- Verification plan: focused notification/action and page guard tests, Workbench typecheck/build, Admin scoped typecheck/lint/build where practical, browser checks when authenticated sessions are available, and `git diff --check`.
+
+## Workstream Registration - 2026-08-26 15:02:04 +08:00
+
+- Workstream ID: `main-media-account-maintenance-calendar`
+- Goal: replace forced media-account S0-S6 transitions with jointly maintained dictionary-backed account status snapshots, immutable maintenance revisions, participant notifications, and a read-only Workbench calendar overview.
+- Non-goals: enforce stage ordering or duration, edit from the calendar, show historical revisions in the calendar, add BPM/reminders/dependencies, execute SQL against a live database, mutate real grants, change branches/worktrees, commit, push, deploy, or alter unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS media-account maintenance/calendar controller, VO, service, DO, mapper, permission, notification, errors/constants and focused tests; Workbench media-student maintenance/history and calendar API/page/route/styles/tests; V146 dictionary/schema/menu/permission/notification migration plus bootstrap verification; directly affected API, permission-flow, menu-coverage, Workbench contract and migration documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing media-account participant ownership, System dictionary/menu/permission/user/notify public APIs, ZSJOS tenant/object permission and optimistic locking, React/Ant Design Workbench; no new dependency.
+- Integration order: add snapshot/revision persistence and dictionary validation -> expose maintenance/history/calendar contracts and notifications -> retire legacy stage commands -> wire Workbench maintenance/history and calendar -> add V146/bootstrap/verification/docs -> run focused and proportional backend/frontend/SQL/browser verification -> append delivery evidence.
+- Verification plan: focused media-account service/object-permission/notification/controller tests plus ZSJOS compile/tests; Workbench focused/full tests, typecheck and production build; SQL source/idempotency/bootstrap checks without live execution; authenticated desktop/mobile browser checks when an available runtime/session exists; scoped diff and documentation consistency review.
+
+## Delivery Entry - 2026-08-26 14:12:00 +08:00
+
+- Workstream ID: `main-positioning-card-import`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: allow a content director to reuse submitted positioning cards for the same account or another account of the same student when filling a new positioning-card draft.
+- Key decisions: source candidates are server-filtered immutable submitted snapshots only; import uses the current published template and stable field keys; compatible fields and historical dictionary snapshots are retained; new/deleted/type-incompatible/dictionary-type-changed fields are skipped; target drafts are created or overwritten only with the supplied optimistic version; source submissions and the positioning lifecycle remain unchanged; no new dependency, permission, table, or migration.
+- Execution or analysis result: added typed `import-sources` and `import` admin APIs, target/source/tenant/object checks, submitted-snapshot source projection, current-template field/type mapping, dictionary snapshot preservation, target draft creation and optimistic overwrite; added Workbench source picker with same/other account labels, loading/empty/error/403/retry states, unsaved/dirty overwrite confirmation, imported-form refresh, skipped-field feedback, and mobile-safe tokenized styling; synchronized API, architecture and Workbench contract documentation.
+- Changed files: `PositioningCardController.java`, `PositioningCardService.java`, `PositioningCardMapper.java`, `ZsjosErrorCodeConstants.java`, three new positioning import VO files, `PositioningCardServiceTest.java`; `MediaStudentsPage.tsx`, `api.ts`, `media-students.css`, `media-students.guard.test.ts`; `docs/api/registration-fulfillment-api.md`, `frontend/workbench/docs/api-contract.md`, `docs/architecture/data-and-permission-flow.md`; this handoff record. Existing unrelated dirty-worktree files were preserved.
+- Verification evidence: targeted backend `PositioningCardServiceTest` passed 14/14; ZSJOS module compile passed; Workbench import guard passed 6/6; Workbench typecheck passed; Workbench production build passed with the existing large-chunk warning; scoped `git diff --check` reported only repository line-ending conversion warnings. Full Workbench suite passed 394/395 with one pre-existing `subordinate-partner.css` hardcoded-spacing guard failure. Full ZSJOS suite passed 589/590 with one pre-existing `LeadFlowHistoryPermissionContractTest` failure caused by the existing subordinate-partner permission expression. No authenticated browser session or live HTTP/database execution was available, so real desktop/mobile interaction remains unverified.
+- Dependency or integration impact: no dependency, branch/worktree operation, commit, push, service restart, migration, live permission mutation, or business-data mutation; no historical positioning snapshot changed.
+- Remaining work: run authenticated desktop/mobile browser checks for source selection, overwrite confirmation and 403/empty/retry states; resolve the unrelated existing Workbench spacing guard and Lead flow-history permission contract before requiring green full-suite CI.
+
+## Workstream Registration - 2026-08-26 14:00:00 +08:00
+
+- Workstream ID: `main-positioning-card-import`
+- Goal: allow a content director to import any submitted positioning-card snapshot for the same student into a new or existing target-account draft, mapped onto the current published template.
+- Non-goals: import unsubmitted drafts, mutate historical submissions, change the positioning review/confirmation/archive state machine, add permissions or dependencies, execute database changes, change branches/worktrees, commit, push, or alter unrelated dirty-worktree work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS positioning-card import controller/VO/service/mapper behavior and focused tests; Workbench positioning dialog/API/tests; directly affected positioning API/architecture documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing positioning submission snapshots, current published director-form template, media-account/service-relation object authorization, System dictionary snapshots, React/Ant Design Workbench; no new dependency.
+- Integration order: add server-owned import-source projection and validated import mapping -> connect Workbench source picker/overwrite flow -> update focused tests and contracts -> run backend/frontend/browser verification -> append delivery evidence.
+- Verification plan: focused positioning Java tests plus ZSJOS module tests; Workbench tests/typecheck/build; authenticated desktop/mobile browser checks when an available runtime/session exists; scoped diff and documentation consistency review.
+
+## Workstream Registration - 2026-08-26 13:00:00 +08:00
+
+- Workstream ID: `main-subordinate-partner-ownership`
+- Goal: add configurable current ownership of a Partner to an employee with the `zsjos:subordinate-partner:query` read scope and preserve submission-time employee snapshots on Partner Leads.
+- Non-goals: grant write actions, expose Partner financial/account secrets, change Partner submission semantics, rewrite historical Lead snapshots, execute SQL against a live database, change branches, commit, push, or modify unrelated dirty work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS Partner ownership/Lead visibility backend, V141 migration/bootstrap/docs, Workbench/Admin subordinate-partner surfaces, focused tests, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing System PermissionApi/AdminUserApi, ZSJOS Lead and Partner APIs, React/Vue menu contracts; no new dependency.
+- Integration order: relation persistence and authorization -> Lead snapshot/range APIs -> migration/bootstrap/docs -> frontend surfaces -> focused verification.
+- Verification plan: focused Java tests, ZSJOS module compile/tests, frontend type/build checks where practical, SQL static/idempotency review, and scoped diff check; no live database or real permission mutation.
+
+## Workstream Registration - 2026-08-26 11:38:37 +08:00
+
+- Workstream ID: `main-v139-v140-partial-migration-repair`
+- Goal: correct the V139/V140 MySQL collation and target-table failures and provide a forward repair for databases that recorded those versions after partial execution.
+- Non-goals: connect to or mutate the current database, delete or rewrite applied version rows, execute V139/V140/V142, change business rows, invent permissions, alter application behavior, add dependencies, create branches, commit, push, deploy, or modify unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V139__lead_supervisor_actions_and_public_sea_route.sql`, `script/sql/mysql/migrations/V140__command_positioning_and_menu_repairs.sql`, new V142 forward-repair migration, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/migrations/README.md`, `script/sql/mysql/verify-bootstrap.sql`, directly affected database-migration operations documentation if required, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing MySQL 8, System menu/role-menu tables, ZSJOS migration registries, Docker-based isolated verification, and repository migration conventions; no new dependency.
+- Integration order: make V139/V140 collation-safe and MySQL-legal for fresh execution -> add a guarded V142 forward repair for already-recorded partial executions -> wire bootstrap/docs/verification -> validate fresh, partial, and repeated execution in isolated MySQL 8 -> append delivery evidence.
+- Verification plan: focused SQL source assertions, isolated MySQL 8 execution with a `utf8mb4_0900_ai_ci` database and `utf8mb4_unicode_ci` System columns, fresh V139/V140/V142 flow, simulated partial V139/V140 state followed by V142, V142 repetition, verification-query results, and scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-26 12:00:27 +08:00
+
+- Workstream ID: `main-v139-v140-partial-migration-repair`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: repair the V139 collation failures and V140 target-table/collation failures reported by the statement-batch client, including the database state where failed migrations still recorded success markers.
+- Key decisions: explicitly align temporary permission tables with `system_menu.permission` at `utf8mb4_unicode_ci`; replace V140's illegal same-target correlated update with a MySQL self-join; execute V139 DML and V140/V142 menu/grant/version work in stored-procedure transaction boundaries; retain repeatable additive DDL while preventing failed calls from writing either version marker; preserve recorded V139/V140 history and repair already-partial databases only through V142; gate initial grant movement and grants by the applicable version so later administrator changes survive reruns; block on conflicting menu identity instead of overwriting it.
+- Execution or analysis result: V139 and V140 are corrected for fresh/unrecorded execution; V142 repairs partially applied V139/V140 schema, menus, duplicate supervisor permission identities, legacy interview grants, initial supervisor grants, and both version registries; bootstrap now includes V142 after V141; operational/migration documentation and verification SQL describe and validate the recovery path. The current `ruoyi-vue-pro` database was not connected to or modified.
+- Changed files: `script/sql/mysql/migrations/V139__lead_supervisor_actions_and_public_sea_route.sql`; `script/sql/mysql/migrations/V140__command_positioning_and_menu_repairs.sql`; `script/sql/mysql/migrations/V142__repair_partial_v139_v140.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `script/sql/mysql/verify-bootstrap.sql`; `docs/operations/database-migrations.md`; `handoff/main.md`.
+- Verification evidence: scoped `git diff --check` passed with only existing LF/CRLF conversion warnings; isolated MySQL 8.4.11 used database default `utf8mb4_0900_ai_ci` with `system_menu.permission=utf8mb4_unicode_ci`; targeted fresh V139 -> V140 -> V141 -> V142 execution passed with all four version markers, exactly five canonical supervisor permission menus, corrected `73460`/`73483` identities, and preserved interview grants; a simulated partially applied V139/V140 database was repaired by V142 and a second V142 execution kept one version marker, five menus, five manager grants, and preserved duplicate-menu grants on the canonical identity; legacy interview grants moved to `73483` while non-administrator `73460` grants were retired on first repair; post-V142 administrator grant removal and custom form grant addition both survived a rerun; forced failures on the second version registry made V139, V140, and V142 exit nonzero with zero corresponding legacy version rows, proving rollback of one-sided markers; focused V139/V140/V141/V142 checks from `verify-bootstrap.sql` all returned `PASS`. Full fresh bootstrap was attempted in the same isolated MySQL version but stopped before V139 at the pre-existing V102 error `Unknown column 'channel_code' in 'field list'`; no task file caused that blocker. The disposable container was stopped and automatically removed.
+- Dependency or integration impact: no new dependency, application API/runtime/business-row change, current-database mutation, branch/worktree operation, commit, push, deployment, or shared-service operation; V142 must follow V141 and is the only supported recovery path for databases that already record the failed V139/V140 attempts; unrelated dirty-worktree changes, including the pre-existing V140/V141 work and audit scripts outside this task's edits, were preserved.
+- Remaining work: run a read-only audit on the reported database, obtain separate explicit approval for current-database changes, apply pending V141 and then V142 with stop-on-error behavior, and require V139/V140/V141/V142 verification checks to pass. Independently repair and verify the pre-existing V102 `channel_code` bootstrap mismatch before claiming a complete fresh-production bootstrap.
+
+## Workstream Registration - 2026-08-26 10:53:34 +08:00
+
+- Workstream ID: `main-eam-asset-create-fields`
+- Goal: limit the `/eam/asset` create dialog's built-in fields to the user-confirmed set while keeping only asset name and category required.
+- Non-goals: change the edit dialog's existing built-in fields, category-driven custom fields, backend/API/database/import/detail/list behavior, dependencies, branches, commits, deployment, services, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/admin/src/views/eam/asset/AssetForm.vue` and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Vue 3, Element Plus form, EAM category, System department/user, dictionary, and upload facilities; no new dependency.
+- Integration order: conditionally hide non-requested built-in fields in create mode -> preserve edit and category custom-field behavior -> run frontend checks -> verify desktop/mobile create-dialog behavior.
+- Verification plan: scoped source/diff inspection, admin TypeScript check, lint, local production build, `git diff --check`, and browser checks at desktop and mobile widths against `http://localhost/eam/asset` when the local environment is usable.
+
+## Delivery Entry - 2026-08-26 11:12:35 +08:00
+
+- Workstream ID: `main-eam-asset-create-fields`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: make the `/eam/asset` create dialog show only asset name, category, management mode, quantity, purchase date, using department, user, asset source, attachments, location, and remark as its default built-in fields, with only asset name and category required.
+- Key decisions: apply the reduced built-in field set only in create mode; preserve the complete edit dialog; retain category-driven optional custom fields; keep the authoritative category, department, user, dictionary, and upload sources unchanged; do not change backend or persisted data contracts.
+- Execution or analysis result: create mode now hides brand/model, specification, serial number, barcode, original value, net value, warranty expiry, and expected life; the requested 11 built-in fields remain visible; the existing `name` and `categoryId` rules remain the only default required rules; edit mode and category custom fields remain unchanged.
+- Changed files: `frontend/admin/src/views/eam/asset/AssetForm.vue`; `handoff/main.md`.
+- Verification evidence: focused AssetForm source contract passed for all 8 create-hidden fields and the exact `name,categoryId` required-rule set; scoped ESLint passed; scoped Prettier check passed after formatting; `pnpm build:local` passed with an existing legacy CSS minify warning; scoped `git diff --check` passed with only line-ending conversion warnings. Full `pnpm ts:check` was attempted but failed on pre-existing errors in BPM, CRM, other EAM, MES, System, and ZSJOS files, with no error in `AssetForm.vue`; full `pnpm lint` was attempted but failed on 125 pre-existing style errors outside this task file. Browser verification reached `http://localhost/eam/asset`, but the only available browser session was logged out and displayed the login-timeout/not-found state, so authenticated desktop/mobile dialog inspection could not be completed.
+- Dependency or integration impact: no dependency, API, backend, schema, dictionary, permission, route, branch/worktree, commit, push, deployment, service, or business-data change; unrelated dirty-worktree changes, including the existing `DynamicFields.vue` modification, were preserved.
+- Remaining work: authenticated desktop and mobile browser verification remains required when a usable local session is available; confirm the 11 requested built-in fields, only two required markers, unchanged category custom fields, and retained full edit fields.
+
 ## Workstream Registration - 2026-08-25 21:10:00 +08:00
 
 - Workstream ID: `main-lead-supervisor-pools-timeline`
@@ -4223,3 +4369,452 @@
 - Verification evidence: `git status` 仅显示 H5、媒体大屏和 handoff；`git diff --name-status -- frontend/admin docs` 无输出；`git diff --name-status -- backend` 无输出；非允许范围未跟踪文件检查无输出；scoped `git diff --check` 仅报告现有 LF/CRLF 转换提示，无实际空白错误
 - Dependency or integration impact: 未修改后端、数据库、权限、依赖、分支、提交或远程分支；未删除 H5/媒体大屏文件
 - Remaining work: 提交前仍需人工审核 H5/媒体大屏中的生成文件、`.env.local` 和缓存文件是否纳入提交
+
+## Delivery Entry - 2026-08-26 10:38:00 +08:00
+
+- Workstream ID: `main-20260826-new-code-remediation`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (HEAD advanced from the registered base during the task through an external `ljc` commit containing the core Lead/order/form changes; Codex created no commit)
+- User goal: complete the approved remediation for Lead timeline and supervisor command idempotency, public-sea visual alignment, team orders, Workbench tenant/type/form/autosave behavior, EAM import/upload safety, positioning authorization/link expiry, and forward-only SQL/audit documentation.
+- Key decisions: preserve the current main worktree and unrelated nested UniApp state; use persistent tenant/operator/idempotency-key replay records and server-owned action projection; reuse the Lead-management master-detail classes and full `LeadDetail` for public sea; keep team orders read-only; preserve EAM employee-collection settings on partial imports; authorize positioning reads before snapshot mapping and use exact frozen service ownership; add V140 instead of rewriting applied V126/V130/V131/V134/V135; correct the presumed-unapplied V139 and forward-repair applied V139 definitions in V140; leave V131 permission revocation and V135 snapshot cleanup as read-only audit/export scripts only.
+- Execution or analysis result: public sea now uses the Lead-management status/list/detail/loading/error presentation while retaining A/B collaboration data and server actions; EAM uploads use the shared authenticated component and imports distinguish omitted columns; positioning links return `expiresAt`, expire by configured TTL, and share a non-enumerable invalid error; V140 adds the supervisor command ledger, positioning expiry/index, 2000-character comment, menu 73460/73483 repair, and single-active supervisor permission repair; affected API/navigation/operations documentation is synchronized.
+- Changed files: ZSJOS positioning VO/DO/mapper/service/tests and supervisor focused tests under `backend/yudao-module-zsjos`; EAM import service/test under `backend/yudao-module-eam`; positioning YAML under `backend/yudao-server`; `frontend/admin/src/views/eam/asset/DynamicFields.vue`; Workbench public-sea/subordinate pages, API/auth/autosave/menu/style tests and `aging-pool.css`; `script/sql/mysql/bootstrap.sql`, V139, new V140, migration README, `verify-bootstrap.sql`, and the two audit scripts; affected registration, sales-order, menu-coverage, positioning-deployment, and database-migration docs; this handoff record. Existing `frontend/workbench/tsconfig.tsbuildinfo` and nested `frontend/yudao-ui-admin-uniapp` state were preserved.
+- Verification evidence: ZSJOS focused reactor test passed 35/35 and compiled all dependencies; EAM focused reactor test passed 3/3 and compiled all dependencies; Workbench full Vitest passed 65 files/396 tests, `npm run typecheck` passed, and `npm run build` passed with only the existing large-chunk warning; Admin `pnpm build:local` passed with an existing legacy CSS minifier warning, while `pnpm ts:check` remained blocked by 16 existing BPM/CRM/EAM/MES/System/export-task errors and `pnpm lint` by 125 existing style issues outside `DynamicFields.vue`; `git diff --check` passed with line-ending warnings only. Browser reached the existing Workbench runtime at `http://127.0.0.1:5174/zsjos/lead-aging-pool` but the available in-app session redirected to login and no alternate authenticated browser existed. `zsjos_db.py check` was blocked by the existing Core-schema manifest gap covering multiple pre-existing mappings, including the new command table, before migration syntax/repeatability execution.
+- Dependency or integration impact: no dependency, branch/worktree operation, service start/stop/restart, commit, push, live database migration, real permission revocation, historical snapshot cleanup, or credential use occurred. Existing environments require controlled V140 application after V139; frontend/backend deployment must remain coordinated because positioning link responses now include expiry and runtime rejects links without it.
+- Remaining work: run V140 twice and `verify-bootstrap.sql` in an approved isolated MySQL database, compare the resulting schema with the development baseline, and review the exact V131/V135 audit row lists before any separately approved cleanup; complete authenticated desktop/mobile checks for Lead management, public sea, and team orders; independently remediate the pre-existing Admin type/lint and Core-schema manifest baselines if fully green repository-wide gates are required.
+## Workstream Registration - 2026-08-26 10:41:22 +08:00
+
+- Workstream ID: `main-20260826-media-screen-new-media`
+- Goal: implement the approved new-media contribution media-screen realtime statistics and persisted daily history snapshot API.
+- Non-goals: execute migrations, mutate business data, invent part-time relationships, add dependencies, change branches/worktrees, commit/push, restart shared services, or overwrite unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS media-screen VO/service/mapper/configuration/snapshot persistence and tests; V141/bootstrap/migration verification; media-screen API and deployment documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Lead DAL, System `DeptApi`/`AdminUserApi`, Redis, Spring scheduling/Quartz facilities, tenant and public media-screen access filter; no new dependency.
+- Integration order: register scope -> implement response/config/aggregate -> add snapshot table and idempotent freeze task -> synchronize SQL/bootstrap/docs -> focused tests and module/server verification -> append delivery evidence.
+- Verification plan: focused media-screen tests; ZSJOS reactor test/compile; yudao-server package; SQL static/repeatability/non-destructive checks; real HTTP only if an available runtime can be used without service mutation.
+
+## Delivery Entry - 2026-08-26 11:24:05 +08:00
+
+- Workstream ID: `main-20260826-media-screen-new-media`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: implement the new-media contribution media-screen realtime contract and persisted daily history snapshots, including explicit department scope, effective-state metrics, trends, series, stars, and no fabricated part-time data.
+- Key decisions: count `internal_new_media` by `source_user_id/source_dept_id`; count recorded `sales_self_sourced` by `source_provider_user_id` and the provider's current System department; restrict output to configured department IDs and enabled System users; use `valid/converted/won`; keep part-time output null; freeze names and daily counts with an idempotent tenant/date/member key; do not backfill invented history.
+- Execution or analysis result: `/stats` now returns summary, ordered department/member metrics, 10-minute cumulative trend, 14-day series, today star and snapshot-backed yesterday champion; `/history` aggregates only frozen daily rows; the guarded scheduler freezes the previous day after the configured Beijing-time boundary; V141 creates the empty snapshot table and is wired into bootstrap/verification; API and deployment documents are synchronized.
+- Changed files: media-screen VO/config/query/scheduler, Lead aggregate mapper projections, snapshot DO/mapper and focused tests under `backend/yudao-module-zsjos`; `backend/yudao-server/src/main/resources/application.yaml`; V141 plus bootstrap/migration README/verification SQL; media-screen API/deployment docs; this handoff record.
+- Verification evidence: final focused media-screen suite passed 22/22; full ZSJOS module suite passed 582/582; direct ZSJOS install and `yudao-server -DskipTests package` passed; built ZSJOS JAR contains query/snapshot mapper/scheduler classes; V141 static scan found no business-row delete/drop/truncate and confirmed repeatable creation, unique key, version markers and V140->V141 bootstrap order; scoped `git diff --check` passed with line-ending warnings only. The prescribed full `-am` reactor compile was separately blocked before ZSJOS by the existing Infra Excel classpath baseline, while direct module and server builds succeeded.
+- Dependency or integration impact: no new dependency, branch/worktree operation, commit, push, live migration, cache deletion, real permission/data mutation, service restart, or deployment. Existing target-file user changes were preserved; V141 must be applied and authoritative department IDs supplied externally before enabling production snapshots.
+- Remaining work: apply V141 in an approved isolated/target MySQL environment and run bootstrap/schema-difference verification; configure the real ordered department IDs; restart/roll out the backend through the approved process; then capture real `/stats` responses for both flags, an `available=true` history response after the first freeze, authorized/unauthorized IP cases, and verify Redis/runtime behavior. Real HTTP and database execution were not performed in this turn.
+
+## Workstream Registration - 2026-08-26 11:31:42 +08:00
+
+- Workstream ID: `main-eam-asset-form-fields`
+- Goal: apply the confirmed reduced built-in asset field set to both create and edit dialogs at `/eam/asset`, with only asset name and category required.
+- Non-goals: change category-driven custom fields, backend/API/database/import/detail/list behavior, historical asset values, dependencies, branches, commits, deployment, services, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing user changes.
+- Target branch: `main`
+- Ownership scope: `frontend/admin/src/views/eam/asset/AssetForm.vue` and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Vue 3, Element Plus form, EAM category, System department/user, dictionary, and upload facilities; no new dependency.
+- Integration order: remove the eight non-requested built-in controls from the shared form -> preserve field values in backend/history and category custom-field behavior -> run focused frontend and build checks -> attempt authenticated desktop/mobile browser verification.
+- Verification plan: focused source contract, scoped ESLint and Prettier, local production build, `git diff --check`, and browser checks for both create and edit dialogs at desktop/mobile widths when an authenticated local session is available.
+
+## Delivery Entry - 2026-08-26 11:38:40 +08:00
+
+- Workstream ID: `main-eam-asset-form-fields`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: remove the previously excluded asset fields from the edit dialog as well as the create dialog.
+- Key decisions: remove the eight controls from the shared template so both modes use the same reduced built-in field set; retain their properties in the form model and backend contract so editing an existing asset does not clear hidden historical values; preserve category-driven optional custom fields and the existing authoritative reference-data sources.
+- Execution or analysis result: brand/model, specification, serial number, barcode, original value, net value, warranty expiry, and expected life are no longer rendered in either create or edit mode; the requested 11 built-in fields remain; `name` and `categoryId` remain the only default required rules.
+- Changed files: `frontend/admin/src/views/eam/asset/AssetForm.vue`; `handoff/main.md`.
+- Verification evidence: focused shared-form source contract passed for all 8 absent controls and the exact `name,categoryId` required-rule set; scoped ESLint and Prettier checks passed; `pnpm build:local` passed with the existing legacy CSS minifier warning; scoped `git diff --check` passed with only a handoff line-ending warning. Full `pnpm ts:check` remained blocked by the same 16 pre-existing errors in BPM, CRM, other EAM, MES, System, and ZSJOS files; full `pnpm lint` remained blocked by the same 125 pre-existing style errors outside this task file. Browser again reached `http://localhost/eam/asset` but the only available session showed login timeout/not-found, so authenticated create/edit desktop/mobile inspection could not run.
+- Dependency or integration impact: no dependency, API, backend, schema, dictionary, permission, route, branch/worktree, commit, push, deployment, service, or business-data change; unrelated dirty-worktree changes, including the existing `DynamicFields.vue` modification, were preserved.
+- Remaining work: authenticated desktop and mobile browser verification remains required when a usable local session is available; confirm the same 11 built-in fields and two required markers in both create and edit dialogs, unchanged category custom fields, and preservation of hidden historical values after editing another field.
+
+## Workstream Registration - 2026-08-26 12:41:23 +08:00
+
+- Workstream ID: `main-subordinate-partner-ownership`
+- Goal: implement the confirmed Partner-to-employee ownership capability and the `zsjos:subordinate-partner:query` read-only subordinate Partner/Lead surface.
+- Non-goals: execute migrations, mutate live role grants or business data, add dependencies, change branches/worktrees, commit/push, or alter unrelated dirty-worktree work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS Partner ownership/audit/snapshot backend, Partner and Lead permission projections/controllers/tests; V143/bootstrap SQL; Workbench and Vue Admin Partner ownership surfaces and APIs; subordinate Partner API/docs/menu coverage; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: System user/permission/menu APIs, existing ZSJOS Partner/Lead/object-permission contracts, shared LeadDetail and frontend service patterns; no new dependency.
+- Integration order: additive ownership schema and audit -> live permission/object visibility and Lead submission snapshot -> admin binding and employee read-only pages -> docs/menu metadata -> focused verification.
+- Verification plan: focused ZSJOS tests and compile; Workbench typecheck/guard/build; Admin targeted lint/build and full typecheck attempt; SQL static/repeatability review; authenticated browser checks when a usable session exists; no live migration or grant mutation.
+
+## Delivery Entry - 2026-08-26 12:41:23 +08:00
+
+- Workstream ID: `main-subordinate-partner-ownership`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: add one-current-owner/many-Partners binding, assignability through `zsjos:subordinate-partner:query`, complete readonly Partner Lead-chain visibility, submission-time owner snapshots, reassignment, unassignment and audit history.
+- Key decisions: current ownership is tenant-scoped and unique per Partner; only currently enabled employees with the query permission can be bound; reassignment immediately moves live visibility and does not backfill old Lead snapshots; disabled/converted Partners retain historical readonly access; subordinate reads never expose write actions or financial/account mutation; admin binding remains on Partner management and employee access is a separate `/zsjos/subordinate-partners` page.
+- Execution or analysis result: added ownership and immutable audit DO/mapper/service, candidate/update/log endpoints, subordinate Partner and Lead endpoints, Partner assignment projection, Lead owner snapshot fields and submission capture, live object authorization and full readonly tab projection, controller permission alternatives, V143 schema/menu/button metadata, Workbench page/API/guard and Partner history modal, Vue Admin APIs/pages, and synchronized API/architecture/menu/migration documentation. Fixed the Workbench history-table timestamp render type mismatch by wrapping the formatter in a row-compatible callback.
+- Changed files: backend ZSJOS Partner ownership, subordinate controller/service, Partner/Lead VO/DO/service/controller/test files; `script/sql/mysql/migrations/V143__subordinate_partner_ownership.sql`, bootstrap and migration README; Workbench subordinate page, management page/API/constants/registry/styles/guard test; Admin Partner/subordinate APIs and views; `docs/api/zsjos-subordinate-partners.md`, permission-flow, role matrix and menu coverage docs; this handoff record.
+- Verification evidence: focused backend tests passed 24/24 (`PartnerOwnershipServiceTest`, `PartnerManagementServiceImplTest`, `LeadSubmissionServiceImplTest`); Workbench `npm run typecheck` passed, subordinate guard test passed 2/2, and `npm run build` passed with the existing large-chunk warning; targeted Admin ESLint passed and `pnpm build:local` passed with the existing legacy `*zoom` CSS warning. Full Admin `pnpm ts:check` completed but remains blocked by 15 pre-existing errors outside the changed subordinate/Partner files. SQL was reviewed for additive guarded DDL, tenant uniqueness, repeatability, relative `/zsjos` child path, permission/menu assertions and version markers; `git diff --check` reported line-ending warnings only. Authenticated browser and live database/migration execution were not performed.
+- Dependency or integration impact: no dependency, branch/worktree operation, commit, push, service restart, live migration, live role grant, historical backfill or business-data mutation occurred. V143 must be applied through the approved controlled database process before production use; System permissions and employee account state remain authoritative at read/assignment time.
+- Remaining work: run V143 and bootstrap/schema comparison in an approved isolated or target database; perform authenticated desktop/mobile browser checks for admin binding, subordinate list, full Lead tabs and unauthorized/expired-permission cases; optionally add endpoint-level authorization tests for reassignment old-owner denial, permission removal, tenant isolation and write-action absence. The Vue subordinate renderer currently exposes the readonly overview drawer, while the React Workbench reuses the complete LeadDetail tab chain; if dual-client parity is required, extend the Vue drawer with the same follow-up/appeal/complaint/order/flow-history projections.
+## Workstream Registration - 2026-08-26 10:39:00 +08:00
+
+- Workstream ID: `main-remove-new-media-student-ops`
+- Goal: completely remove the retired new-media Student Operations menu and its exception-ticket, cooperation-assessment, and graduation domains from runtime code, the rewritten development baseline, BPM assets, and the confirmed local development database.
+- Non-goals: remove or change the separate student-contact extension workflow or its `异常情况处理` menu; change other new-media account/content/positioning/production behavior; add dependencies; create or switch branches/worktrees; commit; push; or overwrite unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus all existing user changes.
+- Target branch: `main`
+- Ownership scope: Student Operations backend controller/VO/service/DAL/tests and its direct registration/media references; Workbench Student Operations route/page/API/style/tests; BPM graduation asset/manifest; new-media baseline migrations V096/V097/V100/V106/V107/V108/V118, bootstrap/verification and new cleanup migration V144; directly affected menu/API/permission/BPM/database documentation; this handoff record; confirmed local database objects owned exclusively by these three retired domains.
+- Owner: Codex `/root`
+- Dependencies: existing Workbench route registry, ZSJOS media-student projection, System menu/notification tables, BPM model cleanup boundary, Flowable repository model, and MySQL bootstrap flow; no new dependency.
+- Integration order: back up and inventory local database -> remove runtime references -> rewrite confirmed development baseline and add V144 exit migration -> update BPM assets/docs -> verify code/bootstrap -> clean local BPM/database state -> verify absence and retained student-contact extension behavior.
+- Verification plan: scoped reference scans; ZSJOS tests/compile and server package; Workbench tests/typecheck/build; BPM manifest validation; fresh bootstrap plus repeatable V144 execution in a disposable database; pre/post local database counts; retained student-contact extension tests and object checks.
+
+## Delivery Entry - 2026-08-26 13:12:05 +08:00
+
+- Workstream ID: `main-remove-new-media-student-ops`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: permanently remove the new-media 学员运营 / Student Operations menu, APIs, services, DAL, permissions, three business tables, historical rows, graduation BPM asset and notifications; preserve the separate 异常情况处理 student-contact extension workflow.
+- Key decisions: confirmed destructive cleanup; rewrite the development baseline and retain V144 as an exit cleanup for old/current environments; delete Flowable model/definitions/deployments/runtime/history only through Flowable services; do not touch `zsjos_student_contact_extension` or `zsjos_student_contact_extension` BPM.
+- Execution or analysis result: removed dedicated backend/controller/VO/DO/mapper/service/listener/test files; removed Workbench route/page/API/style/test; removed graduation BPM XML/manifest entry and graduation notification scene; rewrote V096/V097/V100/V107/bootstrap; removed obsolete V106/V108/V118 migration files/markers; added repeatable V144; synchronized menu/API/permission/migration/BPM docs; changed new-media operator seed remark from “内容及学员运营” to “内容运营”. Local Flowable cleanup for `zsjos_media_graduation` succeeded through RuntimeService/HistoryService/RepositoryService: instances, history, process definitions, deployment and model are all zero. V144 was executed twice successfully against local `ruoyi-vue-pro`.
+- Changed files: all Student Operations files and direct references listed in the workstream scope; `script/sql/mysql/migrations/V144__remove_new_media_student_operations.sql`; baseline/verification/bootstrap SQL; `script/bpm/manifest.json`; affected Workbench, architecture, API, migration and BPM documentation; `script/sql/quick-init-org.sql`; this handoff record. Unrelated dirty-worktree files were preserved.
+- Verification evidence: BPM manifest validator passed (`Validated 9 versioned BPM assets`); ZSJOS main/test compilation and install passed with `-DskipTests`; Workbench `npm run typecheck` passed and `npm run build` passed; BPM Flowable cleanup test passed 1/1; V144 first and second executions exited 0; post-cleanup counts: retired tables 0, menus 0, role grants 0, graduation templates/rules/messages 0, business events 0, graduation BPM models/definitions/runtime/history 0, V144 marker 1; preserved student-contact table/permission/BPM definition each 1; reference scan has only V144 deletion predicates and explicit verification/docs references; scoped diff checks report line-ending warnings only.
+- Backup/recovery: pre-cleanup full SQL backup at `C:\Users\EDY\AppData\Local\Temp\zsj-os-removal-backup\ruoyi-vue-pro-before-student-ops-removal-20260826-124338.sql`; SHA-256 `12477F6375041868D0F1EC73CC55D5E34EF32FE50AEADA6284F4965825262592`. Deleted business rows/tables and BPM history are recoverable only by restoring that backup; no rollback SQL is provided.
+- Dependency or integration impact: no dependency, branch/worktree, commit, push, service restart or deployment; local database and BPM state were intentionally mutated per confirmation. `异常情况处理` remains the student-contact extension approval capability and was verified present.
+- Remaining work: full ZSJOS reactor test is not green because an unrelated pre-existing `LeadFlowHistoryPermissionContractTest` expects the old single permission while the existing subordinate-partner change supplies `hasAnyPermissions`; Workbench suite is 393/394 with one unrelated `subordinate-partner.css` spacing-token failure; full `-am` test was also stopped earlier by an unrelated Infra UniApp generator failure. These are outside this cleanup and were not changed.
+
+## Workstream Registration - 2026-08-26 14:22:12 +08:00
+
+- Workstream ID: `main-dual-frontend-boundary`
+- Goal: codify the durable development boundary for the independent Vue administration frontend and React employee workbench, including their shared backend, authentication, tenant, menu, permission, and conditional reuse contracts.
+- Non-goals: change application behavior, APIs, menus, authentication, dependencies, package workspaces, frontend source code, architecture documents, branches/worktrees, commits, deployments, services, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: root `AGENTS.md` and this handoff record only.
+- Owner: Codex `/root`
+- Dependencies: existing repository, frontend subtree, authentication, permission, and architecture rules; no new dependency.
+- Integration order: register scope -> add the root dual-frontend contract while preserving approved exceptions -> perform targeted consistency and diff checks -> append delivery evidence.
+- Verification plan: compare the new rule with the three relevant architecture documents and both frontend subtree `AGENTS.md` files; run targeted content assertions and `git diff --check -- AGENTS.md handoff/main.md`; review only the scoped diff. No frontend build is required for a documentation-only rule change.
+
+## Delivery Entry - 2026-08-26 14:23:55 +08:00
+
+- Workstream ID: `main-dual-frontend-boundary`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: formalize the independent Admin and Workbench frontend boundary while requiring their shared backend, authentication, tenant, menu, permission, and conditional common-package development contract.
+- Key decisions: place the cross-runtime rule only in the root `AGENTS.md`; preserve approved `admin_embed`, documented dual-frontend coverage, and explicit business exceptions; require compatibility verification for both consumers of shared contracts; make shared-package extraction conditional and framework-independent rather than creating a package now.
+- Execution or analysis result: added a durable administration/workbench contract covering separate users, menus, interactions, stacks, and project ownership; shared server authority and prohibited duplicate truths; client-specific rendering; cross-consumer verification; and the approval boundary for shared protocol, utility, design, transport, and authentication packages.
+- Changed files: root `AGENTS.md`; `handoff/main.md`.
+- Verification evidence: targeted content assertion passed all 8 required rule markers; consistency scan matched the existing runtime, authentication, menu, permission, `admin_embed`, dual-renderer, Vue, and React contracts across the three relevant architecture documents and both frontend subtree rules; scoped `git diff --check` passed with line-ending warnings only; scoped `AGENTS.md` diff review confirmed only the intended subsection was added. Frontend builds were not run because this turn changes documentation rules only.
+- Dependency or integration impact: no application behavior, source code, API, schema, menu data, authentication, dependency, workspace, architecture document, branch/worktree, commit, service, deployment, or external state changed; unrelated working-tree changes were preserved.
+- Remaining work: None.
+
+## Workstream Registration - 2026-08-26 14:25:54 +08:00
+
+- Workstream ID: `main-production-ticket-dispatch-pool`
+- Goal: implement account-scoped production-ticket dispatch with creator-as-reviewer, permission-backed user-relation candidates, permanent assigned acceptance/rejection, an unassigned claim pool, immutable account/positioning context, and unlimited recorded revisions.
+- Non-goals: automatic dispatch, acceptance timeout, page-presence or workload balancing, reassignment, dependency additions, live migration or permission mutation, branch/worktree operations, commits, pushes, service reconfiguration, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS production-ticket controller/VO/service/DAL/constants/tests; user-relation target eligibility backend and both existing management renderers; Workbench media-student account launch, production-ticket list/pool/global assignment UI, typed APIs/styles/tests; additive production-ticket/user-relation SQL, bootstrap verification, permissions and directly affected architecture/API/menu documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing System permission/user public APIs, ZSJOS user-relation/account/positioning/business-event facilities, Workbench route shell and sales-assignment visual pattern; no new dependency.
+- Integration order: register scope -> extend relation eligibility and production-ticket persistence/API/state machine -> add SQL/menu grants -> implement account launch and ticket assignment/pool UI -> update both relation-management renderers -> synchronize docs -> run focused and proportional verification.
+- Verification plan: focused ZSJOS unit/contract tests and module compile; Workbench tests/typecheck/build and desktop/mobile browser checks; Admin targeted lint/typecheck/build and browser check; SQL syntax/repeatability/static relationship review plus bootstrap assertions; no live migration execution without separate confirmation.
+
+## Delivery Entry - 2026-08-26 14:56:55 +08:00
+
+- Workstream ID: `main-production-ticket-dispatch-pool`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: implement account-scoped production-ticket dispatch, permanent assigned acceptance/rejection, permission-backed candidates, public-pool claiming, immutable snapshots, and unlimited revision counting.
+- Key decisions: creator/reviewer are fixed to the logged-in operator; account launch requires a current confirmed positioning submission; empty assignment enters `public_pool`; assigned tickets are permanent `pending_accept`; candidates are configured relation targets intersected with the live accept permission; no new ticket writes script/deadline/max-revision fields; no live migration execution.
+- Execution or analysis result: completed backend state/API/DAL integration and fixed action projection so rejection is shown only with its dedicated permission. Added V145 repeatable migration and bootstrap/verification wiring, permission-based relation scene, permission/menu grants, notification templates/rules, and historical conversion limited to unassigned pending tickets. Added Admin and Workbench relation eligibility controls. Added Workbench account-row launch with confirmed-positioning guard and snapshot modal, independent pending/mine/pool ticket views, claim confirmation, and non-closable global assignment host with required rejection reason.
+- Changed files: production ticket backend/controller/VO/DO/mapper/service/object permissions/constants/errors/notifications; user-relation backend/VO/DO/service; `script/sql/mysql/migrations/V145__production_ticket_dispatch_pool.sql`, `script/sql/mysql/bootstrap.sql`, `script/sql/mysql/verify-bootstrap.sql`; Admin relation API/form; Workbench API, relation management, student account page, ticket page/global host, route shell, styles and API contract; role permission matrix; this handoff. Existing unrelated dirty files were preserved.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed (21/21); focused `ProductionTicketServiceTest` passed 3/3 after removing obsolete legacy create-field fixture; Workbench `npm run typecheck` passed; Workbench `npm run build` passed; Admin `npm run ts:check` passed; scoped `git diff --check` passed with existing line-ending warnings. SQL was statically reviewed and not executed against a real database. Browser checks and broader backend tests remain unverified.
+- Dependency or integration impact: no dependency, branch/worktree, commit, push, service restart, deployment, or live database mutation. V145 must be applied only through the controlled migration process after confirmation.
+- Remaining work: add broader focused backend/frontend coverage, complete desktop/mobile browser verification, expand migration README and architecture/menu documentation where needed, and review any remaining legacy fixtures that construct removed create fields.
+
+## Delivery Entry - 2026-08-26 15:49:48 +08:00
+
+- Workstream ID: `main-media-account-maintenance-calendar`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: replace forced S0-S6 media-account transitions with jointly maintained dictionary snapshots and immutable revisions, notify assigned director/operator after actual changes, preserve legacy stage logs, and add a participant-scoped read-only calendar Gantt overview.
+- Key decisions: all seven maintenance fields remain optional; dates are paired and ordered; unchanged selections retain their historical label snapshots; changed selections are validated against enabled System dictionary data and snapshotted server-side; no-op saves write nothing; current account version alone appears in the calendar; account participants form ordinary object scope and independent `query-all` expands it; notification recipients use updated assignments, are deduplicated and exclude the actor; legacy stage commands remain one-cycle compatibility routes that always return the retired-feature error.
+- Execution or analysis result: added current snapshot columns, immutable revision persistence and history projection, arbitrary stage maintenance, validation/optimistic locking, calendar overlap and unscheduled queries, participant notifications, object/feature permissions, and retired old stage commands. Added Workbench account maintenance/history UI and `/calendar/overview` week/month/quarter/year Gantt with authoritative dictionary filters/colors, user filters, clipping markers, today/weekend treatment and remote states. Added repeatable V146 schema, confirmed dictionaries, top-level calendar menu, inherited permissions, notification template/rules, bootstrap verification, dedicated API documentation and synchronized permission/menu/Workbench contracts.
+- Changed files: media-account controller/VO/DO/mapper/service/object-permission/constants/errors/tests, maintenance revision persistence, legacy stage mapper, media-student projection/service, media notification scene; Workbench account maintenance component, media-student integration, calendar page/route/registry/API/styles/tests; `script/sql/mysql/migrations/V146__media_account_maintenance_calendar.sql`, bootstrap/verification/migration README; media-account API, data/permission flow, role-permission matrix, menu coverage and Workbench API contract; this handoff record. Existing unrelated dirty-worktree changes were preserved.
+- Verification evidence: focused backend account/permission/notification tests passed 14/14 and the prior ZSJOS compile passed; full ZSJOS module tests ran 599 with 598 passing and one pre-existing `LeadFlowHistoryPermissionContractTest` failure caused by the existing subordinate-partner `hasAnyPermissions` expression. Workbench focused calendar/maintenance/menu tests passed 19/19, `npm run typecheck` passed, and production build passed with the existing large-chunk warning. Full Workbench tests ran 400 with 399 passing and one pre-existing `subordinate-partner.css` spacing-token failure. V146 static assertions passed for version markers, non-upsert temporary seeds, `query-all` plus page-query inheritance, relative child path, revision uniqueness and absence of media-account deletes; scoped `git diff --check` reported line-ending warnings only. The local dev page at `http://127.0.0.1:4178/calendar/overview` loaded behind the authentication gate with no console errors, but no authenticated session was available for desktop/mobile Gantt interaction checks.
+- Dependency or integration impact: no dependency, branch/worktree operation, commit, push, deployment, shared-service restart, live migration, database synchronization, role mutation, historical revision fabrication or legacy-stage-log rewrite occurred. V146 remains unapplied and must go through the separately confirmed controlled database process; it intentionally synchronizes the four approved dictionary labels/status/colors and grants calendar permissions by existing permission relationships rather than role names.
+- Remaining work: execute V146 twice in an approved disposable or target MySQL environment, run bootstrap/schema-difference verification, and complete authenticated desktop/mobile checks for week/month/quarter/year views, long names, horizontal scrolling, tooltip, empty/error/unauthorized states and real menu/dictionary/API responses. Resolve the unrelated subordinate-partner Workbench spacing guard and Lead flow-history permission contract before requiring fully green repository suites.
+
+## Workstream Registration - 2026-08-26 16:37:49 +08:00
+
+- Workstream ID: `main-media-account-history-authorization`
+- Goal: prevent unauthorized media-account maintenance-history requests while allowing account participants with an existing query or maintenance feature permission to read maintenance and legacy history.
+- Non-goals: change user 230, role/menu grants, account ownership, database data/schema, maintenance write authorization, student-detail visibility, dependencies, branches/worktrees, commits, pushes, deployments, services, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes, including the media-account maintenance/calendar implementation.
+- Target branch: `main`
+- Ownership scope: media-account Controller and Service action projection; focused media-account permission tests; Workbench account-maintenance panel and integration/guard tests; media-account maintenance API documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing System permission API, ZSJOS media-account object permission provider, Workbench server-returned `availableActions`, and the V146 maintenance/history contract; no new dependency.
+- Integration order: register scope -> add cumulative server-side history affordance and endpoint permission expression -> gate Workbench history rendering/loading by that affordance -> synchronize documentation -> run focused backend/frontend checks and broader compile/type/build verification.
+- Verification plan: focused service action-projection tests for feature/object allowed and denied cases; controller permission contract assertions; Workbench guard tests proving unauthorized accounts do not request history and authorized accounts can load both history sources; ZSJOS compile/tests; Workbench typecheck/build; scoped diff and documentation consistency checks. No live database mutation or role/permission synchronization.
+
+## Workstream Scope Extension - 2026-08-26 16:41:20 +08:00
+
+- Workstream ID: `main-media-account-history-authorization`
+- Added ownership scope: `MediaWorkflowConstants.java`, because `VIEW_ACCOUNT_HISTORY` is a backend-to-frontend action protocol value and the module keeps account action identifiers in that focused constants owner.
+- Integration impact: no dependency, database, menu, role, account ownership, branch/worktree, service, deployment, or external-state change.
+
+## Workstream Scope Extension - 2026-08-26 16:49:10 +08:00
+
+- Workstream ID: `main-media-account-history-authorization`
+- Added ownership scope: `frontend/workbench/docs/api-contract.md` and `docs/architecture/data-and-permission-flow.md`, because both directly describe the changed history authorization and server-projected Workbench capability contract.
+- Integration impact: documentation synchronization only; no additional runtime, dependency, database, menu, role, account ownership, branch/worktree, service, deployment, or external-state change.
+
+## Delivery Entry - 2026-08-26 16:51:05 +08:00
+
+- Workstream ID: `main-media-account-history-authorization`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: fix the `Access Denied` warning produced when user 230 opened account 5 maintenance history, without changing real roles, menus, account ownership, or database data.
+- Key decisions: retain current-state visibility inherited from authorized student detail; accept either existing account-query or account-maintenance feature permission at the two read-only history endpoints; independently retain `@ZsjosPermission(... action = "read")`; project `VIEW_ACCOUNT_HISTORY` only when both feature and object permissions pass; make Workbench load and render history only from that server-projected capability.
+- Execution or analysis result: user 230 no longer causes a history request for unrelated account 5 because its account projection omits `VIEW_ACCOUNT_HISTORY`; an assigned director/operator with account query or maintenance permission receives the capability and can load maintenance and legacy history. The current status snapshot remains visible, maintenance-write authorization is unchanged, and no permission or ownership data was altered.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/account/MediaAccountController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/MediaWorkflowConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/account/MediaAccountServiceTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/admin/account/MediaAccountControllerPermissionTest.java`; `frontend/workbench/src/components/AccountMaintenancePanel.tsx`; `frontend/workbench/src/components/account-maintenance.guard.test.ts`; `docs/api/media-account-maintenance-calendar.md`; `frontend/workbench/docs/api-contract.md`; `docs/architecture/data-and-permission-flow.md`; this handoff record. Existing unrelated dirty-worktree changes were preserved.
+- Verification evidence: backend focused account authorization and maintenance tests passed 15/15 with the 21-module reactor build successful; Workbench focused maintenance/calendar/student tests passed 12/12; `npm run typecheck` passed; `npm run build` passed with only the existing large-chunk warning; exact permission/action/documentation assertions passed 7/7; scoped `git diff --check` passed with line-ending warnings only. The local Workbench route loaded through its authentication gate with no console errors, but authenticated participant/unrelated-user browser interaction was not available in the current browser session.
+- Dependency or integration impact: no dependency, schema, migration, dictionary, menu, role, user, account ownership, business data, branch/worktree operation, commit, push, deployment, server restart, or shared external-state change. Backend and Workbench must be deployed together because the UI deliberately hides history until the new server action is present.
+- Remaining work: after the existing backend and Workbench services are updated through the normal deployment flow, perform an authenticated check that user 230 viewing account 5 emits no history request/WARN and that account participant 248 can load both history tabs. No code work remains for the confirmed scope.
+## Workstream Registration - 2026-08-26 17:25:04 +08:00
+
+- Workstream ID: `main-media-account-maintenance-menu-parent`
+- Goal: correct the server-owned `zsjos:media-account:maintenance` button so it belongs to the active media-student page menu `7022`, and add delivery assertions/documentation that prevent it from returning to retired menu `6970`.
+- Non-goals: execute V146 or bootstrap against any database, mutate live role grants or permissions, restructure the calendar directory/page, change frontend authorization logic, add dependencies, change branches/worktrees, commit, push, or alter unrelated dirty-worktree work.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: `script/sql/mysql/migrations/V146__media_account_maintenance_calendar.sql`, the V146 assertion in `script/sql/mysql/verify-bootstrap.sql`, the V146 description in `script/sql/mysql/migrations/README.md`, the media-student permission ownership description in `docs/frontend/zsjos-menu-coverage.md`, and this handoff record.
+- Owner: Codex `/root`
+- Dependencies: active server-owned media-student page menu `7022`, retired standalone account menu `6970`, existing System `system_menu` and `system_role_menu` permission inheritance; no new dependency.
+- Integration order: assert active parent menu -> repair V146 button parent -> strengthen bootstrap verification -> synchronize directly affected documentation -> run focused static SQL and diff checks.
+- Verification plan: verify exact `73603 -> 7022` button metadata, active `7022` parent contract, absence of any active maintenance button under `6970`, unchanged permission-based grant inheritance, non-destructive/repeatable SQL shape, and scoped `git diff --check`; do not execute live database synchronization.
+
+## Delivery Entry - 2026-08-26 17:28:40 +08:00
+
+- Workstream ID: `main-media-account-maintenance-menu-parent`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: repair the account-maintenance permission configuration so operators with the inherited edit grant can maintain account status, and enforce the repository rule that directories, pages, and buttons are server-owned menu metadata.
+- Key decisions: place button menu `73603` under the active media-student page `7022`; reject V146 execution when `7022` is not the active type-2 `zsjos:media-student:query-my` page; retain permission-based `system_role_menu` inheritance from existing account query/edit/query-all grants without role-name checks; leave the top-level calendar hierarchy unchanged.
+- Execution or analysis result: corrected the V146 parent from retired menu `6970` to active menu `7022`, added a pre-insert parent assertion, strengthened bootstrap verification for the exact button metadata, and synchronized migration and menu-coverage documentation.
+- Changed files: `script/sql/mysql/migrations/V146__media_account_maintenance_calendar.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `docs/frontend/zsjos-menu-coverage.md`; `handoff/main.md`.
+- Verification evidence: all 13 focused static assertions passed for active parent metadata, exact button parent, retired-parent absence, unchanged calendar hierarchy, edit-permission grant inheritance, absence of role-name authorization, bootstrap inclusion and exact verification, documentation coverage, and absence of ZSJOS business-row deletes; scoped `git diff --check` passed with line-ending warnings only. No frontend/backend build was run because runtime code did not change. No live database or bootstrap execution was performed because database synchronization and real permission mutation require separate confirmation.
+- Dependency or integration impact: no dependency, frontend/backend runtime, branch/worktree operation, commit, push, live menu grant, database row, or service change. V146 remains to be applied through the separately approved database process; when applied, eligible roles inherit `73603` from existing `zsjos:media-account:edit` grants.
+- Remaining work: run V146 and `verify-bootstrap.sql` in an approved disposable or target database, then confirm an authorized operator receives `zsjos:media-account:maintenance` through the server menu response and can save a related account while unrelated users remain denied.
+## Workstream Registration - 2026-08-26 17:46:30 +08:00
+
+- Workstream ID: `main-account-scoped-maintenance-ui`
+- Goal: move media-account status maintenance out of the student-level tab set and into the selected account context, with per-account status summaries and an account-owned maintenance/history area.
+- Non-goals: change backend APIs, permission identifiers, object authorization, dictionaries, maintenance data semantics, calendar behavior, database/schema/menu metadata, dependencies, branches/worktrees, commits, pushes, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: the maintenance placement and account presentation in `frontend/workbench/src/pages/MediaStudentsPage.tsx`; focused maintenance/media-student guard tests; directly affected Workbench/menu documentation; this handoff record. `AccountMaintenancePanel.tsx` and media-student styles may be changed only if the account-owned composition requires it.
+- Owner: Codex `/root`
+- Dependencies: existing server-projected account snapshots and `MAINTAIN_ACCOUNT`/`VIEW_ACCOUNT_HISTORY` actions, current media-student account selection, existing `AccountMaintenancePanel`; no new dependency.
+- Integration order: normalize retired maintenance deep links -> add per-account status summary/action -> render maintenance/history inside the account tab for the selected account -> remove the student-level maintenance tab -> update tests/docs -> run focused tests, typecheck, build and browser checks where available.
+- Verification plan: focused normalization and source-contract tests; account maintenance guard tests; Workbench typecheck and production build; desktop/mobile browser inspection if an authenticated runtime is available; scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-26 18:01:07 +08:00
+
+- Workstream ID: `main-account-scoped-maintenance-ui`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: correct the media-account maintenance information architecture so status maintenance belongs to each account rather than appearing as a student-level tab.
+- Key decisions: retain only overview/accounts/content as student tabs; normalize legacy `tab=maintenance` and `tab=positioning` URLs to accounts; show each account's snapshot status, stage and schedule directly in its row; use that account's server-projected `MAINTAIN_ACCOUNT`/`VIEW_ACCOUNT_HISTORY` actions for the row entry; open the selected account's editor directly for maintainers and keep immutable/legacy history inside the selected account area.
+- Execution or analysis result: removed the outer status-maintenance tab, embedded the existing account snapshot/history panel in the account tab, added account-row summaries and direct maintain/view actions, added controlled initial editing for the selected account, and synchronized Workbench/menu documentation and guard coverage.
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/components/AccountMaintenancePanel.tsx`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `frontend/workbench/docs/api-contract.md`; `docs/frontend/zsjos-menu-coverage.md`; `handoff/main.md`.
+- Verification evidence: focused media-student and account-maintenance tests passed 10/10; `npm run typecheck` passed; `npm run build` passed with the existing large-chunk warning; tracked-file `git diff --check` passed with line-ending warnings only, and the untracked panel file produced no whitespace-error output under `git diff --no-index --check` (exit 1 denotes expected file difference). Full `npm test` passed 401/402; its sole failure is the pre-existing spacing-token violation in unchanged `src/styles/pages/subordinate-partner.css`. The local app is running at `http://127.0.0.1:5173/`; browser navigation reached the login page, but no authenticated employee session was available, so account interaction and authenticated desktop/mobile visual inspection remain unverified.
+- Dependency or integration impact: no dependency, backend/API, permission identifier, object authorization, dictionary, calendar, schema, menu metadata, branch/worktree operation, commit, push, database, business-data, or shared-service change. Existing unrelated dirty changes in all touched files were preserved.
+- Remaining work: with an authenticated director/operator session, verify account-row status truncation, direct editor opening for `MAINTAIN_ACCOUNT`, read-only history entry for `VIEW_ACCOUNT_HISTORY`, account switching, save refresh, and desktop/mobile layout; separately fix the existing `subordinate-partner.css` spacing-token violations if a fully green Workbench suite is required.
+
+## Workstream Registration - 2026-08-26 19:02:08 +08:00
+
+- Workstream ID: `main-new-code-review-fixes`
+- Goal: fix the eight confirmed Git new-code review findings covering production-ticket command idempotency and V145 safety, subordinate-Partner database pagination, media-account maintenance optimistic locking, and stale-request handling in both subordinate-Partner frontends.
+- Non-goals: review or fix the other 25 OCR-timeout files; change media-screen snapshot catch-up or public tenant access contracts; execute V145 or any database synchronization; mutate live permissions, roles, menus, users, or business data; add dependencies; operate branches/worktrees; commit, push, deploy, restart services, or alter unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: production-ticket command DO/mapper/service integration, production-ticket error constants and focused tests; `V145__production_ticket_dispatch_pool.sql`, bootstrap verification and directly affected migration/API documentation; subordinate-Partner ownership mapper/DAL projection/service and focused tests; media-account maintenance optimistic-lock service/test; Workbench and Admin subordinate-Partner pages and focused tests; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing ZSJOS tenant/object permission framework, System notification boundary, current production-ticket and Partner ownership tables, existing command-ledger and frontend request-generation patterns; no new dependency.
+- Integration order: register ownership -> add command ledger and idempotent service behavior -> harden V145/index/menu identities -> move subordinate-Partner filtering and pagination to DAL -> enforce no-op optimistic version -> sequence React/Vue requests -> synchronize docs/tests -> run backend, frontend, SQL, whitespace and browser verification.
+- Verification plan: focused production-ticket, subordinate-Partner and media-account tests followed by the ZSJOS reactor test and server package; Workbench tests/typecheck/build; Admin typecheck/lint/build; V145/bootstrap static and repeatability assertions without database execution; `git diff --check`; authenticated desktop/mobile browser checks when an available session permits them.
+
+## Delivery Entry - 2026-08-26 19:03:00 +08:00
+
+- Workstream ID: `main-new-code-review-fixes`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: implement the confirmed eight-item repair plan for newly added Git code, covering production-ticket idempotency and V145 safety, subordinate-Partner pagination, media-account optimistic locking, and React/Vue stale-request handling.
+- Key decisions: use a tenant/operator/idempotency command ledger and SHA-256 request fingerprints while preserving existing HTTP response shapes; replay completed identical commands before state-dependent ticket authorization and reject changed/incomplete reuse with `PRODUCTION_TICKET_ACTION_IDEMPOTENCY_CONFLICT`; retain the tenant-wide ticket-create unique boundary after logical deletion; make V145 fail closed on duplicate keys and bidirectional fixed-menu identity collisions; execute subordinate-Partner count/page in tenant-scoped joined SQL with a long offset and stable order; validate account version before dictionary/no-op processing; use submitted search terms and independent request generations in both frontends.
+- Execution or analysis result: create, reject-assignment, and claim now mutate and publish events only for the first completed command and replay the saved result for exact retries; V145 initializes the command table and repairs or rejects unsafe ticket indexes/menu identities; subordinate-Partner pages no longer load all ownership rows or paginate in memory; stale no-change account maintenance requests return the stable version-conflict code; late partner, lead, and detail responses can no longer overwrite current React/Vue state. The `open-code-review` findings determined this bounded repair scope, while the `ruoyi-vue-pro` conventions kept the implementation on the existing Controller/Service/DAL, tenant, permission, dictionary, Vue, and React boundaries.
+- Changed files: production-ticket controller/error/service plus new command DO/mapper/action/command services; `ProductionTicketServiceTest`, `ProductionTicketActionServiceTest`, and `ProductionTicketCommandServiceTest`; Partner ownership mapper/service, new `SubordinatePartnerRow`, subordinate-Partner service and `SubordinatePartnerServiceTest`; media-account maintenance service/test; `frontend/workbench/src/pages/SubordinatePartnerPage.tsx`, its guard test and page stylesheet; `frontend/admin/src/views/zsjos/subordinatePartner/index.vue`; `script/sql/mysql/migrations/V145__production_ticket_dispatch_pool.sql`, `script/sql/mysql/verify-bootstrap.sql`, migration README, Workbench API contract, and this handoff record. Existing unrelated dirty-worktree changes were preserved.
+- Verification evidence: 23 focused backend tests passed with the 21-module reactor successful; backend source compile passed and `mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` passed across 28 modules; Workbench passed 403/403 tests, typecheck, and production build; Admin target-page ESLint and full production build passed; V145 procedure/delimiter and transaction pairs, bootstrap order, unique-index definitions, command table, menu identities, and verification query were statically reviewed; repository-wide `git diff --check` passed with line-ending warnings only. The requested full backend test command was attempted but stopped in the unrelated existing `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch` failure before reaching ZSJOS. Admin full typecheck remains blocked by existing errors in BPM/EAM/CRM/System/Export files, and full lint remains blocked by the existing empty `src/components/DocAlert/index.vue` template; neither blocker is in this workstream.
+- Dependency or integration impact: no new dependency, branch/worktree operation, commit, push, database execution, menu/role/permission mutation, service restart, deployment, or shared external-state change. Backend and both frontends consume unchanged API paths and response shapes; V145 remains an unapplied development baseline and must be applied only through a separately approved database process.
+- Remaining work: run V145 plus `verify-bootstrap.sql` in an approved disposable database, then perform authenticated desktop/mobile rapid-switch/search/pagination/detail checks in both frontends. Resolve the unrelated Infra/Admin baseline failures separately if fully green repository-wide commands are required.
+
+## Workstream Registration - 2026-08-26 20:07:11 +08:00
+
+- Workstream ID: `main-supervisor-lead-state-guidance`
+- Goal: make supervisor Lead operations expose the current Lead and assignment state, prevent clearly inapplicable batch commands, and return actionable state-conflict messages without changing the lifecycle rules.
+- Non-goals: expand supervisor operations, change permissions or object scope, add dependencies, alter database schema/data, add or edit SQL migrations, execute database changes, create branches/worktrees, commit, push, deploy, restart services, or modify unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: supervisor Lead state policy, command validation and error text; Lead supervisor action projection; Workbench subordinate-sales Lead status display, selection eligibility, API action types and focused tests; subordinate-sales API documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing Lead lifecycle fields, supervisor permissions, current subordinate-sales APIs, React/Ant Design Workbench and existing test toolchains; no new dependency.
+- Integration order: centralize backend state policy -> apply it to command validation and action projection -> add Workbench status labels and selection eligibility -> synchronize types/docs/tests -> run backend/frontend/browser and diff verification -> append delivery evidence.
+- Verification plan: focused backend policy, command and projection tests plus ZSJOS module tests; Workbench focused/full tests, typecheck and build; authenticated desktop/mobile browser checks when a session is available; scoped `git diff --check`; no SQL or database execution.
+
+## Delivery Entry - 2026-08-26 20:28:00 +08:00
+
+- Workstream ID: `main-supervisor-lead-state-guidance`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: implement the approved supervisor Lead status guidance and operation-entry repair so supervisors can distinguish Lead state from assignment state, avoid obviously invalid batch commands, and receive an actionable backend reason when a state changes or is invalid.
+- Key decisions: keep the existing lifecycle, permissions, object scope, HTTP contracts, and error code `1900003058`; centralize all five supervisor state rules in one backend policy shared by command validation and `availableActions`; render unknown persisted values explicitly; standardize `recycle_pending` as “回收待处理”; require every selected Lead to satisfy a batch action's base state and never silently filter a mixed selection; keep the backend as final authority.
+- Execution or analysis result: supervisor transfer, restore, recycle, claim-pool release, and public-sea release now use one state matrix; rejected commands identify the operation, current Lead/assignment state, closed marker where applicable, and allowed condition. The Workbench shows separate Lead and assignment columns, preserves selected Lead snapshots across pages, disables invalid mixed selections with counts, shows an operation/count/state summary before submission, retains per-Lead batch results by `leadNo`, and directly surfaces enhanced backend conflict messages. Unknown values are not presented as normal statuses.
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SupervisorLeadActionPolicy.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesCommandService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/SupervisorLeadActionPolicyTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/SubordinateSalesCommandServiceTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `frontend/workbench/src/services/subordinateLeadActions.ts`; `frontend/workbench/src/services/subordinateLeadActions.test.ts`; `frontend/workbench/src/pages/SubordinateSalesPage.tsx`; `frontend/workbench/src/pages/subordinate-lead-actions.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `docs/api/zsjos-subordinate-sales.md`; this handoff record. Existing unrelated dirty-worktree changes were preserved.
+- Verification evidence: focused backend policy/command/projection tests passed 42/42; Workbench focused eligibility/guard tests passed 7/7; final Workbench full suite passed 409/409 across 68 files; `npm run typecheck` passed; `npm run build` passed with only the existing large-chunk warning; `mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` passed across all 28 reactor modules; scoped `git diff --check` passed with line-ending warnings only. The requested full backend test command was attempted but stopped before ZSJOS in the unrelated existing `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch` failure. Browser navigation reached the Workbench login page at `http://127.0.0.1:5175/`, but no authenticated supervisor session was available, so desktop/mobile supervisor-page interaction and real authorized/unauthorized API checks remain unverified.
+- Dependency or integration impact: no new dependency, schema, field, dictionary, menu, button permission, permission identifier, business data, SQL file, numbered migration, branch/worktree operation, commit, push, database execution, backend service, deployment, or shared external-state change. No SQL migration is required because the state fields and V139/V140/V142 permission setup already exist; deployed environments only need those existing migrations to have been applied normally.
+- Remaining work: in an environment with an authenticated supervisor session and backend data covering mixed Lead states, verify desktop/mobile columns, tooltips, confirmation summaries, partial batch failures, concurrent state changes, and authorized/unauthorized requests. Resolve the unrelated Infra test independently if a fully green repository-wide backend test run is required.
+
+## Workstream Registration - 2026-08-26 20:29:04 +08:00
+
+- Workstream ID: `main-positioning-flow-refactor`
+- Goal: simplify every positioning-card round to director draft/submission, assigned-operator review, operator-generated public link, and student decision; make student agreement immediately effective and require every later revision to repeat that path.
+- Non-goals: delete historical positioning/IP/BPM data or columns, cancel in-flight IP process instances, rewrite historical archived/rejected facts, change positioning templates or dictionary snapshots, add dependencies, execute SQL against a live database, mutate real permissions, change branches/worktrees, commit, push, deploy, restart services, or alter unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: ZSJOS positioning-card state machine, submission/link persistence, object authorization, media-student projection and production-ticket effective-snapshot lookup; positioning controllers/VOs/constants/errors and focused tests; Workbench media-student positioning UI/API/tests; anonymous H5 positioning page; forward-only positioning migration, bootstrap/verification, BPM manifest compatibility; directly affected API, architecture, menu, operations and Workbench documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing ZSJOS positioning snapshots and object-permission framework, System menu/permission and notification APIs, BPM listener only for already-running IP instances, React/Ant Design Workbench, Vue/Vant H5; no new dependency.
+- Integration order: preserve overlapping positioning import/link changes -> implement effective-submission state and revision command -> update media projections/downstream reads -> update Workbench/H5 -> add forward migration/bootstrap/BPM compatibility/docs -> run focused and proportional backend/frontend/SQL/browser verification -> append delivery evidence.
+- Verification plan: focused positioning, media-student and production-ticket backend tests plus ZSJOS module test/compile; Workbench focused/full tests, typecheck and build; H5 build; SQL source/repeatability/bootstrap checks without live execution; authenticated desktop/mobile and anonymous-link browser checks when available; scoped `git diff --check`.
+
+## Workstream Scope Update - 2026-08-26 20:35:00 +08:00
+
+- Workstream ID: `main-positioning-flow-refactor`
+- User correction: do not add a SQL migration script.
+- Scope adjustment: no migration or bootstrap change will be made. Historical `trial_14d` cards with `student_agreed` submissions will remain stored unchanged and be recognized through an explicit runtime compatibility read/revision rule. Retired `confirm-trial` and `archive` menu rows remain inert because their backend endpoints and projected actions are removed. SQL execution and real permission mutation remain out of scope.
+
+## Workstream Registration - 2026-08-26 20:53:08 +08:00
+
+- Workstream ID: `main-origin-sync-20260826-2053`
+- Goal: fast-forward local `main` to the latest `origin/main` while preserving existing local work; use the remote version for any actual frontend conflict and preserve both local and remote records in the confirmed non-frontend `handoff/main.md` conflict.
+- Non-goals: change business behavior, dependencies, database data/schema, services, branches/worktrees, commits, pushes, or unrelated local and nested-repository changes.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `9c447a284d79e5f7b79f5917f3a549babab85928` plus existing uncommitted user changes.
+- Target branch: `main` at `origin/main` commit `b4b8e7fa46`.
+- Ownership scope: Git synchronization of the two overlapping paths `frontend/h5/src/pages/positioning/confirmation.vue` and `handoff/main.md`; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing `origin/main`; no new dependency.
+- Integration order: temporarily stash only the two overlapping tracked paths -> fast-forward `main` -> restore the local path changes -> retain automatic frontend merge because it has no content conflict -> preserve both sides of the confirmed handoff conflict -> verify repository state.
+- Verification plan: confirm `HEAD == origin/main`, ahead/behind `0/0`, no unmerged paths, empty index, no temporary stash, remote frontend changes present, and all unrelated local plus nested-repository changes preserved.
+
+## Delivery Entry - 2026-08-26 20:52:53 +08:00
+
+- Workstream ID: `main-positioning-flow-refactor`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `9c447a284d79e5f7b79f5917f3a549babab85928` (no commit created)
+- User goal: implement the positioning-card lifecycle `director draft/submit -> operator review -> operator-generated link -> student decision -> round complete`, and make every later director edit repeat that full path without adding an SQL migration.
+- Key decisions: every new submission, including `professionalRisk`, enters `operator_feasibility` without starting BPM; student agreement atomically supersedes the prior `confirmed` submission and marks the current submission/card `confirmed`; operator rejection and student change requests return the card workspace to `co_creating` while an older effective submission remains downstream-authoritative; only the original director with configured edit and object permission may start a revision on the same card; `latestRound` and `effective` are independent projections and legacy `current` aliases `latestRound`; historical non-archived `trial_14d/student_agreed` remains runtime-compatible without data rewriting; the IP listener and process asset remain only for already-running instances.
+- Execution or analysis result: removed active trial-confirmation/archive endpoints and actions; added `start-revision`; locked the account during public agreement and preserved one effective submission; updated production-ticket lookup, media-student projections/task line, Workbench account actions and version grouping, and anonymous H5 completion content; synchronized API, architecture, menu, operations and Workbench contract documentation. The `ruoyi-vue-pro` guidance kept the implementation on existing Controller/Service/DAL, tenant, permission, dictionary-snapshot and frontend conventions.
+- Changed files: positioning controller/VOs/constants/object-permission/service/mappers and focused tests under `backend/yudao-module-zsjos`; media-student response/service/test and production-ticket effective lookup/test; `frontend/workbench/src/services/api.ts`, `MediaStudentsPage.tsx`, `MediaFeaturePage.tsx`, `media-students.guard.test.ts`, positioning styles and Workbench API contract; `frontend/h5/src/api/positioning.ts` and positioning confirmation page; positioning sections in registration API, data/permission architecture, menu coverage and public-link deployment documentation; this handoff record. No SQL or bootstrap file was changed by this workstream.
+- Verification evidence: focused backend positioning/confirmation/media-student/production-ticket tests passed 33/33 with the full 21-module dependency reactor successful; Workbench passed 410/410 tests across 68 files, typecheck, and production build with only the existing large-chunk warning; H5 production build passed; scoped `git diff --check` passed with line-ending warnings only. The requested full backend reactor test was attempted but stopped before ZSJOS at the unrelated existing `yudao-module-infra` `CodegenEngineUniappTest.testExecute_treeSearch` failure (210 Infra tests, one failure). Browser checks reached the Workbench unified login page and rendered the anonymous H5 invalid-link state at 390x844 without console errors; no authenticated session or valid confirmation token was available.
+- Dependency or integration impact: no new dependency, SQL migration, bootstrap edit, database execution, live menu/role mutation, BPM instance cancellation, branch/worktree operation, commit, push, deployment, or service restart. Existing SQL changes and migrations visible in the shared dirty worktree belong to other workstreams and were not modified for this goal. Keep `zsjos_media_positioning_ip` deployed until the separately counted in-flight instances reach zero; new submissions no longer depend on it.
+- Remaining work: in a controlled environment with an authenticated original director, assigned operator and valid anonymous token, execute desktop/mobile browser and real API checks for first confirmation, operator rejection, student change request, link regeneration/stale-link rejection, revision while the old effective version still creates a production ticket, and atomic replacement after revised confirmation. Resolve the unrelated Infra generator test separately if a fully green repository-wide backend run is required.
+
+## Delivery Entry - 2026-08-26 20:56:01 +08:00
+
+- Workstream ID: `main-origin-sync-20260826-2053`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47` (fast-forwarded to `origin/main`; no commit created)
+- User goal: pull the latest remote code, use the remote version for any frontend conflict, and ask for confirmation on other conflicts.
+- Key decisions: the frontend overlap `frontend/h5/src/pages/positioning/confirmation.vue` had no content conflict and was auto-merged; the sole actual conflict was `handoff/main.md`, and both remote and local records were retained after explicit user confirmation; only those two overlapping paths were temporarily stashed.
+- Execution or analysis result: local `main` fast-forwarded from `9c447a284d79e5f7b79f5917f3a549babab85928` to remote commit `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47`; existing local changes were restored; the confirmed handoff conflict was resolved without discarding either side.
+- Changed files: the 60 paths in remote commit `b4b8e7fa46`; restored local changes in `frontend/h5/src/pages/positioning/confirmation.vue`; merged local and remote records plus this delivery entry in `handoff/main.md`. All other dirty-worktree content was left in place.
+- Verification evidence: `HEAD` and `origin/main` both resolve to `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47`; ahead/behind is `0/0`; unmerged path count is zero; index is empty; both pre-resolution handoff versions are ordered subsequences of the resolved file; no conflict markers remain; the temporary stash was removed; nested `frontend/yudao-ui-admin-uniapp` still reports only its original three modified files.
+- Dependency or integration impact: no dependency, database, service, branch/worktree, commit, push, deployment, or unrelated-local-change operation; the remote commit added and updated frontend assets as recorded by Git.
+- Remaining work: none for the pull operation; existing uncommitted work remains for its owning workstreams.
+
+## Workstream Registration - 2026-08-26 21:07:43 +08:00
+
+- Workstream ID: `main-commit-push-20260826-2107`
+- Goal: commit the complete current root-repository worktree and push the resulting commit from local `main` to `origin/main` after explicit confirmation of the exact broad scope.
+- Non-goals: edit business implementation, run tests or services again, change branches/worktrees, rewrite history, include nested-repository working-tree changes, or alter database/external application state.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47` with 155 tracked changed/deleted files and 70 untracked files in the root repository.
+- Target branch: `origin/main`.
+- Ownership scope: all current root-repository changes, including backend, frontends, SQL/BPM, documentation, repository instructions and handoff records; Git commit and push metadata. Nested `frontend/yudao-ui-admin-uniapp` working-tree files are excluded.
+- Owner: Codex `/root`
+- Dependencies: existing verified workstream outputs and configured `origin`; no new dependency.
+- Integration order: append handoff records -> stage the complete root worktree -> validate staged scope and basic Git hygiene -> create one commit -> push `main` to `origin/main` -> verify local/remote equality.
+- Verification plan: no unmerged paths, `git diff --cached --check`, staged scope/count review, successful commit, successful push, `HEAD == origin/main`, ahead/behind `0/0`, clean root worktree except the unchanged dirty nested repository.
+
+## Delivery Entry - 2026-08-26 21:07:43 +08:00
+
+- Workstream ID: `main-commit-push-20260826-2107`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: base `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47`; the new commit containing this entry will be reported after creation.
+- User goal: submit all current local root-repository changes to the cloud remote.
+- Key decisions: include the explicitly confirmed broad root-repository scope in one commit; exclude the independently dirty nested `frontend/yudao-ui-admin-uniapp` working tree because its gitlink commit is unchanged; push directly to `origin/main` without rewriting history.
+- Execution or analysis result: prepared the complete confirmed root scope for staging, commit and push; final Git evidence is obtained immediately after this entry is included in the commit.
+- Changed files: all current root-repository tracked modifications/deletions and untracked additions across backend, frontends, SQL/BPM, documentation, `AGENTS.md`, and handoff records; nested-repository internal files excluded.
+- Verification evidence: before staging, local `HEAD` and freshly fetched `origin/main` both resolved to `b4b8e7fa462dbf409610e0a0e1c819d9dd0cfc47`, ahead/behind was `0/0`, there were no unmerged paths, and the index was empty; prior workstream-specific test/build evidence remains recorded above. Final staged, commit and push checks follow immediately.
+- Dependency or integration impact: publishing the accumulated confirmed implementation, schema scripts, BPM removal, frontend, documentation and repository-rule changes to shared `origin/main`; no live database execution, deployment or service operation.
+- Remaining work: verify the resulting commit and remote branch after push; no additional source edit is planned.

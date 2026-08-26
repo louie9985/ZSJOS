@@ -33,6 +33,27 @@ describe('DirectorAutoSaveCoordinator', () => {
     expect(keys).toEqual(['stable-key', 'stable-key'])
   })
 
+  it('publishes an error state while retaining a retryable failed job', async () => {
+    vi.useFakeTimers()
+    const states: DirectorAutoSaveState[] = []
+    const coordinator = new DirectorAutoSaveCoordinator(1500, state => states.push(state), () => 'stable-key')
+    coordinator.begin()
+    coordinator.schedule(async () => { throw new Error('network unavailable') })
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(states.at(-1)).toEqual({ status: 'error', error: 'network unavailable' })
+  })
+
+  it('publishes conflict for terminal version failures', async () => {
+    vi.useFakeTimers()
+    const conflict = { code: 1900010024 }
+    const states: DirectorAutoSaveState[] = []
+    const coordinator = new DirectorAutoSaveCoordinator(1500, state => states.push(state), () => 'key', error => error === conflict)
+    coordinator.begin()
+    coordinator.schedule(async () => { throw conflict })
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(states.at(-1)?.status).toBe('conflict')
+  })
+
   it('ignores completion state from an invalidated session', async () => {
     let resolveSave: (() => void) | undefined
     const states: DirectorAutoSaveState[] = []

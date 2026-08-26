@@ -5,13 +5,14 @@ import type { ImpersonationSession } from './impersonation'
 export type { ImpersonationSession } from './impersonation'
 
 export type PersonnelState = { userId: number; state: 'enabled' | 'disabled' | 'departed'; reason?: string; changedAt?: Timestamp }
-export type Partner = { id: number; partnerNo: string; name: string; mobile: string; status: 'enabled' | 'disabled' | 'converted'; boundSystemUserId: number; channelId?: string }
+export type Partner = { id: number; partnerNo: string; name: string; mobile: string; status: 'enabled' | 'disabled' | 'converted'; boundSystemUserId: number; channelId?: string; assignedEmployeeUserId?: number; assignedEmployeeName?: string; assignedAt?: Timestamp; assignmentVersion?: number; assignmentEffective?: boolean }
+export type PartnerOwnershipLog = { id: number; previousEmployeeName?: string; employeeName?: string; actionType: 'assign' | 'reassign' | 'unassign'; reason: string; operatorName?: string; occurredAt: Timestamp }
 export type PartnerCreate = { partnerNo: string; name: string; mobile: string; password: string; channelId?: string }
 export type BusinessAudit = { id: number; operatorNameSnapshot: string; operatorRoleSnapshot: string; actionCode: string; targetType: string; targetId: string; sourceIp?: string; occurredAt: Timestamp }
 export type ImpersonationAudit = { id: number; sessionId: number; administratorUserId: number; targetUserId: number; httpMethod: string; requestPath: string; occurredAt: Timestamp }
 export type Cashback = { id: number; cashbackNo: string; type: 'valid' | 'deal'; status: 'pending_settlement' | 'available' | 'withdrawing' | 'withdrawn' | 'cancelled'; beneficiaryUserId: number; productNameSnapshot: string; amount: number; generatedAt: Timestamp; availableAt: Timestamp }
 export type Withdrawal = { id: number; withdrawalNo: string; applicantUserId: number; status: string; verificationStatus: string; applicationAmount: number; accountNameSnapshot: string; maskedCardNumber: string; cardNumber?: string; bankNameSnapshot: string; branchNameSnapshot?: string; submittedAt: Timestamp; rejectionReason?: string; bankTransactionNo?: string; proofUrl?: string; paidAt?: Timestamp }
-export type RelationScene = { id?: number; name: string; code: string; sourceLabel: string; targetLabel: string; sourcePostCode: string; targetPostCode: string; status: number; remark?: string }
+export type RelationScene = { id?: number; name: string; code: string; sourceLabel: string; targetLabel: string; sourcePostCode: string; targetPostCode?: string; targetEligibilityType: 'post' | 'permission'; targetPermissionCode?: string; status: number; remark?: string }
 export type RelationUser = { id: number; nickname: string; maskedMobile?: string; deptId?: number; deptName?: string; status: number }
 export type UserRelation = RelationUser & { targetUsers: RelationUser[]; validTargetCount: number; invalidTargetCount: number; updateTime?: Timestamp }
 export type UserRelationLog = { id: number; sourceUsers: string; targetUsers: string; actionType: 'append' | 'replace' | 'remove'; operatorName: string; createTime: Timestamp }
@@ -32,6 +33,9 @@ export const managementApi = {
   convertPartner: async (id: number, data: { username: string; password: string; targetType: string; deptId: number; migrateHistoricalOrganization: boolean; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/partner/${id}/convert`, data)),
   updatePartnerMobile: async (id: number, mobile: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/mobile`, { mobile })),
   resetPartnerPassword: async (id: number, password: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/reset-password`, { password })),
+  partnerAssignmentCandidates: async () => unwrap<SimpleUser[]>(await http.get('/zsjos/partner/assignment-candidates')),
+  updatePartnerAssignment: async (id: number, assignedUserId: number | undefined, reason: string, expectedVersion?: number) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/assignment`, { assignedUserId, reason, expectedVersion })),
+  partnerAssignmentLogs: async (id: number, pageNo = 1, pageSize = 20) => unwrap<PageResult<PartnerOwnershipLog>>(await http.get(`/zsjos/partner/${id}/assignment-log/page`, { params: { pageNo, pageSize } })),
   startImpersonation: async (targetUserId: number, reason: string) => unwrap<ImpersonationSession>(await http.post('/zsjos/impersonation/start', { targetUserId, reason })),
   endImpersonation: async (id: number) => unwrap<boolean>(await http.post(`/zsjos/impersonation/${id}/end`, undefined, { params: { reason: 'manual' } })),
   businessAudits: async (params: { pageNo: number; pageSize: number; actionCode?: string; targetType?: string }) => unwrap<PageResult<BusinessAudit>>(await http.get('/zsjos/business-audit/page', { params })),

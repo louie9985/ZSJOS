@@ -25,10 +25,16 @@ public class MediaAccountObjectPermissionProvider implements ZsjosObjectPermissi
         MediaAccountDO account = mapper.selectById(id);
         if (account == null) return false;
         if ("read".equals(action) && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) return true;
+        if ("maintenance".equals(action)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")) return true;
         if ("read".equals(action) && account.getStudentPersonId() != null
                 && relationMapper.existsActiveByDirectorOrOperatorAndPerson(userId, account.getStudentPersonId())) return true;
         boolean related = userId.equals(account.getOwnerOperatorUserId()) || userId.equals(account.getDirectorUserId());
-        return related && ("read".equals(action) || "update".equals(action) || "stage-advance".equals(action)
+        if ("production-ticket-create".equals(action)) {
+            return userId.equals(account.getOwnerOperatorUserId());
+        }
+        return related && ("read".equals(action) || "update".equals(action) || "edit".equals(action)
+                || "maintenance".equals(action) || "stage-advance".equals(action)
                 || "grade".equals(action) || "rescue".equals(action)
                 || "bind-student".equals(action) || "rebind".equals(action));
     }

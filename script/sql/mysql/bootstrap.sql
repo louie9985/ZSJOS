@@ -93,7 +93,6 @@ SOURCE script/sql/mysql/migrations/V114__student_delivery_stages.sql;
 SOURCE script/sql/mysql/migrations/V115__generic_work_order.sql;
 SOURCE script/sql/mysql/migrations/V116__study_planner_repurchase_permissions.sql;
 SOURCE script/sql/mysql/migrations/V117__lead_category_label_snapshot.sql;
-SOURCE script/sql/mysql/migrations/V118__independent_role_permission_boundaries.sql;
 SOURCE script/sql/mysql/migrations/V119__workbench_relative_child_paths.sql;
 SOURCE script/sql/mysql/migrations/V120__restore_operator_media_student_menu.sql;
 SOURCE script/sql/mysql/migrations/V121__retire_lead_qualification_exception_menu.sql;
@@ -115,6 +114,13 @@ SOURCE script/sql/mysql/migrations/V136__sales_order_team_management.sql;
 SOURCE script/sql/mysql/migrations/V137__repair_workbench_menu_render_mode_version_collision.sql;
 SOURCE script/sql/mysql/migrations/V138__hrm_fms_eam_workbench_admin_embed.sql;
 SOURCE script/sql/mysql/migrations/V139__lead_supervisor_actions_and_public_sea_route.sql;
+SOURCE script/sql/mysql/migrations/V140__command_positioning_and_menu_repairs.sql;
+SOURCE script/sql/mysql/migrations/V141__media_screen_daily_snapshot.sql;
+SOURCE script/sql/mysql/migrations/V142__repair_partial_v139_v140.sql;
+SOURCE script/sql/mysql/migrations/V143__subordinate_partner_ownership.sql;
+SOURCE script/sql/mysql/migrations/V144__remove_new_media_student_operations.sql;
+SOURCE script/sql/mysql/migrations/V145__production_ticket_dispatch_pool.sql;
+SOURCE script/sql/mysql/migrations/V146__media_account_maintenance_calendar.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

@@ -36,6 +36,22 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
                 .in(ProductionTicketDO::getReviewerUserId, userIds));
         return selectPage(req, query.orderByDesc(ProductionTicketDO::getUpdateTime).orderByDesc(ProductionTicketDO::getId));
     }
+    default PageResult<ProductionTicketDO> selectPoolPage(ProductionTicketPageReqVO req) {
+        return selectPage(req, new LambdaQueryWrapperX<ProductionTicketDO>()
+                .eq(ProductionTicketDO::getStatus, "public_pool")
+                .likeIfPresent(ProductionTicketDO::getTicketNo, req.getKeyword())
+                .orderByAsc(ProductionTicketDO::getCreateTime).orderByAsc(ProductionTicketDO::getId));
+    }
+    default List<ProductionTicketDO> selectPendingByAssignee(Long userId) {
+        return selectList(new LambdaQueryWrapperX<ProductionTicketDO>()
+                .eq(ProductionTicketDO::getAssigneeFilmingEditorUserId, userId)
+                .eq(ProductionTicketDO::getStatus, "pending_accept")
+                .orderByAsc(ProductionTicketDO::getCreateTime).orderByAsc(ProductionTicketDO::getId));
+    }
+    default ProductionTicketDO selectByIdempotencyKey(String key) {
+        return selectOne(new LambdaQueryWrapperX<ProductionTicketDO>()
+                .eq(ProductionTicketDO::getIdempotencyKey, key));
+    }
     default int transition(Long id, Integer version, String from, String to) {
         return update(null, new LambdaUpdateWrapper<ProductionTicketDO>().eq(ProductionTicketDO::getId, id)
                 .eq(ProductionTicketDO::getVersion, version).eq(ProductionTicketDO::getStatus, from)
@@ -46,5 +62,22 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
                 .eq(ProductionTicketDO::getVersion,version).eq(ProductionTicketDO::getStatus,"checking")
                 .set(ProductionTicketDO::getStatus,"rejected").set(ProductionTicketDO::getReworkReasonType,reason)
                 .setSql("revision_count = revision_count + 1").set(ProductionTicketDO::getVersion,version+1));
+    }
+    default int rejectAssignment(Long id, Integer version) {
+        return update(null, new LambdaUpdateWrapper<ProductionTicketDO>()
+                .eq(ProductionTicketDO::getId, id).eq(ProductionTicketDO::getVersion, version)
+                .eq(ProductionTicketDO::getStatus, "pending_accept")
+                .set(ProductionTicketDO::getStatus, "public_pool")
+                .set(ProductionTicketDO::getAssigneeFilmingEditorUserId, null)
+                .set(ProductionTicketDO::getVersion, version + 1));
+    }
+    default int claim(Long id, Integer version, Long userId) {
+        return update(null, new LambdaUpdateWrapper<ProductionTicketDO>()
+                .eq(ProductionTicketDO::getId, id).eq(ProductionTicketDO::getVersion, version)
+                .eq(ProductionTicketDO::getStatus, "public_pool")
+                .isNull(ProductionTicketDO::getAssigneeFilmingEditorUserId)
+                .set(ProductionTicketDO::getStatus, "accepted")
+                .set(ProductionTicketDO::getAssigneeFilmingEditorUserId, userId)
+                .set(ProductionTicketDO::getVersion, version + 1));
     }
 }

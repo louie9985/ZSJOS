@@ -29,6 +29,7 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
     @Resource private PostApi postApi;
     @Resource private LeadMapper leadMapper;
     @Resource private PartnerAccountService partnerAccountService;
+    @Resource private PartnerOwnershipService ownershipService;
 
     @Override @Transactional(rollbackFor = Exception.class)
     public Long create(PartnerCreateReqVO reqVO) {
@@ -40,7 +41,20 @@ public class PartnerManagementServiceImpl implements PartnerManagementService {
         return partner.getId();
     }
 
-    @Override public List<PartnerRespVO> list() { return BeanUtils.toBean(mapper.selectList(), PartnerRespVO.class); }
+    @Override public List<PartnerRespVO> list() {
+        return mapper.selectList().stream().map(partner -> {
+            PartnerRespVO result = BeanUtils.toBean(partner, PartnerRespVO.class);
+            var ownership = ownershipService.getByPartnerId(partner.getId());
+            if (ownership != null) {
+                result.setAssignedEmployeeUserId(ownership.getEmployeeUserId());
+                result.setAssignedEmployeeName(ownership.getEmployeeNameSnapshot());
+                result.setAssignedAt(ownership.getAssignedAt());
+                result.setAssignmentVersion(ownership.getVersion());
+                result.setAssignmentEffective(ownershipService.canRead(ownership.getEmployeeUserId(), partner.getId()));
+            }
+            return result;
+        }).toList();
+    }
 
     @Override public PartnerMeRespVO getMe(Long accountId) {
         PartnerContext context = partnerAccountService.requireContext(accountId);

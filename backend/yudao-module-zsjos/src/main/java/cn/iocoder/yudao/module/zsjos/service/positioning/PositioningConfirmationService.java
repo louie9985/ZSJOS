@@ -42,6 +42,7 @@ public class PositioningConfirmationService {
     @Resource private MediaAccountMapper accountMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
     @Value("${zsjos.positioning.public-base-url:}") private String publicBaseUrl;
+    @Value("${zsjos.positioning.confirmation-link-ttl-hours:168}") private long confirmationLinkTtlHours;
 
     @ZsjosPermission(bizType = BIZ_TYPE_POSITIONING_CARD, bizId = "#cardId", action = "student-link-generate")
     @Transactional(rollbackFor = Exception.class)
@@ -59,11 +60,12 @@ public class PositioningConfirmationService {
             throw exception(POSITIONING_CARD_PERMISSION_DENIED);
         }
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiresAt = now.plusHours(Math.max(1, confirmationLinkTtlHours));
         linkMapper.revokeActiveBySubmission(submission.getId(), now);
         String rawToken = Base64.encodeUrlSafe(RandomUtil.randomBytes(32));
         PositioningConfirmationLinkDO link = new PositioningConfirmationLinkDO();
         link.setCardId(cardId).setSubmissionId(submission.getId()).setTokenHash(hash(rawToken))
-                .setStatus("active").setCreatedByUserId(operatorUserId).setVersion(0);
+                .setStatus("active").setCreatedByUserId(operatorUserId).setExpiresAt(expiresAt).setVersion(0);
         linkMapper.insert(link);
         if (POSITIONING_STUDENT_LINK_PENDING.equals(card.getStatus())) {
             if (submissionMapper.markStatus(submission.getId(), submission.getVersion(),
@@ -76,7 +78,7 @@ public class PositioningConfirmationService {
                     POSITIONING_STUDENT_LINK_PENDING, POSITIONING_STUDENT_CONFIRM, null,
                     "positioning-link:" + cardId + ":" + cardVersion);
         }
-        return new PositioningLinkRespVO(baseUrl + "/positioning/share#token=" + rawToken);
+        return new PositioningLinkRespVO(baseUrl + "/positioning/share#token=" + rawToken, expiresAt);
     }
 
     private String requirePublicBaseUrl() {
@@ -99,12 +101,7 @@ public class PositioningConfirmationService {
 
     public PublicPositioningConfirmationRespVO publicDetail(String rawToken) {
         PositioningConfirmationLinkDO link = linkMapper.selectByTokenHash(hash(rawToken));
-        if (link == null || "revoked".equals(link.getStatus())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
-        if ("used".equals(link.getStatus())) {
-            PublicPositioningConfirmationRespVO response = new PublicPositioningConfirmationRespVO();
-            response.setState("processed");
-            return response;
-        }
+        if (!isActive(link, LocalDateTime.now())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         return inTenant(link.getTenantId(), () -> readyDetail(link));
     }
 
@@ -115,7 +112,7 @@ public class PositioningConfirmationService {
             throw exception(POSITIONING_STUDENT_COMMENT_REQUIRED);
         }
         PositioningConfirmationLinkDO located = linkMapper.selectByTokenHash(hash(rawToken));
-        if (located == null) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
+        if (!isActive(located, LocalDateTime.now())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         inTenant(located.getTenantId(), () -> {
             decideInTenant(rawToken, request);
             return null;
@@ -127,7 +124,7 @@ public class PositioningConfirmationService {
         PositioningCardSubmissionDO submission = submissionMapper.selectById(link.getSubmissionId());
         PositioningCardSubmissionDO latest = card == null ? null : submissionMapper.selectLatestByCard(card.getId());
         if (card == null || submission == null || latest == null || !Objects.equals(latest.getId(), submission.getId())
-                || !"active".equals(link.getStatus()) || !POSITIONING_STUDENT_CONFIRM.equals(card.getStatus())
+                || !isActive(link, LocalDateTime.now()) || !POSITIONING_STUDENT_CONFIRM.equals(card.getStatus())
                 || !POSITIONING_STUDENT_CONFIRM.equals(submission.getStatus())) {
             throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         }
@@ -138,7 +135,6 @@ public class PositioningConfirmationService {
                 : account.getNickname() == null ? account.getAccountNo() : account.getNickname());
         response.setPlatformLabel(account == null ? null : account.getPlatformLabelSnapshot());
         response.setSubmittedAt(submission.getSubmittedAt());
-        response.setTrialEndDate(submission.getTrialEndDate());
         response.setFields(submission.getFieldsSnapshotJson() == null ? List.of()
                 : JsonUtils.parseArray(submission.getFieldsSnapshotJson(), Object.class));
         response.setValues(submission.getValuesSnapshotJson() == null ? Map.of()
@@ -161,7 +157,7 @@ public class PositioningConfirmationService {
 
     private void decideInTenant(String rawToken, PublicPositioningDecisionReqVO request) {
         PositioningConfirmationLinkDO link = linkMapper.selectByTokenHashForUpdate(hash(rawToken));
-        if (link == null || !"active".equals(link.getStatus())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
+        if (!isActive(link, LocalDateTime.now())) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         PositioningCardDO card = cardMapper.selectByIdForUpdate(link.getCardId(), link.getTenantId());
         PositioningCardSubmissionDO submission = submissionMapper.selectByIdForUpdate(link.getSubmissionId(),
                 link.getTenantId());
@@ -171,9 +167,15 @@ public class PositioningConfirmationService {
                 || !POSITIONING_STUDENT_CONFIRM.equals(submission.getStatus())) {
             throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         }
+        if (accountMapper.selectByIdForUpdate(submission.getAccountId(), link.getTenantId()) == null) {
+            throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
+        }
         LocalDateTime now = LocalDateTime.now();
         boolean agreed = "agree".equals(request.getDecision());
-        String submissionStatus = agreed ? "student_agreed" : "change_requested";
+        String submissionStatus = agreed ? POSITIONING_CONFIRMED : "change_requested";
+        if (agreed) {
+            submissionMapper.supersedeConfirmedByAccount(submission.getAccountId(), submission.getId());
+        }
         if (submissionMapper.markStudentDecision(submission.getId(), submission.getVersion(),
                 POSITIONING_STUDENT_CONFIRM, submissionStatus, request.getDecision(),
                 agreed ? null : request.getComment().trim(), now) == 0
@@ -187,6 +189,11 @@ public class PositioningConfirmationService {
     private static String hash(String rawToken) {
         if (rawToken == null || rawToken.isBlank()) throw exception(POSITIONING_CONFIRMATION_LINK_INVALID);
         return SecureUtil.sha256(rawToken);
+    }
+
+    private static boolean isActive(PositioningConfirmationLinkDO link, LocalDateTime now) {
+        return link != null && "active".equals(link.getStatus()) && link.getExpiresAt() != null
+                && link.getExpiresAt().isAfter(now);
     }
 
     private static <T> T inTenant(Long tenantId, Callable<T> action) {

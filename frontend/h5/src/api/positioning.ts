@@ -6,7 +6,6 @@ export interface PositioningConfirmation {
   accountName?:string
   platformLabel?:string
   submittedAt?:string|number
-  trialEndDate?:string
   fields?:PositioningField[]
   values?:Record<string,unknown>
   dictSnapshots?:Record<string,unknown>

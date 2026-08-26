@@ -173,37 +173,6 @@ CREATE TABLE IF NOT EXISTS `zsjos_interview_record` (
   PRIMARY KEY (`id`), KEY `idx_tenant_account_status` (`tenant_id`,`account_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='定位采访记录';
 
-CREATE TABLE IF NOT EXISTS `zsjos_cooperation_assessment` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `student_person_id` bigint NOT NULL, `account_id` bigint NOT NULL,
-  `operator_user_id` bigint NOT NULL, `period` varchar(32) NOT NULL,
-  `committed_level_value` varchar(100) NOT NULL, `committed_level_label_snapshot` varchar(100) NOT NULL,
-  `current_week_level_value` varchar(100) NOT NULL, `current_week_level_label_snapshot` varchar(100) NOT NULL,
-  `last30d_level_value` varchar(100) NOT NULL, `last30d_level_label_snapshot` varchar(100) NOT NULL,
-  `level_gap_reason` varchar(2000) DEFAULT NULL, `company_delivery_ok` bit(1) NOT NULL,
-  `special_reason` varchar(1000) DEFAULT NULL, `improve_plan_json` json DEFAULT NULL,
-  `indicators_json` json NOT NULL, `evidence_refs_json` json NOT NULL, `assessed_at` datetime NOT NULL,
-  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
-  PRIMARY KEY (`id`), KEY `idx_tenant_account_assessed` (`tenant_id`,`account_id`,`assessed_at`),
-  KEY `idx_tenant_student_assessed` (`tenant_id`,`student_person_id`,`assessed_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员配合度评估';
-
-CREATE TABLE IF NOT EXISTS `zsjos_exception_ticket` (
-  `id` bigint NOT NULL AUTO_INCREMENT, `exception_no` varchar(64) NOT NULL, `account_id` bigint NOT NULL,
-  `category_value` varchar(100) NOT NULL, `category_label_snapshot` varchar(100) NOT NULL,
-  `description` varchar(2000) NOT NULL, `evidence_refs_json` json NOT NULL,
-  `responsibility_type` varchar(32) NOT NULL, `owner_user_id` bigint NOT NULL,
-  `process_instance_id` varchar(64) DEFAULT NULL, `status` varchar(24) NOT NULL,
-  `resolution` varchar(2000) DEFAULT NULL, `resolved_at` datetime DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
-  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL,
-  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_exception_no` (`tenant_id`,`exception_no`,`deleted`),
-  KEY `idx_tenant_account_status` (`tenant_id`,`account_id`,`status`),
-  KEY `idx_tenant_owner_status` (`tenant_id`,`owner_user_id`,`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='新媒体异常工单';
-
 CREATE TABLE IF NOT EXISTS `zsjos_workbench_capacity` (
   `id` bigint NOT NULL AUTO_INCREMENT, `user_id` bigint NOT NULL, `staff_type` varchar(32) NOT NULL,
   `online_status` varchar(24) NOT NULL DEFAULT 'offline', `accepting` bit(1) NOT NULL DEFAULT b'0',

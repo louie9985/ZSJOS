@@ -61,6 +61,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.INBOX_AUDIENCE_S
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_SUBMITTED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
+import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadActionPolicy.Action.*;
 
 @Service
 public class LeadManagementServiceImpl implements LeadManagementService {
@@ -350,6 +351,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             result.setSourceUserId(null);
         }
         result.setPendingAssigneeUserName(userName(users, lead.getPendingAssigneeUserId()));
+        result.setPartnerOwnerNameSnapshot(lead.getPartnerOwnerNameSnapshot());
         result.setHandlingStage(LeadHandlingStage.resolve(lead));
         result.setQualifiedByUserName(userName(users, lead.getQualifiedByUserId()));
         result.setRecycleSourceOwnerUserName(userName(users, lead.getRecycleSourceOwnerUserId()));
@@ -464,6 +466,14 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private List<String> resolveVisibleTabs(LeadDO lead, Long userId) {
         List<String> tabs = new ArrayList<>();
         tabs.add(DETAIL_TAB_OVERVIEW);
+        if (leadObjectPermissionService.canReadSubordinatePartnerLead(lead, userId)) {
+            tabs.add(DETAIL_TAB_FOLLOW_UPS);
+            tabs.add(DETAIL_TAB_APPEALS);
+            tabs.add(DETAIL_TAB_COMPLAINTS);
+            tabs.add(DETAIL_TAB_ORDERS);
+            tabs.add(DETAIL_TAB_FLOW_HISTORY);
+            return tabs;
+        }
         if (securityFrameworkService.hasPermission(PERMISSION_DETAIL_FOLLOW_UP_READ)) tabs.add(DETAIL_TAB_FOLLOW_UPS);
         if (canReadAppealRecords(lead, userId)) tabs.add(DETAIL_TAB_APPEALS);
         if (securityFrameworkService.hasPermission(PERMISSION_DETAIL_COMPLAINT_READ)) tabs.add(DETAIL_TAB_COMPLAINTS);
@@ -507,7 +517,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_TRANSFER, true));
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
         }
-        addSupervisorActions(actions, lead, currentUserId, suspended, recyclePending);
+        addSupervisorActions(actions, lead, currentUserId);
         if (Objects.equals(lead.getSourceUserId(), currentUserId)
                 && lead.getStatus() != null
                 && !Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {
@@ -559,29 +569,29 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private void addSupervisorActions(List<LeadManagementRespVO.ActionVO> actions, LeadDO lead,
-                                      Long currentUserId, boolean suspended, boolean recyclePending) {
+                                      Long currentUserId) {
         if (currentUserId == null) return;
         Long scopedOwner = lead.getOwnerUserId() != null ? lead.getOwnerUserId() : lead.getRecycleSourceOwnerUserId();
         if (scopedOwner == null || !leadObjectPermissionService.getManagedUserIds(currentUserId).contains(scopedOwner)) return;
-        boolean submitted = STATUS_SUBMITTED.equals(lead.getStatus()) && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
-        boolean valid = Set.of(STATUS_VALID, STATUS_CONVERTED).contains(lead.getStatus())
-                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
-        if ((submitted || suspended || recyclePending || valid)
+        if (SupervisorLeadActionPolicy.isAllowed(TRANSFER, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_TRANSFER)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_TRANSFER, true));
         }
-        if ((submitted || suspended) && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RECYCLE)) {
+        if (SupervisorLeadActionPolicy.isAllowed(RECYCLE, lead)
+                && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RECYCLE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RECYCLE, true));
         }
-        if ((submitted || suspended || recyclePending)
+        if (SupervisorLeadActionPolicy.isAllowed(RELEASE_CLAIM_POOL, lead)
                 && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_CLAIM_POOL)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_CLAIM_POOL, true));
         }
-        if (valid && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA)
+        if (SupervisorLeadActionPolicy.isAllowed(RELEASE_PUBLIC_SEA, lead)
+                && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RELEASE_PUBLIC_SEA)
                 && agingPoolService.canEnterManually(lead.getId())) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA, true));
         }
-        if (suspended && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RESTORE)) {
+        if (SupervisorLeadActionPolicy.isAllowed(RESTORE, lead)
+                && securityFrameworkService.hasPermission(PERMISSION_SUPERVISOR_RESTORE)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUPERVISOR_RESTORE, true));
         }
     }

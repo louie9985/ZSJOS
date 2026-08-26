@@ -38,6 +38,7 @@ public interface PositioningConfirmationLinkMapper extends BaseMapperX<Positioni
                 .eq(PositioningConfirmationLinkDO::getId, id)
                 .eq(PositioningConfirmationLinkDO::getVersion, version)
                 .eq(PositioningConfirmationLinkDO::getStatus, "active")
+                .gt(PositioningConfirmationLinkDO::getExpiresAt, now)
                 .set(PositioningConfirmationLinkDO::getStatus, "used")
                 .set(PositioningConfirmationLinkDO::getUsedAt, now)
                 .set(PositioningConfirmationLinkDO::getVersion, version + 1));

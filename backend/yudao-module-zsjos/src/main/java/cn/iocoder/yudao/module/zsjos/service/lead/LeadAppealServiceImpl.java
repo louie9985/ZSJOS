@@ -87,6 +87,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     /** Submitters may read the appeal history of their own Lead; other readers need appeal capability. */
     private boolean canReadAppealRecords(LeadDO lead, Long userId) {
         return Objects.equals(lead.getSourceUserId(), userId)
+                || leadObjectPermissionService.canReadSubordinatePartnerLead(lead, userId)
                 || permissionApi.hasAnyPermissions(userId, PERMISSION_DETAIL_APPEAL_READ,
                 PERMISSION_APPEAL_REVIEW_SALES_MANAGER, PERMISSION_APPEAL_REVIEW_QUALITY,
                 PERMISSION_APPEAL_REVIEW_CHAIRMAN);

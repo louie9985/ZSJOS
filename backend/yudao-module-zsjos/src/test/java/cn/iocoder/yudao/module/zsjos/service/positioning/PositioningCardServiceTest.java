@@ -8,6 +8,8 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardDraftRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardImportReqVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
@@ -30,6 +32,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -108,6 +111,128 @@ class PositioningCardServiceTest {
         verify(mapper).insert(argThat((PositioningCardDO card) -> "{}".equals(card.getLayer2Json())
                 && "{}".equals(card.getFormulaJson()) && "{}".equals(card.getComplianceJson())
                 && card.getTrialEndDate() == null));
+    }
+
+    @Test
+    void importSourcesIncludesReadableSubmissionsFromCurrentAndOtherAccounts() {
+        MediaAccountDO current = new MediaAccountDO().setId(10L).setStudentPersonId(20L)
+                .setDirectorUserId(99L).setNickname("当前账号");
+        MediaAccountDO other = new MediaAccountDO().setId(11L).setStudentPersonId(20L)
+                .setDirectorUserId(99L).setNickname("其他账号");
+        ServiceRelationDO relation = importRelation();
+        when(accountMapper.selectById(10L)).thenReturn(current);
+        when(personMapper.selectById(20L)).thenReturn(
+                new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO().setId(20L));
+        when(relationMapper.selectActiveByPersonIds(java.util.List.of(20L))).thenReturn(java.util.List.of(relation));
+        when(accountMapper.selectByStudent(20L)).thenReturn(java.util.List.of(current, other));
+        PositioningCardSubmissionDO first = submission(101L, "operator_feasibility", 0)
+                .setCardId(501L).setAccountId(10L).setStudentPersonId(20L).setSubmissionNo(1);
+        PositioningCardSubmissionDO second = submission(102L, "student_confirm", 0)
+                .setCardId(502L).setAccountId(11L).setStudentPersonId(20L).setSubmissionNo(2);
+        when(submissionMapper.selectByStudentAndAccountIds(eq(20L), any())).thenReturn(java.util.List.of(first, second));
+        when(mapper.selectById(501L)).thenReturn(card(false, "operator_feasibility", 1)
+                .setId(501L).setAccountId(10L).setStudentPersonId(20L).setCardNo("PC-1"));
+        when(mapper.selectById(502L)).thenReturn(card(false, "student_confirm", 2)
+                .setId(502L).setAccountId(11L).setStudentPersonId(20L).setCardNo("PC-2"));
+        when(objectPermissionProvider.hasPermission(any(), eq("read"), eq(99L))).thenReturn(true);
+
+        var result = service.getImportSources(20L, 10L, 30L, 99L);
+
+        assertEquals(2, result.size());
+        assertTrue(result.get(0).getSameAccount());
+        assertEquals("其他账号", result.get(1).getAccountLabel());
+    }
+
+    @Test
+    void importSubmissionMapsCompatibleFieldsAndPreservesDictionarySnapshot() {
+        mockImportTarget();
+        MediaAccountDO sourceAccount = new MediaAccountDO().setId(11L).setStudentPersonId(20L);
+        when(accountMapper.selectById(11L)).thenReturn(sourceAccount);
+        PositioningCardSubmissionDO source = importSubmissionSource();
+        when(submissionMapper.selectById(101L)).thenReturn(source);
+        when(mapper.selectById(501L)).thenReturn(card(false, "operator_feasibility", 1)
+                .setId(501L).setAccountId(11L).setStudentPersonId(20L));
+        DirectorFormTemplateVO.Field name = field("name", "text", null);
+        DirectorFormTemplateVO.Field category = field("category", "radio", "positioning_category");
+        DirectorFormTemplateVO.Field changed = field("changed", "number", null);
+        DirectorFormTemplateVO.Field added = field("added", "text", null);
+        DirectorFormTemplateVO.Snapshot published = positioningSnapshot(java.util.Map.of());
+        published.setFields(java.util.List.of(name, category, changed, added));
+        when(directorFormTemplateService.validateAndSnapshot(DirectorFormTemplateService.SCENE_POSITIONING,
+                null, java.util.Map.of(), false)).thenReturn(published);
+        var mappedValues = java.util.Map.<String, Object>of("name", "复用姓名", "category", "expert");
+        var dictSnapshot = java.util.Map.<String, Object>of("category",
+                java.util.Map.of("value", "expert", "labelSnapshot", "专家型", "dictType", "positioning_category"));
+        DirectorFormTemplateVO.Snapshot mapped = positioningSnapshot(mappedValues);
+        mapped.setFields(published.getFields()); mapped.setDictSnapshots(dictSnapshot);
+        when(directorFormTemplateService.validateAndSnapshotVersion(DirectorFormTemplateService.SCENE_POSITIONING,
+                41L, mappedValues, false, dictSnapshot)).thenReturn(mapped);
+        when(mapper.selectLatestCreatingDraft(30L, 10L, 1L)).thenReturn(null);
+        doAnswer(invocation -> { invocation.<PositioningCardDO>getArgument(0).setId(700L); return 1; })
+                .when(mapper).insert(any(PositioningCardDO.class));
+
+        PositioningCardImportReqVO request = importRequest();
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            var result = service.importSubmission(request, 99L);
+            assertEquals(700L, result.getId());
+            assertEquals(mappedValues, result.getValues());
+            assertTrue(result.getSkippedFieldKeys().containsAll(java.util.List.of("removed", "changed")));
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+        verify(submissionMapper, never()).insert(any(PositioningCardSubmissionDO.class));
+        verify(mapper).insert(argThat((PositioningCardDO draft) -> draft.getAccountId().equals(10L)
+                && draft.getTemplateVersionId().equals(41L)
+                && draft.getValuesSnapshotJson().contains("复用姓名")
+                && draft.getDictSnapshotJson().contains("专家型")));
+    }
+
+    @Test
+    void importSubmissionOverwritesOnlyExpectedDraftVersion() {
+        mockImportTarget();
+        when(accountMapper.selectById(11L)).thenReturn(new MediaAccountDO().setId(11L).setStudentPersonId(20L));
+        PositioningCardSubmissionDO source = importSubmissionSource();
+        when(submissionMapper.selectById(101L)).thenReturn(source);
+        when(mapper.selectById(501L)).thenReturn(card(false, "operator_feasibility", 1)
+                .setId(501L).setAccountId(11L).setStudentPersonId(20L));
+        DirectorFormTemplateVO.Snapshot snapshot = positioningSnapshot(java.util.Map.of());
+        snapshot.setFields(java.util.List.of());
+        when(directorFormTemplateService.validateAndSnapshot(DirectorFormTemplateService.SCENE_POSITIONING,
+                null, java.util.Map.of(), false)).thenReturn(snapshot);
+        when(directorFormTemplateService.validateAndSnapshotVersion(DirectorFormTemplateService.SCENE_POSITIONING,
+                41L, java.util.Map.of(), false, java.util.Map.of())).thenReturn(snapshot);
+        PositioningCardDO existing = editableDraft(4).setId(701L).setServiceRelationId(30L);
+        when(mapper.selectLatestCreatingDraft(30L, 10L, 1L)).thenReturn(existing);
+        when(mapper.overwriteDraftFromImport(existing, 4)).thenReturn(1);
+        PositioningCardImportReqVO request = importRequest();
+        request.setTargetDraftId(701L); request.setVersion(4);
+
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            var result = service.importSubmission(request, 99L);
+            assertEquals(5, result.getVersion());
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+        verify(mapper).overwriteDraftFromImport(existing, 4);
+    }
+
+    @Test
+    void importSubmissionRejectsSourceFromAnotherStudent() {
+        mockImportTarget();
+        when(accountMapper.selectById(11L)).thenReturn(new MediaAccountDO().setId(11L).setStudentPersonId(21L));
+        when(submissionMapper.selectById(101L)).thenReturn(importSubmissionSource().setStudentPersonId(21L));
+        when(mapper.selectById(501L)).thenReturn(card(false, "operator_feasibility", 1)
+                .setId(501L).setAccountId(11L).setStudentPersonId(21L));
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.importSubmission(importRequest(), 99L));
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+        verifyNoInteractions(directorFormTemplateService);
     }
 
     @Test
@@ -222,34 +347,60 @@ class PositioningCardServiceTest {
     }
 
     @Test
-    void professionalSubmitStartsBpmOnceAndEntersIpReview() {
+    void professionalSubmitAlsoGoesDirectlyToOperatorWithoutStartingBpm() {
         PositioningCardDO card = card(true, MediaWorkflowConstants.POSITIONING_CO_CREATING, 0)
                 .setServiceRelationId(30L);
         when(mapper.selectById(1L)).thenReturn(card);
         mockAssignedOperator();
-        PostRespDTO post = new PostRespDTO();
-        post.setId(30L); post.setStatus(0);
-        AdminUserRespDTO reviewer = new AdminUserRespDTO();
-        reviewer.setId(254L); reviewer.setStatus(0);
-        AdminUserRespDTO disabled = new AdminUserRespDTO();
-        disabled.setId(255L); disabled.setStatus(1);
-        when(postApi.getPostByCode(MediaWorkflowConstants.POST_CODE_IP_TEACHER)).thenReturn(post);
-        when(adminUserApi.getUserListByPostIds(java.util.List.of(30L)))
-                .thenReturn(java.util.List.of(reviewer, disabled));
-        when(processInstanceApi.createProcessInstance(eq(99L), any())).thenReturn("process-1");
-        when(mapper.updateByVersion(any(), eq(0), eq(MediaWorkflowConstants.POSITIONING_CO_CREATING))).thenReturn(1);
+        when(mapper.transitionWithOperator(1L, 0, MediaWorkflowConstants.POSITIONING_CO_CREATING,
+                MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY, 88L)).thenReturn(1);
 
         service.submitReview(1L, 0, 99L);
 
-        verify(processInstanceApi, times(1)).createProcessInstance(eq(99L), argThat((BpmProcessInstanceCreateReqDTO request) ->
-                java.util.List.of(254L).equals(request.getStartUserSelectAssignees().get("ipReviewer"))
-                        && Long.valueOf(254L).equals(request.getVariables().get("assignee"))
-                        && java.util.List.of(254L).equals(request.getVariables().get("coll_userList"))));
-        verify(mapper).updateByVersion(argThat(value ->
-                MediaWorkflowConstants.POSITIONING_IP_REVIEW.equals(value.getStatus())
-                        && "process-1".equals(value.getIpProcessInstanceId())
-                        && Long.valueOf(254L).equals(value.getIpReviewerUserId())), eq(0),
-                eq(MediaWorkflowConstants.POSITIONING_CO_CREATING));
+        verifyNoInteractions(processInstanceApi, postApi);
+        verify(mapper).transitionWithOperator(1L, 0, MediaWorkflowConstants.POSITIONING_CO_CREATING,
+                MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY, 88L);
+        verify(submissionMapper).insert(argThat((PositioningCardSubmissionDO value) ->
+                Boolean.TRUE.equals(value.getProfessionalRisk())
+                        && MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY.equals(value.getStatus())));
+    }
+
+    @Test
+    void startRevisionRestoresEffectiveSnapshotForOriginalDirector() {
+        PositioningCardDO card = card(false, MediaWorkflowConstants.POSITIONING_CONFIRMED, 5)
+                .setDirectorUserId(99L).setVersionNo(2);
+        PositioningCardSubmissionDO effective = submission(15L, MediaWorkflowConstants.POSITIONING_CONFIRMED, 3)
+                .setTemplateId(40L).setTemplateVersionId(41L).setValuesSnapshotJson("{\"persona\":\"expert\"}");
+        when(mapper.selectByIdForUpdate(1L, 7L)).thenReturn(card);
+        when(submissionMapper.selectCurrentConfirmedByAccount(10L)).thenReturn(effective);
+        when(submissionMapper.selectLatestByCard(1L)).thenReturn(effective);
+        when(mapper.startRevision(card, effective, 5)).thenReturn(1);
+
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(7L);
+        try {
+            PositioningCardDraftRespVO result = service.startRevision(1L, 5, 99L);
+            assertEquals(1L, result.getId());
+            assertEquals(6, result.getVersion());
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+        verify(mapper).startRevision(card, effective, 5);
+    }
+
+    @Test
+    void startRevisionRejectsAnotherDirectorWithoutMutation() {
+        PositioningCardDO card = card(false, MediaWorkflowConstants.POSITIONING_CONFIRMED, 5)
+                .setDirectorUserId(99L);
+        when(mapper.selectByIdForUpdate(1L, 7L)).thenReturn(card);
+
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(7L);
+        try {
+            assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                    () -> service.startRevision(1L, 5, 100L));
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+        verify(mapper, never()).startRevision(any(), any(), any());
     }
 
     @Test
@@ -358,6 +509,53 @@ class PositioningCardServiceTest {
     private PositioningCardSubmissionDO submission(Long id, String status, Integer version) {
         return new PositioningCardSubmissionDO().setId(id).setCardId(1L).setOperatorUserId(88L)
                 .setStatus(status).setVersion(version).setSubmissionNo(1);
+    }
+
+    private ServiceRelationDO importRelation() {
+        return new ServiceRelationDO().setId(30L).setPersonId(20L).setContentDirectorUserId(99L)
+                .setOperatorUserId(88L).setStatus("active").setAcceptanceStatus("accepted")
+                .setDirectorStage("positioning_ready");
+    }
+
+    private void mockImportTarget() {
+        when(accountMapper.selectById(10L)).thenReturn(new MediaAccountDO().setId(10L).setStudentPersonId(20L)
+                .setDirectorUserId(99L));
+        when(personMapper.selectById(20L)).thenReturn(
+                new cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO().setId(20L));
+        ServiceRelationDO relation = importRelation();
+        when(relationMapper.selectActiveByPersonIds(java.util.List.of(20L))).thenReturn(java.util.List.of(relation));
+        when(relationMapper.selectByIdForUpdate(30L, 1L)).thenReturn(relation);
+    }
+
+    private PositioningCardImportReqVO importRequest() {
+        PositioningCardImportReqVO request = new PositioningCardImportReqVO();
+        request.setSourceSubmissionId(101L); request.setAccountId(10L); request.setStudentPersonId(20L);
+        request.setServiceRelationId(30L); request.setTrialEndDate(java.time.LocalDate.now().plusDays(14));
+        return request;
+    }
+
+    private PositioningCardSubmissionDO importSubmissionSource() {
+        DirectorFormTemplateVO.Field name = field("name", "text", null);
+        DirectorFormTemplateVO.Field category = field("category", "select", "positioning_category");
+        DirectorFormTemplateVO.Field removed = field("removed", "text", null);
+        DirectorFormTemplateVO.Field changed = field("changed", "text", null);
+        return submission(101L, "operator_feasibility", 0).setCardId(501L).setAccountId(11L)
+                .setStudentPersonId(20L).setFieldsSnapshotJson(
+                        cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(
+                                java.util.List.of(name, category, removed, changed)))
+                .setValuesSnapshotJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(
+                        java.util.Map.of("name", "复用姓名", "category", "expert", "removed", "旧字段",
+                                "changed", "不兼容")))
+                .setDictSnapshotJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils.toJsonString(
+                        java.util.Map.of("category", java.util.Map.of("value", "expert",
+                                "labelSnapshot", "专家型", "dictType", "positioning_category"))));
+    }
+
+    private DirectorFormTemplateVO.Field field(String key, String type, String dictType) {
+        DirectorFormTemplateVO.Field field = new DirectorFormTemplateVO.Field();
+        field.setKey(key); field.setTitle(key); field.setType(type); field.setDictType(dictType);
+        field.setEnabled(true); field.setRequired(false); field.setSystemField(false); field.setSort(1);
+        return field;
     }
 
     private DirectorFormTemplateVO.Snapshot positioningSnapshot(java.util.Map<String, Object> values) {

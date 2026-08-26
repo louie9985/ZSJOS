@@ -20,15 +20,23 @@ export type MediaAccountDetailSnapshot = { key: string; label: string; type: str
 export type MediaAccountField = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multi_select' | 'boolean'; required: boolean; enabled: boolean; sort: number; dictType?: string; searchable: boolean }
 export type MediaAccountFieldConfig = { id: number; versionNo: number; version: number; fields: MediaAccountField[] }
 export type MediaAccount = { id: number; accountNo: string; nickname: string; platformValue: string; platformLabelSnapshot: string; platformAccountId?: string; leadDirection?: string; studentPersonId?: number; directorUserId?: number; detailConfigVersionId?: number; detailValues?: Record<string, unknown>; detailSnapshots?: MediaAccountDetailSnapshot[]; accountGradeValue?: string; accountGradeLabelSnapshot?: string; healthStatusValue?: string; healthStatusLabelSnapshot?: string; riskLevelValue?: string; riskLevelLabelSnapshot?: string; healthJson?: string; rescueStatus?: string; rebindProcessInstanceId?: string; sStage: string; status?: string; version: number; availableActions: string[] }
+export type MediaAccountMaintenanceProblem = { value: string; labelSnapshot: string }
+export type MediaAccountMaintenance = { currentStatusValue?: string; currentStatusLabelSnapshot?: string; stageValue?: string; stageLabelSnapshot?: string; primaryProblems: MediaAccountMaintenanceProblem[]; executionMeasureValue?: string; executionMeasureLabelSnapshot?: string; adjustmentDirection?: string; startDate?: string; endDate?: string }
+export type MediaAccountMaintenanceRevision = MediaAccountMaintenance & { id: number; revisionNo: number; changedFields: string[]; operatedByUserId: number; operatedByUserName?: string; operatedAt: Timestamp }
+export type MediaAccountLegacyStage = { id: number; fromStage?: string; toStage?: string; direction?: string; judgmentBasis?: string; judgedByUserId?: number; judgedByUserName?: string; judgedAt?: Timestamp }
+export type MediaAccountCalendarItem = { id: number; accountNo: string; nickname?: string; platformLabelSnapshot?: string; studentPersonId?: number; studentName?: string; directorUserId?: number; directorUserName?: string; operatorUserId?: number; operatorUserName?: string; currentStatusValue?: string; currentStatusLabelSnapshot?: string; stageValue?: string; stageLabelSnapshot?: string; startDate: string; endDate: string }
+export type MediaAccountCalendarResult = { list: MediaAccountCalendarItem[]; total: number; unscheduledCount: number }
 export type MediaContent = { id: number; contentNo: string; accountId: number; title: string; status: string; version: number; availableActions: string[] }
-export type MediaException = { id: number; exceptionNo: string; accountId: number; categoryLabelSnapshot: string; description: string; status: string; version: number; availableActions: string[] }
 export type MediaReview = { id: number; reviewNo: string; reviewType: string; subjectType: string; subjectId: number; reviewerUserId?: number; rejectReason?: string; status: string; version: number; availableActions: string[] }
-export type GraduationApplication = { id: number; applicationNo: string; serviceRelationId: number; studentPersonId: number; plannerUserId: number; reviewerUserId: number; status: string; processInstanceId?: string; resultReason?: string; version: number }
-export type ProductionTicket = { id: number; ticketNo: string; accountId: number; status: string; version: number; expectedDeliveredAt?: Timestamp; deadlineAt?: Timestamp; availableActions: string[] }
+export type ProductionTicketDispatchContext = { accountId: number; accountNo?: string; accountName?: string; platformLabel?: string; studentName?: string; accountFields?: MediaAccountDetailSnapshot[]; positioningSubmissionId?: number; positioning?: Record<string, unknown> }
+export type ProductionTicket = { id: number; ticketNo: string; accountId: number; ownerOperatorUserId?: number; reviewerUserId?: number; assigneeFilmingEditorUserId?: number; positioningSubmissionId?: number; dispatchContext?: ProductionTicketDispatchContext; status: string; version: number; revisionCount?: number; expectedDeliveredAt?: Timestamp; deadlineAt?: Timestamp; availableActions: string[] }
+export type ProductionTicketCreateContext = ProductionTicketDispatchContext & { canCreate: boolean; unavailableReason?: string; positioning?: Record<string, unknown>; assigneeCandidates: AssignmentUser[] }
 export type PositioningCard = { id: number; cardNo: string; accountId: number; studentPersonId?: number; serviceRelationId?: number; directorUserId?: number; operatorUserId?: number; templateId?: number; templateVersionId?: number; fieldsSnapshot?: StudentContactFormField[]; valuesSnapshot?: Record<string, unknown>; dictSnapshot?: Record<string, unknown>; trialEndDate?: string; status: string; professionalRisk?: boolean; versionNo?: number; version: number; availableActions: string[] }
 export type PositioningCardDraftRequest = { accountId: number; studentPersonId?: number; serviceRelationId?: number; templateId?: number; trialEndDate?: string; values?: Record<string, unknown>; version?: number; professionalRisk?: boolean; layer1Json?: string; layer2Json?: string; formulaJson?: string; feasibilityJson?: string; contentFormJson?: string; complianceJson?: string }
 export type PositioningCardDraftResult = { id: number; version: number }
 export type PositioningLinkResult = { sharePath: string; expiresAt: Timestamp }
+export type PositioningCardImportSource = { submissionId: number; cardId: number; cardNo: string; accountId: number; accountLabel: string; submissionNo: number; status: string; submittedAt?: Timestamp; sameAccount: boolean }
+export type PositioningCardImportResult = PositioningCardDraftResult & DirectorTemplateSnapshot & { trialEndDate?: string; professionalRisk: boolean; skippedFieldKeys: string[] }
 export type SalesUser = { id: number; nickname: string; maskedMobile?: string; deptName?: string; avatar?: string }
 export type AssignmentUser = SalesUser & { deptId?: number; status: number }
 export type AssignmentRelation = AssignmentUser & { salesUsers: AssignmentUser[]; validSalesCount: number; invalidSalesCount: number; updateTime?: Timestamp }
@@ -46,8 +54,8 @@ export type StudentTaskStage = { key: string; label: string; status: 'done' | 'c
 export type MyStudent = { personId: number; personNo?: string; leadId?: number; leadNo?: string; name?: string; mobile?: string; wechatId?: string; activatedAt?: Timestamp; services: Array<{ serviceRelationId: number; leadId?: number; leadNo?: string; orderId?: number; orderNo?: string; courseName?: string; skuName?: string; categoryPath?: string[]; attributeValues?: string[]; productSnapshot?: string; status: string; activatedAt?: Timestamp; acceptanceStatus?: string; acceptedAt?: Timestamp; version?: number; owner?: boolean; ownerUserId?: number; ownerUserName?: string; contentDirectorUserId?: number; contentDirectorUserName?: string; careerPlannerUserId?: number; careerPlannerUserName?: string; operatorUserId?: number; operatorUserName?: string; directorStage?: string; directorInterviewAt?: Timestamp }> }
 export type MediaStudentDetail = {
   student: MyStudent
-  accounts: Array<{ id: number; accountNo: string; nickname?: string; platformLabel?: string; stage?: string; runStatus?: string; version: number; lastActivityAt?: Timestamp; availableActions: string[]; detailSnapshots: MediaAccountDetailSnapshot[]; taskLine: StudentTaskStage[] }>
-  positioningCards: Array<{ id: number; accountId: number; cardNo: string; status: string; versionNo?: number; professionalRisk?: boolean; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
+  accounts: Array<{ id: number; accountNo: string; nickname?: string; platformLabel?: string; stage?: string; stageLabelSnapshot?: string; currentStatusValue?: string; currentStatusLabelSnapshot?: string; primaryProblems: MediaAccountMaintenanceProblem[]; executionMeasureValue?: string; executionMeasureLabelSnapshot?: string; adjustmentDirection?: string; maintenanceStartDate?: string; maintenanceEndDate?: string; runStatus?: string; version: number; lastActivityAt?: Timestamp; availableActions: string[]; detailSnapshots: MediaAccountDetailSnapshot[]; taskLine: StudentTaskStage[] }>
+  positioningCards: Array<{ id: number; accountId: number; submissionId: number; cardNo: string; status: string; latestRound: boolean; effective: boolean; current: boolean; versionNo?: number; submissionNo?: number; professionalRisk?: boolean; studentDecisionComment?: string; submittedAt?: Timestamp; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
   positioningDrafts: Array<{ id: number; accountId: number; cardNo: string; status: string; versionNo?: number; professionalRisk?: boolean; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
   contents: Array<{ id: number; accountId: number; contentNo: string; title?: string; status: string; currentVersionNo?: number; publishedAt?: Timestamp; version: number; lastActivityAt?: Timestamp; availableActions: string[] }>
   productionTickets: Array<{ id: number; accountId: number; ticketNo: string; status: string; deadlineAt?: Timestamp; revisionCount?: number; lastActivityAt?: Timestamp }>
@@ -136,6 +144,7 @@ export type ManagedLeadAttachment = { id: number; fileUrl: string; originalName:
 export type ManagedLead = {
   id: number; leadNo: string; personId: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
   sourceType: string; sourceLabel?: string; sourceUserId?: number; sourceUserName?: string; sourceChannel?: string
+  partnerOwnerNameSnapshot?: string
   provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string; leadCategory?: string; leadCategoryLabelSnapshot?: string
   remark?: string; status: string; assignmentStatus: string; handlingStage: string
   qualificationStatus: 'pending' | 'valid' | 'invalid'
@@ -157,7 +166,7 @@ export type ManagedLead = {
   primaryProduct?: ManagedLeadProduct; intendedProducts?: ManagedLeadProduct[]; attachments?: ManagedLeadAttachment[]
   opportunity?: { id: number; status: string; nextFollowUpAt?: Timestamp; wonAt?: Timestamp }
   activeSalesOrderId?: number; activeSalesOrderStatus?: 'pending_approval' | 'revision_required'
-  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT' | 'QUALIFICATION_RESTORE' | 'QUALIFICATION_TRANSFER' | 'QUALIFICATION_RECYCLE' | 'QUALIFICATION_RELEASE'; enabled: boolean }>
+  availableActions?: Array<{ code: 'EDIT_BASIC_INFO' | 'ADD_FOLLOW_UP' | 'JUDGE_VALID' | 'JUDGE_INVALID' | 'ENTER_DEAL' | 'ENTER_REPURCHASE' | 'REVISE_DEAL' | 'SUBMITTER_SUPPLEMENT' | 'SUBMITTER_URGE' | 'SUBMITTER_COMPLAINT' | 'QUALIFICATION_RESTORE' | 'QUALIFICATION_TRANSFER' | 'QUALIFICATION_RECYCLE' | 'QUALIFICATION_RELEASE' | 'SUPERVISOR_RESTORE' | 'SUPERVISOR_TRANSFER' | 'SUPERVISOR_RECYCLE' | 'SUPERVISOR_RELEASE_CLAIM_POOL' | 'SUPERVISOR_RELEASE_PUBLIC_SEA'; enabled: boolean }>
 }
 export type LeadComplaintEvidence = { infraFileId: number; fileUrl: string; originalName?: string; contentType?: string; fileSize?: number }
 export type LeadComplaint = {
@@ -461,6 +470,11 @@ export const clearAuthStorage = () => {
   localStorage.removeItem(STORAGE_KEYS.EXPIRES_TIME)
   localStorage.removeItem(STORAGE_KEYS.IMPERSONATION)
 }
+export type SubordinatePartner = {
+  id: number; partnerNo: string; name: string; mobile?: string
+  status: 'enabled' | 'disabled' | 'converted'; assignedEmployeeName?: string
+  assignedAt?: Timestamp; assignmentEffective: boolean
+}
 
 type SharedTenantCacheItem = { c: number; e: number; v: string }
 
@@ -719,6 +733,10 @@ export const api = {
     advanceStage: async (id: number, toStage: string, version: number, basis: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/advance-stage`, null, { params: { toStage, version, basis, criteriaSnapshotJson: JSON.stringify({ basis }) } })),
     rollbackStage: async (id: number, toStage: string, version: number, basis: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/rollback-stage`, null, { params: { toStage, version, basis, criteriaSnapshotJson: JSON.stringify({ basis }) } })),
     update: async (id: number, data: Partial<MediaAccount> & { version: number; nickname: string }) => unwrap<boolean>(await http.put(`/zsjos/media-account/${id}`, data)),
+    maintain: async (id: number, data: { version: number; currentStatusValue?: string; stageValue?: string; primaryProblemValues?: string[]; executionMeasureValue?: string; adjustmentDirection?: string; startDate?: string; endDate?: string }) => unwrap<number>(await http.put(`/zsjos/media-account/${id}/maintenance`, data)),
+    maintenanceHistory: async (id: number, params: { pageNo: number; pageSize: number }) => unwrap<PageResult<MediaAccountMaintenanceRevision>>(await http.get(`/zsjos/media-account/${id}/maintenance-history`, { params })),
+    legacyStageHistory: async (id: number, params: { pageNo: number; pageSize: number }) => unwrap<PageResult<MediaAccountLegacyStage>>(await http.get(`/zsjos/media-account/${id}/legacy-stage-history`, { params })),
+    calendar: async (params: { pageNo: number; pageSize: number; rangeStart: string; rangeEnd: string; keyword?: string; currentStatusValue?: string; stageValue?: string; directorUserId?: number; operatorUserId?: number }) => unwrap<MediaAccountCalendarResult>(await http.get('/zsjos/media-account/calendar', { params })),
     diagnose: async (id: number, data: { weekNo: string; statStart: string; statEnd: string; basicJson: string; productionFunnelJson: string; platformDataJson: string; contentPerfJson: string; leadFunnelJson: string; rootCauseJson: string; nextWeekPlanJson: string; suggestedGrade?: string; configVersionId: number }) => unwrap<number>(await http.post(`/zsjos/media-account/${id}/diagnoses`, data)),
     publishedDiagnosisConfig: async () => unwrap<number>(await http.get('/zsjos/media-account/diagnosis-config/published')),
     rescue: async (id: number, version: number, status: string) => unwrap<boolean>(await http.post(`/zsjos/media-account/${id}/rescue`, null, { params: { version, status } })),
@@ -738,10 +756,15 @@ export const api = {
     versions: async (contentId: number) => unwrap<unknown[]>(await http.get('/zsjos/content/version/list', { params: { contentId } }))
   },
   productionTicket: {
-    create: async (data: { accountId: number; reviewerUserId: number; assigneeFilmingEditorUserId?: number; scriptText?: string; expectedDeliveredAt?: Timestamp; deadlineAt?: Timestamp; maxRevisionCount?: number }) => unwrap<number>(await http.post('/zsjos/production-ticket/create', data)),
+    createContext: async (accountId: number) => unwrap<ProductionTicketCreateContext>(await http.get('/zsjos/production-ticket/create-context', { params: { accountId } })),
+    create: async (data: { accountId: number; assigneeUserId?: number }) => unwrap<number>(await http.post('/zsjos/production-ticket/create', { ...data, idempotencyKey: createIdempotencyKey() })),
     get: async (id: number) => unwrap<ProductionTicket>(await http.get('/zsjos/production-ticket/get', { params: { id } })),
     page: async (params: { pageNo: number; pageSize: number; status?: string; keyword?: string }) => unwrap<PageResult<ProductionTicket>>(await http.get('/zsjos/production-ticket/page', { params })),
+    pendingAssignments: async () => unwrap<ProductionTicket[]>(await http.get('/zsjos/production-ticket/assignment/my-pending')),
+    poolPage: async (params: { pageNo: number; pageSize: number; keyword?: string }) => unwrap<PageResult<ProductionTicket>>(await http.get('/zsjos/production-ticket/pool/page', { params })),
     accept: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/accept`, null, { params: { version } })),
+    rejectAssignment: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/reject-assignment`, { version, reason, idempotencyKey: createIdempotencyKey() })),
+    claim: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/claim`, { version, idempotencyKey: createIdempotencyKey() })),
     startProduction: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/start-production`, null, { params: { version } })),
     submit: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/submit`, null, { params: { version } })),
     startCheck: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/production-ticket/${id}/start-check`, null, { params: { version } })),
@@ -754,14 +777,15 @@ export const api = {
     create: async (data: PositioningCardDraftRequest) => unwrap<number>(await http.post('/zsjos/positioning-card/create', data)),
     createDraft: async (data: PositioningCardDraftRequest) => unwrap<PositioningCardDraftResult>(await http.post('/zsjos/positioning-card/draft', data)),
     updateDraft: async (id: number, data: PositioningCardDraftRequest & { version: number }) => unwrap<PositioningCardDraftResult>(await http.put(`/zsjos/positioning-card/draft/${id}`, data)),
+    importSources: async (params: { studentPersonId: number; accountId: number; serviceRelationId: number }) => unwrap<PositioningCardImportSource[]>(await http.get('/zsjos/positioning-card/import-sources', { params })),
+    importSubmission: async (data: { sourceSubmissionId: number; accountId: number; studentPersonId: number; serviceRelationId: number; targetDraftId?: number; version?: number }) => unwrap<PositioningCardImportResult>(await http.post('/zsjos/positioning-card/import', data)),
     get: async (id: number) => unwrap<PositioningCard>(await http.get('/zsjos/positioning-card/get', { params: { id } })),
     page: async (params: { pageNo: number; pageSize: number; status?: string }) => unwrap<PageResult<PositioningCard>>(await http.get('/zsjos/positioning-card/page', { params })),
     submitReview: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/submit-review`, null, { params: { version } })),
     operatorApprove: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/operator-approve`, null, { params: { version } })),
     operatorReject: async (id: number, version: number, reason: string) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/operator-reject`, null, { params: { version, reason } })),
     generateStudentLink: async (id: number, version: number) => unwrap<PositioningLinkResult>(await http.post(`/zsjos/positioning-card/${id}/student-link`, null, { params: { version } })),
-    confirmTrial: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/confirm-trial`, null, { params: { version } })),
-    archive: async (id: number, version: number) => unwrap<boolean>(await http.post(`/zsjos/positioning-card/${id}/archive`, null, { params: { version } })),
+    startRevision: async (id: number, version: number) => unwrap<PositioningCardDraftResult>(await http.post(`/zsjos/positioning-card/${id}/start-revision`, null, { params: { version } })),
     versions: async (cardId: number) => unwrap<unknown[]>(await http.get('/zsjos/positioning/workspace/versions', { params: { cardId } })),
     execCard: async (cardId: number) => unwrap<unknown>(await http.get('/zsjos/positioning/workspace/exec-card', { params: { cardId } }))
   },
@@ -772,14 +796,6 @@ export const api = {
     publish: async (positioning: boolean, id: number, data: { versionId: number; version: number }) => unwrap<boolean>(await http.post(`${positioning ? '/zsjos/positioning-template' : '/zsjos/director-interview-template'}/${id}/publish`, data)),
     get: async () => unwrap<DirectorConfig>(await http.get('/zsjos/director-config')),
     update: async (data: DirectorConfig) => unwrap<boolean>(await http.put('/zsjos/director-config', data))
-  },
-  studentOps: {
-    exceptions: async () => unwrap<MediaException[]>(await http.get('/zsjos/student-ops/exceptions')),
-    createException: async (data: Record<string, unknown>) => unwrap<number>(await http.post('/zsjos/student-ops/exceptions/create', data)),
-    resolve: async (id: number, version: number, resolution: string) => unwrap<boolean>(await http.post(`/zsjos/student-ops/exceptions/${id}/resolve`, null, { params: { version, resolution } })),
-    assess: async (data: Record<string, unknown>) => unwrap<number>(await http.post('/zsjos/student-ops/assessments/create', data)),
-    graduations: async () => unwrap<GraduationApplication[]>(await http.get('/zsjos/student-ops/graduations')),
-    graduate: async (data: { serviceRelationId: number; reason: string; snapshotJson: string }) => unwrap<number>(await http.post('/zsjos/student-ops/graduations/create', data))
   },
   mediaReview: {
     list: async () => unwrap<MediaReview[]>(await http.get('/zsjos/reviews/list')),
@@ -1056,6 +1072,12 @@ export const api = {
   subordinateSalesPage: async (params: { pageNo: number; pageSize: number; keyword?: string; accountStatus?: number; presence?: string; accepting?: boolean; advancedFilter?: AdvancedFilterGroup }) =>
     params.advancedFilter ? unwrap<PageResult<SubordinateSales>>(await http.post('/zsjos/subordinate-sales/search-page', params))
       : unwrap<PageResult<SubordinateSales>>(await http.get('/zsjos/subordinate-sales/page', { params })),
+  subordinatePartners: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+    unwrap<PageResult<SubordinatePartner>>(await http.get('/zsjos/subordinate-partners/page', { params })),
+  subordinatePartnerLeads: async (partnerId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+    unwrap<PageResult<ManagedLead>>(await http.get(`/zsjos/subordinate-partners/${partnerId}/leads/page`, { params })),
+  subordinatePartnerLead: async (leadId: number) =>
+    unwrap<ManagedLead>(await http.get(`/zsjos/subordinate-partners/leads/${leadId}`)),
   subordinateSalesOverview: async (salesUserId: number) =>
     unwrap<SubordinateSales>(await http.get(`/zsjos/subordinate-sales/${salesUserId}/overview`)),
   subordinateSalesLeads: async (salesUserId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string; advancedFilter?: AdvancedFilterGroup }) =>

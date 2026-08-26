@@ -14,4 +14,9 @@ public class PartnerRespVO {
     private String channelId;
     private LocalDateTime enabledAt;
     private LocalDateTime disabledAt;
+    private Long assignedEmployeeUserId;
+    private String assignedEmployeeName;
+    private LocalDateTime assignedAt;
+    private Integer assignmentVersion;
+    private Boolean assignmentEffective;
 }

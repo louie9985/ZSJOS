@@ -25,7 +25,10 @@ class MediaScreenPropertiesTest {
                 "yudao.media-screen.clients[0].tenant-id", "7",
                 "yudao.media-screen.clients[0].cidrs[0]", "10.20.0.0/16",
                 "yudao.media-screen.trusted-proxies[0]", "127.0.0.1",
-                "yudao.media-screen.cache.stats-ttl-seconds", "30"));
+                "yudao.media-screen.cache.stats-ttl-seconds", "30",
+                "yudao.media-screen.new-media.department-ids[0]", "101",
+                "yudao.media-screen.snapshot.hour", "4",
+                "yudao.media-screen.snapshot.minute", "15"));
 
         MediaScreenProperties properties = new Binder(source)
                 .bind(MediaScreenProperties.PREFIX, Bindable.of(MediaScreenProperties.class))
@@ -36,6 +39,9 @@ class MediaScreenPropertiesTest {
         assertEquals("10.20.0.0/16", properties.getClients().get(0).getCidrs().get(0));
         assertEquals("127.0.0.1", properties.getTrustedProxies().get(0));
         assertEquals(30, properties.getCache().getStatsTtlSeconds());
+        assertEquals(101L, properties.getNewMedia().getDepartmentIds().get(0));
+        assertEquals(4, properties.getSnapshot().getHour());
+        assertEquals(15, properties.getSnapshot().getMinute());
     }
 
     @Test

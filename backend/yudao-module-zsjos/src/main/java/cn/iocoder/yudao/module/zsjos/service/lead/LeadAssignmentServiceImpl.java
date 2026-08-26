@@ -88,7 +88,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
                 .map(LeadAssignmentRelationDO::getTargetUserId)
                 .collect(Collectors.toSet());
         Map<Long, AdminUserRespDTO> targetUserMap = adminUserApi.getUserMap(targetUserIds);
-        Set<Long> validSalesIds = getUsersByPostCode(scene.getTargetPostCode(), true).stream()
+        Set<Long> validSalesIds = getEligibleTargetUsersInternal(scene).stream()
                 .map(AdminUserRespDTO::getId).collect(Collectors.toSet());
         Map<Long, DeptRespDTO> deptMap = getDeptMap(pageUsers, targetUserMap.values());
         List<LeadAssignmentRelationRespVO> list = pageUsers.stream()
@@ -105,7 +105,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
     }
 
     private List<LeadAssignmentUserRespVO> getEligibleTargetUsers(UserRelationSceneDO scene) {
-        List<AdminUserRespDTO> users = getUsersByPostCode(scene.getTargetPostCode(), true).stream()
+        List<AdminUserRespDTO> users = getEligibleTargetUsersInternal(scene).stream()
                 .sorted(userComparator()).toList();
         Map<Long, DeptRespDTO> deptMap = getDeptMap(users, List.of());
         return users.stream().map(user -> convertUser(user, deptMap)).toList();
@@ -123,7 +123,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         }
         Set<Long> configuredIds = relations.stream().map(LeadAssignmentRelationDO::getTargetUserId)
                 .collect(Collectors.toSet());
-        List<AdminUserRespDTO> users = getUsersByPostCode(scene.getTargetPostCode(), true).stream()
+        List<AdminUserRespDTO> users = getEligibleTargetUsersInternal(scene).stream()
                 .filter(user -> configuredIds.contains(user.getId()))
                 .sorted(userComparator())
                 .toList();
@@ -161,7 +161,7 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
                 throw exception(LEAD_ASSIGNMENT_SCOPE_DENIED);
             }
         }
-        Set<Long> validSalesIds = getUsersByPostCode(scene.getTargetPostCode(), true).stream()
+        Set<Long> validSalesIds = getEligibleTargetUsersInternal(scene).stream()
                 .map(AdminUserRespDTO::getId).collect(Collectors.toSet());
         if (!validSalesIds.containsAll(targetUserIds)) {
             throw exception(leadErrors ? LEAD_ASSIGNMENT_TARGET_INVALID : USER_RELATION_TARGET_INVALID);
@@ -223,6 +223,19 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
     @Override
     public List<LeadAssignmentUserRespVO> getAdminEligibleTargetUsers(String sceneCode) {
         return getEligibleTargetUsers(sceneService.getSceneByCode(sceneCode));
+    }
+
+    @Override
+    public List<LeadAssignmentUserRespVO> getConfiguredTargetUsers(String sceneCode, Long sourceUserId) {
+        UserRelationSceneDO scene = sceneService.getEnabledSceneByCode(sceneCode);
+        Set<Long> configuredIds = relationMapper.selectListBySourceUserIds(sceneCode, Set.of(sourceUserId)).stream()
+                .filter(this::isEnabledRelation).map(LeadAssignmentRelationDO::getTargetUserId)
+                .collect(Collectors.toSet());
+        List<AdminUserRespDTO> users = getEligibleTargetUsersInternal(scene).stream()
+                .filter(user -> configuredIds.contains(user.getId()))
+                .sorted(userComparator()).toList();
+        Map<Long, DeptRespDTO> deptMap = getDeptMap(users, List.of());
+        return users.stream().map(user -> convertUser(user, deptMap)).toList();
     }
 
     @Override
@@ -368,6 +381,16 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         return adminUserApi.getUserListByPostIds(Collections.singleton(post.getId())).stream()
                 .filter(user -> !enabledOnly || CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
                 .toList();
+    }
+
+    private List<AdminUserRespDTO> getEligibleTargetUsersInternal(UserRelationSceneDO scene) {
+        if ("permission".equals(scene.getTargetEligibilityType())) {
+            Set<Long> userIds = permissionApi.getEnabledUserIdsByPermission(scene.getTargetPermissionCode());
+            return adminUserApi.getUserList(userIds).stream()
+                    .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
+                    .toList();
+        }
+        return getUsersByPostCode(scene.getTargetPostCode(), true);
     }
 
     private boolean canManageSourceUser(Long operatorUserId, AdminUserRespDTO sourceUser) {

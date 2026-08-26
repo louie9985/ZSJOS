@@ -46,7 +46,10 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="目标岗位" prop="targetPostCode">
+          <el-form-item label="目标资格" prop="targetEligibilityType">
+            <el-segmented v-model="formData.targetEligibilityType" :options="[{ label: '岗位', value: 'post' }, { label: '功能权限', value: 'permission' }]" />
+          </el-form-item>
+          <el-form-item v-if="formData.targetEligibilityType === 'post'" label="目标岗位" prop="targetPostCode">
             <el-select v-model="formData.targetPostCode" filterable placeholder="请选择目标岗位">
               <el-option
                 v-for="post in postOptions"
@@ -58,6 +61,9 @@
                 <span class="post-code">{{ post.code }}</span>
               </el-option>
             </el-select>
+          </el-form-item>
+          <el-form-item v-else label="目标权限码" prop="targetPermissionCode">
+            <el-input v-model="formData.targetPermissionCode" placeholder="例如：zsjos:production-ticket:accept" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -114,6 +120,8 @@ const formData = ref<UserRelationApi.UserRelationSceneVO>({
   targetLabel: '',
   sourcePostCode: '',
   targetPostCode: '',
+  targetEligibilityType: 'post',
+  targetPermissionCode: '',
   status: 0,
   remark: ''
 })
@@ -130,7 +138,8 @@ const formRules = reactive({
   sourceLabel: [{ required: true, message: '来源称谓不能为空', trigger: 'blur' }],
   targetLabel: [{ required: true, message: '目标称谓不能为空', trigger: 'blur' }],
   sourcePostCode: [{ required: true, message: '请选择来源岗位', trigger: 'change' }],
-  targetPostCode: [{ required: true, message: '请选择目标岗位', trigger: 'change' }],
+  targetPostCode: [{ validator: (_: unknown, value: string) => formData.value.targetEligibilityType !== 'post' || value ? Promise.resolve() : Promise.reject(new Error('请选择目标岗位')), trigger: 'change' }],
+  targetPermissionCode: [{ validator: (_: unknown, value: string) => formData.value.targetEligibilityType !== 'permission' || value?.trim() ? Promise.resolve() : Promise.reject(new Error('请输入目标权限码')), trigger: 'blur' }],
   status: [{ required: true, message: '请选择状态', trigger: 'change' }]
 })
 
@@ -185,6 +194,8 @@ const resetForm = () => {
     targetLabel: '',
     sourcePostCode: '',
     targetPostCode: '',
+    targetEligibilityType: 'post',
+    targetPermissionCode: '',
     status: 0,
     remark: ''
   }

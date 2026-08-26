@@ -22,6 +22,7 @@ public class PositioningConfirmationLinkDO extends TenantBaseDO {
     private String tokenHash;
     private String status;
     private Long createdByUserId;
+    private LocalDateTime expiresAt;
     private LocalDateTime revokedAt;
     private LocalDateTime usedAt;
     private Integer version;

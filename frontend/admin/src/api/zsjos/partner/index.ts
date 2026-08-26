@@ -10,6 +10,11 @@ export interface PartnerVO {
   channelId?: string
   enabledAt?: string
   disabledAt?: string
+  assignedEmployeeUserId?: number
+  assignedEmployeeName?: string
+  assignedAt?: string
+  assignmentVersion?: number
+  assignmentEffective?: boolean
 }
 
 export interface PartnerCreateVO {
@@ -42,3 +47,11 @@ export const updatePartnerMobile = (id: number, mobile: string) =>
   request.put({ url: `/zsjos/partner/${id}/mobile`, data: { mobile } })
 export const resetPartnerPassword = (id: number, password: string) =>
   request.put({ url: `/zsjos/partner/${id}/reset-password`, data: { password } })
+export interface AssignmentCandidateVO { id: number; nickname: string; deptId?: number; status: number }
+export const getAssignmentCandidates = () =>
+  request.get<AssignmentCandidateVO[]>({ url: '/zsjos/partner/assignment-candidates' })
+export const updateAssignment = (id: number, data: { assignedUserId?: number; reason: string; expectedVersion?: number }) =>
+  request.put({ url: `/zsjos/partner/${id}/assignment`, data })
+export interface AssignmentLogVO { id: number; previousEmployeeName?: string; employeeName?: string; reason: string; operatorName?: string; occurredAt: string }
+export const getAssignmentLogPage = (id: number) =>
+  request.get<{ list: AssignmentLogVO[]; total: number }>({ url: `/zsjos/partner/${id}/assignment-log/page`, params: { pageNo: 1, pageSize: 100 } })

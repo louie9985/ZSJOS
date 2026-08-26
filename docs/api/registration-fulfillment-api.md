@@ -132,15 +132,30 @@ excluded from `positioningCards` and the operation timeline. Submission locks th
 and requires an assigned, enabled operator before creating the next submission. Operator approval advances
 only the latest submission to `student_link_pending`; the assigned operator can then generate or regenerate
 the student link with `POST /zsjos/positioning-card/{id}/student-link` and permission
-`zsjos:positioning-card:student-link-generate`.
+`zsjos:positioning-card:student-link-generate`. The command returns
+`{ sharePath, expiresAt }`; `sharePath` remains the absolute H5 URL and `expiresAt` is the configured
+server-side expiry boundary.
 
 The anonymous student contract is `GET /public-api/zsjos/positioning-confirmation/detail` and
 `POST /public-api/zsjos/positioning-confirmation/decision`. Both carry the opaque token only in
 `X-Positioning-Token`; the share route stores it after `#token=`. Public responses expose account display
 data, submission time, field/value/label snapshots and decision state, but no card number, internal IDs,
 user IDs, or token. A decision, regeneration, or non-current submission invalidates the active link.
+Expiry also invalidates it. Missing, expired, revoked, already-used, and unknown tokens deliberately share
+one stable invalid-link error so callers cannot enumerate link state.
 `request_changes` requires a 1-500 character comment and returns the card to the director draft stage;
-`agree` advances the existing `trial_14d` flow.
+`agree` atomically marks the current submission `confirmed`, supersedes the account's previous
+`confirmed` submission, consumes the link, and completes the card round. A later edit starts through
+`POST /zsjos/positioning-card/{id}/start-revision?version=...`; only the original director may restore
+the effective submission snapshot into the same card's draft workspace. The prior effective submission
+remains available to production-ticket creation until the revised submission is confirmed.
+
+New submissions always follow `co_creating -> operator_feasibility -> student_link_pending ->
+student_confirm -> confirmed`, including cards whose `professionalRisk` snapshot is true. New submissions
+do not create an IP BPM instance. The IP result listener remains only for instances already in
+`ip_review` before rollout. Historical `trial_14d` cards with `student_agreed` submissions are not
+migrated; runtime reads treat a non-archived historical agreement as effective and allow its original
+director to start a revision. Historical `archived`, `ip_rejected`, and other audit values remain read-only.
 
 Generated links must be absolute and target the anonymous H5 page, not the authenticated Workbench.
 The backend reads that origin from `ZSJOS_PUBLIC_H5_BASE_URL` and rejects link generation before any
@@ -201,4 +216,16 @@ an item. The V129 seed is repeatable and is not executed by application startup.
 模板管理接口为 `/admin-api/zsjos/director-interview-template/**`、
 `/admin-api/zsjos/positioning-template/**` 和 `/admin-api/zsjos/director-config`。定位卡业务端通过
 `GET /admin-api/zsjos/positioning-card/published-template` 获取当前发布模板，创建草稿时保存
-`personId + accountId + serviceRelationId + templateVersionId + trialEndDate` 及完整快照。
+`personId + accountId + serviceRelationId + templateVersionId` 及完整快照。
+
+定位卡复用导入使用以下接口，并同时要求 `zsjos:positioning-card:create` 与
+`zsjos:positioning-card:query`：
+
+- `GET /admin-api/zsjos/positioning-card/import-sources?studentPersonId=...&accountId=...&serviceRelationId=...`
+  返回当前编导对目标学员可读的全部已提交定位卡版本，包含当前账号和该学员其他账号；未提交草稿不进入候选。
+- `POST /admin-api/zsjos/positioning-card/import` 将指定 `sourceSubmissionId` 导入目标账号草稿。
+  目标已有草稿时必须携带 `targetDraftId + version`，并继续使用乐观锁；没有草稿时创建新的账号定位卡草稿。
+
+导入始终使用当前发布模板，按稳定字段 `key` 复制类型兼容的值。新增字段留空，已删除、类型不兼容或
+字典类型改变的字段跳过；未改变的字典选择沿用来源提交中的 value 与 label 快照。来源提交只读，导入
+不会修改历史定位卡、提交序号、审核状态或学员决定，也不会导入历史试运行日期。

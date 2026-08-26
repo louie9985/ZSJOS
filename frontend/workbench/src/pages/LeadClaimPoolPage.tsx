@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, App, Button, Card, Empty, Image, Pagination, Skeleton, Spin, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { api, type AdvancedFilterGroup, type PendingLead } from '../services/api'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
 import { resolvedDisplayLabel, tryStartLeadPageRequest } from '../services/leadManagement'
@@ -84,6 +85,8 @@ function ClaimCard({ lead, canClaim, claiming, onClaim }: {
 }
 
 export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
+  const location = useLocation()
+  const initialLocationKey = useRef(location.key)
   const { message } = App.useApp()
   const [items, setItems] = useState<PendingLead[]>([])
   const [total, setTotal] = useState(0)
@@ -124,6 +127,9 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
   }, [loadPage])
 
   useEffect(() => { refresh() }, [refresh])
+  useEffect(() => {
+    if (location.key !== initialLocationKey.current) refresh()
+  }, [location.key, refresh])
 
   const changePage = useCallback((targetPage: number) => {
     const version = ++requestVersion.current

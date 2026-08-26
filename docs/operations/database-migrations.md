@@ -384,7 +384,7 @@ after controlled execution, run `verify-bootstrap.sql` and require every V113 ch
 
 ## V119 Workbench relative child menu paths
 
-V119 follows V118 and normalizes only active page-menu metadata directly beneath the unique active
+V119 follows V117 in the rewritten baseline and normalizes only active page-menu metadata directly beneath the unique active
 `/zsjos` Workbench root. A stored child path such as `/zsjos/my-students` becomes `my-students`; the
 resolved browser URL remains `/zsjos/my-students`. Buttons, external links, nested pages outside that
 direct parent, role grants, users, and business rows are not changed.
@@ -454,3 +454,52 @@ facts and must not be rewritten. V137 therefore repeatably ensures `system_menu.
 exists and records a new unique compatibility marker without changing menu grants or business rows. Run it
 after V132-V136 for both upgraded and fresh environments, then require the V137 compatibility check in
 `verify-bootstrap.sql` to return `PASS`.
+
+## V140 supervisor idempotency, positioning expiry, and menu repair
+
+V140 follows V139. It creates the tenant/operator/idempotency-key command ledger used by supervisor Lead
+commands, adds `expires_at` plus its lookup index to positioning confirmation links, backfills only active
+historical links to `create_time + 7 days`, and widens the student decision comment to 2000 characters.
+It restores menu `73460` to the student business-form page, moves the interview-template page and its
+buttons/grants to stable menu `73483`, and forward-repairs V139 supervisor permission definitions by
+preferring the oldest compatible identity, preserving its grants, and leaving exactly one active definition
+per permission. It also preserves the canonical relative public-sea path `lead-aging-pool`.
+
+The migration is forward-only and repeatable. This repository update does not execute it against any
+database. V139 and V140 now execute their repair and version writes inside one stored-procedure call; their
+temporary permission tables use the System menu collation, and V140 uses a legal role-menu self-join. After
+controlled application, run `verify-bootstrap.sql` and require the V139 and V140 checks to pass.
+`script/sql/mysql/audit/V131_permission_grant_audit.sql` and
+`script/sql/mysql/audit/V135_snapshot_cleanup_audit.sql` are read-only scope/export scripts. Do not revoke
+permissions or clear inferred snapshot fields until the exact tenant and row list has been separately
+confirmed and a recovery export has been retained.
+
+## V142 partial V139/V140 execution repair
+
+V142 is required when a statement-batch client continued after the former V139 collation error or V140
+same-target-table error and then wrote either migration's success markers. Do not delete or edit those applied
+version rows and do not rerun a recorded V139/V140 file. First run a read-only audit of both version tables,
+menus `73460`/`73483`, the five supervisor permissions, affected role-menu grants, positioning expiry objects,
+and the command table. After the exact environment is separately approved, apply V141 if pending and then V142.
+
+V142 repairs only additive V140 schema, migration-owned menu identities, and affected grants. It preserves
+effective grants while consolidating duplicate supervisor menu definitions, completes the original initial
+`sales_manager` grants, and blocks rather than overwriting a conflicting menu owner. It deletes no Lead,
+positioning, command, account, or other business row. Its single stored-procedure call records V142 only after
+all repair statements succeed. Run `verify-bootstrap.sql` afterward and require the V139, V140, V141, and V142
+checks to pass. Recovery is forward-only; do not drop idempotency or positioning schema after runtime use.
+
+## V144 new-media Student Operations retirement
+
+V144 permanently removes the retired new-media exception-ticket, cooperation-assessment and graduation
+domains. It deletes graduation notification messages/rules/templates and business events first, then
+Student Operations grants and menu/button definitions, then drops the three business tables. It also
+removes obsolete V106/V108/V118 migration markers before recording V144. Student-contact extension
+approval (`zsjos_student_contact_extension`) is a separate business capability and is not touched.
+
+Before execution, retain a verified full database backup and confirm there are no active or historical
+`zsjos_media_graduation` process instances. Retire that Flowable model/deployment through the BPM service
+and repository boundary; do not delete `ACT_*` rows directly. V144 is repeatable but irreversible without
+restoring the backup. After the first and second executions, verify all retired menus, grants, notification
+records, events and tables are absent, while the student-contact extension table, permission and process
+definition remain present.

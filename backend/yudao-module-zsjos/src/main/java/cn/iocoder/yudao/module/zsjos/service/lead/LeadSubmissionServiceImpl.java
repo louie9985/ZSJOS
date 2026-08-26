@@ -65,6 +65,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private PersonIdentityWriteService personIdentityWriteService;
     @Resource private LeadCategorySnapshotService categorySnapshotService;
     @Resource private PartnerAccountMapper partnerAccountMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -375,6 +376,13 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechatId);
         lead.setSourceType(sourceType(identity));
         lead.setSourceUserId(sourceUserId); lead.setPartnerId(identity.partnerId());
+        if (identity.partnerId() != null) {
+            var ownership = partnerOwnershipService.getByPartnerId(identity.partnerId());
+            if (ownership != null) {
+                lead.setPartnerOwnerUserIdSnapshot(ownership.getEmployeeUserId());
+                lead.setPartnerOwnerNameSnapshot(ownership.getEmployeeNameSnapshot());
+            }
+        }
         if (identity.identity() == LeadSubmissionIdentityService.Identity.SALES) {
             lead.setSourceProviderUserId(reqVO.getNewMediaProviderUserId());
             lead.setSourceProviderRecorded(true);

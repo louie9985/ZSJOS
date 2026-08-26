@@ -38,7 +38,6 @@ onMounted(load)
       </section>
       <van-cell-group inset title="定位内容">
         <van-cell v-for="field in fields" :key="field.key" :title="field.title" :label="displayValue(field.key)" />
-        <van-cell title="试运行结束日期" :value="confirmation.trialEndDate || '未填写'" />
       </van-cell-group>
       <van-cell-group v-for="[title,section] in legacySections" :key="title" inset :title="title">
         <van-cell v-for="(value,key) in section" :key="key" :title="String(key)" :label="typeof value==='object'?JSON.stringify(value):String(value)" />

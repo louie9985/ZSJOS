@@ -77,6 +77,7 @@ export const APP_ROUTES = {
   STUDENT_CONTACT_CONFIG: '/zsjos/student-contact-config',
   STUDENT_CONTACT_EXCEPTIONS: '/zsjos/student-contact-exceptions',
   SUBORDINATE_SALES: '/zsjos/subordinate-sales',
+  SUBORDINATE_PARTNERS: '/zsjos/subordinate-partners',
   TODAY_TASKS: '/zsjos/tasks/today',
   WORK_PLANS: '/zsjos/work-plans',
   BPM_TODO: '/bpm/task/todo',
@@ -99,9 +100,9 @@ export const APP_ROUTES = {
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread'
   ,MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets'
-  ,MEDIA_STUDENT_OPS: '/zsjos/student-ops'
   ,MEDIA_REVIEWS: '/zsjos/reviews'
   ,MEDIA_STUDENTS: '/zsjos/media-students'
+  ,MEDIA_CALENDAR: '/calendar/overview'
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
@@ -128,6 +129,7 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.TODAY_TASKS,
   APP_ROUTES.WORK_PLANS,
   APP_ROUTES.SUBORDINATE_SALES,
+  APP_ROUTES.SUBORDINATE_PARTNERS,
   APP_ROUTES.LEAD_APPEALS,
   APP_ROUTES.MY_SALES_ORDERS,
   APP_ROUTES.TEAM_SALES_ORDERS,
@@ -146,9 +148,9 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.ALL_MESSAGES,
   APP_ROUTES.UNREAD_MESSAGES
   ,APP_ROUTES.MEDIA_PRODUCTION_TICKETS
-  ,APP_ROUTES.MEDIA_STUDENT_OPS
   ,APP_ROUTES.MEDIA_REVIEWS
   ,APP_ROUTES.MEDIA_STUDENTS
+  ,APP_ROUTES.MEDIA_CALENDAR
 ])
 
 // ========== Dictionaries ==========
@@ -170,6 +172,10 @@ export const DICT_TYPE = {
   ,ORDER_PAYMENT_METHOD: 'zsjos_order_payment_method'
   ,STUDENT_CONTACT_UNSUCCESSFUL_REASON: 'zsjos_student_contact_unsuccessful_reason'
   ,STUDENT_CONTACT_EXTENSION_REASON: 'zsjos_student_contact_extension_reason'
+  ,MEDIA_ACCOUNT_CURRENT_STATUS: 'zsjos_media_account_current_status'
+  ,MEDIA_ACCOUNT_STAGE: 'zsjos_media_account_stage'
+  ,MEDIA_ACCOUNT_PRIMARY_PROBLEM: 'zsjos_media_account_primary_problem'
+  ,MEDIA_ACCOUNT_EXECUTION_MEASURE: 'zsjos_media_account_execution_measure'
 } as const
 
 // ========== Lead Management ==========

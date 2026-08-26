@@ -1,4 +1,4 @@
-.media-accounts-page,.media-content-page,.media-tickets-page,.media-positioning-page,.media-student-ops-page { display:flex; height:100%; min-height:0; flex-direction:column; }
+.media-accounts-page,.media-content-page,.media-tickets-page,.media-positioning-page { display:flex; height:100%; min-height:0; flex-direction:column; }
 .media-feature-heading,.media-feature-detail-title { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--crm-gap); margin-bottom:var(--crm-gap); }
 .media-feature-heading h4,.media-feature-detail-title h4,.media-feature-card h5 { margin:0; }
 .media-feature-heading > div:first-child,.media-feature-detail-title > div:first-child { display:flex; min-width:0; flex-direction:column; gap:var(--crm-sp-1); }
@@ -22,4 +22,4 @@
 .media-feature-meta { display:grid; grid-template-columns:1fr 1fr; }
 .media-feature-skeleton { padding:var(--crm-sp-3); }
 @container (max-width:699px) { .media-feature-overview-main,.media-feature-overview-aside { grid-column:1/-1; } }
-@media (max-width:768px) { .media-accounts-page,.media-content-page,.media-tickets-page,.media-positioning-page,.media-student-ops-page { height:auto; min-height:100%; } .media-feature-inbox-layout { grid-template-columns:minmax(0,1fr); } .media-feature-list-pane { max-height:44vh; } .media-feature-fields { grid-template-columns:minmax(0,1fr); } }
+@media (max-width:768px) { .media-accounts-page,.media-content-page,.media-tickets-page,.media-positioning-page { height:auto; min-height:100%; } .media-feature-inbox-layout { grid-template-columns:minmax(0,1fr); } .media-feature-list-pane { max-height:44vh; } .media-feature-fields { grid-template-columns:minmax(0,1fr); } }

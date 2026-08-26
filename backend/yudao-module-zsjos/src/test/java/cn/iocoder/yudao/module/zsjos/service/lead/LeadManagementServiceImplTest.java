@@ -429,6 +429,27 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void detailProjectsRecyclePendingSupervisorActionsFromSharedPolicy() {
+        LeadDO lead = actionLead("submitted", "recycle_pending", true);
+        lead.setOwnerUserId(null);
+        lead.setRecycleSourceOwnerUserId(20L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(leadObjectPermissionService.canReadDetail(lead, 10L)).thenReturn(true);
+        when(leadObjectPermissionService.getManagedUserIds(10L)).thenReturn(Set.of(20L));
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of());
+        when(intendedProductMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
+        when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-transfer")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:subordinate-sales:lead-release-claim-pool")).thenReturn(true);
+
+        LeadManagementRespVO result = service.getLead(1L, 10L);
+
+        assertEquals(List.of("SUPERVISOR_TRANSFER", "SUPERVISOR_RELEASE_CLAIM_POOL"),
+                result.getAvailableActions().stream().map(LeadManagementRespVO.ActionVO::getCode).toList());
+        verify(agingPoolService, never()).canEnterManually(1L);
+    }
+
+    @Test
     void activePoolCollaboratorOnlyReceivesFollowUpAndDealActions() {
         LeadDO lead = actionLead("valid", "owned", true);
         OpportunityDO opportunity = new OpportunityDO();

@@ -6,6 +6,9 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.Positioning
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardDraftRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningLinkRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardImportReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardImportRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo.PositioningCardImportSourceRespVO;
 import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningCardService;
 import cn.iocoder.yudao.module.zsjos.service.positioning.PositioningConfirmationService;
 import cn.iocoder.yudao.module.zsjos.controller.admin.director.vo.DirectorFormTemplateVO;
@@ -21,6 +24,8 @@ import org.springframework.web.bind.annotation.*;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
 import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+
+import java.util.List;
 
 @Tag(name = "管理后台 - 新媒体定位卡")
 @RestController
@@ -43,6 +48,19 @@ public class PositioningCardController {
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
     public CommonResult<PositioningCardDraftRespVO> createDraft(@Valid @RequestBody PositioningCardSaveReqVO req) {
         return success(service.create(req, getLoginUserId()));
+    }
+    @GetMapping("/import-sources") @Operation(summary = "获得可导入的已提交定位卡")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create') && @ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<List<PositioningCardImportSourceRespVO>> importSources(
+            @RequestParam Long studentPersonId, @RequestParam Long accountId,
+            @RequestParam Long serviceRelationId) {
+        return success(service.getImportSources(studentPersonId, accountId, serviceRelationId, getLoginUserId()));
+    }
+    @PostMapping("/import") @Operation(summary = "导入已提交定位卡到目标草稿")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create') && @ss.hasPermission('zsjos:positioning-card:query')")
+    public CommonResult<PositioningCardImportRespVO> importSubmission(
+            @Valid @RequestBody PositioningCardImportReqVO req) {
+        return success(service.importSubmission(req, getLoginUserId()));
     }
     @PutMapping("/draft/{id}") @Operation(summary = "保存定位卡草稿")
     @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:create')")
@@ -81,14 +99,10 @@ public class PositioningCardController {
                                                                    @RequestParam Integer version) {
         return success(confirmationService.generateLink(id, version, getLoginUserId()));
     }
-    @PostMapping("/{id}/confirm-trial") @Operation(summary = "确认十四天试跑结果")
-    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:confirm-trial')")
-    public CommonResult<Boolean> confirmTrial(@PathVariable Long id, @RequestParam Integer version) {
-        service.confirmTrial(id, version); return success(true);
-    }
-    @PostMapping("/{id}/archive") @Operation(summary = "归档定位卡")
-    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:archive')")
-    public CommonResult<Boolean> archive(@PathVariable Long id, @RequestParam Integer version) {
-        service.archive(id, version); return success(true);
+    @PostMapping("/{id}/start-revision") @Operation(summary = "开始修改已确认定位卡")
+    @PreAuthorize("@ss.hasPermission('zsjos:positioning-card:edit')")
+    public CommonResult<PositioningCardDraftRespVO> startRevision(@PathVariable Long id,
+                                                                   @RequestParam Integer version) {
+        return success(service.startRevision(id, version, getLoginUserId()));
     }
 }

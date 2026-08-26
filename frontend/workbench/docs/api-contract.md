@@ -41,7 +41,6 @@
 
 ### 工作台扩展
 
-- `/zsjos/student-ops` 提供异常工单处理和配合度评估入口。
 - `/zsjos/positioning/workspace` 提供采访导入确认、定位版本历史和三方执行卡签字。
 
 新媒体业务接口由 `yudao-module-zsjos` 提供，前缀为 `/admin-api`：
@@ -51,15 +50,20 @@
 - `POST /zsjos/media-account/{id}/bind-student?studentPersonId=...`：绑定学员并保留历史。
 - `GET /zsjos/media-account/student-candidates`：返回当前用户有权访问的精简学员候选；仅具备 `zsjos:media-account:query-all` 的管理员可查询租户全量候选。工作台学员中心创建账号时优先使用当前学员上下文，不得用该接口扩大可见范围。
 - `POST /zsjos/media-account/{id}/unbind-student`：解绑学员并保留历史。
-- `POST /zsjos/media-account/{id}/advance-stage`、`rollback-stage`：推进或回退 S0-S6 阶段，必须携带版本号。
+- `PUT /zsjos/media-account/{id}/maintenance`：共同维护当下状态、阶段、主要问题、实行措施、修改方向和日期区间；只提交字典 value，服务端保存标签快照和不可变版本。
+- `GET /zsjos/media-account/{id}/maintenance-history`、`legacy-stage-history`：分页查看新的维护版本和保留的原阶段记录，接受账号查询或维护功能权限并叠加账号对象读取权限；账号投影仅在两层权限都通过时返回 `VIEW_ACCOUNT_HISTORY`，Workbench 未收到该能力时不得请求或展示历史。
+- Workbench 将状态摘要、维护入口和两类历史归属到具体账号：账号行只根据该账号的 `MAINTAIN_ACCOUNT`/`VIEW_ACCOUNT_HISTORY` 投影操作，选中账号后在“账号”页签内展示完整状态与历史，不提供学员级“状态维护”页签；旧 `tab=maintenance` 链接兼容进入 `accounts`。
+- `GET /zsjos/media-account/calendar`：查询与日期窗口相交的当前账号区间，并返回当前范围下的未排期数量；普通用户限本人所属编导/运营账号，`zsjos:media-calendar:query-all` 扩展为全量。
+- `POST /zsjos/media-account/{id}/advance-stage`、`rollback-stage`：兼容路由保留一个周期，但不再流转阶段，固定返回“阶段推进功能已停用，请使用状态维护”。
 - `PUT /zsjos/media-account/{id}`：编辑账号资料，必须携带版本号。
 - `POST /zsjos/media-account/{id}/rescue`：更新挽救状态，必须携带版本号。
 - `POST /zsjos/media-account/{id}/request-rebind`：发起账号换绑 BPM，必须携带目标学员和版本号。
 - `POST /zsjos/content/create`、`GET /zsjos/content/get`、`GET /zsjos/content/page`：内容查询；状态命令分别使用 `complete-topic`、`submit-production`、`submit-acceptance`、`approve-acceptance`、`reject-acceptance`、`start-revision`、`resubmit-production`。
-- `POST /zsjos/production-ticket/create`、`GET /zsjos/production-ticket/get`、`GET /zsjos/production-ticket/page`：拍剪工单查询；状态命令分别使用 `accept`、`start-production`、`submit`、`start-check`、`approve`、`reject`、`reaccept`。
-- `POST /zsjos/positioning-card/create`、`GET /zsjos/positioning-card/get`、`GET /zsjos/positioning-card/page`：定位卡查询；命令使用 `submit-review`、`operator-confirm`、`operator-reject`、`confirm-trial`、`archive`。运营确认和退回分别受独立功能权限控制，`query-all` 只扩大读取范围。
+- `GET /zsjos/production-ticket/create-context?accountId=` 返回账号字段、已确认定位卡快照和关系/权限交集候选人；`POST /zsjos/production-ticket/create` 仅接收账号、可选受派人和幂等键。独立页面提供待接单、我的工单和公共池视图；`GET /zsjos/production-ticket/assignment/my-pending`、`POST /zsjos/production-ticket/{id}/reject-assignment`、`GET /zsjos/production-ticket/pool/page` 与 `POST /zsjos/production-ticket/{id}/claim` 支持永久指定待接、拒接入池和并发抢单。创建、拒接和抢单按租户、操作人、幂等键及请求指纹保存结果；相同请求重放原成功结果且不重复发送事件，不同参数复用键返回稳定幂等冲突。状态命令继续使用 `accept`、`start-production`、`submit`、`start-check`、`approve`、`reject`、`reaccept`。
+- `POST /zsjos/positioning-card/create`、`GET /zsjos/positioning-card/get`、`GET /zsjos/positioning-card/page`：定位卡查询；命令使用 `submit-review`、`operator-confirm`、`operator-reject`、`student-link`、`start-revision`。运营确认和退回分别受独立功能权限控制，`query-all` 只扩大读取范围。
+- `GET /zsjos/positioning-card/import-sources` 由服务端返回同一学员当前账号和其他账号的可读已提交版本；`POST /zsjos/positioning-card/import` 按当前发布模板把选中提交映射到目标草稿。Workbench 不从详情投影自行拼来源，不导入其他账号草稿；覆盖已有草稿前确认并提交当前 `draftId + version`。
 
-所有详情和分页响应均为 RespVO，并返回服务端计算的 `availableActions`。定位卡普通路径为 `co_creating -> operator_feasibility`；标记专业风险时仅在编导提交审核时创建 `zsjos_media_positioning_ip` BPM，完成 IP 专业审核后再进入运营可行性复核。IP、运营复核和学员拒绝均回到 `co_creating`，由原 `content_director` 修改后重新提交。定位岗位统一使用 `content_director`。所有写操作同时受菜单/按钮权限、对象权限和乐观锁版本约束；分页额外受责任人和部门数据范围约束。
+所有详情和分页响应均为 RespVO，并返回服务端计算的 `availableActions`。定位卡统一路径为 `co_creating -> operator_feasibility -> student_link_pending -> student_confirm -> confirmed`；`professionalRisk` 仅保留为业务快照，不再改变审核路径。运营退回或学员提出修改均回到 `co_creating`，由原 `content_director` 修改后重新提交。确认后的再次修改使用 `start-revision`，修订审核期间旧 `effective` 提交继续供下游使用，新提交经学员确认后原子替换旧版。历史 `trial_14d/student_agreed` 数据不迁移，通过运行时兼容为有效版本；历史 IP BPM 监听器仅处理发布前已在途实例。定位岗位统一使用 `content_director`。所有写操作同时受菜单/按钮权限、对象权限和乐观锁版本约束；分页额外受责任人和部门数据范围约束。
 
 `/zsjos/accounts`、`/zsjos/content` 和 `/zsjos/positioning` 不再注册为页面入口。第三方账号、内容生产和账号定位从 `/zsjos/media-students` 的具体学员标签发起；拍剪工单仍保留独立页面。按钮只在服务端下发对应权限且对象 `availableActions` 允许时显示。
 
@@ -72,6 +76,8 @@
 认证失败既可能使用 HTTP 401，也可能使用 HTTP 200 包裹业务码 `401`。工作台对两种响应执行同一套单次刷新与请求回放；刷新失败通过全局事件立即卸载工作台并进入登录页。HTTP 403 保留当前会话并显示无权限，网络错误和服务端错误保留独立的重试状态。
 
 `/messages/all` 调用 `my-page` 获取当前用户全部消息；`/messages/unread` 固定传递 `readStatus=false`。两个页面均由权限接口中的服务端菜单决定是否可见，前端不自行制造入口权限。
+
+消息中心和实时消息弹窗的业务跳转会携带新的导航上下文。目标页面即使已经处于当前路由，也必须重新读取消息指向的列表/详情数据；当前筛选条件保留，目标记录不在筛选结果时临时置顶。消息导航会清理未提交的临时表单状态，以服务端最新详情为准，不使用浏览器整站刷新。
 
 WebSocket 使用 `/infra/ws?token=...`，不带 `/admin-api` 前缀。当前消费 `notify-message-new` 和 `zsjos_lead_assignment`；事件只触发对应 HTTP 数据刷新，不替代站内信或客资业务记录。
 
@@ -88,7 +94,7 @@ WebSocket 使用 `/infra/ws?token=...`，不带 `/admin-api` 前缀。当前消�
 
 ### 拍剪工单返工
 
-`POST /admin-api/zsjos/production-ticket/{id}/reject` 使用 `version` 与必填 `reason`。原因去除首尾空白后必须为 1-500 个字符；服务端在返工上限内原子递增 `revisionCount`，将原因保存到工单返工原因与业务状态事件，并向原剪拍责任人发送返工消息。工单列表优先展示 `deadlineAt`，兼容仅返回 `expectedDeliveredAt` 的历史记录。
+`POST /admin-api/zsjos/production-ticket/{id}/reject` 使用 `version` 与必填 `reason`。原因去除首尾空白后必须为 1-500 个字符；服务端原子递增 `revisionCount`，不再参与历史最大返工次数限制。工单列表保留旧截止时间字段读取兼容，但新建工单不写入截止时间或返工上限。
 ### Student delivery stages
 
 `GET /zsjos/student/service/{serviceRelationId}/contact-context` returns the server-owned normal delivery stage projection in `deliveryStage`, `deliveryStageLabel`, and `deliveryStages`. The planner advances the current stage with `POST /zsjos/student/service/{serviceRelationId}/delivery-stage` using the current `stage`, a required remark, structured `data`, and an idempotency key. The backend validates service ownership, stage order, required facts, attachment ownership, and idempotency; the client must not mutate stage fields directly.

@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.dal.mysql.positioning;
 
 import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.positioning.PositioningCardSubmissionDO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
@@ -75,6 +76,26 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .set(PositioningCardDO::getProfessionalRisk, card.getProfessionalRisk())
                 .set(PositioningCardDO::getVersion, version + 1));
     }
+    default int overwriteDraftFromImport(PositioningCardDO card, Integer version) {
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
+                .eq(PositioningCardDO::getId, card.getId()).eq(PositioningCardDO::getVersion, version)
+                .eq(PositioningCardDO::getStatus, "co_creating")
+                .set(PositioningCardDO::getTemplateId, card.getTemplateId())
+                .set(PositioningCardDO::getTemplateVersionId, card.getTemplateVersionId())
+                .set(PositioningCardDO::getFieldsSnapshotJson, card.getFieldsSnapshotJson())
+                .set(PositioningCardDO::getValuesSnapshotJson, card.getValuesSnapshotJson())
+                .set(PositioningCardDO::getDictSnapshotJson, card.getDictSnapshotJson())
+                .set(PositioningCardDO::getTrialEndDate, card.getTrialEndDate())
+                .set(PositioningCardDO::getLayer1Json, card.getLayer1Json())
+                .set(PositioningCardDO::getLayer2Json, card.getLayer2Json())
+                .set(PositioningCardDO::getFormulaJson, card.getFormulaJson())
+                .set(PositioningCardDO::getFeasibilityJson, card.getFeasibilityJson())
+                .set(PositioningCardDO::getContentFormJson, card.getContentFormJson())
+                .set(PositioningCardDO::getComplianceJson, card.getComplianceJson())
+                .set(PositioningCardDO::getProfessionalRisk, card.getProfessionalRisk())
+                .set(PositioningCardDO::getOperatorUserId, card.getOperatorUserId())
+                .set(PositioningCardDO::getVersion, version + 1));
+    }
     default int updateCurrentOperatorByServiceRelations(Collection<Long> serviceRelationIds, Long operatorUserId) {
         if (serviceRelationIds == null || serviceRelationIds.isEmpty()) return 0;
         return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
@@ -111,6 +132,35 @@ public interface PositioningCardMapper extends BaseMapperX<PositioningCardDO> {
                 .set(PositioningCardDO::getOperatorReviewedByUserId, operatorUserId)
                 .set(PositioningCardDO::getOperatorReviewedAt, reviewedAt)
                 .set(PositioningCardDO::getOperatorReviewComment, comment)
+                .set(PositioningCardDO::getVersion, version + 1));
+    }
+    default int startRevision(PositioningCardDO card, PositioningCardSubmissionDO effective, Integer version) {
+        int nextVersionNo = card.getVersionNo() == null ? 1 : card.getVersionNo() + 1;
+        return update(null, new LambdaUpdateWrapper<PositioningCardDO>()
+                .eq(PositioningCardDO::getId, card.getId())
+                .eq(PositioningCardDO::getVersion, version)
+                .eq(PositioningCardDO::getStatus, card.getStatus())
+                .set(PositioningCardDO::getTemplateId, effective.getTemplateId())
+                .set(PositioningCardDO::getTemplateVersionId, effective.getTemplateVersionId())
+                .set(PositioningCardDO::getFieldsSnapshotJson, effective.getFieldsSnapshotJson())
+                .set(PositioningCardDO::getValuesSnapshotJson, effective.getValuesSnapshotJson())
+                .set(PositioningCardDO::getDictSnapshotJson, effective.getDictSnapshotJson())
+                .set(PositioningCardDO::getTrialEndDate, effective.getTrialEndDate())
+                .set(PositioningCardDO::getLayer1Json, effective.getLayer1Json())
+                .set(PositioningCardDO::getLayer2Json, effective.getLayer2Json())
+                .set(PositioningCardDO::getFormulaJson, effective.getFormulaJson())
+                .set(PositioningCardDO::getFeasibilityJson, effective.getFeasibilityJson())
+                .set(PositioningCardDO::getContentFormJson, effective.getContentFormJson())
+                .set(PositioningCardDO::getComplianceJson, effective.getComplianceJson())
+                .set(PositioningCardDO::getProfessionalRisk, effective.getProfessionalRisk())
+                .set(PositioningCardDO::getStatus, "co_creating")
+                .set(PositioningCardDO::getVersionNo, nextVersionNo)
+                .set(PositioningCardDO::getIpProcessInstanceId, null)
+                .set(PositioningCardDO::getIpReviewerUserId, null)
+                .set(PositioningCardDO::getIpReviewedAt, null)
+                .set(PositioningCardDO::getOperatorReviewedByUserId, null)
+                .set(PositioningCardDO::getOperatorReviewedAt, null)
+                .set(PositioningCardDO::getOperatorReviewComment, null)
                 .set(PositioningCardDO::getVersion, version + 1));
     }
     default int advanceVersionNo(Long id, Integer expectedVersion, Integer expectedVersionNo, Integer nextVersionNo) {

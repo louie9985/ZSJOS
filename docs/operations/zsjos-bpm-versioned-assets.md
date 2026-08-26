@@ -6,4 +6,6 @@
 
 每次发布记录资产版本、SHA-256、Flowable 定义 ID、Flowable 版本、部署时间和操作人。发布后核对 Process Key 和任务 Key，并以受控业务请求创建一个新实例验证待办。新定义只服务新实例，不迁移、不重启、不改写在途实例。
 
+退役流程属于版本不可变规则的显式例外：经业务确认永久下线且确认无在途或历史实例后，可以从交付清单和基线中删除该流程资产，并通过 BPM 服务及 Flowable `RepositoryService` 边界级联删除模型、定义和部署。不得通过零散删除 `ACT_*` 表记录来退役流程。2026-08-26 已按此规则退役新媒体毕业流程 `zsjos_media_graduation`；学员联系延期流程 `zsjos_student_contact_extension` 独立保留。
+
 学员联系延期流程还依赖 V095 创建的 `zsjos-system-form:student-contact-extension` 动态表单。Admin 创建模型时必须选择“流程表单”并绑定该租户下名称为“学员联系延期审批表单”的表单，不能留空或绑定普通 BPM 发起表单。字段由 ZSJOS 启动变量填充并设为只读；主管审批意见使用 BPM 任务的必填“审批意见”字段，状态监听器将其快照到延期记录的 `decisionReason`。

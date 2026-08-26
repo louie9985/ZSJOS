@@ -7,11 +7,14 @@
       <el-table-column prop="partnerNo" label="兼职编号" />
       <el-table-column prop="name" label="姓名" />
       <el-table-column prop="mobile" label="手机号" />
+      <el-table-column label="当前归属" min-width="150"><template #default="scope"><span>{{ scope.row.assignedEmployeeName || '未分配' }}</span><el-tag v-if="scope.row.assignedEmployeeName && scope.row.assignmentEffective === false" type="warning" class="ml-8px">授权失效</el-tag></template></el-table-column>
       <el-table-column label="状态"
         ><template #default="scope">{{ statusLabels[scope.row.status] }}</template></el-table-column
       >
       <el-table-column label="操作" width="420">
         <template #default="scope">
+          <el-button v-hasPermi="['zsjos:partner:assign-owner']" link type="primary" @click="openAssignment(scope.row)">归属</el-button>
+          <el-button v-hasPermi="['zsjos:partner:assign-owner']" link @click="openAssignmentLogs(scope.row)">历史</el-button>
           <el-button
             v-if="scope.row.status === 'enabled'"
             v-hasPermi="['zsjos:partner:update-state']"
@@ -95,6 +98,16 @@
       ><el-button type="primary" @click="submitConvert">确认转换</el-button></template
     >
   </Dialog>
+  <Dialog v-model="assignmentVisible" title="设置兼职归属">
+    <el-form label-width="100px">
+      <el-form-item label="归属员工"><el-select v-model="assignmentUserId" clearable filterable :loading="assignmentLoading" placeholder="留空表示解除归属"><el-option v-for="user in assignmentCandidates" :key="user.id" :label="user.nickname" :value="user.id" /></el-select></el-form-item>
+      <el-form-item label="调整原因" required><el-input v-model="assignmentReason" type="textarea" :rows="4" maxlength="500" show-word-limit /></el-form-item>
+    </el-form>
+    <template #footer><el-button @click="assignmentVisible = false">取消</el-button><el-button type="primary" :loading="assignmentLoading" :disabled="!assignmentReason.trim()" @click="submitAssignment">确认</el-button></template>
+  </Dialog>
+  <Dialog v-model="assignmentLogVisible" title="兼职归属历史" width="760px">
+    <el-table v-loading="assignmentLogLoading" :data="assignmentLogs" empty-text="暂无归属变更"><el-table-column label="变更前"><template #default="scope">{{ scope.row.previousEmployeeName || '未分配' }}</template></el-table-column><el-table-column label="变更后"><template #default="scope">{{ scope.row.employeeName || '未分配' }}</template></el-table-column><el-table-column prop="reason" label="原因" min-width="180" show-overflow-tooltip /><el-table-column prop="operatorName" label="操作人" /><el-table-column prop="occurredAt" label="时间" min-width="170" /></el-table>
+  </Dialog>
 </template>
 <script lang="ts" setup>
 import * as PartnerApi from '@/api/zsjos/partner'
@@ -109,6 +122,15 @@ const loadError = ref('')
 const statusLabels = { enabled: '启用', disabled: '停用', converted: '已转员工' }
 const createVisible = ref(false)
 const convertVisible = ref(false)
+const assignmentVisible = ref(false)
+const assignmentLoading = ref(false)
+const assignmentPartner = ref<PartnerApi.PartnerVO>()
+const assignmentUserId = ref<number>()
+const assignmentReason = ref('')
+const assignmentCandidates = ref<PartnerApi.AssignmentCandidateVO[]>([])
+const assignmentLogVisible = ref(false)
+const assignmentLogLoading = ref(false)
+const assignmentLogs = ref<PartnerApi.AssignmentLogVO[]>([])
 const selectedId = ref<number>()
 const deptList = ref<Tree[]>([])
 const createForm = reactive<PartnerApi.PartnerCreateVO>({
@@ -171,6 +193,34 @@ const submitConvert = async () => {
   convertVisible.value = false
   message.success('兼职已转为员工')
   await load()
+}
+const openAssignment = async (row: PartnerApi.PartnerVO) => {
+  assignmentPartner.value = row
+  assignmentUserId.value = row.assignedEmployeeUserId
+  assignmentReason.value = ''
+  assignmentVisible.value = true
+  assignmentLoading.value = true
+  try { assignmentCandidates.value = await PartnerApi.getAssignmentCandidates() }
+  catch { assignmentCandidates.value = []; message.error('候选员工加载失败') }
+  finally { assignmentLoading.value = false }
+}
+const submitAssignment = async () => {
+  const row = assignmentPartner.value
+  if (!row || !assignmentReason.value.trim()) return
+  assignmentLoading.value = true
+  try {
+    await PartnerApi.updateAssignment(row.id, { assignedUserId: assignmentUserId.value, reason: assignmentReason.value.trim(), expectedVersion: row.assignmentVersion })
+    message.success(assignmentUserId.value ? '兼职归属已更新' : '兼职归属已解除')
+    assignmentVisible.value = false
+    await load()
+  } finally { assignmentLoading.value = false }
+}
+const openAssignmentLogs = async (row: PartnerApi.PartnerVO) => {
+  assignmentLogVisible.value = true
+  assignmentLogLoading.value = true
+  try { assignmentLogs.value = (await PartnerApi.getAssignmentLogPage(row.id)).list }
+  catch { assignmentLogs.value = []; message.error('归属历史加载失败') }
+  finally { assignmentLogLoading.value = false }
 }
 const changeMobile = async (row: PartnerApi.PartnerVO) => {
   const result = await message.prompt('请输入新的登录手机号', '修改手机号')

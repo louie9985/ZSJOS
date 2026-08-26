@@ -12,6 +12,7 @@ import {
   Select,
   Skeleton,
   Space,
+  Tabs,
   Tag,
   Tooltip,
   Typography,
@@ -26,7 +27,6 @@ import {
   type DictData,
   type MediaAccount,
   type MediaContent,
-  type MediaException,
   type PositioningCard,
   type ProductionTicket,
   type SimpleUser,
@@ -38,14 +38,12 @@ export type MediaFeature =
   | "accounts"
   | "content"
   | "tickets"
-  | "positioning"
-  | "student-ops";
+  | "positioning";
 type Row = (
   | MediaAccount
   | MediaContent
   | ProductionTicket
   | PositioningCard
-  | MediaException
 ) & { id: number; version: number; availableActions: string[] };
 const labels: Record<string, string> = {
   s0: "S0",
@@ -85,7 +83,6 @@ const titles: Record<MediaFeature, string> = {
   content: "内容生产",
   tickets: "拍剪工单",
   positioning: "账号定位",
-  "student-ops": "学员运营",
 };
 const actionLabels: Record<string, string> = {
   ADVANCE_STAGE: "推进阶段",
@@ -112,8 +109,7 @@ const actionLabels: Record<string, string> = {
   SUBMIT_POSITIONING_REVIEW: "提交审核",
   APPROVE_POSITIONING_FEASIBILITY: "运营通过",
   REJECT_POSITIONING_FEASIBILITY: "运营退回",
-  CONFIRM_POSITIONING_TRIAL: "确认试跑",
-  ARCHIVE_POSITIONING: "归档",
+  START_POSITIONING_REVISION: "修改定位卡",
   accept: "接收",
   reject: "退回",
   submit: "提交",
@@ -161,8 +157,7 @@ async function loadRows(
     const result = await api.positioningCard.page({ pageNo, pageSize: 20 });
     return { list: result.list as Row[], total: result.total };
   }
-  const result = await api.studentOps.exceptions();
-  return { list: result as Row[], total: result.length };
+  return { list: [], total: 0 };
 }
 async function loadDetail(feature: MediaFeature, preferredId: number) {
   if (feature === "accounts") return api.mediaAccount.get(preferredId);
@@ -220,15 +215,13 @@ async function runAction(
         api.positioningCard.operatorApprove(row.id, row.version),
       REJECT_POSITIONING_FEASIBILITY: () =>
         api.positioningCard.operatorReject(row.id, row.version, reason || ""),
-      CONFIRM_POSITIONING_TRIAL: () =>
-        api.positioningCard.confirmTrial(row.id, row.version),
-      ARCHIVE_POSITIONING: () =>
-        api.positioningCard.archive(row.id, row.version),
+      START_POSITIONING_REVISION: async () => {
+        await api.positioningCard.startRevision(row.id, row.version);
+        return true;
+      },
     };
     return f[action]?.();
   }
-  if (feature === "student-ops")
-    return api.studentOps.resolve(row.id, row.version, "已处理");
   return undefined;
 }
 
@@ -276,9 +269,7 @@ export default function MediaFeaturePage({
           ? "zsjos:production-ticket:create"
           : feature === "positioning"
             ? "zsjos:positioning-card:create"
-            : feature === "student-ops"
-                ? "zsjos:student-ops:create-exception"
-                : "";
+            : "";
   const canCreate =
     Boolean(createPermission) && hasPermission(permissions, createPermission);
   const load = useCallback(
@@ -384,8 +375,6 @@ export default function MediaFeaturePage({
         } as never);
       if (feature === "positioning")
         await api.positioningCard.create(values as never);
-      if (feature === "student-ops")
-        await api.studentOps.createException(values);
       message.success("创建成功");
       setCreateOpen(false);
       await load(1);
@@ -582,23 +571,7 @@ export default function MediaFeaturePage({
                   },
                   { label: "状态", value: (r: Row) => statusText(r.status) },
                 ]
-              : feature === "student-ops"
-                  ? [
-                      {
-                        label: "异常编号",
-                        value: (r: Row) => (r as MediaException).exceptionNo,
-                      },
-                      {
-                        label: "异常类型",
-                        value: (r: Row) =>
-                          (r as MediaException).categoryLabelSnapshot,
-                      },
-                      {
-                        label: "状态",
-                        value: (r: Row) => statusText(r.status),
-                      },
-                    ]
-                  : [],
+              : [],
     [feature],
   );
   return (
@@ -1147,59 +1120,6 @@ function CreateMediaModal({
             </Form.Item>
           </>
         )}
-        {feature === "student-ops" && (
-          <>
-            <Form.Item
-              name="accountId"
-              label="关联账号"
-              rules={[{ required: true }]}
-            >
-              <Select options={accountOptions} />
-            </Form.Item>
-            <Form.Item
-              name="categoryValue"
-              label="异常类型值"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="categoryLabelSnapshot"
-              label="异常类型标签快照"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="description"
-              label="异常描述"
-              rules={[{ required: true }]}
-            >
-              <Input.TextArea rows={4} />
-            </Form.Item>
-            <Form.Item
-              name="evidenceRefsJson"
-              label="证据引用 JSON"
-              rules={[{ required: true }]}
-            >
-              <Input.TextArea rows={3} />
-            </Form.Item>
-            <Form.Item
-              name="responsibilityType"
-              label="责任类型"
-              rules={[{ required: true }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item
-              name="ownerUserId"
-              label="处理人"
-              rules={[{ required: true }]}
-            >
-              <Select options={userOptions} />
-            </Form.Item>
-          </>
-        )}
       </Form>
     </Modal>
   );
@@ -1216,7 +1136,44 @@ export function ProductionTicketsPage({
 }: {
   permissions?: string[];
 }) {
-  return <MediaFeaturePage feature="tickets" permissions={permissions} />;
+  const [view, setView] = useState<'pending' | 'mine' | 'pool'>('mine');
+  const [rows, setRows] = useState<ProductionTicket[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [preview, setPreview] = useState<ProductionTicket>();
+  const load = useCallback(async () => {
+    setLoading(true); setError('');
+    try {
+      const result = view === 'pending' ? { list: await api.productionTicket.pendingAssignments(), total: 0 } : view === 'pool' ? await api.productionTicket.poolPage({ pageNo: 1, pageSize: 100 }) : await api.productionTicket.page({ pageNo: 1, pageSize: 100 });
+      setRows(result.list);
+    } catch (cause) { setRows([]); setError(errorText(cause)); } finally { setLoading(false); }
+  }, [view]);
+  useEffect(() => { void load(); }, [load]);
+  const act = async (ticket: ProductionTicket, action: string) => {
+    try {
+      if (action === 'CLAIM_TICKET') { setPreview(ticket); return; }
+      await runAction('tickets', ticket as Row, action);
+      message.success('操作成功'); await load();
+    } catch (cause) { message.error(errorText(cause)); }
+  };
+  return <section className="workspace-page media-tickets-page"><header className="media-feature-heading"><Typography.Title level={4}>拍剪工单</Typography.Title><Tooltip title="刷新"><Button icon={<ReloadOutlined/>} onClick={() => void load()}/></Tooltip></header><Tabs activeKey={view} onChange={key => setView(key as typeof view)} items={[{ key: 'pending', label: '待接单' }, { key: 'mine', label: '我的工单' }, { key: 'pool', label: '公共池', disabled: !hasPermission(permissions, 'zsjos:production-ticket:pool-query') && !hasPermission(permissions, 'zsjos:production-ticket:claim') }]} />{error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}<div className="media-ticket-list">{loading ? <Skeleton active paragraph={{ rows: 6 }}/> : rows.length ? rows.map(ticket => <div className="media-ticket-row" key={ticket.id}><div><strong>{ticket.ticketNo}</strong><span>{ticket.dispatchContext?.studentName || '学员未记录'} · {ticket.dispatchContext?.platformLabel || '平台未记录'} · {ticket.dispatchContext?.accountName || ticket.dispatchContext?.accountNo || `账号 ${ticket.accountId}`}</span></div><Space wrap><Tag>{statusText(ticket.status)}</Tag><Button onClick={() => setPreview(ticket)}>查看快照</Button>{ticket.availableActions.filter(action => action !== 'REJECT_TICKET_ASSIGNMENT').map(action => <Button type={action === 'CLAIM_TICKET' ? 'primary' : 'default'} key={action} onClick={() => void act(ticket, action)}>{actionText(action)}</Button>)}</Space></div>) : <Empty description={view === 'pool' ? '公共池暂无可抢工单' : view === 'pending' ? '暂无待接指定单' : '暂无工单'}/>}</div><Modal width="min(960px, calc(100vw - 32px))" title={preview ? `${preview.ticketNo} · 派单快照` : '派单快照'} open={Boolean(preview)} onCancel={() => setPreview(undefined)} okText={preview?.availableActions.includes('CLAIM_TICKET') ? '确认抢单' : '关闭'} onOk={async () => { if (preview?.availableActions.includes('CLAIM_TICKET')) { try { await api.productionTicket.claim(preview.id, preview.version); message.success('抢单成功'); setPreview(undefined); await load(); } catch (cause) { message.error(errorText(cause)); } } else setPreview(undefined); }}><ProductionTicketSnapshot ticket={preview}/></Modal></section>;
+}
+
+function ProductionTicketSnapshot({ ticket }: { ticket?: ProductionTicket }) {
+  if (!ticket) return null;
+  const context = ticket.dispatchContext;
+  if (!context) return <Empty description="暂无派单快照" />;
+  return <div className="media-ticket-snapshot"><Typography.Paragraph><strong>学员：</strong>{context.studentName || '未记录'}</Typography.Paragraph><Typography.Paragraph><strong>账号：</strong>{context.platformLabel || '平台未记录'} · {context.accountName || context.accountNo || ticket.accountId}</Typography.Paragraph>{context.accountFields?.map(field => <Typography.Paragraph key={field.key}><strong>{field.label}：</strong>{field.displayValue || String(field.value ?? '未记录')}</Typography.Paragraph>)}<Typography.Title level={5}>完整定位卡</Typography.Title><pre>{JSON.stringify(context.positioning || {}, null, 2)}</pre></div>;
+}
+
+export function ProductionTicketAssignmentHost({ permissions = [] }: { permissions?: string[] }) {
+  const enabled = hasPermission(permissions, 'zsjos:production-ticket:accept');
+  const [pending, setPending] = useState<ProductionTicket[]>([]), [rejecting, setRejecting] = useState(false), [reason, setReason] = useState(''), [saving, setSaving] = useState(false);
+  const load = useCallback(async () => { if (!enabled) return; try { setPending(await api.productionTicket.pendingAssignments()); } catch { setPending([]); } }, [enabled]);
+  useEffect(() => { void load(); if (!enabled) return; const timer = window.setInterval(() => void load(), 30000); return () => window.clearInterval(timer); }, [enabled, load]);
+  const ticket = pending[0];
+  const finish = async (accept: boolean) => { if (!ticket) return; if (!accept && (!rejecting || !reason.trim())) { setRejecting(true); if (rejecting) message.error('请填写拒接原因'); return; } try { setSaving(true); if (accept) await api.productionTicket.accept(ticket.id, ticket.version); else await api.productionTicket.rejectAssignment(ticket.id, ticket.version, reason.trim()); message.success(accept ? '已接单' : '已拒接，工单已进入公共池'); setRejecting(false); setReason(''); await load(); } catch (cause) { message.error(errorText(cause)); } finally { setSaving(false); } };
+  return <Modal width="min(960px, calc(100vw - 32px))" title="拍剪指定派单" open={Boolean(ticket)} closable={false} maskClosable={false} keyboard={false} footer={<Space><Button danger loading={saving} disabled={!hasPermission(permissions, 'zsjos:production-ticket:reject-assignment')} onClick={() => void finish(false)}>{rejecting ? '确认拒接' : '拒绝接单'}</Button><Button type="primary" loading={saving} onClick={() => void finish(true)}>接单</Button></Space>}><ProductionTicketSnapshot ticket={ticket}/>{rejecting && <Input.TextArea autoFocus rows={3} maxLength={500} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="请填写拒接原因"/>}</Modal>;
 }
 export function PositioningPage({
   permissions = [],
@@ -1224,7 +1181,4 @@ export function PositioningPage({
   permissions?: string[];
 }) {
   return <MediaFeaturePage feature="positioning" permissions={permissions} />;
-}
-export function StudentOpsPage() {
-  return <MediaFeaturePage feature="student-ops" />;
 }

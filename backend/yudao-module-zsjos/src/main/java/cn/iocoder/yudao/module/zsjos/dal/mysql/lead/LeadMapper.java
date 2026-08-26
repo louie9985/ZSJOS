@@ -28,6 +28,62 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    @Select("""
+            SELECT
+              CASE WHEN source_type='sales_self_sourced' AND source_provider_recorded=b'1'
+                   THEN source_provider_user_id ELSE source_user_id END AS contributor_user_id,
+              source_dept_id, source_type, source_provider_user_id,
+              SUM(CASE WHEN submitted_at >= #{todayStart} THEN 1 ELSE 0 END) AS today_count,
+              SUM(CASE WHEN submitted_at >= #{weekStart} THEN 1 ELSE 0 END) AS week_count,
+              SUM(CASE WHEN submitted_at >= #{monthStart} THEN 1 ELSE 0 END) AS month_total,
+              SUM(CASE WHEN submitted_at >= #{monthStart} AND status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS month_effective
+            FROM zsjos_lead
+            WHERE tenant_id=#{tenantId} AND deleted=b'0'
+              AND submitted_at >= LEAST(#{weekStart}, #{monthStart}) AND submitted_at < #{now}
+              AND ((source_type='internal_new_media' AND source_user_id IS NOT NULL)
+                OR (source_type='sales_self_sourced' AND source_provider_recorded=b'1' AND source_provider_user_id IS NOT NULL))
+            GROUP BY contributor_user_id, source_dept_id, source_type, source_provider_user_id
+            """)
+    List<MediaScreenContributionRow> countMediaScreenContributions(@Param("tenantId") Long tenantId,
+                                                                     @Param("todayStart") LocalDateTime todayStart,
+                                                                     @Param("weekStart") LocalDateTime weekStart,
+                                                                     @Param("monthStart") LocalDateTime monthStart,
+                                                                     @Param("now") LocalDateTime now);
+
+    @Select("""
+            SELECT FLOOR(TIMESTAMPDIFF(MINUTE, #{from}, submitted_at) / 10) AS bucket,
+              CASE WHEN source_type='sales_self_sourced' AND source_provider_recorded=b'1'
+                   THEN source_provider_user_id ELSE source_user_id END AS contributor_user_id,
+              source_dept_id, source_type, source_provider_user_id, COUNT(*) AS submitted_count,
+              SUM(CASE WHEN status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS valid_count
+            FROM zsjos_lead
+            WHERE tenant_id=#{tenantId} AND deleted=b'0' AND submitted_at>=#{from} AND submitted_at<#{to}
+              AND ((source_type='internal_new_media' AND source_user_id IS NOT NULL)
+                OR (source_type='sales_self_sourced' AND source_provider_recorded=b'1' AND source_provider_user_id IS NOT NULL))
+            GROUP BY bucket, contributor_user_id, source_dept_id, source_type, source_provider_user_id
+            ORDER BY bucket
+            """)
+    List<MediaScreenTimedContributionRow> countMediaScreenTenMinuteContributions(@Param("tenantId") Long tenantId,
+                                                                                   @Param("from") LocalDateTime from,
+                                                                                   @Param("to") LocalDateTime to);
+
+    @Select("""
+            SELECT DATE(submitted_at) AS bucket,
+              CASE WHEN source_type='sales_self_sourced' AND source_provider_recorded=b'1'
+                   THEN source_provider_user_id ELSE source_user_id END AS contributor_user_id,
+              source_dept_id, source_type, source_provider_user_id, COUNT(*) AS submitted_count,
+              SUM(CASE WHEN status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS valid_count
+            FROM zsjos_lead
+            WHERE tenant_id=#{tenantId} AND deleted=b'0' AND submitted_at>=#{from} AND submitted_at<#{to}
+              AND ((source_type='internal_new_media' AND source_user_id IS NOT NULL)
+                OR (source_type='sales_self_sourced' AND source_provider_recorded=b'1' AND source_provider_user_id IS NOT NULL))
+            GROUP BY bucket, contributor_user_id, source_dept_id, source_type, source_provider_user_id
+            ORDER BY bucket
+            """)
+    List<MediaScreenTimedContributionRow> countMediaScreenDailyContributions(@Param("tenantId") Long tenantId,
+                                                                              @Param("from") LocalDateTime from,
+                                                                              @Param("to") LocalDateTime to);
+
     @Select("SELECT COUNT(*) AS total FROM zsjos_lead WHERE tenant_id=#{tenantId} AND deleted=b'0'")
     long countForMediaScreen(@Param("tenantId") Long tenantId);
 

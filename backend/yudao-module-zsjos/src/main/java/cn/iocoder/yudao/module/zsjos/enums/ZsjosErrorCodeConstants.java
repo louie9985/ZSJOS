@@ -18,6 +18,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_LOGIN_BAD_CREDENTIALS = new ErrorCode(1_900_000_012, "手机号或密码错误");
     ErrorCode PARTNER_PASSWORD_MISMATCH = new ErrorCode(1_900_000_013, "当前密码错误");
     ErrorCode PARTNER_TOKEN_TYPE_INVALID = new ErrorCode(1_900_000_014, "当前令牌不是兼职合作方身份");
+    ErrorCode PARTNER_OWNERSHIP_TARGET_INVALID = new ErrorCode(1_900_000_015, "归属员工必须是启用且拥有下属兼职权限的员工");
+    ErrorCode PARTNER_OWNERSHIP_VERSION_CONFLICT = new ErrorCode(1_900_000_016, "兼职归属已被其他人修改，请刷新后重试");
+    ErrorCode PARTNER_OWNERSHIP_PERMISSION_DENIED = new ErrorCode(1_900_000_017, "无权查看该下属兼职");
     ErrorCode PARTNER_ACCOUNT_CONCURRENT_MODIFICATION = new ErrorCode(1_900_000_015, "兼职账号已被并发修改，请重试");
 
     ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
@@ -34,6 +37,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode USER_RELATION_SOURCE_INVALID = new ErrorCode(1_900_002_007, "来源用户不存在、已停用或不符合场景岗位要求");
     ErrorCode USER_RELATION_TARGET_INVALID = new ErrorCode(1_900_002_008, "目标用户不存在、已停用或不符合场景岗位要求");
     ErrorCode USER_RELATION_MODE_INVALID = new ErrorCode(1_900_002_009, "不支持的用户关系操作模式");
+    ErrorCode USER_RELATION_SCENE_ELIGIBILITY_INVALID = new ErrorCode(1_900_002_010, "用户关系场景目标资格配置无效");
 
     ErrorCode LEAD_CONTACT_REQUIRED = new ErrorCode(1_900_003_001, "手机号和微信号至少填写一个");
     ErrorCode LEAD_CONTACT_CONFLICT = new ErrorCode(1_900_003_002, "手机号和微信号分别属于不同客户，请核对后重试");
@@ -114,7 +118,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SUBORDINATE_SALES_STATUS_INVALID = new ErrorCode(1_900_003_055, "账号或接单状态无效");
     ErrorCode SUBORDINATE_SALES_TARGET_INVALID = new ErrorCode(1_900_003_056, "目标销售无效、已停用或不在管理范围内");
     ErrorCode SUBORDINATE_LEAD_OWNER_CHANGED = new ErrorCode(1_900_003_057, "客资归属已变化，请刷新后重试");
-    ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058, "当前客资状态不允许执行该操作");
+    ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058,
+            "无法执行“{}”：客资当前为“{}”；{}仅适用于{}");
     ErrorCode SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA = new ErrorCode(1_900_003_059, "客资已在人工公海中");
     ErrorCode SUBORDINATE_COMMAND_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_060, "主管客资操作幂等键已被其他请求使用");
     ErrorCode LEAD_TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_003_072, "客资转派审批流程尚未部署或暂不可用");
@@ -265,6 +270,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_INVALID = new ErrorCode(1_900_011_009, "第三方账号字段配置或字段值无效");
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_NOT_PUBLISHED = new ErrorCode(1_900_011_010, "第三方账号字段配置尚未发布");
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_011_011, "第三方账号字段配置已变化，请刷新后重试");
+    ErrorCode MEDIA_ACCOUNT_STAGE_TRANSITION_RETIRED = new ErrorCode(1_900_011_012, "账号阶段推进功能已停用，请使用状态维护");
+    ErrorCode MEDIA_ACCOUNT_MAINTENANCE_INVALID = new ErrorCode(1_900_011_013, "账号状态维护内容无效，请检查字典选项和日期范围");
     ErrorCode MEDIA_REBIND_REVIEWER_INVALID = new ErrorCode(1_900_011_009, "账号换绑审批人未配置或不可用");
     ErrorCode MEDIA_REBIND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_011_008, "账号换绑流程尚未部署或暂不可用");
 
@@ -286,6 +293,12 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PRODUCTION_TICKET_ENTITLEMENT_HANDLING_REQUIRED = new ErrorCode(1_900_013_006, "超权益工单必须选择审批、收费或学员自制");
     ErrorCode PRODUCTION_TICKET_REFERENCE_INVALID = new ErrorCode(1_900_013_007, "拍剪工单关联账号或责任人不存在");
     ErrorCode PRODUCTION_TICKET_REJECT_REASON_REQUIRED = new ErrorCode(1_900_013_008, "拍剪工单返工原因不能为空且不能超过 500 个字符");
+    ErrorCode PRODUCTION_TICKET_POSITIONING_REQUIRED = new ErrorCode(1_900_013_009, "当前账号尚无已确认定位卡，不能发起拍剪工单");
+    ErrorCode PRODUCTION_TICKET_ASSIGNEE_INVALID = new ErrorCode(1_900_013_010, "所选剪拍专员不在当前运营的可派单关系中或已失去接单权限");
+    ErrorCode PRODUCTION_TICKET_ASSIGNMENT_REJECT_REASON_REQUIRED = new ErrorCode(1_900_013_011, "拒接原因不能为空且不能超过 500 个字符");
+    ErrorCode PRODUCTION_TICKET_CLAIM_ALREADY_TAKEN = new ErrorCode(1_900_013_012, "拍剪工单已被其他人抢单");
+    ErrorCode PRODUCTION_TICKET_CREATE_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_013_013, "拍剪工单创建幂等键已被其他请求使用");
+    ErrorCode PRODUCTION_TICKET_ACTION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_013_014, "拍剪工单操作幂等键已被其他请求使用");
 
     ErrorCode POSITIONING_CARD_NOT_EXISTS = new ErrorCode(1_900_014_001, "定位卡不存在");
     ErrorCode POSITIONING_CARD_STATE_INVALID = new ErrorCode(1_900_014_002, "当前定位卡状态不允许该操作");
@@ -306,16 +319,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode POSITIONING_CONFIRMATION_LINK_INVALID = new ErrorCode(1_900_014_017, "确认链接无效或已失效");
     ErrorCode POSITIONING_STUDENT_COMMENT_REQUIRED = new ErrorCode(1_900_014_018, "修改意见不能为空且不能超过 500 个字符");
     ErrorCode POSITIONING_PUBLIC_H5_URL_INVALID = new ErrorCode(1_900_014_019, "学员确认页公网地址未配置或无效，请联系管理员");
+    ErrorCode POSITIONING_IMPORT_SOURCE_INVALID = new ErrorCode(1_900_014_020, "所选定位卡提交版本不可导入，请刷新后重试");
 
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
-
-    ErrorCode MEDIA_EXCEPTION_NOT_EXISTS = new ErrorCode(1_900_018_001, "异常工单不存在");
-    ErrorCode MEDIA_EXCEPTION_STATE_INVALID = new ErrorCode(1_900_018_002, "当前异常工单状态不允许该操作");
-    ErrorCode MEDIA_EXCEPTION_VERSION_CONFLICT = new ErrorCode(1_900_018_003, "异常工单已被其他人修改，请刷新后重试");
-    ErrorCode MEDIA_GRADUATION_PROCESS_UNAVAILABLE = new ErrorCode(1_900_018_004, "学员结业流程尚未部署或暂不可用");
-    ErrorCode MEDIA_GRADUATION_NOT_EXISTS = new ErrorCode(1_900_018_005, "学员结业申请不存在");
-    ErrorCode MEDIA_GRADUATION_STATE_INVALID = new ErrorCode(1_900_018_006, "当前结业申请状态不允许该操作");
-    ErrorCode MEDIA_GRADUATION_SUPERVISOR_INVALID = new ErrorCode(1_900_018_007, "学习规划师直属部门负责人未配置、已停用或为本人");
 
 }

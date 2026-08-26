@@ -16,13 +16,18 @@ import {
   Table,
   Tabs,
   Tag,
+  Tooltip,
   Typography,
   message,
 } from "antd";
 import type { ColumnsType, TableRowSelection } from "antd/es/table/interface";
 import {
   ArrowLeftOutlined,
+  DeleteOutlined,
+  ExportOutlined,
   PoweroffOutlined,
+  RollbackOutlined,
+  SwapOutlined,
   TeamOutlined,
 } from "@ant-design/icons";
 import EmployeeAvatar from "../components/EmployeeAvatar";
@@ -50,12 +55,18 @@ import {
   summarizeBatchResult,
   todayStatusLabel,
 } from "../services/subordinateSales";
+import {
+  SUPERVISOR_LEAD_ACTION_LABELS,
+  subordinateAssignmentStatusLabel,
+  supervisorLeadSelectionEligibility,
+  type SupervisorLeadBatchAction,
+} from "../services/subordinateLeadActions";
 
 const PAGE_SIZE = 20;
 type ReasonAction =
   | { type: "account"; sales: SubordinateSales; value: boolean }
   | { type: "dispatch"; sales: SubordinateSales; value: boolean };
-type BatchAction = "transfer" | "restore" | "recycle" | "claimPool" | "publicSea";
+type BatchAction = SupervisorLeadBatchAction;
 
 function Metrics({ sales }: { sales: SubordinateSales }) {
   const metrics = [
@@ -210,6 +221,7 @@ function SalesDetail({
   const [leadKeyword, setLeadKeyword] = useState("");
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [selected, setSelected] = useState<React.Key[]>([]);
+  const [selectedLeadMap, setSelectedLeadMap] = useState<Map<number, ManagedLead>>(new Map());
   const [tasks, setTasks] = useState<SubordinateTask[]>([]);
   const [taskTotal, setTaskTotal] = useState(0);
   const [taskBucket, setTaskBucket] = useState<BusinessTaskBucket>("today");
@@ -217,7 +229,7 @@ function SalesDetail({
   const [error, setError] = useState("");
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchType, setBatchType] = useState<BatchAction>("transfer");
-  const batchIdempotencyKey = useRef<string>();
+  const batchIdempotencyKey = useRef<string | undefined>(undefined);
   const [candidates, setCandidates] = useState<AssignmentUser[]>([]);
   const [batchSaving, setBatchSaving] = useState(false);
   const [batchResult, setBatchResult] = useState<SubordinateBatchResult>();
@@ -236,6 +248,14 @@ function SalesDetail({
         advancedFilter,
       });
       setLeads(page.list);
+      setSelectedLeadMap(current => {
+        if (!current.size) return current;
+        const next = new Map(current);
+        page.list.forEach(lead => {
+          if (next.has(lead.id)) next.set(lead.id, lead);
+        });
+        return next;
+      });
       setLeadTotal(page.total);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "客资加载失败");
@@ -263,6 +283,7 @@ function SalesDetail({
   useEffect(() => {
     setTab("overview");
     setSelected([]);
+    setSelectedLeadMap(new Map());
     setLeadPage(1);
     setError("");
   }, [sales?.userId]);
@@ -273,9 +294,16 @@ function SalesDetail({
     if (tab === "tasks") void loadTasks();
   }, [loadTasks, tab]);
 
+  const selectedLeads = selected
+    .map(key => selectedLeadMap.get(Number(key)))
+    .filter((lead): lead is ManagedLead => Boolean(lead));
+  const eligibility = (type: BatchAction) =>
+    supervisorLeadSelectionEligibility(type, selected.length, selectedLeads);
+
   const openBatch = async (type: BatchAction) => {
-    if (!selected.length) {
-      message.warning("请先选择客资");
+    const selection = eligibility(type);
+    if (!selection.allowed) {
+      message.warning(selection.message);
       return;
     }
     setBatchType(type);
@@ -308,6 +336,7 @@ function SalesDetail({
       setResultOpen(true);
       setBatchOpen(false);
       setSelected([]);
+      setSelectedLeadMap(new Map());
       batchIdempotencyKey.current = undefined;
       await loadLeads();
       onChanged();
@@ -338,10 +367,16 @@ function SalesDetail({
       render: (value) => value || "-",
     },
     {
-      title: "状态",
+      title: "客资状态",
       dataIndex: "status",
-      width: 100,
+      width: 110,
       render: (value) => <Tag>{LEAD_STATUS_LABELS[value] || value}</Tag>,
+    },
+    {
+      title: "分配状态",
+      dataIndex: "assignmentStatus",
+      width: 130,
+      render: (value) => <Tag>{subordinateAssignmentStatusLabel(value)}</Tag>,
     },
     {
       title: "分类",
@@ -388,9 +423,29 @@ function SalesDetail({
   ];
   const rowSelection: TableRowSelection<ManagedLead> = {
     selectedRowKeys: selected,
-    onChange: setSelected,
+    onChange: (keys, rows) => {
+      setSelected(keys);
+      const selectedIds = new Set(keys.map(Number));
+      setSelectedLeadMap(current => {
+        const next = new Map([...current].filter(([id]) => selectedIds.has(id)));
+        rows.forEach(row => next.set(row.id, row));
+        return next;
+      });
+    },
     preserveSelectedRowKeys: true,
   };
+  const batchActions: Array<{
+    type: BatchAction;
+    permission: string;
+    icon: React.ReactNode;
+    danger?: boolean;
+  }> = [
+    { type: "transfer", permission: "zsjos:subordinate-sales:lead-transfer", icon: <SwapOutlined /> },
+    { type: "restore", permission: "zsjos:subordinate-sales:lead-restore", icon: <RollbackOutlined /> },
+    { type: "recycle", permission: "zsjos:subordinate-sales:lead-recycle", icon: <DeleteOutlined />, danger: true },
+    { type: "claimPool", permission: "zsjos:subordinate-sales:lead-release-claim-pool", icon: <ExportOutlined />, danger: true },
+    { type: "publicSea", permission: "zsjos:subordinate-sales:lead-release-public-sea", icon: <ExportOutlined />, danger: true },
+  ];
   if (detailLeadId)
     return (
       <ManagedLeadDetail
@@ -512,35 +567,21 @@ function SalesDetail({
                 <div className="subordinate-batch-bar">
                   <Typography.Text>已选 {selected.length} 条</Typography.Text>
                   <Space wrap>
-                    <Button
-                      disabled={
-                        !selected.length ||
-                        !permissions.includes(
-                          "zsjos:subordinate-sales:lead-transfer",
-                        )
-                      }
-                      onClick={() => void openBatch("transfer")}
-                    >
-                      转派
-                    </Button>
-                    <Button disabled={!selected.length || !permissions.includes("zsjos:subordinate-sales:lead-restore")}
-                      onClick={() => void openBatch("restore")}>恢复</Button>
-                    <Button disabled={!selected.length || !permissions.includes("zsjos:subordinate-sales:lead-recycle")}
-                      danger onClick={() => void openBatch("recycle")}>回收</Button>
-                    <Button disabled={!selected.length || !permissions.includes("zsjos:subordinate-sales:lead-release-claim-pool")}
-                      danger onClick={() => void openBatch("claimPool")}>释放至抢单池</Button>
-                    <Button
-                      disabled={
-                        !selected.length ||
-                        !permissions.includes(
-                          "zsjos:subordinate-sales:lead-release-public-sea",
-                        )
-                      }
-                      danger
-                      onClick={() => void openBatch("publicSea")}
-                    >
-                      释放至公海池
-                    </Button>
+                    {batchActions.map(action => {
+                      const selection = eligibility(action.type);
+                      const hasPermission = permissions.includes(action.permission);
+                      const disabled = !hasPermission || !selection.allowed;
+                      return (
+                        <Tooltip key={action.type} title={hasPermission ? selection.message : "无操作权限"}>
+                          <span>
+                            <Button icon={action.icon} disabled={disabled} danger={action.danger}
+                              onClick={() => void openBatch(action.type)}>
+                              {SUPERVISOR_LEAD_ACTION_LABELS[action.type]}
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      );
+                    })}
                   </Space>
                 </div>
                 {error && (
@@ -561,7 +602,7 @@ function SalesDetail({
                   rowSelection={rowSelection}
                   columns={leadColumns}
                   dataSource={leads}
-                  scroll={{ x: 820 }}
+                  scroll={{ x: 960 }}
                   pagination={{
                     current: leadPage,
                     pageSize: PAGE_SIZE,
@@ -620,12 +661,12 @@ function SalesDetail({
       />
       <Modal
         open={batchOpen}
-        title={({ transfer: "批量转派客资", restore: "批量恢复客资", recycle: "批量回收客资",
-          claimPool: "批量释放至抢单池", publicSea: "批量释放至公海池" })[batchType]}
+        title={`批量${SUPERVISOR_LEAD_ACTION_LABELS[batchType]}客资`}
         confirmLoading={batchSaving}
         onOk={() => void submitBatch()}
         onCancel={() => setBatchOpen(false)}
       >
+        <Alert type="info" showIcon message={eligibility(batchType).message} style={{ marginBottom: 16 }} />
         <Form form={form} layout="vertical">
           {batchType === "transfer" ? (
             <Form.Item

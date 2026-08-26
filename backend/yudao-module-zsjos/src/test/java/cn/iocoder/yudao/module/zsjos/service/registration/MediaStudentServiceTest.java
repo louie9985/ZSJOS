@@ -12,7 +12,6 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.content.ContentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardSubmissionMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.production.ProductionTicketMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.GraduationApplicationMapper;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.studentops.MediaStudentTalkRecordMapper;
@@ -33,6 +32,8 @@ import java.lang.reflect.Method;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -47,7 +48,6 @@ class MediaStudentServiceTest {
     @Mock private MediaAccountService accountService;
     @Mock private ContentService contentService;
     @Mock private PositioningCardService positioningService;
-    @Mock private GraduationApplicationMapper graduationMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private MediaStudentTalkRecordMapper talkRecordMapper;
     @Mock private PermissionApi permissionApi;
@@ -80,7 +80,6 @@ class MediaStudentServiceTest {
         when(contentService.availableActionsForVisible(content, 1L, false))
                 .thenReturn(contentDetail.getAvailableActions());
         when(ticketMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of(ticket));
-        when(graduationMapper.selectByStudent(2L)).thenReturn(List.of());
         when(talkRecordMapper.selectRecentByStudent(2L)).thenReturn(List.of());
 
         MediaStudentDetailRespVO result = service.getDetail(1L, 2L);
@@ -107,5 +106,40 @@ class MediaStudentServiceTest {
         method.setAccessible(true);
 
         assertDoesNotThrow(() -> method.invoke(service, (Object) null));
+    }
+
+    @Test
+    void detailSeparatesLatestRoundFromEffectiveSubmission() {
+        MyStudentRespVO student = new MyStudentRespVO();
+        student.setPersonId(2L); student.setServices(List.of());
+        MediaAccountDO account = new MediaAccountDO().setId(3L).setAccountNo("MA-3");
+        PositioningCardDO card = new PositioningCardDO().setId(5L).setAccountId(3L)
+                .setStudentPersonId(2L).setDirectorUserId(1L).setStatus("operator_feasibility");
+        PositioningCardSubmissionDO latest = new PositioningCardSubmissionDO().setId(8L).setCardId(5L)
+                .setAccountId(3L).setStudentPersonId(2L).setSubmissionNo(2)
+                .setStatus("operator_feasibility").setSubmittedAt(java.time.LocalDateTime.now());
+        PositioningCardSubmissionDO effective = new PositioningCardSubmissionDO().setId(7L).setCardId(5L)
+                .setAccountId(3L).setStudentPersonId(2L).setSubmissionNo(1)
+                .setStatus("confirmed").setSubmittedAt(java.time.LocalDateTime.now().minusDays(1));
+        when(myStudentService.getMediaStudent(1L, 2L)).thenReturn(student);
+        when(accountMapper.selectByParticipantAndStudent(1L, 2L)).thenReturn(List.of(account));
+        when(accountService.get(3L, 1L)).thenReturn(new MediaAccountRespVO().setDetailSnapshots(List.of()));
+        when(positioningMapper.selectByStudentAndAccountIds(2L, List.of(3L))).thenReturn(List.of(card));
+        when(positioningSubmissionMapper.selectByStudentAndAccountIds(2L, List.of(3L)))
+                .thenReturn(List.of(latest, effective));
+        when(contentMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of());
+        when(ticketMapper.selectByAccountIds(List.of(3L))).thenReturn(List.of());
+        when(talkRecordMapper.selectRecentByStudent(2L)).thenReturn(List.of());
+
+        MediaStudentDetailRespVO result = service.getDetail(1L, 2L);
+
+        var latestProjection = result.getPositioningCards().get(0);
+        var effectiveProjection = result.getPositioningCards().get(1);
+        assertTrue(latestProjection.getLatestRound());
+        assertTrue(latestProjection.getCurrent());
+        assertFalse(latestProjection.getEffective());
+        assertFalse(effectiveProjection.getLatestRound());
+        assertFalse(effectiveProjection.getCurrent());
+        assertTrue(effectiveProjection.getEffective());
     }
 }

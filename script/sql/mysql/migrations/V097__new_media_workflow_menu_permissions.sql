@@ -17,8 +17,7 @@ INSERT IGNORE INTO system_menu
 (6979,'接单拍剪工单','zsjos:production-ticket:accept',3,2,6977,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (6980,'账号定位','zsjos:positioning-card:query',2,43,6735,'positioning','ep:compass','zsjos-workbench','MediaPositioningPage',0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (6981,'创建定位卡','zsjos:positioning-card:create',3,1,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(6982,'提交定位审核','zsjos:positioning-card:submit-review',3,2,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(6984,'学员运营','zsjos:student-ops:query',2,45,6735,'student-ops','ep:user','zsjos-workbench','MediaStudentOpsPage',0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
+(6982,'提交定位审核','zsjos:positioning-card:submit-review',3,2,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
 INSERT IGNORE INTO system_menu
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
 (6987,'提交制作','zsjos:content:submit-production',3,3,6974,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
@@ -46,14 +45,10 @@ INSERT IGNORE INTO system_menu
 (7006,'编辑内容版本','zsjos:content:edit',3,8,6974,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7007,'编辑工单内容项','zsjos:production-ticket:edit',3,6,6977,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
 (7008,'编辑定位工作台','zsjos:positioning-card:edit',3,6,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7009,'定位执行卡签字','zsjos:positioning-card:sign',3,7,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7013,'创建异常工单','zsjos:student-ops:create-exception',3,1,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7014,'处理异常工单','zsjos:student-ops:resolve-exception',3,2,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7015,'配合度评估','zsjos:student-ops:assess',3,3,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
+(7009,'定位执行卡签字','zsjos:positioning-card:sign',3,7,6980,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
 INSERT IGNORE INTO system_menu
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
 (7019,'账号换绑申请','zsjos:media-account:rebind',3,8,6970,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7020,'超权益处理','zsjos:production-ticket:over-entitlement',3,7,6977,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0'),
-(7021,'学员结业','zsjos:student-ops:graduate',3,4,6984,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
+(7020,'超权益处理','zsjos:production-ticket:over-entitlement',3,7,6977,'','','',NULL,0,b'1',b'1',b'1','migration-V097',NOW(),'migration-V097',NOW(),b'0');
 INSERT INTO zsjos_schema_version(version,description,checksum) VALUES ('V097','New-media workflow menu permissions without review or diagnosis entries','new-media-menu-v4') ON DUPLICATE KEY UPDATE description=VALUES(description),checksum=VALUES(checksum);
 INSERT INTO zsjos_module_schema_version(module_code,version,description,checksum,release_version,installed_at) VALUES ('core','V097','New-media workflow menu permissions without review or diagnosis entries',SHA2('new-media-menu-v4',256),'baseline',NOW()) ON DUPLICATE KEY UPDATE description=VALUES(description),checksum=VALUES(checksum);

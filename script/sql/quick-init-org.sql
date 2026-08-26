@@ -70,7 +70,7 @@ VALUES
     ('center_head',            '中心负责人',       1,  0, '一级业务中心、事业部或职能部门负责人'),
     ('dept_manager',           '部门主管',         2,  0, '二级部门通用管理岗位'),
     ('content_director',       '编导',             3,  0, '公司级公共编导岗位，可在不同新媒体部门复用'),
-    ('new_media_operator',     '新媒体运营',       4,  0, '新媒体内容及学员运营'),
+    ('new_media_operator',     '新媒体运营',       4,  0, '新媒体内容运营'),
     ('filming_editor',         '剪拍专员',         5,  0, '拍摄、剪辑及素材管理'),
     ('sales_manager',          '销售主管',         6,  0, NULL),
     ('sales_specialist',       '销售专员',         7,  0, NULL),

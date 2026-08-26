@@ -19,6 +19,7 @@ public class LeadManagementRespVO {
     private String sourceLabel;
     private Long sourceUserId;
     private String sourceUserName;
+    private String partnerOwnerNameSnapshot;
     private String sourceChannel;
     private String provinceCode;
     private String provinceName;

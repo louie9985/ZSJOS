@@ -26,6 +26,9 @@
 - `GET /zsjos/sales-order/team-page`、`POST /zsjos/sales-order/team-search-page`：团队订单分页查询，支持状态、关键词和高级条件；团队成员提交范围始终作为固定边界。
 - `GET /zsjos/sales-order/team-cursor`、`POST /zsjos/sales-order/team-search-cursor`：团队订单游标查询，筛选条件与分页接口一致。
 - `GET /zsjos/sales-order/team-status-counts`：团队订单状态统计，范围与团队订单列表一致。
+- Workbench `/zsjos/sales-orders/team` directly consumes the three team cursor/search/count contracts.
+  It uses the normal order detail contract in read-only `team` mode and never exposes update, terminate,
+  approval, or export commands from the team-query permission.
 - `GET /zsjos/sales-order/approval/filter-profile`：返回当前租户已发布的待处理/已处理方案，以及当前用户按审批配置部门解析出的 `centers`。单中心用户只返回本中心；同时落入两个配置部门范围的用户返回报名履约和财务两个中心。
 - `GET /zsjos/sales-order/approval/task-target?taskId=`：校验当前用户对 BPM 普通任务或主管加签任务的关系后，返回 `workType`、`orderId`、`taskId`、`taskDefinitionKey`、`center`、`confirmationId` 和处理状态，用于今日任务和消息的精确跳转。
 - `GET /zsjos/sales-order/approval/notification-target?orderId=&sceneCode=&sourceEventKey=`：仅接受主管申请和主管决定两个通知场景，分别要求当前用户是指定主管或加签申请人；服务端使用消息既有的事件幂等键精确恢复确认记录和固化任务定位，并执行订单对象权限检查。兼容缺少事件键的旧消息时才回退该订单最新确认记录；前端不得提交用户 ID 或任意目标 URL。

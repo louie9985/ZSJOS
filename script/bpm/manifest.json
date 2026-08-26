@@ -41,19 +41,6 @@
       "sha256": "034066e1730a6f8a2f8ad75e93ead6ab5512a67411b2a2f625d645148861193c"
     },
     {
-      "processKey": "zsjos_media_graduation",
-      "assetVersion": "1.0.0",
-      "recommended": true,
-      "taskKeys": ["graduationReviewer"],
-      "businessVariables": ["studentPersonId", "graduationReason"],
-      "assigneeVariables": ["coll_userList", "assignee"],
-      "runtimeOnlyVariables": ["studentPersonId", "graduationReason"],
-      "businessKeyFormat": "media-graduation:{studentPersonId}:v{versionNo}",
-      "minimumMigration": "V096",
-      "path": "zsjos_media_graduation/1.0.0/process.bpmn20.xml",
-      "sha256": "207645ebf220938f948c7d88ef03ec97f5b2f69731d46f6c1d0424705b3938c7"
-    },
-    {
       "processKey": "zsjos_media_positioning_ip",
       "assetVersion": "1.0.0",
       "recommended": true,

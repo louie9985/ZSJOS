@@ -4,14 +4,13 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountSav
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.AccountStageLogDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountStudentLinkDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.account.AccountStageLogMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountStudentLinkMapper;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceProblemVO;
 import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
@@ -43,7 +42,6 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Slf4j
 public class MediaAccountService {
     @Resource private MediaAccountMapper mapper;
-    @Resource private AccountStageLogMapper stageLogMapper;
     @Resource private MediaAccountStudentLinkMapper linkMapper;
     @Resource private MediaAccountNumberService numberService;
     @Resource private PermissionApi permissionApi;
@@ -77,50 +75,21 @@ public class MediaAccountService {
                 .setDetailConfigVersionId(details.configVersionId())
                 .setDetailValuesJson(JsonUtils.toJsonString(details.values()))
                 .setDetailSnapshotJson(JsonUtils.toJsonString(details.snapshots()))
-                .setLeadDirection(req.getLeadDirection()).setSStage("s0")
-                .setSStageEnteredAt(LocalDateTime.now()).setIsSilent(false).setRunStatus(RUN_STATUS_ACTIVE)
+                .setLeadDirection(req.getLeadDirection()).setSStage(null)
+                .setSStageEnteredAt(null).setIsSilent(false).setRunStatus(RUN_STATUS_ACTIVE)
                 .setRescueStatus("none").setWhitelistStatus("none").setVersion(0);
         mapper.insert(account);
         return account.getId();
     }
 
-    @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "stage-advance")
-    @Transactional(rollbackFor = Exception.class)
     public void advanceStage(Long accountId, String toStage, Integer version, String criteriaSnapshotJson,
                              String basis, String idempotencyKey, Long userId) {
-        stageTransition(accountId, toStage, version, criteriaSnapshotJson, basis, idempotencyKey, userId, true);
+        throw exception(MEDIA_ACCOUNT_STAGE_TRANSITION_RETIRED);
     }
 
-    @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "stage-rollback")
-    @Transactional(rollbackFor = Exception.class)
     public void rollbackStage(Long accountId, String toStage, Integer version, String criteriaSnapshotJson,
                               String basis, String idempotencyKey, Long userId) {
-        stageTransition(accountId, toStage, version, criteriaSnapshotJson, basis, idempotencyKey, userId, false);
-    }
-
-    private void stageTransition(Long accountId, String toStage, Integer version, String criteriaSnapshotJson,
-                                 String basis, String idempotencyKey, Long userId, boolean advancing) {
-        if (!ACCOUNT_STAGES.contains(toStage)) throw exception(MEDIA_ACCOUNT_STAGE_INVALID);
-        if (criteriaSnapshotJson == null || criteriaSnapshotJson.isBlank() || basis == null || basis.isBlank()) {
-            throw exception(MEDIA_ACCOUNT_STAGE_BASIS_REQUIRED);
-        }
-        MediaAccountDO account = require(accountId);
-        if (stageLogMapper.selectByIdempotencyKey(idempotencyKey) != null) return;
-        if (account.getSStage().equals(toStage)) throw exception(MEDIA_ACCOUNT_STAGE_INVALID);
-        int indexFrom = ACCOUNT_STAGES.indexOf(account.getSStage());
-        int indexTo = ACCOUNT_STAGES.indexOf(toStage);
-        if (advancing != (indexTo > indexFrom)) throw exception(MEDIA_ACCOUNT_STAGE_INVALID);
-        String direction = indexTo > indexFrom ? "advance" : "rollback";
-        String stageVersion = indexTo > indexFrom ? toStage : account.getSStageVersion();
-        LocalDateTime now = LocalDateTime.now();
-        if (mapper.updateStage(accountId, version, account.getSStage(), toStage, stageVersion, userId, now) == 0) {
-            throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
-        }
-        AccountStageLogDO log = new AccountStageLogDO().setAccountId(accountId).setFromStage(account.getSStage())
-                .setToStage(toStage).setStageVersion(stageVersion).setDirection(direction)
-                .setCriteriaSnapshotJson(criteriaSnapshotJson).setJudgmentBasis(basis)
-                .setJudgedByUserId(userId).setJudgedAt(now).setIdempotencyKey(idempotencyKey);
-        stageLogMapper.insert(log);
+        throw exception(MEDIA_ACCOUNT_STAGE_TRANSITION_RETIRED);
     }
 
     public MediaAccountDO require(Long id) {
@@ -141,7 +110,14 @@ public class MediaAccountService {
                 : JsonUtils.parseObject(account.getDetailValuesJson(), Map.class));
         response.setDetailSnapshots(account.getDetailSnapshotJson() == null ? List.of()
                 : JsonUtils.parseArray(account.getDetailSnapshotJson(), MediaAccountDetailSnapshotVO.class));
+        response.setPrimaryProblems(account.getPrimaryProblemsJson() == null ? List.of()
+                : JsonUtils.parseArray(account.getPrimaryProblemsJson(), MediaAccountMaintenanceProblemVO.class));
         return response;
+    }
+
+    /** Projects only actions that pass both account relationship and feature-permission checks. */
+    public List<String> availableActionsForVisible(MediaAccountDO account, Long userId) {
+        return toResp(account, userId).getAvailableActions();
     }
 
     public PageResult<MediaAccountRespVO> page(MediaAccountPageReqVO req, Long userId) {
@@ -322,13 +298,14 @@ public class MediaAccountService {
     private MediaAccountRespVO toResp(MediaAccountDO account, Long userId) {
         MediaAccountRespVO response = BeanUtils.toBean(account, MediaAccountRespVO.class);
         List<String> actions = new ArrayList<>();
-        if (objectPermissionProvider.hasPermission(account.getId(), "stage-advance", userId)
-                && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:stage-advance")) {
-            actions.add(ACTION_ADVANCE_STAGE);
+        if (objectPermissionProvider.hasPermission(account.getId(), "read", userId)
+                && permissionApi.hasAnyPermissions(userId,
+                "zsjos:media-account:query", "zsjos:media-account:maintenance")) {
+            actions.add(ACTION_VIEW_ACCOUNT_HISTORY);
         }
-        if (!"s0".equals(account.getSStage()) && objectPermissionProvider.hasPermission(account.getId(), "stage-rollback", userId)
-                && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:stage-rollback")) {
-            actions.add(ACTION_ROLLBACK_STAGE);
+        if (objectPermissionProvider.hasPermission(account.getId(), "maintenance", userId)
+                && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:maintenance")) {
+            actions.add("MAINTAIN_ACCOUNT");
         }
         if (objectPermissionProvider.hasPermission(account.getId(), "bind-student", userId)
                 && permissionApi.hasAnyPermissions(userId, "zsjos:media-account:bind-student")) {
@@ -346,6 +323,8 @@ public class MediaAccountService {
                 : JsonUtils.parseObject(account.getDetailValuesJson(), Map.class));
         response.setDetailSnapshots(account.getDetailSnapshotJson() == null ? List.of()
                 : JsonUtils.parseArray(account.getDetailSnapshotJson(), MediaAccountDetailSnapshotVO.class));
+        response.setPrimaryProblems(account.getPrimaryProblemsJson() == null ? List.of()
+                : JsonUtils.parseArray(account.getPrimaryProblemsJson(), MediaAccountMaintenanceProblemVO.class));
         return response;
     }
 

@@ -30,6 +30,7 @@ class PartnerManagementServiceImplTest {
     @Mock private PostApi postApi;
     @Mock private LeadMapper leadMapper;
     @Mock private PartnerAccountService partnerAccountService;
+    @Mock private PartnerOwnershipService ownershipService;
 
     @Test
     void createUsesIndependentPartnerAccount() {

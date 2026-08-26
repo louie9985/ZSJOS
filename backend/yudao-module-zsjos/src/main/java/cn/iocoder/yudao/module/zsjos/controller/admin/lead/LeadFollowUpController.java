@@ -33,7 +33,7 @@ public class LeadFollowUpController {
 
     @GetMapping("/{id}/follow-ups/page")
     @Operation(summary = "获得客资跟进记录")
-    @PreAuthorize("@ss.hasPermission('zsjos:lead-detail:follow-up-read')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:follow-up-read','zsjos:subordinate-partner:query')")
     @ZsjosPermission(bizType = "lead", bizId = "#id", action = "follow-up-read")
     public CommonResult<PageResult<LeadFollowUpRespVO>> getPage(
             @PathVariable("id") Long id,

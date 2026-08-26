@@ -29,6 +29,7 @@ import java.util.UUID;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
+import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadActionPolicy.Action.*;
 
 @Service
 public class SubordinateSalesCommandService {
@@ -50,10 +51,7 @@ public class SubordinateSalesCommandService {
         String fingerprint = fingerprint("transfer", List.of(leadId), targetUserId, null, reason);
         if (!beginCommand("transfer", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
-        if (!Set.of(STATUS_SUBMITTED, STATUS_SUSPENDED, STATUS_VALID, STATUS_CONVERTED).contains(lead.getStatus())
-                || !Set.of(ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING).contains(lead.getAssignmentStatus())) {
-            throw exception(SUBORDINATE_LEAD_STATE_INVALID);
-        }
+        SupervisorLeadActionPolicy.requireAllowed(TRANSFER, lead);
         Long beforeOwner = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())
                 ? lead.getRecycleSourceOwnerUserId() : lead.getOwnerUserId();
         if (Objects.equals(beforeOwner, targetUserId)) {
@@ -82,9 +80,7 @@ public class SubordinateSalesCommandService {
         String fingerprint = fingerprint("restore", List.of(leadId), null, null, reason);
         if (!beginCommand("restore", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
-        if (!STATUS_SUSPENDED.equals(lead.getStatus()) || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())) {
-            throw exception(SUBORDINATE_LEAD_STATE_INVALID);
-        }
+        SupervisorLeadActionPolicy.requireAllowed(RESTORE, lead);
         LeadDispositionReqVO request = disposition(reason, idempotencyKey);
         qualificationService.restore(leadId, managerUserId, request);
         addAudit("lead_restore", managerUserId, lead.getOwnerUserId(), leadId,
@@ -102,10 +98,7 @@ public class SubordinateSalesCommandService {
         String fingerprint = fingerprint("recycle", List.of(leadId), null, null, reason);
         if (!beginCommand("recycle", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
-        if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                || !Set.of(STATUS_SUBMITTED, STATUS_SUSPENDED).contains(lead.getStatus())) {
-            throw exception(SUBORDINATE_LEAD_STATE_INVALID);
-        }
+        SupervisorLeadActionPolicy.requireAllowed(RECYCLE, lead);
         LeadDispositionReqVO request = disposition(reason, idempotencyKey);
         if (STATUS_SUSPENDED.equals(lead.getStatus())) qualificationService.recycle(leadId, managerUserId, request);
         else qualificationService.supervisorRecycleOwned(leadId, managerUserId, request);
@@ -124,12 +117,7 @@ public class SubordinateSalesCommandService {
         String fingerprint = fingerprint("release-claim-pool", List.of(leadId), null, null, reason);
         if (!beginCommand("release-claim-pool", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
-        if (!STATUS_SUBMITTED.equals(lead.getStatus()) && !STATUS_SUSPENDED.equals(lead.getStatus())) {
-            throw exception(SUBORDINATE_LEAD_STATE_INVALID);
-        }
-        if (!Set.of(ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING).contains(lead.getAssignmentStatus())) {
-            throw exception(SUBORDINATE_LEAD_STATE_INVALID);
-        }
+        SupervisorLeadActionPolicy.requireAllowed(RELEASE_CLAIM_POOL, lead);
         LeadDispositionReqVO request = disposition(reason, idempotencyKey);
         if (STATUS_SUSPENDED.equals(lead.getStatus())
                 || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
@@ -153,11 +141,7 @@ public class SubordinateSalesCommandService {
         String fingerprint = fingerprint("release-public-sea", List.of(leadId), null, collaboratorUserId, reason);
         if (!beginCommand("release-public-sea", managerUserId, idempotencyKey, fingerprint)) return;
         LeadDO lead = requireManagedLeadForUpdate(leadId, managerUserId);
-        if (!ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                || !Set.of(STATUS_VALID, STATUS_CONVERTED).contains(lead.getStatus())
-                || lead.getClosedAt() != null) {
-            throw exception(SUBORDINATE_LEAD_STATE_INVALID);
-        }
+        SupervisorLeadActionPolicy.requireAllowed(RELEASE_PUBLIC_SEA, lead);
         agingPoolService.enterManually(leadId, collaboratorUserId, managerUserId, reason,
                 "supervisor-public-sea:" + idempotencyKey);
         addAudit("public_sea_release", managerUserId, collaboratorUserId, leadId,

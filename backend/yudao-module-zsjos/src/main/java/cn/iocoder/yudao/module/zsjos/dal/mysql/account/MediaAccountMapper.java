@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarPageReqVO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -14,6 +15,10 @@ import java.util.List;
 
 @Mapper
 public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
+    @Select("SELECT * FROM zsjos_media_account WHERE id=#{id} AND tenant_id=#{tenantId} "
+            + "AND deleted=b'0' FOR UPDATE")
+    MediaAccountDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
+
     default PageResult<MediaAccountDO> selectPage(MediaAccountPageReqVO req, Collection<Long> userIds, boolean all) {
         LambdaQueryWrapperX<MediaAccountDO> q = new LambdaQueryWrapperX<>();
         q.eqIfPresent(MediaAccountDO::getSStage, req.getSStage());
@@ -28,6 +33,40 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
         if (!all) query.and(x -> x.in(MediaAccountDO::getOwnerOperatorUserId, userIds).or()
                 .in(MediaAccountDO::getDirectorUserId, userIds));
         return selectList(query).stream().map(MediaAccountDO::getId).toList();
+    }
+
+    default PageResult<MediaAccountDO> selectCalendarPage(MediaAccountCalendarPageReqVO req, Long userId,
+                                                           boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, userId, all);
+        query.isNotNull(MediaAccountDO::getMaintenanceStartDate)
+                .isNotNull(MediaAccountDO::getMaintenanceEndDate)
+                .le(MediaAccountDO::getMaintenanceStartDate, req.getRangeEnd())
+                .ge(MediaAccountDO::getMaintenanceEndDate, req.getRangeStart())
+                .orderByAsc(MediaAccountDO::getMaintenanceStartDate)
+                .orderByAsc(MediaAccountDO::getId);
+        return selectPage(req, query);
+    }
+
+    default long selectCalendarUnscheduledCount(MediaAccountCalendarPageReqVO req, Long userId, boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, userId, all);
+        query.and(row -> row.isNull(MediaAccountDO::getMaintenanceStartDate)
+                .or().isNull(MediaAccountDO::getMaintenanceEndDate));
+        return selectCount(query);
+    }
+
+    private LambdaQueryWrapperX<MediaAccountDO> calendarQuery(MediaAccountCalendarPageReqVO req, Long userId,
+                                                               boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = new LambdaQueryWrapperX<>();
+        if (!all) query.and(row -> row.eq(MediaAccountDO::getOwnerOperatorUserId, userId)
+                .or().eq(MediaAccountDO::getDirectorUserId, userId));
+        if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
+            query.and(row -> row.like(MediaAccountDO::getAccountNo, req.getKeyword().trim())
+                    .or().like(MediaAccountDO::getNickname, req.getKeyword().trim()));
+        }
+        return query.eqIfPresent(MediaAccountDO::getCurrentStatusValue, req.getCurrentStatusValue())
+                .eqIfPresent(MediaAccountDO::getSStage, req.getStageValue())
+                .eqIfPresent(MediaAccountDO::getDirectorUserId, req.getDirectorUserId())
+                .eqIfPresent(MediaAccountDO::getOwnerOperatorUserId, req.getOperatorUserId());
     }
     default MediaAccountDO selectByAccountNo(String accountNo) {
         return selectOne(new LambdaQueryWrapperX<MediaAccountDO>().eq(MediaAccountDO::getAccountNo, accountNo));
@@ -114,6 +153,12 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
     default int updateProfile(MediaAccountDO account, Integer version) {
         account.setVersion(version + 1);
         return update(account, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId, account.getId()).eq(MediaAccountDO::getVersion, version));
+    }
+
+    default int updateMaintenance(MediaAccountDO account, Integer version) {
+        account.setVersion(version + 1);
+        return update(account, new LambdaUpdateWrapper<MediaAccountDO>()
+                .eq(MediaAccountDO::getId, account.getId()).eq(MediaAccountDO::getVersion, version));
     }
     default int updateRescue(Long id, Integer version, String status) {
         return update(null, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId,id).eq(MediaAccountDO::getVersion,version).set(MediaAccountDO::getRescueStatus,status).set(MediaAccountDO::getVersion,version+1));

@@ -18,6 +18,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Objects;
 
+import static cn.hutool.core.util.StrUtil.isBlank;
+
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -36,7 +38,7 @@ public class UserRelationSceneServiceImpl implements UserRelationSceneService {
     @Override
     public Long createScene(UserRelationSceneSaveReqVO reqVO) {
         validateCodeUnique(reqVO.getCode(), null);
-        validatePosts(reqVO);
+        validateEligibility(reqVO);
         UserRelationSceneDO scene = BeanUtils.toBean(reqVO, UserRelationSceneDO.class);
         sceneMapper.insert(scene);
         return scene.getId();
@@ -48,7 +50,7 @@ public class UserRelationSceneServiceImpl implements UserRelationSceneService {
         if (!Objects.equals(existing.getCode(), reqVO.getCode())) {
             throw exception(USER_RELATION_SCENE_CODE_IMMUTABLE);
         }
-        validatePosts(reqVO);
+        validateEligibility(reqVO);
         sceneMapper.updateById(BeanUtils.toBean(reqVO, UserRelationSceneDO.class));
     }
 
@@ -111,11 +113,21 @@ public class UserRelationSceneServiceImpl implements UserRelationSceneService {
         }
     }
 
-    private void validatePosts(UserRelationSceneSaveReqVO reqVO) {
-        if (postApi.getPostByCode(reqVO.getSourcePostCode()) == null
-                || postApi.getPostByCode(reqVO.getTargetPostCode()) == null) {
+    private void validateEligibility(UserRelationSceneSaveReqVO reqVO) {
+        if (postApi.getPostByCode(reqVO.getSourcePostCode()) == null) {
             throw exception(USER_RELATION_SCENE_POST_INVALID);
         }
+        if ("permission".equals(reqVO.getTargetEligibilityType())) {
+            if (isBlank(reqVO.getTargetPermissionCode())) {
+                throw exception(USER_RELATION_SCENE_ELIGIBILITY_INVALID);
+            }
+            reqVO.setTargetPostCode(null);
+            return;
+        }
+        if (postApi.getPostByCode(reqVO.getTargetPostCode()) == null) {
+            throw exception(USER_RELATION_SCENE_POST_INVALID);
+        }
+        reqVO.setTargetPermissionCode(null);
     }
 
 }

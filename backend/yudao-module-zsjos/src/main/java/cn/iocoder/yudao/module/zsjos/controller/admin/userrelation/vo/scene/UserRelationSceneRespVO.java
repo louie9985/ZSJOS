@@ -14,6 +14,8 @@ public class UserRelationSceneRespVO {
     private String targetLabel;
     private String sourcePostCode;
     private String targetPostCode;
+    private String targetEligibilityType;
+    private String targetPermissionCode;
     private Integer status;
     private String remark;
     private LocalDateTime createTime;

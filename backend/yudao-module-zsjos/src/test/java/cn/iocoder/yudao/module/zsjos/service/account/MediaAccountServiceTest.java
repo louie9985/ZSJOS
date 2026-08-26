@@ -18,6 +18,10 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -31,6 +35,7 @@ class MediaAccountServiceTest {
     @Mock private PersonMapper personMapper;
     @Mock private AdminUserApi adminUserApi;
     @Mock private MediaAccountFieldConfigService fieldConfigService;
+    @Mock private MediaAccountObjectPermissionProvider objectPermissionProvider;
 
     @Test
     void ordinaryCreatorIsBoundAsDirectorAndSnapshotsConfiguredDetails() {
@@ -58,5 +63,34 @@ class MediaAccountServiceTest {
                         && account.getNickname().equals("中世健课堂")
                         && account.getDetailConfigVersionId().equals(12L)));
         verify(adminUserApi).validateUser(248L);
+    }
+
+    @Test
+    void legacyStageCommandsReturnTheRetiredContractError() {
+        ServiceException advance = assertThrows(ServiceException.class,
+                () -> service.advanceStage(1L, "s2", 0, "{}", "legacy", "advance", 20L));
+        ServiceException rollback = assertThrows(ServiceException.class,
+                () -> service.rollbackStage(1L, "s0", 0, "{}", "legacy", "rollback", 20L));
+        assertEquals(1_900_011_012, advance.getCode());
+        assertEquals(1_900_011_012, rollback.getCode());
+    }
+
+    @Test
+    void projectsHistoryAccessWhenFeatureAndObjectPermissionsBothPass() {
+        MediaAccountDO account = new MediaAccountDO().setId(5L);
+        when(objectPermissionProvider.hasPermission(5L, "read", 248L)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(248L,
+                "zsjos:media-account:query", "zsjos:media-account:maintenance")).thenReturn(true);
+
+        assertTrue(service.availableActionsForVisible(account, 248L).contains("VIEW_ACCOUNT_HISTORY"));
+    }
+
+    @Test
+    void omitsHistoryAccessWhenFeatureOrObjectPermissionFails() {
+        MediaAccountDO account = new MediaAccountDO().setId(5L);
+        when(objectPermissionProvider.hasPermission(5L, "read", 248L)).thenReturn(true);
+
+        assertFalse(service.availableActionsForVisible(account, 248L).contains("VIEW_ACCOUNT_HISTORY"));
+        assertFalse(service.availableActionsForVisible(account, 230L).contains("VIEW_ACCOUNT_HISTORY"));
     }
 }

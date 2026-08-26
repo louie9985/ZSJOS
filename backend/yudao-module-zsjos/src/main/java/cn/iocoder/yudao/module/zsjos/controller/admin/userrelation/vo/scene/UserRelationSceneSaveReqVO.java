@@ -26,8 +26,14 @@ public class UserRelationSceneSaveReqVO {
     @NotBlank(message = "来源岗位不能为空")
     private String sourcePostCode;
 
-    @NotBlank(message = "目标岗位不能为空")
     private String targetPostCode;
+
+    @NotBlank(message = "目标资格类型不能为空")
+    @Pattern(regexp = "post|permission", message = "目标资格类型不正确")
+    private String targetEligibilityType = "post";
+
+    @Pattern(regexp = "^$|^[a-z][a-z0-9:-]{2,127}$", message = "目标权限标识格式不正确")
+    private String targetPermissionCode;
 
     @NotNull(message = "状态不能为空")
     private Integer status;

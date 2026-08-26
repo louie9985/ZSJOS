@@ -258,6 +258,11 @@ yudao:
 
 --- #################### 芋道相关配置 ####################
 
+zsjos:
+  positioning:
+    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
+    confirmation-link-ttl-hours: ${ZSJOS_POSITIONING_CONFIRMATION_LINK_TTL_HOURS:168}
+
 yudao:
   info:
     version: 1.0.0
@@ -295,8 +300,13 @@ yudao:
       stale-if-error-seconds: 60
     limits:
       max-history-days: 366
-  positioning:
-    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
+    new-media:
+      # Supply authoritative department IDs through deployment configuration; never infer them by name.
+      department-ids: []
+    snapshot:
+      hour: 4
+      minute: 0
+      scan-delay-ms: 300000
   api-encrypt:
     enable: false # 是否开启 API 加密。默认关闭，避免低版本 JDK 8（8u120 以下）启动时 bcprov 的 JCE 认证报错
     algorithm: AES # 加密算法，支持 AES、RSA 等

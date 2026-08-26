@@ -313,23 +313,12 @@ Workbench form, which collects a single delivery deadline. The migration is forw
 repeatable, and changes no existing business rows; tightening the column again requires
 an explicit backfill and separate schema decision.
 
-### V106 media graduation closure
-
-Adds the graduation-application table and the in-app template/rule for graduation result
-notifications. Review-report columns, permissions, templates and rules are intentionally absent.
-The migration is additive, repeatable, and forward-only.
-
 ### V107 new-media role operation permissions
 
 Adds missing operation permissions to the existing tenant-1 study planner, content director,
 new-media operator, and filming editor roles. The migration is additive and repeatable: it
 does not remove existing role grants, create accounts, or change business rows. Service-level
 object authorization and responsibility checks remain authoritative.
-
-### V108 new-media supervisor graduation permissions
-
-Adds graduation initiation to `delivery_manager`. It is additive, repeatable, and limited to existing roles; it does
-not create users, publish BPM, or change business rows.
 
 ### V109 local media BPM publisher permission
 
@@ -396,15 +385,6 @@ pending reviews. It is repeatable through `information_schema` guards and record
 markers. Apply after V116 through the reviewed migration process; database execution remains a
 separately confirmed operation.
 
-### V118 Independent role-managed permission boundaries
-
-Removes the accidental default `zsjos:student-ops:*` role-menu grants from the
-`study_planner` role. The `学员运营` menu and operation buttons remain in
-`system_menu` and can be assigned independently by an administrator to an explicitly
-chosen role. No users, posts, roles, menu definitions, or business rows are changed.
-The migration is repeatable and forward-only; apply it after V117 through the reviewed
-migration process.
-
 ### V119 Workbench relative child menu paths
 
 Normalizes page-menu paths directly beneath the active `/zsjos` Workbench root from
@@ -412,7 +392,7 @@ duplicated absolute values such as `/zsjos/my-students` to relative child values
 as `my-students`. The resolved public browser URL remains `/zsjos/my-students` because
 the client joins the parent and child paths. The migration changes no menu IDs,
 permissions, role grants, users, or business rows. It blocks on an ambiguous Workbench
-root or a conflicting active sibling path and is otherwise repeatable. Apply after V118.
+root or a conflicting active sibling path and is otherwise repeatable. Apply after V117.
 
 ### V120 Restore operator media-student menu grant
 
@@ -558,3 +538,91 @@ Restores the server-owned public-sea page path to the Workbench canonical relati
 claim-pool release, and public-sea release. The first installation grants them only to enabled
 `sales_manager` roles; reruns preserve administrator-managed grants. It changes no Lead, assignment,
 opportunity, public-sea, account, or audit rows and does not rewrite V039.
+The migration runs its repair and both version writes inside one stored-procedure call. Its temporary
+permission table explicitly uses `utf8mb4_unicode_ci`, matching `system_menu.permission`; a statement
+failure rolls back the V139 DML and prevents either V139 version marker from being written.
+
+### V140 Command idempotency, positioning expiry, and menu identity repair
+
+Creates the tenant/operator scoped supervisor-command ledger, adds and backfills the positioning
+confirmation-link expiry boundary, expands the student decision comment to 2000 characters, and
+restores menu `73460` to student business-form configuration while moving the interview-template
+page and its buttons/grants to stable menu `73483`. Apply after V139. The migration is repeatable;
+it also restores the oldest compatible soft-deleted V139 supervisor permission identity, preserves grants,
+and leaves one active definition for each permission. It does not execute the separate V131
+permission-revocation or V135 inferred-snapshot cleanup.
+The migration runs its schema/menu repair and version writes inside one stored-procedure call. The
+temporary permission table explicitly matches the System menu collation, and the role-menu move uses a
+legal MySQL self-join. A failed call may retain earlier additive DDL because MySQL commits DDL, but it does
+not record V140; rerun the corrected migration only when V140 was never recorded.
+
+Use `../audit/V131_permission_grant_audit.sql` and `../audit/V135_snapshot_cleanup_audit.sql` for
+read-only scope review and recovery export. Any resulting permission revocation or snapshot update
+requires an independently confirmed tenant/row list and is intentionally not part of bootstrap.
+
+### V141 Media-screen daily snapshot
+
+Creates the empty tenant-scoped daily member snapshot table used by the public new-media contribution
+screen history API. The unique tenant/date/member key makes the daily freeze idempotent; department and
+member names are frozen with that day's counts. Apply after V140. The migration does not backfill or
+invent historical data, change Lead rows, or seed business options. Once snapshots have been written,
+rollback requires a reviewed export-and-forward-repair plan because deleting the table loses frozen history.
+
+### V142 Partial V139/V140 execution repair
+
+Repairs databases where a statement-batch client continued after the former V139 collation failure or
+V140 target-table failure and nevertheless recorded their version markers. It repeatably ensures the V140
+command/positioning schema, restores menu `73460` and interview menu `73483`, moves legacy interview grants,
+canonicalizes the five supervisor permissions without losing effective duplicate grants, and completes the
+initial `sales_manager` grants. It blocks on conflicting menu ownership and writes V142 only after the single
+stored-procedure call completes. Do not delete V139/V140 version rows or rerun those recorded files; apply
+V142 after V141 through the controlled migration process. No Lead, positioning submission snapshot, command
+record, account, or other business row is deleted. Rollback is forward-only and later permission changes must
+use reviewed System configuration or another forward migration.
+
+### V143 Subordinate Partner ownership
+
+V143 adds the tenant-scoped one-current-owner relation between a Partner and a System employee, immutable
+assignment audit rows, and nullable submission-time employee ID/name snapshots on Partner Leads. It creates the
+server-owned `subordinate-partners` page permission and the independent Partner assignment button permission.
+Only the assignment button is initially granted to enabled `system_administrator` roles; ordinary subordinate
+read access remains administrator-configured. It creates no ownership rows, does not backfill historical Leads,
+and is repeatable. Recovery disables menus or grants while retaining relationship, audit, and snapshot facts.
+
+### V144 Remove new-media Student Operations
+
+Retires the new-media Student Operations domains: exception tickets, cooperation assessments, and
+graduation applications. In execution order it deletes graduation notification messages, rules and
+templates; deletes `media-graduation` business events; deletes Student Operations role-menu grants and
+menu/button definitions; drops the three business tables; removes obsolete V106/V108/V118 markers; and
+records V144. The separately owned student-contact extension table, permissions, process key and history
+are explicitly outside this migration.
+
+V144 is repeatable through stable scene, aggregate and permission identifiers plus guarded table drops.
+It is intentionally destructive and forward-only. Take and verify a full database backup before applying
+it; recovery requires restoring that pre-execution backup. Flowable model, definition, deployment and
+runtime/history cleanup must be performed through the BPM service/repository boundary before V144, not by
+adding scattered `ACT_*` deletes to this SQL file.
+
+### V145 Production-ticket dispatch and public pool
+
+Adds account-scoped production-ticket dispatch snapshots, rejection and the filming-editor claim pool.
+It adds a tenant/operator command ledger for replay-safe create, assignment-rejection and claim commands;
+the create key remains unique across logical deletion. Fixed permission IDs are guarded by bidirectional
+ID/permission ownership checks before any upsert. It inherits grants from existing production-ticket
+permissions and seeds the corresponding notification scenes. Apply after V144; no historical assigned
+ticket is rewritten. A partial rerun refuses to rebuild the create-key index when duplicate tenant keys
+exist, so conflicts must be audited and corrected through a separately reviewed data repair.
+
+### V146 Media-account maintenance and calendar
+
+Adds nullable dictionary-backed current account-maintenance snapshots, the immutable per-account revision
+table, and the top-level `/calendar` directory with relative child path `overview`. Existing `s_stage`
+values receive only a current label snapshot; no maintenance revision is invented and the original stage
+log remains intact. The `zsjos:media-account:maintenance` operation is a server-owned button under the active
+media-student page `7022` (`/zsjos/media-students`), never under the retired standalone account page `6970`.
+Calendar and maintenance grants are inherited from the effective account query, edit, and query-all grants
+instead of role names. The former stage-advance/rollback menu permissions are disabled
+and their grants retired; the compatibility endpoints return the explicit retired-operation error to users
+with the new maintenance permission. V146 is repeatable and forward-only. Recovery disables the new menus
+and notification rule while retaining account snapshots and revision history.

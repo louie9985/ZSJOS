@@ -135,15 +135,17 @@ describe('workbench menu conversion', () => {
   })
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
-    // 迁移基线包含 HRM 员工设置与历史工资表两个正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(43)
+    // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
+    expect(RENDERABLE_APP_ROUTES.size).toBe(45)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/calendar/overview')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/accounts')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/content')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/positioning')
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/appeals')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES] as string[]).not.toContain('/zsjos/leads/qualification-exceptions')
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/lead-aging-pool')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/sales-orders/team')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/opportunity-public-sea')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/sales-order-supervisor-confirmations')

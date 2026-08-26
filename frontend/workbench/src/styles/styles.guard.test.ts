@@ -176,7 +176,6 @@ describe('spacing and sizing anchors', () => {
       'sales-order-inbox-layout',
       'work-plan-layout',
       'subordinate-inbox-layout',
-      'aging-pool-layout',
       'business-inbox-layout',
       'media-students-inbox-layout'
       ,'media-feature-inbox-layout'

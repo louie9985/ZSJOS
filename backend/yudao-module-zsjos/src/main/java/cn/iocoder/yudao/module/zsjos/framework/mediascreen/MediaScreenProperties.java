@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.framework.mediascreen;
 import jakarta.validation.Valid;
 import jakarta.annotation.PostConstruct;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -24,6 +25,8 @@ public class MediaScreenProperties {
     @Valid private List<Client> clients = new ArrayList<>();
     @Valid private Cache cache = new Cache();
     @Valid private Limits limits = new Limits();
+    @Valid private NewMedia newMedia = new NewMedia();
+    @Valid private Snapshot snapshot = new Snapshot();
 
     @PostConstruct
     void validateAccessConfiguration() {
@@ -58,5 +61,17 @@ public class MediaScreenProperties {
     @Data
     public static class Limits {
         @Min(1) private int maxHistoryDays = 366;
+    }
+
+    @Data
+    public static class NewMedia {
+        private List<Long> departmentIds = new ArrayList<>();
+    }
+
+    @Data
+    public static class Snapshot {
+        @Min(0) @Max(23) private int hour = 4;
+        @Min(0) @Max(59) private int minute = 0;
+        @Min(60000) private long scanDelayMs = 300000;
     }
 }

@@ -120,6 +120,20 @@ default and are updated only when the administrator explicitly requests migratio
 
 ## Menu and route flow
 
+Media-account stage is an operator-maintained dictionary snapshot rather than an enforced S0-S6 state
+machine. The current snapshot lives on the account and every actual change appends an immutable revision;
+the pre-existing stage log is retained as read-only legacy history. Maintenance requires both
+`zsjos:media-account:maintenance` and the account object relationship. Any changed maintenance field emits
+one notification to the current director and operator after de-duplication, excluding the actor.
+Maintenance and legacy history accept either the account-query or account-maintenance feature permission,
+then independently require account-object read access. Account projections expose `VIEW_ACCOUNT_HISTORY`
+only after both layers pass, and Workbench must not probe either history endpoint without that capability.
+
+The server-owned top-level `/calendar` directory contains the relative `overview` child. Its account Gantt
+projection shows only complete current date pairs that intersect the requested natural-date window. The
+ordinary `zsjos:media-calendar:query` scope is the current user as director or operator;
+`zsjos:media-calendar:query-all` is the independent all-account override.
+
 ```text
 role-to-menu assignments
   -> backend permission calculation
@@ -465,6 +479,15 @@ The server-owned `下属销售` menu is available only with `zsjos:subordinate-s
 
 The independent `zsjos:subordinate-sales:pause-all` command resolves that same live scope on the server and never accepts frontend target IDs, filters, or loaded rows. It persists only the sales dispatch preference as paused, including for disabled accounts, and records per-user changes in the existing subordinate-sales audit log. The first V092 installation grants this capability to enabled `sales_manager` roles, but the permission does not expand the manager hierarchy or subordinate visibility.
 
+Partner ownership is an explicit ZSJOS relationship because Partner is an independent `PARTNER`
+subject and has no System department or post. One Partner has at most one current employee owner; an
+employee may own multiple Partners. `zsjos:subordinate-partner:query` is both the assignment-candidate
+qualification and employee read feature, while every list/detail request also checks the live
+tenant-scoped relationship. Permission/account loss disables access without deleting the relationship.
+Reassignment moves all historical/future Partner Lead visibility to the new employee, but each new
+Partner Lead snapshots the configured employee ID and name at submission time. Historical null
+snapshots remain `未记录` and are never inferred from the current relationship.
+
 Supervisor Lead commands use five independent `zsjos:subordinate-sales:lead-*` button permissions and
 the same live department-leader scope. Submitted or suspended Leads release to the claim pool; valid
 pre-deal Leads release to the canonical public sea while preserving formal ownership and optionally
@@ -535,6 +558,24 @@ digest. Public lookup first ignores tenant filtering solely to locate that globa
 normal tenant filtering under the link row's tenant before reading or deciding. Public invalid, revoked, stale,
 and missing tokens share the same non-enumerable error contract. Feature permissions, operator ownership,
 latest-submission status and optimistic versions are cumulative checks.
+
+The active positioning lifecycle is `co_creating -> operator_feasibility -> student_link_pending ->
+student_confirm -> confirmed`; `professionalRisk` is retained as a snapshot but does not select a different
+route. Student agreement locks the account, replaces its previous `confirmed` submission with `superseded`,
+marks the current immutable submission `confirmed`, consumes the link, and completes the card in one
+transaction. Operator rejection or a student change request returns only the mutable card to `co_creating`.
+When a confirmed card is revised, the original director restores the current effective snapshot into the same
+card workspace and the account's old effective submission remains authoritative for downstream production
+until the new round is confirmed. `latestRound` identifies the newest account submission; `effective`
+independently identifies the downstream version, while legacy `current` temporarily aliases `latestRound`.
+Historical non-archived `student_agreed` submissions remain runtime-compatible effective versions without a
+data migration. Historical IP process listeners remain available only to finish already-running instances.
+
+Positioning-card reuse reads only immutable submitted snapshots for the same Person. The server filters source
+submissions through current account visibility and positioning-card object read authorization, then maps compatible
+stable field keys onto the current published template. Historical dictionary labels remain snapshot values;
+removed, type-incompatible, or dictionary-type-changed fields are not copied. Import creates or version-overwrites
+only the target account's editable draft and never mutates a source submission or the positioning lifecycle.
 # Public media-screen access
 
 `/public-api/zsjos/media-screen/**` is a narrowly scoped exception to login-token authentication.

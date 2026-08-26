@@ -17,6 +17,7 @@ import LeadAppealPage from '../pages/LeadAppealPage'
 import SalesOrderApprovalPage from '../pages/SalesOrderApprovalPage'
 import MySalesOrderPage from '../pages/MySalesOrderPage'
 import SubordinateSalesPage from '../pages/SubordinateSalesPage'
+import SubordinatePartnerPage from '../pages/SubordinatePartnerPage'
 import ExternalRepurchasePage from '../pages/ExternalRepurchasePage'
 import ExportTaskPage from '../pages/ExportTaskPage'
 import {
@@ -38,8 +39,9 @@ import {
   WorkPlanConfigPage
 } from '../pages/ConfigurationPages'
 import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, StudentContactConfigPage, StudentContactExceptionsPage } from '../pages/RegistrationPages'
-import { ProductionTicketsPage, StudentOpsPage } from '../pages/MediaFeaturePage'
+import { ProductionTicketsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
+import MediaCalendarPage from '../pages/MediaCalendarPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -56,6 +58,8 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   const location = useLocation()
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage selfSourced/>
@@ -71,6 +75,7 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   }
   if (menu?.path === APP_ROUTES.LEAD_AGING_POOL) return <LeadAgingPoolPage/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage permissions={permissions} onOpenAssignment={onOpenAssignment}/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
@@ -97,12 +102,12 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
+  if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.MEDIA_STUDENT_OPS) return <StudentOpsPage/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
     <Result status="info" title="页面尚未迁移" subTitle="该菜单已由统一权限系统下发，前端页面尚未迁移。"/>
     <Typography.Paragraph type="secondary">路径：{menu?.path || location.pathname}　组件：{menu?.component || '未配置'}</Typography.Paragraph>

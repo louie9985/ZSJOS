@@ -46,6 +46,7 @@ public class LeadObjectPermissionService {
     @Resource private SalesOrderObjectPermissionService salesOrderObjectPermissionService;
     @Resource private LeadAgingPoolService leadAgingPoolService;
     @Resource private MediaAccountMapper mediaAccountMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
 
     public void check(Long leadId, String action) {
         LeadDO lead = leadMapper.selectById(leadId);
@@ -109,11 +110,16 @@ public class LeadObjectPermissionService {
                     && canManageQualificationException(lead, userId)
                 || canReadAgingPool(lead.getId(), userId)
                 || canReadManualPublicSea(lead, userId) || canReadStudentSalesHistory(lead, userId)
-                || canReadMediaStudentLead(lead, userId)) {
+                || canReadMediaStudentLead(lead, userId)
+                || lead.getPartnerId() != null && partnerOwnershipService.canRead(userId, lead.getPartnerId())) {
             return true;
         }
         return salesOrderMapper.selectByLeadId(lead.getId()).stream()
                 .anyMatch(order -> salesOrderObjectPermissionService.canRead(order, userId));
+    }
+
+    public boolean canReadSubordinatePartnerLead(LeadDO lead, Long userId) {
+        return lead.getPartnerId() != null && partnerOwnershipService.canRead(userId, lead.getPartnerId());
     }
 
     public boolean canReadStudentSalesHistory(LeadDO lead, Long userId) {

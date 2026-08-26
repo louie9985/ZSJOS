@@ -93,7 +93,7 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
             EamCategoryDO category = current.get(row.categoryCode());
             EamCategoryFieldDO existing = fieldService.getFieldListByCategoryId(category.getId()).stream()
                     .filter(field -> Objects.equals(field.getFieldKey(), row.fieldKey())).findFirst().orElse(null);
-            EamCategoryFieldSaveReqVO req = toFieldReq(row, category.getId());
+            EamCategoryFieldSaveReqVO req = toFieldReq(row, category.getId(), existing);
             if (existing == null) {
                 fieldService.createField(req);
             } else if (!sameField(existing, row)) {
@@ -202,7 +202,7 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
 
     private FieldRow parseField(Map<Integer, String> row) {
         return new FieldRow(cell(row, 0), cell(row, 1), cell(row, 2), cell(row, 3), cell(row, 4), cell(row, 5),
-                parseBoolean(cell(row, 6), true), parseInteger(cell(row, 7), 0), cell(row, 8));
+                parseBoolean(cell(row, 6), true), parseInteger(cell(row, 7), 0), cell(row, 8), Set.copyOf(row.keySet()));
     }
 
     private EamCategorySaveReqVO toCategoryReq(CategoryRow row, Long parentId) {
@@ -212,14 +212,25 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
         return req;
     }
 
-    private EamCategoryFieldSaveReqVO toFieldReq(FieldRow row, Long categoryId) {
+    private EamCategoryFieldSaveReqVO toFieldReq(FieldRow row, Long categoryId, EamCategoryFieldDO existing) {
         EamCategoryFieldSaveReqVO req = new EamCategoryFieldSaveReqVO();
         req.setCategoryId(categoryId); req.setFieldKey(row.fieldKey()); req.setFieldName(row.fieldName());
-        req.setFieldType(FIELD_TYPES.get(row.fieldType())); req.setRequired(false);
-        req.setOptionSource(StrUtil.emptyToNull(row.optionSource()));
-        req.setDictType(StrUtil.emptyToNull(row.dictType()));
-        req.setAdminVisible(row.adminVisible()); req.setCollectionVisible(true);
-        req.setCollectionRequired(false); req.setSort(row.sort());
+        req.setFieldType(FIELD_TYPES.get(row.fieldType()));
+        if (existing == null) {
+            req.setRequired(false); req.setAdminVisible(row.adminVisible()); req.setCollectionVisible(true);
+            req.setCollectionRequired(false); req.setSort(row.sort());
+            req.setOptionSource(StrUtil.emptyToNull(row.optionSource()));
+            req.setDictType(StrUtil.emptyToNull(row.dictType()));
+        } else {
+            req.setRequired(existing.getRequired()); req.setOptions(existing.getOptions());
+            req.setAdminVisible(row.provided(6) ? row.adminVisible() : existing.getAdminVisible());
+            req.setCollectionVisible(existing.getCollectionVisible());
+            req.setCollectionRequired(existing.getCollectionRequired());
+            req.setConditionRule(existing.getConditionRule());
+            req.setSort(row.provided(7) ? row.sort() : existing.getSort());
+            req.setOptionSource(row.provided(4) ? StrUtil.emptyToNull(row.optionSource()) : existing.getOptionSource());
+            req.setDictType(row.provided(5) ? StrUtil.emptyToNull(row.dictType()) : existing.getDictType());
+        }
         return req;
     }
 
@@ -233,10 +244,10 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private boolean sameField(EamCategoryFieldDO existing, FieldRow row) {
         return Objects.equals(existing.getFieldName(), row.fieldName())
                 && Objects.equals(existing.getFieldType(), FIELD_TYPES.get(row.fieldType()))
-                && Objects.equals(existing.getOptionSource(), StrUtil.emptyToNull(row.optionSource()))
-                && Objects.equals(existing.getDictType(), StrUtil.emptyToNull(row.dictType()))
-                && Objects.equals(Boolean.TRUE.equals(existing.getAdminVisible()), row.adminVisible())
-                && Objects.equals(existing.getSort(), row.sort());
+                && (!row.provided(4) || Objects.equals(existing.getOptionSource(), StrUtil.emptyToNull(row.optionSource())))
+                && (!row.provided(5) || Objects.equals(existing.getDictType(), StrUtil.emptyToNull(row.dictType())))
+                && (!row.provided(6) || Objects.equals(Boolean.TRUE.equals(existing.getAdminVisible()), row.adminVisible()))
+                && (!row.provided(7) || Objects.equals(existing.getSort(), row.sort()));
     }
 
 
@@ -289,7 +300,10 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private record CategoryRow(String code, String name, String parentCode, Integer status, Integer sort,
                                Integer managementMode, String unit, String remark) {}
     private record FieldRow(String categoryCode, String fieldKey, String fieldName, String fieldType,
-                            String optionSource, String dictType, Boolean adminVisible, Integer sort, String remark) {}
+                             String optionSource, String dictType, Boolean adminVisible, Integer sort, String remark,
+                             Set<Integer> providedColumns) {
+        private boolean provided(int index) { return providedColumns.contains(index); }
+    }
     private record ParsedConfig(List<CategoryRow> categories, List<FieldRow> fields) {}
 
 }

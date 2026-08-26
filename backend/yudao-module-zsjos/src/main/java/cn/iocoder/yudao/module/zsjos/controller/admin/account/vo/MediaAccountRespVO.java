@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.controller.admin.account.vo;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -23,6 +24,15 @@ public class MediaAccountRespVO {
     private List<MediaAccountDetailSnapshotVO> detailSnapshots;
     private String leadDirection;
     private String sStage;
+    private String currentStatusValue;
+    private String currentStatusLabelSnapshot;
+    private String sStageLabelSnapshot;
+    private List<MediaAccountMaintenanceProblemVO> primaryProblems;
+    private String executionMeasureValue;
+    private String executionMeasureLabelSnapshot;
+    private String adjustmentDirection;
+    private LocalDate maintenanceStartDate;
+    private LocalDate maintenanceEndDate;
     private LocalDateTime sStageEnteredAt;
     private String runStatus;
     private String rescueStatus;

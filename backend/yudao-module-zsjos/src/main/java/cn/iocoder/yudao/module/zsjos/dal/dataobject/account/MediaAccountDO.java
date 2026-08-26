@@ -9,6 +9,7 @@ import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @TableName("zsjos_media_account")
 @KeySequence("zsjos_media_account_seq")
@@ -38,7 +39,16 @@ public class MediaAccountDO extends TenantBaseDO {
     private String trackSecondaryValue;
     private String trackSecondaryLabelSnapshot;
     private String leadDirection;
+    private String currentStatusValue;
+    private String currentStatusLabelSnapshot;
     private String sStage;
+    private String sStageLabelSnapshot;
+    private String primaryProblemsJson;
+    private String executionMeasureValue;
+    private String executionMeasureLabelSnapshot;
+    private String adjustmentDirection;
+    private LocalDate maintenanceStartDate;
+    private LocalDate maintenanceEndDate;
     private String sStageVersion;
     private LocalDateTime sStageEnteredAt;
     private Long sStageJudgedByUserId;

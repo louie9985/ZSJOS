@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesAuditLogMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.SubordinateSalesCommandMapper;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,12 +29,17 @@ class SubordinateSalesCommandServiceTest {
     @InjectMocks private SubordinateSalesCommandService service;
     @Mock private LeadMapper leadMapper;
     @Mock private SubordinateSalesAuditLogMapper auditLogMapper;
+    @Mock private SubordinateSalesCommandMapper commandMapper;
     @Mock private LeadDispatchService dispatchService;
     @Mock private LeadObjectPermissionService permissionService;
     @Mock private LeadAgingPoolService agingPoolService;
     @Mock private LeadQualificationService qualificationService;
 
-    @BeforeEach void setUp() { TenantContextHolder.setTenantId(1L); }
+    @BeforeEach void setUp() {
+        TenantContextHolder.setTenantId(1L);
+        lenient().when(commandMapper.insertIgnore(anyLong(), any())).thenReturn(1);
+        lenient().when(commandMapper.complete(anyLong(), anyLong(), anyString(), anyString())).thenReturn(1);
+    }
     @AfterEach void tearDown() { TenantContextHolder.clear(); }
 
     @Test
@@ -71,6 +77,9 @@ class SubordinateSalesCommandServiceTest {
 
         assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SUBORDINATE_LEAD_STATE_INVALID.getCode(),
                 error.getCode());
+        org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("无法执行“释放至公海池”"));
+        org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("已提交 / 已归属"));
+        org.junit.jupiter.api.Assertions.assertTrue(error.getMessage().contains("有效或已转化 / 已归属且未关闭"));
         verifyNoInteractions(agingPoolService);
     }
 

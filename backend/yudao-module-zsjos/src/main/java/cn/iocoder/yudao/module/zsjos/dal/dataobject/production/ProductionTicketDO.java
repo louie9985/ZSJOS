@@ -20,6 +20,9 @@ public class ProductionTicketDO extends TenantBaseDO {
     private Long ownerOperatorUserId;
     private Long assigneeFilmingEditorUserId;
     private Long reviewerUserId;
+    private Long positioningSubmissionId;
+    private String dispatchContextSnapshotJson;
+    private String idempotencyKey;
     private String scriptText;
     private String scriptUrl;
     private String materialRefsJson;

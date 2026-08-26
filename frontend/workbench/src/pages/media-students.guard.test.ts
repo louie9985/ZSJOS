@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 describe('director and operator My Students', () => {
   const page = readFileSync('src/pages/MediaStudentsPage.tsx', 'utf8')
   const api = readFileSync('src/services/api.ts', 'utf8')
+  const autoSave = readFileSync('src/services/directorAutoSave.ts', 'utf8')
   const style = readFileSync('src/styles/pages/media-students.css', 'utf8')
 
   it('uses the workbench master-detail recipe', () => {
@@ -42,8 +43,8 @@ describe('director and operator My Students', () => {
     expect(page).toContain("x.personNo || '暂无学员编号'")
     expect(page).toContain("operationTimeline.filter(item => item.type !== 'talk')")
     expect(page).toContain("value === 'positioning'")
+    expect(page).toContain("value === 'positioning' || value === 'maintenance'")
     expect(page).toContain("useState(normalizeMediaStudentTab(params.get('tab')))")
-    expect(api).not.toContain('/talk-records')
     expect(page).toContain("label: '学习规划师', value: selectedService.ownerUserName")
     expect(page).toContain('mainBeforeColumns')
     expect(page).toContain('最新内容')
@@ -56,6 +57,22 @@ describe('director and operator My Students', () => {
     expect(page).toContain("directorContext?.availableActions.filter(action => ['DIRECTOR_PRECHECK', 'DIRECTOR_INTERVIEW', 'ASSIGN_OPERATOR'].includes(action))")
   })
 
+  it('refreshes the selected student when a notification reuses the current route', () => {
+    expect(page).toContain('const initialLocationKey = useRef(location.key)')
+    expect(page).toContain('if (location.key !== initialLocationKey.current) void loadPage(1')
+  })
+
+  it('keeps account maintenance in the account context instead of a student-level tab', () => {
+    expect(page).toContain("const MEDIA_STUDENT_TABS = new Set(['overview', 'accounts', 'content'])")
+    expect(page).not.toContain("key: 'maintenance', label: '状态维护'")
+    expect(page).toContain("x.availableActions.includes('MAINTAIN_ACCOUNT')")
+    expect(page).toContain("x.availableActions.includes('VIEW_ACCOUNT_HISTORY')")
+    expect(page).toContain('状态：{x.currentStatusLabelSnapshot')
+    expect(page).toContain('selectAccount(x.id, canMaintainAccount)')
+    expect(page).toContain('initiallyEditing={maintenanceEditorAccountId === selectedAccount.id}')
+    expect(page).toContain('{selectedAccount && <AccountMaintenancePanel')
+  })
+
   it('autosaves only server-backed director business drafts', () => {
     expect(page).toContain('const AUTO_SAVE_DELAY_MS = 1500')
     expect(page).toContain('onValuesChange={scheduleAutoSave}')
@@ -63,7 +80,7 @@ describe('director and operator My Students', () => {
     expect(page).toContain('DirectorAutoSaveCoordinator')
     expect(page).toContain('stageDraftVersion.current = authoritativeVersion')
     expect(page).toContain('草稿已自动保存')
-    expect(page).toContain('草稿已在其他窗口更新，请刷新后继续')
+    expect(autoSave).toContain('草稿版本已变化，请重新加载后继续')
     expect(page).toContain('valuePropName="checked" label={label}')
     expect(page).not.toContain("if (field.type === 'checkbox') return null")
     expect(page).not.toContain('localStorage.setItem')
@@ -80,5 +97,32 @@ describe('director and operator My Students', () => {
     expect(page).toContain('const positioningShareUrl = (sharePath: string)')
     expect(page).toContain("url.protocol !== 'http:' && url.protocol !== 'https:'")
     expect(page).not.toContain('`${window.location.origin}${result.sharePath}`')
+  })
+
+  it('separates the effective positioning from the latest review round', () => {
+    expect(api).toContain('latestRound: boolean; effective: boolean; current: boolean')
+    expect(page).toContain('item.effective')
+    expect(page).toContain('item.latestRound && !item.effective')
+    expect(page).toContain('当前生效定位')
+    expect(page).toContain('当前审核轮次')
+    expect(page).toContain('历史提交')
+    expect(page).toContain("accountEffective?.availableActions.includes('START_POSITIONING_REVISION')")
+    expect(page).toContain('api.positioningCard.startRevision(row.id, row.version)')
+    expect(api).toContain('`/zsjos/positioning-card/${id}/start-revision`')
+    expect(api).not.toContain('/confirm-trial')
+    expect(api).not.toContain('positioning-card/${id}/archive')
+    expect(page).not.toContain('试运行结束日期')
+    expect(page).not.toContain('确认试跑')
+  })
+
+  it('imports only server-projected submitted positioning snapshots', () => {
+    expect(api).toContain("http.get('/zsjos/positioning-card/import-sources'")
+    expect(api).toContain("http.post('/zsjos/positioning-card/import'")
+    expect(api).toContain('unwrap<PositioningCardImportSource[]>')
+    expect(page).toContain('导入现有定位卡')
+    expect(page).toContain('暂无可导入的已提交定位卡')
+    expect(page).toContain('覆盖当前定位卡草稿？')
+    expect(page).toContain('targetDraftId: currentDraft?.id')
+    expect(page).toContain('result.skippedFieldKeys.length')
   })
 })

@@ -29,7 +29,7 @@ GET /public-api/zsjos/media-screen/stats?tenantId=1&includePartTimers=0
 | 参数 | 必填 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenantId` | 是 | Long | 无 | 服务端白名单中配置的租户 ID |
-| `includePartTimers` | 否 | Integer | `0` | `0` 不返回分部计时榜内容，`1` 返回；其他值为 400 |
+| `includePartTimers` | 否 | Integer | `0` | 仅允许 `0` 或 `1`；本期只回显，兼职陪跑字段固定为 `null` |
 
 示例响应：
 
@@ -39,36 +39,37 @@ GET /public-api/zsjos/media-screen/stats?tenantId=1&includePartTimers=0
   "msg": "",
   "data": {
     "tenantId": 1,
-    "generatedAt": 1787630400000,
-    "totalLeads": 128,
-    "departmentRanking": [
-      { "name": "示例部门", "leadCount": 52, "rank": 1 }
-    ],
-    "memberRanking": [
-      { "name": "示例成员", "leadCount": 21, "rank": 1 }
-    ],
-    "todayStar": { "name": "示例成员", "leadCount": 21, "rank": 1 },
-    "partTimer": { "enabled": false, "items": [] },
-    "trend": [
-      { "date": "2026-08-25", "leadCount": 18 }
-    ],
-    "historySnapshot": null,
-    "available": true,
-    "snapshotDate": null,
-    "source": null,
-    "snapshotCreatedAt": null
+    "updatedAt": 1787630400000,
+    "refreshIntervalSeconds": 5,
+    "partTimeIncluded": false,
+    "summary": { "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 },
+    "departments": [{
+      "name": "新媒体一部",
+      "subtitle": "主管 示例主管",
+      "metrics": { "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 },
+      "members": [{ "name": "示例成员", "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 }]
+    }],
+    "partTimeCompanionDepartment": null,
+    "todayStar": { "name": "示例成员", "deptName": "新媒体一部", "today": 18, "yesterday": 12, "rankToday": 1, "rankYesterday": 2 },
+    "yesterdayChampion": { "name": "昨日成员", "deptName": "新媒体二部", "count": 16 },
+    "trend": { "today": [0, 2, 5], "yesterday": [1, 3, 4], "stepMinutes": 10 },
+    "series": { "submitted": [8, 11, 18], "valid": [3, 4, 6] }
   }
 }
 ```
 
-当前统计口径：
+当前主统计口径：
 
-- `totalLeads`：当前租户全部未逻辑删除 Lead 数量。
-- `departmentRanking`：按 Lead 的来源部门分组，无法解析的部门显示“未分配”。
-- `memberRanking`：按非空 Lead 负责人分组，无法解析的用户显示“未知成员”。
-- `todayStar`：当前成员榜第一项；没有成员数据时为 `null`。
-- `partTimer.items`：`includePartTimers=1` 时当前与成员榜一致，否则为空数组。
-- `trend`：最近 7 个自然日按 `submitted_at` 聚合；没有数据的日期当前不会自动补零。
+- 只返回 `yudao.media-screen.new-media.department-ids` 明确配置的部门，顺序与配置一致。
+- `internal_new_media` 按 `source_user_id` 归属贡献人、按 Lead 的 `source_dept_id` 快照归属部门。
+- 已登记新媒体提供方的 `sales_self_sourced` 按 `source_provider_user_id` 归属贡献人、按该提供方当前 System 部门归属部门。
+- 只展示当前启用的 System 用户；`partner` 来源不会进入普通成员榜。
+- `monthEffective` 使用 Lead 状态 `valid`、`converted`、`won`。
+- `summary` 是部门合计，部门 `metrics` 是成员合计；配置部门和在职成员无数据时仍返回零值对象。
+- `trend.today/yesterday` 是北京时间零点起每 10 分钟累计序列；`series` 是近 14 个自然日提交量和有效量。
+- 本期无权威兼职陪跑关系，`partTimeCompanionDepartment=null`；`includePartTimers` 只校验并回显，不改变统计结果。
+
+新客户端使用嵌套结构。旧平铺字段仅为兼容投影，不再定义主业务口径。
 
 ## 4. 历史统计
 
@@ -82,7 +83,7 @@ GET /public-api/zsjos/media-screen/history?tenantId=1&date=2026-08-24&includePar
 | `date` | 否 | `yyyy-MM-dd` | 当天 | 不得晚于当天，不得超过配置的最大历史天数 |
 | `includePartTimers` | 否 | Integer | `0` | 仅允许 `0` 或 `1` |
 
-当前版本尚未建立持久化历史快照源，因此接口会明确返回 `available=false`，不会用当前数据伪造历史数据：
+V141 建立持久化历史快照源。指定日期无快照时返回 `available=false`，不会用当前数据伪造历史数据：
 
 ```json
 {
@@ -107,7 +108,9 @@ GET /public-api/zsjos/media-screen/history?tenantId=1&date=2026-08-24&includePar
 }
 ```
 
-前端应显示“该日期暂无历史快照”，不能把全零结果当成真实历史统计。
+有快照时返回 `available=true`，结构与实时接口的 `summary` 和 `departments` 对齐。`today` 为目标日冻结值，
+`week` 从该周周一累计至目标日，`monthTotal/monthEffective` 从月初累计至目标日；这些值全部从每日冻结表逐日求和。
+前端应在 `available=false` 时显示“该日期暂无历史快照”。
 
 ## 5. 维护状态
 
@@ -203,6 +206,7 @@ export async function getMediaScreenStats(tenantId: number) {
 - 聚合服务：`yudao-module-zsjos/.../service/mediascreen/MediaScreenQueryService.java`
 - 访问过滤器和配置：`yudao-module-zsjos/.../framework/mediascreen/`
 - Lead 统计 SQL：`yudao-module-zsjos/.../dal/mysql/lead/LeadMapper.java`
+- 历史快照：`yudao-module-zsjos/.../dal/mysql/mediascreen/` 和 `service/mediascreen/MediaScreenSnapshotScheduler.java`
 - 运行配置：`yudao-server/src/main/resources/application.yaml`
 
-新增字段时必须同步 VO、本文档和前端类型。改变统计口径时必须说明旧、新口径及缓存影响；历史接口只有在存在权威持久化快照后才能返回 `available=true`。
+新增字段时必须同步 VO、本文档和前端类型。改变统计口径时必须说明旧、新口径及缓存影响；历史接口只有目标日期存在权威冻结快照时才能返回 `available=true`。

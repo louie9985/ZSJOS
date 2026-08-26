@@ -205,8 +205,7 @@ const handleSelectionChange = (array: NotifyMessageApi.NotifyMessageVO[]) => {
   selectedIds.value = array?.map((row) => row.id) ?? []
 }
 
-onMounted(async () => {
-  await getList()
+const openRouteMessage = async () => {
   const messageId = Number(route.query.messageId)
   if (Number.isFinite(messageId) && messageId > 0) {
     try {
@@ -216,5 +215,17 @@ onMounted(async () => {
       message.warning('消息不存在或当前账号无权查看')
     }
   }
+}
+
+watch(
+  () => route.query.messageId,
+  () => {
+    void openRouteMessage()
+  }
+)
+
+onMounted(async () => {
+  await getList()
+  await openRouteMessage()
 })
 </script>

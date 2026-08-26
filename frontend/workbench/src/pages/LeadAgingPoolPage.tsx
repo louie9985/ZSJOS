@@ -1,28 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
-  Avatar,
   Button,
-  Card,
   Empty,
   Form,
   Input,
-  List,
   Modal,
-  Pagination,
   Select,
+  Skeleton,
   Space,
-  Spin,
   Tag,
   Typography,
   message,
 } from "antd";
-import {
-  FileAddOutlined,
-  PlusOutlined,
-  UserSwitchOutlined,
-} from "@ant-design/icons";
-import DetailFieldGrid from "../components/DetailFieldGrid";
+import { UserSwitchOutlined } from "@ant-design/icons";
 import {
   api,
   type LeadAgingPoolItem,
@@ -31,10 +22,11 @@ import {
   type AdvancedFilterGroup,
   type ManagedLead,
 } from "../services/api";
-import LeadFollowUpPanel from "../components/LeadFollowUpPanel";
-import SalesOrderEntryModal from "../components/SalesOrderEntryModal";
+import LeadDetail from "../components/LeadDetail";
+import { NameAvatar } from "../components/LeadDetailOverview";
 import { formatTimestamp } from "../services/time";
 import { AdvancedFilterToolbar, filterCount } from "../components/AdvancedFilter";
+import { isLeadInboxUnauthorized } from "../services/leadManagement";
 
 const statusLabel: Record<LeadAgingPoolStatus, string> = {
   waiting_assignment: "待指派",
@@ -56,8 +48,7 @@ export default function LeadAgingPoolPage() {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<LeadAgingPoolItem>();
   const [detail, setDetail] = useState<ManagedLead>();
-  const [followOpen, setFollowOpen] = useState(false);
-  const [orderOpen, setOrderOpen] = useState(false);
+  const [detailError, setDetailError] = useState("");
   const [assignOpen, setAssignOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -69,7 +60,6 @@ export default function LeadAgingPoolPage() {
   const [exitReason, setExitReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [pageNo, setPageNo] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const selectedCycleRef = useRef<number | undefined>(undefined);
   const listRequestRef = useRef(0);
   const detailRequestRef = useRef(0);
@@ -87,6 +77,7 @@ export default function LeadAgingPoolPage() {
   const loadDetail = useCallback(async (item?: LeadAgingPoolItem) => {
     const requestId = ++detailRequestRef.current;
     setDetail(undefined);
+    setDetailError("");
     if (!item) return;
     try {
       const nextDetail = await api.managedLead(item.leadId);
@@ -94,27 +85,23 @@ export default function LeadAgingPoolPage() {
     } catch (detailError) {
       if (requestId === detailRequestRef.current) {
         setDetail(undefined);
-        message.error(
-          detailError instanceof Error
-            ? detailError.message
-            : "客资详情加载失败",
-        );
+        setDetailError(detailError instanceof Error ? detailError.message : "客资详情加载失败");
       }
     }
   }, []);
 
   const load = useCallback(
-    async (overrides?: { keyword?: string; pageNo?: number }) => {
+    async (overrides?: { keyword?: string; pageNo?: number; append?: boolean }) => {
       const requestId = ++listRequestRef.current;
       const nextKeyword = overrides?.keyword ?? keyword;
-      const nextPageNo = overrides?.pageNo ?? pageNo;
+      const nextPageNo = overrides?.pageNo ?? 1;
       setLoading(true);
       setError("");
       try {
         const [page, nextCounts, nextProfile] = await Promise.all([
           api.agingPoolPage({
             pageNo: nextPageNo,
-            pageSize,
+            pageSize: 20,
             keyword: nextKeyword || undefined,
             inboxGroup: agingPoolGroup?.key || "all",
             inboxStage: inboxStage || "all",
@@ -124,16 +111,19 @@ export default function LeadAgingPoolPage() {
           api.agingPoolFilterProfile(),
         ]);
         if (requestId !== listRequestRef.current) return;
-        setItems(page.list || []);
+        setItems(current => overrides?.append
+          ? [...current, ...(page.list || []).filter(row => !current.some(item => item.cycleId === row.cycleId))]
+          : page.list || []);
         setTotal(page.total || 0);
+        setPageNo(nextPageNo);
         setCounts(nextCounts);
         setFilterProfile(nextProfile);
-        const nextSelected =
-          page.list.find((item) => item.cycleId === selectedCycleRef.current) ||
-          page.list[0];
-        setSelected(nextSelected);
-        selectedCycleRef.current = nextSelected?.cycleId;
-        await loadDetail(nextSelected);
+        if (!overrides?.append) {
+          const nextSelected = page.list.find((item) => item.cycleId === selectedCycleRef.current) || page.list[0];
+          setSelected(nextSelected);
+          selectedCycleRef.current = nextSelected?.cycleId;
+          await loadDetail(nextSelected);
+        }
       } catch (loadError) {
         if (requestId === listRequestRef.current) {
           setError(
@@ -144,7 +134,7 @@ export default function LeadAgingPoolPage() {
         if (requestId === listRequestRef.current) setLoading(false);
       }
     },
-    [advancedFilter, agingPoolGroup?.key, inboxStage, keyword, loadDetail, pageNo, pageSize],
+    [advancedFilter, agingPoolGroup?.key, inboxStage, keyword, loadDetail],
   );
 
   useEffect(() => {
@@ -258,174 +248,52 @@ export default function LeadAgingPoolPage() {
       </div>
       {error && (
         <Alert
-          type="error"
+          type={isLeadInboxUnauthorized(error) ? "warning" : "error"}
           showIcon
-          message={error}
-          action={
+          message={isLeadInboxUnauthorized(error) ? "无权查看公海池" : "公海池加载失败"}
+          description={error}
+          action={!isLeadInboxUnauthorized(error) ? (
             <Button size="small" onClick={() => void load()}>
               重试
             </Button>
-          }
+          ) : undefined}
         />
       )}
-      <div className="aging-pool-layout">
-        <Card className="aging-pool-list" styles={{ body: { padding: 0 } }}>
-          <Spin spinning={loading}>
-            <List
-              dataSource={items}
-              locale={{ emptyText: <Empty description="暂无公海商机" /> }}
-              renderItem={(item) => (
-                <List.Item
-                  className={
-                    selected?.cycleId === item.cycleId
-                      ? "aging-pool-item active"
-                      : "aging-pool-item"
-                  }
-                  onClick={() => void selectItem(item)}
-                >
-                  <List.Item.Meta
-                    avatar={<Avatar>{item.submittedName.slice(0, 1)}</Avatar>}
-                    title={
-                      <Space>
-                        <strong>{item.submittedName}</strong>
-                        <Tag>{statusLabel[item.status]}</Tag>
-                      </Space>
-                    }
-                    description={
-                      <>
-                        <div>
-                          {item.submittedMobile || "无手机号"} ·{" "}
-                          {item.submittedWechatId || "无微信号"}
-                        </div>
-                        <div>
-                          A：
-                          {item.originalOwnerUserName ||
-                            `#${item.originalOwnerUserId}`}{" "}
-                          · B：{item.collaboratorUserName || "待指派"}
-                        </div>
-                        <div>到期：{formatTimestamp(item.dueAt)}</div>
-                      </>
-                    }
-                  />
-                </List.Item>
-              )}
-            />
-          </Spin>
-          <div className="aging-pool-pagination">
-            <Pagination
-              size="small"
-              current={pageNo}
-              pageSize={pageSize}
-              total={total}
-              showSizeChanger
-              showTotal={(value) => `共 ${value} 条`}
-              onChange={(nextPage, nextSize) => {
-                setPageNo(nextSize === pageSize ? nextPage : 1);
-                setPageSize(nextSize);
-              }}
-            />
+      <div className="lead-inbox-layout">
+        <aside className="lead-inbox-list-pane">
+          <div className="lead-inbox-toolbar"><Typography.Text type="secondary">共 {total} 条</Typography.Text></div>
+          <div className="lead-inbox-scroll">
+            {loading && items.length === 0 ? <Skeleton active paragraph={{ rows: 8 }} /> : items.length === 0
+              ? <Empty description="暂无公海商机" />
+              : items.map(item => <button type="button" key={item.cycleId}
+                  className={`lead-inbox-item${selected?.cycleId === item.cycleId ? " active" : ""}`}
+                  onClick={() => void selectItem(item)}>
+                  <div className="lead-inbox-item-main"><NameAvatar name={item.submittedName} size={36}/>
+                    <div className="lead-inbox-item-copy"><div className="lead-inbox-item-title"><strong>{item.submittedName}</strong><Tag>{statusLabel[item.status]}</Tag></div>
+                      <span>{item.leadNo}</span><span>{item.submittedMobile || "无手机号"} · {item.submittedWechatId || "无微信号"}</span>
+                      <span>A：{item.originalOwnerUserName || `#${item.originalOwnerUserId}`} · B：{item.collaboratorUserName || "待指派"}</span>
+                      <span>进入 {formatTimestamp(item.enteredAt)} · 到期 {formatTimestamp(item.dueAt)}</span>
+                    </div>
+                  </div>
+                </button>)}
+            {items.length < total && <div className="aging-pool-load-more"><Button loading={loading} onClick={() => void load({ pageNo: pageNo + 1, append: true })}>加载更多</Button></div>}
           </div>
-        </Card>
-        <Card className="aging-pool-detail">
-          {!selected || !detail ? (
-            <Empty description="选择一条客资查看详情" />
-          ) : (
-            <>
-              <div className="aging-pool-detail-heading">
-                <div>
-                  <Typography.Title level={4}>
-                    {detail.submittedName}
-                  </Typography.Title>
-                  <Typography.Text type="secondary">
-                    {detail.leadNo} ·{" "}
-                    {selected.frozenDeptName ||
-                      `部门 #${selected.frozenDeptId}`}
-                  </Typography.Text>
-                </div>
-                <Space wrap>
-                  {selected.availableActions.includes("ASSIGN") && (
-                    <Button
-                      icon={<UserSwitchOutlined />}
-                      onClick={() => void openAssign()}
-                    >
-                      {selected.collaboratorUserId ? "换派B" : "指派B"}
-                    </Button>
-                  )}
-                  {selected.availableActions.includes("EXIT") && (
-                    <Button danger onClick={() => setExitOpen(true)}>
-                      退出公海
-                    </Button>
-                  )}
-                  {selected.availableActions.includes("REQUEST_TRANSFER") && (
-                    <Button icon={<UserSwitchOutlined />} onClick={() => setTransferOpen(true)}>
-                      申请转给我
-                    </Button>
-                  )}
-                  {detail.availableActions?.some(
-                    (action) => action.code === "ADD_FOLLOW_UP",
-                  ) && (
-                    <Button
-                      type="primary"
-                      icon={<PlusOutlined />}
-                      onClick={() => setFollowOpen(true)}
-                    >
-                      跟进
-                    </Button>
-                  )}
-                  {detail.availableActions?.some((action) =>
-                    ["ENTER_DEAL", "REVISE_DEAL"].includes(
-                      action.code,
-                    ),
-                  ) && (
-                    <Button
-                      icon={<FileAddOutlined />}
-                      onClick={() => setOrderOpen(true)}
-                    >
-                      {selected.activeSalesOrderStatus ===
-                            "revision_required"
-                          ? "补正成交"
-                          : "录入成交"}
-                    </Button>
-                  )}
-                </Space>
-              </div>
-              <section className="aging-pool-summary-card">
-                <DetailFieldGrid items={[
-                  { key: "mobile", label: "手机号", value: detail.submittedMobile },
-                  { key: "wechat", label: "微信号", value: detail.submittedWechatId },
-                  { key: "owner", label: "原归属销售A", value: selected.originalOwnerUserName },
-                  { key: "collaborator", label: "协同销售B", value: selected.collaboratorUserName || "待指派" },
-                  { key: "ownershipStartedAt", label: "持有起点", value: formatTimestamp(selected.ownershipStartedAt) },
-                  { key: "enteredAt", label: "进入公海", value: formatTimestamp(selected.enteredAt) },
-                  { key: "lastFollowUpAt", label: "最近跟进", value: formatTimestamp(selected.lastFollowUpAt) },
-                  { key: "nextFollowUpAt", label: "下次跟进", value: formatTimestamp(selected.nextFollowUpAt) },
-                  { key: "remark", label: "备注", value: detail.remark, span: 2 },
-                ]}/>
-              </section>
-              <LeadFollowUpPanel
-                lead={detail}
-                open={followOpen}
-                onClose={() => setFollowOpen(false)}
-                onDirtyChange={() => undefined}
-                onChanged={() => void load()}
-              />
-              <SalesOrderEntryModal
-                open={orderOpen}
-                lead={detail}
-                orderId={
-                  selected.activeSalesOrderStatus === "revision_required"
-                    ? selected.activeSalesOrderId
-                    : undefined
-                }
-                onClose={() => setOrderOpen(false)}
-                onSubmitted={() => {
-                  setOrderOpen(false);
-                  void load();
-                }}
-              />
-            </>
-          )}
-        </Card>
+        </aside>
+        <main className="lead-inbox-detail-pane">
+          {detailError ? <Alert type={isLeadInboxUnauthorized(detailError) ? "warning" : "error"} showIcon
+              message={isLeadInboxUnauthorized(detailError) ? "无权查看该客资" : "客资详情加载失败"}
+              description={detailError}
+              action={!isLeadInboxUnauthorized(detailError) ? <Button size="small" onClick={() => void loadDetail(selected)}>重试</Button> : undefined}/>
+            : !selected ? <Empty description="选择一条客资查看详情" />
+            : !detail ? <Skeleton active paragraph={{ rows: 10 }} />
+            : <><div className="aging-pool-business-bar"><div><Typography.Text strong>公海协作</Typography.Text><Typography.Text type="secondary">A：{selected.originalOwnerUserName || `#${selected.originalOwnerUserId}`} · B：{selected.collaboratorUserName || "待指派"} · 到期 {formatTimestamp(selected.dueAt)}</Typography.Text></div><Space wrap>
+                {selected.availableActions.includes("ASSIGN") && <Button icon={<UserSwitchOutlined/>} onClick={() => void openAssign()}>{selected.collaboratorUserId ? "换派B" : "指派B"}</Button>}
+                {selected.availableActions.includes("EXIT") && <Button danger onClick={() => setExitOpen(true)}>退出公海</Button>}
+                {selected.availableActions.includes("REQUEST_TRANSFER") && <Button icon={<UserSwitchOutlined/>} onClick={() => setTransferOpen(true)}>申请转给我</Button>}
+              </Space></div>
+              <LeadDetail lead={detail} categories={[]} categoryLabel={value => value || "未记录"} channelLabel={value => value || "未记录"}
+                mode="owner" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void load()}/></>}
+        </main>
       </div>
       <Modal
         title={selected?.collaboratorUserId ? "更换协同销售B" : "指派协同销售B"}

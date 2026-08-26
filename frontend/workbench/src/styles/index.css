@@ -10,6 +10,7 @@
 @import './pages/claim-pool.css';
 @import './pages/aging-pool.css';
 @import './pages/subordinate-sales.css';
+@import './pages/subordinate-partner.css';
 @import './pages/today-tasks.css';
 @import './pages/work-plan.css';
 @import './pages/message-inbox.css';
@@ -19,6 +20,7 @@
 @import './pages/management.css';
 @import './pages/registration.css';
 @import './pages/media-students.css';
+@import './pages/media-calendar.css';
 @import './pages/media-feature.css';
 @import './components/lead-detail.css';
 @import './components/lead-detail-v2.css';

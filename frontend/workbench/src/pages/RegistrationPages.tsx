@@ -194,7 +194,7 @@ export function RegistrationPoolPage() {
 
   useEffect(() => {
     void load(1, routeState?.registrationCaseId);
-  }, [advancedFilter, keyword]);
+  }, [advancedFilter, keyword, location.key, routeState?.registrationCaseId]);
   useEffect(() => {
     const refresh = (event: Event) => {
       const caseId = Number(
