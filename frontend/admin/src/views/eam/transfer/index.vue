@@ -56,8 +56,8 @@
       </el-table-column>
       <el-table-column label="资产编号" prop="assetCode" min-width="140" />
       <el-table-column label="资产名称" prop="assetName" min-width="160" show-overflow-tooltip />
-      <el-table-column label="转出人" prop="fromUserName" min-width="100" />
-      <el-table-column label="接收人" prop="toUserName" min-width="100" />
+      <el-table-column label="转出员工" prop="fromEmployeeName" min-width="100" />
+      <el-table-column label="接收员工" prop="toEmployeeName" min-width="100" />
       <el-table-column label="状态" min-width="90" align="center">
         <template #default="{ row }">
           <dict-tag :type="'eam_transfer_status'" :value="row.status" />

@@ -7,6 +7,8 @@ import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
 import cn.iocoder.yudao.module.eam.dal.mysql.category.EamCategoryMapper;
 import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
+import cn.iocoder.yudao.module.eam.enums.category.EamCustodyModeEnum;
+import cn.iocoder.yudao.module.eam.enums.category.EamDeliveryModeEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
@@ -41,6 +43,7 @@ public class EamCategoryServiceImpl implements EamCategoryService {
         // 3. 插入
         EamCategoryDO category = BeanUtils.toBean(reqVO, EamCategoryDO.class);
         normalizeManagement(category);
+        validateCategoryPolicy(category);
         categoryMapper.insert(category);
         return category.getId();
     }
@@ -57,6 +60,7 @@ public class EamCategoryServiceImpl implements EamCategoryService {
         // 4. 更新
         EamCategoryDO updateObj = BeanUtils.toBean(reqVO, EamCategoryDO.class);
         normalizeManagement(updateObj);
+        validateCategoryPolicy(updateObj);
         categoryMapper.updateById(updateObj);
     }
 
@@ -112,6 +116,20 @@ public class EamCategoryServiceImpl implements EamCategoryService {
         return chain;
     }
 
+    @Override
+    public EamCategoryPolicy getEffectivePolicy(Long categoryId) {
+        Integer deliveryMode = null;
+        Integer custodyMode = null;
+        for (EamCategoryDO category : getAncestorChain(categoryId)) {
+            deliveryMode = deliveryMode == null ? category.getDeliveryMode() : deliveryMode;
+            custodyMode = custodyMode == null ? category.getCustodyMode() : custodyMode;
+        }
+        if (deliveryMode == null || custodyMode == null) {
+            throw exception(CATEGORY_POLICY_UNCONFIRMED);
+        }
+        return new EamCategoryPolicy(deliveryMode, custodyMode);
+    }
+
     private void validateParentCategory(Long parentId, Long selfId) {
         if (parentId == null || parentId == 0L) {
             return; // 根分类
@@ -152,6 +170,21 @@ public class EamCategoryServiceImpl implements EamCategoryService {
         }
         if (StrUtil.isBlank(category.getUnit())) {
             category.setUnit("个");
+        }
+    }
+
+    private void validateCategoryPolicy(EamCategoryDO category) {
+        boolean root = category.getParentId() == null || category.getParentId() == 0L;
+        if (root && (category.getDeliveryMode() == null || category.getCustodyMode() == null)) {
+            throw exception(CATEGORY_POLICY_REQUIRED);
+        }
+        if (category.getDeliveryMode() != null
+                && !Arrays.asList(EamDeliveryModeEnum.ARRAYS).contains(category.getDeliveryMode())) {
+            throw exception(CATEGORY_POLICY_INVALID);
+        }
+        if (category.getCustodyMode() != null
+                && !Arrays.asList(EamCustodyModeEnum.ARRAYS).contains(category.getCustodyMode())) {
+            throw exception(CATEGORY_POLICY_INVALID);
         }
     }
 

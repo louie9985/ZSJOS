@@ -22,6 +22,8 @@
 @import './pages/media-students.css';
 @import './pages/media-calendar.css';
 @import './pages/media-feature.css';
+@import './pages/eam-assets.css';
+@import './pages/feedback.css';
 @import './components/lead-detail.css';
 @import './components/lead-detail-v2.css';
 @import './components/detail-field-grid.css';

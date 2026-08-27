@@ -48,7 +48,7 @@ public class EamTransferDO extends BaseDO {
     /**
      * 转出使用人
      */
-    private Long fromUserId;
+    private Long fromEmployeeId;
     /**
      * 转出部门
      */
@@ -56,7 +56,7 @@ public class EamTransferDO extends BaseDO {
     /**
      * 接收使用人
      */
-    private Long toUserId;
+    private Long toEmployeeId;
     /**
      * 接收部门
      */

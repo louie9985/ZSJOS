@@ -25,10 +25,10 @@ public class EamInventoryDetailRespVO {
     private String assetCode;
 
     @Schema(description = "账面使用人编号", example = "1")
-    private Long expectUserId;
+    private Long expectEmployeeId;
 
     @Schema(description = "账面使用人名称", example = "张三")
-    private String expectUserName;
+    private String expectEmployeeName;
 
     @Schema(description = "账面使用部门编号", example = "100")
     private Long expectDeptId;
@@ -37,7 +37,7 @@ public class EamInventoryDetailRespVO {
     private String expectLocation;
 
     @Schema(description = "实盘使用人编号", example = "2")
-    private Long actualUserId;
+    private Long actualEmployeeId;
 
     @Schema(description = "实盘使用部门编号", example = "101")
     private Long actualDeptId;

@@ -72,7 +72,7 @@ public class EamInventoryServiceImpl implements EamInventoryService {
                 .map(asset -> EamInventoryDetailDO.builder()
                         .inventoryId(inventory.getId())
                         .assetId(asset.getId())
-                        .expectUserId(asset.getUseUserId())
+                        .expectEmployeeId(asset.getUseEmployeeId())
                         .expectDeptId(asset.getUseDeptId())
                         .expectLocation(asset.getLocation())
                         .result(EamInventoryResultEnum.UNCHECKED.getResult())
@@ -97,7 +97,7 @@ public class EamInventoryServiceImpl implements EamInventoryService {
         detailMapper.updateById(EamInventoryDetailDO.builder()
                 .id(reqVO.getDetailId())
                 .result(reqVO.getResult())
-                .actualUserId(reqVO.getActualUserId())
+                .actualEmployeeId(reqVO.getActualEmployeeId())
                 .actualDeptId(reqVO.getActualDeptId())
                 .actualLocation(reqVO.getActualLocation())
                 .remark(reqVO.getRemark())
@@ -154,7 +154,7 @@ public class EamInventoryServiceImpl implements EamInventoryService {
         }
         // 只同步归属，状态不因盘点而改变
         assetService.applyChange(detail.getAssetId(), null,
-                detail.getActualUserId(), detail.getActualDeptId(),
+                detail.getActualEmployeeId(), detail.getActualDeptId(),
                 EamChangeTypeEnum.INVENTORY.getType(), detail.getInventoryId(),
                 StrUtil.format("盘点同步归属，存放地点 {}",
                         StrUtil.blankToDefault(detail.getActualLocation(), "未填写")));

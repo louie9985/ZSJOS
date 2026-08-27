@@ -97,7 +97,7 @@
         </template>
       </el-table-column>
       <el-table-column label="品牌型号" prop="brand" min-width="130" show-overflow-tooltip />
-      <el-table-column label="使用人" prop="useUserName" min-width="100" />
+      <el-table-column label="使用员工" prop="useEmployeeName" min-width="100" />
       <el-table-column label="使用部门" prop="useDeptName" min-width="120" />
       <el-table-column label="存放地点" prop="location" min-width="140" show-overflow-tooltip />
       <el-table-column
@@ -186,7 +186,7 @@ const queryParams = reactive({
   categoryId: undefined,
   status: undefined,
   useDeptId: undefined,
-  useUserId: undefined,
+  useEmployeeId: undefined,
   extFieldKey: undefined,
   extFieldValue: undefined,
 })

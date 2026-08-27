@@ -42,6 +42,8 @@ import { MyStudentsPage, RegistrationChecklistConfigPage, RegistrationPoolPage, 
 import { ProductionTicketsPage } from '../pages/MediaFeaturePage'
 import MediaStudentsPage from '../pages/MediaStudentsPage'
 import MediaCalendarPage from '../pages/MediaCalendarPage'
+import EamAssetPage from '../pages/EamAssetPage'
+import FeedbackPage from '../pages/FeedbackPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -103,6 +105,9 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage/>
+  if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
+  if (menu?.path === APP_ROUTES.ASSET_DEMANDS) return <EamAssetPage permissions={permissions} view="demands"/>
+  if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_CONFIG) return <StudentContactConfigPage/>
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>

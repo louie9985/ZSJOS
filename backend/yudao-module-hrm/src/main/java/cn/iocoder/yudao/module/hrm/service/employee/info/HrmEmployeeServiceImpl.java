@@ -36,6 +36,7 @@ import cn.iocoder.yudao.module.hrm.controller.admin.employee.vo.employee.HrmEmpl
 import cn.iocoder.yudao.module.hrm.controller.admin.portal.employee.vo.employee.HrmPortalEmployeeUpdateReqVO;
 import cn.iocoder.yudao.module.hrm.controller.admin.employee.vo.quitinfo.HrmEmployeeQuitInfoSaveReqVO;
 import cn.iocoder.yudao.module.hrm.controller.admin.employee.vo.salarycard.HrmEmployeeSalaryCardSaveReqVO;
+import cn.iocoder.yudao.module.hrm.api.employee.event.HrmEmployeeLifecycleEventType;
 import cn.iocoder.yudao.module.hrm.controller.admin.insurance.vo.employeeinfo.HrmInsuranceEmployeeInfoSaveReqVO;
 import cn.iocoder.yudao.module.hrm.dal.dataobject.employee.employment.HrmEmployeeChangeRecordDO;
 import cn.iocoder.yudao.module.hrm.dal.dataobject.employee.info.HrmEmployeeDO;
@@ -58,6 +59,7 @@ import cn.iocoder.yudao.module.hrm.service.insurance.employee.HrmInsuranceEmploy
 import cn.iocoder.yudao.module.hrm.service.insurance.config.HrmInsuranceSchemeService;
 import cn.iocoder.yudao.module.hrm.service.recruit.candidate.HrmRecruitCandidateService;
 import cn.iocoder.yudao.module.hrm.service.recruit.config.HrmRecruitChannelService;
+import cn.iocoder.yudao.module.hrm.service.employee.api.HrmEmployeeLifecycleEventPublisher;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.notify.NotifyMessageSendApi;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendSingleToUserReqDTO;
@@ -196,6 +198,8 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
     private HrmRecruitCandidateService recruitCandidateService;
     @Resource
     private TransactionTemplate transactionTemplate;
+    @Resource
+    private HrmEmployeeLifecycleEventPublisher lifecycleEventPublisher;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -223,6 +227,9 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
             recruitCandidateService.confirmRecruitCandidateEntry(
                     employee.getCandidateId(), updateObj.getEntryTime());
         }
+
+        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.ENTRY_CONFIRMED,
+                employee.getId(), employee, employee.getId());
 
         // 4. 记录操作日志上下文
         LogRecordContext.putVariable("employee", employee);
@@ -258,7 +265,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         LocalDateTime companyAgeStartTime = defaultIfNull(
                 reqVO.getCompanyAgeStartTime(), reqVO.getEntryTime());
         // 2.2 保存再入职异动记录
-        createEmployeeChangeRecord(BeanUtils.toBean(
+        HrmEmployeeChangeRecordDO rehireRecord = createEmployeeChangeRecord(BeanUtils.toBean(
                 reqVO, HrmEmployeeChangeRecordCreateReqVO.class)
                 .setNewDeptId(reqVO.getDeptId()).setNewPostName(reqVO.getPostName())
                 .setNewPostLevel(reqVO.getPostLevel()).setNewWorkAddress(reqVO.getWorkAddress())
@@ -281,6 +288,9 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
                 .setWorkCity(reqVO.getWorkCity()).setWorkAddress(reqVO.getWorkAddress())
                 .setWorkDetailAddress(reqVO.getWorkDetailAddress()).setLeaveTime(null);
         employeeMapper.updateForEntryById(updateObj);
+
+        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.REHIRED,
+                rehireRecord.getId(), employee, employee.getId());
 
         // 4. 记录操作日志上下文
         LogRecordContext.putVariable("employee", employee);
@@ -334,9 +344,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
 
         // 3. 立即应用已生效的调岗
         if (beforeOrEqualNow(changeRecord.getEffectTime())) {
-            employeeMapper.updatePositionById(changeRecord.getEmployeeId(), changeRecord.getNewDeptId(),
-                    changeRecord.getNewPostName(), changeRecord.getNewPostLevel(),
-                    changeRecord.getNewWorkAddress(), changeRecord.getNewLeaderEmployeeId());
+            applyEmployeeChange(changeRecord);
         }
 
         // 4. 记录操作日志上下文
@@ -360,9 +368,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
 
         // 3. 立即应用已生效的晋升
         if (beforeOrEqualNow(changeRecord.getEffectTime())) {
-            employeeMapper.updatePositionById(changeRecord.getEmployeeId(), changeRecord.getNewDeptId(),
-                    changeRecord.getNewPostName(), changeRecord.getNewPostLevel(),
-                    changeRecord.getNewWorkAddress(), changeRecord.getNewLeaderEmployeeId());
+            applyEmployeeChange(changeRecord);
         }
 
         // 4. 记录操作日志上下文
@@ -386,9 +392,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
 
         // 3. 立即应用已生效的降级
         if (beforeOrEqualNow(changeRecord.getEffectTime())) {
-            employeeMapper.updatePositionById(changeRecord.getEmployeeId(), changeRecord.getNewDeptId(),
-                    changeRecord.getNewPostName(), changeRecord.getNewPostLevel(),
-                    changeRecord.getNewWorkAddress(), changeRecord.getNewLeaderEmployeeId());
+            applyEmployeeChange(changeRecord);
         }
 
         // 4. 记录操作日志上下文
@@ -484,6 +488,8 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
 
         // 4. 标记异动记录已实际生效
         employeeChangeRecordService.updateEmployeeChangeRecordAppliedTime(changeRecord.getId(), LocalDateTime.now());
+        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.CHANGE_EFFECTIVE,
+                changeRecord.getId(), employee, employee.getId());
         return true;
     }
 
@@ -505,6 +511,8 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         // 2. 将员工状态更新为正式
         employeeMapper.updateById(new HrmEmployeeDO().setId(employeeId)
                 .setStatus(HrmEmployeeStatusEnum.REGULAR.getStatus()));
+        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.CHANGE_EFFECTIVE,
+                employeeId, employee, employeeId);
         return true;
     }
 
@@ -526,6 +534,8 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.LEFT.getStatus())
                 .setLeaveTime(quitInfo.getPlanQuitTime())
                 .setCompanyAge(getYearsBetween(companyAgeStartDate, quitInfo.getPlanQuitTime().toLocalDate())));
+        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.LEFT,
+                quitInfo.getId(), employee, employee.getId());
         return true;
     }
 
@@ -554,7 +564,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
                 .setApplyQuitTime(getDayBeginTime(reqVO.getApplyQuitTime()))
                 .setSalarySettlementTime(getDayBeginTime(reqVO.getSalarySettlementTime()))
                 .setOldEmployeeStatus(employee.getStatus());
-        employeeQuitInfoService.saveEmployeeQuitInfo(quitInfo);
+        Long quitInfoId = employeeQuitInfoService.saveEmployeeQuitInfo(quitInfo);
 
         // 3. 更新员工离职状态
         boolean effectiveImmediately = beforeOrEqualNow(reqVO.getPlanQuitTime());
@@ -568,6 +578,10 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         }
         employeeMapper.updateById(new HrmEmployeeDO().setId(reqVO.getEmployeeId())
                 .setEntryStatus(entryStatus).setLeaveTime(reqVO.getPlanQuitTime()).setCompanyAge(companyAge));
+
+        lifecycleEventPublisher.publish(effectiveImmediately
+                        ? HrmEmployeeLifecycleEventType.LEFT : HrmEmployeeLifecycleEventType.QUIT_PLANNED,
+                quitInfoId, employee, employee.getId());
 
         // 4. 记录操作日志上下文
         LogRecordContext.putVariable("employee", employee);
@@ -583,7 +597,7 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         if (ObjUtil.notEqual(HrmEmployeeEntryStatusEnum.PENDING_LEAVE.getStatus(), employee.getEntryStatus())) {
             throw exception(EMPLOYEE_QUIT_CANCEL_STATUS_INVALID);
         }
-        employeeQuitInfoService.validateQuitInfoByEmployeeId(reqVO.getEmployeeId());
+        HrmEmployeeQuitInfoDO quitInfo = employeeQuitInfoService.validateQuitInfoByEmployeeId(reqVO.getEmployeeId());
 
         // 2. 删除离职信息
         employeeQuitInfoService.deleteEmployeeQuitInfo(reqVO.getEmployeeId());
@@ -592,6 +606,9 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         employeeMapper.updateById(new HrmEmployeeDO().setId(reqVO.getEmployeeId())
                 .setEntryStatus(HrmEmployeeEntryStatusEnum.ACTIVE.getStatus()));
         employeeMapper.updateLeaveTimeById(reqVO.getEmployeeId(), null);
+
+        lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.QUIT_CANCELLED,
+                quitInfo.getId(), employee, employee.getId());
 
         // 4. 记录操作日志上下文
         LogRecordContext.putVariable("employee", employee);
@@ -609,6 +626,11 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         // 2. 插入员工档案
         HrmEmployeeDO employee = buildEmployee(createReqVO);
         employeeMapper.insert(employee);
+
+        if (employee.getUserId() != null) {
+            lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.ACCOUNT_BOUND,
+                    employee.getId(), null, employee.getId());
+        }
 
         // 3. 事务提交后发送员工端开通通知
         sendEmployeeOpenedMessage(Collections.singletonList(employee));
@@ -660,6 +682,10 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         // 2. 批量插入员工档案
         List<HrmEmployeeDO> employees = convertList(saveReqVOList, this::buildEmployee);
         employeeMapper.insertBatch(employees);
+
+        employees.stream().filter(employee -> employee.getUserId() != null)
+                .forEach(employee -> lifecycleEventPublisher.publish(
+                        HrmEmployeeLifecycleEventType.ACCOUNT_BOUND, employee.getId(), null, employee.getId()));
 
         // 3. 事务提交后发送员工端开通通知，并按员工档案分别记录操作日志
         sendEmployeeOpenedMessage(employees);
@@ -719,6 +745,11 @@ public class HrmEmployeeServiceImpl implements HrmEmployeeService {
         // 2. 更新员工档案
         HrmEmployeeDO updateObj = buildEmployeeForUpdate(updateReqVO, employee);
         employeeMapper.updateById(updateObj);
+
+        if (employee.getUserId() == null && updateObj.getUserId() != null) {
+            lifecycleEventPublisher.publish(HrmEmployeeLifecycleEventType.ACCOUNT_BOUND,
+                    employee.getId(), employee, employee.getId());
+        }
 
         // 3. 记录操作日志上下文
         LogRecordContext.putVariable(DiffParseFunction.OLD_OBJECT,

@@ -170,9 +170,12 @@ describe('workbench menu conversion', () => {
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
     // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(45)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(48)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/calendar/overview')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/my-assets')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/asset-demands')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/feedback')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/accounts')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/content')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/positioning')

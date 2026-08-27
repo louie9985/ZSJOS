@@ -1,0 +1,354 @@
+package cn.iocoder.yudao.module.zsjos.service.feedback;
+
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
+import cn.iocoder.yudao.module.bpm.api.definition.BpmDefinitionReadApi;
+import cn.iocoder.yudao.module.bpm.api.definition.dto.BpmProcessDefinitionMetadataRespDTO;
+import cn.iocoder.yudao.module.bpm.api.task.BpmProcessInstanceApi;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmProcessInstanceCreateReqDTO;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
+import cn.iocoder.yudao.module.system.api.notify.NotifyBusinessEventApi;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.permission.RoleApi;
+import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackActionVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.feedback.vo.FeedbackCreateReqVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackConfigDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackReplyDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackRoundDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackSurveyDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderHistoryDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackConfigMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackNoDailyCounterMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackReplyMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackRoundMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackSurveyMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderHistoryMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderMapper;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
+
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_CHAIRMAN_INVALID;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_CONFIG_VERSION_CONFLICT;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_SURVEY_ALREADY_REQUESTED;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class FeedbackServiceImplTest {
+
+    @Mock private FeedbackMapper feedbackMapper;
+    @Mock private FeedbackRoundMapper roundMapper;
+    @Mock private FeedbackReplyMapper replyMapper;
+    @Mock private FeedbackSurveyMapper surveyMapper;
+    @Mock private FeedbackConfigMapper configMapper;
+    @Mock private FeedbackNoDailyCounterMapper counterMapper;
+    @Mock private WorkOrderMapper workOrderMapper;
+    @Mock private WorkOrderHistoryMapper historyMapper;
+    @Mock private FeedbackDynamicFormService dynamicFormService;
+    @Mock private BpmDefinitionReadApi definitionReadApi;
+    @Mock private BpmProcessInstanceApi processInstanceApi;
+    @Mock private AdminUserApi adminUserApi;
+    @Mock private DeptApi deptApi;
+    @Mock private RoleApi roleApi;
+    @Mock private PermissionApi permissionApi;
+    @Mock private FileApi fileApi;
+    @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
+    @InjectMocks private FeedbackServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        TenantContextHolder.setTenantId(1L);
+    }
+
+    @AfterEach
+    void tearDown() {
+        TenantContextHolder.clear();
+    }
+
+    @Test
+    void supportCreatePersistsBusinessNumberAndDictionarySnapshot() {
+        FeedbackConfigDO config = config(FeedbackConstants.TYPE_SUPPORT, false);
+        stubOpenConfig(config);
+        FeedbackDynamicFormService.ParsedForm form = parsedForm();
+        when(dynamicFormService.requireCompatibleForm(1L, FeedbackConstants.TYPE_SUPPORT, "title"))
+                .thenReturn(form);
+        when(dynamicFormService.normalizeValues(eq(form), any(), eq(11L))).thenReturn(
+                new FeedbackDynamicFormService.NormalizedValues(Map.of(
+                        "title", "无法访问内网",
+                        "supportType", Map.of("type", "zsjos_feedback_support_type",
+                                "value", "network_communication", "label", "网络与通信")), List.of()));
+        when(adminUserApi.getUser(11L)).thenReturn(user(11L, "提交人"));
+        when(counterMapper.selectReservedValue()).thenReturn(7L);
+        doAnswer(invocation -> {
+            ((WorkOrderDO) invocation.getArgument(0)).setId(100L);
+            return 1;
+        }).when(workOrderMapper).insert(any(WorkOrderDO.class));
+        doAnswer(invocation -> {
+            ((FeedbackDO) invocation.getArgument(0)).setId(200L);
+            return 1;
+        }).when(feedbackMapper).insert(any(FeedbackDO.class));
+
+        Long id = service.create(FeedbackConstants.TYPE_SUPPORT, createRequest(0), 11L);
+
+        assertEquals(200L, id);
+        ArgumentCaptor<FeedbackDO> feedback = ArgumentCaptor.forClass(FeedbackDO.class);
+        verify(feedbackMapper).insert(feedback.capture());
+        assertTrue(feedback.getValue().getFeedbackNo().matches("SUP-\\d{8}-0007"));
+        assertEquals("network_communication", feedback.getValue().getSupportTypeValue());
+        assertEquals("网络与通信", feedback.getValue().getSupportTypeLabelSnapshot());
+        assertEquals(FeedbackConstants.STATUS_WAITING, feedback.getValue().getStatus());
+        verify(workOrderMapper).insert(any(WorkOrderDO.class));
+    }
+
+    @Test
+    void createRejectsStaleConfigurationBeforeReadingForm() {
+        when(configMapper.selectByType(FeedbackConstants.TYPE_BUG))
+                .thenReturn(config(FeedbackConstants.TYPE_BUG, false));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.create(FeedbackConstants.TYPE_BUG, createRequest(9), 11L));
+
+        assertEquals(FEEDBACK_CONFIG_VERSION_CONFLICT.getCode(), error.getCode());
+        verify(dynamicFormService, never()).requireCompatibleForm(anyLong(), any(), any());
+    }
+
+    @Test
+    void assigningWaitingFeedbackMovesItToInProgress() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_WAITING);
+        when(feedbackMapper.selectByIdForUpdate(200L)).thenReturn(row);
+        when(permissionApi.getEnabledUserIdsByPermission(FeedbackConstants.PERMISSION_BUG_MANAGE))
+                .thenReturn(Set.of(21L));
+        when(adminUserApi.getUser(21L)).thenReturn(user(21L, "处理人"));
+        when(feedbackMapper.updateById(row)).thenReturn(1);
+        when(workOrderMapper.selectById(100L)).thenReturn(workOrder());
+        FeedbackActionVO.AssignReq request = new FeedbackActionVO.AssignReq();
+        request.setVersion(0);
+        request.setIdempotencyKey("assign-1");
+        request.setAssigneeUserId(21L);
+
+        service.assign(200L, request, 31L);
+
+        assertEquals(FeedbackConstants.STATUS_IN_PROGRESS, row.getStatus());
+        assertEquals(21L, row.getAssigneeUserId());
+        verify(historyMapper).insert(any(WorkOrderHistoryDO.class));
+    }
+
+    @Test
+    void employeeCanReplyAfterCompletionAndNotifiesCurrentAssignee() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_COMPLETED);
+        row.setAssigneeUserId(21L);
+        when(feedbackMapper.selectByIdForUpdate(200L)).thenReturn(row);
+        when(adminUserApi.getUser(11L)).thenReturn(user(11L, "提交人"));
+        when(feedbackMapper.updateById(row)).thenReturn(1);
+        when(workOrderMapper.selectById(100L)).thenReturn(workOrder());
+        stubOpenConfig(config(FeedbackConstants.TYPE_BUG, false));
+        FeedbackActionVO.ReplyReq request = new FeedbackActionVO.ReplyReq();
+        request.setVersion(0);
+        request.setIdempotencyKey("reply-1");
+        request.setContent("补充一张复现截图");
+        request.setAttachmentIds(List.of());
+
+        service.replyOwn(200L, request, 11L);
+
+        assertTrue(row.getUnreadForAssignee());
+        verify(replyMapper).insert(any(FeedbackReplyDO.class));
+        ArgumentCaptor<NotifyBusinessEvent> event = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(notifyBusinessEventApi).publish(event.capture());
+        assertEquals(21L, event.getValue().getPayload().get("assigneeUserId"));
+    }
+
+    @Test
+    void completedFeedbackCanRequestSurveyOnlyOnce() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_COMPLETED);
+        when(feedbackMapper.selectByIdForUpdate(200L)).thenReturn(row);
+        when(surveyMapper.selectByFeedbackId(200L)).thenReturn(new FeedbackSurveyDO());
+        FeedbackActionVO.VersionedCommand request = new FeedbackActionVO.VersionedCommand();
+        request.setVersion(0);
+        request.setIdempotencyKey("survey-1");
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.requestSurvey(200L, request, 31L));
+
+        assertEquals(FEEDBACK_SURVEY_ALREADY_REQUESTED.getCode(), error.getCode());
+        verify(surveyMapper, never()).insert(any(FeedbackSurveyDO.class));
+    }
+
+    @Test
+    void requirementWithoutDepartmentLeaderStartsDirectlyWithChairman() {
+        FeedbackConfigDO config = config(FeedbackConstants.TYPE_REQUIREMENT, true);
+        stubOpenConfig(config);
+        stubRequirementForm(config);
+        AdminUserRespDTO submitter = user(11L, "提交人");
+        submitter.setDeptId(5L);
+        when(adminUserApi.getUser(11L)).thenReturn(submitter);
+        when(deptApi.getDept(5L)).thenReturn(new DeptRespDTO());
+        stubChairmen(List.of(user(30L, "董事长")));
+        when(processInstanceApi.createProcessInstance(eq(11L), any())).thenReturn("pi-1");
+        when(counterMapper.selectReservedValue()).thenReturn(1L);
+        AtomicReference<FeedbackDO> inserted = stubInsertedRows();
+        when(feedbackMapper.selectById(200L)).thenAnswer(invocation -> inserted.get());
+        when(feedbackMapper.updateById(any(FeedbackDO.class))).thenReturn(1);
+        when(roundMapper.insert(any(FeedbackRoundDO.class))).thenReturn(1);
+        when(roundMapper.updateById(any(FeedbackRoundDO.class))).thenReturn(1);
+
+        service.create(FeedbackConstants.TYPE_REQUIREMENT, createRequest(0), 11L);
+
+        ArgumentCaptor<BpmProcessInstanceCreateReqDTO> process =
+                ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
+        verify(processInstanceApi).createProcessInstance(eq(11L), process.capture());
+        assertEquals("feedback:100:round:1", process.getValue().getBusinessKey());
+        assertFalse((Boolean) process.getValue().getVariables().get("hasDepartmentLeader"));
+        assertEquals(List.of(), process.getValue().getStartUserSelectAssignees()
+                .get(FeedbackConstants.TASK_DEPARTMENT_LEADER));
+        assertEquals(List.of(30L), process.getValue().getStartUserSelectAssignees()
+                .get(FeedbackConstants.TASK_CHAIRMAN));
+    }
+
+    @Test
+    void requirementSubmissionRejectsAmbiguousChairmanConfiguration() {
+        FeedbackConfigDO config = config(FeedbackConstants.TYPE_REQUIREMENT, true);
+        stubOpenConfig(config);
+        stubRequirementForm(config);
+        when(adminUserApi.getUser(11L)).thenReturn(user(11L, "提交人"));
+        stubChairmen(List.of(user(30L, "董事长甲"), user(31L, "董事长乙")));
+        when(counterMapper.selectReservedValue()).thenReturn(1L);
+        stubInsertedRows();
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.create(FeedbackConstants.TYPE_REQUIREMENT, createRequest(0), 11L));
+
+        assertEquals(FEEDBACK_CHAIRMAN_INVALID.getCode(), error.getCode());
+        verify(processInstanceApi, never()).createProcessInstance(anyLong(), any());
+    }
+
+    private void stubRequirementForm(FeedbackConfigDO config) {
+        FeedbackDynamicFormService.ParsedForm form = parsedForm();
+        when(dynamicFormService.requireCompatibleForm(1L, FeedbackConstants.TYPE_REQUIREMENT, "title"))
+                .thenReturn(form);
+        when(dynamicFormService.normalizeValues(eq(form), any(), eq(11L))).thenReturn(
+                new FeedbackDynamicFormService.NormalizedValues(Map.of("title", "建设新系统"), List.of()));
+        BpmProcessDefinitionMetadataRespDTO definition = new BpmProcessDefinitionMetadataRespDTO();
+        definition.setId("definition-1");
+        definition.setKey(FeedbackConstants.PROCESS_DEFINITION_KEY);
+        definition.setVersion(1);
+        definition.setSuspended(false);
+        when(definitionReadApi.getPublishedProcessDefinition(config.getBpmProcessDefinitionKey()))
+                .thenReturn(definition);
+    }
+
+    private void stubChairmen(List<AdminUserRespDTO> users) {
+        RoleRespDTO role = new RoleRespDTO();
+        role.setId(9L);
+        role.setCode(FeedbackConstants.ROLE_CHAIRMAN);
+        role.setStatus(0);
+        when(roleApi.getRoleByCode(FeedbackConstants.ROLE_CHAIRMAN)).thenReturn(role);
+        Set<Long> ids = users.stream().map(AdminUserRespDTO::getId).collect(java.util.stream.Collectors.toSet());
+        when(permissionApi.getUserRoleIdListByRoleIds(Set.of(9L))).thenReturn(ids);
+        when(adminUserApi.getUserList(ids)).thenReturn(users);
+    }
+
+    private AtomicReference<FeedbackDO> stubInsertedRows() {
+        AtomicReference<FeedbackDO> inserted = new AtomicReference<>();
+        doAnswer(invocation -> {
+            ((WorkOrderDO) invocation.getArgument(0)).setId(100L);
+            return 1;
+        }).when(workOrderMapper).insert(any(WorkOrderDO.class));
+        doAnswer(invocation -> {
+            FeedbackDO row = invocation.getArgument(0);
+            row.setId(200L);
+            inserted.set(row);
+            return 1;
+        }).when(feedbackMapper).insert(any(FeedbackDO.class));
+        return inserted;
+    }
+
+    private void stubOpenConfig(FeedbackConfigDO config) {
+        when(configMapper.selectByType(config.getFeedbackType())).thenReturn(config);
+        when(permissionApi.getEnabledUserIdsByPermission(
+                FeedbackConstants.TYPE_PERMISSION.get(config.getFeedbackType()))).thenReturn(Set.of(21L));
+    }
+
+    private FeedbackDynamicFormService.ParsedForm parsedForm() {
+        return new FeedbackDynamicFormService.ParsedForm(1L, "反馈表单", List.of(), List.of(),
+                List.of("title"), List.of());
+    }
+
+    private FeedbackConfigDO config(String type, boolean approvalEnabled) {
+        FeedbackConfigDO config = new FeedbackConfigDO();
+        config.setId(1L);
+        config.setFeedbackType(type);
+        config.setFormId(1L);
+        config.setTitleFieldKey("title");
+        config.setDispatcherUserIdsJson("[21]");
+        config.setApprovalEnabled(approvalEnabled);
+        config.setBpmProcessDefinitionKey(approvalEnabled ? FeedbackConstants.PROCESS_DEFINITION_KEY : null);
+        config.setVersion(0);
+        return config;
+    }
+
+    private FeedbackCreateReqVO createRequest(int configVersion) {
+        FeedbackCreateReqVO request = new FeedbackCreateReqVO();
+        request.setValues(Map.of("title", "测试反馈"));
+        request.setConfigVersion(configVersion);
+        request.setIdempotencyKey("create-1");
+        return request;
+    }
+
+    private FeedbackDO feedback(String type, String status) {
+        FeedbackDO row = new FeedbackDO();
+        row.setId(200L);
+        row.setWorkOrderId(100L);
+        row.setFeedbackType(type);
+        row.setFeedbackNo("BUG-20260826-0001");
+        row.setTitle("测试反馈");
+        row.setStatus(status);
+        row.setSubmitterUserId(11L);
+        row.setVersion(0);
+        return row;
+    }
+
+    private WorkOrderDO workOrder() {
+        WorkOrderDO row = new WorkOrderDO();
+        row.setId(100L);
+        row.setBusinessType(FeedbackConstants.BUSINESS_TYPE_FEEDBACK);
+        row.setVersion(0);
+        return row;
+    }
+
+    private AdminUserRespDTO user(Long id, String name) {
+        AdminUserRespDTO user = new AdminUserRespDTO();
+        user.setId(id);
+        user.setNickname(name);
+        user.setStatus(0);
+        return user;
+    }
+}

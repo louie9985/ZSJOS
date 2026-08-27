@@ -17,6 +17,9 @@ public interface ErrorCodeConstants {
     ErrorCode CATEGORY_PARENT_ERROR = new ErrorCode(1_070_001_004, "不能设置自己或子分类为父分类");
     ErrorCode CATEGORY_IMPORT_FILE_INVALID = new ErrorCode(1_070_001_005, "分类配置文件无效：{}");
     ErrorCode CATEGORY_IMPORT_CONFLICT = new ErrorCode(1_070_001_006, "分类配置存在 {} 个冲突，请先修正模板");
+    ErrorCode CATEGORY_POLICY_REQUIRED = new ErrorCode(1_070_001_007, "根分类必须确认交付模式和持有模式");
+    ErrorCode CATEGORY_POLICY_INVALID = new ErrorCode(1_070_001_008, "分类交付模式或持有模式不合法");
+    ErrorCode CATEGORY_POLICY_UNCONFIRMED = new ErrorCode(1_070_001_009, "分类及其父分类尚未确认交付模式和持有模式");
 
     // ========== 分类字段 1-070-002-000 ==========
     ErrorCode FIELD_NOT_EXISTS = new ErrorCode(1_070_002_000, "自定义字段不存在");
@@ -55,5 +58,27 @@ public interface ErrorCodeConstants {
     // ========== 编号规则 1-070-008-000 ==========
     ErrorCode CODE_RULE_NOT_EXISTS = new ErrorCode(1_070_008_000, "资产编号规则不存在");
     ErrorCode CODE_RULE_GENERATE_FAIL = new ErrorCode(1_070_008_001, "资产编号生成失败");
+
+    // ========== 办公采购 1-070-009-000 ==========
+    ErrorCode DEMAND_NOT_EXISTS = new ErrorCode(1_070_009_000, "资产需求不存在");
+    ErrorCode DEMAND_STATUS_INVALID = new ErrorCode(1_070_009_001, "资产需求当前状态不允许该操作");
+    ErrorCode DEMAND_ITEM_NOT_EXISTS = new ErrorCode(1_070_009_002, "资产需求明细不存在");
+    ErrorCode PURCHASE_NOT_EXISTS = new ErrorCode(1_070_009_003, "办公采购单不存在");
+    ErrorCode PURCHASE_STATUS_INVALID = new ErrorCode(1_070_009_004, "办公采购单当前状态不允许该操作");
+    ErrorCode PURCHASE_ITEM_NOT_EXISTS = new ErrorCode(1_070_009_005, "办公采购明细不存在");
+    ErrorCode PURCHASE_QUANTITY_INVALID = new ErrorCode(1_070_009_006, "采购、入库或退货数量超出可处理数量");
+    ErrorCode STOCK_NOT_EXISTS = new ErrorCode(1_070_009_007, "库存品项不存在");
+    ErrorCode STOCK_INSUFFICIENT = new ErrorCode(1_070_009_008, "可用库存不足，请刷新后重新确认");
+    ErrorCode STOCK_CANDIDATE_INVALID = new ErrorCode(1_070_009_009, "库存候选与需求分类或属性不匹配");
+    ErrorCode HOLDING_NOT_EXISTS = new ErrorCode(1_070_009_010, "员工资产持有记录不存在");
+    ErrorCode HOLDING_STATUS_INVALID = new ErrorCode(1_070_009_011, "员工资产当前状态不允许该操作");
+    ErrorCode RETURN_RESULT_INVALID = new ErrorCode(1_070_009_012, "资产退还验收结果不合法");
+    ErrorCode EMPLOYEE_ASSET_TASK_NOT_EXISTS = new ErrorCode(1_070_009_013, "员工资产任务不存在");
+    ErrorCode EMPLOYEE_NOT_BOUND = new ErrorCode(1_070_009_014, "员工尚未绑定系统账号，无法创建资产需求");
+    ErrorCode EMPLOYEE_NOT_EXISTS = new ErrorCode(1_070_009_019, "HRM 员工不存在");
+    ErrorCode PURCHASE_PAYMENT_MODE_INVALID = new ErrorCode(1_070_009_015, "付款方式未配置或已停用");
+    ErrorCode PURCHASE_SERIAL_NUMBER_INVALID = new ErrorCode(1_070_009_016, "单件资产入库或退货必须填写与数量一致且不重复的序列号");
+    ErrorCode EMPLOYEE_ASSET_TASK_STATUS_INVALID = new ErrorCode(1_070_009_017, "员工资产任务当前状态不允许该操作");
+    ErrorCode PURCHASE_RETURN_SOURCE_INVALID = new ErrorCode(1_070_009_018, "退货物品不属于该采购入库批次、已退货或当前不可退");
 
 }

@@ -105,6 +105,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         List<Long> attachments = validateAttachments(attachmentIds, userId);
 
         WorkOrderDO row = new WorkOrderDO();
+        row.setBusinessType("GENERIC");
         row.setOrderNo("WO" + System.currentTimeMillis() + UUID.randomUUID().toString().substring(0, 4));
         row.setSceneCode(scene.getCode());
         row.setSceneNameSnapshot(scene.getName());

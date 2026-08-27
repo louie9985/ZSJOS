@@ -9,8 +9,8 @@ import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
 import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
-import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
-import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -43,7 +43,7 @@ class EamAssetLedgerImportServiceImplTest {
     @Mock
     private EamAssetImportRowMapper importRowMapper;
     @Mock
-    private AdminUserApi adminUserApi;
+    private HrmEmployeeApi employeeApi;
     @Mock
     private EamCategoryFieldService categoryFieldService;
     @Mock
@@ -63,7 +63,7 @@ class EamAssetLedgerImportServiceImplTest {
         existingAsset.setAssetCode("ZSJ-100");
         when(assetMapper.selectListByAssetCodes(anyList())).thenReturn(List.of(existingAsset));
         when(categoryService.getCategoryList()).thenReturn(categories());
-        when(adminUserApi.getUserListByStatus(0)).thenReturn(List.of(user(1L, "张三", 10L)));
+        when(employeeApi.getEmployeeList()).thenReturn(List.of(employee(1L, "张三", 10L)));
         when(categoryFieldService.validateAndNormalizeExtFieldsWithSnapshots(any(), any()))
                 .thenReturn(new EamCategoryFieldService.NormalizedExtFields(Map.of(), Map.of(), Map.of()));
         EamAssetImportPreviewRespVO defaultPreview = importService.preview(
@@ -77,7 +77,7 @@ class EamAssetLedgerImportServiceImplTest {
         assertEquals("张三", defaultPreview.getRows().get(0).getMatchedUserName());
         assertEquals("SKIP_EXISTING", defaultPreview.getRows().get(1).getAction());
         assertTrue(defaultPreview.getRows().get(1).getWarnings().stream()
-                .anyMatch(message -> message.contains("未匹配系统用户")));
+                .anyMatch(message -> message.contains("未匹配 HRM 员工")));
         assertEquals(1, updatePreview.getUpdateCount());
         assertEquals("UPDATE", updatePreview.getRows().get(1).getAction());
     }
@@ -96,12 +96,12 @@ class EamAssetLedgerImportServiceImplTest {
         return List.of(root, leaf);
     }
 
-    private static AdminUserRespDTO user(Long id, String nickname, Long deptId) {
-        AdminUserRespDTO user = new AdminUserRespDTO();
-        user.setId(id);
-        user.setNickname(nickname);
-        user.setDeptId(deptId);
-        return user;
+    private static HrmEmployeeRespDTO employee(Long id, String name, Long deptId) {
+        HrmEmployeeRespDTO employee = new HrmEmployeeRespDTO();
+        employee.setId(id);
+        employee.setName(name);
+        employee.setDeptId(deptId);
+        return employee;
     }
 
 }

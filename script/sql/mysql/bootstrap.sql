@@ -17,6 +17,7 @@ SOURCE script/sql/mysql/00-bootstrap-schema.sql;
 SOURCE script/sql/mysql/01-bootstrap-system-seed.sql;
 SOURCE script/sql/mysql/02-bootstrap-zsjos-seed.sql;
 SOURCE script/sql/mysql/03-bootstrap-dictionary-types.sql;
+SOURCE script/sql/mysql/04-bootstrap-zsjos-feedback-dictionary.sql;
 SOURCE script/sql/mysql/migrations/V031__timed_business_notifications.sql;
 SOURCE script/sql/mysql/migrations/V032__normalize_lead_inbox_filter_keys.sql;
 SOURCE script/sql/mysql/migrations/V034__lead_aging_collaboration_pool.sql;
@@ -121,6 +122,8 @@ SOURCE script/sql/mysql/migrations/V143__subordinate_partner_ownership.sql;
 SOURCE script/sql/mysql/migrations/V144__remove_new_media_student_operations.sql;
 SOURCE script/sql/mysql/migrations/V145__production_ticket_dispatch_pool.sql;
 SOURCE script/sql/mysql/migrations/V146__media_account_maintenance_calendar.sql;
+SOURCE script/sql/mysql/migrations/V147__workbench_navigation_layout.sql;
+SOURCE script/sql/mysql/migrations/V149__feedback_management.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

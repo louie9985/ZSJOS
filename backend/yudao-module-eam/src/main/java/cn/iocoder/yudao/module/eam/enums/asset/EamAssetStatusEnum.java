@@ -23,7 +23,8 @@ public enum EamAssetStatusEnum implements ArrayValuable<Integer> {
     PENDING_SCRAP(4, "待报废"),
     SCRAPPED(5, "已报废"),
     LOST(6, "已丢失"),
-    FROZEN(7, "已冻结");
+    FROZEN(7, "已冻结"),
+    RETURNED_TO_SUPPLIER(8, "已退供应商");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(EamAssetStatusEnum::getStatus).toArray(Integer[]::new);
@@ -93,6 +94,6 @@ public enum EamAssetStatusEnum implements ArrayValuable<Integer> {
     /**
      * 终态集合（不允许进一步操作）
      */
-    public static final Set<Integer> TERMINAL_STATUSES = Set.of(SCRAPPED.status);
+    public static final Set<Integer> TERMINAL_STATUSES = Set.of(SCRAPPED.status, RETURNED_TO_SUPPLIER.status);
 
 }

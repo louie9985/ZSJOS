@@ -64,4 +64,6 @@ public interface EamCategoryService {
      */
     List<EamCategoryDO> getAncestorChain(Long categoryId);
 
+    EamCategoryPolicy getEffectivePolicy(Long categoryId);
+
 }

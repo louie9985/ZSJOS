@@ -29,19 +29,19 @@ public class EamTransferRespVO {
     private String assetCode;
 
     @Schema(description = "转出使用人编号", example = "1")
-    private Long fromUserId;
+    private Long fromEmployeeId;
 
     @Schema(description = "转出使用人名称", example = "张三")
-    private String fromUserName;
+    private String fromEmployeeName;
 
     @Schema(description = "转出部门编号", example = "100")
     private Long fromDeptId;
 
     @Schema(description = "接收使用人编号", example = "2")
-    private Long toUserId;
+    private Long toEmployeeId;
 
     @Schema(description = "接收使用人名称", example = "李四")
-    private String toUserName;
+    private String toEmployeeName;
 
     @Schema(description = "接收部门编号", example = "101")
     private Long toDeptId;

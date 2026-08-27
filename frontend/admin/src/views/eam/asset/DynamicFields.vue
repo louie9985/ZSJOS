@@ -1,7 +1,11 @@
 <template>
   <!-- 按分类的自定义字段定义动态渲染表单项；字段定义随分类切换而重新加载 -->
   <template v-for="field in fields" :key="field.fieldKey">
-    <el-form-item :label="field.fieldName" :prop="`extFields.${field.fieldKey}`">
+    <el-form-item
+      :label="field.fieldName"
+      :prop="`extFields.${field.fieldKey}`"
+      :rules="fieldRules(field)"
+    >
       <el-input
         v-if="field.fieldType === FieldType.TEXT"
         v-model="model[field.fieldKey]"
@@ -37,7 +41,12 @@
         clearable
         :placeholder="`请选择${field.fieldName}`"
       >
-        <el-option v-for="opt in selectOptions(field)" :key="String(opt.value)" :label="opt.label" :value="opt.value" />
+        <el-option
+          v-for="opt in selectOptions(field)"
+          :key="String(opt.value)"
+          :label="opt.label"
+          :value="opt.value"
+        />
       </el-select>
       <UploadFile
         v-else-if="field.fieldType === FieldType.FILE"
@@ -69,6 +78,8 @@ const props = defineProps<{
   categoryId?: number
   /** 扩展字段值对象，双向绑定 */
   modelValue: Record<string, any>
+  /** collection 用于需求/入库采集，admin 用于资产管理表单。 */
+  context?: 'admin' | 'collection'
 }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: Record<string, any>): void }>()
 
@@ -84,7 +95,14 @@ const selectOptions = (field: CategoryFieldApi.CategoryFieldVO) =>
   field.optionSource === 'SYSTEM_DICT' && field.dictType
     ? getStrDictOptions(field.dictType)
     : (field.options || []).map((value) => ({ label: value, value }))
-const setFile = (key: string, value: string) => emit('update:modelValue', { ...model.value, [key]: value || undefined })
+const fieldRules = (field: CategoryFieldApi.CategoryFieldVO) => {
+  const required = props.context === 'collection' ? field.collectionRequired : field.required
+  return required
+    ? [{ required: true, message: `请填写${field.fieldName}`, trigger: 'change' }]
+    : []
+}
+const setFile = (key: string, value: string) =>
+  emit('update:modelValue', { ...model.value, [key]: value || undefined })
 
 /** 分类切换后，丢弃不再属于新分类的扩展字段值，避免提交时被后端拒绝 */
 const loadFields = async (categoryId?: number) => {
@@ -95,7 +113,11 @@ const loadFields = async (categoryId?: number) => {
   loading.value = true
   try {
     const definitions = await CategoryFieldApi.getEffectiveFieldList(categoryId)
-    fields.value = definitions.filter((field) => field.adminVisible !== false)
+    fields.value = definitions.filter((field) =>
+      props.context === 'collection'
+        ? field.collectionVisible !== false
+        : field.adminVisible !== false
+    )
     const allowed = new Set(fields.value.map((f) => f.fieldKey))
     const next: Record<string, any> = {}
     Object.entries(model.value).forEach(([key, value]) => {

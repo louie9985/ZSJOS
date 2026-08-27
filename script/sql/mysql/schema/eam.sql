@@ -1,11 +1,10 @@
 -- EAM (Enterprise Asset Management) desired schema.
 -- This file is the authoritative structure reference for the `eam` optional module.
--- Fresh installs are performed through migrations/eam/V001__eam_schema.sql; this file
--- documents the same structure for schema-drift comparison and review.
+-- Fresh installs are performed through migrations/eam/V001 through the latest migration;
+-- this file documents the resulting structure for schema-drift comparison and review.
 --
--- Ownership: EAM module. Depends on Core only for system_users / system_dept references,
--- which are held as plain identifiers, not foreign keys, matching the repository's
--- cross-module convention.
+-- Ownership: EAM module. Employee references are HRM employee IDs resolved through
+-- HrmEmployeeApi; operator/audit IDs remain plain System user IDs.
 
 CREATE TABLE IF NOT EXISTS `eam_category` (
   `id`          bigint       NOT NULL AUTO_INCREMENT COMMENT '分类编号',
@@ -15,6 +14,8 @@ CREATE TABLE IF NOT EXISTS `eam_category` (
   `sort`        int          NOT NULL DEFAULT 0       COMMENT '排序',
   `status`      tinyint      NOT NULL DEFAULT 0       COMMENT '状态：0 开启 1 关闭',
   `management_mode` tinyint  NOT NULL DEFAULT 1       COMMENT '管理模式：1 单件 2 批量',
+  `delivery_mode` tinyint             DEFAULT NULL    COMMENT '本级交付模式：1 实物入库 2 数字交付，NULL 继承父级',
+  `custody_mode` tinyint              DEFAULT NULL    COMMENT '本级持有模式：1 消耗型 2 需归还型，NULL 继承父级',
   `unit`        varchar(20)  NOT NULL DEFAULT '个'    COMMENT '默认计量单位',
   `remark`      varchar(500)          DEFAULT NULL    COMMENT '备注',
   `creator`     varchar(64)           DEFAULT ''      COMMENT '创建者',
@@ -61,7 +62,7 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   `management_mode` tinyint       NOT NULL DEFAULT 1       COMMENT '管理模式快照：1 单件 2 批量',
   `quantity`        int           NOT NULL DEFAULT 1       COMMENT '资产数量',
   `unit`            varchar(20)   NOT NULL DEFAULT '个'    COMMENT '计量单位快照',
-  `status`          tinyint       NOT NULL DEFAULT 0       COMMENT '资产状态：0 闲置 1 在用 2 借出 3 维修中 4 待报废 5 已报废 6 已丢失 7 已冻结',
+  `status`          tinyint       NOT NULL DEFAULT 0       COMMENT '资产状态：0 闲置 1 在用 2 借出 3 维修中 4 待报废 5 已报废 6 已丢失 7 已冻结 8 已退供应商',
   `previous_status` tinyint                DEFAULT NULL    COMMENT '进入可逆中间态前的状态，用于维修完成/报废驳回/解冻恢复',
   `brand`           varchar(100)           DEFAULT NULL    COMMENT '品牌型号',
   `specification`   varchar(255)           DEFAULT NULL    COMMENT '规格参数',
@@ -74,9 +75,9 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   `source_label_snapshot` varchar(100)      DEFAULT NULL    COMMENT '来源标签快照',
   `warranty_date`   date                   DEFAULT NULL    COMMENT '保修到期日',
   `use_dept_id`     bigint                 DEFAULT NULL    COMMENT '使用部门编号，引用 system_dept',
-  `use_user_id`     bigint                 DEFAULT NULL    COMMENT '使用人编号，引用 system_users',
-  `use_user_name_snapshot` varchar(100)       DEFAULT NULL    COMMENT '使用人姓名快照',
-  `supervisor_user_id` bigint                 DEFAULT NULL    COMMENT '直属上级用户编号',
+  `use_employee_id`     bigint                 DEFAULT NULL    COMMENT '使用员工编号，引用 HRM 员工档案',
+  `use_employee_name_snapshot` varchar(100)       DEFAULT NULL    COMMENT '使用员工姓名快照',
+  `supervisor_employee_id` bigint                 DEFAULT NULL    COMMENT '直属上级员工编号',
   `supervisor_name_snapshot` varchar(100)     DEFAULT NULL    COMMENT '直属上级姓名快照',
   `join_date`       date                      DEFAULT NULL    COMMENT '使用人入司日期',
   `commitment_accepted` bit(1)                DEFAULT NULL    COMMENT '使用人承诺是否确认',
@@ -98,7 +99,7 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   UNIQUE KEY `uk_eam_asset_code` (`tenant_id`, `asset_code`, `deleted`),
   KEY `idx_eam_asset_category` (`tenant_id`, `category_id`),
   KEY `idx_eam_asset_status` (`tenant_id`, `status`),
-  KEY `idx_eam_asset_use_user` (`tenant_id`, `use_user_id`),
+  KEY `idx_eam_asset_use_employee` (`tenant_id`, `use_employee_id`),
   KEY `idx_eam_asset_use_dept` (`tenant_id`, `use_dept_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = 'EAM 资产卡片';
 
@@ -135,7 +136,7 @@ CREATE TABLE IF NOT EXISTS `eam_asset_verification` (
 
 CREATE TABLE IF NOT EXISTS `eam_asset_handover` (
   `id` bigint NOT NULL AUTO_INCREMENT, `asset_id` bigint NOT NULL, `content` varchar(500) DEFAULT NULL,
-  `from_user_id` bigint DEFAULT NULL, `to_user_id` bigint DEFAULT NULL, `handover_time` datetime DEFAULT NULL,
+  `from_employee_id` bigint DEFAULT NULL, `to_employee_id` bigint DEFAULT NULL, `handover_time` datetime DEFAULT NULL,
   `remark` varchar(500) DEFAULT NULL, `import_batch_id` bigint DEFAULT NULL, `creator` varchar(64) DEFAULT '',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0',
@@ -148,8 +149,8 @@ CREATE TABLE IF NOT EXISTS `eam_asset_change_log` (
   `change_type`    tinyint      NOT NULL                 COMMENT '变更类型，见 EamChangeTypeEnum',
   `before_status`  tinyint               DEFAULT NULL    COMMENT '变更前状态',
   `after_status`   tinyint               DEFAULT NULL    COMMENT '变更后状态',
-  `before_user_id` bigint                DEFAULT NULL    COMMENT '变更前使用人',
-  `after_user_id`  bigint                DEFAULT NULL    COMMENT '变更后使用人',
+  `before_employee_id` bigint                DEFAULT NULL    COMMENT '变更前使用员工',
+  `after_employee_id`  bigint                DEFAULT NULL    COMMENT '变更后使用员工',
   `before_dept_id` bigint                DEFAULT NULL    COMMENT '变更前使用部门',
   `after_dept_id`  bigint                DEFAULT NULL    COMMENT '变更后使用部门',
   `biz_id`         bigint                DEFAULT NULL    COMMENT '关联单据编号',
@@ -171,9 +172,9 @@ CREATE TABLE IF NOT EXISTS `eam_transfer` (
   `no`                   varchar(64) NOT NULL                 COMMENT '单据业务编号',
   `type`                 tinyint     NOT NULL                 COMMENT '流转类型：1 领用 2 退还 3 借用 4 归还 5 调拨',
   `asset_id`             bigint      NOT NULL                 COMMENT '资产编号',
-  `from_user_id`         bigint               DEFAULT NULL    COMMENT '转出使用人',
+  `from_employee_id`         bigint               DEFAULT NULL    COMMENT '转出使用员工',
   `from_dept_id`         bigint               DEFAULT NULL    COMMENT '转出部门',
-  `to_user_id`           bigint               DEFAULT NULL    COMMENT '接收使用人',
+  `to_employee_id`           bigint               DEFAULT NULL    COMMENT '接收使用员工',
   `to_dept_id`           bigint               DEFAULT NULL    COMMENT '接收部门',
   `expected_return_date` date                 DEFAULT NULL    COMMENT '预计归还日期，仅借用',
   `actual_return_date`   date                 DEFAULT NULL    COMMENT '实际归还日期，仅归还',
@@ -222,10 +223,10 @@ CREATE TABLE IF NOT EXISTS `eam_inventory_detail` (
   `id`              bigint       NOT NULL AUTO_INCREMENT COMMENT '明细编号',
   `inventory_id`    bigint       NOT NULL                 COMMENT '盘点单编号',
   `asset_id`        bigint       NOT NULL                 COMMENT '资产编号',
-  `expect_user_id`  bigint                DEFAULT NULL    COMMENT '账面使用人',
+  `expect_employee_id`  bigint                DEFAULT NULL    COMMENT '账面使用员工',
   `expect_dept_id`  bigint                DEFAULT NULL    COMMENT '账面使用部门',
   `expect_location` varchar(255)          DEFAULT NULL    COMMENT '账面存放地点',
-  `actual_user_id`  bigint                DEFAULT NULL    COMMENT '实盘使用人',
+  `actual_employee_id`  bigint                DEFAULT NULL    COMMENT '实盘使用员工',
   `actual_dept_id`  bigint                DEFAULT NULL    COMMENT '实盘使用部门',
   `actual_location` varchar(255)          DEFAULT NULL    COMMENT '实盘存放地点',
   `result`          tinyint      NOT NULL DEFAULT 0       COMMENT '盘点结果：0 未盘 1 正常 2 位置不符 3 未找到',
@@ -303,3 +304,177 @@ CREATE TABLE IF NOT EXISTS `eam_code_rule` (
   PRIMARY KEY (`id`),
   KEY `idx_eam_code_rule_category` (`tenant_id`, `category_id`)
 ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COMMENT = 'EAM 资产编号规则';
+
+CREATE TABLE IF NOT EXISTS `eam_demand` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `no` varchar(64) NOT NULL, `employee_id` bigint NOT NULL,
+  `applicant_user_id` bigint NOT NULL, `applicant_dept_id` bigint DEFAULT NULL, `status` tinyint NOT NULL,
+  `process_instance_id` varchar(64) DEFAULT NULL, `reason` varchar(500) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_demand_no` (`tenant_id`,`no`,`deleted`),
+  KEY `idx_eam_demand_employee` (`tenant_id`,`employee_id`,`status`),
+  KEY `idx_eam_demand_applicant` (`tenant_id`,`applicant_user_id`,`create_time`), KEY `idx_eam_demand_process` (`process_instance_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 办公资产需求';
+
+CREATE TABLE IF NOT EXISTS `eam_demand_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `demand_id` bigint NOT NULL, `name` varchar(200) NOT NULL,
+  `category_id` bigint NOT NULL, `management_mode` tinyint NOT NULL, `delivery_mode` tinyint NOT NULL,
+  `delivery_mode_label_snapshot` varchar(50) NOT NULL, `custody_mode` tinyint NOT NULL,
+  `custody_mode_label_snapshot` varchar(50) NOT NULL, `quantity` int NOT NULL, `unit` varchar(20) NOT NULL,
+  `ext_fields` json DEFAULT NULL, `ext_field_labels` json DEFAULT NULL, `ext_field_dict_types` json DEFAULT NULL,
+  `reserved_quantity` int NOT NULL DEFAULT 0,
+  `purchased_quantity` int NOT NULL DEFAULT 0, `fulfilled_quantity` int NOT NULL DEFAULT 0, `closed_quantity` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_demand_item_demand` (`tenant_id`,`demand_id`), KEY `idx_eam_demand_item_category` (`tenant_id`,`category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 办公资产需求明细';
+
+CREATE TABLE IF NOT EXISTS `eam_purchase` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `no` varchar(64) NOT NULL, `status` tinyint NOT NULL,
+  `payment_mode` int NOT NULL, `payment_mode_label_snapshot` varchar(100) NOT NULL,
+  `supplier_name_snapshot` varchar(200) DEFAULT NULL, `supplier_contact_snapshot` varchar(200) DEFAULT NULL,
+  `estimated_amount` decimal(14,2) DEFAULT NULL, `actual_amount` decimal(14,2) DEFAULT NULL,
+  `expected_arrival_date` date DEFAULT NULL, `process_instance_id` varchar(64) DEFAULT NULL,
+  `expense_status` tinyint NOT NULL DEFAULT 0, `expense_process_instance_id` varchar(64) DEFAULT NULL,
+  `applicant_user_id` bigint NOT NULL, `file_urls` json DEFAULT NULL, `remark` varchar(1000) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_purchase_no` (`tenant_id`,`no`,`deleted`),
+  KEY `idx_eam_purchase_status` (`tenant_id`,`status`,`create_time`), KEY `idx_eam_purchase_process` (`process_instance_id`),
+  KEY `idx_eam_purchase_expense_process` (`expense_process_instance_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 轻量办公采购单';
+
+CREATE TABLE IF NOT EXISTS `eam_purchase_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `purchase_id` bigint NOT NULL, `name` varchar(200) NOT NULL,
+  `category_id` bigint NOT NULL, `management_mode` tinyint NOT NULL, `delivery_mode` tinyint NOT NULL,
+  `delivery_mode_label_snapshot` varchar(50) NOT NULL, `custody_mode` tinyint NOT NULL,
+  `custody_mode_label_snapshot` varchar(50) NOT NULL, `quantity` int NOT NULL, `received_quantity` int NOT NULL DEFAULT 0,
+  `returned_quantity` int NOT NULL DEFAULT 0, `short_closed_quantity` int NOT NULL DEFAULT 0,
+  `short_close_remark` varchar(500) DEFAULT NULL, `unit` varchar(20) NOT NULL, `unit_price` decimal(14,2) DEFAULT NULL,
+  `ext_fields` json DEFAULT NULL, `ext_field_labels` json DEFAULT NULL, `ext_field_dict_types` json DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_purchase_item_purchase` (`tenant_id`,`purchase_id`), KEY `idx_eam_purchase_item_category` (`tenant_id`,`category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 采购明细';
+
+CREATE TABLE IF NOT EXISTS `eam_purchase_source` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `purchase_item_id` bigint NOT NULL, `demand_item_id` bigint DEFAULT NULL,
+  `quantity` int NOT NULL, `fulfilled_quantity` int NOT NULL DEFAULT 0, `closed_quantity` int NOT NULL DEFAULT 0,
+  `target_employee_id` bigint DEFAULT NULL, `target_dept_id` bigint DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_purchase_source_item` (`tenant_id`,`purchase_item_id`), KEY `idx_eam_purchase_source_demand` (`tenant_id`,`demand_item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 采购来源与分配映射';
+
+CREATE TABLE IF NOT EXISTS `eam_receipt` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `no` varchar(64) NOT NULL, `purchase_id` bigint NOT NULL, `type` tinyint NOT NULL,
+  `operator_user_id` bigint DEFAULT NULL, `operate_time` datetime NOT NULL, `file_urls` json DEFAULT NULL, `remark` varchar(500) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_receipt_no` (`tenant_id`,`no`,`deleted`), KEY `idx_eam_receipt_purchase` (`tenant_id`,`purchase_id`,`operate_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 入库与退货批次';
+
+CREATE TABLE IF NOT EXISTS `eam_receipt_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `receipt_id` bigint NOT NULL, `purchase_item_id` bigint NOT NULL,
+  `stock_balance_id` bigint DEFAULT NULL, `quantity` int NOT NULL, `unit_price` decimal(14,2) DEFAULT NULL,
+  `serial_numbers` json DEFAULT NULL, `actual_ext_fields` json DEFAULT NULL,
+  `actual_ext_field_labels` json DEFAULT NULL, `actual_ext_field_dict_types` json DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_receipt_item_receipt` (`tenant_id`,`receipt_id`), KEY `idx_eam_receipt_item_purchase_item` (`tenant_id`,`purchase_item_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 入库与退货批次明细';
+
+CREATE TABLE IF NOT EXISTS `eam_stock_balance` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `name` varchar(200) NOT NULL, `category_id` bigint NOT NULL,
+  `management_mode` tinyint NOT NULL, `delivery_mode` tinyint NOT NULL, `custody_mode` tinyint NOT NULL,
+  `unit` varchar(20) NOT NULL, `attribute_signature` char(64) NOT NULL, `ext_fields` json DEFAULT NULL,
+  `ext_field_labels` json DEFAULT NULL, `ext_field_dict_types` json DEFAULT NULL,
+  `on_hand_quantity` int NOT NULL DEFAULT 0, `reserved_quantity` int NOT NULL DEFAULT 0,
+  `frozen_quantity` int NOT NULL DEFAULT 0, `minimum_quantity` int NOT NULL DEFAULT 0, `next_expiry_date` date DEFAULT NULL,
+  `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_stock_balance_match`
+    (`tenant_id`,`category_id`,`unit`,`management_mode`,`delivery_mode`,`custody_mode`,`attribute_signature`,`deleted`),
+  KEY `idx_eam_stock_balance_alert` (`tenant_id`,`minimum_quantity`,`next_expiry_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 全公司库存余额';
+
+CREATE TABLE IF NOT EXISTS `eam_stock_movement` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `stock_balance_id` bigint NOT NULL, `type` tinyint NOT NULL,
+  `quantity` int NOT NULL, `before_quantity` int NOT NULL, `after_quantity` int NOT NULL,
+  `business_type` varchar(50) NOT NULL, `business_id` bigint DEFAULT NULL, `operator_user_id` bigint DEFAULT NULL,
+  `operate_time` datetime NOT NULL, `remark` varchar(500) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_stock_movement_balance` (`tenant_id`,`stock_balance_id`,`operate_time`),
+  KEY `idx_eam_stock_movement_business` (`tenant_id`,`business_type`,`business_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 库存流水';
+
+CREATE TABLE IF NOT EXISTS `eam_stock_reservation` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `demand_item_id` bigint NOT NULL, `stock_balance_id` bigint DEFAULT NULL,
+  `asset_id` bigint DEFAULT NULL, `target_employee_id` bigint NOT NULL,
+  `quantity` int NOT NULL, `status` tinyint NOT NULL, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_stock_reservation_demand` (`tenant_id`,`demand_item_id`,`status`),
+  KEY `idx_eam_stock_reservation_balance` (`tenant_id`,`stock_balance_id`,`status`), KEY `idx_eam_stock_reservation_asset` (`tenant_id`,`asset_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 库存预留';
+
+CREATE TABLE IF NOT EXISTS `eam_stock_holding` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `employee_id` bigint NOT NULL,
+  `asset_id` bigint DEFAULT NULL, `stock_balance_id` bigint DEFAULT NULL, `name_snapshot` varchar(220) NOT NULL,
+  `quantity` int NOT NULL, `custody_mode` tinyint NOT NULL, `status` tinyint NOT NULL, `signed_at` datetime DEFAULT NULL,
+  `return_applied_at` datetime DEFAULT NULL, `return_inspected_at` datetime DEFAULT NULL,
+  `return_result` tinyint DEFAULT NULL, `return_remark` varchar(500) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_stock_holding_employee` (`tenant_id`,`employee_id`,`status`),
+  KEY `idx_eam_stock_holding_asset` (`tenant_id`,`asset_id`,`status`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 员工批量或待签收持有明细';
+
+CREATE TABLE IF NOT EXISTS `eam_stock_reminder` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `scene` varchar(40) NOT NULL, `business_type` varchar(40) NOT NULL,
+  `business_id` bigint NOT NULL, `due_date` date DEFAULT NULL, `reminder_date` date NOT NULL,
+  `status` tinyint NOT NULL DEFAULT 0, `content` varchar(500) NOT NULL, `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_stock_reminder`
+    (`tenant_id`,`scene`,`business_type`,`business_id`,`reminder_date`,`deleted`),
+  KEY `idx_eam_stock_reminder_status` (`tenant_id`,`status`,`due_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 低库存与数字资产到期提醒投影';
+
+CREATE TABLE IF NOT EXISTS `eam_employee_asset_task` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `event_key` varchar(160) NOT NULL, `latest_event_key` varchar(160) NOT NULL,
+  `type` tinyint NOT NULL,
+  `status` tinyint NOT NULL, `employee_id` bigint NOT NULL,
+  `leader_user_id` bigint DEFAULT NULL, `employee_name_snapshot` varchar(100) NOT NULL, `dept_id_snapshot` bigint DEFAULT NULL,
+  `process_instance_id` varchar(64) DEFAULT NULL, `demand_id` bigint DEFAULT NULL, `planned_leave_time` datetime DEFAULT NULL,
+  `remark` varchar(500) DEFAULT NULL, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_eam_employee_asset_task_event` (`tenant_id`,`event_key`,`deleted`),
+  UNIQUE KEY `uk_eam_employee_asset_task_latest_event` (`tenant_id`,`latest_event_key`,`deleted`),
+  KEY `idx_eam_employee_asset_task_employee` (`tenant_id`,`employee_id`,`type`,`status`), KEY `idx_eam_employee_asset_task_process` (`process_instance_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 员工配资、异动复核与离职结清任务';
+
+CREATE TABLE IF NOT EXISTS `eam_employee_asset_task_item` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `task_id` bigint NOT NULL, `asset_id` bigint DEFAULT NULL,
+  `holding_id` bigint DEFAULT NULL, `asset_name_snapshot` varchar(220) NOT NULL, `action` tinyint DEFAULT NULL,
+  `transfer_to_employee_id` bigint DEFAULT NULL, `status` tinyint NOT NULL DEFAULT 0, `remark` varchar(500) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), KEY `idx_eam_employee_asset_task_item_task` (`tenant_id`,`task_id`),
+  KEY `idx_eam_employee_asset_task_item_asset` (`tenant_id`,`asset_id`), KEY `idx_eam_employee_asset_task_item_holding` (`tenant_id`,`holding_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 员工资产任务明细';

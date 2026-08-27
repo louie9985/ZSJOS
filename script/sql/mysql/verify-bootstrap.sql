@@ -1591,3 +1591,126 @@ SELECT 'V142 partial V139 V140 execution repair' AS check_name,
                        'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
                        'zsjos:subordinate-sales:lead-release-public-sea'))<>5),
           'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback version registration' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V149' AND checksum=SHA2('V149__feedback_management.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V149'
+                        AND checksum=SHA2('V149__feedback_management.sql',256)),
+          'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback schema and idempotency' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables
+           WHERE table_schema=DATABASE() AND table_name IN (
+             'zsjos_feedback_no_daily_counter','zsjos_feedback','zsjos_feedback_round',
+             'zsjos_feedback_reply','zsjos_feedback_survey','zsjos_feedback_config'))=6
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_work_order'
+                        AND column_name='business_type' AND is_nullable='NO'
+                        AND column_default='GENERIC')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_work_order'
+                        AND index_name='idx_tenant_business_type'
+                      GROUP BY index_name
+                      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index)=
+                             'tenant_id,business_type,create_time')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_feedback_no_daily_counter'
+                        AND index_name='uk_tenant_date_type' AND non_unique=0
+                      GROUP BY index_name
+                      HAVING GROUP_CONCAT(column_name ORDER BY seq_in_index)=
+                             'tenant_id,sequence_date,feedback_type')
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_feedback_reply'
+                        AND column_name='idempotency_key' AND is_nullable='NO'
+                        AND collation_name='utf8mb4_bin')
+          AND EXISTS (SELECT 1 FROM information_schema.columns
+                      WHERE table_schema=DATABASE() AND table_name='zsjos_feedback_config'
+                        AND column_name='last_idempotency_key' AND is_nullable='YES'
+                        AND collation_name='utf8mb4_bin'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback default forms and settings' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_tenant tenant
+            WHERE tenant.deleted=b'0' AND tenant.status=0
+              AND ((SELECT COUNT(*) FROM bpm_form form
+                    WHERE form.tenant_id=tenant.id AND form.deleted=b'0'
+                      AND form.remark IN (
+                        'zsjos-feedback-form:requirement:1','zsjos-feedback-form:bug:1',
+                        'zsjos-feedback-form:support:1','zsjos-feedback-form:survey:1'))<>4
+                OR (SELECT COUNT(*) FROM zsjos_feedback_config config
+                    WHERE config.tenant_id=tenant.id AND config.deleted=b'0'
+                      AND config.feedback_type IN ('REQUIREMENT','BUG','SUPPORT','SURVEY'))<>4
+                OR NOT EXISTS (SELECT 1 FROM zsjos_feedback_config config
+                    WHERE config.tenant_id=tenant.id AND config.deleted=b'0'
+                      AND config.feedback_type='REQUIREMENT' AND config.title_field_key='title'
+                      AND config.approval_enabled=b'1'
+                      AND config.bpm_process_definition_key='zsjos_feedback_requirement_approval')
+                OR NOT EXISTS (SELECT 1 FROM zsjos_feedback_config config
+                    WHERE config.tenant_id=tenant.id AND config.deleted=b'0'
+                      AND config.feedback_type='SURVEY' AND config.title_field_key='rating'))),
+          'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback support dictionary' AS check_name,
+       IF(EXISTS (SELECT 1 FROM system_dict_type
+                  WHERE type='zsjos_feedback_support_type' AND status=0 AND deleted=b'0')
+          AND (SELECT COUNT(*) FROM system_dict_data
+               WHERE dict_type='zsjos_feedback_support_type' AND status=0 AND deleted=b'0')=5
+          AND (SELECT COUNT(*) FROM system_dict_data
+               WHERE dict_type='zsjos_feedback_support_type' AND status=0 AND deleted=b'0'
+                 AND ((value='account_permission' AND label='账号与权限')
+                   OR (value='business_software' AND label='业务系统/软件')
+                   OR (value='office_equipment' AND label='办公设备')
+                   OR (value='network_communication' AND label='网络与通信')
+                   OR (value='other' AND label='其他')))=5,
+          'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback menus and permissions' AS check_name,
+       IF((SELECT COUNT(*) FROM system_menu
+           WHERE id IN (79910,79911,79912,79913,79914,79915,79916,
+                        79920,79921,79922,79923,79924,79925,79926,79927,79928,79929,79930)
+             AND status=0 AND deleted=b'0')=18
+          AND EXISTS (SELECT 1 FROM system_menu
+                      WHERE id=79910 AND parent_id=6735 AND path='feedback'
+                        AND component='zsjos/feedback/index'
+                        AND permission='zsjos:feedback:query'
+                        AND workbench_render_mode='native' AND type=2 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+                      WHERE id=79920 AND parent_id=0 AND path='feedback-management'
+                        AND workbench_render_mode='admin_only' AND type=1 AND deleted=b'0')
+          AND (SELECT COUNT(DISTINCT permission) FROM system_menu
+               WHERE id IN (79910,79911,79912,79913,79914,79915,79916,
+                            79921,79922,79923,79924,79925,79926,79927,79928,79929,79930)
+                 AND permission LIKE 'zsjos:feedback:%' AND deleted=b'0')=17,
+          'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback tenant-package coverage' AS check_name,
+       IF(NOT EXISTS (
+            SELECT 1 FROM system_tenant_package package
+            WHERE package.deleted=b'0' AND JSON_CONTAINS(package.menu_ids,'6735','$')
+              AND (SELECT COUNT(*)
+                   FROM (SELECT 79910 AS menu_id UNION ALL SELECT 79911 UNION ALL SELECT 79912
+                         UNION ALL SELECT 79913 UNION ALL SELECT 79914 UNION ALL SELECT 79915
+                         UNION ALL SELECT 79916 UNION ALL SELECT 79920 UNION ALL SELECT 79921
+                         UNION ALL SELECT 79922 UNION ALL SELECT 79923 UNION ALL SELECT 79924
+                         UNION ALL SELECT 79925 UNION ALL SELECT 79926 UNION ALL SELECT 79927
+                         UNION ALL SELECT 79928 UNION ALL SELECT 79929 UNION ALL SELECT 79930) expected
+                   WHERE JSON_CONTAINS(package.menu_ids,CAST(expected.menu_id AS JSON),'$'))<>18),
+          'PASS','FAIL') AS result;
+
+SELECT 'V149 feedback notification defaults' AS check_name,
+       IF((SELECT COUNT(DISTINCT code) FROM system_notify_template
+           WHERE deleted=b'0' AND code IN (
+             'ZSJOS_FEEDBACK_EMPLOYEE_REPLIED','ZSJOS_FEEDBACK_ADMIN_REPLIED',
+             'ZSJOS_FEEDBACK_COMPLETED','ZSJOS_FEEDBACK_SURVEY_REQUESTED'))=4
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant tenant
+            WHERE tenant.deleted=b'0' AND tenant.status=0
+              AND (SELECT COUNT(DISTINCT rule_row.scene_code) FROM system_notify_rule rule_row
+                   WHERE rule_row.tenant_id=tenant.id AND rule_row.deleted=b'0'
+                     AND rule_row.scene_code IN (
+                       'zsjos.feedback.employee_replied','zsjos.feedback.admin_replied',
+                       'zsjos.feedback.completed','zsjos.feedback.survey_requested'))<4),
+          'PASS','FAIL') AS result;

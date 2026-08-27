@@ -49,21 +49,8 @@
 
       <!-- 领用/借用/调拨需要指定接收方；退还/归还只是把资产收回，不需要 -->
       <template v-if="needReceiver">
-        <el-form-item label="接收人" prop="toUserId">
-          <el-select
-            v-model="formData.toUserId"
-            filterable
-            clearable
-            class="!w-full"
-            placeholder="请选择接收人"
-          >
-            <el-option
-              v-for="user in userList"
-              :key="user.id"
-              :label="user.nickname"
-              :value="user.id"
-            />
-          </el-select>
+        <el-form-item label="接收员工" prop="toEmployeeId">
+          <HrmEmployeeSelect v-model="formData.toEmployeeId" placeholder="请选择接收员工" />
         </el-form-item>
         <el-form-item label="接收部门" prop="toDeptId">
           <el-tree-select
@@ -126,7 +113,7 @@ import * as TransferApi from '@/api/eam/transfer'
 import { TransferType, NEED_APPROVAL_TYPES } from '@/api/eam/transfer'
 import * as AssetApi from '@/api/eam/asset'
 import * as DeptApi from '@/api/system/dept'
-import * as UserApi from '@/api/system/user'
+import HrmEmployeeSelect from '@/views/hrm/employee/components/HrmEmployeeSelect.vue'
 
 defineOptions({ name: 'EamTransferForm' })
 
@@ -143,7 +130,6 @@ const formRef = ref()
 const assetOptions = ref<AssetApi.AssetVO[]>([])
 const assetLoading = ref(false)
 const deptTree = ref<any[]>([])
-const userList = ref<any[]>([])
 
 const needReceiver = computed(() =>
   [TransferType.RECEIVE, TransferType.BORROW, TransferType.ALLOCATE].includes(
@@ -155,7 +141,7 @@ const needApproval = computed(() => NEED_APPROVAL_TYPES.includes(formData.value.
 const formRules = computed(() => ({
   type: [{ required: true, message: '流转类型不能为空', trigger: 'change' }],
   assetId: [{ required: true, message: '资产不能为空', trigger: 'change' }],
-  toUserId: needReceiver.value
+  toEmployeeId: needReceiver.value
     ? [{ required: true, message: '接收人不能为空', trigger: 'change' }]
     : [],
   expectedReturnDate:
@@ -168,7 +154,7 @@ function buildEmptyForm(): TransferApi.TransferVO {
   return {
     type: TransferType.RECEIVE,
     assetId: undefined as any,
-    toUserId: undefined,
+    toEmployeeId: undefined,
     toDeptId: undefined,
     expectedReturnDate: undefined,
     actualReturnDate: undefined,
@@ -213,6 +199,5 @@ const submitForm = async () => {
 
 onMounted(async () => {
   deptTree.value = handleTree(await DeptApi.getSimpleDeptList())
-  userList.value = await UserApi.getSimpleUserList()
 })
 </script>

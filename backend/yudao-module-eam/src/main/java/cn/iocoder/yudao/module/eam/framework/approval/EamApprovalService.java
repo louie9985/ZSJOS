@@ -9,6 +9,11 @@ package cn.iocoder.yudao.module.eam.framework.approval;
  */
 public interface EamApprovalService {
 
+    default String start(String definitionKey, String businessKey, String summary,
+                         java.util.Map<String, Object> variables) {
+        return start(definitionKey, businessKey, summary);
+    }
+
     /**
      * 发起一次审批
      *
@@ -18,6 +23,12 @@ public interface EamApprovalService {
      * @return 流程实例 ID；返回 null 表示未走流程（直通生效）
      */
     String start(String definitionKey, String businessKey, String summary);
+
+    /**
+     * 业务域确认取消后终止仍在运行的流程实例。
+     */
+    default void terminate(String processInstanceId, String reason) {
+    }
 
     /**
      * 当前实现是否会真正产生审批环节

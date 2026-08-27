@@ -59,6 +59,9 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
 | 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
 | 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage` | 不注册（员工只读总览） |
+| 48 | 需求与反馈 | `/zsjos/feedback` | `FeedbackPage` | `zsjos/feedback/index` |
+| 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
+| 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |
 
 “我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 
@@ -71,6 +74,8 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - 团队订单正式路径为 `/zsjos/sales-orders/team`，只消费服务端 `zsjos:sales-order:query-team`
   页面授权；详情使用只读 `team` 模式，不投影修改、终止或审批操作。
 - `/zsjos/leads/manage` 是服务端隐藏菜单：具备菜单授权时可以直接访问，但不显示在 React 导航中。
+- `/zsjos/feedback` 由服务端相对子路径 `feedback` 解析，要求页面权限 `zsjos:feedback:query`；创建、查看、回复和满意度入口分别消费独立按钮权限。通知深链使用 `feedbackId`，详情仍由服务端校验本人数据范围。
+- `/zsjos/my-assets` 与 `/zsjos/asset-demands` 分别由服务端相对子路径 `my-assets`、`asset-demands` 解析。页面查询权限为 `eam:workbench:asset:query`、`eam:workbench:demand:query`；签收、退还、报修和提交申请继续使用独立按钮权限，Workbench 不按持有状态之外的前端推断扩大操作权。
 - 订单、学员、审批和业务通知可深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={overview|follow-ups|orders|appeals|complaints|flow-history}`；省略或传入非法 `tab` 时进入概览。该入口只加载指定详情，不扩大客资列表。通知按场景选择跟进、申诉、投诉或概览页签，当前不自动改投流转记录；前端只会激活服务端 `visibleTabs` 中的目标页签，不可见时回退概览。五个业务标签权限在 System 角色权限管理中独立配置，`flow-history` 对应 `zsjos:lead-detail:flow-read`，不得由角色名或前端 mode 推断。
 - 历史 `/zsjos/sales-order-supervisor-confirmations` 仅由 React 重定向到 `/zsjos/sales-order-approvals`，服务端不再发布独立主管确认页面菜单。
 - 新增或修改页面菜单时，必须同步服务端菜单种子、React `APP_ROUTES`/`RENDERABLE_APP_ROUTES`/`RouteHost`、Vue `component` 文件和本矩阵。

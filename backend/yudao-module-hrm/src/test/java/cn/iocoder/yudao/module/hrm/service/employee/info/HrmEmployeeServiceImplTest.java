@@ -1,6 +1,8 @@
 package cn.iocoder.yudao.module.hrm.service.employee.info;
 
 import cn.iocoder.yudao.module.hrm.service.employee.config.HrmEmployeeFieldConfigService;
+import cn.iocoder.yudao.module.hrm.service.employee.api.HrmEmployeeLifecycleEventPublisher;
+import cn.iocoder.yudao.module.hrm.api.employee.event.HrmEmployeeLifecycleEventType;
 import cn.iocoder.yudao.module.hrm.service.employee.employment.HrmEmployeeChangeRecordService;
 import cn.iocoder.yudao.module.hrm.service.employee.employment.HrmEmployeeQuitInfoService;
 import cn.iocoder.yudao.module.hrm.service.employee.employment.HrmEmployeeSalaryCardService;
@@ -108,8 +110,10 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
@@ -167,6 +171,8 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
     private HrmInsuranceSchemeService insuranceSchemeService;
     @MockitoBean
     private HrmRecruitCandidateService recruitCandidateService;
+    @MockitoBean
+    private HrmEmployeeLifecycleEventPublisher lifecycleEventPublisher;
 
     @BeforeEach
     public void setUpChangeRecordService() {
@@ -213,6 +219,28 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         assertNull(dbEmployee.getLeaveTime());
         verify(recruitCandidateService).confirmRecruitCandidateEntry(
                 candidateId, dbEmployee.getEntryTime());
+    }
+
+    @Test
+    public void testConfirmEmployeeEntry_lifecycleListenerFailureRollback() {
+        HrmEmployeeDO employee = randomEmployeeDO(o -> o
+                .setEntryStatus(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus())
+                .setEntryTime(null).setCandidateId(null));
+        employeeMapper.insert(employee);
+        HrmEmployeeConfirmEntryReqVO confirmReqVO = BeanUtils.toBean(
+                randomEmployeeSaveReqVO(o -> o.setId(employee.getId())
+                        .setEntryTime(LocalDateTime.now().minusMinutes(1))
+                        .setCandidateId(null)), HrmEmployeeConfirmEntryReqVO.class);
+        doThrow(new IllegalStateException("EAM lifecycle listener failed")).when(lifecycleEventPublisher)
+                .publish(eq(HrmEmployeeLifecycleEventType.ENTRY_CONFIRMED), eq(employee.getId()),
+                        any(HrmEmployeeDO.class), eq(employee.getId()));
+
+        assertThrows(IllegalStateException.class,
+                () -> employeeService.confirmEmployeeEntry(confirmReqVO));
+
+        HrmEmployeeDO unchanged = employeeMapper.selectById(employee.getId());
+        assertEquals(HrmEmployeeEntryStatusEnum.PENDING_ENTRY.getStatus(), unchanged.getEntryStatus());
+        assertNull(unchanged.getEntryTime());
     }
 
     @Test
@@ -633,6 +661,8 @@ public class HrmEmployeeServiceImplTest extends BaseDbUnitTest {
         employeeMapper.insert(employee);
         HrmEmployeeCancelQuitReqVO reqVO = new HrmEmployeeCancelQuitReqVO()
                 .setEmployeeId(employee.getId()).setReason("员工撤回离职");
+        when(quitInfoService.validateQuitInfoByEmployeeId(employee.getId()))
+                .thenReturn(new HrmEmployeeQuitInfoDO().setId(randomLongId()).setEmployeeId(employee.getId()));
 
         // 调用
         employeeService.cancelEmployeeQuit(reqVO);

@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = true)
 public class WorkOrderDO extends TenantBaseDO {
     @TableId private Long id;
+    private String businessType;
     private String orderNo;
     private String sceneCode;
     private String sceneNameSnapshot;

@@ -37,6 +37,28 @@
       <el-form-item label="计量单位" prop="unit">
         <el-input v-model="formData.unit" placeholder="如 个、本、套、箱" />
       </el-form-item>
+      <el-form-item label="交付模式" prop="deliveryMode">
+        <el-select
+          v-model="formData.deliveryMode"
+          clearable
+          class="!w-full"
+          :placeholder="policyPlaceholder"
+        >
+          <el-option label="实物入库" :value="1" />
+          <el-option label="数字交付" :value="2" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="持有模式" prop="custodyMode">
+        <el-select
+          v-model="formData.custodyMode"
+          clearable
+          class="!w-full"
+          :placeholder="policyPlaceholder"
+        >
+          <el-option label="消耗型" :value="1" />
+          <el-option label="需归还型" :value="2" />
+        </el-select>
+      </el-form-item>
       <el-form-item label="排序" prop="sort">
         <el-input-number v-model="formData.sort" :min="0" class="!w-full" :controls="false" />
       </el-form-item>
@@ -87,6 +109,8 @@ const formData = ref<CategoryApi.CategoryVO>({
   sort: 0,
   status: 0,
   managementMode: 1,
+  deliveryMode: 1,
+  custodyMode: 2,
   unit: '个',
   remark: ''
 })
@@ -99,6 +123,9 @@ const formRules = reactive({
   sort: [{ required: true, message: '排序不能为空', trigger: 'blur' }],
   status: [{ required: true, message: '状态不能为空', trigger: 'change' }]
 })
+const policyPlaceholder = computed(() =>
+  formData.value.parentId === 0 ? '顶级分类必须选择' : '留空继承父分类'
+)
 const formRef = ref()
 
 /** 编辑时把自身从父分类候选中剔除，避免选出环形结构 */
@@ -153,6 +180,8 @@ const resetForm = () => {
     sort: 0,
     status: 0,
     managementMode: 1,
+    deliveryMode: 1,
+    custodyMode: 2,
     unit: '个',
     remark: ''
   }

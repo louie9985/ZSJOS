@@ -8,6 +8,10 @@ export interface CategoryVO {
   sort: number
   status: number
   managementMode: number
+  deliveryMode?: number
+  custodyMode?: number
+  effectiveDeliveryMode?: number
+  effectiveCustodyMode?: number
   unit: string
   remark?: string
   createTime?: Date

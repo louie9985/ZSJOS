@@ -2,6 +2,19 @@
   "schemaVersion": 1,
   "assets": [
     {
+      "processKey": "zsjos_feedback_requirement_approval",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "taskKeys": ["departmentLeaderReview", "chairmanReview"],
+      "businessVariables": ["feedbackId", "workOrderId", "feedbackNo", "roundNo", "hasDepartmentLeader"],
+      "assigneeVariables": ["departmentLeaderUsers", "departmentLeaderAssignee", "chairmanUsers", "chairmanAssignee"],
+      "runtimeOnlyVariables": ["feedbackId", "workOrderId", "feedbackNo", "roundNo", "hasDepartmentLeader"],
+      "businessKeyFormat": "feedback:{workOrderId}:round:{roundNo}",
+      "minimumMigration": "V149",
+      "path": "zsjos_feedback_requirement_approval/1.0.0/process.bpmn20.xml",
+      "sha256": "4d9c6cb690e8cea86bcea7d31f5d09da772d4e82b4514e0d2cb1e210efc051cd"
+    },
+    {
       "processKey": "zsjos_media_reposition",
       "assetVersion": "1.0.0",
       "recommended": true,

@@ -30,6 +30,18 @@ public class EamCategoryRespVO {
     @Schema(description = "管理模式：1 单件，2 批量", requiredMode = Schema.RequiredMode.REQUIRED)
     private Integer managementMode;
 
+    @Schema(description = "本级交付模式；空表示继承")
+    private Integer deliveryMode;
+
+    @Schema(description = "本级持有模式；空表示继承")
+    private Integer custodyMode;
+
+    @Schema(description = "生效交付模式", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Integer effectiveDeliveryMode;
+
+    @Schema(description = "生效持有模式", requiredMode = Schema.RequiredMode.REQUIRED)
+    private Integer effectiveCustodyMode;
+
     @Schema(description = "计量单位", requiredMode = Schema.RequiredMode.REQUIRED)
     private String unit;
 

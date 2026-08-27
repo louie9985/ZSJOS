@@ -644,7 +644,23 @@ and package writes are repeatable, and both schema-version markers are recorded.
 requires a reviewed forward migration because published snapshots are permanent; do not
 drop either table while any tenant layout or history exists.
 
-`V139-V146` are now present in the integrated migration chain. V147 still requires a
-continuous migration review against those landed files before it is added to the
-fresh-bootstrap order or enabled in final marker verification; do not execute V147 until
-that integration review is complete.
+`V139-V147` are now present in the integrated migration chain. V149 follows V147; V148 is
+intentionally absent because it is owned elsewhere. V149 must remain the only migration
+number used by the feedback-management workspace and must be reviewed through the normal
+controlled migration process before execution.
+
+### V149 Feedback management
+
+Adds the tenant-scoped requirement, BUG and technical-support feedback workspace. It extends
+generic work orders with `business_type`, creates feedback/reply/approval-round/survey/config
+tables and the daily number counter, and seeds default forms, the approved support dictionary,
+menu/button permissions, and notification templates/rules. Existing work-order rows remain
+`GENERIC`; feedback rows are marked `FEEDBACK` and excluded by generic work-order APIs.
+
+V149 is additive, repeatable and guarded against fixed-ID, route, permission, form-marker and
+dictionary conflicts. It records both schema-version registries and does not delete business
+data. Form definitions, field values, dictionary labels, people, attachments, processing results
+and approval rounds are snapshotted for history. Execute only after V147, run
+`verify-bootstrap.sql`, and retain the additive schema on application rollback. BPM import,
+publish, enablement and dispatcher configuration are manual release steps; no startup auto-deploy
+is introduced.

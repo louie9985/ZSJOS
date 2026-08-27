@@ -98,11 +98,14 @@ export const APP_ROUTES = {
   MAINTENANCE: '/system/maintenance',
   NOTIFY_RULE: '/messages/notify/notify-rule',
   ALL_MESSAGES: '/messages/all',
-  UNREAD_MESSAGES: '/messages/unread'
-  ,MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets'
-  ,MEDIA_REVIEWS: '/zsjos/reviews'
-  ,MEDIA_STUDENTS: '/zsjos/media-students'
-  ,MEDIA_CALENDAR: '/calendar/overview'
+  UNREAD_MESSAGES: '/messages/unread',
+  MY_ASSETS: '/zsjos/my-assets',
+  ASSET_DEMANDS: '/zsjos/asset-demands',
+  FEEDBACK: '/zsjos/feedback',
+  MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets',
+  MEDIA_REVIEWS: '/zsjos/reviews',
+  MEDIA_STUDENTS: '/zsjos/media-students',
+  MEDIA_CALENDAR: '/calendar/overview'
 } as const
 
 export const RENDERABLE_APP_ROUTES = new Set([
@@ -146,11 +149,14 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.MAINTENANCE,
   APP_ROUTES.NOTIFY_RULE,
   APP_ROUTES.ALL_MESSAGES,
-  APP_ROUTES.UNREAD_MESSAGES
-  ,APP_ROUTES.MEDIA_PRODUCTION_TICKETS
-  ,APP_ROUTES.MEDIA_REVIEWS
-  ,APP_ROUTES.MEDIA_STUDENTS
-  ,APP_ROUTES.MEDIA_CALENDAR
+  APP_ROUTES.UNREAD_MESSAGES,
+  APP_ROUTES.MY_ASSETS,
+  APP_ROUTES.ASSET_DEMANDS,
+  APP_ROUTES.FEEDBACK,
+  APP_ROUTES.MEDIA_PRODUCTION_TICKETS,
+  APP_ROUTES.MEDIA_REVIEWS,
+  APP_ROUTES.MEDIA_STUDENTS,
+  APP_ROUTES.MEDIA_CALENDAR
 ])
 
 // ========== Dictionaries ==========
@@ -176,6 +182,7 @@ export const DICT_TYPE = {
   ,MEDIA_ACCOUNT_STAGE: 'zsjos_media_account_stage'
   ,MEDIA_ACCOUNT_PRIMARY_PROBLEM: 'zsjos_media_account_primary_problem'
   ,MEDIA_ACCOUNT_EXECUTION_MEASURE: 'zsjos_media_account_execution_measure'
+  ,EAM_ASSET_STATUS: 'eam_asset_status'
 } as const
 
 // ========== Lead Management ==========

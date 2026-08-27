@@ -138,6 +138,9 @@ export enum DICT_TYPE {
   ZSJOS_LEAD_SOURCE_CHANNEL = 'zsjos_lead_source_channel',
   ZSJOS_LEAD_CATEGORY = 'zsjos_lead_category',
 
+  // ========== EAM 模块 ==========
+  EAM_ASSET_STATUS = 'eam_asset_status',
+
   // ========== INFRA 模块 ==========
   INFRA_BOOLEAN_STRING = 'infra_boolean_string',
   INFRA_JOB_STATUS = 'infra_job_status',

@@ -54,6 +54,14 @@ public class EamCategoryDO extends BaseDO {
      */
     private Integer managementMode;
     /**
+     * 交付模式：1 实物入库，2 数字交付；子分类为空表示继承。
+     */
+    private Integer deliveryMode;
+    /**
+     * 持有模式：1 消耗型，2 需归还型；子分类为空表示继承。
+     */
+    private Integer custodyMode;
+    /**
      * 默认计量单位
      */
     private String unit;
