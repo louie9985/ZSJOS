@@ -1,5 +1,11 @@
 /* Cross-page building blocks reused by more than one business page. */
 
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-5);
+}
+
 .page-heading {
   display: flex;
   align-items: flex-end;
