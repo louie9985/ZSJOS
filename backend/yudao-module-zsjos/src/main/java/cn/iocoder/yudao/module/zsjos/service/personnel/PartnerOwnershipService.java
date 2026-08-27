@@ -47,16 +47,19 @@ public class PartnerOwnershipService {
     }
 
     public boolean canQuery(Long employeeUserId) {
+        if (employeeUserId == null) return false;
         if (!permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION, MANAGE_PERMISSION)) return false;
         AdminUserRespDTO user = adminUserApi.getUser(employeeUserId);
         return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus());
     }
 
     public boolean canManage(Long employeeUserId) {
+        if (employeeUserId == null) return false;
         return permissionApi.hasAnyPermissions(employeeUserId, MANAGE_PERMISSION) && isEnabledUser(employeeUserId);
     }
 
     public boolean canRead(Long employeeUserId, Long partnerId) {
+        if (employeeUserId == null || partnerId == null) return false;
         if (canManage(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
         PartnerOwnershipDO ownership = getByPartnerId(partnerId);
         return ownership != null && Objects.equals(ownership.getEmployeeUserId(), employeeUserId)

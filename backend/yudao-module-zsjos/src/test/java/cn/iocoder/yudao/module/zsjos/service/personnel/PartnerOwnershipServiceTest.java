@@ -61,6 +61,14 @@ class PartnerOwnershipServiceTest {
     }
 
     @Test
+    void nullEmployeeUserIdCannotResolveSystemPermissions() {
+        assertFalse(service.canQuery(null));
+        assertFalse(service.canManage(null));
+        assertFalse(service.canRead(null, 10L));
+        verifyNoInteractions(permissionApi, adminUserApi, ownershipMapper, partnerMapper);
+    }
+
+    @Test
     void assignmentRequiresPermissionAndWritesAudit() {
         when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L));
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));

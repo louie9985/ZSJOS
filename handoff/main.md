@@ -1,5 +1,34 @@
 # Main Workstream
 
+## Workstream Registration - 2026-08-27 11:45:00 +08:00
+
+- Workstream ID: `main-partner-ownership-null-permission-guard`
+- Goal: 修复合作方客资详情在员工用户 ID 为空时进入 System 权限缓存并生成空缓存键的回归。
+- Non-goals: 不改变合作方详情权限模型；不修改 System 缓存实现、数据库、前端、依赖、分支、提交、推送或服务状态；保留其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `ec43fbb56971a904ba4e5f1eafd53cae34c4c1b5`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `PartnerOwnershipService` 的空员工用户 ID 授权入口及其聚焦测试；本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: 现有 System `PermissionApi`、AdminUserApi 和 ZSJOS 合作方归属服务；无新增依赖。
+- Integration order: 增加空值短路 -> 增加权限 API 不调用回归测试 -> 运行 ZSJOS 聚焦测试与模块编译 -> 追加交付证据。
+- Verification plan: `PartnerOwnershipServiceTest`；`mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile`；必要时运行 ZSJOS 模块测试；执行 scoped `git diff --check`。
+
+## Delivery Entry - 2026-08-27 12:05:10 +08:00
+
+- Workstream ID: `main-partner-ownership-null-permission-guard`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `ec43fbb56971a904ba4e5f1eafd53cae34c4c1b5`（未创建提交）。
+- User goal: 修复合作方客资详情因空员工用户 ID 进入 System 权限缓存而抛出 `Null key returned for cache operation` 的异常。
+- Key decisions: `canQuery`、`canManage`、`canRead` 对空员工用户 ID（以及对象读取中的空 partner ID）直接返回无权限；不改变非空用户的权限判断和合作方详情投影，不修改 System 缓存实现。
+- Execution or analysis result: 空员工用户 ID 不再调用 `PermissionApi`、`AdminUserApi`、归属 Mapper 或合作方 Mapper；新增回归测试覆盖三条入口。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/personnel/PartnerOwnershipService.java`、`backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/personnel/PartnerOwnershipServiceTest.java`、本 handoff 条目。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am "-Dtest=PartnerOwnershipServiceTest" "-Dsurefire.failIfNoSpecifiedTests=false" test` 通过，聚焦测试 5/5，依赖 reactor 全部成功；scoped `git diff --check` 通过，仅报告既有 LF/CRLF 转换警告。未执行真实 HTTP、Redis 或数据库验证。
+- Dependency or integration impact: 无新增 Maven/npm 依赖，无数据库、权限、菜单、业务数据、服务启停、分支、提交或推送操作；保留其他未提交改动。
+- Remaining work: 运行中的后端需由环境维护者按正常发布流程重新加载该类后，再用合作方详情接口做真实请求验收；当前无可用授权会话，真实接口验证未完成。
+
 ## Workstream Registration - 2026-08-26 21:25:19 +08:00
 
 - Workstream ID: `main-eam-office-procurement-hrm-assets`
