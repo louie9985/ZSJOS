@@ -1,4 +1,5 @@
 import request from '@/config/axios'
+import type { AxiosProgressEvent } from 'axios'
 
 export interface NoticeVO {
   id: number | undefined
@@ -7,8 +8,21 @@ export interface NoticeVO {
   content: string
   status: number
   remark: string
+  publishStatus: 'DRAFT' | 'PUBLISHED' | 'OFFLINE'
+  publishTime?: number
+  offlineTime?: number
+  attachments: NoticeAttachmentVO[]
   creator: string
   createTime: Date
+}
+
+export interface NoticeAttachmentVO {
+  infraFileId: number
+  fileName: string
+  mimeType?: string
+  fileSize: number
+  sort: number
+  downloadUrl?: string
 }
 
 // 查询公告列表
@@ -43,5 +57,19 @@ export const deleteNoticeList = (ids: number[]) => {
 
 // 推送公告
 export const pushNotice = (id: number) => {
-  return request.post({ url: '/system/notice/push?id=' + id })
+  return request.post({ url: '/system/notice/publish?id=' + id })
+}
+
+export const publishNotice = (id: number) => request.post({ url: '/system/notice/publish?id=' + id })
+export const offlineNotice = (id: number) => request.post({ url: '/system/notice/offline?id=' + id })
+export const copyNotice = (id: number) => request.post({ url: '/system/notice/copy?id=' + id })
+export const uploadNoticeAttachment = (
+  file: File,
+  onUploadProgress?: (event: AxiosProgressEvent) => void
+) => {
+  const data = new FormData()
+  data.append('file', file)
+  return request.upload<{ code: number; msg?: string; data: NoticeAttachmentVO }>({
+    url: '/system/notice/attachment/upload', data, onUploadProgress
+  })
 }

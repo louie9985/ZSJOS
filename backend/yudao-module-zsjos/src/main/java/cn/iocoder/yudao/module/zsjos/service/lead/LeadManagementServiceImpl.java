@@ -332,7 +332,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setSourceChannel(lead.getSourceChannelId());
         boolean blindIdentity = isBlindIdentity(lead, currentUserId);
         boolean viewerIsOwner = Objects.equals(currentUserId, lead.getOwnerUserId());
-        boolean viewerIsSubmitter = Objects.equals(currentUserId, lead.getSourceUserId());
+        boolean viewerIsSubmitter = PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(currentUserId, lead.getProviderOwnerId());
         boolean selfSourcedWithoutProvider = SOURCE_SALES_SELF.equals(lead.getSourceType())
                 && Boolean.TRUE.equals(lead.getSourceProviderRecorded())
                 && lead.getSourceProviderUserId() == null;
@@ -356,7 +357,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setQualifiedByUserName(userName(users, lead.getQualifiedByUserId()));
         result.setRecycleSourceOwnerUserName(userName(users, lead.getRecycleSourceOwnerUserId()));
         List<String> relationTypes = new ArrayList<>(2);
-        if (Objects.equals(currentUserId, lead.getSourceUserId())) {
+        if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(currentUserId, lead.getProviderOwnerId())) {
             relationTypes.add("submitter");
         }
         if (Objects.equals(currentUserId, lead.getOwnerUserId())) {
@@ -483,7 +485,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     }
 
     private boolean canReadAppealRecords(LeadDO lead, Long userId) {
-        return Objects.equals(lead.getSourceUserId(), userId)
+        return PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(lead.getProviderOwnerId(), userId)
                 || securityFrameworkService.hasAnyPermissions(PERMISSION_DETAIL_APPEAL_READ,
                 PERMISSION_APPEAL_REVIEW_SALES_MANAGER, PERMISSION_APPEAL_REVIEW_QUALITY,
                 PERMISSION_APPEAL_REVIEW_CHAIRMAN);
@@ -518,7 +521,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
         }
         addSupervisorActions(actions, lead, currentUserId);
-        if (Objects.equals(lead.getSourceUserId(), currentUserId)
+        if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(lead.getProviderOwnerId(), currentUserId)
                 && lead.getStatus() != null
                 && !Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {
             if (securityFrameworkService.hasPermission("zsjos:lead:submitter-supplement")) {
@@ -657,6 +661,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         Set<Long> userIds = new LinkedHashSet<>();
         for (LeadDO lead : leads) {
             addIfPresent(userIds, lead.getSourceUserId());
+            if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())) {
+                addIfPresent(userIds, lead.getProviderOwnerId());
+            }
             addIfPresent(userIds, lead.getOwnerUserId());
             addIfPresent(userIds, lead.getPendingAssigneeUserId());
             addIfPresent(userIds, lead.getQualifiedByUserId());

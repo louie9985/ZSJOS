@@ -9,7 +9,6 @@ public interface PartnerManagementService {
     List<PartnerRespVO> list();
     void disable(Long id, PartnerStateReqVO reqVO);
     void enable(Long id, PartnerStateReqVO reqVO);
-    void convert(Long id, PartnerConvertReqVO reqVO);
     void updateMobile(Long id, PartnerMobileUpdateReqVO reqVO);
     void resetPassword(Long id, PartnerPasswordResetReqVO reqVO);
     PartnerMeRespVO getMe(Long userId);

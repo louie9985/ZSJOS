@@ -113,9 +113,11 @@ class LeadAppealServiceImplTest {
     }
 
     @Test
-    void submitterCanReadOwnLeadAppealHistoryWithoutAppealReadPermission() {
+    void providerCanReadOwnLeadAppealHistoryWithoutAppealReadPermission() {
         LeadDO lead = new LeadDO().setId(8L);
         lead.setSourceUserId(40L);
+        lead.setProviderOwnerType("system_user");
+        lead.setProviderOwnerId(40L);
         when(leadMapper.selectById(8L)).thenReturn(lead);
         when(leadObjectPermissionService.canReadDetail(lead, 40L)).thenReturn(true);
         when(appealMapper.selectListByLeadId(8L)).thenReturn(List.of());
@@ -439,6 +441,8 @@ class LeadAppealServiceImplTest {
         lead.setLeadNo("KZ202608160000000008");
         lead.setStatus(STATUS_INVALID);
         lead.setSourceUserId(7L);
+        lead.setProviderOwnerType("system_user");
+        lead.setProviderOwnerId(7L);
         lead.setOwnerUserId(ownerUserId);
         return lead;
     }

@@ -66,6 +66,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadCategorySnapshotService categorySnapshotService;
     @Resource private PartnerAccountMapper partnerAccountMapper;
     @Resource private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
+    @Resource private LeadProviderAttributionService providerAttributionService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -395,6 +396,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_UNASSIGNED);
         lead.setDispatchMode(reqVO.getDispatchMode()); lead.setAssignmentAttemptCount(0);
         lead.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); lead.setSubmittedAt(submittedAt);
+        providerAttributionService.apply(lead, identity.identity(), reqVO.getNewMediaProviderUserId(), submittedAt);
         lead.setVersion(0); leadMapper.insert(lead);
         return lead;
     }

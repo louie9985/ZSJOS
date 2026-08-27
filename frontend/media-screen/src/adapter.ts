@@ -32,8 +32,9 @@ export type ScreenTodayStar = {
   yesterday: number;
   rankToday: number;
   rankYesterday: number | null;
+  includesPartTime: boolean;
 };
-export type ScreenYesterdayChampion = { name: string; deptName: string; count: number };
+export type ScreenYesterdayChampion = { name: string; deptName: string; count: number; includesPartTime: boolean };
 export type ScreenRealtimeTrend = { today: number[]; yesterday: number[]; stepMinutes: number };
 export type ScreenSeries = { submitted: number[]; valid: number[] };
 export type HistoryRankItem = RankItem & {
@@ -59,6 +60,7 @@ export type MediaScreenModel = {
 
 export type HistoryModel = {
   available: boolean;
+  source: string | null;
   snapshotDate: string | null;
   snapshotCreatedAt: string | null;
   totalLeads: number | null;
@@ -104,6 +106,11 @@ function nonNegativeInteger(value: unknown): number | null {
   return number !== null && number >= 0 ? Math.trunc(number) : null;
 }
 
+function positiveInteger(value: unknown): number | null {
+  const number = nonNegativeInteger(value);
+  return number !== null && number > 0 ? number : null;
+}
+
 function adaptMetrics(raw: BackendMetrics | null | undefined): ScreenMetrics | null {
   const today = nonNegativeInteger(raw?.today);
   const week = nonNegativeInteger(raw?.week);
@@ -114,20 +121,22 @@ function adaptMetrics(raw: BackendMetrics | null | undefined): ScreenMetrics | n
     : { today, week, monthTotal, monthEffective };
 }
 
-function adaptMember(raw: BackendMember, departmentKey: string, index: number): ScreenMember | null {
+function adaptMember(raw: BackendMember): ScreenMember | null {
   const name = typeof raw.name === 'string' ? raw.name.trim() : '';
   const metrics = adaptMetrics(raw);
-  if (!name || !metrics) return null;
-  const memberKey = `${departmentKey}-member-${index}-${name}`;
+  const userId = positiveInteger(raw.userId);
+  if (!name || !metrics || userId === null) return null;
+  const memberKey = `user-${userId}`;
   const partTimers = Array.isArray(raw.partTimers)
     ? raw.partTimers
-        .map((item, partTimerIndex) => {
+        .map((item) => {
           const partTimerName = typeof item.name === 'string' ? item.name.trim() : '';
           const partTimerMetrics = adaptMetrics(item);
-          if (!partTimerName || !partTimerMetrics) return null;
+          const partnerId = positiveInteger(item.partnerId);
+          if (!partTimerName || !partTimerMetrics || partnerId === null) return null;
           return {
-            id: `${memberKey}-part-${partTimerIndex}-${partTimerName}`,
-            actorId: `${memberKey}-part-${partTimerIndex}`,
+            id: `partner-${partnerId}`,
+            actorId: `partner-${partnerId}`,
             name: partTimerName,
             ...partTimerMetrics,
           };
@@ -143,13 +152,14 @@ function adaptMember(raw: BackendMember, departmentKey: string, index: number): 
   };
 }
 
-function adaptDepartment(raw: BackendDepartment, index: number, companion = false): ScreenDepartment | null {
+function adaptDepartment(raw: BackendDepartment, companion = false): ScreenDepartment | null {
   const name = typeof raw.name === 'string' ? raw.name.trim() : '';
   const metrics = adaptMetrics(raw.metrics);
-  if (!name || !metrics || !Array.isArray(raw.members)) return null;
-  const key = companion ? 'part_time_companion' : `media-department-${index}-${name}`;
+  const departmentId = positiveInteger(raw.departmentId);
+  if (!name || !metrics || !Array.isArray(raw.members) || (!companion && departmentId === null)) return null;
+  const key = companion ? 'part_time_companion' : `department-${departmentId}`;
   const members = raw.members
-    .map((member, memberIndex) => adaptMember(member, key, memberIndex))
+    .map((member) => adaptMember(member))
     .filter((member): member is ScreenMember => member !== null);
   if (raw.members.length > 0 && members.length !== raw.members.length) return null;
   return {
@@ -164,7 +174,7 @@ function adaptDepartment(raw: BackendDepartment, index: number, companion = fals
 function adaptDepartments(raw: BackendDepartment[] | null | undefined): ModuleValue<ScreenDepartment[]> {
   if (!Array.isArray(raw)) return unsupported('响应中缺少新媒体部门及成员统计');
   const departments = raw
-    .map((department, index) => adaptDepartment(department, index))
+    .map((department) => adaptDepartment(department))
     .filter((department): department is ScreenDepartment => department !== null);
   if (raw.length > 0 && departments.length !== raw.length) {
     return unsupported('新媒体部门或成员缺少今日、本周、本月、本月有效字段');
@@ -175,7 +185,7 @@ function adaptDepartments(raw: BackendDepartment[] | null | undefined): ModuleVa
 function adaptCompanion(raw: BackendDepartment | null | undefined): ModuleValue<ScreenDepartment> {
   if (raw === null) return { state: 'empty', value: null };
   if (raw === undefined) return unsupported('响应中缺少真实兼职陪跑统计');
-  const department = adaptDepartment(raw, 0, true);
+  const department = adaptDepartment(raw, true);
   return department
     ? { state: 'real', value: department }
     : unsupported('兼职陪跑成员缺少今日、本周、本月、本月有效字段');
@@ -205,6 +215,7 @@ export function adaptStats(raw: BackendStats): MediaScreenModel {
           yesterday: nonNegativeInteger(raw.todayStar?.yesterday) ?? 0,
           rankToday: todayStarRank,
           rankYesterday: nonNegativeInteger(raw.todayStar?.rankYesterday),
+          includesPartTime: raw.todayStar?.includesPartTime === true,
         }
       : null;
   const championName = typeof raw.yesterdayChampion?.name === 'string' ? raw.yesterdayChampion.name.trim() : '';
@@ -235,6 +246,7 @@ export function adaptStats(raw: BackendStats): MediaScreenModel {
               deptName:
                 typeof raw.yesterdayChampion?.deptName === 'string' ? raw.yesterdayChampion.deptName.trim() : '',
               count: championCount,
+              includesPartTime: raw.yesterdayChampion?.includesPartTime === true,
             },
           }
         : raw.yesterdayChampion === null
@@ -259,6 +271,7 @@ export function adaptHistory(raw: BackendHistory): HistoryModel {
   if (!available) {
     return {
       available: false,
+      source: typeof raw.source === 'string' ? raw.source : null,
       snapshotDate:
         (typeof raw.snapshotDate === 'string' && raw.snapshotDate) ||
         (typeof snapshot?.snapshotDate === 'string' && snapshot.snapshotDate) ||
@@ -309,6 +322,7 @@ export function adaptHistory(raw: BackendHistory): HistoryModel {
     .filter((item): item is HistoryRankItem => item !== null);
   return {
     available: true,
+    source: typeof raw.source === 'string' ? raw.source : null,
     snapshotDate:
       (typeof raw.snapshotDate === 'string' && raw.snapshotDate) ||
       (typeof snapshot?.snapshotDate === 'string' && snapshot.snapshotDate) ||

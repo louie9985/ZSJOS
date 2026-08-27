@@ -30,19 +30,27 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 public interface LeadMapper extends BaseMapperX<LeadDO> {
     @Select("""
             SELECT
-              CASE WHEN source_type='sales_self_sourced' AND source_provider_recorded=b'1'
-                   THEN source_provider_user_id ELSE source_user_id END AS contributor_user_id,
-              source_dept_id, source_type, source_provider_user_id,
-              SUM(CASE WHEN submitted_at >= #{todayStart} THEN 1 ELSE 0 END) AS today_count,
-              SUM(CASE WHEN submitted_at >= #{weekStart} THEN 1 ELSE 0 END) AS week_count,
-              SUM(CASE WHEN submitted_at >= #{monthStart} THEN 1 ELSE 0 END) AS month_total,
-              SUM(CASE WHEN submitted_at >= #{monthStart} AND status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS month_effective
+              contribution_user_id_snapshot AS contributor_user_id,
+              contribution_dept_id_snapshot AS source_dept_id,
+              contribution_user_name_snapshot AS contributor_name,
+              contribution_dept_name_snapshot AS department_name,
+              contribution_supervisor_user_id_snapshot AS supervisor_user_id,
+              contribution_supervisor_name_snapshot AS supervisor_name,
+              CASE WHEN provider_owner_type='partner' THEN 'part_time' ELSE 'direct' END AS contribution_type,
+              provider_owner_id, provider_owner_name_snapshot AS provider_owner_name,
+              SUM(CASE WHEN counted_at >= #{todayStart} THEN 1 ELSE 0 END) AS today_count,
+              SUM(CASE WHEN counted_at >= #{weekStart} THEN 1 ELSE 0 END) AS week_count,
+              SUM(CASE WHEN counted_at >= #{monthStart} THEN 1 ELSE 0 END) AS month_total,
+              SUM(CASE WHEN counted_at >= #{monthStart} AND status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS month_effective
             FROM zsjos_lead
             WHERE tenant_id=#{tenantId} AND deleted=b'0'
-              AND submitted_at >= LEAST(#{weekStart}, #{monthStart}) AND submitted_at < #{now}
-              AND ((source_type='internal_new_media' AND source_user_id IS NOT NULL)
-                OR (source_type='sales_self_sourced' AND source_provider_recorded=b'1' AND source_provider_user_id IS NOT NULL))
-            GROUP BY contributor_user_id, source_dept_id, source_type, source_provider_user_id
+              AND counted_at >= LEAST(#{weekStart}, #{monthStart}) AND counted_at < #{now}
+              AND provider_owner_type IN ('system_user','partner')
+              AND contribution_user_id_snapshot IS NOT NULL AND contribution_dept_id_snapshot IS NOT NULL
+            GROUP BY contribution_user_id_snapshot,contribution_dept_id_snapshot,
+              contribution_user_name_snapshot,contribution_dept_name_snapshot,
+              contribution_supervisor_user_id_snapshot,contribution_supervisor_name_snapshot,
+              contribution_type,provider_owner_id,provider_owner_name_snapshot
             """)
     List<MediaScreenContributionRow> countMediaScreenContributions(@Param("tenantId") Long tenantId,
                                                                      @Param("todayStart") LocalDateTime todayStart,
@@ -51,16 +59,17 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                                      @Param("now") LocalDateTime now);
 
     @Select("""
-            SELECT FLOOR(TIMESTAMPDIFF(MINUTE, #{from}, submitted_at) / 10) AS bucket,
-              CASE WHEN source_type='sales_self_sourced' AND source_provider_recorded=b'1'
-                   THEN source_provider_user_id ELSE source_user_id END AS contributor_user_id,
-              source_dept_id, source_type, source_provider_user_id, COUNT(*) AS submitted_count,
+            SELECT FLOOR(TIMESTAMPDIFF(MINUTE, #{from}, counted_at) / 10) AS bucket,
+              contribution_user_id_snapshot AS contributor_user_id,
+              contribution_dept_id_snapshot AS source_dept_id,
+              CASE WHEN provider_owner_type='partner' THEN 'part_time' ELSE 'direct' END AS contribution_type,
+              COUNT(*) AS submitted_count,
               SUM(CASE WHEN status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS valid_count
             FROM zsjos_lead
-            WHERE tenant_id=#{tenantId} AND deleted=b'0' AND submitted_at>=#{from} AND submitted_at<#{to}
-              AND ((source_type='internal_new_media' AND source_user_id IS NOT NULL)
-                OR (source_type='sales_self_sourced' AND source_provider_recorded=b'1' AND source_provider_user_id IS NOT NULL))
-            GROUP BY bucket, contributor_user_id, source_dept_id, source_type, source_provider_user_id
+            WHERE tenant_id=#{tenantId} AND deleted=b'0' AND counted_at>=#{from} AND counted_at<#{to}
+              AND provider_owner_type IN ('system_user','partner')
+              AND contribution_user_id_snapshot IS NOT NULL AND contribution_dept_id_snapshot IS NOT NULL
+            GROUP BY bucket,contribution_user_id_snapshot,contribution_dept_id_snapshot,contribution_type
             ORDER BY bucket
             """)
     List<MediaScreenTimedContributionRow> countMediaScreenTenMinuteContributions(@Param("tenantId") Long tenantId,
@@ -68,16 +77,17 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                                                                    @Param("to") LocalDateTime to);
 
     @Select("""
-            SELECT DATE(submitted_at) AS bucket,
-              CASE WHEN source_type='sales_self_sourced' AND source_provider_recorded=b'1'
-                   THEN source_provider_user_id ELSE source_user_id END AS contributor_user_id,
-              source_dept_id, source_type, source_provider_user_id, COUNT(*) AS submitted_count,
+            SELECT DATE(counted_at) AS bucket,
+              contribution_user_id_snapshot AS contributor_user_id,
+              contribution_dept_id_snapshot AS source_dept_id,
+              CASE WHEN provider_owner_type='partner' THEN 'part_time' ELSE 'direct' END AS contribution_type,
+              COUNT(*) AS submitted_count,
               SUM(CASE WHEN status IN ('valid','converted','won') THEN 1 ELSE 0 END) AS valid_count
             FROM zsjos_lead
-            WHERE tenant_id=#{tenantId} AND deleted=b'0' AND submitted_at>=#{from} AND submitted_at<#{to}
-              AND ((source_type='internal_new_media' AND source_user_id IS NOT NULL)
-                OR (source_type='sales_self_sourced' AND source_provider_recorded=b'1' AND source_provider_user_id IS NOT NULL))
-            GROUP BY bucket, contributor_user_id, source_dept_id, source_type, source_provider_user_id
+            WHERE tenant_id=#{tenantId} AND deleted=b'0' AND counted_at>=#{from} AND counted_at<#{to}
+              AND provider_owner_type IN ('system_user','partner')
+              AND contribution_user_id_snapshot IS NOT NULL AND contribution_dept_id_snapshot IS NOT NULL
+            GROUP BY bucket,contribution_user_id_snapshot,contribution_dept_id_snapshot,contribution_type
             ORDER BY bucket
             """)
     List<MediaScreenTimedContributionRow> countMediaScreenDailyContributions(@Param("tenantId") Long tenantId,
@@ -258,6 +268,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getSourceChannelId, reqVO.getSourceChannel())
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
                 .eqIfPresent(LeadDO::getSourceUserId, reqVO.getSourceUserId())
+                .eqIfPresent(LeadDO::getProviderOwnerType, reqVO.getProviderOwnerType())
+                .eqIfPresent(LeadDO::getProviderOwnerId, reqVO.getProviderOwnerId())
                 .eqIfPresent(LeadDO::getOwnerUserId, reqVO.getOwnerUserId())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
         if (inboxMatchNone) {
@@ -291,7 +303,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 query.eq(LeadDO::getId, -1L);
             } else {
                 query.and(wrapper -> {
-                    if (hasSourceScope) wrapper.in(LeadDO::getSourceUserId, visibleSourceUserIds);
+                    if (hasSourceScope) wrapper.eq(LeadDO::getProviderOwnerType, "system_user")
+                            .in(LeadDO::getProviderOwnerId, visibleSourceUserIds);
                     if (hasOwnerScope) {
                         if (hasSourceScope) wrapper.or();
                         wrapper.in(LeadDO::getOwnerUserId, visibleOwnerUserIds)
@@ -391,7 +404,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 query.eq("id", -1L);
             } else {
                 query.and(wrapper -> {
-                    if (hasSourceScope) wrapper.in("source_user_id", visibleSourceUserIds);
+                    if (hasSourceScope) wrapper.eq("provider_owner_type", "system_user")
+                            .in("provider_owner_id", visibleSourceUserIds);
                     if (hasOwnerScope) {
                         if (hasSourceScope) wrapper.or();
                         wrapper.in("owner_user_id", visibleOwnerUserIds);
@@ -418,11 +432,12 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .groupBy("status", "assignment_status", "handling_stage");
         if (visibleUserId != null) {
             if ("submitter".equals(audience)) {
-                query.eq("source_user_id", visibleUserId);
+                query.eq("provider_owner_type", "system_user").eq("provider_owner_id", visibleUserId);
             } else if ("owner".equals(audience)) {
                 query.eq("owner_user_id", visibleUserId);
             } else {
-                query.and(wrapper -> wrapper.eq("source_user_id", visibleUserId)
+                query.and(wrapper -> wrapper.eq("provider_owner_type", "system_user")
+                        .eq("provider_owner_id", visibleUserId)
                         .or().eq("owner_user_id", visibleUserId));
             }
         }

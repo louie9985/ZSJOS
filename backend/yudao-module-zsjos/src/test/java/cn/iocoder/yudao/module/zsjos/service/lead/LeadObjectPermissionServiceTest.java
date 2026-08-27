@@ -324,6 +324,10 @@ class LeadObjectPermissionServiceTest {
         LeadDO lead = new LeadDO();
         lead.setId(1L);
         lead.setSourceUserId(sourceUserId);
+        if (sourceUserId != null) {
+            lead.setProviderOwnerType("system_user");
+            lead.setProviderOwnerId(sourceUserId);
+        }
         lead.setOwnerUserId(ownerUserId);
         return lead;
     }

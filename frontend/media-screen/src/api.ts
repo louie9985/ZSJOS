@@ -21,10 +21,12 @@ export type BackendMetrics = {
 };
 
 export type BackendPartTimerDetail = BackendMetrics & {
+  partnerId?: number | null;
   name?: string | null;
 };
 
 export type BackendMember = BackendMetrics & {
+  userId?: number | null;
   name?: string | null;
   departmentName?: string | null;
   leadCount?: number | null;
@@ -34,6 +36,7 @@ export type BackendMember = BackendMetrics & {
 };
 
 export type BackendDepartment = {
+  departmentId?: number | null;
   name?: string | null;
   subtitle?: string | null;
   metrics?: BackendMetrics | null;
@@ -51,12 +54,14 @@ export type BackendTodayStar = BackendRankItem & {
   yesterday?: number | null;
   rankToday?: number | null;
   rankYesterday?: number | null;
+  includesPartTime?: boolean | null;
 };
 
 export type BackendYesterdayChampion = {
   name?: string | null;
   deptName?: string | null;
   count?: number | null;
+  includesPartTime?: boolean | null;
 };
 
 export type BackendStats = {
@@ -84,9 +89,7 @@ export type BackendHistory = BackendStats & {
   source?: string | null;
   snapshotCreatedAt?: string | null;
   departments?: Array<BackendDepartment & {
-    members?: Array<BackendRankItem & {
-      departmentName?: string | null;
-    }> | null;
+    members?: Array<BackendMember & BackendRankItem> | null;
   }> | null;
   historySnapshot?: {
     available?: boolean | null;

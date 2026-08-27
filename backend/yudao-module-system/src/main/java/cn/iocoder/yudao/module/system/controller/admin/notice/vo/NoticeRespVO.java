@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Schema(description = "管理后台 - 通知公告信息 Response VO")
 @Data
@@ -26,5 +27,10 @@ public class NoticeRespVO {
 
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "时间戳格式")
     private LocalDateTime createTime;
+
+    private String publishStatus;
+    private LocalDateTime publishTime;
+    private LocalDateTime offlineTime;
+    private List<NoticeAttachmentVO> attachments;
 
 }

@@ -41,6 +41,9 @@ public class LeadManagementPageReqVO extends PageParam {
     private String sourceChannel;
     private String leadCategory;
     private Long sourceUserId;
+    @Pattern(regexp = "system_user|partner", message = "客资提供方类型不正确")
+    private String providerOwnerType;
+    private Long providerOwnerId;
     private Long ownerUserId;
 
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)

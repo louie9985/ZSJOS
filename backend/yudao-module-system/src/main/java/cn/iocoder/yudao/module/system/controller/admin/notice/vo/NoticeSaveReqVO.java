@@ -6,6 +6,10 @@ import lombok.Data;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.Valid;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @Schema(description = "管理后台 - 通知公告创建/修改 Request VO")
 @Data
@@ -28,5 +32,9 @@ public class NoticeSaveReqVO {
 
     @Schema(description = "状态，参见 CommonStatusEnum 枚举类", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
+
+    @Size(max = 10, message = "公告附件不能超过10个")
+    @Valid
+    private List<NoticeAttachmentVO> attachments = new ArrayList<>();
 
 }

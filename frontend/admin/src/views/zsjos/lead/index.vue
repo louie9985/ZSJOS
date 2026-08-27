@@ -113,6 +113,9 @@
           userText(scope.row.sourceUserId, scope.row.sourceUserName)
         }}</template>
       </el-table-column>
+      <el-table-column label="提供方" min-width="110" prop="providerOwnerNameSnapshot">
+        <template #default="scope">{{ scope.row.providerOwnerNameSnapshot || '-' }}</template>
+      </el-table-column>
       <el-table-column label="负责人" min-width="110">
         <template #default="scope">{{
           userText(scope.row.ownerUserId, scope.row.ownerUserName)
@@ -208,6 +211,9 @@
         <el-descriptions title="提交与分配" :column="2" border class="mt-20px">
           <el-descriptions-item label="提交人">{{
             userText(detail.sourceUserId, detail.sourceUserName)
+          }}</el-descriptions-item>
+          <el-descriptions-item label="提供方">{{
+            detail.providerOwnerNameSnapshot || '-'
           }}</el-descriptions-item>
           <el-descriptions-item label="负责人">{{
             userText(detail.ownerUserId, detail.ownerUserName)

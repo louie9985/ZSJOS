@@ -8,16 +8,18 @@ describe('subordinate Partner surface', () => {
     const host = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
     expect(constants).toContain("SUBORDINATE_PARTNERS: '/zsjos/subordinate-partners'")
     expect(registry).toContain("'zsjos/subordinatePartner/index'")
-    expect(host).toContain('<SubordinatePartnerPage/>')
+    expect(host).toContain('<SubordinatePartnerPage permissions={permissions}/>')
   })
 
   it('uses scoped endpoints and the readonly Lead detail mode', () => {
-    const api = readFileSync('src/services/api.ts', 'utf8')
+    const api = readFileSync('src/services/managementApi.ts', 'utf8')
     const page = readFileSync('src/pages/SubordinatePartnerPage.tsx', 'utf8')
-    expect(api).toContain('/zsjos/subordinate-partners/${partnerId}/leads/page')
-    expect(api).toContain('/zsjos/subordinate-partners/leads/${leadId}')
+    expect(api).toContain('/zsjos/partner/${partnerId}/leads/page')
+    expect(api).toContain('/zsjos/partner/leads/${leadId}')
     expect(page).toContain('mode="manager-readonly"')
     expect(page).toContain("lead.partnerOwnerNameSnapshot || '未记录'")
+    expect(page).toContain("zsjos:partner:manage")
+    expect(page).not.toContain('转为员工')
   })
 
   it('submits search state and rejects stale partner, lead, and detail requests', () => {

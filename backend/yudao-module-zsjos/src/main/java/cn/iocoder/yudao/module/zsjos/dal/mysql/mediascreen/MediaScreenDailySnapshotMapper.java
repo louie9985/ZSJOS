@@ -14,8 +14,8 @@ import java.util.List;
 
 @Mapper
 public interface MediaScreenDailySnapshotMapper extends BaseMapperX<MediaScreenDailySnapshotDO> {
-    @Insert("INSERT IGNORE INTO zsjos_media_screen_daily_snapshot(snapshot_date,supervisor_id,department_name,member_id,member_name,submitted_count,valid_count,part_time_submitted_count,part_time_valid_count,creator,create_time,updater,update_time,deleted,tenant_id) "
-            + "VALUES(#{row.snapshotDate},#{row.supervisorId},#{row.departmentName},#{row.memberId},#{row.memberName},#{row.submittedCount},#{row.validCount},#{row.partTimeSubmittedCount},#{row.partTimeValidCount},'',NOW(),'',NOW(),b'0',#{tenantId})")
+    @Insert("INSERT IGNORE INTO zsjos_media_screen_daily_snapshot(snapshot_date,contribution_type,department_id,department_name,supervisor_id,supervisor_name,member_id,member_name,member_enabled,today_count,week_count,month_total,month_effective,partner_details_json,creator,create_time,updater,update_time,deleted,tenant_id) "
+            + "VALUES(#{row.snapshotDate},#{row.contributionType},#{row.departmentId},#{row.departmentName},#{row.supervisorId},#{row.supervisorName},#{row.memberId},#{row.memberName},#{row.memberEnabled},#{row.todayCount},#{row.weekCount},#{row.monthTotal},#{row.monthEffective},#{row.partnerDetailsJson},'',NOW(),'',NOW(),b'0',#{tenantId})")
     int insertIgnore(@Param("tenantId") Long tenantId, @Param("row") MediaScreenDailySnapshotDO row);
 
     default List<MediaScreenDailySnapshotDO> selectByDate(Long tenantId, LocalDate date) {

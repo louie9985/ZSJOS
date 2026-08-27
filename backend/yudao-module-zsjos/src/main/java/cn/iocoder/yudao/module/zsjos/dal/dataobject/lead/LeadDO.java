@@ -29,6 +29,16 @@ public class LeadDO extends TenantBaseDO {
     private Long partnerId;
     private Long partnerOwnerUserIdSnapshot;
     private String partnerOwnerNameSnapshot;
+    private String providerOwnerType;
+    private Long providerOwnerId;
+    private String providerOwnerNameSnapshot;
+    private Long contributionUserIdSnapshot;
+    private String contributionUserNameSnapshot;
+    private Long contributionSupervisorUserIdSnapshot;
+    private String contributionSupervisorNameSnapshot;
+    private Long contributionDeptIdSnapshot;
+    private String contributionDeptNameSnapshot;
+    private LocalDateTime countedAt;
     private String sourceChannelId;
     private String provinceCode;
     private String provinceName;

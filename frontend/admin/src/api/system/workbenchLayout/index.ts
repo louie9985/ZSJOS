@@ -46,6 +46,7 @@ export interface WorkbenchLayoutDraftRespVO {
   scopeId: number
   draftRevision: number
   snapshot: WorkbenchLayoutSnapshot
+  candidatePages: WorkbenchLayoutCandidateRespVO['pages']
   publishedVersionId?: number
   publishedVersionNo?: number
   publishedEnabled?: boolean
@@ -55,9 +56,12 @@ export interface WorkbenchLayoutDraftRespVO {
 export interface WorkbenchMenuMeta {
   globalVersionId?: number
   globalVersionNo?: number
-  winningRoleId?: number
-  roleVersionId?: number
-  roleVersionNo?: number
+  appliedRoleLayouts: Array<{
+    roleId: number
+    versionId?: number
+    versionNo?: number
+    priority?: number
+  }>
   fallback: boolean
   fallbackReason?: string
 }

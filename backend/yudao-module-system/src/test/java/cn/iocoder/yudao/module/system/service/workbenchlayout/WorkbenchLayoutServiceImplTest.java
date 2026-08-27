@@ -5,6 +5,7 @@ import cn.iocoder.yudao.module.system.controller.admin.workbenchlayout.vo.Workbe
 import cn.iocoder.yudao.module.system.controller.admin.workbenchlayout.vo.WorkbenchLayoutRestoreReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.workbenchlayout.vo.WorkbenchLayoutSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.permission.RoleDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.workbenchlayout.WorkbenchLayoutDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.workbenchlayout.WorkbenchLayoutVersionDO;
 import cn.iocoder.yudao.module.system.dal.mysql.workbenchlayout.WorkbenchLayoutMapper;
@@ -31,6 +32,7 @@ import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServic
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.WORKBENCH_LAYOUT_REVISION_CONFLICT;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +63,7 @@ class WorkbenchLayoutServiceImplTest {
                 .setName("我的工资条").setPath("/hrm/portal/salary/slip").setIcon("ep:money")
                 .setWorkbenchRenderMode("native").setVisible(true).setKeepAlive(true)
                 .setAlwaysShow(true).setStatus(0);
+        lenient().when(menuService.filterDisableMenus(anyList())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
@@ -75,7 +78,7 @@ class WorkbenchLayoutServiceImplTest {
     }
 
     @Test
-    void shouldUseHighestPriorityEnabledRoleLayout() {
+    void shouldApplyPublishedRoleLayoutAndExposeAppliedMetadata() {
         WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(List.of(salaryMenu));
         WorkbenchLayoutDO globalLayout = new WorkbenchLayoutDO().setPublishedVersionId(10L);
         WorkbenchLayoutVersionDO globalVersion = new WorkbenchLayoutVersionDO().setId(10L).setVersionNo(3)
@@ -85,8 +88,8 @@ class WorkbenchLayoutServiceImplTest {
         findPage(roleNodes, 100L).setHidden(true);
         WorkbenchLayoutSnapshot roleDifference = resolver.normalizeRoleDraft(global,
                 WorkbenchLayoutSnapshot.builder().scopeType("ROLE").enabled(true).priority(1)
-                        .nodes(roleNodes).build());
-        WorkbenchLayoutDO winningRole = new WorkbenchLayoutDO().setScopeId(2L)
+                        .nodes(roleNodes).build(), List.of(salaryMenu));
+        WorkbenchLayoutDO appliedRole = new WorkbenchLayoutDO().setScopeId(2L)
                 .setPublishedVersionId(20L).setPublishedVersionNo(1)
                 .setPublishedEnabled(true).setPublishedPriority(1);
         WorkbenchLayoutVersionDO roleVersion = new WorkbenchLayoutVersionDO().setId(20L).setVersionNo(1)
@@ -94,16 +97,21 @@ class WorkbenchLayoutServiceImplTest {
 
         when(layoutMapper.selectByScope("GLOBAL", 0L)).thenReturn(globalLayout);
         when(versionMapper.selectById(10L)).thenReturn(globalVersion);
-        when(layoutMapper.selectPublishedRoleLayouts(Set.of(1L, 2L))).thenReturn(List.of(winningRole));
+        when(layoutMapper.selectPublishedRoleLayouts(Set.of(1L, 2L))).thenReturn(List.of(appliedRole));
         when(versionMapper.selectById(20L)).thenReturn(roleVersion);
+        when(permissionService.getRoleMenuListByRoleId(Set.of(2L))).thenReturn(Set.of(100L));
+        when(menuService.getMenuList(Set.of(100L))).thenReturn(List.of(salaryMenu));
 
         var projection = service.getProjection(Set.of(1L, 2L), List.of(salaryMenu));
 
         assertThat(projection.getMenus()).isEmpty();
         assertThat(projection.getMeta().getFallback()).isFalse();
-        assertThat(projection.getMeta().getWinningRoleId()).isEqualTo(2L);
         assertThat(projection.getMeta().getGlobalVersionNo()).isEqualTo(3);
-        assertThat(projection.getMeta().getRoleVersionNo()).isEqualTo(1);
+        assertThat(projection.getMeta().getAppliedRoleLayouts()).singleElement().satisfies(applied -> {
+            assertThat(applied.getRoleId()).isEqualTo(2L);
+            assertThat(applied.getVersionNo()).isEqualTo(1);
+            assertThat(applied.getPriority()).isEqualTo(1);
+        });
     }
 
     @Test
@@ -116,6 +124,28 @@ class WorkbenchLayoutServiceImplTest {
                 new WorkbenchLayoutDO().setId(1L).setDraftRevision(2));
 
         assertServiceException(() -> service.saveDraft(request), WORKBENCH_LAYOUT_REVISION_CONFLICT);
+    }
+
+    @Test
+    void shouldReturnOnlyRoleAuthorizedVisibleWorkbenchCandidates() {
+        MenuDO hidden = new MenuDO().setId(101L).setParentId(0L).setType(2).setSort(2)
+                .setName("隐藏页面").setPath("/hidden").setWorkbenchRenderMode("native")
+                .setVisible(false).setStatus(0);
+        WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(List.of(salaryMenu, hidden));
+        when(roleService.getRole(2L)).thenReturn(new RoleDO().setId(2L).setName("销售"));
+        when(permissionService.getRoleMenuListByRoleId(Set.of(2L))).thenReturn(Set.of(100L, 101L));
+        when(menuService.getMenuList(Set.of(100L, 101L))).thenReturn(List.of(salaryMenu, hidden));
+        when(layoutMapper.selectByScope("ROLE", 2L)).thenReturn(null);
+        when(layoutMapper.selectByScope("GLOBAL", 0L)).thenReturn(
+                new WorkbenchLayoutDO().setPublishedVersionId(10L));
+        when(versionMapper.selectById(10L)).thenReturn(new WorkbenchLayoutVersionDO().setId(10L)
+                .setSnapshotJson(JsonUtils.toJsonString(global)));
+
+        var draft = service.getDraft("ROLE", 2L);
+
+        assertThat(draft.getCandidatePages()).extracting("sourceMenuId").containsExactly(100L);
+        assertThat(findPage(draft.getSnapshot().getNodes(), 100L)).isNotNull();
+        assertThat(findPage(draft.getSnapshot().getNodes(), 101L)).isNull();
     }
 
     @Test

@@ -85,8 +85,9 @@ public class LeadObjectPermissionService {
     public boolean canRead(LeadDO lead, Long userId) {
         return securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)
                 || securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)
-                    && (Objects.equals(userId, lead.getSourceUserId())
-                    || managesUserDepartment(userId, lead.getSourceUserId()))
+                    && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                    && (Objects.equals(userId, lead.getProviderOwnerId())
+                    || managesUserDepartment(userId, lead.getProviderOwnerId()))
                 || securityFrameworkService.hasPermission(PERMISSION_QUERY_OWNED)
                     && (Objects.equals(userId, lead.getOwnerUserId())
                     || managesUserDepartment(userId, lead.getOwnerUserId()))
@@ -103,7 +104,8 @@ public class LeadObjectPermissionService {
      */
     public boolean canReadDetail(LeadDO lead, Long userId) {
         if (userId == null) return false;
-        if (hasQueryAll() || Objects.equals(userId, lead.getSourceUserId())
+        if (hasQueryAll() || PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(userId, lead.getProviderOwnerId())
                 || Objects.equals(userId, lead.getOwnerUserId())
                 || managesUserDepartment(userId, lead.getOwnerUserId())
                 || securityFrameworkService.hasPermission("zsjos:lead:qualification:manage")

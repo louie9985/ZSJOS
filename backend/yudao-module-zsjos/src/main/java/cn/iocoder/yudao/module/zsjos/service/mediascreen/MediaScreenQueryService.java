@@ -8,99 +8,718 @@ import cn.iocoder.yudao.module.system.api.maintenance.MaintenanceModeApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.pub.mediascreen.vo.MediaScreenRespVO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.mediascreen.MediaScreenDailySnapshotDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.MediaScreenContributionRow;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.MediaScreenTimedContributionRow;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.mediascreen.MediaScreenDailySnapshotMapper;
 import cn.iocoder.yudao.module.zsjos.framework.mediascreen.MediaScreenProperties;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.*;
-import java.util.*;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Service
 public class MediaScreenQueryService {
+
     private static final ZoneId ZONE = ZoneId.of("Asia/Shanghai");
-    private final LeadMapper leadMapper; private final MediaScreenDailySnapshotMapper snapshotMapper;
-    private final AdminUserApi adminUserApi; private final DeptApi deptApi;
-    private final MaintenanceModeApi maintenanceModeApi; private final StringRedisTemplate redis;
+    private static final String DIRECT = "direct";
+    private static final String PART_TIME = "part_time";
+
+    private final LeadMapper leadMapper;
+    private final MediaScreenDailySnapshotMapper snapshotMapper;
+    private final PartnerMapper partnerMapper;
+    private final AdminUserApi adminUserApi;
+    private final DeptApi deptApi;
+    private final MaintenanceModeApi maintenanceModeApi;
+    private final StringRedisTemplate redis;
     private final MediaScreenProperties properties;
 
     public MediaScreenQueryService(LeadMapper leadMapper, MediaScreenDailySnapshotMapper snapshotMapper,
-                                   AdminUserApi adminUserApi, DeptApi deptApi, MaintenanceModeApi maintenanceModeApi,
-                                   StringRedisTemplate redis, MediaScreenProperties properties) {
-        this.leadMapper=leadMapper; this.snapshotMapper=snapshotMapper; this.adminUserApi=adminUserApi;
-        this.deptApi=deptApi; this.maintenanceModeApi=maintenanceModeApi; this.redis=redis; this.properties=properties;
+                                   PartnerMapper partnerMapper, AdminUserApi adminUserApi, DeptApi deptApi,
+                                   MaintenanceModeApi maintenanceModeApi, StringRedisTemplate redis,
+                                   MediaScreenProperties properties) {
+        this.leadMapper = leadMapper;
+        this.snapshotMapper = snapshotMapper;
+        this.partnerMapper = partnerMapper;
+        this.adminUserApi = adminUserApi;
+        this.deptApi = deptApi;
+        this.maintenanceModeApi = maintenanceModeApi;
+        this.redis = redis;
+        this.properties = properties;
     }
 
     public MediaScreenRespVO stats(Long tenantId, boolean includePartTimers) {
-        String key="zsjos:media-screen:"+tenantId+":stats:"+includePartTimers;
-        MediaScreenRespVO cached=read(key,MediaScreenRespVO.class); if(cached!=null)return cached;
-        ZonedDateTime now=ZonedDateTime.now(ZONE); MediaScreenRespVO value=aggregate(tenantId,now.toLocalDate(),now.toLocalDateTime());
-        value.setPartTimeIncluded(includePartTimers);value.getPartTimer().setEnabled(includePartTimers);write(key,value,properties.getCache().getStatsTtlSeconds()); return value;
+        String key = "zsjos:media-screen:" + tenantId + ":stats:" + includePartTimers;
+        MediaScreenRespVO cached = read(key, MediaScreenRespVO.class);
+        if (cached != null) return cached;
+        ZonedDateTime now = ZonedDateTime.now(ZONE);
+        MediaScreenRespVO value = aggregateRealtime(tenantId, now.toLocalDate(), now.toLocalDateTime(), includePartTimers);
+        write(key, value, properties.getCache().getStatsTtlSeconds());
+        return value;
     }
 
     public MediaScreenRespVO history(Long tenantId, LocalDate date, boolean includePartTimers) {
-        String key="zsjos:media-screen:"+tenantId+":history:"+date+":"+includePartTimers;
-        MediaScreenRespVO cached=read(key,MediaScreenRespVO.class); if(cached!=null)return cached;
-        List<MediaScreenDailySnapshotDO> target=snapshotMapper.selectByDate(tenantId,date);
-        MediaScreenRespVO result=target.isEmpty()?emptyHistory(tenantId,date):aggregateHistory(tenantId,date,target);
-        result.setPartTimeIncluded(includePartTimers); write(key,result,properties.getCache().getHistoryTtlSeconds()); return result;
+        String key = "zsjos:media-screen:" + tenantId + ":history:" + date + ":" + includePartTimers;
+        MediaScreenRespVO cached = read(key, MediaScreenRespVO.class);
+        if (cached != null) return cached;
+        List<MediaScreenDailySnapshotDO> rows = snapshotMapper.selectByDate(tenantId, date);
+        MediaScreenRespVO value = rows.isEmpty()
+                ? emptyHistory(tenantId, date, includePartTimers)
+                : aggregateHistory(tenantId, date, rows, includePartTimers);
+        write(key, value, properties.getCache().getHistoryTtlSeconds());
+        return value;
     }
 
-    public Map<String,Object> maintenance(Long tenantId){
-        String key="zsjos:media-screen:"+tenantId+":maintenance"; Map<String,Object> cached=read(key,Map.class); if(cached!=null)return cached;
-        Map<String,Object> value=new LinkedHashMap<>(); value.put("tenantId",tenantId); value.put("maintenanceEnabled",maintenanceModeApi.isEnabled()); value.put("checkedAt",OffsetDateTime.now(ZONE)); write(key,value,properties.getCache().getMaintenanceTtlSeconds()); return value;
+    public Map<String, Object> maintenance(Long tenantId) {
+        String key = "zsjos:media-screen:" + tenantId + ":maintenance";
+        Map<String, Object> cached = read(key, Map.class);
+        if (cached != null) return cached;
+        Map<String, Object> value = new LinkedHashMap<>();
+        value.put("tenantId", tenantId);
+        value.put("maintenanceEnabled", maintenanceModeApi.isEnabled());
+        value.put("checkedAt", OffsetDateTime.now(ZONE));
+        write(key, value, properties.getCache().getMaintenanceTtlSeconds());
+        return value;
     }
 
     @Transactional
     public void freeze(Long tenantId, LocalDate date) {
-        List<Long> deptIds=deptIds(); if(deptIds.isEmpty())return; List<AdminUserRespDTO> roster=activeUsers(deptIds);
-        Map<Long,AdminUserRespDTO> users=new HashMap<>();roster.forEach(u->users.put(u.getId(),u));LocalDateTime from=date.atStartOfDay(),to=date.plusDays(1).atStartOfDay();
-        List<MediaScreenContributionRow> rows=leadMapper.countMediaScreenContributions(tenantId,from,from,from,to);Set<Long> contributorIds=new HashSet<>();rows.forEach(x->contributorIds.add(x.getContributorUserId()));users.putAll(adminUserApi.getUserMap(contributorIds));Map<Key,Counts> counts=merge(rows,users,deptIds);
-        Map<Long,Key> assignments=new LinkedHashMap<>();for(AdminUserRespDTO u:roster)assignments.put(u.getId(),new Key(u.getId(),u.getDeptId()));for(Key key:counts.keySet())assignments.put(key.user(),key);
-        Set<Long> existing=new HashSet<>(snapshotMapper.selectMemberIds(tenantId,date,assignments.keySet()));Map<Long,DeptRespDTO> deptMap=deptApi.getDeptMap(deptIds);
-        for(Key key:assignments.values()){AdminUserRespDTO user=users.get(key.user());if(user==null||existing.contains(user.getId()))continue;DeptRespDTO dept=deptMap.get(key.dept());Counts c=counts.getOrDefault(key,new Counts());snapshotMapper.insertIgnore(tenantId,new MediaScreenDailySnapshotDO().setSnapshotDate(date).setSupervisorId(dept==null?null:dept.getLeaderUserId()).setDepartmentName(dept==null?"":dept.getName()).setMemberId(user.getId()).setMemberName(user.getNickname()).setSubmittedCount((int)c.today).setValidCount((int)c.effective).setPartTimeSubmittedCount(0).setPartTimeValidCount(0));}
+        if (!snapshotMapper.selectByDate(tenantId, date).isEmpty()) return;
+        List<Long> departmentIds = departmentIds();
+        if (departmentIds.isEmpty()) return;
+        LocalDateTime cutoff = date.plusDays(1).atStartOfDay();
+        List<MediaScreenContributionRow> rows = contributionRows(tenantId, date, cutoff);
+        Map<Long, DeptRespDTO> departments = deptApi.getDeptMap(departmentIds);
+        Map<Long, AdminUserRespDTO> users = userMap(rows);
+        List<AdminUserRespDTO> roster = activeRoster(departmentIds);
+        roster.forEach(user -> users.put(user.getId(), user));
+        Map<Long, PartnerDO> partners = partnerMap(rows);
+
+        for (Long departmentId : departmentIds) {
+            DeptRespDTO department = departments.get(departmentId);
+            if (department == null) continue;
+            List<MediaScreenContributionRow> directRows = rows.stream()
+                    .filter(row -> DIRECT.equals(row.getContributionType())
+                            && Objects.equals(departmentId, row.getSourceDeptId())).toList();
+            Set<Long> memberIds = directRows.stream().map(MediaScreenContributionRow::getContributorUserId)
+                    .collect(Collectors.toCollection(LinkedHashSet::new));
+            roster.stream().filter(user -> Objects.equals(departmentId, user.getDeptId()))
+                    .map(AdminUserRespDTO::getId).forEach(memberIds::add);
+            if (memberIds.isEmpty()) memberIds.add(0L);
+            for (Long memberId : memberIds) {
+                List<MediaScreenContributionRow> memberRows = filterMember(directRows, memberId);
+                insertSnapshot(tenantId, date, DIRECT, department, memberId, users.get(memberId), memberRows, null);
+            }
+        }
+
+        Map<MemberKey, List<MediaScreenContributionRow>> partTimeGroups = rows.stream()
+                .filter(row -> PART_TIME.equals(row.getContributionType()))
+                .collect(Collectors.groupingBy(row -> new MemberKey(row.getSourceDeptId(), row.getContributorUserId()),
+                        LinkedHashMap::new, Collectors.toList()));
+        for (Map.Entry<MemberKey, List<MediaScreenContributionRow>> entry : partTimeGroups.entrySet()) {
+            DeptRespDTO department = departments.get(entry.getKey().departmentId());
+            if (department == null) continue;
+            List<MediaScreenRespVO.PartTimerDetail> details = partnerDetails(entry.getValue(), partners);
+            insertSnapshot(tenantId, date, PART_TIME, department, entry.getKey().userId(),
+                    users.get(entry.getKey().userId()), entry.getValue(), JsonUtils.toJsonString(details));
+        }
     }
 
-    private MediaScreenRespVO aggregate(Long tenantId,LocalDate date,LocalDateTime now){
-        MediaScreenRespVO r=new MediaScreenRespVO(); r.setTenantId(tenantId); r.setGeneratedAt(now); r.setUpdatedAt(now.atZone(ZONE).toInstant().toEpochMilli()); r.setRefreshIntervalSeconds((int)properties.getCache().getRefreshIntervalSeconds());
-        List<Long> ids=deptIds(); Map<Long,DeptRespDTO> dm=ids.isEmpty()?Map.of():deptApi.getDeptMap(ids); List<AdminUserRespDTO> roster=activeUsers(ids); Map<Long,AdminUserRespDTO> users=new HashMap<>(); roster.forEach(u->users.put(u.getId(),u));
-        LocalDateTime day=date.atStartOfDay(), week=date.with(DayOfWeek.MONDAY).atStartOfDay(), month=date.withDayOfMonth(1).atStartOfDay(); List<MediaScreenContributionRow> rows=leadMapper.countMediaScreenContributions(tenantId,day,week,month,now); rows.forEach(x->{if(x.getContributorUserId()!=null)users.putIfAbsent(x.getContributorUserId(),adminUserApi.getUserMap(List.of(x.getContributorUserId())).get(x.getContributorUserId()));});
-        List<MediaScreenRespVO.Department> ds=departments(ids,dm,roster,users,merge(rows,users,ids)); MediaScreenRespVO.Metrics summary=new MediaScreenRespVO.Metrics(); ds.forEach(d->add(summary,d.getMetrics())); r.setSummary(summary); r.setDepartments(ds); r.setPartTimeCompanionDepartment(null); r.setTodayStar(star(ds,date,tenantId)); r.setYesterdayChampion(champion(tenantId,date.minusDays(1))); r.setTrend(buildTrend(tenantId,date,now,users,ids)); r.setSeries(buildSeries(tenantId,date,users,ids));
-        r.setTotalLeads(summary.getMonthTotal()); r.setDepartmentRanking(rankDepartments(ds)); r.setMemberRanking(rankMembers(ds)); MediaScreenRespVO.PartTimer partTimer=new MediaScreenRespVO.PartTimer();partTimer.setEnabled(false);partTimer.setItems(List.of());r.setPartTimer(partTimer);return r;
+    private MediaScreenRespVO aggregateRealtime(Long tenantId, LocalDate date, LocalDateTime now,
+                                                 boolean includePartTimers) {
+        List<Long> departmentIds = departmentIds();
+        Map<Long, DeptRespDTO> departmentMap = departmentIds.isEmpty() ? Map.of() : deptApi.getDeptMap(departmentIds);
+        List<MediaScreenContributionRow> rows = contributionRows(tenantId, date, now);
+        Map<Long, AdminUserRespDTO> users = userMap(rows);
+        List<AdminUserRespDTO> roster = activeRoster(departmentIds);
+        roster.forEach(user -> users.put(user.getId(), user));
+        Map<Long, PartnerDO> partners = partnerMap(rows);
+
+        List<MediaScreenRespVO.Department> directDepartments = buildDirectDepartments(
+                departmentIds, departmentMap, rows, roster, users);
+        MediaScreenRespVO.Department companion = includePartTimers
+                ? buildCompanion(rows, users, partners) : null;
+        MediaScreenRespVO.Metrics summary = sumDepartments(directDepartments);
+        if (companion != null) add(summary, companion.getMetrics());
+
+        MediaScreenRespVO result = base(tenantId, includePartTimers);
+        result.setSummary(summary);
+        result.setDepartments(directDepartments);
+        result.setPartTimeCompanionDepartment(companion);
+        result.setTodayStar(todayStar(rows, users, includePartTimers, tenantId, date));
+        result.setYesterdayChampion(yesterdayChampion(tenantId, date.minusDays(1), includePartTimers));
+        result.setTrend(buildTrend(tenantId, date, now, departmentIds, includePartTimers));
+        result.setSeries(buildSeries(tenantId, date, departmentIds, includePartTimers));
+        applyLegacy(result);
+        return result;
     }
 
-    private MediaScreenRespVO aggregateHistory(Long tenantId,LocalDate date,List<MediaScreenDailySnapshotDO> target){
-        MediaScreenRespVO r=new MediaScreenRespVO(); r.setTenantId(tenantId);r.setAvailable(true);r.setSource("persisted_snapshot");r.setGeneratedAt(LocalDateTime.now(ZONE));r.setSnapshotCreatedAt(target.get(0).getCreateTime());
-        LocalDate month=date.withDayOfMonth(1),week=date.with(DayOfWeek.MONDAY),from=month.isBefore(week)?month:week; List<MediaScreenDailySnapshotDO> all=snapshotMapper.selectByDateBetween(tenantId,from,date); Map<Long,MediaScreenRespVO.Metrics> mm=new HashMap<>();
-        for(MediaScreenDailySnapshotDO x:all){MediaScreenRespVO.Metrics m=mm.computeIfAbsent(x.getMemberId(),k->new MediaScreenRespVO.Metrics());if(x.getSnapshotDate().equals(date))m.setToday(m.getToday()+x.getSubmittedCount());if(!x.getSnapshotDate().isBefore(week))m.setWeek(m.getWeek()+x.getSubmittedCount());if(!x.getSnapshotDate().isBefore(month)){m.setMonthTotal(m.getMonthTotal()+x.getSubmittedCount());m.setMonthEffective(m.getMonthEffective()+x.getValidCount());}}
-        Map<String,MediaScreenRespVO.Department> dm=new LinkedHashMap<>(); for(MediaScreenDailySnapshotDO x:target){var d=dm.computeIfAbsent(x.getDepartmentName(),this::department);var m=member(x.getMemberName(),mm.getOrDefault(x.getMemberId(),new MediaScreenRespVO.Metrics()));d.getMembers().add(m);add(d.getMetrics(),metrics(m));}
-        List<MediaScreenRespVO.Department> ds=new ArrayList<>(dm.values());MediaScreenRespVO.Metrics sum=new MediaScreenRespVO.Metrics();ds.forEach(d->add(sum,d.getMetrics()));r.setSummary(sum);r.setDepartments(ds);r.setPartTimeCompanionDepartment(null);r.setTodayStar(null);r.setYesterdayChampion(null);r.setTrend(trend(sum.getToday()));var s=new MediaScreenRespVO.Series();s.setSubmitted(List.of());s.setValid(List.of());r.setSeries(s);r.setTotalLeads(sum.getToday());r.setDepartmentRanking(rankDepartments(ds));r.setMemberRanking(rankMembers(ds));return r;
+    private List<MediaScreenContributionRow> contributionRows(Long tenantId, LocalDate date, LocalDateTime cutoff) {
+        Set<Long> allowedDepartments = new LinkedHashSet<>(departmentIds());
+        return leadMapper.countMediaScreenContributions(tenantId, date.atStartOfDay(),
+                        date.with(DayOfWeek.MONDAY).atStartOfDay(), date.withDayOfMonth(1).atStartOfDay(), cutoff)
+                .stream().filter(row -> allowedDepartments.contains(row.getSourceDeptId())).toList();
     }
 
-    private MediaScreenRespVO emptyHistory(Long tenantId,LocalDate date){MediaScreenRespVO r=new MediaScreenRespVO();r.setTenantId(tenantId);r.setSnapshotDate(date);r.setAvailable(false);r.setSource("persisted_snapshot");r.setGeneratedAt(LocalDateTime.now(ZONE));r.setDepartments(List.of());r.setDepartmentRanking(List.of());r.setMemberRanking(List.of());return r;}
-    private Map<Key,Counts> merge(List<MediaScreenContributionRow> rows,Map<Long,AdminUserRespDTO> users,List<Long> ids){Map<Key,Counts> out=new HashMap<>();for(var x:rows){AdminUserRespDTO contributor=users.get(x.getContributorUserId());if(contributor==null||!CommonStatusEnum.ENABLE.getStatus().equals(contributor.getStatus()))continue;AdminUserRespDTO p=x.getSourceProviderUserId()==null?null:users.get(x.getSourceProviderUserId());Long d="sales_self_sourced".equals(x.getSourceType())&&p!=null?p.getDeptId():x.getSourceDeptId();if(d==null||!ids.contains(d))continue;Counts c=out.computeIfAbsent(new Key(x.getContributorUserId(),d),k->new Counts());c.today+=n(x.getTodayCount());c.week+=n(x.getWeekCount());c.month+=n(x.getMonthTotal());c.effective+=n(x.getMonthEffective());}return out;}
-    private List<MediaScreenRespVO.Department> departments(List<Long> ids,Map<Long,DeptRespDTO> dm,List<AdminUserRespDTO> roster,Map<Long,AdminUserRespDTO> users,Map<Key,Counts> counts){List<MediaScreenRespVO.Department> out=new ArrayList<>();for(Long id:ids){DeptRespDTO d=dm.get(id);if(d==null)continue;var v=department(d.getName());AdminUserRespDTO l=d.getLeaderUserId()==null?null:users.computeIfAbsent(d.getLeaderUserId(),uid->adminUserApi.getUserMap(List.of(uid)).get(uid));v.setSubtitle(l==null?"":"主管 "+l.getNickname());LinkedHashSet<Long> memberIds=new LinkedHashSet<>();for(var u:roster)if(Objects.equals(u.getDeptId(),id))memberIds.add(u.getId());for(Key key:counts.keySet())if(Objects.equals(key.dept(),id))memberIds.add(key.user());for(Long memberId:memberIds){AdminUserRespDTO u=users.get(memberId);if(u==null)continue;Counts c=counts.get(new Key(memberId,id));var m=member(u.getNickname(),c==null?new MediaScreenRespVO.Metrics():c.metrics());v.getMembers().add(m);add(v.getMetrics(),metrics(m));}out.add(v);}return out;}
-    private List<AdminUserRespDTO> activeUsers(List<Long> ids){return ids.isEmpty()?List.of():adminUserApi.getUserListByDeptIds(ids).stream().filter(u->CommonStatusEnum.ENABLE.getStatus().equals(u.getStatus())).toList();}
-    private List<Long> deptIds(){return properties.getNewMedia().getDepartmentIds()==null?List.of():properties.getNewMedia().getDepartmentIds().stream().filter(Objects::nonNull).distinct().toList();}
-    private MediaScreenRespVO.Department department(String n){var d=new MediaScreenRespVO.Department();d.setName(n);d.setSubtitle("");d.setMetrics(new MediaScreenRespVO.Metrics());d.setMembers(new ArrayList<>());return d;}
-    private MediaScreenRespVO.Trend trend(long today){var t=new MediaScreenRespVO.Trend();var a=new ArrayList<>(Collections.nCopies(144,0L));a.set(143,today);t.setToday(a);t.setYesterday(new ArrayList<>(Collections.nCopies(144,0L)));t.setStepMinutes(10);return t;}
-    private MediaScreenRespVO.Trend buildTrend(Long tenantId,LocalDate date,LocalDateTime now,Map<Long,AdminUserRespDTO> users,List<Long> ids){int slots=Math.max(1,(now.getHour()*60+now.getMinute())/10+1);LocalDateTime today=date.atStartOfDay(),yesterday=date.minusDays(1).atStartOfDay();var todayRows=leadMapper.countMediaScreenTenMinuteContributions(tenantId,today,now);var yesterdayRows=leadMapper.countMediaScreenTenMinuteContributions(tenantId,yesterday,yesterday.plusMinutes(slots*10L));List<Long> a=cumulative(todayRows,users,ids,slots),b=cumulative(yesterdayRows,users,ids,slots);var t=new MediaScreenRespVO.Trend();t.setToday(a);t.setYesterday(b);t.setStepMinutes(10);return t;}
-    private MediaScreenRespVO.Series buildSeries(Long tenantId,LocalDate date,Map<Long,AdminUserRespDTO> users,List<Long> ids){LocalDate from=date.minusDays(13);var rows=leadMapper.countMediaScreenDailyContributions(tenantId,from.atStartOfDay(),date.plusDays(1).atStartOfDay());Map<LocalDate,long[]> totals=new HashMap<>();for(var x:rows)if(inScope(x,users,ids)){LocalDate bucket=LocalDate.parse(x.getBucket());long[] v=totals.computeIfAbsent(bucket,k->new long[2]);v[0]+=n(x.getSubmittedCount());v[1]+=n(x.getValidCount());}List<Long> submitted=new ArrayList<>(),valid=new ArrayList<>();for(int i=0;i<14;i++){long[] v=totals.getOrDefault(from.plusDays(i),new long[2]);submitted.add(v[0]);valid.add(v[1]);}var s=new MediaScreenRespVO.Series();s.setSubmitted(submitted);s.setValid(valid);return s;}
-    private List<Long> cumulative(List<MediaScreenTimedContributionRow> rows,Map<Long,AdminUserRespDTO> users,List<Long> ids,int slots){long[] values=new long[slots];for(var x:rows)if(inScope(x,users,ids)){int bucket=Integer.parseInt(x.getBucket());if(bucket>=0&&bucket<slots)values[bucket]+=n(x.getSubmittedCount());}List<Long> out=new ArrayList<>(slots);long total=0;for(long value:values){total+=value;out.add(total);}return out;}
-    private boolean inScope(MediaScreenTimedContributionRow x,Map<Long,AdminUserRespDTO> users,List<Long> ids){AdminUserRespDTO contributor=users.computeIfAbsent(x.getContributorUserId(),id->adminUserApi.getUserMap(List.of(id)).get(id));if(contributor==null||!CommonStatusEnum.ENABLE.getStatus().equals(contributor.getStatus()))return false;AdminUserRespDTO p=x.getSourceProviderUserId()==null?null:users.computeIfAbsent(x.getSourceProviderUserId(),id->adminUserApi.getUserMap(List.of(id)).get(id));Long d="sales_self_sourced".equals(x.getSourceType())&&p!=null?p.getDeptId():x.getSourceDeptId();return d!=null&&ids.contains(d);}
-    private MediaScreenRespVO.Star star(List<MediaScreenRespVO.Department> ds,LocalDate date,Long tenantId){MediaScreenRespVO.Member w=null;String d="";for(var x:ds)for(var m:x.getMembers())if(w==null||m.getToday()>w.getToday()){w=m;d=x.getName();}if(w==null||w.getToday()==0)return null;var s=new MediaScreenRespVO.Star();s.setName(w.getName());s.setDeptName(d);s.setToday(w.getToday());s.setLeadCount(w.getToday());s.setRankToday(1);s.setRank(1);List<MediaScreenDailySnapshotDO> yesterday=snapshotMapper.selectByDate(tenantId,date.minusDays(1));List<MediaScreenDailySnapshotDO> ranked=yesterday.stream().sorted(Comparator.comparingInt(MediaScreenDailySnapshotDO::getSubmittedCount).reversed()).toList();for(int i=0;i<ranked.size();i++){var x=ranked.get(i);if(Objects.equals(x.getMemberName(),w.getName())&&Objects.equals(x.getDepartmentName(),d)){s.setYesterday(x.getSubmittedCount());s.setRankYesterday(i+1);break;}}return s;}
-    private MediaScreenRespVO.Champion champion(Long tenantId,LocalDate date){return snapshotMapper.selectByDate(tenantId,date).stream().max(Comparator.comparingInt(MediaScreenDailySnapshotDO::getSubmittedCount)).filter(x->x.getSubmittedCount()>0).map(x->{var c=new MediaScreenRespVO.Champion();c.setName(x.getMemberName());c.setDeptName(x.getDepartmentName());c.setCount(x.getSubmittedCount());return c;}).orElse(null);}
-    private List<MediaScreenRespVO.RankItem> rankDepartments(List<MediaScreenRespVO.Department> ds){List<MediaScreenRespVO.RankItem> out=new ArrayList<>();int i=1;for(var d:ds){var x=new MediaScreenRespVO.RankItem();x.setName(d.getName());x.setLeadCount(d.getMetrics().getMonthTotal());x.setRank(i++);out.add(x);}return out;}
-    private List<MediaScreenRespVO.RankItem> rankMembers(List<MediaScreenRespVO.Department> ds){List<MediaScreenRespVO.RankItem> out=new ArrayList<>();for(var d:ds)for(var m:d.getMembers()){var x=new MediaScreenRespVO.RankItem();x.setName(m.getName());x.setLeadCount(m.getMonthTotal());out.add(x);}out.sort(Comparator.comparingLong(MediaScreenRespVO.RankItem::getLeadCount).reversed());int i=1;for(var x:out)x.setRank(i++);return out;}
-    private MediaScreenRespVO.Member member(String name,MediaScreenRespVO.Metrics x){var m=new MediaScreenRespVO.Member();m.setName(name);m.setToday(x.getToday());m.setWeek(x.getWeek());m.setMonthTotal(x.getMonthTotal());m.setMonthEffective(x.getMonthEffective());return m;}
-    private MediaScreenRespVO.Metrics metrics(MediaScreenRespVO.Member x){var m=new MediaScreenRespVO.Metrics();m.setToday(x.getToday());m.setWeek(x.getWeek());m.setMonthTotal(x.getMonthTotal());m.setMonthEffective(x.getMonthEffective());return m;}
-    private static void add(MediaScreenRespVO.Metrics a,MediaScreenRespVO.Metrics b){a.setToday(a.getToday()+b.getToday());a.setWeek(a.getWeek()+b.getWeek());a.setMonthTotal(a.getMonthTotal()+b.getMonthTotal());a.setMonthEffective(a.getMonthEffective()+b.getMonthEffective());}
-    private static long n(Long x){return x==null?0:x;} private static class Counts{long today,week,month,effective;MediaScreenRespVO.Metrics metrics(){var m=new MediaScreenRespVO.Metrics();m.setToday(today);m.setWeek(week);m.setMonthTotal(month);m.setMonthEffective(effective);return m;}} private record Key(Long user,Long dept){}
-    private <T>T read(String k,Class<T> c){try{String s=redis.opsForValue().get(k);return s==null?null:JsonUtils.parseObject(s,c);}catch(Exception e){return null;}} private void write(String k,Object v,long ttl){try{redis.opsForValue().set(k,JsonUtils.toJsonString(v),ttl,TimeUnit.SECONDS);}catch(Exception ignored){}}
+    private List<MediaScreenRespVO.Department> buildDirectDepartments(List<Long> departmentIds,
+                                                                      Map<Long, DeptRespDTO> departments,
+                                                                      List<MediaScreenContributionRow> allRows,
+                                                                      List<AdminUserRespDTO> roster,
+                                                                      Map<Long, AdminUserRespDTO> users) {
+        List<MediaScreenRespVO.Department> result = new ArrayList<>();
+        for (Long departmentId : departmentIds) {
+            DeptRespDTO source = departments.get(departmentId);
+            if (source == null) continue;
+            MediaScreenRespVO.Department department = department(departmentId, source.getName(),
+                    supervisorSubtitle(source));
+            List<MediaScreenContributionRow> rows = allRows.stream()
+                    .filter(row -> DIRECT.equals(row.getContributionType())
+                            && Objects.equals(departmentId, row.getSourceDeptId())).toList();
+            rows.forEach(row -> add(department.getMetrics(), metrics(row)));
+            Set<Long> memberIds = roster.stream().filter(user -> Objects.equals(departmentId, user.getDeptId()))
+                    .map(AdminUserRespDTO::getId).collect(Collectors.toCollection(LinkedHashSet::new));
+            rows.stream().map(MediaScreenContributionRow::getContributorUserId)
+                    .filter(id -> isEnabled(users.get(id))).forEach(memberIds::add);
+            for (Long memberId : memberIds) {
+                List<MediaScreenContributionRow> memberRows = filterMember(rows, memberId);
+                String name = snapshotName(memberRows);
+                if (name == null && memberRows.isEmpty()) name = users.get(memberId).getNickname();
+                if (name == null || !isEnabled(users.get(memberId))) continue;
+                department.getMembers().add(member(memberId, name, source.getName(), sum(memberRows), false, null));
+            }
+            result.add(department);
+        }
+        return result;
+    }
+
+    private MediaScreenRespVO.Department buildCompanion(List<MediaScreenContributionRow> allRows,
+                                                         Map<Long, AdminUserRespDTO> users,
+                                                         Map<Long, PartnerDO> partners) {
+        List<MediaScreenContributionRow> rows = allRows.stream()
+                .filter(row -> PART_TIME.equals(row.getContributionType())).toList();
+        if (rows.isEmpty()) return null;
+        MediaScreenRespVO.Department department = department(null, "兼职陪跑", "按提交时员工归属统计");
+        rows.forEach(row -> add(department.getMetrics(), metrics(row)));
+        Map<Long, List<MediaScreenContributionRow>> groups = rows.stream().collect(Collectors.groupingBy(
+                MediaScreenContributionRow::getContributorUserId, LinkedHashMap::new, Collectors.toList()));
+        for (Map.Entry<Long, List<MediaScreenContributionRow>> entry : groups.entrySet()) {
+            if (!isEnabled(users.get(entry.getKey()))) continue;
+            String name = snapshotName(entry.getValue());
+            if (name == null) continue;
+            String departmentName = distinctDepartmentName(entry.getValue());
+            department.getMembers().add(member(entry.getKey(), name, departmentName, sum(entry.getValue()), false,
+                    partnerDetails(entry.getValue(), partners)));
+        }
+        return department;
+    }
+
+    private List<MediaScreenRespVO.PartTimerDetail> partnerDetails(List<MediaScreenContributionRow> rows,
+                                                                   Map<Long, PartnerDO> partners) {
+        List<MediaScreenRespVO.PartTimerDetail> result = new ArrayList<>();
+        for (MediaScreenContributionRow row : rows) {
+            PartnerDO partner = partners.get(row.getProviderOwnerId());
+            if (partner == null || !"enabled".equals(partner.getStatus()) || row.getProviderOwnerName() == null) continue;
+            MediaScreenRespVO.PartTimerDetail detail = new MediaScreenRespVO.PartTimerDetail();
+            detail.setPartnerId(row.getProviderOwnerId());
+            detail.setName(row.getProviderOwnerName());
+            copy(detail, metrics(row));
+            result.add(detail);
+        }
+        result.sort(Comparator.comparingLong(MediaScreenRespVO.PartTimerDetail::getToday).reversed()
+                .thenComparing(MediaScreenRespVO.PartTimerDetail::getName));
+        return result;
+    }
+
+    private MediaScreenRespVO aggregateHistory(Long tenantId, LocalDate date,
+                                                List<MediaScreenDailySnapshotDO> rows,
+                                                boolean includePartTimers) {
+        MediaScreenRespVO result = base(tenantId, includePartTimers);
+        result.setAvailable(true);
+        result.setSnapshotDate(date);
+        result.setSource("persisted_snapshot_v2");
+        result.setSnapshotCreatedAt(rows.get(0).getCreateTime());
+        Map<Long, List<MediaScreenDailySnapshotDO>> direct = rows.stream()
+                .filter(row -> DIRECT.equals(row.getContributionType()))
+                .collect(Collectors.groupingBy(MediaScreenDailySnapshotDO::getDepartmentId,
+                        LinkedHashMap::new, Collectors.toList()));
+        List<MediaScreenRespVO.Department> departments = new ArrayList<>();
+        for (Long departmentId : departmentIds()) {
+            List<MediaScreenDailySnapshotDO> departmentRows = direct.get(departmentId);
+            if (departmentRows == null || departmentRows.isEmpty()) continue;
+            String name = departmentRows.get(0).getDepartmentName();
+            String supervisor = departmentRows.get(0).getSupervisorName();
+            MediaScreenRespVO.Department department = department(departmentId, name,
+                    supervisor == null ? "" : "主管 " + supervisor);
+            for (MediaScreenDailySnapshotDO row : departmentRows) {
+                MediaScreenRespVO.Metrics metrics = metrics(row);
+                add(department.getMetrics(), metrics);
+                if (Boolean.TRUE.equals(row.getMemberEnabled()) && row.getMemberId() != 0L
+                        && row.getMemberName() != null && !row.getMemberName().isBlank()) {
+                    department.getMembers().add(member(row.getMemberId(), row.getMemberName(), name,
+                            metrics, false, null));
+                }
+            }
+            departments.add(department);
+        }
+        MediaScreenRespVO.Department companion = includePartTimers ? historyCompanion(rows) : null;
+        MediaScreenRespVO.Metrics summary = sumDepartments(departments);
+        if (companion != null) add(summary, companion.getMetrics());
+        result.setSummary(summary);
+        result.setDepartments(departments);
+        result.setPartTimeCompanionDepartment(companion);
+        result.setTodayStar(starFromSnapshot(rows, includePartTimers));
+        result.setYesterdayChampion(championFromSnapshot(rows, includePartTimers));
+        result.setTrend(emptyTrend());
+        MediaScreenRespVO.Series series = new MediaScreenRespVO.Series();
+        series.setSubmitted(List.of());
+        series.setValid(List.of());
+        result.setSeries(series);
+        applyLegacy(result);
+        return result;
+    }
+
+    private MediaScreenRespVO.Department historyCompanion(List<MediaScreenDailySnapshotDO> rows) {
+        List<MediaScreenDailySnapshotDO> partRows = rows.stream()
+                .filter(row -> PART_TIME.equals(row.getContributionType())).toList();
+        if (partRows.isEmpty()) return null;
+        MediaScreenRespVO.Department department = department(null, "兼职陪跑", "按快照日账号状态统计");
+        for (MediaScreenDailySnapshotDO row : partRows) {
+            MediaScreenRespVO.Metrics metrics = metrics(row);
+            add(department.getMetrics(), metrics);
+            if (!Boolean.TRUE.equals(row.getMemberEnabled()) || row.getMemberName() == null
+                    || row.getMemberName().isBlank()) continue;
+            List<MediaScreenRespVO.PartTimerDetail> details = row.getPartnerDetailsJson() == null ? null
+                    : JsonUtils.parseArray(row.getPartnerDetailsJson(), MediaScreenRespVO.PartTimerDetail.class);
+            if (details == null) details = List.of();
+            department.getMembers().add(member(row.getMemberId(), row.getMemberName(), row.getDepartmentName(),
+                    metrics, false, details));
+        }
+        return department;
+    }
+
+    private MediaScreenRespVO emptyHistory(Long tenantId, LocalDate date, boolean includePartTimers) {
+        MediaScreenRespVO result = base(tenantId, includePartTimers);
+        result.setAvailable(false);
+        result.setSnapshotDate(date);
+        result.setSource("persisted_snapshot_v2");
+        result.setSummary(new MediaScreenRespVO.Metrics());
+        result.setDepartments(List.of());
+        result.setPartTimeCompanionDepartment(null);
+        result.setTrend(emptyTrend());
+        MediaScreenRespVO.Series series = new MediaScreenRespVO.Series();
+        series.setSubmitted(List.of());
+        series.setValid(List.of());
+        result.setSeries(series);
+        result.setDepartmentRanking(List.of());
+        result.setMemberRanking(List.of());
+        MediaScreenRespVO.HistorySnapshot snapshot = new MediaScreenRespVO.HistorySnapshot();
+        snapshot.setAvailable(false);
+        snapshot.setSnapshotDate(date);
+        result.setHistorySnapshot(snapshot);
+        return result;
+    }
+
+    private MediaScreenRespVO.Star todayStar(List<MediaScreenContributionRow> rows,
+                                             Map<Long, AdminUserRespDTO> users,
+                                             boolean includePartTimers, Long tenantId, LocalDate date) {
+        Map<Long, List<MediaScreenContributionRow>> groups = eligibleRows(rows, includePartTimers).stream()
+                .filter(row -> isEnabled(users.get(row.getContributorUserId())) && snapshotName(List.of(row)) != null)
+                .collect(Collectors.groupingBy(MediaScreenContributionRow::getContributorUserId));
+        List<Map.Entry<Long, List<MediaScreenContributionRow>>> ranked = groups.entrySet().stream()
+                .sorted(Comparator.<Map.Entry<Long, List<MediaScreenContributionRow>>>comparingLong(
+                        entry -> sum(entry.getValue()).getToday()).reversed().thenComparing(Map.Entry::getKey)).toList();
+        if (ranked.isEmpty() || sum(ranked.get(0).getValue()).getToday() == 0) return null;
+        Map.Entry<Long, List<MediaScreenContributionRow>> winner = ranked.get(0);
+        MediaScreenRespVO.Metrics metrics = sum(winner.getValue());
+        MediaScreenRespVO.Star star = new MediaScreenRespVO.Star();
+        star.setName(snapshotName(winner.getValue()));
+        star.setDeptName(distinctDepartmentName(winner.getValue()));
+        star.setToday(metrics.getToday());
+        star.setLeadCount(metrics.getToday());
+        star.setRankToday(1);
+        star.setRank(1);
+        star.setIncludesPartTime(winner.getValue().stream().anyMatch(row -> PART_TIME.equals(row.getContributionType())));
+        List<MediaScreenDailySnapshotDO> yesterday = snapshotMapper.selectByDate(tenantId, date.minusDays(1));
+        List<MemberSnapshot> yesterdayRanking = rankSnapshots(yesterday, includePartTimers);
+        for (int i = 0; i < yesterdayRanking.size(); i++) {
+            if (Objects.equals(yesterdayRanking.get(i).userId(), winner.getKey())) {
+                star.setYesterday(yesterdayRanking.get(i).metrics().getToday());
+                star.setRankYesterday(i + 1);
+                break;
+            }
+        }
+        return star;
+    }
+
+    private MediaScreenRespVO.Champion yesterdayChampion(Long tenantId, LocalDate date,
+                                                          boolean includePartTimers) {
+        List<MemberSnapshot> ranked = rankSnapshots(snapshotMapper.selectByDate(tenantId, date), includePartTimers);
+        if (ranked.isEmpty() || ranked.get(0).metrics().getToday() == 0) return null;
+        return champion(ranked.get(0));
+    }
+
+    private MediaScreenRespVO.Star starFromSnapshot(List<MediaScreenDailySnapshotDO> rows,
+                                                    boolean includePartTimers) {
+        List<MemberSnapshot> ranked = rankSnapshots(rows, includePartTimers);
+        if (ranked.isEmpty() || ranked.get(0).metrics().getToday() == 0) return null;
+        MemberSnapshot winner = ranked.get(0);
+        MediaScreenRespVO.Star star = new MediaScreenRespVO.Star();
+        star.setName(winner.name());
+        star.setDeptName(winner.departmentName());
+        star.setToday(winner.metrics().getToday());
+        star.setLeadCount(winner.metrics().getToday());
+        star.setRankToday(1);
+        star.setRank(1);
+        star.setIncludesPartTime(winner.includesPartTime());
+        return star;
+    }
+
+    private MediaScreenRespVO.Champion championFromSnapshot(List<MediaScreenDailySnapshotDO> rows,
+                                                            boolean includePartTimers) {
+        List<MemberSnapshot> ranked = rankSnapshots(rows, includePartTimers);
+        return ranked.isEmpty() || ranked.get(0).metrics().getToday() == 0 ? null : champion(ranked.get(0));
+    }
+
+    private List<MemberSnapshot> rankSnapshots(List<MediaScreenDailySnapshotDO> rows, boolean includePartTimers) {
+        Map<Long, List<MediaScreenDailySnapshotDO>> groups = rows.stream()
+                .filter(row -> Boolean.TRUE.equals(row.getMemberEnabled()) && row.getMemberId() != 0L)
+                .filter(row -> includePartTimers || DIRECT.equals(row.getContributionType()))
+                .collect(Collectors.groupingBy(MediaScreenDailySnapshotDO::getMemberId));
+        return groups.entrySet().stream().map(entry -> {
+                    List<MediaScreenDailySnapshotDO> memberRows = entry.getValue();
+                    MediaScreenRespVO.Metrics metrics = new MediaScreenRespVO.Metrics();
+                    memberRows.forEach(row -> add(metrics, metrics(row)));
+                    String name = memberRows.stream().map(MediaScreenDailySnapshotDO::getMemberName)
+                            .filter(value -> value != null && !value.isBlank()).findFirst().orElse(null);
+                    Set<String> departments = memberRows.stream().map(MediaScreenDailySnapshotDO::getDepartmentName)
+                            .filter(Objects::nonNull).collect(Collectors.toSet());
+                    String departmentName = departments.size() == 1 ? departments.iterator().next() : "跨部门";
+                    boolean partTime = memberRows.stream().anyMatch(row -> PART_TIME.equals(row.getContributionType()));
+                    return new MemberSnapshot(entry.getKey(), name, departmentName, metrics, partTime);
+                }).filter(item -> item.name() != null)
+                .sorted(Comparator.comparingLong((MemberSnapshot item) -> item.metrics().getToday()).reversed()
+                        .thenComparing(MemberSnapshot::userId)).toList();
+    }
+
+    private MediaScreenRespVO.Champion champion(MemberSnapshot winner) {
+        MediaScreenRespVO.Champion champion = new MediaScreenRespVO.Champion();
+        champion.setName(winner.name());
+        champion.setDeptName(winner.departmentName());
+        champion.setCount(winner.metrics().getToday());
+        champion.setIncludesPartTime(winner.includesPartTime());
+        return champion;
+    }
+
+    private MediaScreenRespVO.Trend buildTrend(Long tenantId, LocalDate date, LocalDateTime now,
+                                                List<Long> departmentIds, boolean includePartTimers) {
+        int slots = Math.max(1, (now.getHour() * 60 + now.getMinute()) / 10 + 1);
+        LocalDateTime today = date.atStartOfDay();
+        LocalDateTime yesterday = date.minusDays(1).atStartOfDay();
+        List<Long> todayValues = cumulative(leadMapper.countMediaScreenTenMinuteContributions(
+                tenantId, today, now), departmentIds, includePartTimers, slots);
+        List<Long> yesterdayValues = cumulative(leadMapper.countMediaScreenTenMinuteContributions(
+                tenantId, yesterday, yesterday.plusMinutes(slots * 10L)), departmentIds, includePartTimers, slots);
+        MediaScreenRespVO.Trend trend = new MediaScreenRespVO.Trend();
+        trend.setToday(todayValues);
+        trend.setYesterday(yesterdayValues);
+        trend.setStepMinutes(10);
+        return trend;
+    }
+
+    private MediaScreenRespVO.Series buildSeries(Long tenantId, LocalDate date, List<Long> departmentIds,
+                                                  boolean includePartTimers) {
+        LocalDate from = date.minusDays(13);
+        List<MediaScreenTimedContributionRow> rows = leadMapper.countMediaScreenDailyContributions(
+                tenantId, from.atStartOfDay(), date.plusDays(1).atStartOfDay());
+        Map<LocalDate, long[]> totals = new HashMap<>();
+        for (MediaScreenTimedContributionRow row : rows) {
+            if (!timedInScope(row, departmentIds, includePartTimers)) continue;
+            long[] values = totals.computeIfAbsent(LocalDate.parse(row.getBucket()), key -> new long[2]);
+            values[0] += number(row.getSubmittedCount());
+            values[1] += number(row.getValidCount());
+        }
+        List<Long> submitted = new ArrayList<>();
+        List<Long> valid = new ArrayList<>();
+        for (int index = 0; index < 14; index++) {
+            long[] values = totals.getOrDefault(from.plusDays(index), new long[2]);
+            submitted.add(values[0]);
+            valid.add(values[1]);
+        }
+        MediaScreenRespVO.Series series = new MediaScreenRespVO.Series();
+        series.setSubmitted(submitted);
+        series.setValid(valid);
+        return series;
+    }
+
+    private List<Long> cumulative(List<MediaScreenTimedContributionRow> rows, List<Long> departmentIds,
+                                  boolean includePartTimers, int slots) {
+        long[] buckets = new long[slots];
+        for (MediaScreenTimedContributionRow row : rows) {
+            if (!timedInScope(row, departmentIds, includePartTimers)) continue;
+            int bucket = Integer.parseInt(row.getBucket());
+            if (bucket >= 0 && bucket < slots) buckets[bucket] += number(row.getSubmittedCount());
+        }
+        List<Long> result = new ArrayList<>(slots);
+        long total = 0;
+        for (long bucket : buckets) {
+            total += bucket;
+            result.add(total);
+        }
+        return result;
+    }
+
+    private boolean timedInScope(MediaScreenTimedContributionRow row, List<Long> departmentIds,
+                                 boolean includePartTimers) {
+        return departmentIds.contains(row.getSourceDeptId())
+                && (includePartTimers || DIRECT.equals(row.getContributionType()));
+    }
+
+    private void insertSnapshot(Long tenantId, LocalDate date, String type, DeptRespDTO department,
+                                Long memberId, AdminUserRespDTO currentUser,
+                                List<MediaScreenContributionRow> rows, String partnerDetailsJson) {
+        MediaScreenRespVO.Metrics metrics = sum(rows);
+        String memberName = snapshotName(rows);
+        if (memberName == null && currentUser != null) memberName = currentUser.getNickname();
+        AdminUserRespDTO supervisor = department.getLeaderUserId() == null ? null
+                : adminUserApi.getUser(department.getLeaderUserId());
+        snapshotMapper.insertIgnore(tenantId, new MediaScreenDailySnapshotDO()
+                .setSnapshotDate(date).setContributionType(type).setDepartmentId(department.getId())
+                .setDepartmentName(department.getName()).setSupervisorId(department.getLeaderUserId())
+                .setSupervisorName(supervisor == null ? null : supervisor.getNickname())
+                .setMemberId(memberId).setMemberName(memberName == null ? "" : memberName)
+                .setMemberEnabled(memberId != 0L && isEnabled(currentUser))
+                .setTodayCount((int) metrics.getToday()).setWeekCount((int) metrics.getWeek())
+                .setMonthTotal((int) metrics.getMonthTotal()).setMonthEffective((int) metrics.getMonthEffective())
+                .setPartnerDetailsJson(partnerDetailsJson));
+    }
+
+    private MediaScreenRespVO base(Long tenantId, boolean includePartTimers) {
+        MediaScreenRespVO result = new MediaScreenRespVO();
+        LocalDateTime now = LocalDateTime.now(ZONE);
+        result.setTenantId(tenantId);
+        result.setGeneratedAt(now);
+        result.setUpdatedAt(now.atZone(ZONE).toInstant().toEpochMilli());
+        result.setRefreshIntervalSeconds((int) properties.getCache().getRefreshIntervalSeconds());
+        result.setPartTimeIncluded(includePartTimers);
+        MediaScreenRespVO.PartTimer partTimer = new MediaScreenRespVO.PartTimer();
+        partTimer.setEnabled(includePartTimers);
+        partTimer.setItems(List.of());
+        result.setPartTimer(partTimer);
+        return result;
+    }
+
+    private void applyLegacy(MediaScreenRespVO result) {
+        result.setTotalLeads(result.getSummary() == null ? 0 : result.getSummary().getMonthTotal());
+        result.setDepartmentRanking(rankDepartments(result.getDepartments()));
+        List<MediaScreenRespVO.Department> memberSources = new ArrayList<>(result.getDepartments());
+        if (result.getPartTimeCompanionDepartment() != null) memberSources.add(result.getPartTimeCompanionDepartment());
+        result.setMemberRanking(rankMembers(memberSources));
+        MediaScreenRespVO.HistorySnapshot snapshot = new MediaScreenRespVO.HistorySnapshot();
+        snapshot.setAvailable(result.isAvailable());
+        snapshot.setSnapshotDate(result.getSnapshotDate());
+        snapshot.setTotalLeads(result.getTotalLeads());
+        result.setHistorySnapshot(snapshot);
+    }
+
+    private List<MediaScreenRespVO.RankItem> rankDepartments(List<MediaScreenRespVO.Department> departments) {
+        List<MediaScreenRespVO.RankItem> result = departments.stream().map(department -> {
+            MediaScreenRespVO.RankItem item = new MediaScreenRespVO.RankItem();
+            item.setName(department.getName());
+            item.setLeadCount(department.getMetrics().getMonthTotal());
+            return item;
+        }).sorted(Comparator.comparingLong(MediaScreenRespVO.RankItem::getLeadCount).reversed()).toList();
+        for (int index = 0; index < result.size(); index++) result.get(index).setRank(index + 1);
+        return result;
+    }
+
+    private List<MediaScreenRespVO.RankItem> rankMembers(List<MediaScreenRespVO.Department> departments) {
+        List<MediaScreenRespVO.RankItem> result = departments.stream().flatMap(value -> value.getMembers().stream())
+                .map(member -> {
+                    MediaScreenRespVO.RankItem item = new MediaScreenRespVO.RankItem();
+                    item.setName(member.getName());
+                    item.setLeadCount(member.getMonthTotal());
+                    return item;
+                }).sorted(Comparator.comparingLong(MediaScreenRespVO.RankItem::getLeadCount).reversed()).toList();
+        for (int index = 0; index < result.size(); index++) result.get(index).setRank(index + 1);
+        return result;
+    }
+
+    private List<AdminUserRespDTO> activeRoster(List<Long> departmentIds) {
+        if (departmentIds.isEmpty()) return List.of();
+        return adminUserApi.getUserListByDeptIds(departmentIds).stream().filter(this::isEnabled).toList();
+    }
+
+    private Map<Long, AdminUserRespDTO> userMap(List<MediaScreenContributionRow> rows) {
+        Set<Long> ids = rows.stream().map(MediaScreenContributionRow::getContributorUserId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+        return ids.isEmpty() ? new HashMap<>() : new HashMap<>(adminUserApi.getUserMap(ids));
+    }
+
+    private Map<Long, PartnerDO> partnerMap(List<MediaScreenContributionRow> rows) {
+        List<Long> ids = rows.stream().filter(row -> PART_TIME.equals(row.getContributionType()))
+                .map(MediaScreenContributionRow::getProviderOwnerId).filter(Objects::nonNull).distinct().toList();
+        return ids.isEmpty() ? Map.of() : partnerMapper.selectBatchIds(ids).stream()
+                .collect(Collectors.toMap(PartnerDO::getId, value -> value));
+    }
+
+    private List<Long> departmentIds() {
+        return properties.getNewMedia().getDepartmentIds() == null ? List.of()
+                : properties.getNewMedia().getDepartmentIds().stream().filter(Objects::nonNull).distinct().toList();
+    }
+
+    private String supervisorSubtitle(DeptRespDTO department) {
+        if (department.getLeaderUserId() == null) return "";
+        AdminUserRespDTO leader = adminUserApi.getUser(department.getLeaderUserId());
+        return leader == null ? "" : "主管 " + leader.getNickname();
+    }
+
+    private boolean isEnabled(AdminUserRespDTO user) {
+        return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus());
+    }
+
+    private List<MediaScreenContributionRow> eligibleRows(List<MediaScreenContributionRow> rows,
+                                                           boolean includePartTimers) {
+        Set<Long> allowedDepartments = new LinkedHashSet<>(departmentIds());
+        return rows.stream().filter(row -> allowedDepartments.contains(row.getSourceDeptId()))
+                .filter(row -> includePartTimers || DIRECT.equals(row.getContributionType())).toList();
+    }
+
+    private static List<MediaScreenContributionRow> filterMember(List<MediaScreenContributionRow> rows, Long memberId) {
+        return rows.stream().filter(row -> Objects.equals(memberId, row.getContributorUserId())).toList();
+    }
+
+    private static String snapshotName(Collection<MediaScreenContributionRow> rows) {
+        return rows.stream().map(MediaScreenContributionRow::getContributorName)
+                .filter(value -> value != null && !value.isBlank()).findFirst().orElse(null);
+    }
+
+    private static String distinctDepartmentName(Collection<MediaScreenContributionRow> rows) {
+        Set<String> names = rows.stream().map(MediaScreenContributionRow::getDepartmentName)
+                .filter(value -> value != null && !value.isBlank()).collect(Collectors.toSet());
+        return names.size() == 1 ? names.iterator().next() : "跨部门";
+    }
+
+    private static MediaScreenRespVO.Department department(Long id, String name, String subtitle) {
+        MediaScreenRespVO.Department result = new MediaScreenRespVO.Department();
+        result.setDepartmentId(id);
+        result.setName(name);
+        result.setSubtitle(subtitle);
+        result.setMetrics(new MediaScreenRespVO.Metrics());
+        result.setMembers(new ArrayList<>());
+        return result;
+    }
+
+    private static MediaScreenRespVO.Member member(Long id, String name, String departmentName,
+                                                    MediaScreenRespVO.Metrics metrics, boolean disabled,
+                                                    List<MediaScreenRespVO.PartTimerDetail> details) {
+        MediaScreenRespVO.Member result = new MediaScreenRespVO.Member();
+        result.setUserId(id);
+        result.setName(name);
+        result.setDepartmentName(departmentName);
+        result.setDisabled(disabled);
+        result.setPartTimers(details);
+        result.setToday(metrics.getToday());
+        result.setWeek(metrics.getWeek());
+        result.setMonthTotal(metrics.getMonthTotal());
+        result.setMonthEffective(metrics.getMonthEffective());
+        return result;
+    }
+
+    private static MediaScreenRespVO.Metrics metrics(MediaScreenContributionRow row) {
+        MediaScreenRespVO.Metrics result = new MediaScreenRespVO.Metrics();
+        result.setToday(number(row.getTodayCount()));
+        result.setWeek(number(row.getWeekCount()));
+        result.setMonthTotal(number(row.getMonthTotal()));
+        result.setMonthEffective(number(row.getMonthEffective()));
+        return result;
+    }
+
+    private static MediaScreenRespVO.Metrics metrics(MediaScreenDailySnapshotDO row) {
+        MediaScreenRespVO.Metrics result = new MediaScreenRespVO.Metrics();
+        result.setToday(number(row.getTodayCount()));
+        result.setWeek(number(row.getWeekCount()));
+        result.setMonthTotal(number(row.getMonthTotal()));
+        result.setMonthEffective(number(row.getMonthEffective()));
+        return result;
+    }
+
+    private static MediaScreenRespVO.Metrics sum(Collection<MediaScreenContributionRow> rows) {
+        MediaScreenRespVO.Metrics result = new MediaScreenRespVO.Metrics();
+        rows.forEach(row -> add(result, metrics(row)));
+        return result;
+    }
+
+    private static MediaScreenRespVO.Metrics sumDepartments(List<MediaScreenRespVO.Department> departments) {
+        MediaScreenRespVO.Metrics result = new MediaScreenRespVO.Metrics();
+        departments.forEach(department -> add(result, department.getMetrics()));
+        return result;
+    }
+
+    private static void add(MediaScreenRespVO.Metrics target, MediaScreenRespVO.Metrics value) {
+        target.setToday(target.getToday() + value.getToday());
+        target.setWeek(target.getWeek() + value.getWeek());
+        target.setMonthTotal(target.getMonthTotal() + value.getMonthTotal());
+        target.setMonthEffective(target.getMonthEffective() + value.getMonthEffective());
+    }
+
+    private static void copy(MediaScreenRespVO.PartTimerDetail target, MediaScreenRespVO.Metrics value) {
+        target.setToday(value.getToday());
+        target.setWeek(value.getWeek());
+        target.setMonthTotal(value.getMonthTotal());
+        target.setMonthEffective(value.getMonthEffective());
+    }
+
+    private static long number(Number value) {
+        return value == null ? 0 : value.longValue();
+    }
+
+    private static MediaScreenRespVO.Trend emptyTrend() {
+        MediaScreenRespVO.Trend trend = new MediaScreenRespVO.Trend();
+        trend.setToday(List.of());
+        trend.setYesterday(List.of());
+        trend.setStepMinutes(10);
+        return trend;
+    }
+
+    private <T> T read(String key, Class<T> type) {
+        try {
+            String value = redis.opsForValue().get(key);
+            return value == null ? null : JsonUtils.parseObject(value, type);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void write(String key, Object value, long ttlSeconds) {
+        try {
+            redis.opsForValue().set(key, JsonUtils.toJsonString(value), ttlSeconds, TimeUnit.SECONDS);
+        } catch (Exception ignored) {
+            // Redis is an optimization; the public screen remains available from authoritative APIs.
+        }
+    }
+
+    private record MemberKey(Long departmentId, Long userId) {}
+    private record MemberSnapshot(Long userId, String name, String departmentName,
+                                  MediaScreenRespVO.Metrics metrics, boolean includesPartTime) {}
 }

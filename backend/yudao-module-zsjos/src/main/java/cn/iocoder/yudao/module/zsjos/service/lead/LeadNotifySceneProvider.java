@@ -104,6 +104,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
         Set<Long> users = new LinkedHashSet<>();
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
+        LeadDO lead = leadMapper.selectById(event.getBizId());
         for (String role : recipientRoles) {
             if (ROLE_QUALIFICATION_MANAGERS.equals(role)) {
                 users.addAll(resolveQualificationManagers(payload));
@@ -131,8 +132,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 continue;
             }
             Long id = switch (role) {
-                case ROLE_SUBMITTER -> longValue(payload.get("submitterUserId"));
-                case ROLE_NEW_MEDIA_PROVIDER -> longValue(payload.get("newMediaProviderUserId"));
+                case ROLE_SUBMITTER, ROLE_NEW_MEDIA_PROVIDER -> lead != null
+                        && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                        ? lead.getProviderOwnerId() : null;
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
                 case ROLE_OWNER -> longValue(payload.get("ownerUserId"));
                 case ROLE_OPERATOR -> event.getOperatorUserId();
@@ -149,8 +151,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         }
         Set<NotifyRecipientDTO> recipients = users.stream().map(NotifyRecipientDTO::admin)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        if (recipientRoles.contains(ROLE_SUBMITTER) && payload.get("partnerId") instanceof Number number) {
-            PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(number.longValue());
+        if ((recipientRoles.contains(ROLE_SUBMITTER) || recipientRoles.contains(ROLE_NEW_MEDIA_PROVIDER))
+                && lead != null && PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) {
+            PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(lead.getProviderOwnerId());
             if (account != null) recipients.add(NotifyRecipientDTO.partner(account.getId()));
         }
         if (recipientRoles.contains(ROLE_COMPLAINANT) && payload.get("complaint.partnerId") instanceof Number number) {
@@ -204,8 +207,14 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 .map(LeadAttachmentDO::getOriginalName).filter(Objects::nonNull).collect(Collectors.joining("、")));
         values.put("attachment.count", attachments.size());
         boolean blindIdentity = recipientUserId != null && isBlindIdentity(lead, recipientUserId);
-        putUser(values, "submitter", lead.getSourceUserId(), blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
-        putUser(values, "owner", lead.getOwnerUserId(), blindIdentity && Objects.equals(recipientUserId, lead.getSourceUserId()));
+        putUser(values, "submitter", lead.getSourceUserId(),
+                blindIdentity && Objects.equals(recipientUserId, lead.getOwnerUserId()));
+        values.put("provider.type", lead.getProviderOwnerType());
+        values.put("provider.id", lead.getProviderOwnerId());
+        values.put("provider.name", lead.getProviderOwnerNameSnapshot());
+        putUser(values, "owner", lead.getOwnerUserId(), blindIdentity
+                && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(recipientUserId, lead.getProviderOwnerId()));
         putUser(values, "pendingSales", lead.getPendingAssigneeUserId(), false);
         putUser(values, "operator", event.getOperatorUserId(), false);
         values.put("event.time", event.getOccurredAt());
@@ -340,7 +349,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     }
 
     private boolean canReadFullContact(LeadDO lead, Long userId) {
-        return Objects.equals(userId, lead.getSourceUserId()) || Objects.equals(userId, lead.getOwnerUserId())
+        return PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(userId, lead.getProviderOwnerId()) || Objects.equals(userId, lead.getOwnerUserId())
                 || permissionApi.hasAnyPermissions(userId, QUERY_ALL_PERMISSION)
                 || managesOwnerDepartment(userId, lead.getOwnerUserId()) || canReadAgingPoolContact(lead.getId(), userId);
     }

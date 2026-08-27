@@ -21,20 +21,20 @@ public class SubordinatePartnerController {
     @Resource private SubordinatePartnerService service;
 
     @GetMapping("/page")
-    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-partner:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:partner:query', 'zsjos:partner:manage')")
     public CommonResult<PageResult<PartnerRespVO>> page(@Valid SubordinatePartnerPageReqVO reqVO) {
         return success(service.getPage(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/{partnerId}/leads/page")
-    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-partner:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:partner:query', 'zsjos:partner:manage')")
     public CommonResult<PageResult<LeadManagementRespVO>> leadPage(@PathVariable Long partnerId,
             @Valid LeadManagementPageReqVO reqVO) {
         return success(service.getLeadPage(partnerId, reqVO, getLoginUserId()));
     }
 
     @GetMapping("/leads/{leadId}")
-    @PreAuthorize("@ss.hasPermission('zsjos:subordinate-partner:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:partner:query', 'zsjos:partner:manage')")
     public CommonResult<LeadManagementRespVO> lead(@PathVariable Long leadId) {
         return success(service.getLead(leadId, getLoginUserId()));
     }

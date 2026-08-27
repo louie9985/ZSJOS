@@ -263,6 +263,8 @@ yudao:
       - tenant-id: 1
         cidrs:
           - 0.0.0.0/0
+    new-media:
+      department-ids: [1011, 1012, 1013]
   pay:
     order-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
     refund-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址

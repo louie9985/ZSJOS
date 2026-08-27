@@ -32,6 +32,16 @@ export interface LeadManagementVO {
   sourceType: string
   sourceUserId?: number
   sourceUserName?: string
+  providerOwnerType?: 'system_user' | 'partner'
+  providerOwnerId?: number
+  providerOwnerNameSnapshot?: string
+  contributionUserIdSnapshot?: number
+  contributionUserNameSnapshot?: string
+  contributionSupervisorUserIdSnapshot?: number
+  contributionSupervisorNameSnapshot?: string
+  contributionDeptIdSnapshot?: number
+  contributionDeptNameSnapshot?: string
+  countedAt?: Timestamp
   sourceChannel?: string
   provinceCode?: string
   provinceName?: string
@@ -69,7 +79,7 @@ export interface LeadManagementVO {
   closeReason?: string
   createTime: Timestamp
   updateTime: Timestamp
-  relationTypes: Array<'submitter' | 'owner'>
+  relationTypes: Array<'submitter' | 'owner' | 'student_service_owner'>
   primaryProduct?: LeadProductVO
   intendedProducts?: LeadProductVO[]
   attachments?: LeadAttachmentVO[]

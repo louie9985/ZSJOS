@@ -51,6 +51,12 @@ SELECT 'student_basic_info_permission' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73427
                       AND permission='zsjos:student:update-basic-info' AND parent_id=73020
                       AND type=3 AND status=0 AND deleted=b'0'), 'PASS','FAIL') AS result;
+SELECT 'retired_migration_placeholders' AS check_name,
+       IF((SELECT COUNT(*) FROM zsjos_schema_version
+           WHERE version IN ('V106', 'V108', 'V118')) = 3
+          AND (SELECT COUNT(*) FROM zsjos_module_schema_version
+               WHERE module_code='core' AND version IN ('V106', 'V108', 'V118')) = 3,
+          'PASS','FAIL') AS result;
 SELECT 'student_delivery_stages' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V114')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V114')
@@ -307,7 +313,8 @@ SELECT 'lead_management_query_all_permission' AS check_name,
 SELECT 'lead_management_v002' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V002'), 'PASS', 'FAIL') AS result;
 SELECT 'claim_pool_menu' AS check_name,
-       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6749 AND permission='' AND component='zsjos/leadClaimPool/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6749 AND permission='zsjos:lead:claim-pool:query'
+                  AND component='zsjos/leadClaimPool/index' AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'claim_pool_action' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6772 AND permission='zsjos:lead:claim' AND parent_id=6749 AND deleted=b'0'), 'PASS', 'FAIL') AS result;
 SELECT 'claim_pool_v003' AS check_name,
@@ -798,9 +805,14 @@ SELECT 'dual_frontend_workbench_menu_components' AS check_name,
                OR (id=6848 AND component='zsjos/leadComplaint/index')
                OR (id=6849 AND component='zsjos/externalRepurchase/index')))=9, 'PASS', 'FAIL') AS result;
 SELECT 'account_personnel_partner_permissions' AS check_name,
-       IF((SELECT COUNT(*) FROM system_menu WHERE deleted=b'0' AND id IN (6850,6851,6852,6853,6854,6855)
-             AND permission IN ('zsjos:personnel:query','zsjos:personnel:update-state','zsjos:partner:query',
-                                'zsjos:partner:create','zsjos:partner:update-state','zsjos:partner:convert'))=6,
+       IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6850 AND permission='zsjos:personnel:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6851 AND permission='zsjos:personnel:update-state' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6852 AND permission='zsjos:partner:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+                      AND permission='zsjos:partner:manage' AND type=3 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE deleted=b'0' AND permission IN (
+            'zsjos:partner:create','zsjos:partner:update-state','zsjos:partner:assign-owner',
+            'zsjos:partner:convert','zsjos:subordinate-partner:query')),
           'PASS', 'FAIL') AS result;
 SELECT 'maintenance_mode_config' AS check_name,
        IF((SELECT COUNT(*) FROM infra_config WHERE config_key='zsjos.system.maintenance-enabled'
@@ -1559,7 +1571,11 @@ SELECT 'V141 media screen daily snapshot' AS check_name,
             AND table_name='zsjos_media_screen_daily_snapshot')
           AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
             AND table_name='zsjos_media_screen_daily_snapshot'
-            AND index_name='uk_tenant_snapshot_member' AND non_unique=0), 'PASS','FAIL') AS result;
+            AND index_name='uk_tenant_snapshot_contributor' AND non_unique=0)
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+            AND table_name='zsjos_media_screen_daily_snapshot' AND column_name='contribution_type')
+          AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE()
+            AND table_name='zsjos_media_screen_daily_snapshot' AND column_name='partner_details_json'), 'PASS','FAIL') AS result;
 SELECT 'V142 partial V139 V140 execution repair' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V142')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
@@ -1713,4 +1729,48 @@ SELECT 'V149 feedback notification defaults' AS check_name,
                      AND rule_row.scene_code IN (
                        'zsjos.feedback.employee_replied','zsjos.feedback.admin_replied',
                        'zsjos.feedback.completed','zsjos.feedback.survey_requested'))<4),
+SELECT 'V148 durable employee announcements' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V148')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V148')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='system_notice'
+                 AND column_name IN ('publish_status','publish_time','offline_time'))=3
+          AND (SELECT COUNT(*) FROM information_schema.tables
+               WHERE table_schema=DATABASE()
+                 AND table_name IN ('system_notice_attachment','system_notice_read'))=2
+          AND (SELECT COUNT(*) FROM system_menu
+               WHERE id IN (79910,79911,79912) AND deleted=b'0')=3
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=79910 AND permission='system:notice:read' AND parent_id=6735
+                 AND path='announcements' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=79911 AND permission='system:notice:publish' AND parent_id=107
+                 AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=79912 AND permission='system:notice:offline' AND parent_id=107
+                 AND type=3 AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V150 claim-pool read and Partner permissions' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V150')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V150')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6749
+            AND permission='zsjos:lead:claim-pool:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6852
+            AND permission='zsjos:partner:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+            AND permission='zsjos:partner:manage' AND type=3 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
+              AND NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
+                WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
+                  AND grant_row.menu_id=6749 AND grant_row.deleted=b'0'))
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+            JOIN system_role_menu grant_row ON grant_row.role_id=role_row.id
+              AND grant_row.tenant_id=role_row.tenant_id AND grant_row.deleted=b'0'
+            JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id
+              AND menu_row.permission='zsjos:lead:claim' AND menu_row.deleted=b'0'
+            WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'),
           'PASS','FAIL') AS result;

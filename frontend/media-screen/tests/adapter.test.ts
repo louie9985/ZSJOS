@@ -12,12 +12,13 @@ test('完整新媒体实时响应映射今日汇总、部门成员、陪跑和�
     summary: { today: 18, week: 80, monthTotal: 128, monthEffective: 46 },
     departments: [
       {
+        departmentId: 1011,
         name: '新媒体一部',
         subtitle: '主管 甲',
         metrics: { today: 12, week: 55, monthTotal: 90, monthEffective: 34 },
         members: [
-          { name: '成员甲', today: 7, week: 30, monthTotal: 50, monthEffective: 20 },
-          { name: '成员乙', today: 5, week: 25, monthTotal: 40, monthEffective: 14 },
+          { userId: 31, name: '成员甲', today: 7, week: 30, monthTotal: 50, monthEffective: 20 },
+          { userId: 32, name: '成员乙', today: 5, week: 25, monthTotal: 40, monthEffective: 14 },
         ],
       },
     ],
@@ -27,17 +28,18 @@ test('完整新媒体实时响应映射今日汇总、部门成员、陪跑和�
       metrics: { today: 6, week: 25, monthTotal: 38, monthEffective: 12 },
       members: [
         {
+          userId: 31,
           name: '成员甲',
           today: 6,
           week: 25,
           monthTotal: 38,
           monthEffective: 12,
-          partTimers: [{ name: '兼职甲', today: 6, week: 25, monthTotal: 38, monthEffective: 12 }],
+          partTimers: [{ partnerId: 81, name: '兼职甲', today: 6, week: 25, monthTotal: 38, monthEffective: 12 }],
         },
       ],
     },
-    todayStar: { name: '成员甲', deptName: '新媒体一部', today: 7, yesterday: 5, rankToday: 1, rankYesterday: 2 },
-    yesterdayChampion: { name: '成员乙', deptName: '新媒体一部', count: 8 },
+    todayStar: { name: '成员甲', deptName: '新媒体一部', today: 7, yesterday: 5, rankToday: 1, rankYesterday: 2, includesPartTime: true },
+    yesterdayChampion: { name: '成员乙', deptName: '新媒体一部', count: 8, includesPartTime: false },
     trend: { today: [0, 2, 7, 18], yesterday: [0, 3, 6, 12], stepMinutes: 10 },
     series: { submitted: [12, 18], valid: [4, 6] },
   });
@@ -49,6 +51,9 @@ test('完整新媒体实时响应映射今日汇总、部门成员、陪跑和�
   assert.equal(model.departments.state, 'real');
   assert.equal(model.departments.value?.[0]?.name, '新媒体一部');
   assert.equal(model.departments.value?.[0]?.members[1]?.monthEffective, 14);
+  assert.equal(model.departments.value?.[0]?.id, 'department-1011');
+  assert.equal(model.departments.value?.[0]?.members[0]?.id, 'user-31');
+  assert.equal(model.partTimeCompanionDepartment.value?.members[0]?.partTimers?.[0]?.id, 'partner-81');
   assert.equal(model.partTimeCompanionDepartment.value?.members[0]?.partTimers?.[0]?.name, '兼职甲');
   assert.equal(model.todayStar.value?.today, 7);
   assert.equal(model.yesterdayChampion.value?.count, 8);
@@ -118,6 +123,7 @@ test('历史 available=false 永远返回无快照', () => {
     adaptHistory({ available: false, snapshotDate: '2026-08-24', totalLeads: 999 }),
     {
       available: false,
+      source: null,
       snapshotDate: '2026-08-24',
       snapshotCreatedAt: null,
       totalLeads: null,
@@ -131,22 +137,25 @@ test('历史 available=false 永远返回无快照', () => {
 test('历史 available=true 映射汇总、主榜和兼职榜', () => {
   const history = adaptHistory({
     available: true,
+    source: 'persisted_snapshot_v2',
     snapshotDate: '2026-08-24',
     totalLeads: 12,
     summary: { today: 3, week: 9, monthTotal: 12, monthEffective: 7 },
     departments: [
       {
+        departmentId: 1011,
         name: '新媒体一部',
-        members: [{ name: '成员甲', leadCount: 3, rank: 1, today: 3, week: 9, monthTotal: 12, monthEffective: 7 }],
+        members: [{ userId: 31, name: '成员甲', leadCount: 3, rank: 1, today: 3, week: 9, monthTotal: 12, monthEffective: 7 }],
       },
     ],
     partTimeCompanionDepartment: {
       name: '兼职陪跑',
       metrics: { today: 2, week: 5, monthTotal: 11, monthEffective: 4 },
-      members: [{ name: '陪跑甲', today: 2, week: 5, monthTotal: 11, monthEffective: 4 }],
+      members: [{ userId: 31, name: '陪跑甲', today: 2, week: 5, monthTotal: 11, monthEffective: 4 }],
     },
   });
   assert.equal(history.available, true);
+  assert.equal(history.source, 'persisted_snapshot_v2');
   assert.equal(history.summary.monthEffective, 7);
   assert.equal(history.mainRanking[0]?.departmentName, '新媒体一部');
   assert.equal(history.partTimerRanking[0]?.name, '陪跑甲');

@@ -4,7 +4,7 @@
 
 ## 本地启动
 
-复制 `.env.example` 为 `.env.local`，至少填写后端分配的租户 ID：
+在 `.env.local` 中至少填写后端分配的租户 ID：
 
 ```dotenv
 VITE_MEDIA_SCREEN_TENANT_ID=实际租户ID
@@ -14,8 +14,8 @@ VITE_MEDIA_SCREEN_BACKEND_TARGET=http://192.168.2.17:48080
 然后执行：
 
 ```powershell
-cd D:\code\ZSJOS\frontend\media-screen
-npm install
+cd D:\ZSJ-OS\frontend\media-screen
+npm ci
 npm run dev
 ```
 
@@ -48,4 +48,5 @@ npm test
 npm run build
 ```
 
-字段契约、对齐状态和后端缺口见 `docs/api/media-screen.md`。
+字段契约见仓库根目录的 `docs/api/media-screen-public-api.md`，部署与白名单配置见
+`docs/operations/media-screen-deployment.md`。

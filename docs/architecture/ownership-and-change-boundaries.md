@@ -13,6 +13,7 @@
 | Product, SKU, and product-driven rule definition | Future approved product capability | Public rule-result contract, stable identifiers, versioning | Inferring rules from names or querying another module's DAL or tables |
 | Existing CRM or other domain behavior | Owning business module | Public module boundary and data-scope rules | Cross-module DAL access or copied domain logic; see the approved ZSJOS lifecycle exception below |
 | New Zhongshijian business behavior | `yudao-module-zsjos` | VO, Service, authorization, tenant, tests | Putting business rules in controllers or framework modules |
+| Lead provider and performance attribution | `yudao-module-zsjos` Lead snapshots | First-count freeze, canonical provider authorization, no current-state historical inference | Reusing `source_*` or current Partner/department ownership as a fallback provider truth |
 | Generic business tasks and work plans | `yudao-module-zsjos` | Command service, scene provider, object permission, state tests | Domain services writing task DAL directly or copying BPM task state |
 | Frontend protocol constants | Shared protocol owner in that frontend | Backend contract alignment | Literal copies in page components |
 | Feature-private constants | Owning feature or component | Local clarity and tests | Growing a global constants dumping ground |

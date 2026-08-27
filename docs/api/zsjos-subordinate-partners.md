@@ -1,40 +1,44 @@
-# 下属兼职与归属 API
+# 兼职管理与归属 API
 
 ## Permission model
 
-`zsjos:subordinate-partner:query` is the single employee read capability. System resolves enabled
-employees holding this permission as assignment candidates. The permission alone does not expose any
-Partner: every read also requires the current tenant-scoped `Partner -> employee` ownership row.
-Removing the permission or disabling the employee immediately makes the retained relationship
-ineffective. Partner disablement or conversion does not remove historical read access.
+`zsjos:partner:query` exposes the consolidated Partner page. An ordinary reader sees only Partners
+whose current tenant-scoped ownership row points to that employee. Removing the permission, disabling
+the employee or reassigning the Partner immediately removes access without deleting ownership history.
 
-`zsjos:partner:assign-owner` protects assignment candidate, update, and audit APIs. It grants no
-subordinate Partner read scope by itself.
+`zsjos:partner:manage` grants tenant-wide Partner visibility and all supported management commands:
+create, enable/disable, login-mobile update, password reset, ownership assignment and ownership history.
+Neither permission is inferred from a role name. Historical `converted` rows remain visible but cannot
+be converted again; the conversion endpoint and permission are retired.
 
-## Administrator endpoints
+## Unified endpoints
 
-- `GET /admin-api/zsjos/partner/assignment-candidates`
-- `PUT /admin-api/zsjos/partner/{partnerId}/assignment` with
-  `{assignedUserId?, reason, expectedVersion?}`. A missing user unassigns the Partner. The reason is
-  required and the current relation version prevents stale changes.
-- `GET /admin-api/zsjos/partner/{partnerId}/assignment-log/page`
+- `GET /admin-api/zsjos/partner/page`
+- `GET /admin-api/zsjos/partner/{partnerId}/leads/page`
+- `GET /admin-api/zsjos/partner/leads/{leadId}`
+- `POST /admin-api/zsjos/partner/create` (`zsjos:partner:manage`)
+- `PUT /admin-api/zsjos/partner/{partnerId}/enable|disable` (`zsjos:partner:manage`)
+- `PUT /admin-api/zsjos/partner/{partnerId}/mobile` (`zsjos:partner:manage`)
+- `PUT /admin-api/zsjos/partner/{partnerId}/reset-password` (`zsjos:partner:manage`)
+- `GET /admin-api/zsjos/partner/assignment-candidates` (`zsjos:partner:manage`)
+- `PUT /admin-api/zsjos/partner/{partnerId}/assignment` (`zsjos:partner:manage`)
+- `GET /admin-api/zsjos/partner/{partnerId}/assignment-log/page` (`zsjos:partner:manage`)
 
-The existing Partner list projects current employee name, assignment time/version, and whether the
-relationship is presently effective. It never returns Partner password or token data.
+The list returns account identity and state, current ownership and lifecycle timestamps. It never
+returns passwords, tokens or the internal bound System user identifier to the Workbench contract.
+Assignment updates require a reason and use the current relation version to reject stale changes.
 
-## Employee endpoints
+The former `/admin-api/zsjos/subordinate-partners/**` GET endpoints remain temporary aliases for a
+rolling frontend/backend release. They execute the same query/manage permission and object checks and
+must not become a second authorization contract.
 
-- `GET /admin-api/zsjos/subordinate-partners/page`
-- `GET /admin-api/zsjos/subordinate-partners/{partnerId}/leads/page`
-- `GET /admin-api/zsjos/subordinate-partners/leads/{leadId}`
+## Partner Lead visibility
 
-The Lead list covers every historical and future Lead whose persisted `partnerId` matches the current
-Partner relationship. Detail, follow-up, appeal, complaint, customer-order, and flow-history reads use
-the same live object check and remain read-only. The relationship does not authorize supplement,
-urge, complaint/appeal submission, follow-up, transfer, recycle, release, account, cashback, or
-withdrawal operations.
+Once a Partner is visible, the reader may inspect every historical and future Lead whose persisted
+`partnerId` matches it. Detail, follow-up, appeal, complaint, customer-order and flow-history reads use
+the same live Partner scope and remain read-only. Reassignment moves this complete visibility to the new
+owner and does not rewrite Lead snapshots.
 
 Partner Leads created after V143 snapshot `partnerOwnerUserIdSnapshot` and
-`partnerOwnerNameSnapshot` from the configured relationship even when that employee is temporarily
-disabled or lacks the read permission. Reassignment never rewrites these fields. Older Leads remain
-null and display `未记录`; current ownership must not be presented as their historical value.
+`partnerOwnerNameSnapshot` at submission. Older null snapshots display `未记录`; current ownership is
+never substituted as historical fact.

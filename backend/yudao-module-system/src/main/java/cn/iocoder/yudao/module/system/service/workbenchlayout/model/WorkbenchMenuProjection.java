@@ -26,11 +26,21 @@ public class WorkbenchMenuProjection {
     public static class Meta {
         private Long globalVersionId;
         private Integer globalVersionNo;
-        private Long winningRoleId;
-        private Long roleVersionId;
-        private Integer roleVersionNo;
+        @Builder.Default
+        private List<AppliedRoleLayout> appliedRoleLayouts = Collections.emptyList();
         private Boolean fallback;
         private String fallbackReason;
+    }
+
+    @Data
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class AppliedRoleLayout {
+        private Long roleId;
+        private Long versionId;
+        private Integer versionNo;
+        private Integer priority;
     }
 
 }

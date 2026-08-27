@@ -14,7 +14,8 @@ import java.util.List;
 @AllArgsConstructor
 public class WorkbenchLayoutSnapshot {
 
-    public static final int SCHEMA_VERSION = 1;
+    public static final int SCHEMA_VERSION = 2;
+    public static final int LEGACY_SCHEMA_VERSION = 1;
     public static final String NODE_TYPE_GROUP = "GROUP";
     public static final String NODE_TYPE_PAGE = "PAGE";
     public static final String UNCLASSIFIED_KEY = "__unclassified__";

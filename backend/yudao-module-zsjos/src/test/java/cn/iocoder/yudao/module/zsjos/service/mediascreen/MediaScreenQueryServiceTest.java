@@ -6,8 +6,10 @@ import cn.iocoder.yudao.module.system.api.maintenance.MaintenanceModeApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.mediascreen.MediaScreenDailySnapshotDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.MediaScreenContributionRow;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.mediascreen.MediaScreenDailySnapshotMapper;
 import cn.iocoder.yudao.module.zsjos.framework.mediascreen.MediaScreenProperties;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,6 +27,7 @@ import static org.mockito.Mockito.*;
 class MediaScreenQueryServiceTest {
     private final LeadMapper leadMapper=mock(LeadMapper.class);
     private final MediaScreenDailySnapshotMapper snapshotMapper=mock(MediaScreenDailySnapshotMapper.class);
+    private final PartnerMapper partnerMapper=mock(PartnerMapper.class);
     private final AdminUserApi userApi=mock(AdminUserApi.class);
     private final DeptApi deptApi=mock(DeptApi.class);
     private final StringRedisTemplate redis=mock(StringRedisTemplate.class);
@@ -40,14 +43,18 @@ class MediaScreenQueryServiceTest {
         when(leadMapper.countMediaScreenTenMinuteContributions(anyLong(),any(),any())).thenReturn(List.of());
         when(leadMapper.countMediaScreenDailyContributions(anyLong(),any(),any())).thenReturn(List.of());
         when(snapshotMapper.selectByDate(anyLong(),any())).thenReturn(List.of());
-        service=new MediaScreenQueryService(leadMapper,snapshotMapper,userApi,deptApi,mock(MaintenanceModeApi.class),redis,properties);
+        when(partnerMapper.selectBatchIds(anyCollection())).thenReturn(List.of(
+                new PartnerDO().setId(101L).setName("合作方甲").setStatus("enabled"),
+                new PartnerDO().setId(102L).setName("合作方乙").setStatus("disabled")));
+        service=new MediaScreenQueryService(leadMapper,snapshotMapper,partnerMapper,userApi,deptApi,
+                mock(MaintenanceModeApi.class),redis,properties);
     }
 
-    @Test void statsAggregatesInternalAndRecordedProviderContribution(){
+    @Test void statsKeepsDirectAndPartTimeExclusiveAndSwitchControlsAllSummaryMetrics(){
         when(leadMapper.countMediaScreenContributions(anyLong(),any(),any(),any(),any())).thenReturn(List.of(
-                row(3L,10L,"internal_new_media",null,2,3,4,2),
-                row(4L,999L,"sales_self_sourced",4L,1,2,3,1),
-                row(3L,999L,"internal_new_media",null,9,9,9,9)));
+                row(3L,10L,"direct",null,null,2,3,4,2),
+                row(4L,20L,"direct",null,null,1,2,3,1),
+                row(3L,10L,"part_time",101L,"合作方甲",5,6,7,3)));
 
         var result=service.stats(1L,false);
 
@@ -55,37 +62,55 @@ class MediaScreenQueryServiceTest {
         assertEquals(3,result.getSummary().getMonthEffective());
         assertEquals(2,result.getDepartments().size());
         assertEquals(4,result.getDepartments().get(0).getMembers().stream().filter(x->x.getName().equals("成员甲")).findFirst().orElseThrow().getMonthTotal());
-        assertEquals(3,result.getDepartments().get(1).getMembers().stream().filter(x->x.getName().equals("成员乙")).findFirst().orElseThrow().getMonthTotal());
         assertNull(result.getPartTimeCompanionDepartment());
         assertFalse(result.isPartTimeIncluded());
+
+        var included=service.stats(1L,true);
+        assertEquals(14,included.getSummary().getMonthTotal());
+        assertEquals(6,included.getSummary().getMonthEffective());
+        assertEquals(7,included.getPartTimeCompanionDepartment().getMetrics().getMonthTotal());
+        assertEquals(1,included.getPartTimeCompanionDepartment().getMembers().get(0).getPartTimers().size());
+        assertEquals(7,included.getTodayStar().getToday());
+        assertTrue(included.getTodayStar().isIncludesPartTime());
     }
 
-    @Test void historyUsesOnlyFrozenRowsAndAccumulatesWeekAndMonth(){
+    @Test void historyUsesFrozenCumulativeMetricsAndSnapshotAccountStatus(){
         LocalDate date=LocalDate.of(2026,8,26);
-        MediaScreenDailySnapshotDO monday=snapshot(date.minusDays(2),3L,"成员甲","新媒体一部",2,1);
-        MediaScreenDailySnapshotDO today=snapshot(date,3L,"成员甲","新媒体一部",5,2);
-        when(snapshotMapper.selectByDate(1L,date)).thenReturn(List.of(today));
-        when(snapshotMapper.selectByDateBetween(1L,date.withDayOfMonth(1),date)).thenReturn(List.of(monday,today));
+        MediaScreenDailySnapshotDO direct=snapshot(date,"direct",10L,3L,"成员甲","新媒体一部",true,5,7,11,4,null);
+        MediaScreenDailySnapshotDO disabled=snapshot(date,"direct",10L,5L,"停用成员","新媒体一部",false,2,2,2,1,null);
+        MediaScreenDailySnapshotDO part=snapshot(date,"part_time",10L,3L,"成员甲","新媒体一部",true,3,4,6,2,"[]");
+        when(snapshotMapper.selectByDate(1L,date)).thenReturn(List.of(direct,disabled,part));
 
         var result=service.history(1L,date,true);
 
         assertTrue(result.isAvailable()); assertTrue(result.isPartTimeIncluded());
-        assertEquals(5,result.getSummary().getToday()); assertEquals(7,result.getSummary().getWeek());
-        assertEquals(7,result.getSummary().getMonthTotal()); assertEquals(3,result.getSummary().getMonthEffective());
+        assertEquals(10,result.getSummary().getToday()); assertEquals(13,result.getSummary().getWeek());
+        assertEquals(19,result.getSummary().getMonthTotal()); assertEquals(7,result.getSummary().getMonthEffective());
+        assertEquals(1,result.getDepartments().get(0).getMembers().size());
+        assertEquals(8,result.getTodayStar().getToday());
+        assertEquals("persisted_snapshot_v2",result.getSource());
         verifyNoInteractions(leadMapper);
     }
 
-    @Test void freezeDoesNotOverwriteExistingMemberSnapshot(){
-        when(leadMapper.countMediaScreenContributions(anyLong(),any(),any(),any(),any())).thenReturn(List.of());
-        when(snapshotMapper.selectMemberIds(eq(1L),any(),anyCollection())).thenReturn(List.of(1L,2L,3L,4L));
+    @Test void freezeDoesNotOverwriteExistingDateSnapshot(){
+        LocalDate date=LocalDate.of(2026,8,25);
+        when(snapshotMapper.selectByDate(1L,date)).thenReturn(List.of(snapshot(date,"direct",10L,3L,
+                "成员甲","新媒体一部",true,1,1,1,1,null)));
 
-        service.freeze(1L,LocalDate.of(2026,8,25));
+        service.freeze(1L,date);
 
+        verifyNoInteractions(leadMapper);
         verify(snapshotMapper,never()).insertIgnore(anyLong(),any());
     }
 
-    private static MediaScreenContributionRow row(long user,long dept,String type,Long provider,long today,long week,long month,long effective){var r=new MediaScreenContributionRow();r.setContributorUserId(user);r.setSourceDeptId(dept);r.setSourceType(type);r.setSourceProviderUserId(provider);r.setTodayCount(today);r.setWeekCount(week);r.setMonthTotal(month);r.setMonthEffective(effective);return r;}
+    private static MediaScreenContributionRow row(long user,long dept,String type,Long provider,String providerName,long today,long week,long month,long effective){var r=new MediaScreenContributionRow();r.setContributorUserId(user);r.setContributorName(user==3L?"成员甲":"成员乙");r.setSourceDeptId(dept);r.setDepartmentName(dept==10L?"新媒体一部":"新媒体二部");r.setContributionType(type);r.setProviderOwnerId(provider);r.setProviderOwnerName(providerName);r.setTodayCount(today);r.setWeekCount(week);r.setMonthTotal(month);r.setMonthEffective(effective);return r;}
     private static DeptRespDTO dept(long id,String name,long leader){return new DeptRespDTO().setId(id).setName(name).setLeaderUserId(leader);}
     private static AdminUserRespDTO user(long id,long dept,String name){var u=new AdminUserRespDTO();u.setId(id);u.setDeptId(dept);u.setNickname(name);u.setStatus(0);return u;}
-    private static MediaScreenDailySnapshotDO snapshot(LocalDate date,long member,String name,String dept,int submitted,int valid){var row=new MediaScreenDailySnapshotDO().setSnapshotDate(date).setMemberId(member).setMemberName(name).setDepartmentName(dept).setSubmittedCount(submitted).setValidCount(valid);row.setCreateTime(LocalDateTime.now());return row;}
+    private static MediaScreenDailySnapshotDO snapshot(LocalDate date,String type,long deptId,long member,String name,
+                                                        String dept,boolean enabled,int today,int week,int month,
+                                                        int effective,String partnerJson){var row=new MediaScreenDailySnapshotDO()
+            .setSnapshotDate(date).setContributionType(type).setDepartmentId(deptId).setMemberId(member)
+            .setMemberName(name).setMemberEnabled(enabled).setDepartmentName(dept).setTodayCount(today)
+            .setWeekCount(week).setMonthTotal(month).setMonthEffective(effective).setPartnerDetailsJson(partnerJson);
+        row.setCreateTime(LocalDateTime.now());return row;}
 }

@@ -5,7 +5,7 @@ import type { ImpersonationSession } from './impersonation'
 export type { ImpersonationSession } from './impersonation'
 
 export type PersonnelState = { userId: number; state: 'enabled' | 'disabled' | 'departed'; reason?: string; changedAt?: Timestamp }
-export type Partner = { id: number; partnerNo: string; name: string; mobile: string; status: 'enabled' | 'disabled' | 'converted'; boundSystemUserId: number; channelId?: string; assignedEmployeeUserId?: number; assignedEmployeeName?: string; assignedAt?: Timestamp; assignmentVersion?: number; assignmentEffective?: boolean }
+export type Partner = { id: number; partnerNo: string; name: string; mobile: string; status: 'enabled' | 'disabled' | 'converted'; channelId?: string; enabledAt?: Timestamp; disabledAt?: Timestamp; assignedEmployeeUserId?: number; assignedEmployeeName?: string; assignedAt?: Timestamp; assignmentVersion?: number; assignmentEffective?: boolean }
 export type PartnerOwnershipLog = { id: number; previousEmployeeName?: string; employeeName?: string; actionType: 'assign' | 'reassign' | 'unassign'; reason: string; operatorName?: string; occurredAt: Timestamp }
 export type PartnerCreate = { partnerNo: string; name: string; mobile: string; password: string; channelId?: string }
 export type BusinessAudit = { id: number; operatorNameSnapshot: string; operatorRoleSnapshot: string; actionCode: string; targetType: string; targetId: string; sourceIp?: string; occurredAt: Timestamp }
@@ -28,9 +28,13 @@ export const managementApi = {
   personnelState: async (userId: number) => unwrap<PersonnelState>(await http.get(`/zsjos/personnel/${userId}/state`)),
   updatePersonnelState: async (userId: number, state: PersonnelState['state'], reason: string) => unwrap<boolean>(await http.put(`/zsjos/personnel/${userId}/state`, { state, reason })),
   partners: async () => unwrap<Partner[]>(await http.get('/zsjos/partner/list')),
+  partnerPage: async (params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+    unwrap<PageResult<Partner>>(await http.get('/zsjos/partner/page', { params })),
+  partnerLeads: async (partnerId: number, params: { pageNo: number; pageSize: number; keyword?: string; status?: string }) =>
+    unwrap<PageResult<import('./api').ManagedLead>>(await http.get(`/zsjos/partner/${partnerId}/leads/page`, { params })),
+  partnerLead: async (leadId: number) => unwrap<import('./api').ManagedLead>(await http.get(`/zsjos/partner/leads/${leadId}`)),
   createPartner: async (data: PartnerCreate) => unwrap<number>(await http.post('/zsjos/partner/create', data)),
   setPartnerEnabled: async (id: number, enabled: boolean, reason: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/${enabled ? 'enable' : 'disable'}`, { reason })),
-  convertPartner: async (id: number, data: { username: string; password: string; targetType: string; deptId: number; migrateHistoricalOrganization: boolean; reason: string }) => unwrap<boolean>(await http.post(`/zsjos/partner/${id}/convert`, data)),
   updatePartnerMobile: async (id: number, mobile: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/mobile`, { mobile })),
   resetPartnerPassword: async (id: number, password: string) => unwrap<boolean>(await http.put(`/zsjos/partner/${id}/reset-password`, { password })),
   partnerAssignmentCandidates: async () => unwrap<SimpleUser[]>(await http.get('/zsjos/partner/assignment-candidates')),

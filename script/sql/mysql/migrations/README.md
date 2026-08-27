@@ -560,13 +560,14 @@ Use `../audit/V131_permission_grant_audit.sql` and `../audit/V135_snapshot_clean
 read-only scope review and recovery export. Any resulting permission revocation or snapshot update
 requires an independently confirmed tenant/row list and is intentionally not part of bootstrap.
 
-### V141 Media-screen daily snapshot
+### V141 Normalized provider attribution and media-screen v2 snapshot
 
-Creates the empty tenant-scoped daily member snapshot table used by the public new-media contribution
-screen history API. The unique tenant/date/member key makes the daily freeze idempotent; department and
-member names are frozen with that day's counts. Apply after V140. The migration does not backfill or
-invent historical data, change Lead rows, or seed business options. Once snapshots have been written,
-rollback requires a reviewed export-and-forward-repair plan because deleting the table loses frozen history.
+Adds nullable canonical provider, contribution employee/department/supervisor snapshots and `counted_at` to
+Lead, then creates the tenant-scoped v2 daily snapshot table. Backfill uses only IDs and timestamps already
+persisted on each Lead; it does not resolve current names, departments or Partner ownership and does not invent
+historical snapshots. An existing v1 snapshot table must be empty before this approved development-baseline
+replacement; otherwise execution blocks. The unique tenant/date/contribution-type/department/member key makes
+freezing idempotent. Once v2 rows exist, rollback requires a reviewed export-and-forward-repair plan.
 
 ### V142 Partial V139/V140 execution repair
 
@@ -586,16 +587,25 @@ V143 adds the tenant-scoped one-current-owner relation between a Partner and a S
 assignment audit rows, and nullable submission-time employee ID/name snapshots on Partner Leads. It creates the
 server-owned `subordinate-partners` page permission and the independent Partner assignment button permission.
 Only the assignment button is initially granted to enabled `system_administrator` roles; ordinary subordinate
-read access remains administrator-configured. It creates no ownership rows, does not backfill historical Leads,
-and is repeatable. Recovery disables menus or grants while retaining relationship, audit, and snapshot facts.
+read access remains administrator-configured. It creates no ownership rows. For historical Partner Leads it may
+copy only the already persisted submission-time employee snapshot into the canonical contribution fields; it
+never queries the current ownership relation to reconstruct history. Recovery disables menus or grants while
+retaining relationship, audit, and snapshot facts.
+
+### V106, V108 and V118 retired migration placeholders
+
+These three files retain the historical version slots of retired Student Operations capabilities so the
+core migration sequence remains continuous. They write only missing rows to `zsjos_schema_version` and
+`zsjos_module_schema_version`; they do not create or restore Student Operations schema, menus, permissions,
+notifications, or business data, and they preserve any existing checksum and installation timestamp.
 
 ### V144 Remove new-media Student Operations
 
 Retires the new-media Student Operations domains: exception tickets, cooperation assessments, and
 graduation applications. In execution order it deletes graduation notification messages, rules and
 templates; deletes `media-graduation` business events; deletes Student Operations role-menu grants and
-menu/button definitions; drops the three business tables; removes obsolete V106/V108/V118 markers; and
-records V144. The separately owned student-contact extension table, permissions, process key and history
+menu/button definitions; drops the three business tables; preserves the retired V106/V108/V118 migration
+markers; and records V144. The separately owned student-contact extension table, permissions, process key and history
 are explicitly outside this migration.
 
 V144 is repeatable through stable scene, aggregate and permission identifiers plus guarded table drops.
@@ -644,10 +654,28 @@ and package writes are repeatable, and both schema-version markers are recorded.
 requires a reviewed forward migration because published snapshots are permanent; do not
 drop either table while any tenant layout or history exists.
 
-`V139-V147` are now present in the integrated migration chain. V149 follows V147; V148 is
-intentionally absent because it is owned elsewhere. V149 must remain the only migration
-number used by the feedback-management workspace and must be reviewed through the normal
-controlled migration process before execution.
+`V139-V150` are present in the integrated development-baseline chain. The retired
+V106/V108/V118 slots are retained by the metadata-only placeholders documented above.
+V148, V149, and V150 retain their independently owned business scopes. Bootstrap executes them
+in numeric order; V150 remains independently executable after V143 and does not require V149 state.
+
+### V148 Durable employee announcements
+
+V148 extends System announcements with draft/published/offline lifecycle fields, stable Infra-file
+attachment references, and tenant-scoped per-ADMIN-user read records. Existing announcements remain
+drafts. Menu ID `79910` is the relative Workbench route `announcements`; IDs `79911-79912` add explicit
+publish/offline operations under the existing Admin notice page. Tenant packages inherit only from
+their existing Workbench or notice parent, and no role grant is created. The migration is additive and
+repeatable; it does not publish historical content or delete business rows. The complete migration runs
+through one stored-procedure call so a statement-batch client cannot continue from a failed prerequisite
+into schema, menu, or version writes. Lifecycle columns use `information_schema` guards instead of
+`ADD COLUMN IF NOT EXISTS`, which is not accepted by every supported MySQL 8 minor version.
+
+An affected development database may already contain the V148 markers, attachment/read tables, and menus
+while lacking one or more lifecycle columns because a batch client continued after the former ALTER error.
+Do not delete either version marker or those additive objects. Back up the database, run the corrected V148
+file explicitly once, and verify all three columns, both tables, menu IDs `79910-79912`, and both V148 markers.
+The normal migration runner may skip this repair when it sees an existing V148 marker.
 
 ### V149 Feedback management
 
@@ -664,3 +692,22 @@ and approval rounds are snapshotted for history. Execute only after V147, run
 `verify-bootstrap.sql`, and retain the additive schema on application rollback. BPM import,
 publish, enablement and dispatcher configuration are manual release steps; no startup auto-deploy
 is introduced.
+
+### V150 Claim-pool read and consolidated Partner permissions
+
+V150 depends on V143 and does not require V149. It makes the existing claim-pool page permission
+`zsjos:lead:claim-pool:query`, preserves page access
+for existing claim and query-all holders, and grants the page to enabled `sales_manager` roles without
+granting the claim action. It keeps menu ID `6852` as the single `兼职管理` page and adds menu ID `79920`
+for `zsjos:partner:manage`. Former subordinate viewers retain the consolidated page; only roles holding
+all former create, state-update and assignment permissions receive manage. The former granular Partner
+buttons, conversion permission and subordinate page are retired after grants are migrated. No Partner,
+Lead, account, ownership or historical converted row is changed. The migration is repeatable and
+forward-only; recovery requires a reviewed permission migration. Its prerequisite checks and all writes
+run inside one stored-procedure call, so a missing V143 foundation or required menu blocks every V150 write.
+Fresh bootstrap sources V150 after V148 and V149. V150 itself does not require V149 state. A development database that already
+recorded V150 during a former partial run must retain that history and first audit whether every V150 statement
+completed. Explicitly rerun the corrected V150 only when that audit confirms its idempotent repair scope is
+sufficient, then verify its menu/grant result instead of deleting version rows or attempting a destructive
+rollback. If any former granular permission was retired before its grants were copied, use a separately
+reviewed forward repair based on exported pre-migration evidence; a rerun cannot reconstruct deleted history.

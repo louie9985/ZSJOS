@@ -29,7 +29,7 @@ GET /public-api/zsjos/media-screen/stats?tenantId=1&includePartTimers=0
 | 参数 | 必填 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- | --- |
 | `tenantId` | 是 | Long | 无 | 服务端白名单中配置的租户 ID |
-| `includePartTimers` | 否 | Integer | `0` | 仅允许 `0` 或 `1`；本期只回显，兼职陪跑字段固定为 `null` |
+| `includePartTimers` | 否 | Integer | `0` | 仅允许 `0` 或 `1`；控制汇总、趋势、14 日序列、今日之星、昨日冠军和兼职陪跑卡片是否计入兼职贡献 |
 
 示例响应：
 
@@ -44,14 +44,15 @@ GET /public-api/zsjos/media-screen/stats?tenantId=1&includePartTimers=0
     "partTimeIncluded": false,
     "summary": { "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 },
     "departments": [{
+      "departmentId": 1011,
       "name": "新媒体一部",
       "subtitle": "主管 示例主管",
       "metrics": { "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 },
-      "members": [{ "name": "示例成员", "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 }]
+      "members": [{ "userId": 31, "name": "示例成员", "today": 18, "week": 52, "monthTotal": 128, "monthEffective": 46 }]
     }],
     "partTimeCompanionDepartment": null,
-    "todayStar": { "name": "示例成员", "deptName": "新媒体一部", "today": 18, "yesterday": 12, "rankToday": 1, "rankYesterday": 2 },
-    "yesterdayChampion": { "name": "昨日成员", "deptName": "新媒体二部", "count": 16 },
+    "todayStar": { "name": "示例成员", "deptName": "新媒体一部", "today": 18, "yesterday": 12, "rankToday": 1, "rankYesterday": 2, "includesPartTime": false },
+    "yesterdayChampion": { "name": "昨日成员", "deptName": "新媒体二部", "count": 16, "includesPartTime": false },
     "trend": { "today": [0, 2, 5], "yesterday": [1, 3, 4], "stepMinutes": 10 },
     "series": { "submitted": [8, 11, 18], "valid": [3, 4, 6] }
   }
@@ -61,13 +62,15 @@ GET /public-api/zsjos/media-screen/stats?tenantId=1&includePartTimers=0
 当前主统计口径：
 
 - 只返回 `yudao.media-screen.new-media.department-ids` 明确配置的部门，顺序与配置一致。
-- `internal_new_media` 按 `source_user_id` 归属贡献人、按 Lead 的 `source_dept_id` 快照归属部门。
-- 已登记新媒体提供方的 `sales_self_sourced` 按 `source_provider_user_id` 归属贡献人、按该提供方当前 System 部门归属部门。
-- 只展示当前启用的 System 用户；`partner` 来源不会进入普通成员榜。
+- 所有统计只读取 Lead 首次计数时冻结的 `countedAt`、规范提供方和贡献员工/部门/主管快照，不按当前组织或 Partner 归属反推历史。
+- 新媒体专员、主管和销售明确选择的 System 提供方计为 `direct`；Partner 在提交时已有员工归属快照时计为 `part_time`，两类贡献互斥。
+- 销售自拓未选择提供方时不计入新媒体大屏；重复客资重新激活不再次计数，也不改写首次归属和 `countedAt`。
+- 汇总保留停用员工的历史贡献，实时成员榜过滤当前停用员工；实时 Partner 明细过滤当前停用 Partner，但员工兼职汇总保留其历史贡献。
+- 今日之星和昨日冠军按员工 ID 合并直属与兼职贡献；新媒体主管与普通成员使用相同上榜规则。
 - `monthEffective` 使用 Lead 状态 `valid`、`converted`、`won`。
-- `summary` 是部门合计，部门 `metrics` 是成员合计；配置部门和在职成员无数据时仍返回零值对象。
+- `summary` 是当前开关口径下的直属部门与可选兼职合计；配置部门和在职成员无数据时仍返回零值对象。
 - `trend.today/yesterday` 是北京时间零点起每 10 分钟累计序列；`series` 是近 14 个自然日提交量和有效量。
-- 本期无权威兼职陪跑关系，`partTimeCompanionDepartment=null`；`includePartTimers` 只校验并回显，不改变统计结果。
+- `includePartTimers=0` 时不返回兼职陪跑卡片且所有全局指标排除兼职；为 `1` 时所有相关指标统一计入兼职。
 
 新客户端使用嵌套结构。旧平铺字段仅为兼容投影，不再定义主业务口径。
 
@@ -98,7 +101,7 @@ V141 建立持久化历史快照源。指定日期无快照时返回 `available=
     "trend": [],
     "available": false,
     "snapshotDate": "2026-08-24",
-    "source": "persisted_snapshot",
+    "source": "persisted_snapshot_v2",
     "historySnapshot": {
       "available": false,
       "snapshotDate": "2026-08-24",
@@ -108,8 +111,9 @@ V141 建立持久化历史快照源。指定日期无快照时返回 `available=
 }
 ```
 
-有快照时返回 `available=true`，结构与实时接口的 `summary` 和 `departments` 对齐。`today` 为目标日冻结值，
-`week` 从该周周一累计至目标日，`monthTotal/monthEffective` 从月初累计至目标日；这些值全部从每日冻结表逐日求和。
+有快照时返回 `available=true`、`source=persisted_snapshot_v2`，结构与实时接口的 `summary` 和 `departments` 对齐。
+每个快照行直接冻结目标日截止时的 `today/week/monthTotal/monthEffective` 累计值、成员启用状态和 Partner 明细，
+历史读取不再查询当前 Lead、用户、部门或 Partner 状态。`includePartTimers` 对历史汇总和榜单使用与实时接口相同的口径。
 前端应在 `available=false` 时显示“该日期暂无历史快照”。
 
 ## 5. 维护状态

@@ -6,6 +6,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Collections;
+import java.util.List;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -16,6 +19,8 @@ public class WorkbenchLayoutDraftRespVO {
     private Long scopeId;
     private Integer draftRevision;
     private WorkbenchLayoutSnapshot snapshot;
+    @Builder.Default
+    private List<WorkbenchLayoutCandidateRespVO.Page> candidatePages = Collections.emptyList();
     private Long publishedVersionId;
     private Integer publishedVersionNo;
     private Boolean publishedEnabled;

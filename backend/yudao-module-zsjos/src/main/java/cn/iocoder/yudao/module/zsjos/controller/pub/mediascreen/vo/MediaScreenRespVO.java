@@ -38,12 +38,25 @@ public class MediaScreenRespVO {
         private long monthEffective;
     }
     @Data public static class Department {
+        private Long departmentId;
         private String name;
         private String subtitle;
         private Metrics metrics;
         private List<Member> members;
     }
     @Data public static class Member {
+        private Long userId;
+        private String name;
+        private String departmentName;
+        private boolean disabled;
+        private List<PartTimerDetail> partTimers;
+        private long today;
+        private long week;
+        private long monthTotal;
+        private long monthEffective;
+    }
+    @Data public static class PartTimerDetail {
+        private Long partnerId;
         private String name;
         private long today;
         private long week;
@@ -58,12 +71,14 @@ public class MediaScreenRespVO {
         private long yesterday;
         private int rankToday;
         private int rank;
-        private int rankYesterday;
+        private Integer rankYesterday;
+        private boolean includesPartTime;
     }
     @Data public static class Champion {
         private String name;
         private String deptName;
         private long count;
+        private boolean includesPartTime;
     }
     @Data public static class Trend {
         private List<Long> today;

@@ -21,6 +21,12 @@ V143 adds `zsjos:subordinate-partner:query` as an administrator-configured emplo
 `zsjos:partner:assign-owner` for Partner ownership maintenance. The latter is initially granted only to
 `system_administrator`; no ordinary role receives subordinate Partner visibility automatically.
 
+V150 retires those two permissions and consolidates Partner access under `zsjos:partner:query` and
+`zsjos:partner:manage`. Query is live-ownership scoped; manage is tenant-wide and includes all supported
+account and ownership commands. Only roles that held the former create, state-update and assignment
+permissions together are upgraded to manage. V150 also assigns the independent
+`zsjos:lead:claim-pool:query` page to enabled `sales_manager` roles without granting `zsjos:lead:claim`.
+
 V146 inherits media-account capabilities by existing permission relationships rather than role names:
 holders of `zsjos:media-account:query` receive `zsjos:media-calendar:query`, holders of account edit
 receive `zsjos:media-account:maintenance`, and holders of account `query-all` receive

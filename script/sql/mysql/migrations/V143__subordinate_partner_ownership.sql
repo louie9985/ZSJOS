@@ -57,6 +57,18 @@ DELIMITER ;
 CALL `zsjos_v143_add_lead_snapshot`();
 DROP PROCEDURE `zsjos_v143_add_lead_snapshot`;
 
+-- Only the submission-time employee snapshot is authoritative for historical Partner attribution.
+UPDATE `zsjos_lead`
+SET `provider_owner_type`=COALESCE(`provider_owner_type`,'partner'),
+    `provider_owner_id`=COALESCE(`provider_owner_id`,`partner_id`),
+    `contribution_user_id_snapshot`=COALESCE(`contribution_user_id_snapshot`,`partner_owner_user_id_snapshot`),
+    `contribution_user_name_snapshot`=COALESCE(`contribution_user_name_snapshot`,`partner_owner_name_snapshot`),
+    `counted_at`=COALESCE(`counted_at`,`submitted_at`),
+    `updater`='migration-V143',`update_time`=NOW()
+WHERE `deleted`=b'0' AND `source_type`='partner' AND `partner_id` IS NOT NULL
+  AND (`provider_owner_id` IS NULL OR (`partner_owner_user_id_snapshot` IS NOT NULL
+       AND `contribution_user_id_snapshot` IS NULL));
+
 DROP PROCEDURE IF EXISTS `zsjos_v143_assert_menu_contract`;
 DELIMITER $$
 CREATE PROCEDURE `zsjos_v143_assert_menu_contract`()

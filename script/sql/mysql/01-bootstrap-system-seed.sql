@@ -1933,3 +1933,17 @@ UPDATE `system_tenant_package`
 SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79903),`updater`='bootstrap-V147',`update_time`=NOW()
 WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'1','$')
   AND NOT JSON_CONTAINS(`menu_ids`,'79903','$');
+
+INSERT IGNORE INTO `system_menu`
+ (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,
+  `workbench_render_mode`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
+ (79910,'公告中心','system:notice:read',2,95,6735,'announcements','ep:notification','system/notice/workbench','AnnouncementCenterPage','native',0,b'1',b'1',b'1','bootstrap-V148',NOW(),'bootstrap-V148',NOW(),b'0'),
+ (79911,'发布公告','system:notice:publish',3,5,107,'','','',NULL,'admin_only',0,b'1',b'1',b'1','bootstrap-V148',NOW(),'bootstrap-V148',NOW(),b'0'),
+ (79912,'下线公告','system:notice:offline',3,6,107,'','','',NULL,'admin_only',0,b'1',b'1',b'1','bootstrap-V148',NOW(),'bootstrap-V148',NOW(),b'0');
+
+UPDATE `system_tenant_package` SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79910)
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'6735','$') AND NOT JSON_CONTAINS(`menu_ids`,'79910','$');
+UPDATE `system_tenant_package` SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79911)
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'107','$') AND NOT JSON_CONTAINS(`menu_ids`,'79911','$');
+UPDATE `system_tenant_package` SET `menu_ids`=JSON_ARRAY_APPEND(`menu_ids`,'$',79912)
+WHERE `deleted`=b'0' AND JSON_CONTAINS(`menu_ids`,'107','$') AND NOT JSON_CONTAINS(`menu_ids`,'79912','$');

@@ -88,6 +88,8 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
     public WorkbenchLayoutDraftRespVO getDraft(String scopeType, Long scopeId) {
         Scope scope = validateScope(scopeType, scopeId);
         WorkbenchLayoutDO layout = layoutMapper.selectByScope(scope.getType(), scope.getId());
+        List<MenuDO> roleMenus = scope.isGlobal() ? Collections.emptyList()
+                : getAuthorizedMenus(Set.of(scope.getId()));
         WorkbenchLayoutSnapshot snapshot;
         int revision;
         if (layout == null) {
@@ -96,18 +98,18 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
                 snapshot = resolver.createInitialGlobalSnapshot(getTenantMenus());
             } else {
                 WorkbenchLayoutSnapshot global = getPublishedGlobalSnapshot();
-                snapshot = resolver.expandRoleSnapshot(global, WorkbenchLayoutSnapshot.builder()
-                        .scopeType(scope.getType()).enabled(false).priority(null).build());
+                snapshot = resolver.createInitialRoleSnapshot(global, roleMenus);
             }
         } else {
             revision = layout.getDraftRevision();
             WorkbenchLayoutSnapshot persisted = parseSnapshot(layout.getDraftSnapshotJson());
             snapshot = scope.isGlobal() ? persisted
-                    : resolver.expandRoleSnapshot(getPublishedGlobalSnapshot(), persisted);
+                    : resolver.reconcileRoleSnapshot(getPublishedGlobalSnapshot(), persisted, roleMenus);
         }
         return WorkbenchLayoutDraftRespVO.builder()
                 .scopeType(scope.getType()).scopeId(scope.getId()).draftRevision(revision)
-                .snapshot(snapshot)
+                .snapshot(snapshot).candidatePages(scope.isGlobal()
+                        ? buildCandidatePages(getTenantMenus()) : buildCandidatePages(roleMenus))
                 .publishedVersionId(layout == null ? null : layout.getPublishedVersionId())
                 .publishedVersionNo(layout == null ? null : layout.getPublishedVersionNo())
                 .publishedEnabled(layout == null ? null : layout.getPublishedEnabled())
@@ -123,7 +125,8 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
             if (scope.isGlobal()) {
                 persisted = resolver.normalizeGlobalDraft(reqVO.getSnapshot(), getTenantMenus());
             } else {
-                persisted = resolver.normalizeRoleDraft(getPublishedGlobalSnapshot(), reqVO.getSnapshot());
+                persisted = resolver.normalizeRoleDraft(getPublishedGlobalSnapshot(), reqVO.getSnapshot(),
+                        getAuthorizedMenus(Set.of(scope.getId())));
             }
         } catch (IllegalArgumentException ex) {
             throw exception(WORKBENCH_LAYOUT_SNAPSHOT_INVALID, ex.getMessage());
@@ -202,6 +205,9 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
             throw exception(WORKBENCH_LAYOUT_REVISION_CONFLICT);
         }
         WorkbenchLayoutSnapshot snapshot = parseSnapshot(layout.getDraftSnapshotJson());
+        snapshot = scope.isGlobal() ? resolver.normalizeGlobalDraft(snapshot, getTenantMenus())
+                : resolver.normalizeRoleDraft(getPublishedGlobalSnapshot(), snapshot,
+                getAuthorizedMenus(Set.of(scope.getId())));
         WorkbenchLayoutImpactRespVO impact = calculatePublishImpact(scope, snapshot);
         if (!Boolean.TRUE.equals(impact.getPublishable())) {
             String messages = impact.getIssues().stream().map(WorkbenchLayoutImpactRespVO.Issue::getMessage)
@@ -214,7 +220,7 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
         int versionNo = Optional.ofNullable(layout.getPublishedVersionNo()).orElse(0) + 1;
         WorkbenchLayoutVersionDO version = new WorkbenchLayoutVersionDO()
                 .setLayoutId(layout.getId()).setScopeType(scope.getType()).setScopeId(scope.getId())
-                .setVersionNo(versionNo).setSnapshotJson(layout.getDraftSnapshotJson())
+                .setVersionNo(versionNo).setSnapshotJson(JsonUtils.toJsonString(snapshot))
                 .setEnabled(scope.isGlobal() || Boolean.TRUE.equals(snapshot.getEnabled()))
                 .setPriority(scope.isGlobal() ? null : snapshot.getPriority())
                 .setPublishRemark(StrUtil.trim(reqVO.getPublishRemark()))
@@ -269,8 +275,11 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
         if (version == null || !Objects.equals(version.getLayoutId(), layout.getId())) {
             throw exception(WORKBENCH_LAYOUT_VERSION_NOT_EXISTS);
         }
-        parseSnapshot(version.getSnapshotJson());
-        if (layoutMapper.updateDraft(layout.getId(), reqVO.getDraftRevision(), version.getSnapshotJson(),
+        WorkbenchLayoutSnapshot restored = parseSnapshot(version.getSnapshotJson());
+        restored = scope.isGlobal() ? resolver.normalizeGlobalDraft(restored, getTenantMenus())
+                : resolver.normalizeRoleDraft(getPublishedGlobalSnapshot(), restored,
+                getAuthorizedMenus(Set.of(scope.getId())));
+        if (layoutMapper.updateDraft(layout.getId(), reqVO.getDraftRevision(), JsonUtils.toJsonString(restored),
                 version.getId()) == 0) {
             throw exception(WORKBENCH_LAYOUT_REVISION_CONFLICT);
         }
@@ -314,7 +323,8 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
                     if (roleVersion == null) {
                         throw new IllegalArgumentException("角色发布版本不存在");
                     }
-                    resolver.validateRoleForPublish(draft, parseSnapshot(roleVersion.getSnapshotJson()), tenantMenus);
+                    resolver.validateRoleSnapshotForPublish(draft, parseSnapshot(roleVersion.getSnapshotJson()),
+                            getAuthorizedMenus(Set.of(roleLayout.getScopeId())));
                 } catch (Exception ex) {
                     RoleDO role = roleMap.get(roleLayout.getScopeId());
                     issues.add(issue(roleLayout.getScopeId(), role == null ? null : role.getName(), ex.getMessage()));
@@ -325,7 +335,8 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
         }
         try {
             if (Boolean.TRUE.equals(draft.getEnabled())) {
-                resolver.validateRoleForPublish(getPublishedGlobalSnapshot(), draft, tenantMenus);
+                resolver.validateRoleSnapshotForPublish(getPublishedGlobalSnapshot(), draft,
+                        getAuthorizedMenus(Set.of(scope.getId())));
                 validatePublishedPriority(scope.getId(), draft.getPriority());
             }
         } catch (Exception ex) {
@@ -346,22 +357,13 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
         if (globalVersion == null) {
             return new ResolvedSnapshot(null, null, "GLOBAL_VERSION_MISSING");
         }
-        WorkbenchLayoutSnapshot effective = parseSnapshot(globalVersion.getSnapshotJson());
-        WorkbenchLayoutDO winner = CollUtil.isEmpty(roleIds) ? null
-                : layoutMapper.selectPublishedRoleLayouts(roleIds).stream().findFirst().orElse(null);
-        WorkbenchLayoutVersionDO roleVersion = null;
-        if (winner != null) {
-            roleVersion = versionMapper.selectById(winner.getPublishedVersionId());
-            if (roleVersion == null) {
-                return new ResolvedSnapshot(null, null, "ROLE_VERSION_MISSING");
-            }
-            effective = resolver.expandRoleSnapshot(effective, parseSnapshot(roleVersion.getSnapshotJson()));
-        }
+        WorkbenchLayoutSnapshot global = parseSnapshot(globalVersion.getSnapshotJson());
+        List<RoleCandidate> candidates = loadPublishedRoleCandidates(roleIds, global);
+        WorkbenchLayoutSnapshot effective = resolver.mergeRoleSnapshots(global,
+                candidates.stream().map(RoleCandidate::getSnapshot).toList());
         WorkbenchMenuProjection.Meta meta = WorkbenchMenuProjection.Meta.builder()
                 .globalVersionId(globalVersion.getId()).globalVersionNo(globalVersion.getVersionNo())
-                .winningRoleId(winner == null ? null : winner.getScopeId())
-                .roleVersionId(roleVersion == null ? null : roleVersion.getId())
-                .roleVersionNo(roleVersion == null ? null : roleVersion.getVersionNo())
+                .appliedRoleLayouts(toAppliedRoleLayouts(candidates))
                 .fallback(false).build();
         return new ResolvedSnapshot(effective, meta, null);
     }
@@ -387,34 +389,23 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
             global = parseSnapshot(globalVersion.getSnapshotJson());
         }
 
-        List<RoleCandidate> candidates = new ArrayList<>();
-        if (CollUtil.isNotEmpty(roleIds)) {
-            for (WorkbenchLayoutDO layout : layoutMapper.selectPublishedRoleLayouts(roleIds)) {
-                WorkbenchLayoutVersionDO version = versionMapper.selectById(layout.getPublishedVersionId());
-                if (version != null) {
-                    candidates.add(new RoleCandidate(layout.getScopeId(), layout.getPublishedPriority(),
-                            parseSnapshot(version.getSnapshotJson()), version));
-                }
-            }
-        }
+        List<RoleCandidate> candidates = loadPublishedRoleCandidates(roleIds, global);
         if (WorkbenchLayoutScopeTypeEnum.ROLE.getType().equals(overrideType)) {
             Scope roleScope = validateScope(overrideType, overrideId);
-            WorkbenchLayoutSnapshot difference = resolver.normalizeRoleDraft(global, reqVO.getSnapshot());
+            WorkbenchLayoutSnapshot difference = resolver.normalizeRoleDraft(global, reqVO.getSnapshot(),
+                    getAuthorizedMenus(Set.of(roleScope.getId())));
             candidates.removeIf(candidate -> Objects.equals(candidate.getRoleId(), roleScope.getId()));
             if (roleIds.contains(roleScope.getId()) && Boolean.TRUE.equals(difference.getEnabled())) {
                 candidates.add(new RoleCandidate(roleScope.getId(), difference.getPriority(), difference, null));
             }
         }
         candidates.sort(Comparator.comparing(RoleCandidate::getPriority).thenComparing(RoleCandidate::getRoleId));
-        RoleCandidate winner = candidates.stream().findFirst().orElse(null);
-        WorkbenchLayoutSnapshot effective = winner == null ? global
-                : resolver.expandRoleSnapshot(global, winner.getSnapshot());
+        WorkbenchLayoutSnapshot effective = resolver.mergeRoleSnapshots(global,
+                candidates.stream().map(RoleCandidate::getSnapshot).toList());
         WorkbenchMenuProjection.Meta meta = WorkbenchMenuProjection.Meta.builder()
                 .globalVersionId(globalVersion == null ? null : globalVersion.getId())
                 .globalVersionNo(globalVersion == null ? null : globalVersion.getVersionNo())
-                .winningRoleId(winner == null ? null : winner.getRoleId())
-                .roleVersionId(winner == null || winner.getVersion() == null ? null : winner.getVersion().getId())
-                .roleVersionNo(winner == null || winner.getVersion() == null ? null : winner.getVersion().getVersionNo())
+                .appliedRoleLayouts(toAppliedRoleLayouts(candidates))
                 .fallback(false).build();
         return new ResolvedSnapshot(effective, meta, null);
     }
@@ -472,11 +463,49 @@ public class WorkbenchLayoutServiceImpl implements WorkbenchLayoutService {
         return menuService.filterDisableMenus(menuService.getMenuList(menuIds));
     }
 
+    private List<WorkbenchLayoutCandidateRespVO.Page> buildCandidatePages(List<MenuDO> menus) {
+        Map<Long, String> paths = resolver.resolvePublicPaths(menus);
+        return resolver.getEligiblePages(menus).stream()
+                .map(menu -> WorkbenchLayoutCandidateRespVO.Page.builder()
+                        .sourceMenuId(menu.getId()).name(menu.getName()).icon(menu.getIcon())
+                        .path(paths.get(menu.getId())).workbenchRenderMode(menu.getWorkbenchRenderMode()).build())
+                .toList();
+    }
+
+    private List<RoleCandidate> loadPublishedRoleCandidates(Set<Long> roleIds,
+                                                             WorkbenchLayoutSnapshot global) {
+        if (CollUtil.isEmpty(roleIds)) {
+            return new ArrayList<>();
+        }
+        List<RoleCandidate> candidates = new ArrayList<>();
+        for (WorkbenchLayoutDO layout : layoutMapper.selectPublishedRoleLayouts(roleIds)) {
+            WorkbenchLayoutVersionDO version = versionMapper.selectById(layout.getPublishedVersionId());
+            if (version == null) {
+                throw new IllegalArgumentException("角色发布版本不存在：" + layout.getScopeId());
+            }
+            WorkbenchLayoutSnapshot snapshot = resolver.reconcileRoleSnapshot(global,
+                    parseSnapshot(version.getSnapshotJson()), getAuthorizedMenus(Set.of(layout.getScopeId())));
+            candidates.add(new RoleCandidate(layout.getScopeId(), layout.getPublishedPriority(), snapshot, version));
+        }
+        candidates.sort(Comparator.comparing(RoleCandidate::getPriority).thenComparing(RoleCandidate::getRoleId));
+        return candidates;
+    }
+
+    private List<WorkbenchMenuProjection.AppliedRoleLayout> toAppliedRoleLayouts(
+            List<RoleCandidate> candidates) {
+        return candidates.stream().map(candidate -> WorkbenchMenuProjection.AppliedRoleLayout.builder()
+                .roleId(candidate.getRoleId()).priority(candidate.getPriority())
+                .versionId(candidate.getVersion() == null ? null : candidate.getVersion().getId())
+                .versionNo(candidate.getVersion() == null ? null : candidate.getVersion().getVersionNo())
+                .build()).toList();
+    }
+
     private WorkbenchLayoutSnapshot parseSnapshot(String json) {
         try {
             WorkbenchLayoutSnapshot snapshot = JsonUtils.parseObject(json, WorkbenchLayoutSnapshot.class);
             if (snapshot == null || snapshot.getSchemaVersion() == null
-                    || snapshot.getSchemaVersion() != WorkbenchLayoutSnapshot.SCHEMA_VERSION) {
+                    || (snapshot.getSchemaVersion() != WorkbenchLayoutSnapshot.SCHEMA_VERSION
+                    && snapshot.getSchemaVersion() != WorkbenchLayoutSnapshot.LEGACY_SCHEMA_VERSION)) {
                 throw new IllegalArgumentException("不支持的快照版本");
             }
             return snapshot;

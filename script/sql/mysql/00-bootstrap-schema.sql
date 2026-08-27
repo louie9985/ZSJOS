@@ -2933,6 +2933,9 @@ CREATE TABLE IF NOT EXISTS `system_notice` (
   `content` text CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '公告内容',
   `type` tinyint NOT NULL COMMENT '公告类型（1通知 2公告）',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '公告状态（0正常 1关闭）',
+  `publish_status` varchar(16) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'DRAFT' COMMENT '发布状态：DRAFT、PUBLISHED、OFFLINE',
+  `publish_time` datetime DEFAULT NULL COMMENT '发布时间',
+  `offline_time` datetime DEFAULT NULL COMMENT '下线时间',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
@@ -2941,6 +2944,32 @@ CREATE TABLE IF NOT EXISTS `system_notice` (
   `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
   PRIMARY KEY (`id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知公告表';
+
+CREATE TABLE IF NOT EXISTS `system_notice_attachment` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '附件ID',
+  `notice_id` bigint NOT NULL COMMENT '公告ID',
+  `infra_file_id` bigint NOT NULL COMMENT 'Infra文件ID',
+  `file_name` varchar(255) NOT NULL COMMENT '文件名快照',
+  `mime_type` varchar(128) DEFAULT NULL COMMENT 'MIME类型快照',
+  `file_size` bigint NOT NULL COMMENT '文件大小快照',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '排序',
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_notice_file` (`tenant_id`,`notice_id`,`infra_file_id`),
+  KEY `idx_notice_attachment` (`tenant_id`,`notice_id`,`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告附件';
+
+CREATE TABLE IF NOT EXISTS `system_notice_read` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '阅读记录ID',
+  `notice_id` bigint NOT NULL COMMENT '公告ID', `user_id` bigint NOT NULL COMMENT 'ADMIN用户ID',
+  `read_time` datetime NOT NULL COMMENT '阅读时间',
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_notice_reader` (`tenant_id`,`notice_id`,`user_id`),
+  KEY `idx_notice_reader` (`tenant_id`,`user_id`,`read_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告阅读记录';
 
 -- system_notify_message
 CREATE TABLE IF NOT EXISTS `system_notify_message` (
@@ -3909,6 +3938,17 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `source_provider_recorded` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否按销售自拓提供方规则记录',
   `source_dept_id` bigint DEFAULT NULL COMMENT '提交时组织快照',
   `partner_id` bigint DEFAULT NULL COMMENT '兼职提交主体编号',
+  `partner_owner_user_id_snapshot` bigint DEFAULT NULL COMMENT '兼职提交时归属员工内部ID快照',
+  `partner_owner_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '兼职提交时归属员工姓名快照',
+  `provider_owner_type` varchar(32) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '规范提供方类型 system_user/partner',
+  `provider_owner_id` bigint DEFAULT NULL COMMENT '规范提供方内部ID',
+  `provider_owner_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次计数时提供方名称快照',
+  `contribution_user_id_snapshot` bigint DEFAULT NULL COMMENT '首次计数时业绩员工ID快照',
+  `contribution_user_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次计数时业绩员工姓名快照',
+  `contribution_supervisor_user_id_snapshot` bigint DEFAULT NULL COMMENT '首次计数时直属主管ID快照',
+  `contribution_supervisor_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次计数时直属主管姓名快照',
+  `contribution_dept_id_snapshot` bigint DEFAULT NULL COMMENT '首次计数时业绩部门ID快照',
+  `contribution_dept_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '首次计数时业绩部门名称快照',
   `source_channel_id` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '来源渠道编号',
   `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资主状态',
   `assignment_status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '客资分配状态',
@@ -3931,6 +3971,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   `qualified_at` datetime DEFAULT NULL COMMENT '有效性判定时间',
   `valid_description` varchar(2000) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '有效判定备注',
   `submitted_at` datetime NOT NULL COMMENT '提交时间',
+  `counted_at` datetime DEFAULT NULL COMMENT '首次计入客资业绩时间',
   `last_activity_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '最近业务活动时间',
   `converted_at` datetime DEFAULT NULL COMMENT '首次销售转化机会创建时间',
   `invalid_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '无效原因',
@@ -3970,6 +4011,8 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   KEY `idx_tenant_owner_assignment` (`tenant_id`,`owner_user_id`,`assignment_status`),
   KEY `idx_tenant_source_user` (`tenant_id`,`source_user_id`),
   KEY `idx_tenant_partner` (`tenant_id`,`partner_id`),
+  KEY `idx_tenant_provider_owner` (`tenant_id`,`provider_owner_type`,`provider_owner_id`,`counted_at`),
+  KEY `idx_tenant_contribution` (`tenant_id`,`contribution_dept_id_snapshot`,`contribution_user_id_snapshot`,`counted_at`),
   KEY `idx_tenant_submitted_at` (`tenant_id`,`submitted_at`),
   KEY `idx_tenant_last_activity` (`tenant_id`,`last_activity_at`,`id`),
   KEY `idx_tenant_pending_expiry` (`tenant_id`,`assignment_status`,`pending_expires_at`),
@@ -3978,6 +4021,68 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead` (
   KEY `idx_tenant_recycle_source` (`tenant_id`,`assignment_status`,`recycle_source_owner_user_id`),
   KEY `idx_tenant_aging_pool_scan` (`tenant_id`,`assignment_status`,`status`,`ownership_started_at`,`deleted`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资';
+
+CREATE TABLE IF NOT EXISTS `zsjos_media_screen_daily_snapshot` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `snapshot_date` date NOT NULL,
+  `contribution_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'direct/part_time',
+  `department_id` bigint NOT NULL,
+  `department_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `supervisor_id` bigint DEFAULT NULL,
+  `supervisor_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `member_id` bigint NOT NULL,
+  `member_name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `member_enabled` bit(1) NOT NULL DEFAULT b'1',
+  `today_count` int NOT NULL DEFAULT 0,
+  `week_count` int NOT NULL DEFAULT 0,
+  `month_total` int NOT NULL DEFAULT 0,
+  `month_effective` int NOT NULL DEFAULT 0,
+  `partner_details_json` json DEFAULT NULL COMMENT '兼职明细冻结快照',
+  `creator` varchar(64) DEFAULT '',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  `tenant_id` bigint NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_snapshot_contributor`
+    (`tenant_id`,`snapshot_date`,`contribution_type`,`department_id`,`member_id`),
+  KEY `idx_tenant_snapshot` (`tenant_id`,`snapshot_date`,`contribution_type`),
+  KEY `idx_tenant_snapshot_supervisor` (`tenant_id`,`snapshot_date`,`supervisor_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='新媒体客资大屏累计冻结快照';
+
+CREATE TABLE IF NOT EXISTS `zsjos_partner_ownership` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `partner_id` bigint NOT NULL,
+  `employee_user_id` bigint NOT NULL,
+  `employee_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `assigned_at` datetime NOT NULL,
+  `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_tenant_partner` (`tenant_id`,`partner_id`),
+  KEY `idx_tenant_employee` (`tenant_id`,`employee_user_id`,`assigned_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='兼职当前员工归属';
+
+CREATE TABLE IF NOT EXISTS `zsjos_partner_ownership_log` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `partner_id` bigint NOT NULL,
+  `previous_employee_user_id` bigint DEFAULT NULL,
+  `previous_employee_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `employee_user_id` bigint DEFAULT NULL,
+  `employee_name_snapshot` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `action_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `reason` varchar(500) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `operator_user_id` bigint NOT NULL,
+  `occurred_at` datetime NOT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`),
+  KEY `idx_tenant_partner_time` (`tenant_id`,`partner_id`,`occurred_at`,`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='兼职员工归属审计';
 
 -- zsjos_lead_no_daily_counter
 CREATE TABLE IF NOT EXISTS `zsjos_lead_no_daily_counter` (

@@ -9,7 +9,7 @@ import {
 describe('management access', () => {
   it('uses exact permissions or the wildcard only', () => {
     expect(hasPermission(['zsjos:audit:query'], 'zsjos:audit:query')).toBe(true)
-    expect(hasPermission(['*:*:*'], 'zsjos:partner:convert')).toBe(true)
+    expect(hasPermission(['*:*:*'], 'zsjos:partner:manage')).toBe(true)
     expect(hasPermission(['zsjos:audit:query'], 'zsjos:audit:query-impersonation')).toBe(false)
   })
 

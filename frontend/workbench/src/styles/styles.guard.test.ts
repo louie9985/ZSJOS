@@ -130,6 +130,7 @@ describe('spacing and sizing anchors', () => {
       /\.business-inbox-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/,
       /\.media-students-detail-pane \{[^}]*padding: var\(--crm-pane-pad\)/
       ,/\.media-feature-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
+      ,/\.announcement-detail-pane \{[^}]*padding:\s*var\(--crm-pane-pad\)/
     ]
     expect(anchors.filter(re => !re.test(joined)).map(re => re.source)).toEqual([])
   })

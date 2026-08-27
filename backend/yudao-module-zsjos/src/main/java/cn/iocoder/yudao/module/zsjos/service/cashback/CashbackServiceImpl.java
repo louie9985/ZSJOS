@@ -45,6 +45,7 @@ import java.util.HashSet;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_PARTNER;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PROVIDER_OWNER_PARTNER;
 import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_ENABLED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -280,14 +281,14 @@ public class CashbackServiceImpl implements CashbackService {
     private EligibleLead eligibleLead(Long leadId) {
         LeadDO lead = leadId == null ? null : leadMapper.selectById(leadId);
         if (lead == null) throw exception(CASHBACK_SOURCE_INVALID);
-        if (!SOURCE_PARTNER.equals(lead.getSourceType())) return null;
-        if (lead.getSourceUserId() == null || lead.getPartnerId() == null) throw exception(CASHBACK_SOURCE_INVALID);
-        PartnerDO partner = partnerMapper.selectById(lead.getPartnerId());
+        if (!PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) return null;
+        if (lead.getProviderOwnerId() == null) throw exception(CASHBACK_SOURCE_INVALID);
+        PartnerDO partner = partnerMapper.selectById(lead.getProviderOwnerId());
         if (partner == null) throw exception(CASHBACK_SOURCE_INVALID);
         if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())
                 || partner.getEnabledAt() == null || partner.getDisabledAt() != null) return null;
         PartnerAccountDO account = partnerAccountMapper.selectById(lead.getSourceUserId());
-        if (account != null && Objects.equals(account.getPartnerId(), lead.getPartnerId())) {
+        if (account != null && Objects.equals(account.getPartnerId(), lead.getProviderOwnerId())) {
             if (!CommonStatusEnum.ENABLE.getStatus().equals(account.getStatus())) return null;
             return new EligibleLead(lead, null);
         }

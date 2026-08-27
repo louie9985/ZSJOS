@@ -14,7 +14,7 @@ export type SocialUser = { id: number; type: number; openid: string; nickname?: 
 export type MenuRenderMode = 'native' | 'admin_embed' | 'admin_only'
 export type RawMenu = { id: number; sourceMenuId?: number; layoutKey?: string; name: string; path?: string; icon?: string; component?: string; componentName?: string; workbenchRenderMode?: MenuRenderMode; visible?: boolean; keepAlive?: boolean; alwaysShow?: boolean; type?: number; sort?: number; parentId: number; children?: RawMenu[] }
 export type WorkbenchMenu = Omit<RawMenu, 'children' | 'path'> & { path: string; hidden: boolean; noCache: boolean; alwaysShow: boolean; children: WorkbenchMenu[] }
-export type WorkbenchLayoutMeta = { globalVersionId?: number; globalVersionNo?: number; winningRoleId?: number; roleVersionId?: number; roleVersionNo?: number; fallback: boolean; fallbackReason?: string }
+export type WorkbenchLayoutMeta = { globalVersionId?: number; globalVersionNo?: number; appliedRoleLayouts: Array<{ roleId: number; versionId?: number; versionNo?: number; priority?: number }>; fallback: boolean; fallbackReason?: string }
 export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; workbenchMenus?: RawMenu[]; workbenchLayoutMeta?: WorkbenchLayoutMeta; defaultAvatar?: string }
 export type DictData = { label: string; value: string; dictType: string; colorType?: string; cssClass?: string }
 export type EamAssetItem = { itemType: string; holdingId?: number; assetId?: number; assetCode?: string; stockBalanceId?: number; name: string; quantity: number; unit?: string; custodyMode?: number; status: number; signedAt?: Timestamp; returnAppliedAt?: Timestamp; returnResult?: number }
@@ -154,6 +154,10 @@ export type ManagedLead = {
   id: number; leadNo: string; personId: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
   sourceType: string; sourceLabel?: string; sourceUserId?: number; sourceUserName?: string; sourceChannel?: string
   partnerOwnerNameSnapshot?: string
+  providerOwnerType?: 'system_user' | 'partner'; providerOwnerId?: number; providerOwnerNameSnapshot?: string
+  contributionUserIdSnapshot?: number; contributionUserNameSnapshot?: string
+  contributionSupervisorUserIdSnapshot?: number; contributionSupervisorNameSnapshot?: string
+  contributionDeptIdSnapshot?: number; contributionDeptNameSnapshot?: string; countedAt?: Timestamp
   provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string; leadCategory?: string; leadCategoryLabelSnapshot?: string
   remark?: string; status: string; assignmentStatus: string; handlingStage: string
   qualificationStatus: 'pending' | 'valid' | 'invalid'
@@ -437,6 +441,26 @@ export type NotifyMessage = {
   bizId?: number
   sourceEventKey?: string
 }
+
+export type AnnouncementAttachment = {
+  infraFileId: number
+  fileName: string
+  mimeType?: string
+  fileSize: number
+  sort: number
+  downloadUrl?: string
+}
+export type Announcement = {
+  id: number
+  title: string
+  type: number
+  content?: string
+  publishTime: Timestamp
+  read: boolean
+  readTime?: Timestamp
+  attachments: AnnouncementAttachment[]
+}
+export type AnnouncementUnreadSummary = { unreadCount: number; latest?: Announcement }
 
 export type NotifyMessagePageParams = {
   pageNo: number
@@ -1140,6 +1164,14 @@ export const api = {
     return unwrap<boolean>(await http.put('/system/notify-message/update-read', undefined, { params }))
   },
   markAllNotifyMessagesRead: async () => unwrap<boolean>(await http.put('/system/notify-message/update-all-read')),
+  announcementPage: async (params: { pageNo: number; pageSize: number }) =>
+    unwrap<PageResult<Announcement>>(await http.get('/system/notice/my-page', { params })),
+  announcement: async (id: number) =>
+    unwrap<Announcement>(await http.get('/system/notice/my-get', { params: { id } })),
+  announcementUnreadSummary: async () =>
+    unwrap<AnnouncementUnreadSummary>(await http.get('/system/notice/unread-summary')),
+  markAnnouncementRead: async (id: number) =>
+    unwrap<boolean>(await http.put('/system/notice/mark-read', undefined, { params: { id } })),
   salesUsers: async () => unwrap<SalesUser[]>(await http.get('/zsjos/lead/sales-user/simple-list')),
   assignmentRelationPage: async (params: { pageNo: number; pageSize: number; keyword?: string; configured?: boolean }) =>
     unwrap<PageResult<AssignmentRelation>>(await http.get('/zsjos/lead-assignment/relation/page', { params })),

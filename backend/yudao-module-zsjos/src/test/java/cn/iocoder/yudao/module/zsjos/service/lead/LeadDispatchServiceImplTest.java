@@ -119,7 +119,6 @@ class LeadDispatchServiceImplTest {
     void claimPoolAllowsQueryAllAdministratorAndLoadsRelationsInBatches() {
         LeadClaimPoolPageReqVO reqVO = request();
         LeadDO lead = lead();
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
         when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(new PageResult<>(List.of(lead), 1L));
         when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of(product()));
         when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of(attachment()));
@@ -150,7 +149,6 @@ class LeadDispatchServiceImplTest {
     void claimPoolPreservesKeysAndLeavesMissingLabelsEmpty() {
         LeadClaimPoolPageReqVO reqVO = request();
         LeadDO lead = lead();
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(true);
         when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(new PageResult<>(List.of(lead), 1L));
         when(productMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadIds(List.of(1L))).thenReturn(List.of());
@@ -166,27 +164,14 @@ class LeadDispatchServiceImplTest {
     }
 
     @Test
-    void claimPoolAllowsEligibleSalesUser() {
+    void claimPoolAllowsAuthorizedReadOnlyUserWithoutSalesQualification() {
         LeadClaimPoolPageReqVO reqVO = request();
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
         when(leadMapper.selectPublicPoolPage(reqVO, null, null)).thenReturn(PageResult.empty());
 
         PageResult<LeadPendingRespVO> result = service.getClaimPoolPage(reqVO, 10L);
 
         assertEquals(0L, result.getTotal());
         verify(leadMapper).selectPublicPoolPage(reqVO, null, null);
-    }
-
-    @Test
-    void claimPoolRejectsUserWithoutSalesOrQueryAllAccess() {
-        when(securityFrameworkService.hasPermission("zsjos:lead:query-all")).thenReturn(false);
-        when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
-
-        ServiceException error = assertThrows(ServiceException.class,
-                () -> service.getClaimPoolPage(request(), 20L));
-
-        assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
     }
 
     @Test

@@ -47,6 +47,8 @@ import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
 import { NotifyMessageProvider } from './components/NotifyMessageProvider'
 import MessageCenter from './components/MessageCenter'
+import { AnnouncementProvider } from './components/AnnouncementProvider'
+import { AnnouncementBar, AnnouncementButton } from './components/AnnouncementEntry'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { SalesDispatchStatusProvider } from './components/SalesDispatchStatusProvider'
 import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
@@ -413,6 +415,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
           <MessageCenter/>
+          {(info.permissions || []).includes('system:notice:read') && <AnnouncementButton/>}
           {(info.permissions || []).includes('zsjos:lead:accept') && (
             <Tooltip title="待接客资"><Badge count={pendingAssignmentCount}><Button type="text" aria-label="待接客资" icon={<InboxOutlined/>} onClick={() => setOpenAssignmentRequest(value => value + 1)}/></Badge></Tooltip>
           )}
@@ -435,6 +438,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         message={`只读借视图：当前以 ${impersonation.targetNameSnapshot} 的数据权限查看，所有 ZSJOS 写操作均会被服务端拒绝。`}
       />}
       <SalesDispatchStatusAlert />
+      {(info.permissions || []).includes('system:notice:read') && <AnnouncementBar/>}
       <ProductionTicketAssignmentHost permissions={info.permissions || []} />
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
       <Layout className="content-layout">
@@ -464,12 +468,12 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   )
 
   return <>
-    <RealtimeProvider><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
+    <RealtimeProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
       {showWatermark
         ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
         : <div className="crm-watermark-wrapper">{shellContent}</div>
       }
-    </NotifyMessageProvider></SalesDispatchStatusProvider></RealtimeProvider>
+    </NotifyMessageProvider></SalesDispatchStatusProvider></AnnouncementProvider></RealtimeProvider>
   </>
 }
 

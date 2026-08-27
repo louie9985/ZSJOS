@@ -7,8 +7,7 @@ public class MediaScreenTimedContributionRow {
     private String bucket;
     private Long contributorUserId;
     private Long sourceDeptId;
-    private String sourceType;
-    private Long sourceProviderUserId;
+    private String contributionType;
     private Long submittedCount;
     private Long validCount;
 }

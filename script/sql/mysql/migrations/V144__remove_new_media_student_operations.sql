@@ -21,8 +21,6 @@ WHERE menu_row.`permission` LIKE 'zsjos:student-ops:%' OR menu_row.`id` IN (6984
 DROP TABLE IF EXISTS `zsjos_exception_ticket`;
 DROP TABLE IF EXISTS `zsjos_cooperation_assessment`;
 DROP TABLE IF EXISTS `zsjos_graduation_application`;
-DELETE FROM `zsjos_schema_version` WHERE `version` IN ('V106', 'V108', 'V118');
-DELETE FROM `zsjos_module_schema_version` WHERE `version` IN ('V106', 'V108', 'V118');
 INSERT INTO `zsjos_schema_version` (`version`, `description`, `checksum`, `installed_at`)
 VALUES ('V144', 'Remove new-media Student Operations domains', 'V144__remove_new_media_student_operations.sql', NOW())
 ON DUPLICATE KEY UPDATE `description` = VALUES(`description`), `checksum` = VALUES(`checksum`);

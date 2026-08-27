@@ -80,6 +80,10 @@ public interface ErrorCodeConstants {
 
     // ========== 通知公告 1-002-008-000 ==========
     ErrorCode NOTICE_NOT_FOUND = new ErrorCode(1_002_008_001, "当前通知公告不存在");
+    ErrorCode NOTICE_NOT_DRAFT = new ErrorCode(1_002_008_002, "仅草稿公告允许编辑或删除");
+    ErrorCode NOTICE_NOT_PUBLISHED = new ErrorCode(1_002_008_003, "当前公告未发布或已下线");
+    ErrorCode NOTICE_ATTACHMENT_INVALID = new ErrorCode(1_002_008_004, "公告附件不存在、无权引用或不符合限制");
+    ErrorCode NOTICE_CONTENT_EMPTY = new ErrorCode(1_002_008_005, "公告正文不能为空");
 
     // ========== 短信渠道 1-002-011-000 ==========
     ErrorCode SMS_CHANNEL_NOT_EXISTS = new ErrorCode(1_002_011_000, "短信渠道不存在");

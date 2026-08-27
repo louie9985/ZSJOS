@@ -11,9 +11,10 @@
     handle=".layout-drag-handle"
     item-key="key"
     @change="emit('change')"
+    @start="startDrag"
   >
     <template #item="{ element }">
-      <div class="layout-tree-item">
+      <div v-show="!element.hidden" class="layout-tree-item" :data-node-key="element.key">
         <div class="layout-node-row" :class="{ 'is-hidden': element.hidden }">
           <el-tooltip content="拖拽调整层级和顺序">
             <Icon class="layout-drag-handle" icon="ic:round-drag-indicator" />
@@ -30,7 +31,7 @@
           <el-switch
             v-model="element.hidden"
             active-text="隐藏"
-            :disabled="!editable"
+            :disabled="!editable || (scopeType === 'ROLE' && isGlobalGroup(element))"
             inactive-text="显示"
             inline-prompt
             @change="emit('change')"
@@ -88,6 +89,7 @@
           @add-child="emit('add-child', $event)"
           @change="emit('change')"
           @delete-group="emit('delete-group', $event)"
+          @external-drag-start="emit('external-drag-start', $event)"
         />
       </div>
     </template>
@@ -97,10 +99,7 @@
 <script lang="ts" setup>
 import VueDraggable from 'vuedraggable'
 import { Icon, IconSelect } from '@/components/Icon'
-import type {
-  WorkbenchLayoutNode,
-  WorkbenchLayoutScopeType
-} from '@/api/system/workbenchLayout'
+import type { WorkbenchLayoutNode, WorkbenchLayoutScopeType } from '@/api/system/workbenchLayout'
 
 defineOptions({ name: 'WorkbenchLayoutTree' })
 
@@ -122,6 +121,7 @@ const emit = defineEmits<{
   (e: 'change'): void
   (e: 'add-child', node: WorkbenchLayoutNode): void
   (e: 'delete-group', key: string): void
+  (e: 'external-drag-start', key: string): void
 }>()
 
 const canEditGroup = (node: WorkbenchLayoutNode) =>
@@ -132,15 +132,26 @@ const canDeleteGroup = (node: WorkbenchLayoutNode) =>
   node.key !== UNCLASSIFIED_KEY &&
   (props.scopeType === 'GLOBAL' || node.key.startsWith('role-group-'))
 
+const isGlobalGroup = (node: WorkbenchLayoutNode) =>
+  node.type === 'GROUP' && !node.key.startsWith('role-group-')
+
 const groupLevels = (node: WorkbenchLayoutNode): number => {
   if (node.type !== 'GROUP') return 0
   const childLevels = node.children.map(groupLevels)
   return 1 + (childLevels.length ? Math.max(...childLevels) : 0)
 }
 
+const startDrag = (event: { item?: HTMLElement }) => {
+  const key = event.item?.dataset.nodeKey
+  if (props.scopeType === 'ROLE' && key && key !== UNCLASSIFIED_KEY) {
+    emit('external-drag-start', key)
+  }
+}
+
 const allowMove = (event: any) => {
   if (!props.editable) return false
   const node = event.draggedContext.element as WorkbenchLayoutNode
+  if (props.scopeType === 'ROLE' && isGlobalGroup(node)) return false
   const targetDepth = Number(event.to?.dataset?.depth ?? props.depth)
   const targetIsUnclassified = event.to?.dataset?.unclassifiedList === 'true'
   if (node.key === UNCLASSIFIED_KEY && targetDepth !== 0) return false

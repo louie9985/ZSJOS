@@ -660,6 +660,10 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     <span className="lead-field-value">{lead.sourceUserName || '-'}</span>
                   </div>
                   <div className="lead-profile-row">
+                    <span className="lead-field-label">提供方</span>
+                    <span className="lead-field-value">{lead.providerOwnerNameSnapshot || '-'}</span>
+                  </div>
+                  <div className="lead-profile-row">
                     <span className="lead-field-label">所属销售</span>
                     <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}</span>
                   </div>

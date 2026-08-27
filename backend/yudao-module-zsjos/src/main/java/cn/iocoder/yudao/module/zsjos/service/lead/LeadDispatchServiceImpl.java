@@ -4,7 +4,6 @@ import cn.hutool.core.util.DesensitizedUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.framework.security.core.service.SecurityFrameworkService;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.infra.api.file.FileApi;
@@ -43,7 +42,6 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 @Slf4j
 public class LeadDispatchServiceImpl implements LeadDispatchService {
 
-    private static final String QUERY_ALL_PERMISSION = "zsjos:lead:query-all";
     private static final int MAX_POOL_SCAN_ROUNDS = 3;
 
     @Resource private LeadMapper leadMapper;
@@ -56,7 +54,6 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Resource private LeadAssignmentService assignmentService;
     @Resource private LeadDispatchRedisRepository dispatchRedisRepository;
     @Resource private DictDataApi dictDataApi;
-    @Resource private SecurityFrameworkService securityFrameworkService;
     @Resource private ApplicationEventPublisher applicationEventPublisher;
     @Resource private FileApi fileApi;
     @Resource private LeadLifecycleTaskService lifecycleTaskService;
@@ -185,9 +182,6 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
 
     @Override
     public PageResult<LeadPendingRespVO> getClaimPoolPage(LeadClaimPoolPageReqVO reqVO, Long userId) {
-        if (!securityFrameworkService.hasPermission(QUERY_ALL_PERMISSION)) {
-            requireSalesUser(userId);
-        }
         PageResult<LeadDO> page = leadMapper.selectPublicPoolPage(reqVO, reqVO.getKeyword(),
                 advancedFilterService.matchLeadIds(reqVO.getAdvancedFilter()));
         return new PageResult<>(toPendingRespList(page.getList()), page.getTotal());

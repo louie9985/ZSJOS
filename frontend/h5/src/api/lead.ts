@@ -93,6 +93,16 @@ export interface LeadListItem {
   followUpStatus?: string
   operationalStatus?: string
   sourceUserName?: string
+  providerOwnerType?: 'system_user' | 'partner'
+  providerOwnerId?: number
+  providerOwnerNameSnapshot?: string
+  contributionUserIdSnapshot?: number
+  contributionUserNameSnapshot?: string
+  contributionSupervisorUserIdSnapshot?: number
+  contributionSupervisorNameSnapshot?: string
+  contributionDeptIdSnapshot?: number
+  contributionDeptNameSnapshot?: string
+  countedAt?: ApiDateValue
   ownerUserName?: string
   pendingAssigneeUserName?: string
   pendingExpiresAt?: ApiDateValue

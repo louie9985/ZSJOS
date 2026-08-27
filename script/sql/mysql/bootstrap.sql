@@ -86,6 +86,8 @@ SOURCE script/sql/mysql/migrations/V100__new_media_role_menu_permissions.sql;
 SOURCE script/sql/mysql/migrations/V101__student_basic_info_permission.sql;
 SOURCE script/sql/mysql/migrations/V102__new_media_business_notifications.sql;
 SOURCE script/sql/mysql/migrations/V103__repair_new_media_operator_director_menu.sql;
+SOURCE script/sql/mysql/migrations/V106__media_review_graduation_closure.sql;
+SOURCE script/sql/mysql/migrations/V108__new_media_supervisor_review_permissions.sql;
 SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
 SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 SOURCE script/sql/mysql/migrations/V112__repair_registration_planner_notification_template.sql;
@@ -94,6 +96,7 @@ SOURCE script/sql/mysql/migrations/V114__student_delivery_stages.sql;
 SOURCE script/sql/mysql/migrations/V115__generic_work_order.sql;
 SOURCE script/sql/mysql/migrations/V116__study_planner_repurchase_permissions.sql;
 SOURCE script/sql/mysql/migrations/V117__lead_category_label_snapshot.sql;
+SOURCE script/sql/mysql/migrations/V118__independent_role_permission_boundaries.sql;
 SOURCE script/sql/mysql/migrations/V119__workbench_relative_child_paths.sql;
 SOURCE script/sql/mysql/migrations/V120__restore_operator_media_student_menu.sql;
 SOURCE script/sql/mysql/migrations/V121__retire_lead_qualification_exception_menu.sql;
@@ -123,7 +126,9 @@ SOURCE script/sql/mysql/migrations/V144__remove_new_media_student_operations.sql
 SOURCE script/sql/mysql/migrations/V145__production_ticket_dispatch_pool.sql;
 SOURCE script/sql/mysql/migrations/V146__media_account_maintenance_calendar.sql;
 SOURCE script/sql/mysql/migrations/V147__workbench_navigation_layout.sql;
+SOURCE script/sql/mysql/migrations/V148__durable_employee_announcements.sql;
 SOURCE script/sql/mysql/migrations/V149__feedback_management.sql;
+SOURCE script/sql/mysql/migrations/V150__claim_pool_read_and_partner_permissions.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

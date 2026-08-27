@@ -1,60 +1,25 @@
 package cn.iocoder.yudao.module.system.service.notice;
 
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
-import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticePageReqVO;
-import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeSaveReqVO;
-import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeDO;
+import cn.iocoder.yudao.module.system.controller.admin.notice.vo.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-/**
- * 通知公告 Service 接口
- */
 public interface NoticeService {
-
-    /**
-     * 创建通知公告
-     *
-     * @param createReqVO 通知公告
-     * @return 编号
-     */
-    Long createNotice(NoticeSaveReqVO createReqVO);
-
-    /**
-     * 更新通知公告
-     *
-     * @param reqVO 通知公告
-     */
-    void updateNotice(NoticeSaveReqVO reqVO);
-
-    /**
-     * 删除通知公告
-     *
-     * @param id 编号
-     */
+    Long createNotice(NoticeSaveReqVO reqVO, Long userId);
+    void updateNotice(NoticeSaveReqVO reqVO, Long userId);
     void deleteNotice(Long id);
-
-    /**
-     * 批量删除通知公告
-     *
-     * @param ids 编号列表
-     */
     void deleteNoticeList(List<Long> ids);
-
-    /**
-     * 获得通知公告分页列表
-     *
-     * @param reqVO 分页条件
-     * @return 部门分页列表
-     */
-    PageResult<NoticeDO> getNoticePage(NoticePageReqVO reqVO);
-
-    /**
-     * 获得通知公告
-     *
-     * @param id 编号
-     * @return 通知公告
-     */
-    NoticeDO getNotice(Long id);
-
+    PageResult<NoticeRespVO> getNoticePage(NoticePageReqVO reqVO);
+    NoticeRespVO getNotice(Long id);
+    NoticeAttachmentVO uploadAttachment(MultipartFile file, Long userId) throws Exception;
+    void publishNotice(Long id);
+    void offlineNotice(Long id);
+    Long copyNotice(Long id);
+    PageResult<NoticeMyRespVO> getMyNoticePage(PageParam reqVO, Long userId);
+    NoticeMyRespVO getMyNotice(Long id, Long userId);
+    NoticeUnreadSummaryRespVO getUnreadSummary(Long userId);
+    void markRead(Long id, Long userId);
 }

@@ -34,6 +34,8 @@ import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionU
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_CLOSED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.STATUS_WON;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PROVIDER_OWNER_PARTNER;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PROVIDER_OWNER_SYSTEM_USER;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ATTACHMENT_URL_EXPIRATION_SECONDS;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_FOUNDED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.COMPLAINT_UNFOUNDED;
@@ -67,9 +69,11 @@ public class LeadComplaintService {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         if (partnerId != null) {
-            if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
+            if (!PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())
+                    || !Objects.equals(lead.getProviderOwnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
         } else {
-            if (!Objects.equals(lead.getSourceUserId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
+            if (!PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                    || !Objects.equals(lead.getProviderOwnerId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
             identityService.requireHistoricalSubmitter(lead, userId);
         }
         if (lead.getOwnerUserId() == null || Set.of(STATUS_INVALID, STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) {

@@ -79,18 +79,22 @@ class LeadNotifySceneProviderTest {
     @Test
     void resolvesLeadCreatedProviderAndActualOperator() {
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED)
-                .operatorUserId(10L).payload(Map.of("submitterUserId", 20L)).build();
+                .bizId(1L).operatorUserId(10L).payload(Map.of("submitterUserId", 20L)).build();
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setProviderOwnerType("system_user")
+                .setProviderOwnerId(20L));
 
         assertEquals(Set.of(NotifyRecipientDTO.admin(10L), NotifyRecipientDTO.admin(20L)),
                 provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER, ROLE_OPERATOR)));
     }
 
     @Test
-    void resolvesDedicatedProviderOnlyFromExplicitPayload() {
+    void resolvesDedicatedProviderOnlyFromFrozenAttribution() {
         NotifyBusinessEvent linked = NotifyBusinessEvent.builder().sceneCode(CREATED)
-                .operatorUserId(10L).payload(Map.of("newMediaProviderUserId", 20L)).build();
+                .bizId(1L).operatorUserId(10L).payload(Map.of("newMediaProviderUserId", 99L)).build();
         NotifyBusinessEvent unlinked = NotifyBusinessEvent.builder().sceneCode(CREATED)
-                .operatorUserId(10L).payload(Map.of()).build();
+                .bizId(2L).operatorUserId(10L).payload(Map.of()).build();
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setProviderOwnerType("system_user")
+                .setProviderOwnerId(20L));
 
         assertEquals(Set.of(NotifyRecipientDTO.admin(20L)),
                 provider.resolveRecipients(linked, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
@@ -140,6 +144,7 @@ class LeadNotifySceneProviderTest {
         lead.setId(1L);
         lead.setLeadNo("KZ202608160000000001");
         lead.setSourceUserId(10L);
+        lead.setProviderOwnerType("system_user"); lead.setProviderOwnerId(10L);
         lead.setOwnerUserId(20L);
         lead.setSubmittedName("张三丰");
         lead.setSubmittedMobile("13800138000");
@@ -163,6 +168,7 @@ class LeadNotifySceneProviderTest {
     void blindsCounterpartIdentityForSubmitterAndOwnerNotifications() {
         LeadDO lead = new LeadDO();
         lead.setId(1L); lead.setSourceUserId(10L); lead.setOwnerUserId(20L);
+        lead.setProviderOwnerType("system_user"); lead.setProviderOwnerId(10L);
         lead.setAssignmentStatus("owned"); lead.setSubmittedName("张三丰");
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(productMapper.selectListByLeadId(1L)).thenReturn(List.of());
@@ -186,6 +192,7 @@ class LeadNotifySceneProviderTest {
     void keepsCounterpartIdentityForQueryAllNotificationRecipient() {
         LeadDO lead = new LeadDO();
         lead.setId(1L); lead.setSourceUserId(10L); lead.setOwnerUserId(20L); lead.setAssignmentStatus("owned");
+        lead.setProviderOwnerType("system_user"); lead.setProviderOwnerId(10L);
         when(leadMapper.selectById(1L)).thenReturn(lead);
         when(productMapper.selectListByLeadId(1L)).thenReturn(List.of());
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());

@@ -31,11 +31,16 @@ public class SubordinatePartnerService {
                 ? null : reqVO.getKeyword().trim();
         long offset = ((long) reqVO.getPageNo() - 1L) * reqVO.getPageSize();
         Long tenantId = TenantContextHolder.getRequiredTenantId();
-        long total = ownershipMapper.selectSubordinateCount(
-                tenantId, userId, reqVO.getStatus(), keyword);
+        boolean manage = ownershipService.canManage(userId);
+        long total = manage
+                ? ownershipMapper.selectManagedCount(tenantId, reqVO.getStatus(), keyword)
+                : ownershipMapper.selectSubordinateCount(tenantId, userId, reqVO.getStatus(), keyword);
         if (total == 0 || offset >= total) return new PageResult<>(List.of(), total);
-        List<PartnerRespVO> rows = ownershipMapper.selectSubordinatePage(
-                tenantId, userId, reqVO.getStatus(), keyword, offset, reqVO.getPageSize())
+        List<SubordinatePartnerRow> page = manage
+                ? ownershipMapper.selectManagedPage(tenantId, reqVO.getStatus(), keyword, offset, reqVO.getPageSize())
+                : ownershipMapper.selectSubordinatePage(
+                        tenantId, userId, reqVO.getStatus(), keyword, offset, reqVO.getPageSize());
+        List<PartnerRespVO> rows = page
                 .stream().map(this::toResponse).toList();
         return new PageResult<>(rows, total);
     }
@@ -50,7 +55,7 @@ public class SubordinatePartnerService {
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         if (lead.getPartnerId() == null) throw exception(PARTNER_OWNERSHIP_PERMISSION_DENIED);
         ownershipService.checkRead(userId, lead.getPartnerId());
-        LeadManagementRespVO result = leadManagementService.getLead(leadId, userId);
+        LeadManagementRespVO result = leadManagementService.getPartnerLead(leadId, lead.getPartnerId());
         result.setAvailableActions(List.of());
         return result;
     }
@@ -59,11 +64,13 @@ public class SubordinatePartnerService {
         PartnerRespVO result = new PartnerRespVO();
         result.setId(row.getId()); result.setPartnerNo(row.getPartnerNo()); result.setName(row.getName());
         result.setMobile(row.getMobile()); result.setStatus(row.getStatus());
-        result.setBoundSystemUserId(row.getBoundSystemUserId()); result.setChannelId(row.getChannelId());
+        result.setChannelId(row.getChannelId());
         result.setEnabledAt(row.getEnabledAt()); result.setDisabledAt(row.getDisabledAt());
         result.setAssignedEmployeeUserId(row.getAssignedEmployeeUserId());
         result.setAssignedEmployeeName(row.getAssignedEmployeeName()); result.setAssignedAt(row.getAssignedAt());
-        result.setAssignmentVersion(row.getAssignmentVersion()); result.setAssignmentEffective(true);
+        result.setAssignmentVersion(row.getAssignmentVersion());
+        result.setAssignmentEffective(row.getAssignedEmployeeUserId() == null ||
+                ownershipService.canRead(row.getAssignedEmployeeUserId(), row.getId()));
         return result;
     }
 }

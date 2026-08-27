@@ -19,6 +19,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.DUPLICATE_OWNER_REMINDER;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.DUPLICATE_REACTIVATED;
@@ -84,6 +85,10 @@ class LeadDuplicateReviewServiceImplTest {
     void invalidLeadWithoutEligibleOwnerReactivatesIntoClaimPool() {
         LeadDuplicateReviewDO review = review(1L);
         LeadDO lead = lead("invalid", "owned", 10L);
+        LocalDateTime originalCountedAt = LocalDateTime.of(2026, 7, 1, 8, 30);
+        lead.setProviderOwnerType("system_user");
+        lead.setProviderOwnerId(7L);
+        lead.setCountedAt(originalCountedAt);
         PersonDO person = new PersonDO();
         person.setId(30L); person.setName("历史客户");
         when(reviewMapper.selectByIdForUpdate(1L, 1L)).thenReturn(review);
@@ -106,6 +111,9 @@ class LeadDuplicateReviewServiceImplTest {
         assertNull(lead.getOwnerUserId());
         assertNull(lead.getOwnershipStartedAt());
         assertEquals("提交时分类", lead.getLeadCategoryLabelSnapshot());
+        assertEquals("system_user", lead.getProviderOwnerType());
+        assertEquals(7L, lead.getProviderOwnerId());
+        assertEquals(originalCountedAt, lead.getCountedAt());
         verify(lifecycleTaskService).cancelFirstFollowUpTasks(eq(20L), any(), any());
         verify(lifecycleTaskService).cancelFollowUpReminders(eq(20L), any(), any());
         verify(notifyEventPublisher).publish(eq(DUPLICATE_REACTIVATED), eq(20L), any(), eq(99L), any(), any());

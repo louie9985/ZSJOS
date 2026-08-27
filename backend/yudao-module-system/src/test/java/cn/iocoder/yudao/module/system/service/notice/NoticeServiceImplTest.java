@@ -1,130 +1,201 @@
 package cn.iocoder.yudao.module.system.service.notice;
 
-import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
-import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.test.core.ut.BaseDbUnitTest;
-import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticePageReqVO;
+import cn.iocoder.yudao.framework.xss.core.clean.XssCleaner;
+import cn.iocoder.yudao.module.infra.api.file.FileApi;
+import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
+import cn.iocoder.yudao.module.infra.api.websocket.WebSocketSenderApi;
+import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeAttachmentVO;
+import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeMyRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeSaveReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeAttachmentDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeDO;
+import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeAttachmentMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeMapper;
+import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeReadMapper;
+import cn.iocoder.yudao.module.system.enums.notice.NoticePublishStatusEnum;
+import jakarta.annotation.Resource;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-import jakarta.annotation.Resource;
+import java.time.LocalDateTime;
+import java.util.List;
 
-import static cn.iocoder.yudao.framework.common.util.object.ObjectUtils.cloneIgnoreId;
-import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertPojoEquals;
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
-import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomLongId;
-import static cn.iocoder.yudao.framework.test.core.util.RandomUtils.randomPojo;
-import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.NOTICE_NOT_FOUND;
+import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 @Import(NoticeServiceImpl.class)
 class NoticeServiceImplTest extends BaseDbUnitTest {
 
-    @Resource
-    private NoticeServiceImpl noticeService;
+    private static final Long USER_ID = 7L;
 
-    @Resource
-    private NoticeMapper noticeMapper;
+    @Resource private NoticeServiceImpl noticeService;
+    @Resource private NoticeMapper noticeMapper;
+    @Resource private NoticeAttachmentMapper attachmentMapper;
+    @Resource private NoticeReadMapper readMapper;
 
-    @Test
-    public void testGetNoticePage_success() {
-        // 插入前置数据
-        NoticeDO dbNotice = randomPojo(NoticeDO.class, o -> {
-            o.setTitle("尼古拉斯赵四来啦！");
-            o.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        });
-        noticeMapper.insert(dbNotice);
-        // 测试 title 不匹配
-        noticeMapper.insert(cloneIgnoreId(dbNotice, o -> o.setTitle("尼古拉斯凯奇也来啦！")));
-        // 测试 status 不匹配
-        noticeMapper.insert(cloneIgnoreId(dbNotice, o -> o.setStatus(CommonStatusEnum.DISABLE.getStatus())));
-        // 准备参数
-        NoticePageReqVO reqVO = new NoticePageReqVO();
-        reqVO.setTitle("尼古拉斯赵四来啦！");
-        reqVO.setStatus(CommonStatusEnum.ENABLE.getStatus());
+    @MockitoBean private FileApi fileApi;
+    @MockitoBean private XssCleaner xssCleaner;
+    @MockitoBean private WebSocketSenderApi webSocketSenderApi;
 
-        // 调用
-        PageResult<NoticeDO> pageResult = noticeService.getNoticePage(reqVO);
-        // 验证查询结果经过筛选
-        assertEquals(1, pageResult.getTotal());
-        assertEquals(1, pageResult.getList().size());
-        assertPojoEquals(dbNotice, pageResult.getList().get(0));
+    @BeforeEach
+    void setUp() {
+        when(xssCleaner.clean(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     @Test
-    public void testGetNotice_success() {
-        // 插入前置数据
-        NoticeDO dbNotice = randomPojo(NoticeDO.class);
-        noticeMapper.insert(dbNotice);
+    void shouldCreateSanitizedDraftWithOwnedAttachmentSnapshot() {
+        when(xssCleaner.clean("<p onclick=bad>正文</p>")).thenReturn("<p>正文</p>");
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, USER_ID));
+        NoticeSaveReqVO request = saveRequest("<p onclick=bad>正文</p>");
+        request.setAttachments(List.of(attachment(101L)));
 
-        // 查询
-        NoticeDO notice = noticeService.getNotice(dbNotice.getId());
+        Long id = noticeService.createNotice(request, USER_ID);
 
-        // 验证插入与读取对象是否一致
-        assertNotNull(notice);
-        assertPojoEquals(dbNotice, notice);
+        NoticeDO stored = noticeMapper.selectById(id);
+        assertEquals(NoticePublishStatusEnum.DRAFT.getStatus(), stored.getPublishStatus());
+        assertEquals("<p>正文</p>", stored.getContent());
+        List<NoticeAttachmentDO> attachments = attachmentMapper.selectListByNoticeId(id);
+        assertEquals(1, attachments.size());
+        assertEquals("制度.pdf", attachments.get(0).getFileName());
+        assertEquals(1024L, attachments.get(0).getFileSize());
     }
 
     @Test
-    public void testCreateNotice_success() {
-        // 准备参数
-        NoticeSaveReqVO reqVO = randomPojo(NoticeSaveReqVO.class)
-                .setId(null); // 避免 id 被赋值
-
-        // 调用
-        Long noticeId = noticeService.createNotice(reqVO);
-        // 校验插入属性是否正确
-        assertNotNull(noticeId);
-        NoticeDO notice = noticeMapper.selectById(noticeId);
-        assertPojoEquals(reqVO, notice, "id");
+    void shouldRejectSanitizedEmptyContentWithStableError() {
+        when(xssCleaner.clean(anyString())).thenReturn("<script></script>");
+        assertServiceException(() -> noticeService.createNotice(saveRequest("<script>bad()</script>"), USER_ID),
+                NOTICE_CONTENT_EMPTY);
     }
 
     @Test
-    public void testUpdateNotice_success() {
-        // 插入前置数据
-        NoticeDO dbNoticeDO = randomPojo(NoticeDO.class);
-        noticeMapper.insert(dbNoticeDO);
+    void shouldRejectAttachmentOutsideCurrentUsersNoticeDirectory() {
+        when(fileApi.getFileInfo(101L)).thenReturn(file(101L, 8L));
+        NoticeSaveReqVO request = saveRequest("<p>正文</p>");
+        request.setAttachments(List.of(attachment(101L)));
 
-        // 准备更新参数
-        NoticeSaveReqVO reqVO = randomPojo(NoticeSaveReqVO.class, o -> o.setId(dbNoticeDO.getId()));
-
-        // 更新
-        noticeService.updateNotice(reqVO);
-        // 检验是否更新成功
-        NoticeDO notice = noticeMapper.selectById(reqVO.getId());
-        assertPojoEquals(reqVO, notice);
+        assertServiceException(() -> noticeService.createNotice(request, USER_ID), NOTICE_ATTACHMENT_INVALID);
+        assertEquals(0, noticeMapper.selectCount());
     }
 
     @Test
-    public void testDeleteNotice_success() {
-        // 插入前置数据
-        NoticeDO dbNotice = randomPojo(NoticeDO.class);
-        noticeMapper.insert(dbNotice);
+    void shouldEnforceDraftOnlyMutationAndLifecycleTransitions() {
+        NoticeDO notice = insertNotice(NoticePublishStatusEnum.DRAFT, null);
 
-        // 删除
-        noticeService.deleteNotice(dbNotice.getId());
+        noticeService.publishNotice(notice.getId());
+        NoticeDO published = noticeMapper.selectById(notice.getId());
+        assertEquals(NoticePublishStatusEnum.PUBLISHED.getStatus(), published.getPublishStatus());
+        assertNotNull(published.getPublishTime());
+        assertServiceException(() -> noticeService.updateNotice(saveRequest(notice.getId()), USER_ID), NOTICE_NOT_DRAFT);
+        assertServiceException(() -> noticeService.deleteNotice(notice.getId()), NOTICE_NOT_DRAFT);
 
-        // 检查是否删除成功
-        assertNull(noticeMapper.selectById(dbNotice.getId()));
+        noticeService.offlineNotice(notice.getId());
+        NoticeDO offline = noticeMapper.selectById(notice.getId());
+        assertEquals(NoticePublishStatusEnum.OFFLINE.getStatus(), offline.getPublishStatus());
+        assertNotNull(offline.getOfflineTime());
+        assertServiceException(() -> noticeService.getMyNotice(notice.getId(), USER_ID), NOTICE_NOT_PUBLISHED);
     }
 
     @Test
-    public void testValidateNoticeExists_success() {
-        // 插入前置数据
-        NoticeDO dbNotice = randomPojo(NoticeDO.class);
-        noticeMapper.insert(dbNotice);
+    void shouldExposeOnlyPublishedNoticesAndPersistReadState() {
+        insertNotice(NoticePublishStatusEnum.DRAFT, null);
+        NoticeDO published = insertNotice(NoticePublishStatusEnum.PUBLISHED, LocalDateTime.now());
+        insertNotice(NoticePublishStatusEnum.OFFLINE, LocalDateTime.now().minusMinutes(1));
 
-        // 成功调用
-        noticeService.validateNoticeExists(dbNotice.getId());
+        assertEquals(1, noticeService.getMyNoticePage(page(), USER_ID).getTotal());
+        assertEquals(1L, noticeService.getUnreadSummary(USER_ID).getUnreadCount());
+        assertEquals(published.getId(), noticeService.getUnreadSummary(USER_ID).getLatest().getId());
+
+        noticeService.markRead(published.getId(), USER_ID);
+        noticeService.markRead(published.getId(), USER_ID);
+
+        assertEquals(1, readMapper.selectListByNoticeIdsAndUserId(List.of(published.getId()), USER_ID).size());
+        assertEquals(0L, noticeService.getUnreadSummary(USER_ID).getUnreadCount());
+        NoticeMyRespVO detail = noticeService.getMyNotice(published.getId(), USER_ID);
+        assertTrue(detail.getRead());
+        assertNotNull(detail.getReadTime());
     }
 
     @Test
-    public void testValidateNoticeExists_noExists() {
-        assertServiceException(() ->
-                noticeService.validateNoticeExists(randomLongId()), NOTICE_NOT_FOUND);
+    void shouldKeepAttachmentSnapshotWhenInfraFileWasDeleted() {
+        NoticeDO published = insertNotice(NoticePublishStatusEnum.PUBLISHED, LocalDateTime.now());
+        NoticeAttachmentDO attachment = new NoticeAttachmentDO();
+        attachment.setNoticeId(published.getId());
+        attachment.setInfraFileId(404L);
+        attachment.setFileName("已删除.pdf");
+        attachment.setFileSize(100L);
+        attachment.setSort(0);
+        attachmentMapper.insert(attachment);
+        when(fileApi.presignGetUrl(404L, 600)).thenThrow(new IllegalStateException("missing"));
+
+        NoticeMyRespVO detail = noticeService.getMyNotice(published.getId(), USER_ID);
+
+        assertEquals(1, detail.getAttachments().size());
+        assertEquals("已删除.pdf", detail.getAttachments().get(0).getFileName());
+        assertNull(detail.getAttachments().get(0).getDownloadUrl());
+    }
+
+    @Test
+    void shouldCopyPublishedNoticeToLengthSafeDraft() {
+        NoticeDO source = insertNotice(NoticePublishStatusEnum.PUBLISHED, LocalDateTime.now());
+        source.setTitle("长".repeat(50));
+        noticeMapper.updateById(source);
+
+        NoticeDO copy = noticeMapper.selectById(noticeService.copyNotice(source.getId()));
+
+        assertEquals(50, copy.getTitle().length());
+        assertTrue(copy.getTitle().endsWith("（副本）"));
+        assertEquals(NoticePublishStatusEnum.DRAFT.getStatus(), copy.getPublishStatus());
+    }
+
+    private NoticeSaveReqVO saveRequest(String content) {
+        NoticeSaveReqVO request = new NoticeSaveReqVO();
+        request.setTitle("测试公告");
+        request.setType(2);
+        request.setContent(content);
+        return request;
+    }
+
+    private NoticeSaveReqVO saveRequest(Long id) {
+        NoticeSaveReqVO request = saveRequest("<p>修改正文</p>");
+        request.setId(id);
+        return request;
+    }
+
+    private NoticeDO insertNotice(NoticePublishStatusEnum publishStatus, LocalDateTime publishTime) {
+        NoticeDO notice = new NoticeDO();
+        notice.setTitle(publishStatus.name());
+        notice.setType(2);
+        notice.setContent("<p>正文</p>");
+        notice.setStatus(0);
+        notice.setPublishStatus(publishStatus.getStatus());
+        notice.setPublishTime(publishTime);
+        noticeMapper.insert(notice);
+        return notice;
+    }
+
+    private NoticeAttachmentVO attachment(Long fileId) {
+        NoticeAttachmentVO attachment = new NoticeAttachmentVO();
+        attachment.setInfraFileId(fileId);
+        return attachment;
+    }
+
+    private FileInfoRespDTO file(Long id, Long creator) {
+        return new FileInfoRespDTO(id, 1L, "制度.pdf", "system/notice/" + creator + "/20260826/制度.pdf",
+                "https://files.example/制度.pdf", "application/pdf", 1024L, String.valueOf(creator));
+    }
+
+    private PageParam page() {
+        PageParam page = new PageParam();
+        page.setPageNo(1);
+        page.setPageSize(20);
+        return page;
     }
 
 }

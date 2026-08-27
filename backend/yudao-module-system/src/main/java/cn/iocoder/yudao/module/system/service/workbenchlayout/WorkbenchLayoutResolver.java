@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.system.controller.admin.workbenchlayout.vo.Workbe
 import cn.iocoder.yudao.module.system.dal.dataobject.permission.MenuDO;
 import cn.iocoder.yudao.module.system.enums.permission.MenuTypeEnum;
 import cn.iocoder.yudao.module.system.service.workbenchlayout.model.WorkbenchLayoutSnapshot;
+import cn.iocoder.yudao.module.system.service.workbenchlayout.model.WorkbenchLayoutSnapshot.Node;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import org.springframework.stereotype.Component;
@@ -90,6 +91,112 @@ public class WorkbenchLayoutResolver {
         return persisted;
     }
 
+    /**
+     * Role schema v2 stores only the pages directly granted to that role. Source groups are a locked
+     * projection of the global layout; role-owned groups remain editable.
+     */
+    public WorkbenchLayoutSnapshot normalizeRoleDraft(WorkbenchLayoutSnapshot global,
+                                                       WorkbenchLayoutSnapshot submitted,
+                                                       List<MenuDO> roleMenus) {
+        if (Integer.valueOf(SCHEMA_VERSION).equals(submitted.getSchemaVersion())) {
+            validateSubmittedRoleBoundaries(global, submitted, getEligiblePageIds(roleMenus));
+        }
+        WorkbenchLayoutSnapshot result = reconcileRoleSnapshot(global, submitted, roleMenus);
+        result.setSchemaVersion(SCHEMA_VERSION);
+        result.setScopeType("ROLE");
+        result.setEnabled(Boolean.TRUE.equals(submitted.getEnabled()));
+        if (Boolean.TRUE.equals(result.getEnabled())
+                && (submitted.getPriority() == null || submitted.getPriority() < 1)) {
+            throw invalid("启用角色覆盖时优先级必须大于 0");
+        }
+        result.setPriority(Boolean.TRUE.equals(result.getEnabled()) ? submitted.getPriority() : null);
+        result.setOperations(new ArrayList<>());
+        validateRoleTree(global, result, getEligiblePageIds(roleMenus));
+        canonicalizeSort(result.getNodes());
+        return result;
+    }
+
+    public WorkbenchLayoutSnapshot createInitialRoleSnapshot(WorkbenchLayoutSnapshot global,
+                                                              List<MenuDO> roleMenus) {
+        return reconcileRoleSnapshot(global, null, roleMenus);
+    }
+
+    public WorkbenchLayoutSnapshot reconcileRoleSnapshot(WorkbenchLayoutSnapshot global,
+                                                          WorkbenchLayoutSnapshot stored,
+                                                          List<MenuDO> roleMenus) {
+        WorkbenchLayoutSnapshot source = stored;
+        if (stored == null) {
+            source = global;
+        } else if (Integer.valueOf(LEGACY_SCHEMA_VERSION).equals(stored.getSchemaVersion())) {
+            source = expandRoleSnapshot(global, stored);
+        }
+        Map<Long, MenuDO> roleMenuMap = toMenuMap(roleMenus);
+        Set<Long> allowedPageIds = getEligiblePageIds(roleMenus);
+        List<Node> roots = copyRelevantGroupSkeleton(global.getNodes(), allowedPageIds);
+        Map<String, FlatNode> sourceNodes = flatten(source.getNodes());
+        addRoleGroups(roots, sourceNodes);
+        applySourceGroupVisibility(roots, sourceNodes);
+        Map<String, FlatNode> targets = flatten(roots);
+        Map<String, FlatNode> globalNodes = flatten(global.getNodes());
+        for (Long menuId : allowedPageIds) {
+            String key = "menu-" + menuId;
+            FlatNode sourcePage = sourceNodes.get(key);
+            FlatNode globalPage = globalNodes.get(key);
+            FlatNode placement = sourcePage == null ? globalPage : sourcePage;
+            String parentKey = placement == null ? UNCLASSIFIED_KEY : placement.getParentKey();
+            if (parentKey == null || !targets.containsKey(parentKey)) {
+                parentKey = globalPage != null && targets.containsKey(globalPage.getParentKey())
+                        ? globalPage.getParentKey() : UNCLASSIFIED_KEY;
+            }
+            MenuDO menu = roleMenuMap.get(menuId);
+            Node page = pageNode(menu);
+            if (sourcePage != null) {
+                page.setHidden(Boolean.TRUE.equals(sourcePage.getNode().getHidden()));
+                page.setSort(sourcePage.getNode().getSort());
+            } else if (globalPage != null) {
+                page.setHidden(Boolean.TRUE.equals(globalPage.getNode().getHidden()));
+                page.setSort(globalPage.getNode().getSort());
+            }
+            targets.get(parentKey).getNode().getChildren().add(page);
+        }
+        sortByDeclaredOrder(roots);
+        WorkbenchLayoutSnapshot result = WorkbenchLayoutSnapshot.builder()
+                .schemaVersion(SCHEMA_VERSION).scopeType("ROLE")
+                .enabled(stored != null && Boolean.TRUE.equals(stored.getEnabled()))
+                .priority(stored == null ? null : stored.getPriority()).nodes(roots).build();
+        validateRoleTree(global, result, allowedPageIds);
+        return result;
+    }
+
+    public WorkbenchLayoutSnapshot mergeRoleSnapshots(WorkbenchLayoutSnapshot global,
+                                                       List<WorkbenchLayoutSnapshot> roleSnapshots) {
+        WorkbenchLayoutSnapshot result = copySnapshot(global);
+        Set<Long> claimedPages = new HashSet<>();
+        for (WorkbenchLayoutSnapshot roleSnapshot : roleSnapshots) {
+            Map<String, FlatNode> roleNodes = flatten(roleSnapshot.getNodes());
+            addRoleGroups(result.getNodes(), roleNodes);
+            for (FlatNode roleNode : roleNodes.values()) {
+                Node page = roleNode.getNode();
+                if (!NODE_TYPE_PAGE.equals(page.getType()) || !claimedPages.add(page.getSourceMenuId())) {
+                    continue;
+                }
+                Map<String, FlatNode> resultNodes = flatten(result.getNodes());
+                FlatNode current = resultNodes.get(page.getKey());
+                FlatNode parent = resultNodes.get(roleNode.getParentKey());
+                if (current == null || parent == null || !NODE_TYPE_GROUP.equals(parent.getNode().getType())) {
+                    continue;
+                }
+                detach(result.getNodes(), current, resultNodes);
+                current.getNode().setHidden(Boolean.TRUE.equals(page.getHidden())
+                        || hasHiddenAncestor(roleNode, roleNodes));
+                current.getNode().setSort(page.getSort());
+                parent.getNode().getChildren().add(current.getNode());
+            }
+        }
+        sortByDeclaredOrder(result.getNodes());
+        return result;
+    }
+
     public WorkbenchLayoutSnapshot expandRoleSnapshot(WorkbenchLayoutSnapshot global,
                                                        WorkbenchLayoutSnapshot roleDifference) {
         validateRoleOperations(global, roleDifference);
@@ -125,6 +232,13 @@ public class WorkbenchLayoutResolver {
                                        List<MenuDO> tenantMenus) {
         WorkbenchLayoutSnapshot finalTree = expandRoleSnapshot(global, roleDifference);
         validateGlobalForPublish(finalTree, tenantMenus);
+    }
+
+    public void validateRoleSnapshotForPublish(WorkbenchLayoutSnapshot global,
+                                               WorkbenchLayoutSnapshot roleSnapshot,
+                                               List<MenuDO> roleMenus) {
+        WorkbenchLayoutSnapshot reconciled = reconcileRoleSnapshot(global, roleSnapshot, roleMenus);
+        validateRoleTree(global, reconciled, getEligiblePageIds(roleMenus));
     }
 
     public RenderResult render(WorkbenchLayoutSnapshot effectiveSnapshot,
@@ -352,6 +466,163 @@ public class WorkbenchLayoutResolver {
                 .sourceMenuId(node.getSourceMenuId())
                 .name(menu == null ? node.getName() : menu.getName())
                 .reason(reason).build();
+    }
+
+    private List<Node> copyRelevantGroupSkeleton(List<Node> nodes, Set<Long> allowedPageIds) {
+        List<Node> result = new ArrayList<>();
+        for (Node node : nodes) {
+            if (!NODE_TYPE_GROUP.equals(node.getType())) {
+                continue;
+            }
+            boolean relevant = UNCLASSIFIED_KEY.equals(node.getKey())
+                    || containsAllowedPage(node, allowedPageIds);
+            if (!relevant) {
+                continue;
+            }
+            result.add(Node.builder().key(node.getKey()).type(NODE_TYPE_GROUP)
+                    .name(node.getName()).icon(node.getIcon()).hidden(node.getHidden()).sort(node.getSort())
+                    .children(copyRelevantGroupSkeleton(node.getChildren(), allowedPageIds)).build());
+        }
+        return result;
+    }
+
+    private boolean containsAllowedPage(Node node, Set<Long> allowedPageIds) {
+        if (NODE_TYPE_PAGE.equals(node.getType())) {
+            return allowedPageIds.contains(node.getSourceMenuId());
+        }
+        return node.getChildren().stream().anyMatch(child -> containsAllowedPage(child, allowedPageIds));
+    }
+
+    private void addRoleGroups(List<Node> roots, Map<String, FlatNode> sourceNodes) {
+        boolean changed;
+        do {
+            changed = false;
+            Map<String, FlatNode> targetNodes = flatten(roots);
+            for (FlatNode source : sourceNodes.values()) {
+                Node group = source.getNode();
+                if (!NODE_TYPE_GROUP.equals(group.getType()) || !group.getKey().startsWith("role-group-")
+                        || targetNodes.containsKey(group.getKey())) {
+                    continue;
+                }
+                String parentKey = source.getParentKey();
+                Node copy = Node.builder().key(group.getKey()).type(NODE_TYPE_GROUP)
+                        .name(group.getName()).icon(group.getIcon()).hidden(group.getHidden())
+                        .sort(group.getSort()).children(new ArrayList<>()).build();
+                if (parentKey == null) {
+                    roots.add(copy);
+                    changed = true;
+                } else {
+                    FlatNode parent = targetNodes.get(parentKey);
+                    if (parent != null && NODE_TYPE_GROUP.equals(parent.getNode().getType())) {
+                        parent.getNode().getChildren().add(copy);
+                        changed = true;
+                    }
+                }
+            }
+        } while (changed);
+    }
+
+    private void applySourceGroupVisibility(List<Node> roots, Map<String, FlatNode> sourceNodes) {
+        Map<String, FlatNode> targetNodes = flatten(roots);
+        for (Map.Entry<String, FlatNode> entry : targetNodes.entrySet()) {
+            Node target = entry.getValue().getNode();
+            FlatNode source = sourceNodes.get(entry.getKey());
+            if (NODE_TYPE_GROUP.equals(target.getType()) && source != null) {
+                target.setHidden(Boolean.TRUE.equals(source.getNode().getHidden()));
+            }
+        }
+    }
+
+    private boolean hasHiddenAncestor(FlatNode node, Map<String, FlatNode> nodes) {
+        String parentKey = node.getParentKey();
+        while (parentKey != null) {
+            FlatNode parent = nodes.get(parentKey);
+            if (parent == null) {
+                return false;
+            }
+            if (Boolean.TRUE.equals(parent.getNode().getHidden())) {
+                return true;
+            }
+            parentKey = parent.getParentKey();
+        }
+        return false;
+    }
+
+    private void validateRoleTree(WorkbenchLayoutSnapshot global, WorkbenchLayoutSnapshot role,
+                                  Set<Long> expectedPageIds) {
+        validateTree(role.getNodes(), false);
+        Set<Long> actualPageIds = collectPageIds(role.getNodes());
+        if (!actualPageIds.equals(expectedPageIds)) {
+            Set<Long> extra = new LinkedHashSet<>(actualPageIds);
+            extra.removeAll(expectedPageIds);
+            Set<Long> missing = new LinkedHashSet<>(expectedPageIds);
+            missing.removeAll(actualPageIds);
+            throw invalid("角色布局页面与当前角色授权不一致，越权页面：" + extra + "，缺少页面：" + missing);
+        }
+        Map<String, FlatNode> globalNodes = flatten(
+                copyRelevantGroupSkeleton(global.getNodes(), expectedPageIds));
+        Map<String, FlatNode> roleNodes = flatten(role.getNodes());
+        for (FlatNode globalNode : globalNodes.values()) {
+            Node group = globalNode.getNode();
+            if (!NODE_TYPE_GROUP.equals(group.getType())) {
+                continue;
+            }
+            FlatNode candidate = roleNodes.get(group.getKey());
+            if (candidate == null || !NODE_TYPE_GROUP.equals(candidate.getNode().getType())
+                    || !Objects.equals(globalNode.getParentKey(), candidate.getParentKey())
+                    || !Objects.equals(group.getName(), candidate.getNode().getName())
+                    || !Objects.equals(emptyToNull(group.getIcon()), emptyToNull(candidate.getNode().getIcon()))) {
+                throw invalid("角色布局不能修改全局分组：" + group.getKey());
+            }
+        }
+        for (FlatNode candidate : roleNodes.values()) {
+            Node node = candidate.getNode();
+            if (NODE_TYPE_GROUP.equals(node.getType()) && !globalNodes.containsKey(node.getKey())
+                    && !node.getKey().startsWith("role-group-")) {
+                throw invalid("角色自定义分组键不正确：" + node.getKey());
+            }
+        }
+    }
+
+    private void validateSubmittedRoleBoundaries(WorkbenchLayoutSnapshot global,
+                                                 WorkbenchLayoutSnapshot submitted,
+                                                 Set<Long> allowedPageIds) {
+        Set<Long> submittedPageIds = collectPageIds(submitted.getNodes());
+        Set<Long> extra = new LinkedHashSet<>(submittedPageIds);
+        extra.removeAll(allowedPageIds);
+        if (!extra.isEmpty()) {
+            throw invalid("角色布局包含未授权页面：" + extra);
+        }
+        Map<String, FlatNode> globalNodes = flatten(
+                copyRelevantGroupSkeleton(global.getNodes(), allowedPageIds));
+        Map<String, FlatNode> submittedNodes = flatten(submitted.getNodes());
+        for (FlatNode globalNode : globalNodes.values()) {
+            Node group = globalNode.getNode();
+            if (!NODE_TYPE_GROUP.equals(group.getType())) {
+                continue;
+            }
+            FlatNode candidate = submittedNodes.get(group.getKey());
+            if (candidate == null || !NODE_TYPE_GROUP.equals(candidate.getNode().getType())
+                    || !Objects.equals(globalNode.getParentKey(), candidate.getParentKey())
+                    || !Objects.equals(group.getName(), candidate.getNode().getName())
+                    || !Objects.equals(emptyToNull(group.getIcon()), emptyToNull(candidate.getNode().getIcon()))) {
+                throw invalid("角色布局不能修改全局分组：" + group.getKey());
+            }
+            if (UNCLASSIFIED_KEY.equals(group.getKey()) && Boolean.TRUE.equals(candidate.getNode().getHidden())) {
+                throw invalid("角色布局不能将“未分类”设为未编排");
+            }
+        }
+    }
+
+    private void detach(List<Node> roots, FlatNode current, Map<String, FlatNode> nodes) {
+        if (current.getParentKey() == null) {
+            roots.remove(current.getNode());
+            return;
+        }
+        FlatNode parent = nodes.get(current.getParentKey());
+        if (parent != null) {
+            parent.getNode().getChildren().remove(current.getNode());
+        }
     }
 
     private void validateTree(List<WorkbenchLayoutSnapshot.Node> roots, boolean rejectEmptyGroups) {

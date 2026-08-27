@@ -8,6 +8,8 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 
+import java.time.LocalDateTime;
+
 /**
  * 通知公告表
  *
@@ -43,5 +45,8 @@ public class NoticeDO extends BaseDO {
      * 枚举 {@link CommonStatusEnum}
      */
     private Integer status;
+    private String publishStatus;
+    private LocalDateTime publishTime;
+    private LocalDateTime offlineTime;
 
 }

@@ -20,6 +20,16 @@ public class LeadManagementRespVO {
     private Long sourceUserId;
     private String sourceUserName;
     private String partnerOwnerNameSnapshot;
+    private String providerOwnerType;
+    private Long providerOwnerId;
+    private String providerOwnerNameSnapshot;
+    private Long contributionUserIdSnapshot;
+    private String contributionUserNameSnapshot;
+    private Long contributionSupervisorUserIdSnapshot;
+    private String contributionSupervisorNameSnapshot;
+    private Long contributionDeptIdSnapshot;
+    private String contributionDeptNameSnapshot;
+    private LocalDateTime countedAt;
     private String sourceChannel;
     private String provinceCode;
     private String provinceName;

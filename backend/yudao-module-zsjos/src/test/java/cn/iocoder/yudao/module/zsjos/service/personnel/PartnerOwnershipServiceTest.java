@@ -32,6 +32,7 @@ class PartnerOwnershipServiceTest {
     @Test
     void permissionLossImmediatelyInvalidatesRetainedOwnership() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(20L));
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(false);
 
         assertFalse(service.canRead(20L, 10L));
@@ -41,11 +42,22 @@ class PartnerOwnershipServiceTest {
     @Test
     void enabledPermissionHolderCanReadCurrentPartner() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(20L));
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
 
         assertTrue(service.canRead(20L, 10L));
         assertFalse(service.canRead(21L, 10L));
+    }
+
+    @Test
+    void managerCanReadAnyExistingTenantPartner() {
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Manager"));
+        when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L));
+
+        assertTrue(service.canRead(20L, 10L));
+        verifyNoInteractions(ownershipMapper);
     }
 
     @Test

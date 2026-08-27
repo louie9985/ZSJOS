@@ -4,7 +4,7 @@
 
 Vue Admin 的 `/system/workbench-layout`（`system/workbenchLayout/index`）是
 `workbenchRenderMode=admin_only` 的系统配置页，不属于员工业务页面，也不计入下表的
-双前端覆盖数量。其候选页面来自租户套餐，发布后由所有 Workbench 桌面布局与移动抽屉
+双前端覆盖数量。全局候选页面来自租户套餐，角色覆盖候选页面来自所选角色当前直接授权的有效页面；发布后由所有 Workbench 桌面布局与移动抽屉
 统一消费；未发布或解析失败时回退原授权菜单树。
 
 H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计入下表 38 个页面路由。V071 只把已失去有效父菜单的兼职权限按钮归为根级、无 path/component 的不可路由元数据，不重建已由 V069 退役的 `partner-portal` 页面。
@@ -27,7 +27,6 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 14 | 产品配置 | `/zsjos/product` | `ProductConfigPage` | `zsjos/product/index` |
 | 15 | 计划配置 | `/zsjos/work-plan-config` | `WorkPlanConfigPage` | `zsjos/workPlanConfig/index` |
 | 16 | 下属销售 | `/zsjos/subordinate-sales` | `SubordinateSalesPage` | `zsjos/subordinateSales/index` |
-| 16A | 下属兼职 | `/zsjos/subordinate-partners` | `SubordinatePartnerPage` | `zsjos/subordinatePartner/index` |
 | 17 | 今日待办 | `/zsjos/tasks/today` | `TodayTasksPage` | `zsjos/todayTask/index` |
 | 18 | 工作计划 | `/zsjos/work-plans` | `WorkPlanPage` | `zsjos/workPlan/index` |
 | 20 | 申诉处理 | `/zsjos/appeals` | `LeadAppealPage` | `zsjos/leadAppeal/index` |
@@ -37,7 +36,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 23 | 历史客户复购 | `/zsjos/orders/external-repurchase` | `ExternalRepurchasePage` | `zsjos/externalRepurchase/index` |
 | 24 | 导出任务 | `/zsjos/export-task` | `ExportTaskPage` | `zsjos/exportTask/index` |
 | 25 | 人员管理 | `/zsjos/personnel` | `PersonnelPage` | `zsjos/personnel/index` |
-| 26 | 兼职主体 | `/zsjos/partner` | `PartnerPage` | `zsjos/partner/index` |
+| 26 | 兼职管理 | `/zsjos/partner` | `SubordinatePartnerPage` | `zsjos/partner/index` |
 | 27 | 只读借视图 | `/zsjos/impersonation` | `ImpersonationPage` | `zsjos/impersonation/index` |
 | 28 | 业务审计 | `/zsjos/business-audit` | `BusinessAuditPage` | `zsjos/businessAudit/index` |
 | 29 | 返现管理 | `/zsjos/cashback` | `CashbackPage` | `zsjos/cashback/index` |
@@ -62,6 +61,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 48 | 需求与反馈 | `/zsjos/feedback` | `FeedbackPage` | `zsjos/feedback/index` |
 | 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
 | 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |
+| 51 | 公告中心 | `/zsjos/announcements` | `AnnouncementCenterPage` | `system/notice/index`（公告管理） |
 
 “我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 

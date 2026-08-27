@@ -93,13 +93,15 @@ const MOCK_STAR: ScreenTodayStar = {
   deptName: '新媒体一部',
   today: 8,
   yesterday: 6,
-  rankToday: 1,
-  rankYesterday: 2,
+      rankToday: 1,
+      rankYesterday: 2,
+      includesPartTime: true,
 };
 const MOCK_YESTERDAY_CHAMPION: ScreenYesterdayChampion = {
   name: '演示成员丙',
   deptName: '新媒体二部',
-  count: 9,
+      count: 9,
+      includesPartTime: false,
 };
 
 function fillUnsupported<T>(module: ModuleValue<T>, value: T): ModuleValue<T> {

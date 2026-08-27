@@ -215,6 +215,7 @@ function goAppeal() {
             <van-cell v-if="lead.submittedWechatId" title="微信号" :value="lead.submittedWechatId" />
             <van-cell title="提交时间" :value="formatDateTime(lead.submittedAt)" />
             <van-cell v-if="lead.sourceUserName" title="来源人" :value="lead.sourceUserName" />
+            <van-cell v-if="lead.providerOwnerNameSnapshot" title="提供方" :value="lead.providerOwnerNameSnapshot" />
             <van-cell v-if="lead.ownerUserName" title="负责销售" :value="lead.ownerUserName" />
             <van-cell v-if="lead.pendingAssigneeUserName" title="待接销售" :value="lead.pendingAssigneeUserName" />
             <van-cell title="来源渠道" :value="lead.sourceLabel || lead.sourceChannel" />

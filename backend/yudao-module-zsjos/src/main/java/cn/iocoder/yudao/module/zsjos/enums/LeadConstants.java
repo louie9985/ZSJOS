@@ -15,6 +15,8 @@ public interface LeadConstants {
     String SOURCE_INTERNAL_NEW_MEDIA = "internal_new_media";
     String SOURCE_PARTNER = "partner";
     String SOURCE_SALES_SELF = "sales_self_sourced";
+    String PROVIDER_OWNER_SYSTEM_USER = "system_user";
+    String PROVIDER_OWNER_PARTNER = "partner";
     String STATUS_SUBMITTED = "submitted";
     String STATUS_SUSPENDED = "suspended";
     String STATUS_VALID = "valid";

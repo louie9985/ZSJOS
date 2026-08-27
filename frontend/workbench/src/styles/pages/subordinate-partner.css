@@ -6,6 +6,10 @@
   background: var(--crm-bg-container);
 }
 
+.subordinate-partner-page > .page-heading {
+  margin-bottom: var(--crm-sp-4);
+}
+
 .subordinate-partner-list {
   display: flex;
   flex-direction: column;
@@ -34,6 +38,14 @@
   margin-bottom: var(--crm-sp-4);
 }
 
+.subordinate-partner-detail-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-4);
+}
+
 @media (max-width: 760px) {
   .subordinate-partner-layout {
     grid-template-columns: 1fr;
@@ -42,5 +54,9 @@
   .subordinate-partner-list {
     border-right: 0;
     border-bottom: 1px solid var(--crm-border);
+  }
+
+  .subordinate-partner-detail-heading {
+    flex-direction: column;
   }
 }

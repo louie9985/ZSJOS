@@ -14,6 +14,63 @@
 - Dependencies: existing System user/dictionary/menu/permission APIs, HRM employee services, BPM public API/status events, Infra Job starter, EAM category/asset/transfer/repair facilities, Vue Admin and React Workbench. The user explicitly approved direct `yudao-module-eam -> yudao-module-hrm` and existing Job starter dependencies; no new third-party dependency or broker is introduced.
 - Integration order: establish HRM public API/events and EAM module wiring -> add category/inventory/procurement/employee-task persistence and services -> wire BPM status listeners and lifecycle idempotency -> add EAM-local SQL/menu/verify -> add Admin employee-assets and Workbench self-service surfaces -> run focused and proportional verification.
 - Verification plan: focused HRM/EAM unit and database tests covering event idempotency, availability/reservation concurrency, partial fulfillment, receipt/return, signing/return inspection and lifecycle cancellation; EAM/HRM Maven tests and server package; `zsjos-db` static/fresh/repeat/drift verification where the local migration chain permits; Admin scoped lint/typecheck/build; Workbench focused/full tests, typecheck/build; authenticated desktop/mobile browser checks when a usable runtime/session is available; scoped diff/ownership review.
+## Workstream Registration - 2026-08-27 00:00:00 +08:00
+
+- Workstream ID: `main-workbench-role-layout-merge`
+- Goal: 修正 Workbench 菜单编排，使角色覆盖只配置角色直接授权的有效 Workbench 页面，并在多角色员工运行时逐页合并全部适用角色布局。
+- Non-goals: 修改 Admin 菜单、角色菜单授权、认证/租户契约、数据库结构或业务数据；新增依赖；切换分支、提交、推送、部署；覆盖现有无关未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: System Workbench layout Controller/VO/Service/Resolver/model and focused tests; Admin Workbench layout API/page/tree; Workbench permission metadata type; directly affected permission-flow and menu-coverage documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: 现有 System Menu/Role/Permission 服务、Workbench 权限响应和 Vue/React 既有依赖；无新增 npm/Maven 依赖。
+- Integration order: 升级并兼容快照模型 -> 角色候选与草稿按直接授权收敛 -> 多角色逐页合并与元数据 -> Admin 编辑约束和预览 -> 类型/文档同步 -> 聚焦测试、前端检查和构建。
+- Verification plan: System Workbench layout 聚焦测试与模块编译；Admin typecheck、scoped lint、build；Workbench tests/typecheck/build；scoped diff/check；有效登录可用时执行桌面/移动浏览器检查，否则明确记录未验证风险。
+
+## Delivery Entry - 2026-08-27 01:04:07 +08:00
+
+- Workstream ID: `main-workbench-role-layout-merge`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修正 `/system/workbench-layout` 的角色覆盖逻辑，使其读取角色现有菜单来设计 Workbench 导航，不配置租户全部菜单，也不修改 Admin 菜单或角色授权。
+- Key decisions: 保留全局布局；角色 v2 快照只保存该角色直接授权的有效 Workbench 页面与角色自定义分组；全局分组骨架在角色编辑中锁定；多角色员工逐页合并全部适用角色布局，同页冲突按全租户唯一优先级裁决；v1 快照按当前角色授权自动收敛；元数据改为 `appliedRoleLayouts[]`。
+- Execution or analysis result: 草稿接口按作用域返回候选页；角色读取、保存、恢复、发布和运行时投影均按当前角色授权收敛；旧整体胜出角色逻辑已替换为多角色逐页合并；Admin 角色树锁定全局分组并展示已应用角色列表；Workbench 类型与权限/菜单文档已同步。布局接口未调用角色菜单写入能力。
+- Changed files: System Workbench layout Controller/VO/Service/Resolver/snapshot/projection model and focused tests；Admin Workbench layout API/page/tree；Workbench permission metadata type；`docs/architecture/data-and-permission-flow.md`、`docs/frontend/zsjos-menu-coverage.md`；本 handoff 记录。现有公告、ZSJOS、SQL、媒体大屏及其他脏文件均保留。
+- Verification evidence: System 聚焦测试 17/17 通过并完成干净模块编译；Admin 本次文件 scoped ESLint 通过，`build:local` 通过（仅既有 lightningcss `*zoom` 警告），全量 `ts:check` 仅被既有 BPM/EAM/MES/CRM 等无关错误阻塞；Workbench 全量测试 414/414、typecheck、生产构建通过（仅既有大 chunk 提示）；scoped `git diff --check` 通过，仅有行尾转换警告。浏览器打开本地页面时登录已超时，未能完成授权业务页桌面/移动交互验收。
+- Dependency or integration impact: 无新增 npm/Maven 依赖，无数据库/SQL、Admin 菜单、角色授权、租户包或外部状态修改，无服务启停、分支/工作树操作、提交、推送或部署。权限响应的 Workbench 布局元数据由单一胜出角色字段变更为 `appliedRoleLayouts[]`。
+- Remaining work: 在具备有效管理员会话和已发布全局布局的环境补做角色切换、候选数量、拖拽锁定、保存/发布/历史恢复、多角色员工预览及桌面/移动布局验收；如有外部消费者依赖已移除的单一胜出角色元数据，需要同步升级。
+
+## Delivery Entry - 2026-08-27 11:15:11 +08:00
+
+- Workstream ID: `main-workbench-role-layout-merge`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修复角色未勾选任何子页面时，角色覆盖编辑器仍显示并允许编排对应父目录的问题。
+- Key decisions: 角色草稿不再复制完整全局目录骨架；仅保留至少包含一个该角色有效可配置页面的全局目录链，并始终保留固定“未分类”节点。该规则只改变 Workbench 编排投影，不修改 Admin 角色菜单授权。
+- Execution or analysis result: 角色 v2 草稿和旧快照收敛均会裁剪无授权页面的空全局目录；全局分组边界校验同步按相关目录链执行；新增回归测试验证未授权目录完全不返回且不能成为编排目标。
+- Changed files: `WorkbenchLayoutResolver.java`、`WorkbenchLayoutResolverTest.java`、`docs/architecture/data-and-permission-flow.md`、本 handoff 记录。
+- Verification evidence: System Workbench layout 聚焦测试 18/18 通过；scoped `git diff --check` 通过，仅有行尾转换警告。
+- Dependency or integration impact: 无依赖、数据库、SQL、Admin 菜单、角色授权、外部状态、服务启停、分支/提交/推送操作。
+- Remaining work: 当前运行中的后端若未热更新，需要由环境维护者重启后刷新 `/system/workbench-layout`；有效登录会话下的页面目视验收仍待补做。
+
+## Workstream Registration - 2026-08-26 23:55:00 +08:00
+
+- Workstream ID: `main-media-screen-provider-ownership`
+- Goal: 完成新媒体客资大屏真实后端、兼职陪跑和历史冻结，并统一 Lead 提供方归属在权限、通知、统计与返现资格中的语义。
+- Non-goals: 不改变销售派单、销售负责人、客资状态机、审批流程、返现金额/比例算法；不删除 Lead 或其他业务数据；不新增依赖；不切换分支、不提交、不推送、不部署；不覆盖 V148/V149 及其他无关未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: V141/V143 开发基线及 bootstrap/schema/校验；ZSJOS Lead 规范提供方字段、创建/权限/通知/返现/管理投影和媒体大屏 Controller/Service/DAL/快照；`frontend/media-screen` 及 Admin/Workbench/H5 必要协议投影；直接受影响的 API、架构、部署和迁移文档；本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: 现有 System 用户/部门/岗位公共 API、V143 Partner 当前归属与审计、Redis 缓存、React/Vue 既有依赖；无新增 npm/Maven 依赖。
+- Integration order: 重写并静态验证 V141/V143 基线 -> 增加规范归属解析与可证明回填 -> 替换权限/通知/返现和管理投影消费点 -> 完成实时/历史大屏聚合与快照 -> 接入三端类型/展示 -> 受控同步本机开发库 -> 后端、前端、SQL、真实接口和浏览器验证。
+- Verification plan: V141 执行前确认本机快照表 0 行并备份旧 DDL；临时库完整执行 bootstrap/V001-V149 并做 schema diff；ZSJOS 聚焦及全量测试、server package；Admin scoped lint/build、Workbench/H5 类型与构建、media-screen test/typecheck/build；真实 200/400/403/503、开关两态、历史、租户隔离及桌面/移动浏览器检查；最终 scoped diff 和敏感内容检查。
 
 ## Delivery Entry - 2026-08-26 19:43:26 +08:00
 
@@ -5077,3 +5134,248 @@
 - Verification evidence: fetch 后 ahead/behind 为 `0/0`；`git diff --check` 通过；新增内容敏感关键词扫描未发现密码、令牌或密钥；既有工作流记录了 EAM focused tests 68/68、EAM employee-asset/stock/purchase tests 24/24、Admin scoped lint/typecheck/build 通过和 Workbench 菜单测试证据；全量聚合测试、MySQL 执行和服务运行保持未执行或受既有环境问题阻塞。
 - Dependency or integration impact: 推送将发布当前 EAM/HRM、反馈管理、BPM API、Admin/Workbench 和 SQL/文档改动；无新增依赖、数据库写入、权限实时变更、服务操作或分支操作。
 - Remaining work: 推送后核对本地与云端哈希；按各工作流记录完成隔离 MySQL 验证、缺失迁移链审计及部署前剩余检查。
+
+## Workstream Registration - 2026-08-26 22:15:00 +08:00
+
+- Workstream ID: `main-system-announcements-v148`
+- Goal: 实现 System 公告草稿/发布/下线生命周期、稳定附件引用与员工阅读记录，提供 Vue 管理端沉浸式公告编辑器，并在 React Workbench 增加常驻公告入口、未读公告条和公告中心。
+- Non-goals: 不覆盖合作方 H5；不做定向受众、弹窗、强制知悉、定时发布、置顶、评论、点赞或阅读报表；不执行 SQL、不修改真实角色权限、不启动或停止共享服务、不新增依赖、不提交或推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，并保留无关的 `frontend/yudao-ui-admin-uniapp` 子模块状态变化。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-system` 的公告 Controller/VO/Service/DAL/DO/枚举/错误码及测试；`frontend/admin` 的 System 公告 API、列表和编辑页面；`frontend/workbench` 的公告 typed service、共享 Header、路由、页面、样式与测试；`script/sql/mysql` 的 V148、fresh schema/seed/bootstrap/验证说明；直接受影响的公告、权限、菜单和前端覆盖文档；本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: 现有 System 租户/菜单/权限/XSS、Infra File API、Vue WangEditor/UploadFile、Workbench ADMIN 认证/菜单/WebSocket；无新增 npm 或 Maven 依赖。
+- Integration order: System 持久化和契约 -> V148 与 fresh baseline/menu -> Vue 管理端 -> Workbench typed service/展示 -> 测试、构建、浏览器与 SQL 静态验证 -> 交付记录。
+- Verification plan: System 公告聚焦单元/数据库测试与模块构建；管理端 scoped lint、`ts:check`、`build:local`；Workbench 聚焦测试、全量测试、typecheck、build；桌面/移动浏览器检查；V148 结构、顺序、幂等、非破坏性与 bootstrap/schema 一致性检查；`git diff --check`。
+
+## Delivery Entry - 2026-08-26 23:02:52 +08:00
+
+- Workstream ID: `main-system-announcements-v148`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 实现公告标题、富文本正文和附件编辑发布能力，并在员工 Workbench 提供常驻公告入口、未读公告条和公告中心，同时保证发布状态、租户隔离、权限与离线未读状态可靠。
+- Key decisions: 公告继续归属 System；管理端采用独立沉浸编辑页并复用 WangEditor/Infra File；生命周期限定为草稿、已发布、已下线，已发布内容不可原地修改；阅读状态以租户、公告、ADMIN 用户的数据库唯一记录为事实源，WebSocket 仅触发刷新；Workbench 使用相对菜单路径 `announcements` 和独立权限 `system:notice:read`；附件保存文件快照而非签名 URL；无新增依赖。
+- Execution or analysis result: 完成公告生命周期、附件、阅读记录、发布后刷新提示和员工只读接口；完成 Vue Admin 公告列表、沉浸编辑、附件上传、预览、发布、下线与复制草稿；完成 React Workbench 顶栏常驻入口、未读角标、40px 公告条、桌面主从公告中心、移动详情抽屉、安全富文本和附件状态；新增 V148、fresh schema/seed/bootstrap 接线及直接相关架构、权限和菜单覆盖文档。
+- Changed files: `backend/yudao-module-system` 公告 Controller/VO/Service/DAL/DO/枚举/错误码及聚焦测试；`frontend/admin/src/api/system/notice`、公告列表与 `NoticeEditor.vue`；`frontend/workbench` 公告 Provider/入口/安全渲染/公告中心、API、路由、样式与测试，以及由 typecheck 更新的已跟踪 `tsconfig.tsbuildinfo`；`script/sql/mysql` 的 V148、bootstrap、fresh/core schema、system seed 和迁移说明；三份直接相关架构/菜单文档；本 handoff 记录。无关的 `frontend/yudao-ui-admin-uniapp` 子模块状态未触碰。
+- Verification evidence: System 聚焦测试 9/9 通过（服务生命周期、复制标题边界、租户隔离、Controller 权限表达式）；Workbench 全量测试 414/414、typecheck、生产构建通过，构建仅保留既有大 chunk 提示；Vue Admin scoped ESLint 和生产构建通过，公告文件无 TypeScript 错误，完整 `ts:check` 仅受既有 BPM/EAM/MES/CRM 错误阻塞；fresh/core schema 字节一致，V148 非破坏性、版本和菜单静态检查通过；最终 `git diff --check` 通过且无敏感内容命中。完整 Maven reactor 测试在进入 System 前受既有 Infra `CodegenEngineUniappTest.testExecute_treeSearch` 失败阻塞；数据库检查工具仅因既有 V106/V108/V118 缺口失败，V147 到 V148 连续。
+- Dependency or integration impact: 无新增 npm/Maven 依赖，无 SQL 或数据库执行，无真实菜单、角色、租户包或权限变更，无服务启停、分支/工作树操作、提交、推送或发布。V148 会在后续受控部署时创建附件与阅读表、扩展公告状态字段，并注册菜单 `79910-79912`；不创建角色授权，租户包只在已有相应父菜单时继承。
+- Remaining work: 在具备授权会话的环境补做 Admin 与 Workbench 桌面/移动浏览器业务页检查；在修复既有迁移缺口后执行 fresh bootstrap/schema-difference 验证；任何开发或共享数据库执行、真实权限同步和部署仍需单独确认。
+
+## Workstream Registration - 2026-08-26 23:09:59 +08:00
+
+- Workstream ID: `main-partner-permission-and-claim-pool-read`
+- Goal: 修复跟进记录图片预览溢出；为抢单池增加独立只读权限并自动授予销售主管；将兼职主体与下属兼职合并为按归属查看、管理即租户全量的两级权限页面，补齐账号管理并退役转员工。
+- Non-goals: 不执行真实数据库迁移，不修改历史兼职、客资或已转换数据，不新增依赖，不改分支/工作树，不提交、推送、部署或改动无关工作流文件。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS 抢单池和兼职管理 Controller/Service/VO/权限及聚焦测试；Workbench 跟进图片、抢单池只读模式、统一兼职管理页面/API/样式/测试；V149 权限菜单迁移、bootstrap 接线及直接相关 API、权限流、角色矩阵和菜单覆盖文档；本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: 现有 System 菜单/按钮权限、Partner 归属关系、Lead 管理只读投影、React/Ant Design Workbench；无新增 npm 或 Maven 依赖。
+- Integration order: 后端权限与统一兼职查询契约 -> Workbench 图片和页面行为 -> V149 菜单/授权迁移与 bootstrap -> 文档与聚焦测试 -> 全量构建、SQL 静态检查和浏览器验证 -> 交付记录。
+- Verification plan: ZSJOS 抢单池/兼职聚焦测试及模块测试；Workbench 聚焦/全量测试、typecheck、生产构建；桌面与移动浏览器检查；V149 依赖、幂等、非破坏性、授权映射及 bootstrap 顺序检查；scoped `git diff --check`。
+
+## Delivery Entry - 2026-08-26 23:41:42 +08:00
+
+- Workstream ID: `main-partner-permission-and-claim-pool-read`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修复跟进记录图片预览越界；增加抢单池独立查看权限，使销售主管可查看但不因该授权获得抢单能力；将兼职功能合并为查看和管理两级权限，管理包含账号与归属操作，并移除转为员工。
+- Key decisions: 抢单池页面和搜索使用 `zsjos:lead:claim-pool:query`，抢单命令继续独立校验 `zsjos:lead:claim` 及销售资格/限额；兼职统一为 `/zsjos/partner`，`query` 只读取当前归属兼职及其全部历史提交客资，`manage` 读取租户全量并开放新增、启停、手机号、密码、归属和归属历史；退役转换入口和命令但保留历史 `converted` 行；V149 只把同时具备原新增、状态和归属三项权限的角色升级为管理权限。
+- Execution or analysis result: 完成跟进图片缩略图容器裁切和预览视口限制；完成抢单池读写权限拆分及只读 UI；合并兼职主体/下属兼职页面与 API，补齐租户全量管理和当前归属查看范围、所有历史提交客资详情读取、账号操作及状态展示；删除转员工 Controller/Service/VO/UI；新增并接线 V149，更新直接相关 API、权限、角色矩阵、菜单和迁移文档。
+- Changed files: `backend/yudao-module-zsjos` 的 Lead 抢单池、兼职管理/归属、相关客资详情 Controller/Service/Mapper/VO 和测试；`frontend/workbench` 的统一兼职页面、路由/API/权限测试以及跟进图片和兼职页面样式；`script/sql/mysql/migrations/V149__claim_pool_read_and_partner_permissions.sql`、`bootstrap.sql`、迁移 README；直接相关 API、权限流、角色矩阵、菜单覆盖和数据库迁移文档；本 handoff 条目。并行 V148 公告改动和其他既有脏文件未覆盖。
+- Verification evidence: 后端编译通过；抢单池/兼职聚焦测试 23/23 通过；ZSJOS 模块全量测试 621/621 通过；Workbench 聚焦测试 33/33、全量测试 414/414、typecheck 和生产构建通过，构建仅有既有大 chunk 提示；V149 在 bootstrap 中紧跟 V148，固定 ID/权限冲突保护、幂等授权、非破坏业务数据范围和只读/抢单前端分离均经静态检查；scoped `git diff --check` 通过。完整 Maven Reactor 被既有 Infra `CodegenEngineUniappTest.testExecute_treeSearch` 失败阻塞；数据库 `check` 被既有 V106/V108/V118 迁移断号阻塞。浏览器能打开本地登录页，但无授权会话，未完成业务页桌面/移动目视验收。
+- Dependency or integration impact: 无新增 npm/Maven 依赖，无 SQL 或数据库执行，无真实角色/权限变更，无共享服务操作，无分支/工作树操作、提交、推送或发布。受控执行 V149 后会修改菜单和角色菜单授权，但不会修改兼职、客资、账号、归属或历史转换业务行。
+- Remaining work: 在有授权会话的环境补做抢单池只读/抢单账号与兼职 query/manage 账号的桌面和移动浏览器验收；修复既有迁移断号后执行 fresh bootstrap/schema-difference 验证；V149 的开发库/生产库执行和真实权限同步仍需单独确认。
+
+## Delivery Entry - 2026-08-27 00:41:00 +08:00
+
+- Workstream ID: `main-media-screen-provider-ownership`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 完成新媒体客资大屏所需后端契约，并统一 Lead 规范提供方归属，使权限、通知、统计、返现资格和三端展示使用一致语义。
+- Key decisions: `source_*` 继续记录提交来源，新增冻结的 `provider_owner_*` 与贡献员工/部门/主管快照作为提供方事实源；销售自拓仅在明确选择提供方时计入，Partner 历史只消费提交时可证明员工快照；重复客资重新激活不改首次归属和 `counted_at`；`includePartTimers` 同时控制汇总、趋势、14 日序列、今日之星和昨日冠军；实时榜单隐藏停用主体但保留总贡献，历史榜单使用快照日启用状态。
+- Execution or analysis result: 完成 Lead 规范归属解析、首次冻结和相关权限/通知/申诉/投诉/返现/管理投影切换；完成大屏实时聚合、兼职陪跑、今日/昨日排行、v2 历史快照及稳定 ID；Admin、Workbench、H5 在保留“提交人/来源人”的同时新增“提供方”；同步 V141/V143、fresh schema、校验脚本、部署/API/架构文档和本地部门配置；将媒体大屏产品标题修正为“中世健”。已受控在本机 `yudao-mysql/ruoyi-vue-pro` 执行 V141/V143，未重放 V148/V149，48 条 Lead 保持完整。
+- Changed files: `backend/yudao-module-zsjos` 的 Lead 提供方归属、权限、通知、返现、管理、大屏 Controller/VO/Service/DAL/DO 及聚焦测试；`frontend/media-screen` API/适配/Mock/测试/README/标题；Admin、Workbench、H5 的 Lead 类型与详情/列表提供方展示；`backend/yudao-server/src/main/resources/application-local.yaml`；V141/V143、fresh/core schema、bootstrap 校验和迁移说明；媒体大屏 API/部署及权限/所有权架构文档；本 handoff 记录。
+- Verification evidence: 提供方、重复激活和大屏聚焦测试通过，相关聚焦集合 111/111；ZSJOS 生产编译和干净 testCompile 通过；`yudao-server -am -DskipTests package` 全反应堆成功。媒体大屏 11/11、Workbench 414/414，媒体大屏/Workbench/H5 生产构建和 Admin 本次文件 scoped ESLint 均通过；Admin 全量 `ts:check` 仅保留既有无关错误。浏览器在 1440x900、390x844 验证完整 Mock 数据态和 503/未开启态，无横向溢出、文字裁切或控制台错误，实际部门卡为三部门加兼职陪跑四张。开发库核对 Lead 48 条，来源 29 internal_new_media、14 partner、5 sales_self_sourced，14 条旧 Partner 未按当前归属反推，5 条销售自拓无明确提供方，`counted_at` 无空值，v2 快照 0 行且索引/唯一键正确；V141/V143 在临时空库重复执行成功，fresh/core schema SHA-256 一致。最终 `git diff --check` 通过且敏感内容扫描无本次新增秘密。
+- Dependency or integration impact: 无新增 npm/Maven 依赖，无 Lead 删除、角色/权限实态修改、分支/工作树操作、提交、推送或部署。开发库仅执行已确认的 V141/V143；旧 v1 空快照 DDL 已备份到 `C:\Users\EDY\AppData\Local\Temp\zsjos-v141-backup-20260827-0018\zsjos_media_screen_daily_snapshot_pre_v141.sql`。本地验证使用临时数据库 `zsjos_media_verify_20260827` 和 `zv827`，未删除；本地媒体大屏真实后端代理与演示实例分别运行在 `http://127.0.0.1:4174/`、`http://127.0.0.1:4175/`。
+- Remaining work: 仓库原始 fresh bootstrap 在 V102 因 baseline `system_notify_template` 缺少既有 `channel_code` 等字段而失败；临时补齐后可执行至 V147，但并行未提交 V148 使用当前 MySQL 不支持的 `ADD COLUMN IF NOT EXISTS` 再次阻断，V149 按设计拒绝绕过 V148，因此完整 V001-V149 初始化和 schema diff 尚未通过。全反应堆测试在到达 ZSJOS 前被既有 Infra `CodegenEngineUniappTest.testExecute_treeSearch` 单测失败阻断。真实后端未启动，200/400/403、开关两态、历史 available 两态、租户/IP 的真实 HTTP 请求仍需在修复 bootstrap/V148 或可用后端环境中补验。
+
+## Workstream Registration - 2026-08-27 00:00:00 +08:00
+
+- Workstream ID: `main-partner-permission-migration-renumber-v150`
+- Goal: 将未执行的抢单池只读与兼职权限迁移从 V149 机械调整为 V150，为其他开发人员已占用的 V149 留出编号。
+- Non-goals: 不改变迁移业务内容、菜单 ID、权限、授权规则或前置依赖；不执行 SQL、不修改数据库、不触碰并行业务改动、不提交或推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `script/sql/mysql/migrations/V149__claim_pool_read_and_partner_permissions.sql` 的文件名及内部版本标记、`bootstrap.sql`、该迁移的直接文档引用和本 handoff 修正条目。
+- Owner: Codex `/root`
+- Dependencies: V148；其他开发人员后续集成的 V149。当前仓库中尚无 V150 文件或版本标记。
+- Integration order: 注册工作流 -> 重命名迁移并替换内部版本 -> 更新 bootstrap 和正式文档 -> 静态扫描与差异检查 -> 追加交付记录。
+- Verification plan: 确认旧 V149 文件和活动引用消失、V150 文件及双版本表标记一致、bootstrap 在 V148 后引用 V150、V150 无冲突、scoped `git diff --check` 通过。
+
+## Workstream Registration Correction - 2026-08-27 09:32:43 +08:00
+
+- Workstream ID: `main-partner-permission-migration-renumber-v150`
+- Correction: 上一条注册时间误写为 `2026-08-27 00:00:00 +08:00`，实际注册时间为本条时间；依赖应表述为“V148 之后由其他开发人员提供的 V149”，V150 必须等待该 V149 集成后执行。历史条目按追加规则保留，不回写。
+
+## Delivery Entry - 2026-08-27 09:32:43 +08:00
+
+- Workstream ID: `main-partner-permission-migration-renumber-v150`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 将抢单池只读与兼职权限迁移从 V149 调整为 V150，因为 V149 已由其他开发人员占用。
+- Key decisions: 迁移业务内容、菜单 ID、权限和授权规则不变；文件名、过程名、审计 creator/updater、两个版本表标记及 checksum 文件名统一改为 V150；V150 显式要求两个版本表均已有 V149，防止跳过其他开发人员的迁移。
+- Execution or analysis result: 旧 `V149__claim_pool_read_and_partner_permissions.sql` 已重命名为 `V150__claim_pool_read_and_partner_permissions.sql`；bootstrap 和直接相关迁移/权限文档已改为 V150。当前工作树尚无其他开发人员的 V149 文件，未创建占位迁移。
+- Changed files: `script/sql/mysql/migrations/V150__claim_pool_read_and_partner_permissions.sql`、`script/sql/mysql/bootstrap.sql`、`script/sql/mysql/migrations/README.md`、`docs/operations/database-migrations.md`、`docs/architecture/zsjos-role-permission-matrix.md`、`handoff/main.md`。其他并行改动未触碰。
+- Verification evidence: 旧 V149 兼职权限迁移文件不存在；V150 文件名、存储过程、审计值、双版本表版本和 checksum 文件名一致；V150 前置检查要求 V149；活动 SQL/正式文档不再把本迁移声明为 V149；scoped `git diff --check` 和静态引用检查完成。
+- Dependency or integration impact: 无 SQL/数据库执行，无真实权限或业务数据修改，无新增依赖，无分支、提交或推送。bootstrap 当前在 V148 后引用 V150，但仓库尚缺其他开发人员的 V149 文件；V149 合入时必须插入两者之间，之后才能执行完整迁移链。
+- Remaining work: 集成其他开发人员的 V149 文件并将其 bootstrap `SOURCE` 放在 V148 与 V150 之间，再运行连续迁移和 fresh bootstrap 验证。
+
+## Delivery Verification Supplement - 2026-08-27 09:39:39 +08:00
+
+- Workstream ID: `main-partner-permission-migration-renumber-v150`
+- Result: 仓库数据库检查器按预期拒绝当前不连续链，版本清单包含 V148、V150 而缺少尚未合入的 V149；同时仍报告既有 V106/V108/V118 缺口。该结果不改变本次改号结论，但确认在其他开发人员的 V149 集成前不能执行完整 bootstrap。
+## Workstream Registration - 2026-08-27 09:50:54 +08:00
+
+- Workstream ID: `main-v148-v150-partial-execution-repair`
+- Goal: 修复 V148 在当前 MySQL 上的加列语法，并确保 V148/V150 在批处理客户端遇错继续时不会绕过前置校验写入后续结构、菜单、授权或版本标记。
+- Non-goals: 不创建或猜测其他开发人员占用的 V149；不执行 SQL；不删除或改写数据库中的 V148/V150 版本记录；不回退真实菜单、角色授权或业务数据；不新增依赖、不切换分支、不提交、不推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，保留工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `script/sql/mysql/migrations/V148__durable_employee_announcements.sql`、`script/sql/mysql/migrations/V150__claim_pool_read_and_partner_permissions.sql`、`script/sql/mysql/bootstrap.sql`、两份直接相关迁移文档、必要的只读验证脚本及本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: V148 依赖 V147；V150 依赖尚未合入的 V149；不新增 npm、Maven 或数据库依赖。
+- Integration order: V148 单调用与兼容 DDL 修复 -> V150 单调用保护 -> 暂停 bootstrap 自动接入 V150 -> 文档和静态/临时 MySQL 验证。
+- Verification plan: SQL 静态引用和顺序检查；MySQL 8 临时库验证 V148 首次及重复执行、模拟已登记但缺字段的修复；验证 V150 缺 V149 时即使客户端继续执行也无新写入；V149 到位后的 V150 双次幂等执行；`zsjos_db.py check`、`git diff --check` 和 scoped diff 审查。
+
+## Delivery Entry - 2026-08-27 10:15:53 +08:00
+
+- Workstream ID: `main-v148-v150-partial-execution-repair`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修复执行 V148/V150 时出现的 MySQL 语法错误、缺失 V149 前置条件以及批处理客户端报错后继续执行导致的半执行问题。
+- Key decisions: V148/V150 的前置校验与全部有效写入统一封装在单次存储过程调用内；V148 三个字段改用 `information_schema` 守卫的动态 DDL；V150 在真实 V149 合入前从 bootstrap 自动链移除；不创建占位 V149，不删除或改写已登记的 V148/V150，不自动回退权限。
+- Execution or analysis result: 修复 V148 的 MySQL 8.4 不兼容加列语法并支持已登记但缺字段环境的显式幂等补齐；修复两个迁移的 continue-on-error 越过校验风险；bootstrap 不再从 V148 跳到 V150；新增 V148 完整性校验及半执行恢复说明。只读审计确认当前库为 MySQL 8.4.11，双版本表已有 V147/V148/V150 而缺 V149，三个公告生命周期字段缺失，两张公告表和菜单已存在，V150 三个目标菜单状态已写入。
+- Changed files: `script/sql/mysql/migrations/V148__durable_employee_announcements.sql`、`V150__claim_pool_read_and_partner_permissions.sql`、`bootstrap.sql`、迁移 README、`verify-bootstrap.sql`、`docs/operations/database-migrations.md` 与本 handoff 条目。
+- Verification evidence: 两个迁移均只有一个顶层 `CALL` 执行有效逻辑，版本登记位于过程内部；V148 无 `ADD COLUMN IF NOT EXISTS`；bootstrap 无 V150 SOURCE；完整 `verify-bootstrap.sql` 在当前 MySQL 可解析执行，新增 V148 检查按预期返回 FAIL 并准确捕获缺失三字段；仓库检查器仅被既有 V106/V108/V118 断号和尚未合入 V149 阻塞；scoped `git diff --check` 通过。未对当前数据库执行写入，未启动隔离 MySQL，因此修正版 V148/V150 的真实写入与双次幂等执行仍未验证。
+- Dependency or integration impact: 无新增依赖，无数据库写入、删除、权限回退、服务启停、分支/工作树操作、提交或推送。V150 必须等待真实 V149；旧 V150 若在复制授权前已退役来源权限，单纯重跑无法重建历史授权，需依据迁移前导出做另一个受审查的 forward repair。
+- Remaining work: 备份当前开发库后显式执行修正版 V148并确认新增校验 PASS；取得并集成真实 V149 后先审计旧 V150 所有 grant-copy/retire 步骤，再决定直接重跑 V150 或制作基于可靠导出的 forward repair；修复既有 V106/V108/V118 断号后完成 fresh bootstrap/schema diff。
+
+## Workstream Registration - 2026-08-27 09:59:12 +08:00
+
+- Workstream ID: `main-retired-migration-placeholders`
+- Goal: 将已退役且不再需要业务实现的 V106、V108、V118 恢复为仅登记版本元数据的占位迁移，修复迁移文件编号连续性，并阻止 V144 删除其历史版本标记。
+- Non-goals: 不恢复 Student Operations 表、菜单、权限、通知或业务数据；不创建或猜测其他开发人员的 V149；不修改 V148/V150 业务内容；不执行 SQL 或连接数据库；不新增依赖、不切换分支、不提交、不推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: 新增 `script/sql/mysql/migrations/V106__media_review_graduation_closure.sql`、`V108__new_media_supervisor_review_permissions.sql`、`V118__independent_role_permission_boundaries.sql`；仅修改 V144 中删除版本标记的语句、`bootstrap.sql` 中 V103-V119 的对应接线、两份直接相关迁移说明及本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: 依赖现有双版本登记表和 V144 退役清理；与 `main-v148-v150-partial-execution-repair` 串行协调，本工作流不接管或修改 V148/V150 专属内容。
+- Integration order: 登记工作流 -> 新增三个无业务副作用占位迁移 -> 修正 V144 -> 接入 bootstrap -> 同步迁移文档 -> 静态与仓库检查 -> 追加交付记录。
+- Verification plan: 检查迁移文件版本连续性；确认占位脚本仅对两个版本登记表执行缺失时插入；确认 V144 不再删除 V106/V108/V118 标记；确认 bootstrap 各引用一次且顺序正确；运行 `python script/sql/mysql/tools/zsjos_db.py check` 和 scoped `git diff --check`，不执行真实数据库。
+
+## Workstream Registration - 2026-08-27 10:20:03 +08:00
+
+- Workstream ID: `main-v150-independent-of-v149`
+- Goal: 使 V150 抢单池只读与兼职权限迁移无需 V149 版本标记即可独立执行，并在 fresh bootstrap 中于 V148 后接入。
+- Non-goals: 不创建、猜测、改写或跳号替代其他开发人员的 V149；不改变 V150 的菜单 ID、权限迁移、角色授权规则或业务数据范围；不执行 SQL、不连接数据库、不回退当前库可能已有的 V150 状态；不新增依赖、不切换分支、不提交、不推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `script/sql/mysql/migrations/V150__claim_pool_read_and_partner_permissions.sql` 的依赖注释和 V149 前置校验、`bootstrap.sql` 的 V150 接线、两份直接相关迁移文档及本 handoff 条目。
+- Owner: Codex `/root`
+- Dependencies: V150 实际依赖 V143 Partner 归属基础、System 菜单 6749/6852、角色菜单和租户包结构；保留已完成的 `main-v148-v150-partial-execution-repair` 单过程事务边界。
+- Integration order: 登记工作流 -> 删除 V149 版本门槛 -> 在 V148 后接入 V150 -> 同步迁移文档 -> 静态依赖、事务边界、顺序与差异验证 -> 追加交付记录。
+- Verification plan: 确认 V150 活动 SQL 不再引用 V149；确认 V150 仍只有一个顶层 CALL 且全部写入位于过程内；确认 bootstrap 在 V148 后恰好引用一次 V150；运行迁移清单检查并确认唯一文件缺口仍为外部 V149；运行 scoped `git diff --check`，不执行真实数据库。
+
+## Workstream Registration Scope Correction - 2026-08-27 10:31:00 +08:00
+
+- Workstream ID: `main-v150-independent-of-v149`
+- Correction: Ownership scope 增加 `script/sql/mysql/verify-bootstrap.sql` 的 V150 最终态检查及两条被 V150 取代的旧断言；原因是 fresh bootstrap 接入 V150 后，旧检查仍要求抢单池页面权限为空并要求已退役兼职按钮存在，会产生确定性误报。其余范围不变，历史注册条目按追加规则保留。
+
+## Delivery Entry - 2026-08-27 10:31:00 +08:00
+
+- Workstream ID: `main-retired-migration-placeholders`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修复缺失的 V106、V108、V118 迁移编号，同时确认这些已退役业务不需要恢复且空生产环境可按受控顺序初始化。
+- Key decisions: 三个版本恢复为仅在缺失时写入双版本登记表的元数据占位，不创建任何 Student Operations 表、菜单、权限、通知或业务数据；V144 继续清理退役业务对象但永久保留三个版本标记；不扩展到其他已由 fresh baseline 折叠的迁移策略。
+- Execution or analysis result: 新增 V106/V108/V118 占位文件并接入 bootstrap；删除 V144 对三个版本标记的清理；新增 bootstrap 只读标记校验并同步迁移与运维说明。迁移文件清单从原来的四个缺口收敛为仅缺外部 V149。
+- Changed files: `script/sql/mysql/migrations/V106__media_review_graduation_closure.sql`、`V108__new_media_supervisor_review_permissions.sql`、`V118__independent_role_permission_boundaries.sql`、`V144__remove_new_media_student_operations.sql`、`script/sql/mysql/bootstrap.sql`、`verify-bootstrap.sql`、迁移 README、`docs/operations/database-migrations.md` 与本 handoff 条目。
+- Verification evidence: 三个占位文件静态扫描仅引用 `zsjos_schema_version` 与 `zsjos_module_schema_version`，各执行两条缺失时 INSERT，未包含业务 DDL/DML；bootstrap 对 V106/V108/V118 各引用一次且相对顺序正确；V144 不再删除标记；迁移清单为 V001-V150 且唯一缺口 V149；scoped `git diff --check` 通过。`zsjos_db.py check` 不再报告 V106/V108/V118，仅因外部 V149 缺失按设计失败。
+- Dependency or integration impact: 无新增依赖，无数据库执行或外部状态变化，无业务功能恢复，无分支、提交或推送。V144 仍是破坏性退役清理，生产执行仍需按既有备份流程；三个占位本身无业务回滚内容。
+- Remaining work: 合入其他开发人员的真实 V149 后运行完整 `zsjos_db.py check`、fresh bootstrap、只读 verifier 和 schema-difference 验证；本次未执行任何真实或临时数据库。
+
+## Delivery Entry - 2026-08-27 10:31:00 +08:00
+
+- Workstream ID: `main-v150-independent-of-v149`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 使 V150 无需 V149 即可执行。
+- Key decisions: V150 的版本前置改为其真实基础 V143 在双版本表均存在；不读取 V149 文件或版本标记；保留单次存储过程调用、事务回滚、基础菜单存在性和固定 ID/权限冲突保护；fresh bootstrap 在 V148 后直接执行 V150。
+- Execution or analysis result: 删除 V149 前置门槛并接回 bootstrap；迁移与运维文档明确区分 V150 独立执行能力和仓库仍等待真实 V149 文件的编号连续性；更新只读验证为 V150 最终菜单/权限状态、双版本标记及销售主管有查看且无抢单权限。
+- Changed files: `script/sql/mysql/migrations/V150__claim_pool_read_and_partner_permissions.sql`、`script/sql/mysql/bootstrap.sql`、`script/sql/mysql/verify-bootstrap.sql`、`script/sql/mysql/migrations/README.md`、`docs/operations/database-migrations.md` 与本 handoff 条目。
+- Verification evidence: V150 可执行 SQL 无 V149 查询或校验，V143 在两个版本登记表的检查均存在，且仅有一个顶层 `CALL zsjos_v150_apply()`；bootstrap 在 V148 后恰好引用一次 V150；旧 verifier 的抢单池空权限和兼职细粒度按钮断言已替换为最终态；fresh seed 核对销售主管角色未持有抢单按钮；无陈旧 V149 前置文档声明；scoped `git diff --check` 通过。完整 `zsjos_db.py check` 仅因尚未合入 V149 文件失败。
+- Dependency or integration impact: V150 可在 V149 缺失时直接或通过 fresh bootstrap 执行，但标准迁移文件清单在真实 V149 合入前仍不连续。无数据库写入、真实角色权限变更、依赖、服务、分支、提交或推送操作。
+- Remaining work: 合入真实 V149 后完成完整迁移清单检查；在获准的隔离空库执行 fresh bootstrap、`verify-bootstrap.sql` 和 V150 双次幂等验证。对已发生旧 V150 半执行的开发库仍需先按现有 handoff 审计授权复制与退役步骤，不能仅凭新前置策略判断可直接重跑。
+
+## Workstream Registration - 2026-08-27 10:50:36 +08:00
+
+- Workstream ID: `main-xss-cleaner-disabled-startup`
+- Goal: 修复 `yudao.xss.enable=false` 时公告服务无可注入 `XssCleaner` 导致应用启动失败，同时保持全局 XSS Filter 与 Jackson 清理关闭。
+- Non-goals: 不开启全局 XSS 请求过滤；不改变公告生命周期、富文本清理规则或接口；不修改运行配置、不新增依赖、不执行数据库、不切换分支、不提交、不推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-framework/yudao-spring-boot-starter-web` 的 XSS 自动配置与聚焦条件测试，以及本 handoff 条目；不修改当前并行公告服务实现。
+- Owner: Codex `/root`
+- Dependencies: 现有 `JsoupXssCleaner`、Spring Boot 自动配置条件和 Web starter 测试依赖；无新增 Maven 依赖。
+- Integration order: 登记工作流 -> 拆分 Cleaner 与全局拦截条件 -> 增加 enable true/false 自动配置测试 -> Web starter 与 System 公告测试 -> 应用启动验证 -> 交付记录。
+- Verification plan: 禁用 XSS 时断言存在一个 `XssCleaner` 且不存在 Filter/Jackson customizer；启用时断言三者均存在；运行 Web starter 聚焦测试、System 公告聚焦测试、相关模块编译和应用启动，最后执行 scoped `git diff --check`。
+
+## Delivery Entry - 2026-08-27 11:03:13 +08:00
+
+- Workstream ID: `main-xss-cleaner-disabled-startup`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修复应用启动时公告服务无法注入 `XssCleaner` 的失败。
+- Key decisions: `XssCleaner` 是可由业务主动调用的清理工具，不与全局请求 XSS 开关绑定；`yudao.xss.enable=false` 仍禁止 Jackson 字符串清理和 Servlet XSS Filter；不通过开启全局开关规避问题，也不在公告服务中私自实例化 Cleaner。
+- Execution or analysis result: 移除 XSS 自动配置类级开关，使默认 `JsoupXssCleaner` Bean 始终可用；为 XSS Filter 增加独立 `enable=true` 条件，Jackson customizer 保留原条件；新增启用/禁用两态自动配置测试。
+- Changed files: `backend/yudao-framework/yudao-spring-boot-starter-web/src/main/java/cn/iocoder/yudao/framework/xss/config/YudaoXssAutoConfiguration.java`、对应 `YudaoXssAutoConfigurationTest.java` 与本 handoff 条目。
+- Verification evidence: 新自动配置聚焦测试 2/2 通过；Web starter 全量 10/10 通过；System 公告服务测试 7/7 通过且依赖 reactor 18/18 成功；`yudao-server -am -DskipTests package` 28/28 模块成功并生成生产 JAR；scoped `git diff --check` 通过。第一次 System 测试命令因 PowerShell 未引用 Maven 属性而在构建前失败，修正参数引用后同一测试通过。
+- Dependency or integration impact: 无新增 Maven 依赖，无配置变化；全局 XSS 关闭语义保持不变，但业务组件在关闭状态下也可注入并主动调用 `XssCleaner`。无数据库、服务、分支、提交或推送操作。
+- Remaining work: 根据仓库外部状态规则，尚未实际启动或重启服务；获得单独授权后可使用当前 local 配置做启动验收并确认原 Bean 缺失错误消失。
+
+## Delivery Entry - 2026-08-27 11:37:41 +08:00
+
+- Workstream ID: `main-workbench-role-layout-merge`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `86381d5a0a6119594ef7eefa0a010b38d6ded5f0`（未创建提交）。
+- User goal: 修复新增“未编排”拖出能力后，右侧导航树无法调整目录顺序的交互回归。
+- Key decisions: 右侧导航树统一由现有 `vuedraggable`/Sortable 管理拖拽；通过其 `start` 事件记录角色节点键供左侧“未编排”接收，不再在同一手柄上启用竞争的原生 HTML draggable；保留全局目录锁定、固定“未分类”及既有层级深度限制。
+- Execution or analysis result: 移除右侧拖拽手柄的原生 dragstart 接管，改为从 Sortable 开始事件读取节点键；树内目录/页面排序和拖出到“未编排”现在共用单一拖拽生命周期，避免原生事件抢占排序手势。
+- Changed files: `frontend/admin/src/views/system/workbenchLayout/WorkbenchLayoutTree.vue` 与本 handoff 条目。
+- Verification evidence: 目标组件 ESLint 通过；目标组件 Prettier 检查通过；Admin `pnpm build:local` 通过，仅有既有 lightningcss `*zoom` 警告；全量 `pnpm ts:check` 未通过，但输出仅为既有 BPM、DocAlert、CRM、EAM、MES、System User 和 exportTask 无关错误，本次 Workbench layout 文件无类型错误；浏览器访问 `http://localhost/system/workbench-layout` 只显示员工工作平台 Logo，未进入 Admin 编辑器，无法完成真实拖拽验收；scoped `git diff --check` 通过，仅有行尾转换警告。
+- Dependency or integration impact: 无新增依赖，无后端、数据库、SQL、Admin 菜单、角色授权或外部状态修改，无服务启停、分支/工作树操作、提交或推送。
+- Remaining work: 在可访问 Admin 布局编辑器且具备有效登录态的环境补做右侧同级排序、跨目录移动、目录拖到左侧“未编排”及拖回右侧的真实浏览器验收。

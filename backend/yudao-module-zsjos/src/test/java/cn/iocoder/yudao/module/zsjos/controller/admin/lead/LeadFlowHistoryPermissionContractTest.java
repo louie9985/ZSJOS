@@ -10,13 +10,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class LeadFlowHistoryPermissionContractTest {
 
     @Test
-    void endpointRequiresFeaturePermissionAndServiceRequiresLeadObjectRead() throws Exception {
+    void endpointAllowsPartnerReadAndServiceRequiresLeadObjectRead() throws Exception {
         PreAuthorize feature = LeadManagementController.class.getMethod("getFlowHistory", Long.class)
                 .getAnnotation(PreAuthorize.class);
         ZsjosPermission object = LeadFlowHistoryService.class.getMethod("getHistory", Long.class)
                 .getAnnotation(ZsjosPermission.class);
 
-        assertEquals("@ss.hasPermission('zsjos:lead-detail:flow-read')", feature.value());
+        assertEquals("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage')",
+                feature.value());
         assertEquals("lead", object.bizType());
         assertEquals("#leadId", object.bizId());
         assertEquals("flow-read", object.action());

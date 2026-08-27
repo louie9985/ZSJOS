@@ -14,7 +14,14 @@ public interface NoticeMapper extends BaseMapperX<NoticeDO> {
         return selectPage(reqVO, new LambdaQueryWrapperX<NoticeDO>()
                 .likeIfPresent(NoticeDO::getTitle, reqVO.getTitle())
                 .eqIfPresent(NoticeDO::getStatus, reqVO.getStatus())
+                .eqIfPresent(NoticeDO::getPublishStatus, reqVO.getPublishStatus())
                 .orderByDesc(NoticeDO::getId));
+    }
+
+    default PageResult<NoticeDO> selectPublishedPage(cn.iocoder.yudao.framework.common.pojo.PageParam reqVO) {
+        return selectPage(reqVO, new LambdaQueryWrapperX<NoticeDO>()
+                .eq(NoticeDO::getPublishStatus, "PUBLISHED")
+                .orderByDesc(NoticeDO::getPublishTime).orderByDesc(NoticeDO::getId));
     }
 
 }

@@ -18,12 +18,17 @@ import java.time.LocalDate;
 public class MediaScreenDailySnapshotDO extends TenantBaseDO {
     @TableId private Long id;
     private LocalDate snapshotDate;
+    private String contributionType;
+    private Long departmentId;
     private Long supervisorId;
+    private String supervisorName;
     private String departmentName;
     private Long memberId;
     private String memberName;
-    private Integer submittedCount;
-    private Integer validCount;
-    private Integer partTimeSubmittedCount;
-    private Integer partTimeValidCount;
+    private Boolean memberEnabled;
+    private Integer todayCount;
+    private Integer weekCount;
+    private Integer monthTotal;
+    private Integer monthEffective;
+    private String partnerDetailsJson;
 }

@@ -161,10 +161,10 @@ Rules:
 - System-owned source menus preserve page names, icons, paths, components, visibility ceilings, route identity, and authorization semantics. Published Workbench layouts own only navigation grouping, ordering, and navigation visibility.
 - Relative child paths are resolved against their parent. Administrator menu paths are not replaced by demo routes.
 - Without a published global layout, Workbench navigation preserves the original recursive menu hierarchy. After publication, every desktop layout and the mobile drawer consume the same `workbenchMenus` projection.
-- A role override applies to the employee's complete authorized page union, not only pages granted by that role. When multiple enabled role overrides apply, the lowest unique tenant priority wins; authorization still uses the union of all enabled roles.
+- A role override is edited from that role's current directly authorized, enabled, source-visible Workbench pages. Its editor includes only the global directory chains that contain at least one such page; empty unrelated global directories are not configurable. At runtime, all enabled role overrides applicable to an employee are merged page by page over the global layout; a page appearing in multiple role layouts uses the lowest unique tenant priority, while pages supplied by other roles retain their global placement.
 - Layout groups have stable independent keys. Pages retain the original `sourceMenuId`, occur at most once, and keep their resolved public URL even when moved to another level. Up to three group levels are allowed, so a page may appear at the fourth rendered level.
 - The fixed top-level `未分类` group receives newly authorized pages that are absent from the published snapshot and is omitted at runtime when empty. Ordinary empty groups, invalid references, duplicate pages, cycles, and over-depth trees block publication.
-- Navigation hiding does not revoke route access. A role may restore a page hidden only by the global layout, while a disabled, source-hidden, or `admin_only` System menu remains unavailable regardless of the layout.
+- Navigation hiding does not revoke route access. In a role layout, pages or ordinary directories may be moved to the unarranged area; an unarranged directory hides only the directly authorized descendant pages governed by that role layout and can be restored with its original hierarchy. The fixed `未分类` group remains arranged. A role may restore a page hidden only by the global layout, while a disabled, source-hidden, or `admin_only` System menu remains unavailable regardless of the layout.
 - Role names are not used to manufacture menus or grant access.
 - Backend component names are metadata only. React renders an explicitly registered local page or a safe placeholder.
 - The 36 active ZSJOS-facing page menus have matching React Workbench and Vue Admin renderers; the auditable mapping is maintained in `docs/frontend/zsjos-menu-coverage.md`. Both clients preserve the server path and permission identity instead of maintaining aliases or a duplicate menu tree.
@@ -178,8 +178,9 @@ Rules:
 Vue Admin owns `/system/workbench-layout/**` and the Admin-only page
 `/system/workbench-layout`. Query, draft update/history restore, and publication are separated
 as `system:workbench-layout:query`, `system:workbench-layout:update`, and
-`system:workbench-layout:publish`. Candidate pages come from the current tenant package rather
-than the configuring administrator's business-page grants. Global and individual role scopes
+`system:workbench-layout:publish`. Global candidate pages come from the current tenant package;
+role draft candidates come from the selected role's current menu grants rather than the configuring
+administrator's business-page grants. Global and individual role scopes
 publish independently; a role cannot publish before the global layout. Draft saves use
 `draftRevision` optimistic locking, publish remarks are required, and historical versions can
 only be restored as a new draft. No layout is pre-published by database initialization.
@@ -192,6 +193,14 @@ Workbench lazy loading uses the additive `/system/notify-message/my-cursor` cont
 `list`, `nextCursor`, and `hasMore`, with server ordering `create_time DESC, id DESC`; the legacy
 page contract remains for compatibility.
 WebSocket events are refresh hints, while the persisted message page remains authoritative.
+
+### Durable employee announcements (V148)
+
+- System owns announcement drafts, lifecycle, attachment snapshots and per-ADMIN-user read records. Existing `system_notice` rows remain `DRAFT` after the upgrade and are never exposed implicitly.
+- Vue Admin uses the existing System notice page for draft editing, attachment upload, publishing, taking offline and copying to a new draft. Published content is immutable; corrections require taking the announcement offline and copying it.
+- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Its permanent header entry, unread bar and `/zsjos/announcements` center are enabled only when the server permission response contains that permission. The direct child menu persists the relative path `announcements` under `/zsjos`.
+- `system_notice_read` is unique by tenant, notice and ADMIN user. Reconnects and offline sessions therefore preserve unread truth. The `notice-published` WebSocket event carries only an invalidation hint; clients always refresh the unread summary API.
+- Announcement body HTML is cleaned by the backend XSS cleaner before persistence and defensively sanitized again in Workbench. Attachments store the Infra file ID plus name, MIME type, size and sort snapshots; download URLs are short-lived and never persisted. Missing Infra files retain their snapshot metadata and render as unavailable.
 
 The partner H5 exposes persisted personal messages through `/part-api/zsjos/messages/**`. The Controller validates the Partner context and supplies the Partner Account ID with `user_type=PARTNER` to every page, detail, read, and unread-count service call. Notification idempotency includes `user_type`, so equal ADMIN and PARTNER numeric IDs cannot collide. External notification channels consume the same typed identity: System dispatches ADMIN and MEMBER through their established APIs, while a module-owned mobile Provider resolves PARTNER only after both account and subject state checks. The SMS log retains the original PARTNER type and never interprets a Partner Account ID as an ADMIN ID.
 
@@ -508,12 +517,18 @@ The independent `zsjos:subordinate-sales:pause-all` command resolves that same l
 
 Partner ownership is an explicit ZSJOS relationship because Partner is an independent `PARTNER`
 subject and has no System department or post. One Partner has at most one current employee owner; an
-employee may own multiple Partners. `zsjos:subordinate-partner:query` is both the assignment-candidate
-qualification and employee read feature, while every list/detail request also checks the live
-tenant-scoped relationship. Permission/account loss disables access without deleting the relationship.
-Reassignment moves all historical/future Partner Lead visibility to the new employee, but each new
-Partner Lead snapshots the configured employee ID and name at submission time. Historical null
-snapshots remain `未记录` and are never inferred from the current relationship.
+employee may own multiple Partners. `zsjos:partner:query` grants the consolidated Partner page but
+ordinary readers still see only Partners currently assigned to them. `zsjos:partner:manage` grants the
+same page with tenant-wide Partner scope and the create, enable/disable, mobile, password and ownership
+commands. Every Partner and Partner-Lead detail request independently checks that scope. Reassignment
+moves all historical and future Partner Lead visibility to the new employee, while each new Partner Lead
+continues to snapshot the configured employee ID and name at submission time. Historical null snapshots
+remain `未记录` and are never inferred from the current relationship. The former subordinate-Partner
+permission and separate page are retired; their endpoints remain temporary rolling-release aliases.
+
+The claim-pool page uses `zsjos:lead:claim-pool:query`, independently of the
+`zsjos:lead:claim` command. Read-only users can list and search tenant claim-pool records but cannot
+claim; claim execution still requires sales qualification, daily-limit and atomic object checks.
 
 Supervisor Lead commands use five independent `zsjos:subordinate-sales:lead-*` button permissions and
 the same live department-leader scope. Submitted or suspended Leads release to the claim pool; valid
@@ -603,6 +618,22 @@ submissions through current account visibility and positioning-card object read 
 stable field keys onto the current published template. Historical dictionary labels remain snapshot values;
 removed, type-incompatible, or dictionary-type-changed fields are not copied. Import creates or version-overwrites
 only the target account's editable draft and never mutates a source submission or the positioning lifecycle.
+## Lead provider attribution
+
+Lead keeps two independent fact groups. `source_*`, `partner_id` and the existing submission fields preserve who
+submitted the record and how it entered the system for display, traceability and old-client compatibility.
+`provider_owner_*`, contribution employee/department/supervisor snapshots and `counted_at` freeze the canonical
+provider and performance attribution when the Lead first becomes countable. Provider permissions, provider
+notifications, cashback eligibility and media-screen statistics consume the canonical fields and do not fall
+back to current organization or Partner ownership.
+
+New-media operators and eligible managers freeze themselves as System providers. Sales self-sourced submissions
+freeze a System provider only when one was explicitly selected; an unselected provider remains `null`. Partner
+submissions freeze the Partner as provider and copy an employee contribution only when a submission-time ownership
+record exists. Duplicate reactivation preserves the original canonical attribution and `counted_at`. Current
+Partner ownership grants the employee read scope only; it does not rewrite history, send provider notifications,
+or authorize proxy commands.
+
 # Public media-screen access
 
 `/public-api/zsjos/media-screen/**` is a narrowly scoped exception to login-token authentication.

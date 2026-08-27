@@ -142,6 +142,102 @@ class WorkbenchLayoutResolverTest {
                 .usingRecursiveComparison().isEqualTo(global.getNodes());
     }
 
+    @Test
+    void shouldKeepOnlyDirectlyAuthorizedPagesInRoleSnapshot() {
+        MenuDO first = menu(71L, 0L, 2, "页面一", "/one", "native", true);
+        MenuDO second = menu(72L, 0L, 2, "页面二", "/two", "native", true);
+        WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(List.of(first, second));
+
+        WorkbenchLayoutSnapshot role = resolver.createInitialRoleSnapshot(global, List.of(first));
+
+        assertThat(role.getSchemaVersion()).isEqualTo(SCHEMA_VERSION);
+        assertThat(flattenSnapshotMenuIds(role.getNodes())).containsExactly(71L);
+    }
+
+    @Test
+    void shouldOmitGlobalDirectoryWithoutAnyAuthorizedRolePage() {
+        MenuDO firstDir = menu(73L, 0L, 1, "目录一", "/one", "native", true);
+        MenuDO firstPage = menu(74L, 73L, 2, "页面一", "page", "native", true);
+        MenuDO secondDir = menu(75L, 0L, 1, "目录二", "/two", "native", true);
+        MenuDO secondPage = menu(76L, 75L, 2, "页面二", "page", "native", true);
+        WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(
+                List.of(firstDir, firstPage, secondDir, secondPage));
+
+        WorkbenchLayoutSnapshot role = resolver.createInitialRoleSnapshot(global,
+                List.of(firstDir, firstPage));
+
+        assertThat(findNode(role.getNodes(), "source-group-73")).isNotNull();
+        assertThat(findNode(role.getNodes(), "source-group-75")).isNull();
+        assertThat(flattenSnapshotMenuIds(role.getNodes())).containsExactly(74L);
+    }
+
+    @Test
+    void shouldPersistUnarrangedDirectoryAndHideOnlyItsRolePages() {
+        MenuDO directory = menu(77L, 0L, 1, "目录", "/directory", "native", true);
+        MenuDO first = menu(78L, 77L, 2, "页面一", "one", "native", true);
+        MenuDO second = menu(79L, 77L, 2, "页面二", "two", "native", true);
+        WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(List.of(directory, first, second));
+        WorkbenchLayoutSnapshot role = resolver.createInitialRoleSnapshot(global, List.of(directory, first));
+        role.setEnabled(true);
+        role.setPriority(1);
+        findNode(role.getNodes(), "source-group-77").setHidden(true);
+
+        WorkbenchLayoutSnapshot normalized = resolver.normalizeRoleDraft(global, role, List.of(directory, first));
+        WorkbenchLayoutSnapshot merged = resolver.mergeRoleSnapshots(global, List.of(normalized));
+        WorkbenchLayoutResolver.RenderResult rendered = resolver.render(merged, List.of(directory, first, second));
+
+        assertThat(findNode(normalized.getNodes(), "source-group-77").getHidden()).isTrue();
+        assertThat(flattenMenuIds(rendered.getMenus())).containsExactly(79L);
+        assertThat(rendered.getFilteredItems()).anySatisfy(item -> {
+            assertThat(item.getSourceMenuId()).isEqualTo(78L);
+            assertThat(item.getReason()).isEqualTo("NAVIGATION_HIDDEN");
+        });
+    }
+
+    @Test
+    void shouldMergeDifferentRolePagesAndUsePriorityOrderForOverlap() {
+        MenuDO first = menu(81L, 0L, 2, "页面一", "/one", "native", true);
+        MenuDO second = menu(82L, 0L, 2, "页面二", "/two", "native", true);
+        WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(List.of(first, second));
+
+        WorkbenchLayoutSnapshot firstRole = resolver.createInitialRoleSnapshot(global, List.of(first));
+        firstRole.setEnabled(true);
+        firstRole.setPriority(1);
+        findByMenuId(firstRole.getNodes(), 81L).setHidden(false);
+
+        WorkbenchLayoutSnapshot secondRole = resolver.createInitialRoleSnapshot(global, List.of(first, second));
+        secondRole.setEnabled(true);
+        secondRole.setPriority(2);
+        findByMenuId(secondRole.getNodes(), 81L).setHidden(true);
+        findByMenuId(secondRole.getNodes(), 82L).setHidden(true);
+
+        WorkbenchLayoutSnapshot merged = resolver.mergeRoleSnapshots(global, List.of(firstRole, secondRole));
+        WorkbenchLayoutResolver.RenderResult rendered = resolver.render(merged, List.of(first, second));
+
+        assertThat(flattenMenuIds(rendered.getMenus())).containsExactly(81L);
+        assertThat(rendered.getFilteredItems()).anySatisfy(item -> {
+            assertThat(item.getSourceMenuId()).isEqualTo(82L);
+            assertThat(item.getReason()).isEqualTo("NAVIGATION_HIDDEN");
+        });
+    }
+
+    @Test
+    void shouldRejectCrossRolePageAndLockedGlobalGroupMutation() {
+        MenuDO first = menu(91L, 0L, 2, "页面一", "/one", "native", true);
+        MenuDO second = menu(92L, 0L, 2, "页面二", "/two", "native", true);
+        WorkbenchLayoutSnapshot global = resolver.createInitialGlobalSnapshot(List.of(first, second));
+        WorkbenchLayoutSnapshot submitted = WorkbenchLayoutSnapshot.builder().scopeType("ROLE")
+                .enabled(true).priority(1).nodes(copyNodes(global.getNodes())).build();
+
+        assertThatThrownBy(() -> resolver.normalizeRoleDraft(global, submitted, List.of(first)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("未授权页面");
+
+        WorkbenchLayoutSnapshot valid = resolver.createInitialRoleSnapshot(global, List.of(first));
+        findNode(valid.getNodes(), UNCLASSIFIED_KEY).setHidden(true);
+        assertThatThrownBy(() -> resolver.normalizeRoleDraft(global, valid, List.of(first)))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("未分类");
+    }
+
     private MenuDO menu(Long id, Long parentId, int type, String name, String path,
                         String renderMode, boolean visible) {
         return new MenuDO().setId(id).setParentId(parentId).setType(type).setName(name).setPath(path)
@@ -171,6 +267,24 @@ class WorkbenchLayoutResolverTest {
             if (child != null) return child;
         }
         return null;
+    }
+
+    private WorkbenchLayoutSnapshot.Node findNode(List<WorkbenchLayoutSnapshot.Node> nodes, String key) {
+        for (WorkbenchLayoutSnapshot.Node node : nodes) {
+            if (key.equals(node.getKey())) return node;
+            WorkbenchLayoutSnapshot.Node child = findNode(node.getChildren(), key);
+            if (child != null) return child;
+        }
+        return null;
+    }
+
+    private List<Long> flattenSnapshotMenuIds(List<WorkbenchLayoutSnapshot.Node> nodes) {
+        List<Long> ids = new ArrayList<>();
+        for (WorkbenchLayoutSnapshot.Node node : nodes) {
+            if (node.getSourceMenuId() != null) ids.add(node.getSourceMenuId());
+            ids.addAll(flattenSnapshotMenuIds(node.getChildren()));
+        }
+        return ids;
     }
 
     private WorkbenchLayoutSnapshot.Node removeByMenuId(List<WorkbenchLayoutSnapshot.Node> nodes, Long menuId) {

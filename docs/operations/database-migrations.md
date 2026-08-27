@@ -489,12 +489,19 @@ positioning, command, account, or other business row. Its single stored-procedur
 all repair statements succeed. Run `verify-bootstrap.sql` afterward and require the V139, V140, V141, and V142
 checks to pass. Recovery is forward-only; do not drop idempotency or positioning schema after runtime use.
 
+## V106, V108 and V118 retired migration placeholders
+
+V106, V108 and V118 are retained as metadata-only placeholders because their Student Operations business
+capabilities are retired while migration numbering must remain continuous. Each file inserts a missing row
+into both version registries and preserves an existing row unchanged. Applying them does not create tables,
+menus, permissions, notification configuration or business data.
+
 ## V144 new-media Student Operations retirement
 
 V144 permanently removes the retired new-media exception-ticket, cooperation-assessment and graduation
 domains. It deletes graduation notification messages/rules/templates and business events first, then
 Student Operations grants and menu/button definitions, then drops the three business tables. It also
-removes obsolete V106/V108/V118 migration markers before recording V144. Student-contact extension
+preserves the V106/V108/V118 retired migration markers before recording V144. Student-contact extension
 approval (`zsjos_student_contact_extension`) is a separate business capability and is not touched.
 
 Before execution, retain a verified full database backup and confirm there are no active or historical
@@ -522,3 +529,28 @@ the read-only checks in `script/sql/mysql/verify-bootstrap.sql`. Afterward verif
 business-type index, binary idempotency keys, four forms/settings per enabled tenant, five dictionary
 values, menu/package coverage, notification defaults, and both version markers. Rollback is
 forward-only; retain feedback history, snapshots, surveys and notification messages.
+### V150 claim-pool and Partner permissions
+
+`V150__claim_pool_read_and_partner_permissions.sql` depends on V143, does not require V149, and changes only
+menu metadata and role-menu grants. It preserves existing claim-pool readers, grants the read-only page to enabled sales
+manager roles, consolidates Partner query/manage permissions, and retires the old Partner action and
+subordinate-page permissions after compatibility grants are copied. It does not modify Partner, Lead,
+account, ownership or historical converted records. Review the generated grant audit before controlled
+execution; rollback requires a forward permission migration.
+
+V148 and V150 use a single stored-procedure call as the failure boundary. This is required because GUI
+statement-batch clients may report a failed `CALL` and still execute later top-level statements. V148 uses
+`information_schema`-guarded dynamic DDL for its three `system_notice` lifecycle columns; do not replace it
+with `ADD COLUMN IF NOT EXISTS`. If the former V148 was partially executed, retain its additive tables,
+menus, and both version markers, take a backup, and explicitly rerun the corrected V148 file. Verify
+`publish_status`, `publish_time`, `offline_time`, both notice child tables, menu IDs `79910-79912`, and both
+V148 registry rows. A version-aware runner may otherwise skip the repair.
+
+V150 is sourced by `bootstrap.sql` after V148 and independently verifies V143 in both version registries;
+the separately owned V149 file and version rows are not prerequisites. If a continue-on-error client already
+wrote V150 state during a former partial run, retain both registry rows and existing permission history, then
+audit menu IDs `6749`, `6852`, `79920`, affected role-menu grants, tenant packages, and both V150 registry rows
+before deciding whether an idempotent rerun is sufficient. If an old permission was retired before its grants
+were copied, a rerun cannot infer those former grants; restore them only through a separately reviewed forward
+repair backed by the pre-migration export. Any destructive cleanup or permission rollback remains a separately
+reviewed operation.

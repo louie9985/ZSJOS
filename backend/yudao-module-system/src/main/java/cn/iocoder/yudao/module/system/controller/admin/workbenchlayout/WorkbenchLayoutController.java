@@ -27,7 +27,7 @@ public class WorkbenchLayoutController {
     private WorkbenchLayoutService workbenchLayoutService;
 
     @GetMapping("/candidates")
-    @Operation(summary = "获得租户套餐内的候选页面和角色")
+    @Operation(summary = "获得全局候选页面和租户角色；角色候选页面随草稿接口返回")
     @PreAuthorize("@ss.hasPermission('system:workbench-layout:query')")
     public CommonResult<WorkbenchLayoutCandidateRespVO> getCandidates() {
         return success(workbenchLayoutService.getCandidates());

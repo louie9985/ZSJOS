@@ -742,6 +742,11 @@ class LeadManagementServiceImplTest {
         lead.setSubmittedName("测试客户");
         lead.setSubmittedMobile("13800138000");
         lead.setSourceUserId(sourceUserId);
+        if (sourceUserId != null) {
+            lead.setProviderOwnerType("system_user");
+            lead.setProviderOwnerId(sourceUserId);
+            lead.setProviderOwnerNameSnapshot("用户" + sourceUserId);
+        }
         lead.setOwnerUserId(ownerUserId);
         return lead;
     }

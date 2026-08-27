@@ -33,8 +33,8 @@
 | `POST /zsjos/lead/dispatch-status/heartbeat` | `zsjos:lead:accept`；仅启用销售专员进入轮询池 |
 | `PUT /zsjos/lead/dispatch-status/mode` | `zsjos:lead:accept`；请求体为 `{ "accepting": true|false }` |
 | `POST /zsjos/lead/dispatch-status/offline` | `zsjos:lead:accept`；正常退出时尽力移出轮询池 |
-| `GET /zsjos/lead/claim-pool/page` | `zsjos:lead:claim` + 启用销售专员校验 |
-| `POST /zsjos/lead/claim-pool/search-page` | 与抢单池相同固定范围；组合关键词和受控高级条件树 |
+| `GET /zsjos/lead/claim-pool/page` | `zsjos:lead:claim-pool:query`；租户抢单池只读视图 |
+| `POST /zsjos/lead/claim-pool/search-page` | `zsjos:lead:claim-pool:query`；相同固定范围内组合关键词和受控高级条件树 |
 
 Ordinary submission identity and dispatch restrictions, submitter actions, and the independent complaint queue are defined in `docs/api/zsjos-lead-submitter-actions.md`.
 | `POST /zsjos/lead/{id}/claim` | `zsjos:lead:claim` + 抢单池对象权限 |

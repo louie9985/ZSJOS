@@ -97,6 +97,7 @@
   flex-direction: column;
   gap: var(--crm-sp-2);
   transition: box-shadow var(--crm-duration-base) ease;
+  overflow: hidden;
 }
 
 .fu-node-card:hover {
@@ -136,11 +137,15 @@
   flex-wrap: wrap;
   gap: var(--crm-sp-2);
   margin-top: var(--crm-sp-1);
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .fu-node-images .ant-image {
   width: 56px;
   height: 56px;
+  flex: 0 0 56px;
+  overflow: hidden;
 }
 
 .fu-node-images img {
@@ -148,4 +153,11 @@
   height: 56px;
   object-fit: cover;
   border-radius: var(--crm-radius-sm);
+  display: block;
+}
+
+.ant-image-preview-img {
+  max-width: calc(100vw - 64px);
+  max-height: calc(100vh - 96px);
+  object-fit: contain;
 }

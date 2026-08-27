@@ -32,7 +32,7 @@ public class AuthPermissionInfoRespVO {
     @Schema(description = "Workbench 最终导航投影；路由授权仍以 menus 为准")
     private List<MenuVO> workbenchMenus;
 
-    @Schema(description = "Workbench 布局版本、胜出角色和回退信息")
+    @Schema(description = "Workbench 布局版本、已应用角色布局和回退信息")
     private WorkbenchMenuProjection.Meta workbenchLayoutMeta;
 
     @Schema(description = "全平台默认员工头像；未配置时为空", example = "https://www.iocoder.cn/default-avatar.png")

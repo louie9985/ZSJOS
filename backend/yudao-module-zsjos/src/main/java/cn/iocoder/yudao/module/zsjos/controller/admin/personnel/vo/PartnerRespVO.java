@@ -10,7 +10,6 @@ public class PartnerRespVO {
     private String name;
     private String mobile;
     private String status;
-    private Long boundSystemUserId;
     private String channelId;
     private LocalDateTime enabledAt;
     private LocalDateTime disabledAt;

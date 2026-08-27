@@ -86,7 +86,8 @@ public class LeadAppealServiceImpl implements LeadAppealService {
 
     /** Submitters may read the appeal history of their own Lead; other readers need appeal capability. */
     private boolean canReadAppealRecords(LeadDO lead, Long userId) {
-        return Objects.equals(lead.getSourceUserId(), userId)
+        return PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                && Objects.equals(lead.getProviderOwnerId(), userId)
                 || leadObjectPermissionService.canReadSubordinatePartnerLead(lead, userId)
                 || permissionApi.hasAnyPermissions(userId, PERMISSION_DETAIL_APPEAL_READ,
                 PERMISSION_APPEAL_REVIEW_SALES_MANAGER, PERMISSION_APPEAL_REVIEW_QUALITY,
@@ -118,8 +119,10 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             throw exception(LEAD_APPEAL_IDEMPOTENCY_CONFLICT);
         }
         if (!STATUS_INVALID.equals(lead.getStatus()) || (partnerId != null
-                ? !Objects.equals(lead.getPartnerId(), partnerId)
-                : !Objects.equals(lead.getSourceUserId(), userId))) {
+                ? !PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())
+                    || !Objects.equals(lead.getProviderOwnerId(), partnerId)
+                : !PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                    || !Objects.equals(lead.getProviderOwnerId(), userId))) {
             throw exception(LEAD_APPEAL_STATE_INVALID);
         }
         LeadAppealDO previous = appealMapper.selectLatestByLeadId(leadId);
@@ -269,7 +272,10 @@ public class LeadAppealServiceImpl implements LeadAppealService {
     @Override
     public List<LeadAppealRespVO> getPartnerLeadAppeals(Long leadId, Long partnerId) {
         LeadDO lead = requireLead(leadId);
-        if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        if (!PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())
+                || !Objects.equals(lead.getProviderOwnerId(), partnerId)) {
+            throw exception(LEAD_APPEAL_PERMISSION_DENIED);
+        }
         return appealMapper.selectListByLeadId(leadId).stream().map(item -> convert(item, lead, null)).toList();
     }
 

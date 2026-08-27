@@ -28,7 +28,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class PartnerOwnershipService {
-    public static final String QUERY_PERMISSION = "zsjos:subordinate-partner:query";
+    public static final String QUERY_PERMISSION = "zsjos:partner:query";
+    public static final String MANAGE_PERMISSION = "zsjos:partner:manage";
 
     @Resource private PartnerOwnershipMapper ownershipMapper;
     @Resource private PartnerOwnershipLogMapper logMapper;
@@ -46,12 +47,17 @@ public class PartnerOwnershipService {
     }
 
     public boolean canQuery(Long employeeUserId) {
-        if (!permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION)) return false;
+        if (!permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION, MANAGE_PERMISSION)) return false;
         AdminUserRespDTO user = adminUserApi.getUser(employeeUserId);
         return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus());
     }
 
+    public boolean canManage(Long employeeUserId) {
+        return permissionApi.hasAnyPermissions(employeeUserId, MANAGE_PERMISSION) && isEnabledUser(employeeUserId);
+    }
+
     public boolean canRead(Long employeeUserId, Long partnerId) {
+        if (canManage(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
         PartnerOwnershipDO ownership = getByPartnerId(partnerId);
         return ownership != null && Objects.equals(ownership.getEmployeeUserId(), employeeUserId)
                 && permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION)

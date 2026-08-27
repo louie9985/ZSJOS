@@ -99,9 +99,11 @@ public class LeadSubmitterActionService {
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         if (partnerId != null) {
-            if (!Objects.equals(lead.getPartnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
+            if (!PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())
+                    || !Objects.equals(lead.getProviderOwnerId(), partnerId)) throw exception(LEAD_PERMISSION_DENIED);
         } else {
-            if (!Objects.equals(lead.getSourceUserId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
+            if (!PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                    || !Objects.equals(lead.getProviderOwnerId(), userId)) throw exception(LEAD_PERMISSION_DENIED);
             identityService.requireHistoricalSubmitter(lead, userId);
         }
         return lead;

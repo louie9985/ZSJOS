@@ -88,13 +88,34 @@
     <div v-if="draft" class="layout-workspace">
       <aside class="candidate-pane">
         <div class="pane-heading">
-          <span>候选页面</span>
-          <el-tag size="small">{{ filteredCandidates.length }}</el-tag>
+          <span>{{ scopeType === 'ROLE' ? '未编排' : '候选页面' }}</span>
+          <el-tag size="small">
+            {{ scopeType === 'ROLE' ? unarrangedNodes.length : filteredCandidates.length }}
+          </el-tag>
         </div>
-        <el-input v-model="candidateKeyword" clearable placeholder="搜索名称或路径">
+        <el-input
+          v-if="scopeType === 'GLOBAL'"
+          v-model="candidateKeyword"
+          clearable
+          placeholder="搜索名称或路径"
+        >
           <template #prefix><Icon icon="ep:search" /></template>
         </el-input>
-        <el-scrollbar class="candidate-scroll">
+        <el-scrollbar
+          v-if="scopeType === 'ROLE'"
+          class="candidate-scroll unarranged-dropzone"
+          @dragover.prevent
+          @drop.prevent="dropToUnarranged"
+        >
+          <div v-if="unarrangedNodes.length === 0" class="pane-empty">暂无未编排内容</div>
+          <WorkbenchUnarrangedTree
+            v-else
+            :candidate-map="candidateMap"
+            :nodes="unarrangedNodes"
+            @drag-start="setDraggedNode"
+          />
+        </el-scrollbar>
+        <el-scrollbar v-else class="candidate-scroll">
           <div v-if="filteredCandidates.length === 0" class="pane-empty">暂无匹配页面</div>
           <div v-for="page in filteredCandidates" :key="page.sourceMenuId" class="candidate-row">
             <Icon :icon="page.icon || 'ep:document'" />
@@ -117,7 +138,12 @@
         </el-scrollbar>
       </aside>
 
-      <section class="editor-pane">
+      <section
+        class="editor-pane"
+        :class="{ 'role-editor-dropzone': scopeType === 'ROLE' }"
+        @dragover.prevent
+        @drop.prevent="dropToNavigation"
+      >
         <div class="pane-heading">
           <span>{{ scopeType === 'GLOBAL' ? '全局导航树' : '角色最终导航树' }}</span>
           <el-button
@@ -158,6 +184,7 @@
           @add-child="addChildGroup"
           @change="markDirty"
           @delete-group="deleteGroup"
+          @external-drag-start="setDraggedNode"
         />
       </section>
     </div>
@@ -170,8 +197,8 @@
         <el-descriptions-item label="全局版本">
           {{ previewResult.meta.globalVersionNo ? `v${previewResult.meta.globalVersionNo}` : '当前草稿' }}
         </el-descriptions-item>
-        <el-descriptions-item label="胜出角色">
-          {{ winningRoleName(previewResult.meta.winningRoleId) }}
+        <el-descriptions-item label="应用角色布局">
+          {{ appliedRoleNames(previewResult.meta.appliedRoleLayouts) }}
         </el-descriptions-item>
       </el-descriptions>
       <el-divider content-position="left">最终导航</el-divider>
@@ -254,6 +281,7 @@ import type {
   WorkbenchLayoutVersionRespVO
 } from '@/api/system/workbenchLayout'
 import WorkbenchLayoutTree from './WorkbenchLayoutTree.vue'
+import WorkbenchUnarrangedTree from './WorkbenchUnarrangedTree.vue'
 
 defineOptions({ name: 'SystemWorkbenchLayout' })
 
@@ -273,9 +301,12 @@ const scopeId = ref(0)
 const draft = ref<WorkbenchLayoutDraftRespVO>()
 const candidateKeyword = ref('')
 const previewUserId = ref<number>()
+const draggedNodeKey = ref('')
 
 const candidateMap = computed(() =>
-  Object.fromEntries((candidates.value?.pages || []).map((page) => [page.sourceMenuId, page]))
+  Object.fromEntries(
+    (draft.value?.candidatePages || candidates.value?.pages || []).map((page) => [page.sourceMenuId, page])
+  )
 )
 
 const collectPageIds = (nodes: WorkbenchLayoutNode[], result = new Set<number>()) => {
@@ -287,10 +318,25 @@ const collectPageIds = (nodes: WorkbenchLayoutNode[], result = new Set<number>()
 }
 
 const arrangedPageIds = computed(() => collectPageIds(draft.value?.snapshot.nodes || []))
+const unarrangedNodes = computed(() => {
+  const result: WorkbenchLayoutNode[] = []
+  const visit = (nodes: WorkbenchLayoutNode[]) => {
+    for (const node of nodes) {
+      if (node.hidden && node.key !== UNCLASSIFIED_KEY) {
+        result.push(node)
+      } else if (node.type === 'GROUP') {
+        visit(node.children)
+      }
+    }
+  }
+  visit(draft.value?.snapshot.nodes || [])
+  return result
+})
 const filteredCandidates = computed(() => {
   const keyword = candidateKeyword.value.trim().toLowerCase()
-  if (!keyword) return candidates.value?.pages || []
-  return (candidates.value?.pages || []).filter(
+  const pages = draft.value?.candidatePages || candidates.value?.pages || []
+  if (!keyword) return pages
+  return pages.filter(
     (page) => page.name.toLowerCase().includes(keyword) || page.path.toLowerCase().includes(keyword)
   )
 })
@@ -298,6 +344,34 @@ const filteredCandidates = computed(() => {
 const markDirty = () => {
   dirty.value = true
 }
+
+const findNodeByKey = (nodes: WorkbenchLayoutNode[], key: string): WorkbenchLayoutNode | undefined => {
+  for (const node of nodes) {
+    if (node.key === key) return node
+    const child = findNodeByKey(node.children, key)
+    if (child) return child
+  }
+}
+
+const resolveDraggedKey = (event: DragEvent) =>
+  event.dataTransfer?.getData('text/workbench-layout-key') || draggedNodeKey.value
+
+const setDraggedNode = (key: string) => {
+  draggedNodeKey.value = key
+}
+
+const setNodeArranged = (event: DragEvent, arranged: boolean) => {
+  if (scopeType.value !== 'ROLE' || !draft.value) return
+  const key = resolveDraggedKey(event)
+  const node = findNodeByKey(draft.value.snapshot.nodes, key)
+  draggedNodeKey.value = ''
+  if (!node || node.key === UNCLASSIFIED_KEY || node.hidden === !arranged) return
+  node.hidden = !arranged
+  markDirty()
+}
+
+const dropToUnarranged = (event: DragEvent) => setNodeArranged(event, false)
+const dropToNavigation = (event: DragEvent) => setNodeArranged(event, true)
 
 const loadDraft = async () => {
   if (scopeType.value === 'ROLE' && !scopeId.value) {
@@ -472,8 +546,16 @@ const previewLayout = async () => {
   }
 }
 
-const winningRoleName = (roleId?: number) =>
-  roleId ? candidates.value?.roles.find((role) => role.id === roleId)?.name || `角色 #${roleId}` : '全局布局'
+const appliedRoleNames = (roleLayouts: WorkbenchLayoutPreviewRespVO['meta']['appliedRoleLayouts']) =>
+  roleLayouts.length
+    ? roleLayouts
+        .map(
+          (layout) =>
+            candidates.value?.roles.find((role) => role.id === layout.roleId)?.name ||
+            `角色 #${layout.roleId}`
+        )
+        .join('、')
+    : '全局布局'
 
 const versionsVisible = ref(false)
 const versionsLoading = ref(false)
@@ -565,6 +647,16 @@ onMounted(loadPage)
 .candidate-scroll {
   height: 550px;
   margin-top: 10px;
+}
+
+.unarranged-dropzone,
+.role-editor-dropzone {
+  transition: background-color 120ms ease;
+}
+
+.unarranged-dropzone:hover,
+.role-editor-dropzone:hover {
+  background: var(--el-fill-color-extra-light);
 }
 
 .candidate-row {
