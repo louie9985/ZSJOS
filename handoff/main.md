@@ -5408,3 +5408,32 @@
 - Verification evidence: 目标组件 ESLint 通过；目标组件 Prettier 检查通过；Admin `pnpm build:local` 通过，仅有既有 lightningcss `*zoom` 警告；全量 `pnpm ts:check` 未通过，但输出仅为既有 BPM、DocAlert、CRM、EAM、MES、System User 和 exportTask 无关错误，本次 Workbench layout 文件无类型错误；浏览器访问 `http://localhost/system/workbench-layout` 只显示员工工作平台 Logo，未进入 Admin 编辑器，无法完成真实拖拽验收；scoped `git diff --check` 通过，仅有行尾转换警告。
 - Dependency or integration impact: 无新增依赖，无后端、数据库、SQL、Admin 菜单、角色授权或外部状态修改，无服务启停、分支/工作树操作、提交或推送。
 - Remaining work: 在可访问 Admin 布局编辑器且具备有效登录态的环境补做右侧同级排序、跨目录移动、目录拖到左侧“未编排”及拖回右侧的真实浏览器验收。
+
+## Workstream Registration - 2026-08-27 12:12:00 +08:00
+
+- Workstream ID: `main-workbench-config-page-layout-20260827`
+- Goal: 提交当前 Workbench 配置页面标题样式与页面间距样式调整并推送到 `origin/main`。
+- Non-goals: 不改变业务逻辑、API、权限、菜单、数据库、服务状态、分支或历史；不执行 SQL、不强制推送。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `a69bfcd2b41ed2ba0b523c578bfd962b610d708c`。
+- Target branch: `origin/main`。
+- Ownership scope: `frontend/workbench/src/pages/ConfigurationPages.tsx`、`frontend/workbench/src/styles/patterns.css` 及本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Workbench 页面样式约定；无新增依赖。
+- Integration order: 检查远端 -> 检查本地差异 -> 追加交付记录 -> 暂存并提交 -> 推送 -> 核对哈希。
+- Verification plan: `git diff --check`、提交成功、推送成功、`HEAD == origin/main`、ahead/behind `0/0`、工作区干净。
+
+## Delivery Entry - 2026-08-27 12:12:00 +08:00
+
+- Workstream ID: `main-workbench-config-page-layout-20260827`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `a69bfcd2b41ed2ba0b523c578bfd962b610d708c`（提交前）。
+- User goal: 拉取云端最新代码并将本地改动推送到云端；有冲突时确认。
+- Key decisions: fetch 后远端无新增提交，本地与远端一致且无冲突；将当前两处 Workbench 配置页面样式改动作为一个提交发布，不执行 SQL、数据库或服务操作。
+- Execution or analysis result: `ConfigurationPages.tsx` 的页面标题容器改用共享 `page-heading` 类；`patterns.css` 新增通用 `page-stack` flex 垂直间距样式。
+- Changed files: `frontend/workbench/src/pages/ConfigurationPages.tsx`、`frontend/workbench/src/styles/patterns.css`、本 handoff 记录。
+- Verification evidence: fetch 后 ahead/behind 为 `0/0`；提交前 `git diff --check` 通过；无暂存或未跟踪的其他文件。未运行完整测试、类型检查或构建。
+- Dependency or integration impact: 无新增依赖、API、权限、菜单、数据库、服务、分支或历史变更。
+- Remaining work: 推送后核对本地与远端哈希及工作区状态。
