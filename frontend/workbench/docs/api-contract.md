@@ -105,3 +105,31 @@ WebSocket 使用 `/infra/ws?token=...`，不带 `/admin-api` 前缀。当前消�
 - `POST /zsjos/work-order/create` accepts `values` as a JSON object plus a top-level `attachmentIds` list. The backend validates required/unknown fields and type-specific user, department, dictionary, date and number values, then stores both definitions and display-label snapshots.
 - Create and action commands require an idempotency key. Reuse is accepted only when order, actor, operation, version, reason, values, and normalized attachments are identical; any mismatch returns an idempotency conflict.
 - `GET /zsjos/work-order/pool?sceneCode=...&pageNo=...&pageSize=...` returns `PageResult<WorkOrderRespVO>` and applies the framework page-size limit.
+
+## EAM 我的资产与采购申请
+
+`/zsjos/my-assets` 和 `/zsjos/asset-demands` 只由 System 权限响应中的服务端菜单开放，
+数据库直接子路径分别保存为 `my-assets` 和 `asset-demands`。前端本地组件注册为
+`EamMyAssets` 和 `EamAssetDemands`，不按角色名推断访问权。
+
+- `GET /admin-api/eam/workbench/my-assets` 返回当前 System 用户对应员工的单件资产、批量持有、
+  待签收、待退还验收和入离职/异动任务；权限为 `eam:workbench:asset:query`。
+- `GET /admin-api/eam/workbench/my-demands` 返回当前用户提交的采购申请；权限为
+  `eam:workbench:demand:query`。
+- `GET /admin-api/eam/workbench/categories` 与 `category-fields?categoryId=` 返回服务端分类策略
+  和采集阶段自定义字段。未确认交付/持有策略的历史分类不可提交；System 字典字段加载失败时
+  必须显示错误和重试，不得回退到硬编码选项。
+- `POST /admin-api/eam/workbench/stock-candidates` 根据当前分类、单位和已填写的自定义字段返回
+  提交前只读库存候选，不创建需求或预留。页面在明细完整后自动刷新；审批通过后仍由管理员
+  通过管理端候选查询和原子预留命令再次确认当时库存。
+- `POST /admin-api/eam/workbench/demand` 提交当前员工的资产需求；员工编号由服务端根据登录
+  `userId` 解析，客户端不能代填其他员工。
+- `PUT /admin-api/eam/workbench/holding/{id}/sign`、`holding/{id}/return` 分别执行签收和退还；
+  后端再次校验持有人。对应权限为 `eam:workbench:asset:sign` 和
+  `eam:workbench:asset:return`。
+- `POST /admin-api/eam/workbench/repair` 复用 EAM 现有报修能力；只允许当前员工持有的单件资产，
+  权限为 `eam:workbench:asset:repair`。
+
+资产卡状态展示使用 System 字典 `eam_asset_status`；持有状态、需求状态和员工资产任务状态
+来自 EAM 技术状态契约。页面分别处理加载、成功、空数据、失败与重试；HTTP 403 保留当前
+会话并由全局无权限状态处理。

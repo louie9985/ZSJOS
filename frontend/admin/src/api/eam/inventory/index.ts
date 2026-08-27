@@ -22,11 +22,11 @@ export interface InventoryDetailVO {
   assetId: number
   assetName?: string
   assetCode?: string
-  expectUserId?: number
-  expectUserName?: string
+  expectEmployeeId?: number
+  expectEmployeeName?: string
   expectDeptId?: number
   expectLocation?: string
-  actualUserId?: number
+  actualEmployeeId?: number
   actualDeptId?: number
   actualLocation?: string
   result: number
@@ -38,7 +38,7 @@ export interface InventoryDetailVO {
 export interface InventoryCheckVO {
   detailId: number
   result: number
-  actualUserId?: number
+  actualEmployeeId?: number
   actualDeptId?: number
   actualLocation?: string
   remark?: string

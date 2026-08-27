@@ -104,15 +104,15 @@ public class EamAssetDO extends BaseDO {
     /**
      * 使用人
      */
-    private Long useUserId;
+    private Long useEmployeeId;
     /**
-     * 使用人姓名快照；用户匹配失败或历史名称变化时保留
+     * 使用员工姓名快照；员工匹配失败或历史名称变化时保留
      */
-    private String useUserNameSnapshot;
+    private String useEmployeeNameSnapshot;
     /**
-     * 直属上级用户
+     * 直属上级员工
      */
-    private Long supervisorUserId;
+    private Long supervisorEmployeeId;
     /**
      * 直属上级姓名快照
      */

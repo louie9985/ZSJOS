@@ -324,4 +324,23 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_015_002, "新媒体工作流配置已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_APPROVER_EMPTY = new ErrorCode(1_900_015_003, "当前审批流程未配置有效审批人");
 
+    ErrorCode FEEDBACK_TYPE_INVALID = new ErrorCode(1_900_016_001, "反馈类型无效");
+    ErrorCode FEEDBACK_NOT_OPEN = new ErrorCode(1_900_016_002, "该类反馈暂未开放，请联系管理员配置分派负责人");
+    ErrorCode FEEDBACK_FORM_NOT_EXISTS = new ErrorCode(1_900_016_003, "反馈动态表单不存在或已停用");
+    ErrorCode FEEDBACK_FORM_INCOMPATIBLE = new ErrorCode(1_900_016_004, "反馈表单包含不兼容字段：{}");
+    ErrorCode FEEDBACK_TITLE_FIELD_INVALID = new ErrorCode(1_900_016_005, "标题字段必须是必填单行文本字段");
+    ErrorCode FEEDBACK_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_016_006, "反馈设置已被修改，请刷新表单后重试");
+    ErrorCode FEEDBACK_VALUE_INVALID = new ErrorCode(1_900_016_007, "反馈字段无效：{}");
+    ErrorCode FEEDBACK_ATTACHMENT_INVALID = new ErrorCode(1_900_016_008, "反馈附件不存在、无权引用或不属于反馈上传目录");
+    ErrorCode FEEDBACK_NOT_EXISTS = new ErrorCode(1_900_016_009, "反馈不存在");
+    ErrorCode FEEDBACK_PERMISSION_DENIED = new ErrorCode(1_900_016_010, "无权查看或操作该反馈");
+    ErrorCode FEEDBACK_STATE_INVALID = new ErrorCode(1_900_016_011, "当前反馈状态不允许该操作");
+    ErrorCode FEEDBACK_VERSION_CONFLICT = new ErrorCode(1_900_016_012, "反馈已被其他人修改，请刷新后重试");
+    ErrorCode FEEDBACK_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_016_013, "反馈幂等键已被其他请求使用");
+    ErrorCode FEEDBACK_ASSIGNEE_INVALID = new ErrorCode(1_900_016_014, "处理人必须是拥有对应反馈管理权限的启用用户");
+    ErrorCode FEEDBACK_PROCESS_UNAVAILABLE = new ErrorCode(1_900_016_015, "需求审批流程尚未发布、已停用或与设置不一致");
+    ErrorCode FEEDBACK_CHAIRMAN_INVALID = new ErrorCode(1_900_016_016, "boss 角色必须且只能配置一名启用用户");
+    ErrorCode FEEDBACK_SURVEY_ALREADY_REQUESTED = new ErrorCode(1_900_016_017, "该反馈已发起过满意度调研");
+    ErrorCode FEEDBACK_SURVEY_STATE_INVALID = new ErrorCode(1_900_016_018, "满意度调研尚未发起或已提交");
+
 }

@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategorySaveR
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryImportService;
+import cn.iocoder.yudao.module.eam.service.category.EamCategoryPolicy;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -73,7 +74,7 @@ public class EamCategoryController {
     @PreAuthorize("@ss.hasPermission('eam:category:query')")
     public CommonResult<List<EamCategoryRespVO>> getCategoryList() {
         List<EamCategoryDO> list = categoryService.getCategoryList();
-        return success(BeanUtils.toBean(list, EamCategoryRespVO.class));
+        return success(list.stream().map(this::buildCategoryRespVO).toList());
     }
 
     @GetMapping("/get")
@@ -82,7 +83,7 @@ public class EamCategoryController {
     @PreAuthorize("@ss.hasPermission('eam:category:query')")
     public CommonResult<EamCategoryRespVO> getCategory(@RequestParam("id") Long id) {
         EamCategoryDO category = categoryService.getCategory(id);
-        return success(BeanUtils.toBean(category, EamCategoryRespVO.class));
+        return success(category == null ? null : buildCategoryRespVO(category));
     }
 
     @GetMapping("/get-import-template")
@@ -112,6 +113,18 @@ public class EamCategoryController {
     public CommonResult<EamCategoryImportRespVO> commitImport(@RequestParam("file") MultipartFile file)
             throws IOException {
         return success(categoryImportService.commit(file.getBytes()));
+    }
+
+    private EamCategoryRespVO buildCategoryRespVO(EamCategoryDO category) {
+        EamCategoryRespVO result = BeanUtils.toBean(category, EamCategoryRespVO.class);
+        try {
+            EamCategoryPolicy policy = categoryService.getEffectivePolicy(category.getId());
+            result.setEffectiveDeliveryMode(policy.deliveryMode());
+            result.setEffectiveCustodyMode(policy.custodyMode());
+        } catch (cn.iocoder.yudao.framework.common.exception.ServiceException ignored) {
+            // 历史分类允许查看；只有新采购使用时才强制完成策略配置。
+        }
+        return result;
     }
 
 }

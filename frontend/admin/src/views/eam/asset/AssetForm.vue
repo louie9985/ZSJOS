@@ -72,21 +72,8 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="使用人" prop="useUserId">
-            <el-select
-              v-model="formData.useUserId"
-              clearable
-              filterable
-              class="!w-full"
-              placeholder="请选择使用人"
-            >
-              <el-option
-                v-for="user in userList"
-                :key="user.id"
-                :label="user.nickname"
-                :value="user.id"
-              />
-            </el-select>
+          <el-form-item label="使用员工" prop="useEmployeeId">
+            <HrmEmployeeSelect v-model="formData.useEmployeeId" placeholder="请选择使用员工" />
           </el-form-item>
         </el-col>
         <el-col :span="12">
@@ -157,7 +144,7 @@ import { handleTree } from '@/utils/tree'
 import { getIntDictOptions } from '@/utils/dict'
 import * as AssetApi from '@/api/eam/asset'
 import * as DeptApi from '@/api/system/dept'
-import * as UserApi from '@/api/system/user'
+import HrmEmployeeSelect from '@/views/hrm/employee/components/HrmEmployeeSelect.vue'
 import DynamicFields from './DynamicFields.vue'
 
 defineOptions({ name: 'EamAssetForm' })
@@ -177,7 +164,6 @@ const formData = ref<AssetApi.AssetVO>(buildEmptyForm())
 const formRef = ref()
 
 const deptTree = ref<any[]>([])
-const userList = ref<any[]>([])
 
 const selectedCategory = computed(() => {
   const find = (nodes: any[]): any => {
@@ -211,7 +197,7 @@ function buildEmptyForm(): AssetApi.AssetVO {
     expectedLife: undefined,
     purchaseDate: undefined,
     useDeptId: undefined,
-    useUserId: undefined,
+    useEmployeeId: undefined,
     location: '',
     remark: '',
     fileUrls: [],
@@ -269,6 +255,5 @@ watch(
 
 onMounted(async () => {
   deptTree.value = handleTree(await DeptApi.getSimpleDeptList())
-  userList.value = await UserApi.getSimpleUserList()
 })
 </script>

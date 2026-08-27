@@ -18,7 +18,7 @@ public class EamInventoryCheckReqVO {
     private Integer result;
 
     @Schema(description = "实盘使用人编号", example = "2")
-    private Long actualUserId;
+    private Long actualEmployeeId;
 
     @Schema(description = "实盘使用部门编号", example = "101")
     private Long actualDeptId;

@@ -24,6 +24,8 @@ import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -70,6 +72,8 @@ public class EamAssetController {
     private EamCategoryService categoryService;
     @Resource
     private AdminUserApi adminUserApi;
+    @Resource
+    private HrmEmployeeApi employeeApi;
     @Resource
     private DeptApi deptApi;
 
@@ -204,15 +208,16 @@ public class EamAssetController {
         }
         Map<Long, String> categoryNameMap = categoryService.getCategoryList().stream()
                 .collect(Collectors.toMap(EamCategoryDO::getId, EamCategoryDO::getName, (a, b) -> a));
-        Map<Long, AdminUserRespDTO> userMap =
-                adminUserApi.getUserMap(convertSet(list, EamAssetDO::getUseUserId));
+        Map<Long, HrmEmployeeRespDTO> employeeMap = employeeApi.getEmployeeList(
+                        convertSet(list, EamAssetDO::getUseEmployeeId)).stream()
+                .collect(Collectors.toMap(HrmEmployeeRespDTO::getId, item -> item, (a, b) -> a));
         Map<Long, DeptRespDTO> deptMap =
                 deptApi.getDeptMap(convertSet(list, EamAssetDO::getUseDeptId));
 
         result.forEach(vo -> {
             vo.setCategoryName(categoryNameMap.get(vo.getCategoryId()));
-            AdminUserRespDTO user = userMap.get(vo.getUseUserId());
-            vo.setUseUserName(user != null ? user.getNickname() : null);
+            HrmEmployeeRespDTO employee = employeeMap.get(vo.getUseEmployeeId());
+            vo.setUseEmployeeName(employee != null ? employee.getName() : vo.getUseEmployeeNameSnapshot());
             DeptRespDTO dept = deptMap.get(vo.getUseDeptId());
             vo.setUseDeptName(dept != null ? dept.getName() : null);
         });

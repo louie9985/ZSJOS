@@ -12,6 +12,8 @@ import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
 import cn.iocoder.yudao.module.eam.service.transfer.EamTransferService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -48,6 +50,8 @@ public class EamTransferController {
     private EamAssetService assetService;
     @Resource
     private AdminUserApi adminUserApi;
+    @Resource
+    private HrmEmployeeApi employeeApi;
 
     @PostMapping("/create")
     @Operation(summary = "创建流转单", description = "领用/借用/调拨走审批，退还/归还直接生效")
@@ -112,11 +116,13 @@ public class EamTransferController {
         Map<Long, EamAssetDO> assetMap = assetService.getAssetList(
                         convertSet(list, EamTransferDO::getAssetId)).stream()
                 .collect(Collectors.toMap(EamAssetDO::getId, a -> a, (a, b) -> a));
-        Set<Long> userIds = new HashSet<>();
-        userIds.addAll(convertSet(list, EamTransferDO::getFromUserId));
-        userIds.addAll(convertSet(list, EamTransferDO::getToUserId));
-        userIds.addAll(convertSet(list, EamTransferDO::getApplyUserId));
-        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(userIds);
+        Set<Long> employeeIds = new HashSet<>();
+        employeeIds.addAll(convertSet(list, EamTransferDO::getFromEmployeeId));
+        employeeIds.addAll(convertSet(list, EamTransferDO::getToEmployeeId));
+        Map<Long, HrmEmployeeRespDTO> employeeMap = employeeApi.getEmployeeList(employeeIds).stream()
+                .collect(Collectors.toMap(HrmEmployeeRespDTO::getId, item -> item, (a, b) -> a));
+        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(
+                convertSet(list, EamTransferDO::getApplyUserId));
 
         result.forEach(vo -> {
             EamAssetDO asset = assetMap.get(vo.getAssetId());
@@ -124,8 +130,8 @@ public class EamTransferController {
                 vo.setAssetName(asset.getName());
                 vo.setAssetCode(asset.getAssetCode());
             }
-            vo.setFromUserName(nicknameOf(userMap, vo.getFromUserId()));
-            vo.setToUserName(nicknameOf(userMap, vo.getToUserId()));
+            vo.setFromEmployeeName(nameOf(employeeMap, vo.getFromEmployeeId()));
+            vo.setToEmployeeName(nameOf(employeeMap, vo.getToEmployeeId()));
             vo.setApplyUserName(nicknameOf(userMap, vo.getApplyUserId()));
         });
         return result;
@@ -134,6 +140,11 @@ public class EamTransferController {
     private String nicknameOf(Map<Long, AdminUserRespDTO> userMap, Long userId) {
         AdminUserRespDTO user = userId != null ? userMap.get(userId) : null;
         return user != null ? user.getNickname() : null;
+    }
+
+    private String nameOf(Map<Long, HrmEmployeeRespDTO> employeeMap, Long employeeId) {
+        HrmEmployeeRespDTO employee = employeeId != null ? employeeMap.get(employeeId) : null;
+        return employee != null ? employee.getName() : null;
     }
 
 }

@@ -54,6 +54,11 @@
                 <el-tag size="small" type="info" class="ml-1">
                   {{ data.managementMode === 2 ? '批量' : '单件' }} / {{ data.unit || '个' }}
                 </el-tag>
+                <el-tag v-if="data.effectiveDeliveryMode" size="small" type="success" class="ml-1">
+                  {{ data.effectiveDeliveryMode === 1 ? '实物' : '数字' }} /
+                  {{ data.effectiveCustodyMode === 1 ? '消耗' : '归还' }}
+                </el-tag>
+                <el-tag v-else size="small" type="danger" class="ml-1">待确认采购属性</el-tag>
               </span>
               <span class="ml-2 shrink-0">
                 <el-button

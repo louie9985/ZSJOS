@@ -15,6 +15,8 @@ import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
 import cn.iocoder.yudao.module.eam.service.inventory.EamInventoryService;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -50,6 +52,8 @@ public class EamInventoryController {
     private EamAssetService assetService;
     @Resource
     private AdminUserApi adminUserApi;
+    @Resource
+    private HrmEmployeeApi employeeApi;
 
     @PostMapping("/create")
     @Operation(summary = "创建盘点单", description = "按范围快照生成盘点明细")
@@ -135,8 +139,9 @@ public class EamInventoryController {
         Map<Long, EamAssetDO> assetMap = assetService.getAssetList(
                         convertSet(details, EamInventoryDetailDO::getAssetId)).stream()
                 .collect(Collectors.toMap(EamAssetDO::getId, a -> a, (a, b) -> a));
-        Map<Long, AdminUserRespDTO> userMap =
-                adminUserApi.getUserMap(convertSet(details, EamInventoryDetailDO::getExpectUserId));
+        Map<Long, HrmEmployeeRespDTO> employeeMap = employeeApi.getEmployeeList(
+                        convertSet(details, EamInventoryDetailDO::getExpectEmployeeId)).stream()
+                .collect(Collectors.toMap(HrmEmployeeRespDTO::getId, item -> item, (a, b) -> a));
 
         result.forEach(vo -> {
             EamAssetDO asset = assetMap.get(vo.getAssetId());
@@ -144,8 +149,8 @@ public class EamInventoryController {
                 vo.setAssetName(asset.getName());
                 vo.setAssetCode(asset.getAssetCode());
             }
-            AdminUserRespDTO user = userMap.get(vo.getExpectUserId());
-            vo.setExpectUserName(user != null ? user.getNickname() : null);
+            HrmEmployeeRespDTO employee = employeeMap.get(vo.getExpectEmployeeId());
+            vo.setExpectEmployeeName(employee != null ? employee.getName() : null);
         });
         return success(result);
     }

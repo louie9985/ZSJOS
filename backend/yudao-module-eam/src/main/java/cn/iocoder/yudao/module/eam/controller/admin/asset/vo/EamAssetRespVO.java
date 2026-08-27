@@ -77,13 +77,13 @@ public class EamAssetRespVO {
     private String useDeptName;
 
     @Schema(description = "使用人编号", example = "1")
-    private Long useUserId;
+    private Long useEmployeeId;
 
     @Schema(description = "使用人名称", example = "张三")
-    private String useUserName;
+    private String useEmployeeName;
 
     @Schema(description = "使用人姓名快照", example = "张三")
-    private String useUserNameSnapshot;
+    private String useEmployeeNameSnapshot;
 
     @Schema(description = "存放地点", example = "总部三楼研发区")
     private String location;

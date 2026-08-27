@@ -19,8 +19,8 @@ public class EamAssetHandoverDO extends BaseDO {
     private Long id;
     private Long assetId;
     private String content;
-    private Long fromUserId;
-    private Long toUserId;
+    private Long fromEmployeeId;
+    private Long toEmployeeId;
     private LocalDateTime handoverTime;
     private String remark;
     private Long importBatchId;

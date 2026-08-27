@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="https://zsjos.com/bpm">
+  <process id="zsjos_feedback_requirement_approval" name="需求反馈审批" isExecutable="true">
+    <startEvent id="StartEvent" name="员工提交需求"/>
+    <sequenceFlow id="flow_start_gateway" sourceRef="StartEvent" targetRef="LeaderGateway"/>
+    <exclusiveGateway id="LeaderGateway" name="是否有部门负责人" default="flow_skip_leader"/>
+    <sequenceFlow id="flow_department_leader" sourceRef="LeaderGateway" targetRef="departmentLeaderReview">
+      <conditionExpression xsi:type="tFormalExpression"><![CDATA[${hasDepartmentLeader == true}]]></conditionExpression>
+    </sequenceFlow>
+    <sequenceFlow id="flow_skip_leader" sourceRef="LeaderGateway" targetRef="chairmanReview"/>
+    <userTask id="departmentLeaderReview" name="部门负责人审批" flowable:assignee="${departmentLeaderAssignee}">
+      <extensionElements>
+        <flowable:candidateStrategy>35</flowable:candidateStrategy>
+        <flowable:approveType>1</flowable:approveType>
+        <flowable:approveMethod>3</flowable:approveMethod>
+        <flowable:reasonRequire>true</flowable:reasonRequire>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${departmentLeaderUsers}" flowable:elementVariable="departmentLeaderAssignee">
+        <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+    <sequenceFlow id="flow_leader_chairman" sourceRef="departmentLeaderReview" targetRef="chairmanReview"/>
+    <userTask id="chairmanReview" name="董事长终审" flowable:assignee="${chairmanAssignee}">
+      <extensionElements>
+        <flowable:candidateStrategy>35</flowable:candidateStrategy>
+        <flowable:approveType>1</flowable:approveType>
+        <flowable:approveMethod>3</flowable:approveMethod>
+        <flowable:reasonRequire>true</flowable:reasonRequire>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${chairmanUsers}" flowable:elementVariable="chairmanAssignee">
+        <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+    <sequenceFlow id="flow_chairman_end" sourceRef="chairmanReview" targetRef="EndEvent"/>
+    <endEvent id="EndEvent" name="审批完成"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_feedback_requirement">
+    <bpmndi:BPMNPlane id="BPMNPlane_feedback_requirement" bpmnElement="zsjos_feedback_requirement_approval">
+      <bpmndi:BPMNShape id="Shape_StartEvent" bpmnElement="StartEvent"><omgdc:Bounds x="80" y="160" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_LeaderGateway" bpmnElement="LeaderGateway" isMarkerVisible="true"><omgdc:Bounds x="170" y="153" width="50" height="50"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_departmentLeaderReview" bpmnElement="departmentLeaderReview"><omgdc:Bounds x="290" y="90" width="180" height="100"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_chairmanReview" bpmnElement="chairmanReview"><omgdc:Bounds x="540" y="128" width="180" height="100"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent" bpmnElement="EndEvent"><omgdc:Bounds x="800" y="160" width="36" height="36"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_flow_start_gateway" bpmnElement="flow_start_gateway"><omgdi:waypoint x="116" y="178"/><omgdi:waypoint x="170" y="178"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_department_leader" bpmnElement="flow_department_leader"><omgdi:waypoint x="195" y="153"/><omgdi:waypoint x="195" y="140"/><omgdi:waypoint x="290" y="140"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_skip_leader" bpmnElement="flow_skip_leader"><omgdi:waypoint x="220" y="178"/><omgdi:waypoint x="540" y="178"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_leader_chairman" bpmnElement="flow_leader_chairman"><omgdi:waypoint x="470" y="140"/><omgdi:waypoint x="505" y="140"/><omgdi:waypoint x="505" y="178"/><omgdi:waypoint x="540" y="178"/></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_chairman_end" bpmnElement="flow_chairman_end"><omgdi:waypoint x="720" y="178"/><omgdi:waypoint x="800" y="178"/></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

@@ -14,7 +14,7 @@
     <el-table v-loading="loading" :data="details" max-height="480">
       <el-table-column label="资产编号" prop="assetCode" min-width="140" fixed="left" />
       <el-table-column label="资产名称" prop="assetName" min-width="150" show-overflow-tooltip />
-      <el-table-column label="账面使用人" prop="expectUserName" min-width="110" />
+      <el-table-column label="账面使用员工" prop="expectEmployeeName" min-width="110" />
       <el-table-column
         label="账面地点"
         prop="expectLocation"
@@ -83,21 +83,8 @@
         </el-radio-group>
       </el-form-item>
       <template v-if="checkForm.result === InventoryResult.LOCATION_MISMATCH">
-        <el-form-item label="实盘使用人" prop="actualUserId">
-          <el-select
-            v-model="checkForm.actualUserId"
-            filterable
-            clearable
-            class="!w-full"
-            placeholder="请选择实际使用人"
-          >
-            <el-option
-              v-for="user in userList"
-              :key="user.id"
-              :label="user.nickname"
-              :value="user.id"
-            />
-          </el-select>
+        <el-form-item label="实盘使用员工" prop="actualEmployeeId">
+          <HrmEmployeeSelect v-model="checkForm.actualEmployeeId" placeholder="请选择实际使用员工" />
         </el-form-item>
         <el-form-item label="实盘部门" prop="actualDeptId">
           <el-tree-select
@@ -131,7 +118,7 @@ import { handleTree } from '@/utils/tree'
 import * as InventoryApi from '@/api/eam/inventory'
 import { InventoryResult } from '@/api/eam/inventory'
 import * as DeptApi from '@/api/system/dept'
-import * as UserApi from '@/api/system/user'
+import HrmEmployeeSelect from '@/views/hrm/employee/components/HrmEmployeeSelect.vue'
 
 defineOptions({ name: 'EamInventoryDetail' })
 
@@ -145,7 +132,6 @@ const inventory = ref<InventoryApi.InventoryVO>({} as InventoryApi.InventoryVO)
 const details = ref<InventoryApi.InventoryDetailVO[]>([])
 
 const deptTree = ref<any[]>([])
-const userList = ref<any[]>([])
 
 const checkVisible = ref(false)
 const checkLoading = ref(false)
@@ -182,7 +168,7 @@ const openCheck = (row: InventoryApi.InventoryDetailVO) => {
   checkForm.value = {
     detailId: row.id,
     result: row.result === InventoryResult.UNCHECKED ? InventoryResult.NORMAL : row.result,
-    actualUserId: row.actualUserId ?? row.expectUserId,
+    actualEmployeeId: row.actualEmployeeId ?? row.expectEmployeeId,
     actualDeptId: row.actualDeptId ?? row.expectDeptId,
     actualLocation: row.actualLocation ?? row.expectLocation,
     remark: row.remark
@@ -224,6 +210,5 @@ const handleMarkLost = async (detailId: number) => {
 
 onMounted(async () => {
   deptTree.value = handleTree(await DeptApi.getSimpleDeptList())
-  userList.value = await UserApi.getSimpleUserList()
 })
 </script>

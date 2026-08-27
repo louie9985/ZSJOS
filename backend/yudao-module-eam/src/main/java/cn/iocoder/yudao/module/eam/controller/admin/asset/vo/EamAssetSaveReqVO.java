@@ -62,7 +62,7 @@ public class EamAssetSaveReqVO {
     private Long useDeptId;
 
     @Schema(description = "使用人编号", example = "1")
-    private Long useUserId;
+    private Long useEmployeeId;
 
     @Schema(description = "存放地点", example = "总部三楼研发区")
     private String location;

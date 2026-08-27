@@ -503,3 +503,22 @@ and repository boundary; do not delete `ACT_*` rows directly. V144 is repeatable
 restoring the backup. After the first and second executions, verify all retired menus, grants, notification
 records, events and tables are absent, while the student-contact extension table, permission and process
 definition remain present.
+
+## V149 feedback management
+
+V149 follows V147 and is the only migration for the requirement, BUG and technical-support feedback
+workspace. V148 is intentionally skipped because that number is owned elsewhere. The migration adds
+`business_type` to the generic work-order table (`GENERIC` for existing records, `FEEDBACK` for this
+feature), six tenant-scoped feedback tables, menu/button metadata, four default BPM dynamic forms,
+feedback settings, the approved support-type dictionary, and four notification templates/rules.
+
+All schema and seed writes are additive and repeatable. Fixed menu IDs, routes, permissions, BPM form
+markers and dictionary identities are checked before writes; conflicts stop execution instead of
+overwriting existing administrator data. Existing feedback and work-order rows are never deleted or
+rebuilt. Both `zsjos_schema_version` and `zsjos_module_schema_version` record V149 with the file SHA-256.
+
+Before an existing-environment execution, review the migration plan, retain a database backup, and run
+the read-only checks in `script/sql/mysql/verify-bootstrap.sql`. Afterward verify the six tables,
+business-type index, binary idempotency keys, four forms/settings per enabled tenant, five dictionary
+values, menu/package coverage, notification defaults, and both version markers. Rollback is
+forward-only; retain feedback history, snapshots, surveys and notification messages.

@@ -25,10 +25,10 @@ public class EamAssetChangeLogRespVO {
     private Integer afterStatus;
 
     @Schema(description = "变更前使用人", example = "1")
-    private Long beforeUserId;
+    private Long beforeEmployeeId;
 
     @Schema(description = "变更后使用人", example = "2")
-    private Long afterUserId;
+    private Long afterEmployeeId;
 
     @Schema(description = "变更前使用部门", example = "100")
     private Long beforeDeptId;

@@ -46,13 +46,13 @@ public interface EamAssetService {
      *
      * @param assetId    资产编号
      * @param newStatus  新状态，null 表示不变
-     * @param newUserId  新使用人，null 表示不变
+     * @param newEmployeeId  新使用人（HRM 员工编号），null 表示不变
      * @param newDeptId  新使用部门，null 表示不变
      * @param changeType 变更类型
      * @param bizId      关联单据编号
      * @param content    变更描述
      */
-    void applyChange(Long assetId, Integer newStatus, Long newUserId, Long newDeptId,
+    void applyChange(Long assetId, Integer newStatus, Long newEmployeeId, Long newDeptId,
                      Integer changeType, Long bizId, String content);
 
     /**

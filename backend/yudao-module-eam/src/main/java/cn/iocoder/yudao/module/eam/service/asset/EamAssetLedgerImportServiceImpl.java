@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.eam.service.asset;
 
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.DigestUtil;
-import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -20,9 +19,9 @@ import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService.Norm
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.coderule.EamCodeRuleService;
-import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
-import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -59,7 +58,7 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
     @Resource
     private EamAssetChangeLogService changeLogService;
     @Resource
-    private AdminUserApi adminUserApi;
+    private HrmEmployeeApi employeeApi;
     @Resource
     private DictDataApi dictDataApi;
 
@@ -147,10 +146,9 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
                 .filter(category -> StrUtil.isNotBlank(category.getCode()))
                 .collect(Collectors.toMap(EamCategoryDO::getCode, Function.identity(), (a, b) -> a));
 
-        Map<String, List<AdminUserRespDTO>> usersByNickname = adminUserApi
-                .getUserListByStatus(CommonStatusEnum.ENABLE.getStatus()).stream()
-                .filter(user -> StrUtil.isNotBlank(user.getNickname()))
-                .collect(Collectors.groupingBy(user -> user.getNickname().trim()));
+        Map<String, List<HrmEmployeeRespDTO>> employeesByName = employeeApi.getEmployeeList().stream()
+                .filter(employee -> StrUtil.isNotBlank(employee.getName()))
+                .collect(Collectors.groupingBy(employee -> employee.getName().trim()));
 
         List<PreparedRow> preparedRows = new ArrayList<>();
         List<EamAssetImportPreviewRespVO.Row> responseRows = new ArrayList<>();
@@ -167,7 +165,8 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
             }
             List<String> warnings = new ArrayList<>(source.warnings());
             List<String> errors = new ArrayList<>(source.errors());
-            AdminUserRespDTO matchedUser = matchUser(source.useUserName(), usersByNickname, warnings, "使用人");
+            HrmEmployeeRespDTO matchedEmployee = matchEmployee(source.useUserName(), employeesByName, warnings, "使用人");
+            HrmEmployeeRespDTO matchedSupervisor = matchEmployee(source.supervisorName(), employeesByName, warnings, "直属上级");
             EamAssetDO existing = StrUtil.isBlank(source.assetCode())
                     ? null : assetsByCode.get(source.assetCode());
             String action = importedRows.containsKey(source.rowNum()) ? "SKIP_SAME_FILE"
@@ -201,12 +200,12 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
                     .categoryName(category.getName())
                     .managementMode(managementMode).quantity(quantity).useUserName(source.useUserName())
                     .supervisorName(source.supervisorName())
-                    .matchedUserName(matchedUser != null ? matchedUser.getNickname() : null)
-                    .matchedSupervisorName(null)
+                    .matchedUserName(matchedEmployee != null ? matchedEmployee.getName() : null)
+                    .matchedSupervisorName(matchedSupervisor != null ? matchedSupervisor.getName() : null)
                     .action(action).mappedFields(source.mappedFields()).defaultedFields(defaultedFields)
                     .warnings(warnings).errors(errors).build();
             responseRows.add(previewRow);
-            preparedRows.add(new PreparedRow(source, category, matchedUser, existing, previewRow,
+            preparedRows.add(new PreparedRow(source, category, matchedEmployee, matchedSupervisor, existing, previewRow,
                     normalized, sourceSelection));
         }
         EamAssetImportPreviewRespVO response = buildResponse(fileHash, responseRows);
@@ -239,10 +238,14 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
         asset.setExpectedLife(parseInteger(row.mappedFields().get("预计使用年限（月）")));
         asset.setLocation(StrUtil.emptyToNull(row.location()));
         asset.setRemark(StrUtil.emptyToNull(row.remark()));
-        asset.setUseUserNameSnapshot(StrUtil.emptyToNull(row.useUserName()));
-        if (item.matchedUser() != null) {
-            asset.setUseUserId(item.matchedUser().getId());
-            asset.setUseDeptId(item.matchedUser().getDeptId());
+        asset.setUseEmployeeNameSnapshot(StrUtil.emptyToNull(row.useUserName()));
+        if (item.matchedEmployee() != null) {
+            asset.setUseEmployeeId(item.matchedEmployee().getId());
+            asset.setUseDeptId(item.matchedEmployee().getDeptId());
+        }
+        asset.setSupervisorNameSnapshot(StrUtil.emptyToNull(row.supervisorName()));
+        if (item.matchedSupervisor() != null) {
+            asset.setSupervisorEmployeeId(item.matchedSupervisor().getId());
         }
         NormalizedExtFields normalized = item.normalizedExtFields();
         asset.setExtFields(normalized.values());
@@ -272,13 +275,13 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
                 }).orElseGet(() -> { errors.add("资产来源字典值无效"); return new SourceSelection(null, null); });
     }
 
-    private static AdminUserRespDTO matchUser(String name, Map<String, List<AdminUserRespDTO>> users,
-                                              List<String> warnings, String label) {
+    private static HrmEmployeeRespDTO matchEmployee(String name, Map<String, List<HrmEmployeeRespDTO>> employees,
+                                                    List<String> warnings, String label) {
         if (StrUtil.isBlank(name)) return null;
-        List<AdminUserRespDTO> matches = users.getOrDefault(name.trim(), List.of());
+        List<HrmEmployeeRespDTO> matches = employees.getOrDefault(name.trim(), List.of());
         if (matches.size() == 1) return matches.get(0);
-        warnings.add(matches.isEmpty() ? label + "未匹配系统用户，已保留姓名快照"
-                : label + "存在重名，未自动关联系统用户");
+        warnings.add(matches.isEmpty() ? label + "未匹配 HRM 员工，已保留姓名快照"
+                : label + "存在重名，未自动关联 HRM 员工");
         return null;
     }
 
@@ -301,7 +304,8 @@ public class EamAssetLedgerImportServiceImpl implements EamAssetLedgerImportServ
     }
 
     private record PreparedRow(EamAssetLedgerParser.LedgerRow source, EamCategoryDO category,
-                               AdminUserRespDTO matchedUser, EamAssetDO existingAsset,
+                               HrmEmployeeRespDTO matchedEmployee, HrmEmployeeRespDTO matchedSupervisor,
+                               EamAssetDO existingAsset,
                                EamAssetImportPreviewRespVO.Row previewRow,
                                NormalizedExtFields normalizedExtFields, SourceSelection sourceSelection) {}
     private record SourceSelection(Integer value, String label) {}

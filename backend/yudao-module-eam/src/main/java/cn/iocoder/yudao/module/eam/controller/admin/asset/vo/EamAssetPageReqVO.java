@@ -29,7 +29,7 @@ public class EamAssetPageReqVO extends PageParam {
     private Long useDeptId;
 
     @Schema(description = "使用人编号", example = "1")
-    private Long useUserId;
+    private Long useEmployeeId;
 
     @Schema(description = "分类自定义字段标识", example = "subject")
     @Pattern(regexp = "^[a-zA-Z][a-zA-Z0-9_]*$", message = "自定义字段标识格式不正确")

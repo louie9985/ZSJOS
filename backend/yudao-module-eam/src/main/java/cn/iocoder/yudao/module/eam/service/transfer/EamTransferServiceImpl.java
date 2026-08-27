@@ -55,7 +55,7 @@ public class EamTransferServiceImpl implements EamTransferService {
         // 2. 组装单据，转出方取资产当前归属
         EamTransferDO transfer = BeanUtils.toBean(reqVO, EamTransferDO.class);
         transfer.setNo(generateNo(reqVO.getType()));
-        transfer.setFromUserId(asset.getUseUserId());
+        transfer.setFromEmployeeId(asset.getUseEmployeeId());
         transfer.setFromDeptId(asset.getUseDeptId());
         transfer.setApplyUserId(SecurityFrameworkUtils.getLoginUserId());
         transfer.setApplyTime(LocalDateTime.now());
@@ -138,30 +138,30 @@ public class EamTransferServiceImpl implements EamTransferService {
     private void applyTransfer(EamTransferDO transfer, EamAssetDO asset) {
         Integer type = transfer.getType();
         Integer newStatus;
-        Long newUserId;
+        Long newEmployeeId;
         Long newDeptId;
 
         if (Objects.equals(type, EamTransferTypeEnum.RECEIVE.getType())) {
             newStatus = EamAssetStatusEnum.IN_USE.getStatus();
-            newUserId = transfer.getToUserId();
+            newEmployeeId = transfer.getToEmployeeId();
             newDeptId = transfer.getToDeptId();
         } else if (Objects.equals(type, EamTransferTypeEnum.BORROW.getType())) {
             newStatus = EamAssetStatusEnum.LENT.getStatus();
-            newUserId = transfer.getToUserId();
+            newEmployeeId = transfer.getToEmployeeId();
             newDeptId = transfer.getToDeptId();
         } else if (Objects.equals(type, EamTransferTypeEnum.ALLOCATE.getType())) {
             newStatus = EamAssetStatusEnum.IN_USE.getStatus();
-            newUserId = transfer.getToUserId();
+            newEmployeeId = transfer.getToEmployeeId();
             newDeptId = transfer.getToDeptId();
         } else {
             // 退还 / 归还：回到闲置，清空归属由 applyChange 的 null 语义处理不了，
             // 这里显式写回 0 表示无归属
             newStatus = EamAssetStatusEnum.IDLE.getStatus();
-            newUserId = 0L;
+            newEmployeeId = 0L;
             newDeptId = 0L;
         }
 
-        assetService.applyChange(transfer.getAssetId(), newStatus, newUserId, newDeptId,
+        assetService.applyChange(transfer.getAssetId(), newStatus, newEmployeeId, newDeptId,
                 resolveChangeType(type), transfer.getId(),
                 StrUtil.format("{}（单据 {}）", resolveTypeName(type), transfer.getNo()));
     }

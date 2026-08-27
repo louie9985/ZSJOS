@@ -22,9 +22,9 @@ export interface AssetVO {
   warrantyDate?: string
   useDeptId?: number
   useDeptName?: string
-  useUserId?: number
-  useUserName?: string
-  useUserNameSnapshot?: string
+  useEmployeeId?: number
+  useEmployeeName?: string
+  useEmployeeNameSnapshot?: string
   location?: string
   expectedLife?: number
   remark?: string
@@ -41,8 +41,8 @@ export interface AssetChangeLogVO {
   changeType: number
   beforeStatus?: number
   afterStatus?: number
-  beforeUserId?: number
-  afterUserId?: number
+  beforeEmployeeId?: number
+  afterEmployeeId?: number
   beforeDeptId?: number
   afterDeptId?: number
   bizId?: number

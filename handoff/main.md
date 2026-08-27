@@ -1,5 +1,20 @@
 # Main Workstream
 
+## Workstream Registration - 2026-08-26 21:25:19 +08:00
+
+- Workstream ID: `main-eam-office-procurement-hrm-assets`
+- Goal: implement lightweight office procurement, unified EAM stock availability/reservation/receipt, employee asset holding and HRM lifecycle linkage through BPM-owned approvals and HRM public API/events.
+- Non-goals: integrate ERP, FMS, supplier master data, warehouses/locations, product/SKU masters, message middleware, a separate HRM API Maven module, HRM schema changes, live database execution, real permission grants, branches/worktrees, commits, pushes, deployments, or unrelated dirty-worktree changes.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `27f2087b48b8a2c3fe7c94fc1aa6c1ff68c3d0e9` plus existing uncommitted user changes.
+- Target branch: `main`
+- Ownership scope: EAM backend module and focused tests; HRM employee public API, lifecycle events and focused employee tests; EAM-local `V007+` migration, desired schema, verification and module documentation; EAM/HRM Admin API and pages including the employee personal-assets tab; EAM employee self-service Workbench services/pages/routes/styles/tests; directly affected architecture, API and navigation documentation; this handoff record. Existing unrelated System, Workbench navigation-layout and Core SQL changes remain preserved.
+- Owner: Codex `/root`
+- Dependencies: existing System user/dictionary/menu/permission APIs, HRM employee services, BPM public API/status events, Infra Job starter, EAM category/asset/transfer/repair facilities, Vue Admin and React Workbench. The user explicitly approved direct `yudao-module-eam -> yudao-module-hrm` and existing Job starter dependencies; no new third-party dependency or broker is introduced.
+- Integration order: establish HRM public API/events and EAM module wiring -> add category/inventory/procurement/employee-task persistence and services -> wire BPM status listeners and lifecycle idempotency -> add EAM-local SQL/menu/verify -> add Admin employee-assets and Workbench self-service surfaces -> run focused and proportional verification.
+- Verification plan: focused HRM/EAM unit and database tests covering event idempotency, availability/reservation concurrency, partial fulfillment, receipt/return, signing/return inspection and lifecycle cancellation; EAM/HRM Maven tests and server package; `zsjos-db` static/fresh/repeat/drift verification where the local migration chain permits; Admin scoped lint/typecheck/build; Workbench focused/full tests, typecheck/build; authenticated desktop/mobile browser checks when a usable runtime/session is available; scoped diff/ownership review.
+
 ## Delivery Entry - 2026-08-26 19:43:26 +08:00
 
 - Workstream ID: `main-notification-navigation-refresh`
@@ -4962,3 +4977,103 @@
 - Verification evidence: 提交前 `HEAD == origin/main == 27f2087b`，ahead/behind 为 `0/0`；`git diff --check` 通过；合并后 Workbench `src/services/menu.test.ts` 16/16 通过；新增内容敏感关键词扫描未发现密码、令牌或密钥。原工作流另有 System 聚焦测试 20/20、后端 package、Admin scoped ESLint/build 和 Workbench 菜单测试证据；未重新运行全量构建。
 - Dependency or integration impact: 推送后共享 `main` 将包含可配置 Workbench 导航布局及 V147 源文件；没有依赖安装、数据库执行、角色授权、初始布局发布、服务操作、分支切换或强制推送。
 - Remaining work: 推送后核对远端哈希；V147 在执行前仍需完成 V139-V146 连续迁移复核以及 bootstrap/verifier 接线和相应验证。
+## Workstream Registration - 2026-08-26 22:40:45 +08:00
+
+- Workstream ID: `main-feedback-management-v149`
+- Goal: implement the confirmed AI application department requirement, BUG, and technical-support feedback workspace across ZSJOS backend, Vue Admin, React Workbench, BPM assets, permissions, dictionaries, SQL initialization, tests, and directly affected documentation.
+- Non-goals: add dashboards, statistics, exports, batch actions, SLA, priority, project management, reopen, internal notes, new dependencies, hardcoded user or role IDs, direct BPM private-table/service access, database execution, BPM import/publish, real permission assignment, service operations, branches, commits, pushes, or changes to unrelated dirty-worktree work.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `d06740d367c6046cb709a0bb199803a4598db425` plus preserved existing EAM, HRM, Admin, SQL, and handoff changes.
+- Target branch: `main`
+- Ownership scope: feedback-owned additions and focused compatibility edits under `backend/yudao-module-zsjos`; the minimum BPM public read API and its tests under `backend/yudao-module-bpm`; feedback API/views/components/tests under `frontend/admin` and `frontend/workbench`; `script/sql/mysql/migrations/V149__feedback_management.sql`; feedback-specific schema, bootstrap, seed, dictionary, verifier, BPM asset/manifest, and migration-documentation changes; directly affected feedback API, navigation, architecture, and deployment documentation; this handoff record. Existing EAM/HRM changes and all unrelated dirty files remain outside scope.
+- Owner: Codex `/root`
+- Dependencies: existing generic ZSJOS work-order model, System users/departments/permissions/dictionaries/notifications public APIs, Infra file API, BPM public process APIs and dynamic-form storage, Vue Admin and React Workbench runtime dependencies; no new dependency.
+- Integration order: inspect and preserve generic work-order compatibility -> add V149/baseline data and BPM public assets -> implement feedback backend state, snapshots, permissions, notifications, and tests -> build Vue Admin management/settings -> build React Workbench employee flow -> update contracts/docs -> run layered verification -> append delivery evidence.
+- Verification plan: focused ZSJOS and BPM tests plus backend compile/package; V149/static bootstrap continuity, repeatability, tenant, menu, dictionary, index, and version checks without shared-database execution; Admin scoped/full typecheck, lint, and local production build; Workbench focused/full tests, typecheck, and production build; desktop/mobile browser checks when a usable authenticated local runtime is available; scoped diff/ownership review and `git diff --check`.
+
+## Delivery Entry - 2026-08-27 01:36:12 +08:00
+
+- Workstream ID: `main-eam-office-procurement-hrm-assets`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `d06740d367c6046cb709a0bb199803a4598db425` (no commit created).
+- User goal: implement lightweight office procurement with BPM approval and one-form receipt, shared EAM stock checking/reservation, employee asset lifecycle management, and HRM employee-profile/Workbench linkage while keeping EAM and HRM database ownership separate.
+- Key decisions: use BPM process keys `eam_asset_demand`, `eam_office_purchase`, `eam_purchase_expense`, and `eam_employee_asset_review`; keep approval actors, countersigning, rejection, cancellation, copy recipients, and history in BPM; keep procurement, inventory, reservations, receipts/returns, holdings, lifecycle tasks, policy snapshots, and BPM references in EAM; add no HRM schema or SQL; expose only HRM public API/DTO and synchronous lifecycle events; do not integrate ERP, FMS, supplier masters, warehouses, product/SKU masters, HTTP/module middleware, or hardcoded roles/approvers.
+- Execution or analysis result: implemented inherited physical/digital and consumable/returnable category policies; demand submission and read-only stock preview; approval-time atomic candidate confirmation, partial reservation and shortage procurement; lightweight purchase merge, expense approval, staged receipt, short-close and supplier return; serialized cards, batch balances/movements/holdings, signing, return inspection and reminders; HRM lifecycle-driven provisioning, review, offboarding settlement and cancellation; Vue Admin demand/purchase/stock and employee personal-assets management; React Workbench personal assets, demand, signing, return and repair flows. The final review also added the complete-form stock-preview endpoint and Admin return-inspection entry, and prevented preview requests before custom fields finish loading.
+- Changed files: EAM category, asset, approval, procurement, stock, employee-asset, job, Controller/VO, DAL/DO, error/status and focused test files under `backend/yudao-module-eam`; HRM employee public API/DTO/event/publisher and lifecycle integration/tests under `backend/yudao-module-hrm`; EAM Admin APIs and category/demand/purchase/stock/employee-asset views under `frontend/admin`; Workbench EAM typed services, route registration, page, styles, guards and API contract under `frontend/workbench`; `script/sql/mysql/migrations/eam/V007__eam_office_procurement_and_employee_assets.sql`, EAM migration README, desired schema and verifier; EAM API/navigation/database documentation; this handoff record. No HRM SQL directory or table change was added.
+- Verification evidence: EAM full tests passed 68/68 and procurement/stock-focused tests passed 25/25; HRM full tests passed 570/570; `yudao-server` package reactor passed 28 modules. Workbench EAM-focused checks passed 20/20, the full test command passed, typecheck passed, and production build passed; after the final custom-field readiness adjustment, `eam-assets.guard.test.ts` passed 4/4, typecheck passed, and production build passed again with only the existing large-chunk warning. Admin task-file ESLint and Prettier checks passed and `build:local` passed. EAM SQL static review confirmed manifest/schema/migration/verify completeness, continuous V001-V007 order, 28 schema tables matching 28 EAM `@TableName` mappings, all 14 V007 table columns/indexes matching the desired schema, and no destructive EAM data statement. Final scoped `git diff --check` and explicit new-file trailing-whitespace scan passed.
+- Dependency or integration impact: `yudao-module-eam` now directly depends on `yudao-module-hrm` and consumes only its public API/DTO/events; existing BPM and Infra Job facilities are reused with no new third-party dependency or broker. No live SQL, BPM publication, menu/role grant, service operation, branch/worktree change, commit, push, or deployment was performed. Unrelated feedback, Core, System/BPM, and Workbench navigation changes in the shared dirty worktree were preserved.
+- Remaining work: deploy and enable the four BPM process definitions in the unified approval center. Full Admin `pnpm ts:check` remains blocked by 18 existing cross-module type errors; the EAM aggregate Maven command remains blocked before EAM by the existing System H2 fixture missing `system_menu.workbench_render_mode`; the global database checker remains blocked by missing Core migration numbers V106, V108, V118, and V148. Docker is not running and no local MySQL client is available, so real fresh install, repeat install, schema drift, verify, and API requests remain unverified. No authenticated browser/runtime was available, so desktop/mobile permissions and end-to-end demand, receipt, signing, return, repair, and offboarding flows still require controlled-environment verification.
+
+## Delivery Entry - 2026-08-27 09:36:13 +08:00
+
+- Workstream ID: `main-feedback-management-v149`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `d06740d367c6046cb709a0bb199803a4598db425` (no commit created).
+- User goal: implement the confirmed requirement, BUG, and technical-support feedback workspace using migration `V149`, with employee card entry/record flows, independent Admin management/settings, dynamic BPM forms, requirement approval, assignment and communication, notifications, satisfaction surveys, permissions, snapshots, and release verification.
+- Key decisions: reserve only `script/sql/mysql/migrations/V149__feedback_management.sql` and leave V148 untouched; reuse generic work orders with explicit `GENERIC`/`FEEDBACK` isolation; use server-owned menus, button permissions, users, departments, roles, dictionaries, notifications, files, and BPM public APIs; persist form/value/person/dictionary/attachment/result/approval snapshots; use `zsjos_feedback_requirement_approval/1.0.0` with business key `feedback:{workOrderId}:round:{roundNo}` and runtime-resolved department leader/chairman; keep completed feedback open for replies without reopening; add no dashboards, statistics, export, batch actions, SLA, priority, project-management scope, role/user hardcoding, or new dependency.
+- Execution or analysis result: implemented six tenant-scoped feedback persistence tables, atomic daily business numbers, generic-work-order isolation, dynamic-form validation, three submission flows, rejected-requirement resubmission rounds, assignment/reassignment, employee/Admin replies, completion, unread state, notification recipients, one-time satisfaction surveys, optimistic locking and idempotency; added the minimum BPM read-only metadata API and versioned approval asset; added Vue Admin requirement/BUG/support lists and settings plus React Workbench `/zsjos/feedback` cards, recent records, filters, details, replies, resubmission and survey flow; synchronized V149, bootstrap/schema/dictionary/verifier artifacts, permissions, notification defaults, API/navigation/BPM/release documentation. Final review also made the Admin save action require the selected BPM key to exist in the current published-process options and corrected the documented status constants to match the backend/frontend contract.
+- Changed files: feedback controllers/VOs, DOs/mappers, services/listener/permission/notification providers, constants/error codes, generic work-order compatibility and focused tests under `backend/yudao-module-zsjos`; BPM definition read API/DTO/implementation under `backend/yudao-module-bpm`; `frontend/admin/src/api/zsjos/feedback/index.ts` and `frontend/admin/src/views/zsjos/feedback/**`; Workbench feedback typed service/tests, dynamic form/tests, page/route/styles plus route/menu/service registration under `frontend/workbench`; `script/sql/mysql/migrations/V149__feedback_management.sql`, `script/sql/mysql/04-bootstrap-zsjos-feedback-dictionary.sql`, bootstrap/core schema/verifier/migration README; `script/bpm/manifest.json` and `script/bpm/zsjos_feedback_requirement_approval/1.0.0/process.bpmn20.xml`; `docs/api/feedback-management.md`, `docs/operations/feedback-management-release.md`, BPM/database/menu documentation; this handoff record. Existing EAM/HRM and unrelated dirty-worktree changes were preserved.
+- Verification evidence: ZSJOS feedback-focused tests passed 15/15 with reactor dependencies; ZSJOS/BPM compilation passed. Workbench feedback-focused tests passed, prior full suite passed 418/418, typecheck and production build passed. Admin feedback-scoped Prettier/ESLint/Stylelint checks and `build:local` passed; the final BPM-option save guard passed Prettier/ESLint and a new production build. Desktop 1440x900 and mobile 390x844 Workbench route checks reached the existing unified login without overflow; only the existing `favicon.ico` 404 appeared. V149 static assertions passed for six tables, 18 package menu entries, 17 permissions, four forms, four notification scenes, five support dictionary values, both version registries, atomic `LAST_INSERT_ID` numbering, and `REQ`/`BUG`/`SUP` prefixes; `git diff --check` and scoped sensitive-content scan passed. The new BPM XML parsed successfully and its SHA-256 `4d9c6cb690e8cea86bcea7d31f5d09da772d4e82b4514e0d2cb1e210efc051cd` matches the manifest.
+- Dependency or integration impact: no new npm/Maven dependency, database execution, BPM import/publication, tenant setting mutation, dispatcher or real menu/role grant, service operation, branch/worktree change, commit, push, or deployment. V149 extends the Core schema and requires V147 in both schema-version registries; the two frontends consume the same new backend contract while retaining their framework-specific UI ownership.
+- Remaining work: first run V149 and the V149 verifier against an isolated MySQL copy twice to prove syntax, repeatability, tenant isolation, indexes, fresh-bootstrap parity, and schema drift; Docker is not running and no usable MySQL environment was available, so this remains unverified. Then deploy the backend, import/publish/enable the BPM asset, verify exactly one enabled `boss` user, inspect the four default forms/settings, configure at least one eligible dispatcher for each submission type, assign menu/button permissions, and publish Admin and Workbench. Full BPM manifest validation remains blocked by the pre-existing checksum mismatch in `zsjos_sales_order_dual_approval/1.0.0/process.bpmn20.xml`; full Admin `pnpm ts:check` remains blocked by existing cross-module errors outside feedback. Execute shared-environment SQL, BPM publication, permission changes, deployment, commit, or push only after separate explicit authorization.
+
+## Workstream Registration - 2026-08-27 10:00:00 +08:00
+
+- Workstream ID: `main-eam-employee-ownership-followup`
+- Goal: complete the confirmed EAM ownership correction so assets, transfers, inventories, holdings, reservations, purchase allocations, and employee-asset tasks use HRM `employee_id`, while HRM employee detail reads assets from EAM.
+- Non-goals: remove System user IDs that represent login actors, applicants, operators, verifiers, or BPM routing; add HRM tables or SQL; introduce Maven API modules or dependencies; execute SQL; change unrelated feedback/Core/Workbench work; create commits or push.
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `d06740d367c6046cb709a0bb199803a4598db425` plus the preserved shared dirty worktree and the existing EAM/HRM implementation.
+- Target branch: `main`
+- Ownership scope: EAM ownership fields and tests under `backend/yudao-module-eam`; HRM employee public API used by EAM; EAM Admin/HRM employee-detail asset API and views; EAM desired schema, V008 migration, verifier, migration README, API documentation; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: existing `yudao-module-eam -> yudao-module-hrm` public API dependency, HRM employee identity, EAM HTTP API, and the V001-V007 EAM module migrations; no new dependency.
+- Integration order: repair residual code/test contracts -> correct V008 and desired/test schema -> document EAM/HRM query ownership -> run backend, frontend, and SQL static verification -> append delivery evidence.
+- Verification plan: residual ownership-field scans; EAM focused/full tests and EAM/HRM aggregate compile; Admin typecheck/scoped lint/build; `zsjos_db.py check`; SQL schema/verifier review; `git diff --check`.
+
+## Delivery Entry - 2026-08-27 11:13:35 +08:00
+
+- Workstream ID: `main-eam-employee-ownership-followup`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `d06740d367c6046cb709a0bb199803a4598db425` (no commit created).
+- User goal: remove System user IDs from EAM asset ownership during development and confirm that the HRM employee detail page reads personal assets through an EAM-owned API.
+- Key decisions: use HRM `employee_id` as the only persisted employee identity for serialized assets, holdings, transfers, inventories, reservations, purchase allocations, and employee-asset tasks; let the Vue HRM detail page call the EAM HTTP API directly with `employeeId`; retain System user IDs only for login actors, applicants, operators, verifiers, leaders used for workflow routing, and other non-ownership audit semantics; do not add an HRM asset table or HRM-to-EAM backend dependency.
+- Execution or analysis result: replaced legacy ownership fields with employee fields across EAM Java contracts, H2 fixtures, tests, Admin API/views, desired schema, verifier, and V008; old single-asset lookup now queries `eam_asset.use_employee_id` directly; V008 deliberately discards historical System user ownership IDs instead of reinterpreting them as HRM employee IDs; HRM employee detail now loads `GET /admin-api/eam/employee-asset/get-by-employee?employeeId=...` from EAM without duplicating asset data in HRM.
+- Changed files: EAM ownership-related controllers/VOs, DOs/mappers, services and tests under `backend/yudao-module-eam`; the existing HRM employee public API implementation/tests used by EAM; EAM Admin APIs/views and HRM employee-detail asset tab under `frontend/admin`; `script/sql/mysql/migrations/eam/V008__eam_employee_ownership.sql`, EAM desired/test schema, verifier and migration README; `docs/api/eam-office-procurement-assets.md`; this handoff record.
+- Verification evidence: focused EAM employee-asset/stock/purchase tests passed 24/24; the EAM test set passed 68/68 with HRM and aggregate dependencies compiling; Admin `pnpm ts:check`, task-file ESLint/Prettier, and `pnpm build:local` passed, with only the existing Lightning CSS `*zoom` warning; EAM migration discovery reports continuous V001-V008, desired schema parsing reports 28 tables, and all 28 EAM `@TableName` mappings match those tables; residual scans found no legacy ownership identifiers in current EAM Java/Admin/desired-schema/API surfaces; scoped `git diff --check` passed before this final record. The full aggregate Maven test remains blocked before EAM by the existing System H2 fixture missing `system_menu.workbench_render_mode`; the repository-wide SQL check remains blocked by existing missing Core migration numbers V106, V108, V118, and V148.
+- Dependency or integration impact: no new Maven/npm dependency, HRM schema or SQL, asset copy in HRM, database execution, service operation, permission mutation, branch/worktree operation, commit, push, or deployment. The existing compile-time dependency remains one-way `yudao-module-eam -> yudao-module-hrm`; the frontend may consume both modules' HTTP APIs without creating a Maven cycle.
+- Remaining work: execute Core+EAM fresh install, repeat migration, schema drift, and EAM verifier checks against an isolated MySQL instance before deployment; Docker is installed but its daemon is not running, and no database or shared service was started. After V008, development assets that previously stored only `use_user_id` must be reassigned to HRM employees.
+
+## Workstream Registration - 2026-08-27 11:23:41 +08:00
+
+- Workstream ID: `main-commit-push-20260827-1123`
+- Goal: 将当前根仓库全部已确认 Git 改动提交到本地 `main` 并推送至 `origin/main`。
+- Non-goals: 不新增业务修改、不执行 SQL 或数据库操作、不启动服务、不切换分支、不变基、不强制推送、不改写历史；保留嵌套仓库边界。
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- Base commit: `d06740d367c6046cb709a0bb199803a4598db425` 加当前 EAM/HRM、反馈管理及相关前端、SQL、文档和 handoff 改动。
+- Target branch: `origin/main`。
+- Ownership scope: 当前根仓库全部已修改和未跟踪文件；不包含任何嵌套仓库内部未提交文件。
+- Owner: Codex `/root`
+- Dependencies: 当前 `origin/main`；既有 EAM/HRM 与反馈工作流验证结果；无新增依赖。
+- Integration order: 获取远端并确认无新增 -> 检查敏感内容和空白 -> 追加交付记录 -> 暂存全部改动 -> 提交 -> 推送 -> 核对远端哈希与工作区。
+- Verification plan: `git diff --check`、敏感关键词扫描、暂存范围统计、提交成功、推送成功、`HEAD == origin/main`、ahead/behind `0/0`。
+
+## Delivery Entry - 2026-08-27 11:23:41 +08:00
+
+- Workstream ID: `main-commit-push-20260827-1123`
+- Branch: `main`
+- Worktree: `/Users/louie/Documents/ChatGPT/ZSJOS 2`
+- HEAD commit: `d06740d367c6046cb709a0bb199803a4598db425`（提交前）。
+- User goal: 将本地改动提交并推送到云端，冲突时向用户确认；本次远端无新增，无需合并。
+- Key decisions: 纳入当前根仓库全部已确认改动；不强推、不改写历史；不执行 SQL、数据库或服务操作；保留嵌套仓库边界。
+- Execution or analysis result: 远端 `origin/main` 与本地同为 `d06740d3`，工作区包含 77 个已修改路径和 159 个未跟踪路径，准备整体提交并推送。
+- Changed files: EAM/HRM 办公采购、库存、员工资产与生命周期接口；ZSJOS 反馈管理；BPM API；Admin/Workbench 页面、接口、测试和样式；EAM/Core SQL、迁移与校验脚本；API/架构/运维文档；本 handoff 记录。
+- Verification evidence: fetch 后 ahead/behind 为 `0/0`；`git diff --check` 通过；新增内容敏感关键词扫描未发现密码、令牌或密钥；既有工作流记录了 EAM focused tests 68/68、EAM employee-asset/stock/purchase tests 24/24、Admin scoped lint/typecheck/build 通过和 Workbench 菜单测试证据；全量聚合测试、MySQL 执行和服务运行保持未执行或受既有环境问题阻塞。
+- Dependency or integration impact: 推送将发布当前 EAM/HRM、反馈管理、BPM API、Admin/Workbench 和 SQL/文档改动；无新增依赖、数据库写入、权限实时变更、服务操作或分支操作。
+- Remaining work: 推送后核对本地与云端哈希；按各工作流记录完成隔离 MySQL 验证、缺失迁移链审计及部署前剩余检查。

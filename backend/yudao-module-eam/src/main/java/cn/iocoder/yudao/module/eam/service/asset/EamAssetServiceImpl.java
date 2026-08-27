@@ -20,10 +20,10 @@ import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService.NormalizedExtFields;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.coderule.EamCodeRuleService;
-import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
-import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,6 +43,7 @@ import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_CODE_DU
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_NOT_EXISTS;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_STATUS_INVALID;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.FIELD_VALUE_INVALID;
+import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.EMPLOYEE_NOT_EXISTS;
 
 /**
  * EAM 资产 Service 实现类
@@ -62,7 +63,7 @@ public class EamAssetServiceImpl implements EamAssetService {
     @Resource
     private EamAssetChangeLogService changeLogService;
     @Resource
-    private AdminUserApi adminUserApi;
+    private HrmEmployeeApi employeeApi;
     @Resource
     private DictDataApi dictDataApi;
 
@@ -183,7 +184,7 @@ public class EamAssetServiceImpl implements EamAssetService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void applyChange(Long assetId, Integer newStatus, Long newUserId, Long newDeptId,
+    public void applyChange(Long assetId, Integer newStatus, Long newEmployeeId, Long newDeptId,
                             Integer changeType, Long bizId, String content) {
         EamAssetDO before = validateAssetExists(assetId);
 
@@ -196,8 +197,8 @@ public class EamAssetServiceImpl implements EamAssetService {
                 updateObj.setPreviousStatus(before.getStatus());
             }
         }
-        if (newUserId != null) {
-            updateObj.setUseUserId(newUserId);
+        if (newEmployeeId != null) {
+            updateObj.setUseEmployeeId(newEmployeeId);
         }
         if (newDeptId != null) {
             updateObj.setUseDeptId(newDeptId);
@@ -341,18 +342,22 @@ public class EamAssetServiceImpl implements EamAssetService {
 
     /** User names are authoritative system data; never accept client-provided snapshots. */
     private void applyUserSnapshots(EamAssetDO asset) {
-        if (asset.getUseUserId() != null) {
-            adminUserApi.validateUser(asset.getUseUserId());
-            AdminUserRespDTO user = adminUserApi.getUser(asset.getUseUserId());
-            asset.setUseUserNameSnapshot(user == null ? null : user.getNickname());
-            if (asset.getUseDeptId() == null && user != null) asset.setUseDeptId(user.getDeptId());
+        if (asset.getUseEmployeeId() != null) {
+            HrmEmployeeRespDTO employee = employeeApi.getEmployee(asset.getUseEmployeeId());
+            if (employee == null) {
+                throw exception(EMPLOYEE_NOT_EXISTS);
+            }
+            asset.setUseEmployeeNameSnapshot(employee.getName());
+            if (asset.getUseDeptId() == null) asset.setUseDeptId(employee.getDeptId());
         } else {
-            asset.setUseUserNameSnapshot(null);
+            asset.setUseEmployeeNameSnapshot(null);
         }
-        if (asset.getSupervisorUserId() != null) {
-            adminUserApi.validateUser(asset.getSupervisorUserId());
-            AdminUserRespDTO supervisor = adminUserApi.getUser(asset.getSupervisorUserId());
-            asset.setSupervisorNameSnapshot(supervisor == null ? null : supervisor.getNickname());
+        if (asset.getSupervisorEmployeeId() != null) {
+            HrmEmployeeRespDTO supervisor = employeeApi.getEmployee(asset.getSupervisorEmployeeId());
+            if (supervisor == null) {
+                throw exception(EMPLOYEE_NOT_EXISTS);
+            }
+            asset.setSupervisorNameSnapshot(supervisor.getName());
         } else {
             asset.setSupervisorNameSnapshot(null);
         }

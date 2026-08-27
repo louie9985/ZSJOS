@@ -50,11 +50,11 @@ public class EamAssetChangeLogDO extends BaseDO {
     /**
      * 变更前使用人
      */
-    private Long beforeUserId;
+    private Long beforeEmployeeId;
     /**
      * 变更后使用人
      */
-    private Long afterUserId;
+    private Long afterEmployeeId;
     /**
      * 变更前使用部门
      */

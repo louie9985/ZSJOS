@@ -20,7 +20,7 @@ public class EamTransferCreateReqVO {
     private Long assetId;
 
     @Schema(description = "接收使用人编号（领用/借用/调拨必填）", example = "2")
-    private Long toUserId;
+    private Long toEmployeeId;
 
     @Schema(description = "接收部门编号（领用/借用/调拨必填）", example = "101")
     private Long toDeptId;

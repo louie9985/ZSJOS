@@ -31,8 +31,8 @@
         <el-descriptions-item label="使用部门">
           {{ detail.useDeptName || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="使用人">{{ detail.useUserName || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="使用人姓名快照">{{ detail.useUserNameSnapshot || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="使用员工">{{ detail.useEmployeeName || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="使用员工姓名快照">{{ detail.useEmployeeNameSnapshot || '-' }}</el-descriptions-item>
         <el-descriptions-item label="资产来源">{{ detail.sourceLabelSnapshot || '-' }}</el-descriptions-item>
         <el-descriptions-item label="原值">{{ detail.originalValue ?? '-' }}</el-descriptions-item>
         <el-descriptions-item label="净值">{{ detail.netValue ?? '-' }}</el-descriptions-item>

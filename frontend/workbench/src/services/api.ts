@@ -17,6 +17,14 @@ export type WorkbenchMenu = Omit<RawMenu, 'children' | 'path'> & { path: string;
 export type WorkbenchLayoutMeta = { globalVersionId?: number; globalVersionNo?: number; winningRoleId?: number; roleVersionId?: number; roleVersionNo?: number; fallback: boolean; fallbackReason?: string }
 export type PermissionInfo = { user: User; roles: string[]; permissions: string[]; menus: RawMenu[]; workbenchMenus?: RawMenu[]; workbenchLayoutMeta?: WorkbenchLayoutMeta; defaultAvatar?: string }
 export type DictData = { label: string; value: string; dictType: string; colorType?: string; cssClass?: string }
+export type EamAssetItem = { itemType: string; holdingId?: number; assetId?: number; assetCode?: string; stockBalanceId?: number; name: string; quantity: number; unit?: string; custodyMode?: number; status: number; signedAt?: Timestamp; returnAppliedAt?: Timestamp; returnResult?: number }
+export type EamAssetTask = { id: number; type: number; status: number; processInstanceId?: string; demandId?: number; plannedLeaveTime?: Timestamp; remark?: string; createTime?: Timestamp }
+export type EamAssetSummary = { employeeId: number; userId?: number; items: EamAssetItem[]; tasks: EamAssetTask[]; pendingSignCount: number; pendingReturnCount: number; offboardingUncleared: boolean }
+export type EamDemandItem = { id?: number; name: string; categoryId: number; managementMode?: number; deliveryModeLabelSnapshot?: string; custodyModeLabelSnapshot?: string; quantity: number; unit?: string; extFields?: Record<string, unknown>; extFieldLabels?: Record<string, string>; extFieldDictTypes?: Record<string, string>; reservedQuantity?: number; purchasedQuantity?: number; fulfilledQuantity?: number; closedQuantity?: number }
+export type EamDemand = { id?: number; no?: string; status?: number; processInstanceId?: string; reason?: string; createTime?: Timestamp; items: EamDemandItem[] }
+export type EamStockCandidate = { candidateType: 'SERIALIZED' | 'BATCH'; assetId?: number; assetCode?: string; stockBalanceId?: number; name: string; categoryId: number; availableQuantity: number; unit?: string }
+export type EamCategory = { id: number; parentId: number; name: string; code: string; unit: string; status: number; managementMode: number; effectiveDeliveryMode?: number; effectiveCustodyMode?: number }
+export type EamCategoryField = { fieldKey: string; fieldName: string; fieldType: number; required: boolean; collectionVisible?: boolean; collectionRequired?: boolean; options?: string[]; optionSource?: string; dictType?: string }
 export type MediaAccountDetailSnapshot = { key: string; label: string; type: string; value: unknown; displayValue?: string; dictType?: string }
 export type MediaAccountField = { key: string; label: string; type: 'text' | 'textarea' | 'number' | 'date' | 'select' | 'multi_select' | 'boolean'; required: boolean; enabled: boolean; sort: number; dictType?: string; searchable: boolean }
 export type MediaAccountFieldConfig = { id: number; versionNo: number; version: number; fields: MediaAccountField[] }
@@ -713,6 +721,17 @@ export const api = {
         throw error
       }))
     return request.then(dictData => dictData.filter(item => item.dictType === dictType))
+  },
+  eam: {
+    myAssets: async () => unwrap<EamAssetSummary>(await http.get('/eam/workbench/my-assets')),
+    myDemands: async () => unwrap<EamDemand[]>(await http.get('/eam/workbench/my-demands')),
+    categories: async () => unwrap<EamCategory[]>(await http.get('/eam/workbench/categories')),
+    categoryFields: async (categoryId: number) => unwrap<EamCategoryField[]>(await http.get('/eam/workbench/category-fields', { params: { categoryId } })),
+    previewStockCandidates: async (data: EamDemandItem) => unwrap<EamStockCandidate[]>(await http.post('/eam/workbench/stock-candidates', data)),
+    createDemand: async (data: { reason?: string; items: EamDemandItem[] }) => unwrap<number>(await http.post('/eam/workbench/demand', data)),
+    sign: async (holdingId: number) => unwrap<boolean>(await http.put(`/eam/workbench/holding/${holdingId}/sign`)),
+    applyReturn: async (holdingId: number, remark?: string) => unwrap<boolean>(await http.put(`/eam/workbench/holding/${holdingId}/return`, undefined, { params: { remark } })),
+    repair: async (data: { assetId: number; faultDesc: string }) => unwrap<number>(await http.post('/eam/workbench/repair', data))
   },
   areaTree: async () => unwrap<AreaNode[]>(await http.get('/system/area/tree')),
   leadCatalog: async () => unwrap<LeadCatalog>(await http.get('/zsjos/lead/product/catalog')),

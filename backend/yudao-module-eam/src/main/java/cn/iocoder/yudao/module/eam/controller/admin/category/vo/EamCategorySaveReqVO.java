@@ -35,6 +35,12 @@ public class EamCategorySaveReqVO {
     @Schema(description = "管理模式：1 单件，2 批量", example = "1")
     private Integer managementMode;
 
+    @Schema(description = "交付模式：1 实物入库，2 数字交付；子分类为空表示继承")
+    private Integer deliveryMode;
+
+    @Schema(description = "持有模式：1 消耗型，2 需归还型；子分类为空表示继承")
+    private Integer custodyMode;
+
     @Schema(description = "计量单位", example = "个")
     private String unit;
 

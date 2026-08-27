@@ -28,7 +28,8 @@ public enum EamChangeTypeEnum implements ArrayValuable<Integer> {
     INVENTORY(12, "盘点"),
     LOST(13, "标记丢失"),
     FREEZE(14, "冻结"),
-    UNFREEZE(15, "解冻");
+    UNFREEZE(15, "解冻"),
+    SUPPLIER_RETURN(16, "退回供应商");
 
     public static final Integer[] ARRAYS = Arrays.stream(values())
             .map(EamChangeTypeEnum::getType).toArray(Integer[]::new);

@@ -40,7 +40,7 @@ public class EamInventoryDetailDO extends BaseDO {
     /**
      * 账面使用人
      */
-    private Long expectUserId;
+    private Long expectEmployeeId;
     /**
      * 账面使用部门
      */
@@ -52,7 +52,7 @@ public class EamInventoryDetailDO extends BaseDO {
     /**
      * 实盘使用人
      */
-    private Long actualUserId;
+    private Long actualEmployeeId;
     /**
      * 实盘使用部门
      */

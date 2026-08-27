@@ -89,6 +89,14 @@
       <el-tab-pane label="工资社保" name="salary" lazy>
         <EmployeeSalarySocialSecurity :employee-id="employeeId" />
       </el-tab-pane>
+      <el-tab-pane
+        v-if="checkPermi(['eam:employee-asset:query'])"
+        label="个人资产"
+        name="asset"
+        lazy
+      >
+        <EmployeeAssetPanel :employee-id="employeeId" />
+      </el-tab-pane>
       <el-tab-pane label="材料附件" name="file" lazy>
         <EmployeeMaterialFiles :employee-id="employeeId" @success="getOperateLog" />
       </el-tab-pane>
@@ -134,6 +142,7 @@ import EmployeeDetailsHeader from './EmployeeDetailsHeader.vue'
 import EmployeeMaterialFiles from './EmployeeMaterialFiles.vue'
 import EmployeePostInfo from './EmployeePostInfo.vue'
 import EmployeeSalarySocialSecurity from './EmployeeSalarySocialSecurity.vue'
+import EmployeeAssetPanel from './EmployeeAssetPanel.vue'
 import {
   HrmBizType,
   HrmEmployeeChangeType,

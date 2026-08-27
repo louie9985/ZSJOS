@@ -7,11 +7,11 @@ export interface TransferVO {
   assetId: number
   assetName?: string
   assetCode?: string
-  fromUserId?: number
-  fromUserName?: string
+  fromEmployeeId?: number
+  fromEmployeeName?: string
   fromDeptId?: number
-  toUserId?: number
-  toUserName?: string
+  toEmployeeId?: number
+  toEmployeeName?: string
   toDeptId?: number
   expectedReturnDate?: string
   actualReturnDate?: string
