@@ -181,7 +181,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Col xs={24} md={8}><Form.Item name="studentNature" label="学员性质" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_NATURE)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市"/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】"/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">报名与服务</Divider>
         <Row gutter={16}>

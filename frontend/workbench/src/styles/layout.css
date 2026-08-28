@@ -8,6 +8,8 @@
   inset: 0;
 }
 
+/* 移动视口用 dvh 跟随地址栏收缩（见文件末的 @supports，本文件按源顺序覆盖） */
+
 /* antd Watermark 包裹层须撑满视口 */
 .crm-watermark-wrapper {
   height: 100vh;
@@ -153,13 +155,14 @@
 }
 
 @media (max-width: 768px) {
-  /* !important 压过 antd Sider 写在元素上的 inline width —— 移动端要强制收窄，
-     React 侧的 collapsed 状态同步见 main.tsx 的 matchMedia 监听。 */
-  .primary-sider {
-    width: var(--crm-sider-1-collapsed)!important;
-    min-width: var(--crm-sider-1-collapsed)!important;
-    max-width: var(--crm-sider-1-collapsed)!important;
-    flex: 0 0 var(--crm-sider-1-collapsed)!important;
+  /* 移动端以抽屉为唯一导航入口：隐藏全部常驻侧栏（含收缩后的 56px 图标栏、
+     二级栏、单列、mini 栏），内容区不再被侧栏偏移占用。
+     antd Sider 的 inline width 由 .crm-sider 显示控制，这里整栏隐藏即可。 */
+  .primary-sider,
+  .secondary-sider,
+  .single-sider,
+  .mini-sider {
+    display: none!important;
   }
 
   .brand-default {
@@ -168,10 +171,6 @@
 
   .brand-mobile {
     display: inline;
-  }
-
-  .secondary-sider {
-    display: none;
   }
 
   .crm-header {
@@ -183,8 +182,38 @@
   }
 
   .header-actions {
-    width: 100%;
+    /* header 已由 margin-inline-start:auto 右对齐；宽度 100% 会把移动品牌单元格挤出布局 */
     justify-content: flex-end;
+  }
+
+  /* 移动端 Header：汉堡 + 品牌/当前页标识 + 必要的用户入口。
+     接单三段控件占宽且非导航必需，窄屏隐藏（状态由全局接单 Alert 提供）。 */
+  .header-dispatch-control {
+    display: none;
+  }
+
+  .mobile-header-brand {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: var(--crm-sp-2);
+  }
+
+  .mobile-header-brand-name {
+    color: var(--crm-color-primary);
+    font-size: var(--crm-font-sm);
+    font-weight: var(--crm-weight-bold);
+    white-space: nowrap;
+  }
+
+  .mobile-header-brand-page {
+    color: var(--crm-text-tertiary);
+    font-size: var(--crm-font-sm);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
 }
@@ -401,6 +430,17 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   padding: var(--crm-sp-3) var(--crm-sp-4) var(--crm-sp-1);
 }
 
+/* 桌面端隐藏移动品牌单元格，避免与侧栏 .brand 重复 */
+.mobile-header-brand {
+  display: none;
+}
+
+/* .header-dispatch-control 仅包裹接单状态控件；无接单权限时控件渲染 null，
+   空的 span 会在 header 里留出一段间隙，故空时整体隐藏。 */
+.header-dispatch-control:empty {
+  display: none;
+}
+
 @media(max-width:768px) {
   .mobile-nav-trigger {
     display: inline-flex;
@@ -415,5 +455,20 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   /* 顶部模式在移动端也隐藏水平菜单，走 drawer */
   .top-primary-menu {
     display: none;
+  }
+}
+
+/* 放在本文件末：以源顺序覆盖上方同特异性规则。
+   移动视口用 dvh 跟随地址栏收缩，避免 iOS 上 100vh 超出可视区留下空隙；
+   vh 兜底在前，浏览器不支持 dvh 时忽略本块。 */
+@supports (height: 100dvh) {
+  .crm-shell {
+    height: 100dvh;
+  }
+  .crm-watermark-wrapper {
+    height: 100dvh;
+  }
+  .content-layout {
+    height: calc(100dvh - var(--crm-header-h));
   }
 }

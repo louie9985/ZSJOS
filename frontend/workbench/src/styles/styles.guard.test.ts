@@ -237,6 +237,18 @@ describe('spacing and sizing anchors', () => {
     expect(joined).toMatch(/\.lead-product-checkbox-control \{[^}]*width: fit-content;[^}]*justify-self: start/)
   })
 
+  it('keeps the intended-product add button ready-state and unknown-mode placeholder', () => {
+    // 「未明确课程」是模式切换（会让两个选择器整体失效），曾做成标签行里的小勾选框，
+    // 被推到列右缘后看起来像在标注隔壁的「课程」字段，且视觉权重远低于其影响范围。
+    const leadProduct = readFileSync(join(ROOT, 'components/lead-product.css'), 'utf8')
+    expect(leadProduct).toMatch(/\.lead-product-add\.ready \{[^}]*box-shadow: 0 0 0 3px var\(--crm-color-primary-border\)/)
+    expect(leadProduct).not.toContain('.lead-product-field-label')
+    // 未明确模式下两个选择器让位给虚线占位，而非留在原地灰着继续暗示「我能填」
+    expect(leadProduct).toMatch(/\.lead-product-primary-grid\.unknown \{[^}]*grid-template-columns: minmax\(0,1fr\) 180px/)
+    expect(leadProduct).toMatch(/\.lead-product-unknown-hint \{[^}]*border: 1px dashed var\(--crm-border-strong\)/)
+    expect(leadProduct).toMatch(/\.lead-product-unknown-hint \{[^}]*min-height: var\(--crm-control-h\)/)
+  })
+
   it('routes spacing through the sp-* ladder or a semantic alias', () => {
     // 1px / 2px 是描边级微调（分隔线端点、1px 位移），0 与 auto 无档位含义
     const ALLOWED = /^(0|auto|inherit|1px|2px|[\d.]+%|[\d.]+(?:vw|vh|em|rem|fr)|var\(--crm-)/

@@ -1,1 +1,14 @@
-<div id="root"></div><script type="module" src="/src/main.tsx"></script>
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- 缺少 viewport 时移动浏览器按约 980px 桌面宽度布局再整体缩放，
+         所有 max-width 媒体查询与 matchMedia 均不会命中移动分支。 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>中世健员工工作台</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

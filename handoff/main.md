@@ -5563,4 +5563,33 @@
 - Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderAttachmentMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderRespVO.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImplTest.java`; `frontend/admin/src/api/zsjos/workOrder/index.ts`; `frontend/admin/src/views/zsjos/workOrderTemplate/index.vue`; `frontend/admin/src/views/zsjos/workOrderAudit/index.vue`; `frontend/workbench/src/services/workOrderApi.ts`; `frontend/workbench/src/services/workOrderForm.ts`; `frontend/workbench/src/services/workOrderForm.test.ts`; `frontend/workbench/src/pages/WorkOrderCenterPage.tsx`; `docs/api/generic-work-order-center.md`; 本 handoff 记录。
 - Verification evidence: `WorkOrderServiceImplTest` 20/20 通过且后端 reactor compile 成功；Workbench 聚焦测试 18/18、typecheck、生产 build 通过；Admin 受影响文件 scoped ESLint 和 `build:local` 通过；受影响源文件 `git diff --check` 通过。
 - Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；响应新增向后兼容的 `requestAttachments` 字段。
+
+## Workstream Registration - 2026-08-28 16:37:46 +08:00
+
+- Workstream ID: workbench-mobile-leads
+- Goal: 将员工工作台客资管理页（`/zsjos/leads/manage`）适配手机布局，移动端用"列表 + 详情底部抽屉"替代既有 50vh 堆叠方案。
+- Non-goals: 不改后端接口、数据库、权限模型或业务规则；不新增依赖；不改 LeadDetail/AdvancedFilter 等子组件内部样式；不处理其他页面移动适配；不创建分支/提交/推送。
+- Branch: main
+- Worktree: /Users/louie/Documents/ChatGPT/ZSJOS 2（本地 main 工作树直接工作）
+- Base commit: d4b1de1f7b5b35abd6ece0a578844424c300c8bb
+- Target branch: main
+- Ownership scope: `frontend/workbench/src/pages/LeadManagementPage.tsx`; `frontend/workbench/src/styles/pages/lead-management.css`; `frontend/workbench/src/pages/desktop-detail-drawer.guard.test.ts`; 本 handoff 记录。
+- Owner: Claude Opus 5 (1M context)
+- Dependencies: `Grid`/`Drawer`（antd 现有依赖）、`window.matchMedia`；无新增依赖。
+- Integration order: 源文件改动 -> 样式改动 -> guard 覆盖补全 -> 验证（typecheck/test/build）。
+- Verification plan: Workbench `npm run typecheck`、`npm test`（重点 `lead-management-unified`、`desktop-detail-drawer`、`styles.guard`）、`npm run build`；浏览器需登录态，无后端可达时记录为未验证项并说明剩余风险。
+
+## Delivery Entry - 2026-08-28 16:37:46 +08:00
+
+- Workstream ID: workbench-mobile-leads
+- Branch: main
+- Worktree: /Users/louie/Documents/ChatGPT/ZSJOS 2
+- HEAD commit: d4b1de1f7b5b35abd6ece0a578844424c300c8bb（未创建提交）。
+- User goal: 员工工作台客资管理页（`/zsjos/leads/manage`）适配手机布局。
+- Key decisions: 采用仓库既有"列表 + 详情底部抽屉"移动端模式（`MessageInboxPage`/`LeadComplaintPage` 同款），替换旧"50vh 列表堆叠 + 下方详情"方案；抽屉打开用 `window.matchMedia('(max-width: 768px)').matches` 内联守卫（与 `desktop-detail-drawer.guard.test.ts` 的 literal 期望一致），返回桌面用 `Grid.useBreakpoint()` 的 `screens.md` 自动关闭；新增 `lead-inbox-mobile-drawer` 类，桌面端 `display:none`、窄屏 `display:block`。
+- Execution or analysis result: 移动端点击客资条目仅在 `matchMedia` 命中时打开底部 82vh 抽屉；视口拉宽到桌面（`screens.md`）自动关闭；深链接 `?leadId=xxx` 在移动端自动弹抽屉；桌面端双栏布局与交互不变；将本页加入 `desktop-detail-drawer.guard.test.ts` 的 `detailPages` 以锁住该模式。
+- Changed files: `frontend/workbench/src/pages/LeadManagementPage.tsx`; `frontend/workbench/src/styles/pages/lead-management.css`; `frontend/workbench/src/pages/desktop-detail-drawer.guard.test.ts`; 本 handoff 记录。
+- Verification evidence: Workbench `npm run typecheck` 通过；聚焦测试 `lead-management-unified`(7)、`desktop-detail-drawer`(9，含新增的 `pages/LeadManagementPage.tsx`)、`styles.guard`(26) 共 42/42 通过；`npm run build` 生产构建通过（仅有既有的 chunk >500kB 警告）。Workbench 全量 `npm test` 有 7 个失败，全部来自本次改动无关的既有未提交改动/契约漂移：`announcement.guard`(1)、`media-students.guard`(4)、`subordinate-lead-actions.guard`(1)——这 6 项通过 `git stash push`（仅暂存本工作流的 3 个源文件）后复现仍失败、`git stash pop` 还原，证明在本工作流改动前即存在；另 1 项 `styles.guard`(字体走 token) 失败来源为 `src/styles/pages/lead-submission.css:57  font-size: 12px;`，该文件是会话开始时即存在的并发工作流未提交改动，不在本工作流改动范围、也未触碰。
+- Dependency or integration impact: 无新增 npm 依赖、后端接口、数据库、权限或菜单变更；仅前端展示层改动。
+- Remaining work: 仓库后端（192.168.2.17:48080）在本环境不可达，且无 Playwright 脚本/登录态，无法在真实浏览器完成 375×667、390×844、412×915、1440×900 的授权前交互验收；需在有效登录态下补做移动端抽屉开合、列表占满高度、无横向溢出、loading/empty/error 状态及桌面端无回归的真实浏览器检查。既有 7 个 Workbench guard 测试失败中，6 项属仓库既有问题、1 项（`styles.guard` 字体 token）由并发的 `LeadSubmissionPage` 工作流未提交改动引入，均需对应工作流修复。
 - Remaining work: 无有效登录态，尚未完成授权后的桌面与移动端真实交互验收；Workbench 全量测试仍有 6 个无关既有失败，Admin 全量 typecheck 仍被无关既有错误阻塞。

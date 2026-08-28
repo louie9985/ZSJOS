@@ -141,7 +141,7 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
         </div>}
         <Form.Item name="regionPath" label="所在地区" rules={[{ required: true, message: '请选择所在地区' }]}>
           <Cascader options={areaOptions} showSearch disabled={loadingSources.area || Boolean(configErrors.area)}
-            placeholder={configErrors.area ? (regionSnapshot || '地区配置加载失败') : (regionSnapshot ? `${regionSnapshot}（请选择）` : '请选择省 / 市')}/>
+            placeholder={configErrors.area ? (regionSnapshot || '地区配置加载失败') : (regionSnapshot ? `${regionSnapshot}（请选择）` : '请选择省 / 市，如果不清楚可填写【其他】')}/>
         </Form.Item>
         <Form.Item name="leadCategory" label="客资分类"><Select allowClear loading={loadingSources.category}
           disabled={loadingSources.category || Boolean(configErrors.category)} options={categories.map(item => ({ value: item.value, label: item.label }))}/></Form.Item>

@@ -9,6 +9,7 @@ const detailPages = [
   'components/SalesOrderSupervisorInbox.tsx',
   'pages/LeadDuplicateReviewPage.tsx',
   'pages/LeadComplaintPage.tsx',
+  'pages/LeadManagementPage.tsx',
   'pages/ManagementPages.tsx'
 ]
 

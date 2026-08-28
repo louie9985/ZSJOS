@@ -133,18 +133,8 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     }
   }, [])
 
-  // 移动端同步：CSS 用 !important 把一级栏压到 56px，必须让 React 状态也收起，
-  // 否则 antd Menu 仍渲染完整文字标签在 56px 容器里溢出。
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 768px)')
-    const sync = (e: MediaQueryList | MediaQueryListEvent) => {
-      if (e.matches) setPrimaryCollapsed(true)
-    }
-    sync(mq)
-    mq.addEventListener('change', sync)
-    return () => mq.removeEventListener('change', sync)
-  }, [])
-
+  // 移动端侧栏由 layout.css 在整个 ≤768px 视口隐藏（抽屉成为唯一导航入口），
+  // 无需再用 matchMedia 同步 primarySider 的 collapsed 状态。
   const authorizedMenus = useMemo(
     () => filterRenderableMenus(buildMenuTree(info.menus || []), RENDERABLE_APP_ROUTES),
     [info.menus]
@@ -390,6 +380,11 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
       <Header className="crm-header">
         {/* 移动端汉堡按钮 */}
         <Button type="text" className="mobile-nav-trigger" aria-label="打开导航菜单" icon={<MenuUnfoldOutlined/>} onClick={() => setMobileNavOpen(true)}/>
+        {/* 移动端品牌 + 当前页标识；桌面端由侧栏 .brand 承担，此单元格仅窄屏显示 */}
+        <span className="mobile-header-brand" aria-hidden="true">
+          <span className="mobile-header-brand-name">中世健 AI-CRM</span>
+          {currentMenu && <span className="mobile-header-brand-page">{currentMenu.name}</span>}
+        </span>
         {/* 顶部模式：一级菜单放在 header */}
         {showTopPrimary && !showTopSecondary && (
           <Menu
@@ -411,7 +406,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
           />
         )}
         <Space size={8} className="header-actions">
-          <SalesDispatchStatusControl/>
+          <span className="header-dispatch-control"><SalesDispatchStatusControl/></span>
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
           <MessageCenter/>

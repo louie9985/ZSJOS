@@ -3,7 +3,9 @@ import {
   Alert,
   Badge,
   Button,
+  Drawer,
   Empty,
+  Grid,
   Skeleton,
   Space,
   Spin,
@@ -82,6 +84,8 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const [searchParams] = useSearchParams()
   const routeState = location.state as { leadId?: number; openFollowUp?: boolean; relationScope?: 'submitted' | 'owned' } | null
   const queryLeadId = Number(searchParams.get('leadId')) || undefined
+  const screens = Grid.useBreakpoint()
+  const [drawerOpen, setDrawerOpen] = useState(false)
   const requestedLeadId = routeState?.leadId || queryLeadId
   const requestedTab = parseLeadDetailTab(searchParams.get('tab'))
     || (routeState?.openFollowUp ? 'follow-ups' : undefined)
@@ -213,6 +217,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     if (listScrollRef.current) listScrollRef.current.scrollTop = 0
     void loadPage(1, true, version)
   }, [detailOnly, loadPage])
+  // 深链接直达某客资时，移动端直接把详情抽屉弹出来，避免用户以为列表为空
+  useEffect(() => {
+    if (requestedLeadId && window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+  }, [requestedLeadId])
+  // 视口拉宽回到桌面端时，关闭移动端详情抽屉、回到双栏布局
+  useEffect(() => { if (screens.md) setDrawerOpen(false) }, [screens.md])
 
   const loadDetail = useCallback(async (id: number, silent = false) => {
     if (!silent) setDetailLoading(true)
@@ -317,6 +327,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     setFollowUpDirty(false)
     routeSelectionRef.current = undefined
     setSelectedId(id)
+    if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
   const detailContent = detailLoading
     ? <Skeleton active paragraph={{ rows: 10 }}/>
@@ -335,7 +346,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     </section>
   }
 
-  return <section className="workspace-page lead-management-page">
+  return <><section className="workspace-page lead-management-page">
     <header className="lead-simple-status-shell" role="group" aria-label="客资状态筛选">
       {returnTo && <Button icon={<ArrowLeftOutlined/>} onClick={() => navigate(returnTo)}>返回订单审批</Button>}
       {SIMPLE_STATUS_OPTIONS.map(option => <button
@@ -396,4 +407,16 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       <main className="lead-inbox-detail-pane">{detailContent}</main>
     </div>
   </section>
+  <Drawer
+    className="lead-inbox-mobile-drawer"
+    title={detail?.submittedName || '客资详情'}
+    placement="bottom"
+    height="82vh"
+    open={drawerOpen}
+    onClose={() => setDrawerOpen(false)}
+    destroyOnClose={false}
+  >
+    {detailContent}
+  </Drawer>
+  </>
 }

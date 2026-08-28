@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { buildHierarchicalNavMenuItems, buildHierarchicalSecondaryItems, buildNavMenuItems } from './navItems'
 import type { PrimaryNavigationItem } from '../services/menu'
+import { getNavigationOpenKeys } from '../services/menu'
 import type { WorkbenchMenu } from '../services/api'
 
 const menu = (id: number, name: string, path: string): WorkbenchMenu =>
@@ -121,5 +122,43 @@ describe('hierarchical menu builders', () => {
     const [item] = buildHierarchicalSecondaryItems(root) as any[]
     expect(item.key).toBe('/zsjos/config')
     expect(item.children[0].key).toBe('/zsjos/config/items')
+  })
+})
+
+describe('mobile drawer open-key recovery', () => {
+  // 抽屉用 getNavigationOpenKeys 求当前页的完整祖先链作为受控 openKeys；
+  // 该链必须与 buildNavMenuItems 产出的 Menu 节点 key 一致，否则展开树点不到页面。
+  it('returns the full ancestor chain for a deep leaf as a keyed tree matching the menu items', () => {
+    // 移动抽屉收到的是 buildTwoLevelNavigation 的 navigation：一级必有 pages，
+    // 二级容器在自身的 children 里继续挂深层页面。
+    const config = menu(2, '配置', '/zsjos/config')
+    config.children = [{ ...menu(3, '项目', '/zsjos/config/items'), parentId: 2, children: [] }]
+    const navigation = [{
+      key: '1', label: '工作台', icon: 'mdi:home', menu: menu(1, '工作台', '/zsjos'),
+      pages: [{
+        key: '2', label: '配置', icon: 'mdi:folder', menu: config,
+        children: [{ key: '/zsjos/config/items', label: '项目', icon: 'mdi:file', menu: config.children[0], children: [] }]
+      }]
+    }] as unknown as PrimaryNavigationItem[]
+
+    const built = buildNavMenuItems(navigation) as any[]
+    const openKeys = getNavigationOpenKeys(navigation, '/zsjos/config/items')
+
+    // 容器节点用 menu.id、叶子用 menu.path，与 buildNavMenuItems 的 key 规则一致
+    expect(built[0].key).toBe('1')
+    expect(built[0].children[0].key).toBe('2')
+    expect(built[0].children[0].children[0].key).toBe('/zsjos/config/items')
+    expect(openKeys).toEqual(['1', '2'])
+  })
+
+  it('returns an empty chain for an unknown or root path', () => {
+    const root = menu(1, '工作台', '/zsjos')
+    root.children = [{ ...menu(2, '配置', '/zsjos/config'), parentId: 1 }]
+    const navigation = [{
+      key: '1', label: '工作台', icon: 'mdi:home', menu: root, pages: []
+    }] as unknown as PrimaryNavigationItem[]
+
+    expect(getNavigationOpenKeys(navigation, '/does/not/exist')).toEqual([])
+    expect(getNavigationOpenKeys(navigation, '/zsjos')).toEqual([])
   })
 })
