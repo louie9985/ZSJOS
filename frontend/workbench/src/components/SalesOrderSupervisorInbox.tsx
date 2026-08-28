@@ -51,6 +51,7 @@ const STATUS_COLORS = {
   rejected: "red",
   cancelled: "default",
 } as const;
+type SupervisorInboxScope = "todo" | "done" | "all";
 
 export default function SalesOrderSupervisorInbox({
   scopeControl,
@@ -61,7 +62,7 @@ export default function SalesOrderSupervisorInbox({
   requestedConfirmationId?: number;
   requestedOrderId?: number;
 }) {
-  const [handled, setHandled] = useState(false),
+  const [scope, setScope] = useState<SupervisorInboxScope>("todo"),
     [keyword, setKeyword] = useState("");
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
   const [items, setItems] = useState<SalesOrderSupervisorInboxItem[]>([]),
@@ -85,9 +86,10 @@ export default function SalesOrderSupervisorInbox({
   const [decision, setDecision] = useState<"confirm" | "reject">(),
     [reason, setReason] = useState("");
   const { submitting, run, resetIntent } = useSubmissionGuard();
+  const handled = scope === "all" ? undefined : scope === "done";
   const load = useCallback(
     async (append = false) => {
-      const requestKey = `${append ? cursor || "none" : "first"}:${handled}:${keyword.trim()}:${JSON.stringify(advancedFilter)}`;
+      const requestKey = `${append ? cursor || "none" : "first"}:${scope}:${keyword.trim()}:${JSON.stringify(advancedFilter)}`;
       if (inflightPages.current.has(requestKey)) return;
       inflightPages.current.add(requestKey);
       const generation = append ? listGeneration.current : ++listGeneration.current;
@@ -140,11 +142,11 @@ export default function SalesOrderSupervisorInbox({
         }
       }
     },
-    [advancedFilter, cursor, handled, keyword],
+    [advancedFilter, cursor, handled, keyword, scope],
   );
   useEffect(() => {
     void load();
-  }, [advancedFilter, handled, keyword]);
+  }, [load]);
   useEffect(() => {
     if (!requestedConfirmationId) return;
     targetConfirmation.current = undefined;
@@ -311,11 +313,12 @@ export default function SalesOrderSupervisorInbox({
         <div className="business-inbox-scope-row">
           {scopeControl}
           <Segmented
-            value={handled ? "done" : "todo"}
-            onChange={(value) => setHandled(value === "done")}
+            value={scope}
+            onChange={(value) => setScope(value as SupervisorInboxScope)}
             options={[
               { label: "待处理", value: "todo" },
               { label: "已处理", value: "done" },
+              { label: "全部", value: "all" },
             ]}
           />
           <Button icon={<ReloadOutlined />} onClick={() => void load()}>

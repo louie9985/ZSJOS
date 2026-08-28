@@ -90,6 +90,42 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
     }
 
     @Test
+    public void testRemoveExcessAccessTokens_keepsOtherClientSession() {
+        TenantContextHolder.setTenantId(0L);
+        Long userId = randomLongId();
+        LocalDateTime now = LocalDateTime.now();
+        OAuth2RefreshTokenDO pcRefresh = randomPojo(OAuth2RefreshTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("zsjos-pc")
+                .setRefreshToken("pc-refresh-token").setExpiresTime(now.plusDays(7)));
+        OAuth2RefreshTokenDO mobileRefresh = randomPojo(OAuth2RefreshTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("zsjos-mobile")
+                .setRefreshToken("mobile-refresh-token").setExpiresTime(now.plusDays(7)));
+        oauth2RefreshTokenMapper.insert(pcRefresh);
+        oauth2RefreshTokenMapper.insert(mobileRefresh);
+        OAuth2AccessTokenDO pcAccess = randomPojo(OAuth2AccessTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("zsjos-pc")
+                .setAccessToken("pc-access-token").setRefreshToken(pcRefresh.getRefreshToken())
+                .setExpiresTime(now.plusHours(2)));
+        OAuth2AccessTokenDO mobileAccess = randomPojo(OAuth2AccessTokenDO.class, o -> o.setId(null)
+                .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("zsjos-mobile")
+                .setAccessToken("mobile-access-token").setRefreshToken(mobileRefresh.getRefreshToken())
+                .setExpiresTime(now.plusHours(2)));
+        oauth2AccessTokenMapper.insert(pcAccess);
+        oauth2AccessTokenMapper.insert(mobileAccess);
+
+        oauth2TokenService.removeExcessAccessTokens(userId, UserTypeEnum.ADMIN.getValue(), "zsjos-mobile", 1);
+
+        assertNotNull(oauth2AccessTokenMapper.selectById(pcAccess.getId()));
+        assertNotNull(oauth2RefreshTokenMapper.selectByRefreshToken(pcRefresh.getRefreshToken()));
+        assertNull(oauth2AccessTokenMapper.selectById(mobileAccess.getId()));
+        assertNull(oauth2RefreshTokenMapper.selectByRefreshToken(mobileRefresh.getRefreshToken()));
+
+        // OAuth2 Token 表按设计忽略租户，显式清理保留的跨 client 对照数据，避免污染其他分页用例。
+        oauth2AccessTokenMapper.deleteById(pcAccess.getId());
+        oauth2RefreshTokenMapper.deleteByRefreshToken(pcRefresh.getRefreshToken());
+    }
+
+    @Test
     public void testCreateAccessToken() {
         TenantContextHolder.setTenantId(0L);
         // 准备参数

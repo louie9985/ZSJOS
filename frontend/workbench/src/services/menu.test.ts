@@ -195,9 +195,11 @@ describe('workbench menu conversion', () => {
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
     // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(52)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(55)
+    expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.ANNOUNCEMENTS)).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/calendar/overview')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/calendar/all')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/my-assets')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/asset-demands')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/feedback')).toBe(true)
@@ -214,6 +216,20 @@ describe('workbench menu conversion', () => {
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/leads/appeals')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/opportunity-public-sea')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/sales-order-supervisor-confirmations')
+  })
+
+  it('resolves the original notice menu to the workbench announcement page', () => {
+    const routes = filterRenderableMenus(buildMenuTree([menu({
+      id: 2739,
+      name: '消息中心',
+      path: '/messages',
+      children: [
+        menu({ id: 107, parentId: 2739, name: '通知公告', path: 'notice', component: 'system/notice/index' })
+      ]
+    })]), RENDERABLE_APP_ROUTES)
+
+    expect(findMenuByPath(routes, APP_ROUTES.ANNOUNCEMENTS)?.name).toBe('通知公告')
+    expect(buildTwoLevelNavigation(routes)[0]?.pages.map(page => page.key)).toContain(APP_ROUTES.ANNOUNCEMENTS)
   })
 
   it('keeps an authorized hidden page routable without adding it to navigation', () => {

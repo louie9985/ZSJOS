@@ -386,7 +386,7 @@ public class LeadInboxFilterConfigServiceImpl implements LeadInboxFilterConfigSe
     private static String audienceLabel(String audience) {
         return INBOX_AUDIENCE_SUBMITTER.equals(audience) ? "提交人视角"
                 : INBOX_AUDIENCE_OWNER.equals(audience) ? "负责人视角"
-                : INBOX_AUDIENCE_REVIEWER.equals(audience) ? "审批人视角" : "超期公海视角";
+                : INBOX_AUDIENCE_REVIEWER.equals(audience) ? "审批人视角" : "公海视角";
     }
 
     private static LeadInboxFilterCapabilityRespVO capability(String field, String label,

@@ -214,6 +214,30 @@ public class AdminAuthServiceImplTest extends BaseDbUnitTest {
     }
 
     @Test
+    public void testLogin_mobileUsesIndependentClientAndLimit() {
+        AuthLoginReqVO reqVO = randomPojo(AuthLoginReqVO.class, o ->
+                o.setUsername("mobile_username").setPassword("mobile_password")
+                        .setPlatform("MOBILE").setSocialType(null));
+        authService.setCaptchaEnable(false);
+        AdminUserDO user = randomPojo(AdminUserDO.class, o -> o.setId(2L).setUsername("mobile_username")
+                .setPassword("mobile_password").setStatus(CommonStatusEnum.ENABLE.getStatus()));
+        when(userService.getUserByUsername("mobile_username")).thenReturn(user);
+        when(userService.isPasswordMatch("mobile_password", user.getPassword())).thenReturn(true);
+        when(configApi.getConfigValueByKey("zsjos.auth.mobile.max-devices")).thenReturn("3");
+        when(configApi.getConfigValueByKey("zsjos.auth.remember-days")).thenReturn("9");
+        OAuth2AccessTokenDO accessToken = randomPojo(OAuth2AccessTokenDO.class, o -> o.setUserId(2L)
+                .setUserType(UserTypeEnum.ADMIN.getValue()).setClientId("zsjos-mobile"));
+        when(oauth2TokenService.createAccessTokenWithLimit(2L, UserTypeEnum.ADMIN.getValue(),
+                "zsjos-mobile", null, 9 * 24 * 60 * 60, 3)).thenReturn(accessToken);
+
+        AuthLoginRespVO result = authService.login(reqVO);
+
+        assertEquals("zsjos-mobile", result.getClientId());
+        verify(oauth2TokenService).createAccessTokenWithLimit(2L, UserTypeEnum.ADMIN.getValue(),
+                "zsjos-mobile", null, 9 * 24 * 60 * 60, 3);
+    }
+
+    @Test
     public void testSendSmsCode() {
         // 准备参数
         String mobile = randomString();

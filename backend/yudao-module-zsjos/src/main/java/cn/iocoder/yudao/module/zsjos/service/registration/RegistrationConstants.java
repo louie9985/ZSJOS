@@ -5,6 +5,7 @@ public interface RegistrationConstants {
     String STATUS_PROCESSING = "processing";
     String STATUS_COMPLETED = "completed";
     String STATUS_CANCELLED = "cancelled";
+    String COMMAND_CLOSE = "close";
     String ITEM_TYPE_CHECKBOX = "checkbox";
     String ITEM_TYPE_STUDY_PLANNER = "study_planner";
     String ITEM_TYPE_ATTACHMENT = "attachment";
@@ -18,6 +19,7 @@ public interface RegistrationConstants {
     String RELATION_REGISTRATION_MANAGER_PLANNER = "registration_manager_study_planner";
     String RELATION_REGISTRATION_SPECIALIST_PLANNER = "registration_specialist_study_planner";
     String PERMISSION_QUERY_POOL = "zsjos:registration:query-pool";
+    String PERMISSION_CLOSE = "zsjos:registration:close";
     String NOTIFY_SCENE_TASK_CREATED = "zsjos.registration.task_created";
     String NOTIFY_SCENE_PLANNER_ASSIGNED = "zsjos.registration.planner_assigned";
     String NOTIFY_SCENE_DIRECTOR_ASSIGNED = "zsjos.registration.director_assigned";

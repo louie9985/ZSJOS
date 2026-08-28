@@ -1,5 +1,12 @@
 import axios, { type AxiosRequestConfig } from "axios";
-import { APP_CONFIG, STORAGE_KEYS } from "../constants";
+import {
+  APP_CONFIG,
+  AUTH_CLIENT_IDS,
+  AUTH_STORAGE_KEYS,
+  STORAGE_KEYS,
+  resolveAuthPlatform,
+  type AuthPlatform,
+} from "../constants";
 import {
   handleImpersonationInvalid,
   resolveImpersonationSessionHeader,
@@ -293,6 +300,10 @@ export type MediaAccountCalendarResult = {
   total: number;
   unscheduledCount: number;
 };
+export type MediaAccountCalendarCandidates = {
+  directors: SimpleUser[];
+  operators: SimpleUser[];
+};
 export type MediaContent = {
   id: number;
   contentNo: string;
@@ -485,6 +496,9 @@ export type RegistrationCase = {
   studyPlannerUserId?: number;
   studyPlannerUserName?: string;
   registrationApprovedAt?: Timestamp;
+  completedAt?: Timestamp;
+  cancelledAt?: Timestamp;
+  cancelReason?: string;
   version: number;
   completable?: boolean;
   completionBlockCode?: string;
@@ -1639,8 +1653,9 @@ export type BusinessTask = {
   actionCode?:
     | "OPEN_LEAD_ASSIGNMENT"
     | "OPEN_LEAD_FOLLOW_UP"
-    | "OPEN_WORK_PLAN_ITEM"
-    | "REVIEW_WORK_PLAN_ITEM"
+    | "OPEN_WORK_TASK"
+    | "CONFIRM_WORK_TASK"
+    | "SUMMARIZE_WORK_PLAN"
     | "OPEN_SALES_ORDER_REVISION"
     | "COMPLETE_BIRTHDAY_CARE"
     | "OPEN_STUDENT_FIRST_CONTACT"
@@ -1657,15 +1672,22 @@ export type BpmTask = {
   name: string;
   createTime: Timestamp;
   endTime?: Timestamp;
+  durationInMillis?: number;
   status: number;
   reason?: string;
+  assigneeUser?: { id: number; nickname: string };
+  ownerUser?: { id: number; nickname: string };
   processInstanceId: string;
   taskDefinitionKey?: string;
   parentTaskId?: string;
+  formName?: string;
+  reasonRequire?: boolean;
   processInstance?: {
     id: string;
     name: string;
     createTime: Timestamp;
+    processDefinitionId?: string;
+    summary?: Array<{ key: string; value: string }>;
     startUser?: { id: number; nickname: string };
   };
 };
@@ -2163,7 +2185,7 @@ type RefreshResult =
   | { status: "refreshed"; accessToken: string }
   | { status: "failed"; expectedRefreshToken: string | null }
   | { status: "stale" };
-let refreshing: Promise<RefreshResult> | null = null;
+const refreshing: Partial<Record<AuthPlatform, Promise<RefreshResult>>> = {};
 
 export class AuthenticationError extends Error {
   readonly code = 401;
@@ -2183,18 +2205,32 @@ export class ApiError extends Error {
   }
 }
 
-export const clearAuthStorage = () => {
-  refreshing = null;
-  // 清理旧版 Workbench key，避免旧会话在升级后残留。
-  localStorage.removeItem("zsjos_access_token");
-  localStorage.removeItem("zsjos_refresh_token");
-  localStorage.removeItem("zsjos_client_id");
-  localStorage.removeItem("zsjos_expires_time");
-  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-  localStorage.removeItem(STORAGE_KEYS.CLIENT_ID);
-  localStorage.removeItem(STORAGE_KEYS.EXPIRES_TIME);
-  localStorage.removeItem(STORAGE_KEYS.IMPERSONATION);
+export const getAuthStorageKeys = (
+  platform: AuthPlatform = resolveAuthPlatform(),
+) => AUTH_STORAGE_KEYS[platform];
+
+export const getAuthAccessToken = (
+  platform: AuthPlatform = resolveAuthPlatform(),
+  storage: Pick<Storage, "getItem"> = localStorage,
+) => storage.getItem(getAuthStorageKeys(platform).accessToken);
+
+export const clearAuthStorage = (
+  platform: AuthPlatform = resolveAuthPlatform(),
+) => {
+  delete refreshing[platform];
+  const keys = getAuthStorageKeys(platform);
+  localStorage.removeItem(keys.accessToken);
+  localStorage.removeItem(keys.refreshToken);
+  localStorage.removeItem(keys.clientId);
+  localStorage.removeItem(keys.expiresTime);
+  if (platform === "PC") {
+    // 旧 Workbench key 只属于 PC/Admin 兼容协议；Mobile 退出不能触碰 PC 会话。
+    localStorage.removeItem("zsjos_access_token");
+    localStorage.removeItem("zsjos_refresh_token");
+    localStorage.removeItem("zsjos_client_id");
+    localStorage.removeItem("zsjos_expires_time");
+    localStorage.removeItem(STORAGE_KEYS.IMPERSONATION);
+  }
 };
 export type SubordinatePartner = {
   id: number;
@@ -2250,50 +2286,105 @@ export const writeSharedTenantId = (
   return normalized;
 };
 
-const authenticatedTenantId = () => {
+const authenticatedTenantId = (platform: AuthPlatform) => {
   const tenantId = readSharedTenantId();
   if (tenantId) return tenantId;
-  expireAuthentication(localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN));
+  const keys = getAuthStorageKeys(platform);
+  expireAuthentication(platform, localStorage.getItem(keys.refreshToken));
   throw new AuthenticationError("租户信息缺失，请重新登录");
 };
 
-export const migrateLegacyAuthStorage = () => {
-  const pairs = [
-    [STORAGE_KEYS.ACCESS_TOKEN, "zsjos_access_token"],
-    [STORAGE_KEYS.REFRESH_TOKEN, "zsjos_refresh_token"],
-    [STORAGE_KEYS.CLIENT_ID, "zsjos_client_id"],
-    [STORAGE_KEYS.EXPIRES_TIME, "zsjos_expires_time"],
-  ] as const;
-  for (const [sharedKey, legacyKey] of pairs) {
-    if (!localStorage.getItem(sharedKey)) {
-      const legacyValue = localStorage.getItem(legacyKey);
-      if (legacyValue) localStorage.setItem(sharedKey, legacyValue);
+const LEGACY_AUTH_KEYS = {
+  accessToken: "zsjos_access_token",
+  refreshToken: "zsjos_refresh_token",
+  clientId: "zsjos_client_id",
+  expiresTime: "zsjos_expires_time",
+} as const;
+
+export const migrateLegacyAuthStorage = (
+  storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = localStorage,
+) => {
+  const pcKeys = AUTH_STORAGE_KEYS.PC;
+  const source = {
+    accessToken:
+      storage.getItem(pcKeys.accessToken) ||
+      storage.getItem(LEGACY_AUTH_KEYS.accessToken),
+    refreshToken:
+      storage.getItem(pcKeys.refreshToken) ||
+      storage.getItem(LEGACY_AUTH_KEYS.refreshToken),
+    clientId:
+      storage.getItem(pcKeys.clientId) ||
+      storage.getItem(LEGACY_AUTH_KEYS.clientId),
+    expiresTime:
+      storage.getItem(pcKeys.expiresTime) ||
+      storage.getItem(LEGACY_AUTH_KEYS.expiresTime),
+  };
+  const complete = Boolean(source.accessToken && source.refreshToken);
+  const platform: AuthPlatform =
+    source.clientId === AUTH_CLIENT_IDS.MOBILE ? "MOBILE" : "PC";
+  const target = AUTH_STORAGE_KEYS[platform];
+  if (complete) {
+    const values = {
+      accessToken: source.accessToken!,
+      refreshToken: source.refreshToken!,
+      clientId: source.clientId || AUTH_CLIENT_IDS[platform],
+      expiresTime: source.expiresTime,
+    };
+    for (const field of [
+      "accessToken",
+      "refreshToken",
+      "clientId",
+      "expiresTime",
+    ] as const) {
+      const value = values[field];
+      if (value && !storage.getItem(target[field]))
+        storage.setItem(target[field], value);
     }
-    localStorage.removeItem(legacyKey);
   }
+  // 无前缀 key 若标记为 mobile，必须移走，避免 Vue Admin/PC 误用 Mobile Token。
+  if (platform === "MOBILE") {
+    Object.values(pcKeys).forEach((key) => storage.removeItem(key));
+  }
+  Object.values(LEGACY_AUTH_KEYS).forEach((key) => storage.removeItem(key));
 };
 
 export const AUTH_EXPIRED_EVENT = "zsjos-auth-expired";
-let authExpiredDispatched = false;
+const authExpiredDispatched: Record<AuthPlatform, boolean> = {
+  PC: false,
+  MOBILE: false,
+};
 export const isCurrentRefreshSession = (
   expectedRefreshToken: string | null,
   currentRefreshToken: string | null,
 ) => expectedRefreshToken === currentRefreshToken;
-const expireAuthentication = (expectedRefreshToken: string | null) => {
+const expireAuthentication = (
+  platform: AuthPlatform,
+  expectedRefreshToken: string | null,
+) => {
+  const keys = getAuthStorageKeys(platform);
   if (
     !isCurrentRefreshSession(
       expectedRefreshToken,
-      localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+      localStorage.getItem(keys.refreshToken),
     )
   )
     return;
-  clearAuthStorage();
-  if (authExpiredDispatched) return;
-  authExpiredDispatched = true;
-  window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  clearAuthStorage(platform);
+  if (authExpiredDispatched[platform]) return;
+  authExpiredDispatched[platform] = true;
+  window.dispatchEvent(
+    new CustomEvent(AUTH_EXPIRED_EVENT, { detail: { platform } }),
+  );
 };
 
 http.interceptors.request.use((config) => {
+  const platform = resolveAuthPlatform();
+  const keys = getAuthStorageKeys(platform);
+  const request = config as typeof config & {
+    _zsjosAuthPlatform?: AuthPlatform;
+    _zsjosImpersonationSessionId?: number;
+  };
+  request._zsjosAuthPlatform = platform;
   const expectedOrigin = new URL(
     config.baseURL || APP_CONFIG.API_BASE_URL,
     window.location.origin,
@@ -2307,20 +2398,20 @@ http.interceptors.request.use((config) => {
     config.headers.delete("X-ZSJOS-Impersonation-Session");
     return config;
   }
-  const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  const token = localStorage.getItem(keys.accessToken);
   config.headers["tenant-id"] = token
-    ? authenticatedTenantId()
+    ? authenticatedTenantId(platform)
     : readSharedTenantId() || APP_CONFIG.DEFAULT_TENANT_ID;
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  const impersonation = localStorage.getItem(STORAGE_KEYS.IMPERSONATION);
+  const impersonation =
+    platform === "PC"
+      ? localStorage.getItem(STORAGE_KEYS.IMPERSONATION)
+      : null;
   const impersonationId = resolveImpersonationSessionHeader(
     config.url,
     impersonation,
     expectedOrigin,
   );
-  const request = config as typeof config & {
-    _zsjosImpersonationSessionId?: number;
-  };
   delete request._zsjosImpersonationSessionId;
   config.headers.delete("X-ZSJOS-Impersonation-Session");
   if (impersonationId != null) {
@@ -2347,12 +2438,17 @@ const retryAfterRefresh = async (
   config: AxiosRequestConfig,
   originalError: unknown,
 ) => {
-  const request = config as AxiosRequestConfig & { _retry?: boolean };
+  const request = config as AxiosRequestConfig & {
+    _retry?: boolean;
+    _zsjosAuthPlatform?: AuthPlatform;
+  };
   if (request._retry || isAuthEndpoint(request.url))
     return Promise.reject(originalError);
   request._retry = true;
+  const platform = request._zsjosAuthPlatform || resolveAuthPlatform();
+  const keys = getAuthStorageKeys(platform);
   // Admin iframe 可能已经完成刷新；先复用共享存储中的新 token，避免两个窗口同时刷新。
-  const sharedAccessToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  const sharedAccessToken = localStorage.getItem(keys.accessToken);
   const sentAuthorization = String(
     request.headers?.Authorization || request.headers?.authorization || "",
   );
@@ -2366,17 +2462,17 @@ const retryAfterRefresh = async (
     };
     return http(request);
   }
-  if (!refreshing) {
-    const task = refreshToken();
-    refreshing = task;
+  if (!refreshing[platform]) {
+    const task = refreshToken(platform);
+    refreshing[platform] = task;
     void task.finally(() => {
-      if (refreshing === task) refreshing = null;
+      if (refreshing[platform] === task) delete refreshing[platform];
     });
   }
-  const result = await refreshing;
+  const result = await refreshing[platform]!;
   if (result.status === "stale") return Promise.reject(originalError);
   if (result.status === "failed") {
-    expireAuthentication(result.expectedRefreshToken);
+    expireAuthentication(platform, result.expectedRefreshToken);
     return Promise.reject(new AuthenticationError());
   }
   request.headers = {
@@ -2430,15 +2526,16 @@ export const unwrap = <T>(response: { data: any }): T => {
   return payload as T;
 };
 
-async function refreshToken(): Promise<RefreshResult> {
-  const refresh = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+async function refreshToken(platform: AuthPlatform): Promise<RefreshResult> {
+  const keys = getAuthStorageKeys(platform);
+  const refresh = localStorage.getItem(keys.refreshToken);
   if (!refresh) return { status: "failed", expectedRefreshToken: null };
   try {
-    const clientId = localStorage.getItem(STORAGE_KEYS.CLIENT_ID);
+    const clientId = localStorage.getItem(keys.clientId);
     const clientIdParam = clientId
       ? `&clientId=${encodeURIComponent(clientId)}`
       : "";
-    const tenantId = authenticatedTenantId();
+    const tenantId = authenticatedTenantId(platform);
     const response = await axios.post(
       `${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`,
       undefined,
@@ -2452,20 +2549,20 @@ async function refreshToken(): Promise<RefreshResult> {
     if (
       !isCurrentRefreshSession(
         refresh,
-        localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+        localStorage.getItem(keys.refreshToken),
       )
     ) {
       return { status: "stale" };
     }
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken);
-    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken);
+    localStorage.setItem(keys.accessToken, result.accessToken);
+    localStorage.setItem(keys.refreshToken, result.refreshToken);
     if (result.clientId)
-      localStorage.setItem(STORAGE_KEYS.CLIENT_ID, result.clientId);
+      localStorage.setItem(keys.clientId, result.clientId);
     return { status: "refreshed", accessToken: result.accessToken };
   } catch {
     return isCurrentRefreshSession(
       refresh,
-      localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN),
+      localStorage.getItem(keys.refreshToken),
     )
       ? { status: "failed", expectedRefreshToken: refresh }
       : { status: "stale" };
@@ -2508,7 +2605,7 @@ export const api = {
   login: async (
     username: string,
     password: string,
-    platform: "PC" | "MOBILE" = "PC",
+    platform: AuthPlatform = "PC",
   ) => {
     writeSharedTenantId(readSharedTenantId() || APP_CONFIG.DEFAULT_TENANT_ID);
     const result = unwrap<{
@@ -2517,15 +2614,16 @@ export const api = {
       expiresTime: string;
       clientId?: string;
     }>(await http.post("/system/auth/login", { username, password, platform }));
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, result.accessToken);
-    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, result.refreshToken);
-    localStorage.setItem(STORAGE_KEYS.EXPIRES_TIME, result.expiresTime);
+    const keys = getAuthStorageKeys(platform);
+    localStorage.setItem(keys.accessToken, result.accessToken);
+    localStorage.setItem(keys.refreshToken, result.refreshToken);
+    localStorage.setItem(keys.expiresTime, result.expiresTime);
     localStorage.setItem(
-      STORAGE_KEYS.CLIENT_ID,
-      result.clientId || (platform === "MOBILE" ? "zsjos-mobile" : "zsjos-pc"),
+      keys.clientId,
+      result.clientId || AUTH_CLIENT_IDS[platform],
     );
-    refreshing = null;
-    authExpiredDispatched = false;
+    delete refreshing[platform];
+    authExpiredDispatched[platform] = false;
     return result;
   },
   logout: async () => {
@@ -2724,6 +2822,24 @@ export const api = {
     }) =>
       unwrap<MediaAccountCalendarResult>(
         await http.get("/zsjos/media-account/calendar", { params }),
+      ),
+    calendarAll: async (params: {
+      pageNo: number;
+      pageSize: number;
+      rangeStart: string;
+      rangeEnd: string;
+      keyword?: string;
+      currentStatusValue?: string;
+      stageValue?: string;
+      directorUserId?: number;
+      operatorUserId?: number;
+    }) =>
+      unwrap<MediaAccountCalendarResult>(
+        await http.get("/zsjos/media-account/calendar/all", { params }),
+      ),
+    calendarCandidates: async () =>
+      unwrap<MediaAccountCalendarCandidates>(
+        await http.get("/zsjos/media-account/calendar/candidates"),
       ),
     diagnose: async (
       id: number,
@@ -3726,7 +3842,7 @@ export const api = {
   salesOrderSupervisorInbox: async (params: {
     pageNo: number;
     pageSize: number;
-    handled: boolean;
+    handled?: boolean;
     keyword?: string;
     advancedFilter?: AdvancedFilterGroup;
   }) =>
@@ -3746,7 +3862,7 @@ export const api = {
   salesOrderSupervisorCursor: async (params: {
     cursor?: string;
     limit?: number;
-    handled: boolean;
+    handled?: boolean;
     keyword?: string;
     advancedFilter?: AdvancedFilterGroup;
   }) =>
@@ -4474,6 +4590,11 @@ export const api = {
     unwrap<boolean>(
       await http.post(`/zsjos/registration/${id}/complete`, data),
     ),
+  closeRegistration: async (
+    id: number,
+    data: { version: number; idempotencyKey: string; reason: string },
+  ) =>
+    unwrap<boolean>(await http.post(`/zsjos/registration/${id}/close`, data)),
   myStudents: async (params: {
     pageNo: number;
     pageSize: number;

@@ -125,7 +125,7 @@ After applying V043, run `verify-bootstrap.sql` and confirm the V041 objects, co
 
 ## V073 registration fulfillment
 
-V073 is additive and follows V072. It creates the versioned checklist, public-pool case, immutable checklist snapshot, completion facts, per-order-item service relationship and command-idempotency tables. It seeds exactly five confirmed items for active tenants, adds menu metadata, grants checklist configuration to `system_administrator`, and grants only My Students to `study_planner`. It does not backfill historical orders and does not grant public-pool handling to ordinary roles. Existing-environment execution still requires a separate approval and a preflight review of orders whose registration node already passed.
+V073 is additive and follows V072. It creates the versioned checklist, public-pool case, immutable checklist snapshot, completion facts, per-order-item service relationship and command-idempotency tables. It seeds exactly five confirmed items for active tenants, adds menu metadata, grants checklist configuration to `system_administrator`, and grants only My Students to `study_planner`. It does not backfill historical orders and does not grant public-pool handling to ordinary roles. Existing-environment execution still requires a separate approval and a preflight review of orders whose registration node already passed. V160 later adds the server-owned `zsjos:registration:close` button metadata under the same registration public-pool page without changing case history or service-relation behavior.
 
 V083 adds checklist attachment flags, versioned route options, case route snapshots and attachment metadata. It resolves the exact, unique active System department names `学生服务与交付中心` and `新媒体与客资中心` once, stores their IDs, and exposes a verification failure when either name is missing or ambiguous. It snapshots routes only for active/pending cases, grants only My Students to enabled `content_director` roles, and adds the director-assignment in-app notification. It does not execute file deletion, backfill completed historical cases, or grant public-pool permissions. Apply after V082 and before V084; execution against an existing environment requires separate approval.
 
@@ -525,8 +525,8 @@ overwriting existing administrator data. Existing feedback and work-order rows a
 rebuilt. Both `zsjos_schema_version` and `zsjos_module_schema_version` record V149 with the file SHA-256.
 
 V149 exclusively reserves menu IDs `79940-79957`: `79940-79946` are the Workbench feedback page and
-buttons, while `79947-79957` are the Admin feedback root, pages and buttons. It must not reuse V148
-announcement IDs `79910-79912` or the V150/V151 Partner-manage ID `79920`.
+buttons, while `79947-79957` are the Admin feedback root, pages and buttons. It must not reuse V148/V158
+announcement IDs `79910-79913` or the V150/V151 Partner-manage ID `79920`.
 
 Before an existing-environment execution, review the migration plan, retain a database backup, and run
 the read-only checks in `script/sql/mysql/verify-bootstrap.sql`. Afterward verify the six tables,
@@ -584,8 +584,11 @@ statement-batch clients may report a failed `CALL` and still execute later top-l
 `information_schema`-guarded dynamic DDL for its three `system_notice` lifecycle columns; do not replace it
 with `ADD COLUMN IF NOT EXISTS`. If the former V148 was partially executed, retain its additive tables,
 menus, and both version markers, take a backup, and explicitly rerun the corrected V148 file. Verify
-`publish_status`, `publish_time`, `offline_time`, both notice child tables, menu IDs `79910-79912`, and both
-V148 registry rows. A version-aware runner may otherwise skip the repair.
+`publish_status`, `publish_time`, `offline_time`, both notice child tables, menu IDs `79911-79912`, the
+retired `79910` row after V158, and both V148 registry rows. A version-aware runner may otherwise skip the
+repair. V158 additionally moves `system:notice:read` to button menu `79913` under the original notice
+menu `107`; verify that tenant packages containing `107` also contain `79913`, active `79910` references
+are gone, and roles that can open the original notice page also receive the read button permission.
 
 V150 is sourced by `bootstrap.sql` after V148 and independently verifies V143 in both version registries;
 the separately owned V149 file and version rows are not prerequisites. If a continue-on-error client already

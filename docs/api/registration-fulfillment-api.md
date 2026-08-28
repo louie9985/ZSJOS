@@ -28,6 +28,7 @@ disabled, or renamed. New cases snapshot the published version and never follow 
 - `POST /zsjos/registration/{id}/items/{itemId}/attachments`
 - `DELETE /zsjos/registration/{id}/items/{itemId}/attachments/{attachmentId}`
 - `POST /zsjos/registration/{id}/complete`
+- `POST /zsjos/registration/{id}/close`
 
 Every command carries `version` and `idempotencyKey`. Item and planner updates return the latest
 registration detail, allowing clients to update one row without reloading the whole page. The
@@ -36,6 +37,12 @@ Chinese `statusLabel`, `orderStatusLabel`, `completionBlockCode`, and `completio
 display. Stable errors distinguish finance pending, finance revision required, stale versions,
 reused keys, incomplete checklists, ineffective orders, invalid planners, terminal cases and
 object authorization failures.
+
+`close` is the explicit user action for an approved order that does not need further service. It
+requires a close reason and marks the registration case `cancelled` with `cancelledAt` and
+`cancelReason`. The command is only valid while the case is still `pending` or `processing`; it
+does not create service relations, does not change the order status, and does not affect already
+completed cases.
 
 At least one snapshotted route must be selected. Study-planner candidates are enabled users holding
 role code `study_planner` inside the selected department subtree; content-director candidates are

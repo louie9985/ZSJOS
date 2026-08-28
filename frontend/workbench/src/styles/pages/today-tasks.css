@@ -43,6 +43,30 @@
   margin-top: var(--crm-sp-3);
 }
 
+.task-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--crm-sp-2);
+  margin-bottom: var(--crm-sp-4);
+}
+
+.task-summary-card {
+  background: var(--crm-bg-layout);
+}
+
+.task-bpm-summary-card {
+  margin-top: var(--crm-sp-3);
+  background: var(--crm-bg-layout);
+  cursor: pointer;
+  transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+}
+
+.task-bpm-summary-card:hover,
+.task-bpm-summary-card:focus-visible {
+  box-shadow: var(--crm-shadow-card);
+  transform: translateY(-1px);
+}
+
 .task-panel-alert {
   margin-top: var(--crm-sp-4);
 }
@@ -93,6 +117,10 @@
 @media (max-width: 900px) {
   .task-center-grid {
     grid-template-columns: 1fr;
+  }
+
+  .task-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .task-center-panel {

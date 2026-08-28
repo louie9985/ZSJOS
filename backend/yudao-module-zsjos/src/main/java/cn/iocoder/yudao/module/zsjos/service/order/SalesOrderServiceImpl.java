@@ -121,8 +121,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         Long duplicateId = findIdempotentOrder(leadId, userId, reqVO.getIdempotencyKey());
         if (duplicateId != null) return duplicateId;
         LeadDO lead = requireEligibleLead(leadId, userId);
-        LeadCollaborationService.OperationContext collaboration =
-                collaborationService.requireCanOperateForUpdate(lead, userId);
+        collaborationService.requireCanEnterDealForUpdate(lead, userId);
         // The lead row serializes concurrent submissions. Recheck after acquiring it so a retry can replay the winner.
         duplicateId = findIdempotentOrder(leadId, userId, reqVO.getIdempotencyKey());
         if (duplicateId != null) return duplicateId;
@@ -131,7 +130,6 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         OpportunityDO opportunity = requireEligibleOpportunity(lead);
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
         LocalDateTime now = LocalDateTime.now();
-        collaborationService.transferOnOrderSubmission(lead, opportunity, collaboration, userId, now);
         SalesOrderDO order = new SalesOrderDO();
         order.setLeadId(leadId); order.setOpportunityId(opportunity.getId()); order.setPersonId(lead.getPersonId());
         order.setOrderType(ORDER_TYPE_FIRST_PURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
@@ -143,9 +141,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
         createDealCashbacks(leadId, order.getId(), createdItems, validated.items());
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
-        if (!collaboration.collaborator()) {
-            agingPoolService.markDealPending(leadId, userId, now);
-        }
+        agingPoolService.markDealPending(leadId, userId, now);
         return order.getId();
     }
 
@@ -291,6 +287,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         }
         cashbackService.cancelDealCashbacks(orderId, "订单接续重提");
         registrationService.cancelByOrderId(orderId, "原订单已被接续", now);
+        if (latest != null) supervisorConfirmationService.cancelPending(latest.getId(), now);
 
         // Release the generated active-order key before inserting the independent successor.
         order.setStatus(STATUS_SUPERSEDED); order.setSupersededByOrderId(null);

@@ -35,9 +35,9 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
         return selectList(query).stream().map(MediaAccountDO::getId).toList();
     }
 
-    default PageResult<MediaAccountDO> selectCalendarPage(MediaAccountCalendarPageReqVO req, Long userId,
-                                                           boolean all) {
-        LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, userId, all);
+    default PageResult<MediaAccountDO> selectCalendarPage(MediaAccountCalendarPageReqVO req,
+                                                           Collection<Long> visibleUserIds, boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, visibleUserIds, all);
         query.isNotNull(MediaAccountDO::getMaintenanceStartDate)
                 .isNotNull(MediaAccountDO::getMaintenanceEndDate)
                 .le(MediaAccountDO::getMaintenanceStartDate, req.getRangeEnd())
@@ -47,18 +47,25 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
         return selectPage(req, query);
     }
 
-    default long selectCalendarUnscheduledCount(MediaAccountCalendarPageReqVO req, Long userId, boolean all) {
-        LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, userId, all);
+    default long selectCalendarUnscheduledCount(MediaAccountCalendarPageReqVO req,
+                                                 Collection<Long> visibleUserIds, boolean all) {
+        LambdaQueryWrapperX<MediaAccountDO> query = calendarQuery(req, visibleUserIds, all);
         query.and(row -> row.isNull(MediaAccountDO::getMaintenanceStartDate)
                 .or().isNull(MediaAccountDO::getMaintenanceEndDate));
         return selectCount(query);
     }
 
-    private LambdaQueryWrapperX<MediaAccountDO> calendarQuery(MediaAccountCalendarPageReqVO req, Long userId,
-                                                               boolean all) {
+    private LambdaQueryWrapperX<MediaAccountDO> calendarQuery(MediaAccountCalendarPageReqVO req,
+                                                               Collection<Long> visibleUserIds, boolean all) {
         LambdaQueryWrapperX<MediaAccountDO> query = new LambdaQueryWrapperX<>();
-        if (!all) query.and(row -> row.eq(MediaAccountDO::getOwnerOperatorUserId, userId)
-                .or().eq(MediaAccountDO::getDirectorUserId, userId));
+        if (!all) {
+            if (visibleUserIds == null || visibleUserIds.isEmpty()) {
+                query.eq(MediaAccountDO::getId, -1L);
+            } else {
+                query.and(row -> row.in(MediaAccountDO::getOwnerOperatorUserId, visibleUserIds)
+                        .or().in(MediaAccountDO::getDirectorUserId, visibleUserIds));
+            }
+        }
         if (req.getKeyword() != null && !req.getKeyword().isBlank()) {
             query.and(row -> row.like(MediaAccountDO::getAccountNo, req.getKeyword().trim())
                     .or().like(MediaAccountDO::getNickname, req.getKeyword().trim()));

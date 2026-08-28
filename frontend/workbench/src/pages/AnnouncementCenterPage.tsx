@@ -83,7 +83,7 @@ export default function AnnouncementCenterPage() {
 
   return <section className="workspace-page announcement-page">
     <div className="page-heading">
-      <Typography.Title level={4}>公告中心</Typography.Title>
+      <Typography.Title level={4}>通知公告</Typography.Title>
       <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}

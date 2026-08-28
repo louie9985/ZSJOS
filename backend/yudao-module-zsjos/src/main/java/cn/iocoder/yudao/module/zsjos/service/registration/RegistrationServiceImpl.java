@@ -463,6 +463,21 @@ public class RegistrationServiceImpl implements RegistrationService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @ZsjosPermission(bizType = "registration-case", bizId = "#caseId", action = COMMAND_CLOSE)
+    public void close(Long caseId, Long userId, RegistrationCloseReqVO reqVO) {
+        String reason = normalizeCloseReason(reqVO.getReason());
+        if (!beginCommand(caseId, userId, COMMAND_CLOSE, reqVO.getIdempotencyKey(), reason)) return;
+        RegistrationCaseDO registrationCase = lockEditable(caseId, reqVO.getVersion());
+        LocalDateTime now = LocalDateTime.now();
+        registrationCase.setStatus(STATUS_CANCELLED);
+        registrationCase.setCancelledAt(now);
+        registrationCase.setCancelReason(reason);
+        registrationCase.setVersion(registrationCase.getVersion() + 1);
+        caseMapper.updateById(registrationCase);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void cancelByOrderId(Long orderId, String reason, LocalDateTime now) {
         RegistrationCaseDO registrationCase = caseMapper.selectByOrderId(orderId);
         if (registrationCase == null) return;
@@ -513,6 +528,10 @@ public class RegistrationServiceImpl implements RegistrationService {
         }
     }
 
+    private String normalizeCloseReason(String reason) {
+        return reason == null ? null : reason.trim();
+    }
+
     private RegistrationCaseDO lockEditable(Long caseId, Integer expectedVersion) {
         RegistrationCaseDO registrationCase = caseMapper.selectByIdForUpdate(caseId, TenantContextHolder.getRequiredTenantId());
         if (registrationCase == null) throw exception(REGISTRATION_CASE_NOT_EXISTS);
@@ -556,7 +575,8 @@ public class RegistrationServiceImpl implements RegistrationService {
         result.setId(registrationCase.getId()); result.setOrderId(registrationCase.getOrderId()); result.setStatus(registrationCase.getStatus());
         result.setStatusLabel(registrationStatusLabel(registrationCase.getStatus()));
         result.setStudyPlannerUserId(registrationCase.getStudyPlannerUserId()); result.setRegistrationApprovedAt(registrationCase.getRegistrationApprovedAt());
-        result.setCompletedAt(registrationCase.getCompletedAt()); result.setVersion(registrationCase.getVersion());
+        result.setCompletedAt(registrationCase.getCompletedAt()); result.setCancelledAt(registrationCase.getCancelledAt());
+        result.setCancelReason(registrationCase.getCancelReason()); result.setVersion(registrationCase.getVersion());
         if (order != null) {
             result.setOrderNo(order.getOrderNo()); result.setOrderStatus(order.getStatus()); result.setOrderStatusLabel(orderStatusLabel(order.getStatus())); result.setStudentName(order.getStudentName());
             result.setStudentMobile(order.getStudentMobile()); LeadDO lead = order.getLeadId() == null ? null : leadMapper.selectById(order.getLeadId());

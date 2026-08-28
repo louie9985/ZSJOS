@@ -134,7 +134,7 @@ public class LeadFlowHistoryService {
 
     private LeadFlowHistoryRespVO fromAging(LeadAgingPoolEventDO item, Map<Long, AdminUserRespDTO> users) {
         boolean system = item.getOperatorUserId() == null || item.getOperatorUserId() == 0;
-        LeadFlowHistoryRespVO vo = base("aging:" + item.getId(), item.getOccurredAt(), "商机公海",
+        LeadFlowHistoryRespVO vo = base("aging:" + item.getId(), item.getOccurredAt(), "公海",
                 agingLabel(item.getEventType()), system ? "系统任务" : "公海处理",
                 system ? "系统" : name(users, item.getOperatorUserId()), item.getReason());
         vo.setFromOwner(name(users, item.getPreviousCollaboratorUserId()));
@@ -309,8 +309,8 @@ public class LeadFlowHistoryService {
             Map.entry("public_pool", "抢单池"), Map.entry("duplicate_review_reactivate", "未分配")
     ).getOrDefault(type, null); }
     private static String agingLabel(String type) { if (type == null) return "公海流转"; return Map.ofEntries(
-            Map.entry("entered", "进入商机公海"), Map.entry("assigned", "分配协作人"),
-            Map.entry("reassigned", "变更协作人"), Map.entry("exited", "退出商机公海"),
+            Map.entry("entered", "进入公海"), Map.entry("assigned", "分配协作人"),
+            Map.entry("reassigned", "变更协作人"), Map.entry("exited", "退出公海"),
             Map.entry("collaborator_cleared", "清除协作人"), Map.entry("deal_pending", "提交成交"),
             Map.entry("converted", "商机成交")
     ).getOrDefault(type, type); }

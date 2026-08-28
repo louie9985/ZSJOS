@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.zsjos.service.registration;
 
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationCaseRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationCloseReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationVersionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo.RegistrationPlannerUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO;
@@ -45,12 +46,15 @@ import java.util.List;
 import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.STATUS_PENDING;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_PENDING_APPROVAL;
 import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_EFFECTIVE;
+import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.STATUS_CANCELLED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGISTRATION_FINANCE_PENDING;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGISTRATION_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGISTRATION_ROUTE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGISTRATION_ATTACHMENT_REQUIRED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.REGISTRATION_IDEMPOTENCY_RESULT_INVALID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.when;
@@ -307,6 +311,43 @@ class RegistrationServiceImplTest {
 
         verify(serviceRelationMapper, times(2)).insert(any(cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO.class));
         verify(registrationNotifyPublisher).publishPlannerAssigned(registrationCase, order, null, 30L, 501L);
+    }
+
+    @Test
+    void closeMarksRegistrationCancelledWithReason() {
+        RegistrationCaseDO registrationCase = editableCase();
+        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
+        RegistrationCloseReqVO request = new RegistrationCloseReqVO();
+        request.setVersion(0); request.setIdempotencyKey("close-registration"); request.setReason("无需服务");
+
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            service.close(1L, 9L, request);
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
+
+        assertEquals(STATUS_CANCELLED, registrationCase.getStatus());
+        assertNotNull(registrationCase.getCancelledAt());
+        assertEquals("无需服务", registrationCase.getCancelReason());
+        verify(caseMapper).updateById(registrationCase);
+    }
+
+    @Test
+    void closeRejectsCompletedRegistration() {
+        RegistrationCaseDO registrationCase = editableCase();
+        registrationCase.setStatus(RegistrationConstants.STATUS_COMPLETED);
+        when(caseMapper.selectByIdForUpdate(1L, 1L)).thenReturn(registrationCase);
+        RegistrationCloseReqVO request = new RegistrationCloseReqVO();
+        request.setVersion(0); request.setIdempotencyKey("close-completed"); request.setReason("无需服务");
+
+        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.setTenantId(1L);
+        try {
+            ServiceException error = assertThrows(ServiceException.class, () -> service.close(1L, 9L, request));
+            assertEquals(REGISTRATION_STATE_INVALID.getCode(), error.getCode());
+        } finally {
+            cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.clear();
+        }
     }
 
     private RegistrationCaseDO editableCase() {

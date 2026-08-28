@@ -90,7 +90,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode WORK_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_109, "工单幂等键已被其他请求使用");
     ErrorCode WORK_ORDER_NUMBER_OVERFLOW = new ErrorCode(1_900_003_110, "工单编号流水已超出模板配置位数");
     ErrorCode WORK_ORDER_RELATED_ACCOUNT_REQUIRED = new ErrorCode(1_900_003_111, "拍剪工单必须选择相关账号");
-    ErrorCode LEAD_COLLABORATION_POOL_CONFLICT = new ErrorCode(1_900_003_082, "客资同时存在人工公海与超期公海记录，请联系管理员核查");
+    ErrorCode LEAD_COLLABORATION_POOL_CONFLICT = new ErrorCode(1_900_003_082, "客资存在重复公海记录，请联系管理员核查");
     ErrorCode LEAD_QUALIFICATION_STATE_INVALID = new ErrorCode(1_900_003_029, "当前客资状态不允许进行有效性判定");
     ErrorCode LEAD_INVALID_REASON_INVALID = new ErrorCode(1_900_003_030, "无效原因不存在或已停用");
     ErrorCode LEAD_QUALIFICATION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_031, "判定或处置请求幂等键已被其他客资使用");
@@ -109,12 +109,12 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_BASIC_INFO_STATE_INVALID = new ErrorCode(1_900_003_044, "当前客资状态不允许修改基础信息");
     ErrorCode LEAD_BASIC_INFO_CONTACT_CONFLICT = new ErrorCode(1_900_003_045, "手机号或微信号已属于其他客户");
     ErrorCode LEAD_OPPORTUNITY_NOT_EXISTS = new ErrorCode(1_900_003_046, "销售机会不存在");
-    ErrorCode LEAD_AGING_POOL_NOT_EXISTS = new ErrorCode(1_900_003_047, "超期公海周期不存在");
-    ErrorCode LEAD_AGING_POOL_STATE_INVALID = new ErrorCode(1_900_003_048, "当前超期公海状态不允许执行该操作");
-    ErrorCode LEAD_AGING_POOL_MANAGER_DENIED = new ErrorCode(1_900_003_049, "无权管理该部门的超期公海客资");
+    ErrorCode LEAD_AGING_POOL_NOT_EXISTS = new ErrorCode(1_900_003_047, "公海周期不存在");
+    ErrorCode LEAD_AGING_POOL_STATE_INVALID = new ErrorCode(1_900_003_048, "当前公海状态不允许执行该操作");
+    ErrorCode LEAD_AGING_POOL_MANAGER_DENIED = new ErrorCode(1_900_003_049, "无权管理该部门的公海客资");
     ErrorCode LEAD_AGING_POOL_SALES_INVALID = new ErrorCode(1_900_003_050, "协同销售无效、不在冻结部门或与原销售相同");
-    ErrorCode LEAD_AGING_POOL_OWNER_INVALID = new ErrorCode(1_900_003_051, "原销售已停用，不能退出超期公海");
-    ErrorCode LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_052, "超期公海请求幂等键已被其他操作使用");
+    ErrorCode LEAD_AGING_POOL_OWNER_INVALID = new ErrorCode(1_900_003_051, "原销售已停用，不能退出公海");
+    ErrorCode LEAD_AGING_POOL_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_052, "公海请求幂等键已被其他操作使用");
     ErrorCode SUBORDINATE_SALES_NOT_MANAGED = new ErrorCode(1_900_003_053, "该销售不在当前主管管理范围内");
     ErrorCode SUBORDINATE_SALES_REASON_REQUIRED = new ErrorCode(1_900_003_054, "操作原因不能为空且不能超过 500 个字符");
     ErrorCode SUBORDINATE_SALES_STATUS_INVALID = new ErrorCode(1_900_003_055, "账号或接单状态无效");
@@ -122,7 +122,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SUBORDINATE_LEAD_OWNER_CHANGED = new ErrorCode(1_900_003_057, "客资归属已变化，请刷新后重试");
     ErrorCode SUBORDINATE_LEAD_STATE_INVALID = new ErrorCode(1_900_003_058,
             "无法执行“{}”：客资当前为“{}”；{}仅适用于{}");
-    ErrorCode SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA = new ErrorCode(1_900_003_059, "客资已在人工公海中");
+    ErrorCode SUBORDINATE_LEAD_ALREADY_PUBLIC_SEA = new ErrorCode(1_900_003_059, "客资已在公海中");
     ErrorCode SUBORDINATE_COMMAND_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_060, "主管客资操作幂等键已被其他请求使用");
     ErrorCode LEAD_TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_900_003_072, "客资转派审批流程尚未部署或暂不可用");
     ErrorCode LEAD_SUBMITTER_IDENTITY_INVALID = new ErrorCode(1_900_003_073, "当前账号无权使用该客资提交入口");
@@ -170,6 +170,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode WORK_PLAN_FIELD_INVALID = new ErrorCode(1_900_005_013, "工作计划自定义字段无效");
     ErrorCode SALES_ORDER_NOT_EXISTS = new ErrorCode(1_900_006_001, "成交订单不存在");
     ErrorCode SALES_ORDER_ENTRY_FORBIDDEN = new ErrorCode(1_900_006_002, "当前客资状态或归属不允许录入成交");
+    ErrorCode SALES_ORDER_ENTRY_REQUIRES_TRANSFER = new ErrorCode(1_900_006_021,
+            "公海协同销售必须先完成正式转派后才能录入成交");
     ErrorCode SALES_ORDER_ACTIVE_DUPLICATE = new ErrorCode(1_900_006_003, "该客资已有未完成成交订单");
     ErrorCode SALES_ORDER_CONTACT_REQUIRED = new ErrorCode(1_900_006_004, "手机号和微信号至少填写一个");
     ErrorCode SALES_ORDER_AMOUNT_INVALID = new ErrorCode(1_900_006_005, "订单金额与成交课程金额不一致");

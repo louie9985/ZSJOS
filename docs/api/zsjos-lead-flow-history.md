@@ -23,7 +23,7 @@ GET /admin-api/zsjos/lead/{leadId}/flow-history
 |---|---|
 | `id` | 稳定投影键，格式为 `lead:{id}`、`event:{id}`、`assignment:{id}` 或 `aging:{id}`；仅用于列表稳定性 |
 | `occurredAt` | 实际发生时间 |
-| `businessObject` | 客资、客资分配、商机公海、客资跟进或客资申诉 |
+| `businessObject` | 客资、客资分配、公海、客资跟进或客资申诉 |
 | `flowNode` | 稳定事件码映射的中文节点 |
 | `source` | 员工工作台、兼职端、系统任务、自动分配、指定派单或公海处理 |
 | `operator` | 员工事件解析当前 System 账号昵称，兼职提交解析当前 Partner 名称；不可解析时为“未知账号” |
@@ -44,7 +44,7 @@ GET /admin-api/zsjos/lead/{leadId}/flow-history
 - Lead 的 `submittedAt`（缺失时使用创建时间）投影为“客资提交”。
 - `zsjos_business_event` 投影判定、挂起、恢复、申诉、跟进和关联分配事件。
 - `zsjos_lead_assignment_history` 投影派单、接单、拒单、超时、抢单、转派、回收和释放。
-- `zsjos_lead_aging_pool_event` 投影商机公海进入、协作人分配/变更和退出。
+- `zsjos_lead_aging_pool_event` 投影公海进入、协作人分配/变更和退出。
 - 业务事件的 `relatedObjectRefs.assignmentHistoryId` 指向分配历史时，只保留业务事件投影。
 
 合并只读取现有持久化事实，不回填或猜测缺失历史。现有来源表没有统一的操作人或销售

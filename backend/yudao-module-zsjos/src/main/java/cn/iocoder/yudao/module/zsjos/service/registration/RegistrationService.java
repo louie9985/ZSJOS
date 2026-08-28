@@ -22,5 +22,6 @@ public interface RegistrationService {
     RegistrationCaseRespVO deleteAttachment(Long caseId, Long itemId, Long attachmentId, Long userId,
                                              RegistrationAttachmentDeleteReqVO reqVO);
     void complete(Long caseId, Long userId, RegistrationVersionReqVO reqVO);
+    void close(Long caseId, Long userId, RegistrationCloseReqVO reqVO);
     void cancelByOrderId(Long orderId, String reason, LocalDateTime now);
 }

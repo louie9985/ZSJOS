@@ -88,15 +88,15 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 timedScene(FIRST_FOLLOW_UP_REMINDER, "首次跟进时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(NEXT_FOLLOW_UP_REMINDER, "下次跟进提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
                 timedScene(QUALIFICATION_REMINDER, "有效性判定时限提醒", ROLE_OWNER, ROLE_DIRECT_LEADER),
-                timedScene(AGING_POOL_REMINDER, "超期公海提前提醒", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_DUE, "客资进入超期公海", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_ASSIGNED_NOTICE, "超期公海指派协同销售", ROLE_OWNER, ROLE_COLLABORATOR,
+                timedScene(AGING_POOL_REMINDER, "公海提前提醒", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_DUE, "客资进入公海", ROLE_OWNER, ROLE_FROZEN_DEPT_LEADER),
+                scene(AGING_POOL_ASSIGNED_NOTICE, "公海指派协同销售", ROLE_OWNER, ROLE_COLLABORATOR,
                         ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_REASSIGNED_NOTICE, "超期公海更换协同销售", ROLE_OWNER,
+                scene(AGING_POOL_REASSIGNED_NOTICE, "公海更换协同销售", ROLE_OWNER,
                         ROLE_PREVIOUS_COLLABORATOR, ROLE_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_REASSIGN_REQUIRED_NOTICE, "超期公海待重新指派", ROLE_OWNER,
+                scene(AGING_POOL_REASSIGN_REQUIRED_NOTICE, "公海待重新指派", ROLE_OWNER,
                         ROLE_PREVIOUS_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER),
-                scene(AGING_POOL_EXITED_NOTICE, "客资退出超期公海", ROLE_OWNER,
+                scene(AGING_POOL_EXITED_NOTICE, "客资退出公海", ROLE_OWNER,
                         ROLE_PREVIOUS_COLLABORATOR, ROLE_FROZEN_DEPT_LEADER));
     }
 

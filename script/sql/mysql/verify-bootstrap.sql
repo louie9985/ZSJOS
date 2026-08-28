@@ -103,9 +103,12 @@ SELECT 'media_account_maintenance_calendar' AS check_name,
           AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_media_account'
                AND column_name IN ('current_status_value','current_status_label_snapshot','s_stage_label_snapshot','primary_problems_json','execution_measure_value','execution_measure_label_snapshot','adjustment_direction','maintenance_start_date','maintenance_end_date'))=9
           AND (SELECT COUNT(*) FROM system_dict_type WHERE type IN ('zsjos_media_account_current_status','zsjos_media_account_stage','zsjos_media_account_primary_problem','zsjos_media_account_execution_measure') AND deleted=b'0')=4
-          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73600,73601,73602,73603) AND status=0 AND deleted=b'0')=4
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (73600,73601,73602,73603,73604) AND status=0 AND deleted=b'0')=5
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73600 AND parent_id=0 AND path='/calendar' AND type=1 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73601 AND parent_id=73600 AND path='overview' AND permission='zsjos:media-calendar:query' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=73604 AND parent_id=73600 AND path='all'
+                      AND permission='zsjos:media-calendar:all-query' AND component='zsjos/mediaCalendarAll/index'
+                      AND workbench_render_mode='native' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73603 AND parent_id=7022 AND type=3
                       AND permission='zsjos:media-account:maintenance' AND status=0 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND status=0 AND deleted=b'0')
@@ -1826,27 +1829,78 @@ SELECT 'V149 feedback notification defaults' AS check_name,
                         'zsjos.feedback.completed','zsjos.feedback.survey_requested'))<4),
           'PASS','FAIL') AS result;
 
-SELECT 'V148 durable employee announcements' AS check_name,
+SELECT 'V158 notice menu consolidation' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V148')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
             WHERE module_code='core' AND version='V148')
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V158')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V158')
           AND (SELECT COUNT(*) FROM information_schema.columns
                WHERE table_schema=DATABASE() AND table_name='system_notice'
                  AND column_name IN ('publish_status','publish_time','offline_time'))=3
           AND (SELECT COUNT(*) FROM information_schema.tables
                WHERE table_schema=DATABASE()
                  AND table_name IN ('system_notice_attachment','system_notice_read'))=2
-          AND (SELECT COUNT(*) FROM system_menu
-               WHERE id IN (79910,79911,79912) AND deleted=b'0')=3
           AND EXISTS (SELECT 1 FROM system_menu
-               WHERE id=79910 AND permission='system:notice:read' AND parent_id=6735
-                 AND path='announcements' AND deleted=b'0')
+               WHERE id=107 AND name='通知公告' AND permission='' AND parent_id=2739
+                 AND path='notice' AND component='system/notice/index' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
                WHERE id=79911 AND permission='system:notice:publish' AND parent_id=107
                  AND type=3 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
                WHERE id=79912 AND permission='system:notice:offline' AND parent_id=107
-                 AND type=3 AND deleted=b'0'),
+                 AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=79913 AND permission='system:notice:read' AND parent_id=107
+                 AND type=3 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu
+               WHERE id=79910 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu
+               WHERE menu_id=79910 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package
+               WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'79910','$'))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package
+               WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'107','$')
+                 AND NOT JSON_CONTAINS(menu_ids,'79913','$'))
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu notice_page_grant
+               WHERE notice_page_grant.menu_id=107 AND notice_page_grant.deleted=b'0'
+                 AND NOT EXISTS (SELECT 1 FROM system_role_menu read_grant
+                   WHERE read_grant.role_id=notice_page_grant.role_id
+                     AND read_grant.tenant_id=notice_page_grant.tenant_id
+                 AND read_grant.menu_id=79913 AND read_grant.deleted=b'0')),
+          'PASS','FAIL') AS result;
+
+SELECT 'V159 public sea terminology' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V159')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V159')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=6794 AND name='公海' AND permission='zsjos:lead-aging-pool:query'
+                 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=6795 AND name='管理部门公海' AND permission='zsjos:lead-aging-pool:manage'
+                 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=6796 AND name='管理全部公海' AND permission='zsjos:lead-aging-pool:manage-all'
+                 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu
+               WHERE deleted=b'0' AND id IN (6794,6795,6796)
+                 AND name REGEXP '超期公海|超期协同公海|商机公海|人工公海')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_lead_inbox_filter_scheme
+               WHERE deleted=b'0' AND audience='agingPool'
+                 AND name REGEXP '超期公海|超期协同公海|商机公海|人工公海')
+          AND NOT EXISTS (SELECT 1 FROM system_notify_template
+               WHERE deleted=b'0' AND code IN (
+                 'ZSJOS_AGING_POOL_REMINDER','ZSJOS_AGING_POOL_DUE','ZSJOS_AGING_POOL_ASSIGNED',
+                 'ZSJOS_AGING_POOL_REASSIGNED','ZSJOS_AGING_POOL_REASSIGN_REQUIRED','ZSJOS_AGING_POOL_EXITED')
+                 AND CONCAT_WS('|',name,title,summary,content,remark) REGEXP '超期公海|超期协同公海|商机公海|人工公海')
+          AND NOT EXISTS (SELECT 1 FROM system_notify_rule
+               WHERE deleted=b'0' AND scene_code IN (
+                 'zsjos.lead.aging_pool_reminder','zsjos.lead.aging_pool_due',
+                 'zsjos.lead.aging_pool_assigned','zsjos.lead.aging_pool_reassigned',
+                 'zsjos.lead.aging_pool_reassign_required','zsjos.lead.aging_pool_exited')
+                 AND name REGEXP '超期公海|超期协同公海|商机公海|人工公海'),
           'PASS','FAIL') AS result;
 
 SELECT 'V150 claim-pool read and Partner permissions' AS check_name,
@@ -1930,4 +1984,28 @@ SELECT 'V157 generic work-order center schema and menus' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=79962 AND parent_id=79972 AND path='available' AND workbench_render_mode='native' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=79963 AND parent_id=79972 AND path='mine' AND workbench_render_mode='native' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (79973,79977) AND workbench_render_mode='admin_only' AND deleted=b'0')=2,
+          'PASS','FAIL') AS result;
+
+SELECT 'V160 registration close-service button' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V160')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V160')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=73003 AND parent_id=73000 AND name='关闭服务'
+                 AND permission='zsjos:registration:close' AND deleted=b'0'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V161 media calendar schedule view' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V161')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V161')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=73604 AND parent_id=73600 AND name='日历日程' AND path='all'
+                 AND permission='zsjos:media-calendar:all-query'
+                 AND component='zsjos/mediaCalendarAll/index'
+                 AND workbench_render_mode='native' AND status=0 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu account_calendar_grant
+               WHERE account_calendar_grant.menu_id IN (73600,73601) AND account_calendar_grant.deleted=b'0'
+                 AND NOT EXISTS (SELECT 1 FROM system_role_menu all_calendar_grant
+                   WHERE all_calendar_grant.role_id=account_calendar_grant.role_id
+                     AND all_calendar_grant.tenant_id=account_calendar_grant.tenant_id
+                     AND all_calendar_grant.menu_id=73604 AND all_calendar_grant.deleted=b'0')),
           'PASS','FAIL') AS result;

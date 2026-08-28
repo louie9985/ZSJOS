@@ -8,9 +8,9 @@ import { useAnnouncements } from './AnnouncementProvider'
 export function AnnouncementButton() {
   const navigate = useNavigate()
   const { unreadCount, error } = useAnnouncements()
-  return <Tooltip title={error || '公告中心'}>
+  return <Tooltip title={error || '通知公告'}>
     <Badge count={unreadCount} size="small" overflowCount={99}>
-      <Button type="text" shape="circle" icon={<NotificationOutlined/>} aria-label="公告中心" onClick={() => navigate(APP_ROUTES.ANNOUNCEMENTS)}/>
+      <Button type="text" shape="circle" icon={<NotificationOutlined/>} aria-label="通知公告" onClick={() => navigate(APP_ROUTES.ANNOUNCEMENTS)}/>
     </Badge>
   </Tooltip>
 }
@@ -22,7 +22,7 @@ export function AnnouncementBar() {
   return <div className="announcement-bar" role="status">
     <button type="button" className="announcement-bar-main" onClick={() => navigate(`${APP_ROUTES.ANNOUNCEMENTS}?announcementId=${latest.id}`)}>
       <NotificationOutlined/>
-      <strong>新公告</strong>
+      <strong>新通知</strong>
       <span className="announcement-bar-title">{latest.title}</span>
       <time>{formatTimestamp(latest.publishTime)}</time>
     </button>

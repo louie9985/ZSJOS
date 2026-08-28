@@ -554,11 +554,12 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
             if (agingPoolCycle == null && canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
             boolean canCreateOrder = securityFrameworkService.hasPermission("zsjos:sales-order:create");
+            boolean formalOwner = agingPoolCycle == null || Objects.equals(lead.getOwnerUserId(), currentUserId);
             if (activeOrder == null) {
-                actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder));
+                actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder && formalOwner));
             } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
                 actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL,
-                        canCreateOrder && salesOrderPermissionService.canRevise(activeOrder, currentUserId)));
+                        canCreateOrder && formalOwner && salesOrderPermissionService.canRevise(activeOrder, currentUserId)));
             }
         } else if (STATUS_WON.equals(lead.getStatus())) {
             boolean enabled = securityFrameworkService.hasPermission("zsjos:sales-order:create")

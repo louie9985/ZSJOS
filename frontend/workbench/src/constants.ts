@@ -47,6 +47,11 @@ export const STORAGE_KEYS = {
   REFRESH_TOKEN: 'REFRESH_TOKEN',
   CLIENT_ID: 'CLIENT_ID',
   EXPIRES_TIME: 'EXPIRES_TIME',
+  // Mobile Workbench 必须与 PC/Admin 会话隔离，避免同源登录互相覆盖。
+  MOBILE_ACCESS_TOKEN: 'MOBILE_ACCESS_TOKEN',
+  MOBILE_REFRESH_TOKEN: 'MOBILE_REFRESH_TOKEN',
+  MOBILE_CLIENT_ID: 'MOBILE_CLIENT_ID',
+  MOBILE_EXPIRES_TIME: 'MOBILE_EXPIRES_TIME',
   // Vue Admin's CACHE_KEY.TenantId resolves to this same-origin key.
   TENANT_ID: 'tenantId',
   LOGIN_FORM: 'zsjos_login_form',
@@ -81,6 +86,7 @@ export const APP_ROUTES = {
   TODAY_TASKS: '/zsjos/tasks/today',
   WORK_PLANS: '/zsjos/work-plans',
   BPM_TODO: '/bpm/task/todo',
+  BPM_DONE: '/bpm/task/done',
   LEAD_APPEALS: '/zsjos/appeals',
   MY_SALES_ORDERS: '/zsjos/sales-orders/my',
   TEAM_SALES_ORDERS: '/zsjos/sales-orders/team',
@@ -99,7 +105,7 @@ export const APP_ROUTES = {
   NOTIFY_RULE: '/messages/notify/notify-rule',
   ALL_MESSAGES: '/messages/all',
   UNREAD_MESSAGES: '/messages/unread',
-  ANNOUNCEMENTS: '/announcements',
+  ANNOUNCEMENTS: '/messages/notice',
   MY_ASSETS: '/zsjos/my-assets',
   ASSET_DEMANDS: '/zsjos/asset-demands',
   FEEDBACK: '/zsjos/feedback',
@@ -109,8 +115,47 @@ export const APP_ROUTES = {
   MEDIA_PRODUCTION_TICKETS: '/zsjos/production-tickets',
   MEDIA_REVIEWS: '/zsjos/reviews',
   MEDIA_STUDENTS: '/zsjos/media-students',
-  MEDIA_CALENDAR: '/calendar/overview'
+  MEDIA_CALENDAR: '/calendar/overview',
+  MEDIA_ALL_CALENDAR: '/calendar/all'
 } as const
+
+export type AuthPlatform = 'PC' | 'MOBILE'
+
+export const AUTH_CLIENT_IDS: Record<AuthPlatform, string> = {
+  PC: 'zsjos-pc',
+  MOBILE: 'zsjos-mobile'
+}
+
+export const AUTH_PLATFORM_SESSION_KEY = 'zsjos.auth.platform'
+
+export const AUTH_STORAGE_KEYS = {
+  PC: {
+    accessToken: STORAGE_KEYS.ACCESS_TOKEN,
+    refreshToken: STORAGE_KEYS.REFRESH_TOKEN,
+    clientId: STORAGE_KEYS.CLIENT_ID,
+    expiresTime: STORAGE_KEYS.EXPIRES_TIME
+  },
+  MOBILE: {
+    accessToken: STORAGE_KEYS.MOBILE_ACCESS_TOKEN,
+    refreshToken: STORAGE_KEYS.MOBILE_REFRESH_TOKEN,
+    clientId: STORAGE_KEYS.MOBILE_CLIENT_ID,
+    expiresTime: STORAGE_KEYS.MOBILE_EXPIRES_TIME
+  }
+} as const
+
+export const resolveAuthPlatform = (
+  pathname = window.location.pathname,
+  storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage
+): AuthPlatform => {
+  if (/(?:^|\/)zsjos\/mobile(?:\/|$)/i.test(pathname)) {
+    storage.setItem(AUTH_PLATFORM_SESSION_KEY, 'MOBILE')
+    return 'MOBILE'
+  }
+  const stored = storage.getItem(AUTH_PLATFORM_SESSION_KEY)
+  if (stored === 'MOBILE') return 'MOBILE'
+  storage.setItem(AUTH_PLATFORM_SESSION_KEY, 'PC')
+  return 'PC'
+}
 
 export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.LEAD_SUBMISSION,
@@ -134,6 +179,8 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.STUDENT_CONTACT_CONFIG,
   APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS,
   APP_ROUTES.TODAY_TASKS,
+  APP_ROUTES.BPM_TODO,
+  APP_ROUTES.BPM_DONE,
   APP_ROUTES.WORK_PLANS,
   APP_ROUTES.SUBORDINATE_SALES,
   APP_ROUTES.SUBORDINATE_PARTNERS,
@@ -164,7 +211,8 @@ export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.MEDIA_PRODUCTION_TICKETS,
   APP_ROUTES.MEDIA_REVIEWS,
   APP_ROUTES.MEDIA_STUDENTS,
-  APP_ROUTES.MEDIA_CALENDAR
+  APP_ROUTES.MEDIA_CALENDAR,
+  APP_ROUTES.MEDIA_ALL_CALENDAR
 ])
 
 // ========== Dictionaries ==========

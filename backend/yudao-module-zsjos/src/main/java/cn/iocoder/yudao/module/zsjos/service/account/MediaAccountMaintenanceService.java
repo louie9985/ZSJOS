@@ -1,11 +1,14 @@
 package cn.iocoder.yudao.module.zsjos.service.account;
 
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.permission.RoleApi;
+import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.*;
@@ -18,6 +21,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMaintenanceRe
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
+import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -38,6 +42,9 @@ public class MediaAccountMaintenanceService {
     public static final String DICT_STAGE = "zsjos_media_account_stage";
     public static final String DICT_PRIMARY_PROBLEM = "zsjos_media_account_primary_problem";
     public static final String DICT_EXECUTION_MEASURE = "zsjos_media_account_execution_measure";
+    public static final String PERMISSION_CALENDAR_QUERY_ALL = "zsjos:media-calendar:query-all";
+    private static final String ROLE_CONTENT_DIRECTOR = "content_director";
+    private static final String ROLE_NEW_MEDIA_OPERATOR = "new_media_operator";
 
     private static final LinkedHashMap<String, String> FIELD_NAMES = new LinkedHashMap<>();
     static {
@@ -56,9 +63,11 @@ public class MediaAccountMaintenanceService {
     @Resource private MediaAccountObjectPermissionProvider objectPermissionProvider;
     @Resource private DictDataApi dictDataApi;
     @Resource private PermissionApi permissionApi;
+    @Resource private RoleApi roleApi;
     @Resource private AdminUserApi adminUserApi;
     @Resource private PersonMapper personMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
+    @Resource private MediaDataScopeService mediaDataScopeService;
 
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#accountId", action = "maintenance")
     @Transactional(rollbackFor = Exception.class)
@@ -144,9 +153,26 @@ public class MediaAccountMaintenanceService {
 
     public MediaAccountCalendarRespVO calendar(MediaAccountCalendarPageReqVO req, Long userId) {
         if (req.getRangeEnd().isBefore(req.getRangeStart())) throw exception(MEDIA_ACCOUNT_MAINTENANCE_INVALID);
-        boolean all = permissionApi.hasAnyPermissions(userId, "zsjos:media-calendar:query-all");
-        PageResult<MediaAccountDO> page = accountMapper.selectCalendarPage(req, userId, all);
-        long unscheduled = accountMapper.selectCalendarUnscheduledCount(req, userId, all);
+        MediaDataScopeService.Scope scope = mediaDataScopeService.resolve(userId, PERMISSION_CALENDAR_QUERY_ALL);
+        return calendarResult(req, scope.userIds(), scope.all());
+    }
+
+    public MediaAccountCalendarRespVO allCalendar(MediaAccountCalendarPageReqVO req, Long userId) {
+        if (req.getRangeEnd().isBefore(req.getRangeStart())) throw exception(MEDIA_ACCOUNT_MAINTENANCE_INVALID);
+        return calendarResult(req, Set.of(), true);
+    }
+
+    public MediaAccountCalendarCandidatesRespVO calendarCandidates(Long userId) {
+        MediaAccountCalendarCandidatesRespVO result = new MediaAccountCalendarCandidatesRespVO();
+        result.setDirectors(roleUsers(ROLE_CONTENT_DIRECTOR));
+        result.setOperators(roleUsers(ROLE_NEW_MEDIA_OPERATOR));
+        return result;
+    }
+
+    private MediaAccountCalendarRespVO calendarResult(MediaAccountCalendarPageReqVO req,
+                                                       Collection<Long> visibleUserIds, boolean all) {
+        PageResult<MediaAccountDO> page = accountMapper.selectCalendarPage(req, visibleUserIds, all);
+        long unscheduled = accountMapper.selectCalendarUnscheduledCount(req, visibleUserIds, all);
         Map<Long, AdminUserRespDTO> users = userMap(page.getList().stream()
                 .flatMap(row -> java.util.stream.Stream.of(row.getDirectorUserId(), row.getOwnerOperatorUserId())).toList());
         Set<Long> personIds = page.getList().stream().map(MediaAccountDO::getStudentPersonId)
@@ -157,6 +183,26 @@ public class MediaAccountMaintenanceService {
         result.setList(page.getList().stream().map(row -> toCalendar(row, users, people)).toList());
         result.setTotal(page.getTotal()); result.setUnscheduledCount(unscheduled);
         return result;
+    }
+
+    private List<MediaAccountCalendarCandidatesRespVO.UserRespVO> roleUsers(String roleCode) {
+        RoleRespDTO role = roleApi.getRoleByCode(roleCode);
+        if (role == null || !Objects.equals(role.getStatus(), CommonStatusEnum.ENABLE.getStatus())) return List.of();
+        Set<Long> userIds = permissionApi.getUserRoleIdListByRoleIds(Set.of(role.getId()));
+        if (userIds == null || userIds.isEmpty()) return List.of();
+        return adminUserApi.getUserList(userIds).stream()
+                .filter(user -> user != null && Objects.equals(user.getStatus(), CommonStatusEnum.ENABLE.getStatus()))
+                .sorted(Comparator.comparing(MediaAccountMaintenanceService::userName)
+                        .thenComparing(AdminUserRespDTO::getId, Comparator.nullsLast(Long::compareTo)))
+                .map(this::toCandidate)
+                .toList();
+    }
+
+    private MediaAccountCalendarCandidatesRespVO.UserRespVO toCandidate(AdminUserRespDTO user) {
+        MediaAccountCalendarCandidatesRespVO.UserRespVO vo = new MediaAccountCalendarCandidatesRespVO.UserRespVO();
+        vo.setId(user.getId()); vo.setNickname(userName(user)); vo.setUsername(user.getUsername());
+        vo.setStatus(user.getStatus()); vo.setDeptId(user.getDeptId());
+        return vo;
     }
 
     private void notifyParticipants(MediaAccountDO account, Long operatorUserId, Map<String, String> changes,

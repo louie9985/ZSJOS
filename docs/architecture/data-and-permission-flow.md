@@ -65,12 +65,23 @@ where the Admin bridge is not yet available, Workbench retains the single iframe
 falls back to document navigation; functionality remains available, while fast route switching
 starts automatically after the updated Admin sends its ready handshake.
 
-The two browser applications share the same-origin `localStorage` keys
-`ACCESS_TOKEN`, `REFRESH_TOKEN`, and `CLIENT_ID`. Existing Workbench keys are migrated on
-first load. When one context receives a 401, it first checks whether the shared access token
-has changed before starting a refresh, which prevents an embedded Admin page from replacing
-a token refreshed by the Workbench context. A refresh failure still clears shared session
-storage and returns the user to login.
+The PC Workbench and Vue Admin share the same-origin `localStorage` keys `ACCESS_TOKEN`,
+`REFRESH_TOKEN`, `CLIENT_ID`, and `EXPIRES_TIME`. The Mobile Workbench uses the isolated
+`MOBILE_ACCESS_TOKEN`, `MOBILE_REFRESH_TOKEN`, `MOBILE_CLIENT_ID`, and
+`MOBILE_EXPIRES_TIME` keys, so the same browser can retain one PC/Admin session and one Mobile
+session without one login overwriting the other. Entering through `/zsjos/mobile` pins that tab
+to the Mobile session in `sessionStorage`; subsequent server-owned menu navigation in the same
+tab remains Mobile even though menu URLs do not repeat the entry prefix. A newly opened ordinary
+Workbench or Admin tab defaults to PC.
+
+Existing Workbench keys are migrated on first load according to the stored `CLIENT_ID`; an old
+Mobile session moves to the Mobile slot, while a PC or unclassified session remains compatible
+with Vue Admin. Login, request authorization, token refresh, 401 recovery, WebSocket authentication,
+and logout all use the current tab's slot. A refresh failure or ordinary logout clears only that
+platform. When one PC context receives a 401, it first checks whether the shared PC access token
+has changed before starting a refresh, which prevents an embedded Admin page from replacing a
+token refreshed by the PC Workbench context. Mobile never reads or writes the PC/Admin slot and
+does not render `admin_embed` pages; those pages direct the user to the computer entry.
 
 The Today Tasks page may show the ZSJOS business-task panel to users with
 `zsjos:business-task:query`. It requests and renders the separate BPM task panel only when the
@@ -143,10 +154,13 @@ Maintenance and legacy history accept either the account-query or account-mainte
 then independently require account-object read access. Account projections expose `VIEW_ACCOUNT_HISTORY`
 only after both layers pass, and Workbench must not probe either history endpoint without that capability.
 
-The server-owned top-level `/calendar` directory contains the relative `overview` child. Its account Gantt
-projection shows only complete current date pairs that intersect the requested natural-date window. The
-ordinary `zsjos:media-calendar:query` scope is the current user as director or operator;
-`zsjos:media-calendar:query-all` is the independent all-account override.
+The server-owned top-level `/calendar` directory contains the relative `overview` and `all` children.
+The account Gantt projection shows only complete current date pairs that intersect the requested
+natural-date window. The ordinary `zsjos:media-calendar:query` scope is resolved in the backend by
+System department data permission, then intersected with each account's director/operator ownership;
+`zsjos:media-calendar:query-all` remains only the account-calendar all-account override. The shared
+`日历日程` page uses its own page permission `zsjos:media-calendar:all-query` and intentionally does
+not apply account object scope.
 
 ```text
 role-to-menu assignments
@@ -202,7 +216,7 @@ WebSocket events are refresh hints, while the persisted message page remains aut
 
 - System owns announcement drafts, lifecycle, attachment snapshots and per-ADMIN-user read records. Existing `system_notice` rows remain `DRAFT` after the upgrade and are never exposed implicitly.
 - Vue Admin uses the existing System notice page for draft editing, attachment upload, publishing, taking offline and copying to a new draft. Published content is immutable; corrections require taking the announcement offline and copying it.
-- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Its permanent header entry, unread bar and `/zsjos/announcements` center are enabled only when the server permission response contains that permission. The direct child menu persists the relative path `announcements` under `/zsjos`.
+- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Its permanent header entry, unread bar and `/messages/notice` center are enabled only when the server permission response contains that permission. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu as a read-only page.
 - `system_notice_read` is unique by tenant, notice and ADMIN user. Reconnects and offline sessions therefore preserve unread truth. The `notice-published` WebSocket event carries only an invalidation hint; clients always refresh the unread summary API.
 - Announcement body HTML is cleaned by the backend XSS cleaner before persistence and defensively sanitized again in Workbench. Attachments store the Infra file ID plus name, MIME type, size and sort snapshots; download URLs are short-lived and never persisted. Missing Infra files retain their snapshot metadata and render as unavailable.
 
@@ -421,7 +435,7 @@ otherwise
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 统一客资页固定使用 `relationScope=all`，对提交人与负责人两类已授权关系取去重并集，不再让前端通过“我提交的/我负责的”切换关系范围；旧接口传入 `submitted` 或 `owned` 仍必须具备对应关系权限。页面保留单选的简单状态标签，`simpleStatus` 只在上述关系并集内追加生命周期条件。跨订单、学员、商机或审批入口只可用内部 `leadId` 深链读取指定详情，绝不把该关系人的客资加入管理列表。
 - 详情响应由服务端投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。`visibleTabs` 由独立 System 功能权限与统一对象关系共同决定；申诉页签对拥有申诉读取/审核能力的用户可见，也对当前 Lead 原提交人可见，但申诉记录接口仍校验 Lead 对象可读和同一申诉读取规则。`flow-history` 仅在当前用户持有 `zsjos:lead-detail:flow-read` 时投影，流转接口还必须通过同一个 Lead 对象读取检查。前端不得根据角色名、详情 mode 或关系字符串推断。跟进、申诉、投诉、订单和流转记录接口仍分别执行对象校验，隐藏页签不构成授权。
-- 客资流转记录是现有事实的只读合并投影：`zsjos_business_event` 提供判定、挂起、恢复、申诉和跟进等业务事件，`zsjos_lead_assignment_history` 提供派单、接单、抢单、转派、回收和释放等归属事件，`zsjos_lead_aging_pool_event` 提供商机公海进入、协作人分配/变更和退出等事件；提交节点来自 Lead 已持久化的提交时间。业务事件通过 `related_object_refs.assignmentHistoryId` 排除对应的重复分配记录，结果按实际发生时间及原始数值 ID 倒序。该投影不补造仓库未记录的历史，不修改三类来源记录，也不建立第二套流转事实表。
+- 客资流转记录是现有事实的只读合并投影：`zsjos_business_event` 提供判定、挂起、恢复、申诉和跟进等业务事件，`zsjos_lead_assignment_history` 提供派单、接单、抢单、转派、回收和释放等归属事件，`zsjos_lead_aging_pool_event` 提供公海进入、协作人分配/变更和退出等事件；提交节点来自 Lead 已持久化的提交时间。业务事件通过 `related_object_refs.assignmentHistoryId` 排除对应的重复分配记录，结果按实际发生时间及原始数值 ID 倒序。该投影不补造仓库未记录的历史，不修改三类来源记录，也不建立第二套流转事实表。
 - 流转记录的事件码、状态码和来源关联由服务端映射为中文显示值。自动与指定派单以分配历史中是否存在持久化规则引用区分，不能从人员或节点显示名称推断。历史 `lead_appeal_overturned` 即使保存的是申诉审核状态，也按稳定事件语义投影为客资“无效 → 有效”；提交申诉和维持原判不产生客资状态变化，历史 `converted` 状态码兼容显示为“有效”，均不改写原事件。原因与备注必须分字段投影：业务原因使用来源记录的原因或原因标签快照，提交说明、判定说明和跟进内容使用已有备注事实，不得复制同一文本填充两个字段。三类来源表只保存人员 ID 而没有统一的姓名快照，因此员工事件通过 System 用户解析当前昵称，兼职提交通过当前 Partner 记录解析名称；主体已删除且无来源快照时显示“未知账号”，不得虚构历史姓名。事件证据引用解析为短时 Infra 文件预览地址，仍受租户、功能权限和 Lead 对象权限保护；Workbench 仅为图片和 PDF 提供预览入口，不提供下载按钮。
 - Lead 业务通知统一深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={目标页签}`。申诉结果进入 `appeals`，投诉结果进入 `complaints`，跟进和提醒进入 `follow-ups`，其余场景进入 `overview`；申诉提交给审核人的待办入口仍优先进入独立申诉处理页。实时弹窗、消息铃铛和消息中心复用同一动作解析。`tab` 只是导航意图，Workbench 必须用详情响应的 `visibleTabs` 再校验，不可见时回退概览，不能据此扩大对象或接口权限。
 - `zsjos_lead_inbox_filter_scheme` 保存租户级草稿和当前已发布配置，`zsjos_lead_inbox_filter_version` 保存不可变发布快照。列表查询只消费已发布版本；筛选标签不返回数量且不执行额外统计查询。保存草稿不影响工作台，回滚通过复制历史快照并发布新版本完成。
@@ -593,7 +607,7 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - 上线后轮次允许普通审批人每轮唯一一次申请销售主管审批，因此整轮最多是报名履约、财务和主管三方。主管只取订单正式销售当前直属部门的 `leaderUserId`，必须启用、不能是正式销售本人且必须持有 `zsjos:sales-order:supervisor-confirm`；BPM 通过并行加签拥有主管任务、评论和历史，ZSJOS 的 `zsjos_order_supervisor_confirmation` 只保存业务申请、决定、状态和 BPM 引用，不复制任务。`pending` 不锁定普通审批任务，报名履约、财务与主管任务可同时可见和处理；一旦申请加签，该中心普通审批与对应主管审批都成为通过条件，先通过的一方等待另一方，二者通过后该中心节点才完成，另一中心状态不受影响。任一中心或主管驳回都由 BPM 驳回整轮；申请中心通过不取消主管记录，中心驳回、销售终止或流程取消才取消未完成申请。普通审批与主管审批共用服务端“成交订单审批”页面，功能权限和本人 BPM 任务仍分别校验。
 - 今日任务和业务消息通过 `/zsjos/sales-order/approval/task-target` 校验 BPM 任务关系后深链到统一审批页；从客户档案返回时仅允许 `/zsjos/sales-order-approvals` 白名单相对路径，禁止站外跳转。
 - 成交普通审批累计要求 Controller 功能权限 `zsjos:sales-order:review`、配置部门范围及本人普通 BPM 任务；主管确认累计要求 `zsjos:sales-order:supervisor-confirm`、本人主管 BPM 子任务、申请记录指定主管和订单对象关系。菜单可见、部门成员、对象可读和 BPM 任务所有权互不替代。
-- 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化。超期协同公海与主管人工公海对同一 Lead 互斥：两条创建路径均在 Lead 行锁后检查另一活动记录；历史上若两者同时存在，协同操作以稳定冲突错误失败，运维只读脚本负责列出冲突但不自动清理。任一公海的协同销售提交首购订单时，事务锁定 Lead、Opportunity 和协同记录，先将 Lead/Opportunity 正式负责人永久转给该销售并换绑未完成跟进任务，再将订单 `formalSalesUserId` 固化为新负责人；订单驳回、取消或终止不恢复原负责人。
+- 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化。产品上只有一个公海池，现行入口统一使用 `zsjos_lead_aging_pool_cycle`；旧 `zsjos_lead_public_sea_record` 仅作历史兼容审计，不得成为新的业务事实源。公海协同销售不得直接提交首购订单，必须先通过线上转派申请或主管直接转派成为正式负责人；转派完成后才允许成交录入。订单驳回、取消或终止不回滚已完成的正式转派。
 - 报名履约和财务任务处理、驳回、创建人或正式负责人终止均按“订单→当前审批轮次”顺序加锁，并校验当前 BPM 任务、轮次、订单/轮次版本与节点幂等键。终止由 BPM 业务授权公共 API 执行并记录真实操作人、授权类型和原因；ZSJOS 保存订单业务状态、轮次和原因快照。
 - ZSJOS owns order, item, immutable round snapshot and business status. A process result listener maps BPM approval to `order.status.effective` and Opportunity `won`, or rejection/cancellation to `order.status.revision_required` and Opportunity `following`. Resubmission never mutates the rejected order into a new round: it creates an independent successor, marks the old order `superseded`, preserves old audit facts, and starts a new BPM round in one transaction.
 - 审批人视角的筛选方案沿用客资筛选方案的草稿/发布版本机制，audience 固定为 `reviewer`，能力值仅允许 `handled=todo|done` 和 `task_definition_key=registrationReview|financeReview`。筛选项稳定编码使用小写下划线格式 `registration_review` / `finance_review`，与保持 BPM 契约的驼峰条件值相互独立；读取历史配置时兼容旧筛选项编码，并在下一次保存或发布时规范化。列表查询先在订单域按订单号、学员姓名或手机号解析流程实例集合，再将租户、流程定义、任务节点和流程实例条件传给 BPM，确保统计、分页和对象授权一致。

@@ -11,7 +11,7 @@ import jakarta.validation.Valid;
 @EqualsAndHashCode(callSuper = true)
 public class LeadAgingPoolPageReqVO extends PageParam {
     private String keyword;
-    @Pattern(regexp = "waiting_assignment|assigned|deal_pending", message = "超期公海状态不正确")
+    @Pattern(regexp = "waiting_assignment|assigned|deal_pending", message = "公海状态不正确")
     private String status;
     private String inboxGroup;
     private String inboxStage;

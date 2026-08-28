@@ -1,25 +1,19 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
-import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadAssignmentHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadPublicSeaRecordMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.ACTION_TRANSFER;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_COLLABORATION_POOL_CONFLICT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED;
 
-/** Coordinates owner-preserving collaboration and the explicit submit-time ownership transfer. */
+/** Coordinates owner-preserving collaboration and the explicit transfer boundary. */
 @Service
 public class LeadCollaborationService {
 
@@ -32,9 +26,6 @@ public class LeadCollaborationService {
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private LeadPublicSeaRecordMapper publicSeaRecordMapper;
     @Resource private LeadMapper leadMapper;
-    @Resource private OpportunityMapper opportunityMapper;
-    @Resource private LeadAssignmentHistoryMapper assignmentHistoryMapper;
-    @Resource private LeadLifecycleTaskService lifecycleTaskService;
 
     public OperationContext requireCanOperateForUpdate(LeadDO lead, Long operatorUserId) {
         if (Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
@@ -58,38 +49,16 @@ public class LeadCollaborationService {
         throw exception(LEAD_PERMISSION_DENIED);
     }
 
-    public void transferOnOrderSubmission(LeadDO lead, OpportunityDO opportunity,
-                                          OperationContext context, Long operatorUserId,
-                                          LocalDateTime transferredAt) {
-        if (!context.collaborator()) return;
-        if (!Objects.equals(lead.getOwnerUserId(), context.originalOwnerUserId())) {
-            throw exception(LEAD_PERMISSION_DENIED);
+    /**
+     * Entry to a first-purchase order is stricter than follow-up collaboration: only the
+     * formal owner may submit. A public-sea collaborator must use the transfer boundary first.
+     */
+    public void requireCanEnterDealForUpdate(LeadDO lead, Long operatorUserId) {
+        if (Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
+            lockCollaborationRows(lead.getId(), operatorUserId, lead.getOwnerUserId());
+            return;
         }
-        String reason = "公海协同销售提交订单，正式归属转移";
-        if ("aging_pool".equals(context.poolType())) {
-            agingPoolService.terminateForOwnerTransfer(lead.getId(), operatorUserId, operatorUserId,
-                    transferredAt, reason);
-        } else {
-            publicSeaRecordMapper.deleteByLeadId(lead.getId());
-        }
-
-        LeadAssignmentHistoryDO history = new LeadAssignmentHistoryDO();
-        history.setLeadId(lead.getId());
-        history.setActionType(ACTION_TRANSFER);
-        history.setFromOwnerUserId(context.originalOwnerUserId());
-        history.setToOwnerUserId(operatorUserId);
-        history.setOperatorUserId(operatorUserId);
-        history.setReason(reason);
-        history.setOccurredAt(transferredAt);
-        assignmentHistoryMapper.insert(history);
-
-        lead.setOwnerUserId(operatorUserId);
-        lead.setOwnershipStartedAt(transferredAt);
-        lead.setCurrentAssignmentHistoryId(history.getId());
-        leadMapper.updateById(lead);
-        opportunity.setOwnerUserId(operatorUserId);
-        opportunityMapper.updateById(opportunity);
-        lifecycleTaskService.reassignPendingSalesTasks(lead.getId(), operatorUserId);
+        throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_TRANSFER);
     }
 
     private void lockCollaborationRows(Long leadId, Long operatorUserId, Long ownerUserId) {

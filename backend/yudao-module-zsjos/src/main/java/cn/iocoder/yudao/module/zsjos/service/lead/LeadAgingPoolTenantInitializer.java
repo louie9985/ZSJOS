@@ -50,7 +50,7 @@ public class LeadAgingPoolTenantInitializer {
         String json = JsonUtils.toJsonString(config);
         LocalDateTime now = LocalDateTime.now();
         LeadInboxFilterSchemeDO scheme = new LeadInboxFilterSchemeDO();
-        scheme.setAudience(INBOX_AUDIENCE_AGING_POOL); scheme.setName("超期公海视角");
+        scheme.setAudience(INBOX_AUDIENCE_AGING_POOL); scheme.setName("公海视角");
         scheme.setDraftConfigJson(json); scheme.setPublishedConfigJson(json); scheme.setPublishedVersion(1);
         scheme.setPublishedBy(0L); scheme.setPublishedAt(now); scheme.setVersion(0);
         schemeMapper.insert(scheme);
@@ -72,18 +72,18 @@ public class LeadAgingPoolTenantInitializer {
     }
 
     private static List<NotifyDefaultRuleReqDTO> defaultNotifyRules() {
-        return List.of(rule("超期公海-提前7天", AGING_POOL_REMINDER, "ZSJOS_AGING_POOL_REMINDER",
+        return List.of(rule("公海-提前7天", AGING_POOL_REMINDER, "ZSJOS_AGING_POOL_REMINDER",
                         List.of("owner", "frozen_dept_leader"), "advance", 10080),
-                rule("超期公海到期通知", AGING_POOL_DUE, "ZSJOS_AGING_POOL_DUE",
+                rule("公海到期通知", AGING_POOL_DUE, "ZSJOS_AGING_POOL_DUE",
                         List.of("owner", "frozen_dept_leader"), null, null),
-                rule("超期公海指派通知", AGING_POOL_ASSIGNED_NOTICE, "ZSJOS_AGING_POOL_ASSIGNED",
+                rule("公海指派通知", AGING_POOL_ASSIGNED_NOTICE, "ZSJOS_AGING_POOL_ASSIGNED",
                         List.of("owner", "collaborator", "frozen_dept_leader"), null, null),
-                rule("超期公海换派通知", AGING_POOL_REASSIGNED_NOTICE, "ZSJOS_AGING_POOL_REASSIGNED",
+                rule("公海换派通知", AGING_POOL_REASSIGNED_NOTICE, "ZSJOS_AGING_POOL_REASSIGNED",
                         List.of("owner", "previous_collaborator", "collaborator", "frozen_dept_leader"), null, null),
-                rule("超期公海待重派通知", AGING_POOL_REASSIGN_REQUIRED_NOTICE,
+                rule("公海待重派通知", AGING_POOL_REASSIGN_REQUIRED_NOTICE,
                         "ZSJOS_AGING_POOL_REASSIGN_REQUIRED",
                         List.of("owner", "previous_collaborator", "frozen_dept_leader"), null, null),
-                rule("超期公海退出通知", AGING_POOL_EXITED_NOTICE, "ZSJOS_AGING_POOL_EXITED",
+                rule("公海退出通知", AGING_POOL_EXITED_NOTICE, "ZSJOS_AGING_POOL_EXITED",
                         List.of("owner", "previous_collaborator", "frozen_dept_leader"), null, null));
     }
 

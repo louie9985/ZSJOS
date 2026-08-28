@@ -40,7 +40,8 @@ Supervisor state rules are authoritative on the backend: submitted Leads may be 
 recycled, or released to the claim pool; suspended Leads additionally support restore; recycle-pending
 Leads support transfer or claim-pool release; valid pre-deal Leads support transfer or release to the
 public sea. Won and closed Leads reject every supervisor command. Public-sea release preserves formal
-ownership and may assign an eligible actual follow-up salesperson in the created public-sea cycle.
+ownership and may assign an eligible actual follow-up salesperson in the created public-sea cycle;
+that collaborator may follow up but cannot submit a first-purchase order until a formal transfer is completed.
 
 `assignmentStatus=recycle_pending` is displayed as `回收待处理`. It means the supervisor has removed
 the current formal owner, retained that employee in `recycleSourceOwnerUserId`, and must next either
@@ -59,7 +60,7 @@ Lead transaction to cover concurrent changes.
 
 Every reason is trimmed, required, and limited to 500 characters. Batch commands accept 1 to 200 IDs and return `{successCount, failureCount, items[]}`. Each item contains internal `leadId`, user-visible `leadNo`, `success`, stable `code`, and `message`; each Lead runs in an independent transaction.
 
-Manual public-sea release preserves Lead owner, main status, and assignment status. It does not use the claim-pool value `assignment_status=public_pool` and does not make the Lead claimable.
+Manual public-sea release preserves Lead owner, main status, and assignment status. It does not use the claim-pool value `assignment_status=public_pool` and does not make the Lead claimable. A collaborator must use the transfer-request BPM flow or supervisor transfer command before entering a first-purchase order.
 
 This state-guidance behavior uses existing Lead columns and the supervisor permissions delivered by
 V139/V140/V142. It requires no new SQL migration, menu grant, dictionary entry, or data repair.

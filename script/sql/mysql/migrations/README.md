@@ -717,19 +717,69 @@ in numeric order; V150 remains independently executable after V143 and does not 
 
 V148 extends System announcements with draft/published/offline lifecycle fields, stable Infra-file
 attachment references, and tenant-scoped per-ADMIN-user read records. Existing announcements remain
-drafts. Menu ID `79910` is the relative Workbench route `announcements`; IDs `79911-79912` add explicit
-publish/offline operations under the existing Admin notice page. Tenant packages inherit only from
-their existing Workbench or notice parent, and no role grant is created. The migration is additive and
-repeatable; it does not publish historical content or delete business rows. The complete migration runs
-through one stored-procedure call so a statement-batch client cannot continue from a failed prerequisite
-into schema, menu, or version writes. Lifecycle columns use `information_schema` guards instead of
-`ADD COLUMN IF NOT EXISTS`, which is not accepted by every supported MySQL 8 minor version.
+drafts. Menu ID `79910` was the temporary Workbench route `announcements`; `79911-79912` add explicit
+publish/offline operations under the existing Admin notice page. V158 later retires `79910` and returns
+the employee entry to the original `通知公告` menu `107` with the public URL `/messages/notice`. Tenant
+packages inherit only from their existing Workbench or notice parent, and no role grant is created. The
+migration is additive and repeatable; it does not publish historical content or delete business rows.
+The complete migration runs through one stored-procedure call so a statement-batch client cannot continue
+from a failed prerequisite into schema, menu, or version writes. Lifecycle columns use
+`information_schema` guards instead of `ADD COLUMN IF NOT EXISTS`, which is not accepted by every supported
+MySQL 8 minor version.
 
 An affected development database may already contain the V148 markers, attachment/read tables, and menus
 while lacking one or more lifecycle columns because a batch client continued after the former ALTER error.
 Do not delete either version marker or those additive objects. Back up the database, run the corrected V148
-file explicitly once, and verify all three columns, both tables, menu IDs `79910-79912`, and both V148 markers.
-The normal migration runner may skip this repair when it sees an existing V148 marker.
+file explicitly once, and verify all three columns, both tables, menu IDs `79911-79912`, the retired
+`79910` row after V158, and both V148 markers. The normal migration runner may skip this repair when it
+sees an existing V148 marker.
+
+### V158 Retire duplicate announcement center menu
+
+V158 follows V157 and retires the temporary employee menu `79910` after the original notice menu is
+reused as the only public announcement entry. It creates the `79913` button permission under menu `107`
+for `system:notice:read`, copies role grants from `79910` to both the original page and the read button
+before retirement, adds the read button to tenant packages that contain the original notice page, then
+logically deletes `79910` and removes its tenant-package references. If an environment already ran the
+former V158 draft, the corrected script may still recover grants soft-deleted by that V158 run because
+those rows keep `updater='V158'`. Existing announcement content, attachments and read records are
+preserved. Fresh bootstrap runs V158 after V157 so the final employee URL remains `/messages/notice` and
+the read API permission is still returned in the permission string set. Tenant package cleanup uses the
+numeric JSON array position from `JSON_TABLE` rather than string search, because package menu IDs are stored
+as JSON numbers.
+
+### V159 Public sea terminology
+
+V159 follows V158 and unifies user-visible ZSJOS public-sea wording from “超期公海”,
+“超期协同公海”, “商机公海” and “人工公海” to the single product term “公海”. It updates only
+server-owned menu names, Lead inbox filter scheme names, notification template/rule display text,
+and table/column comments. Technical identifiers remain stable, including `lead-aging-pool`,
+`AGING_POOL`, `zsjos:lead-aging-pool:*`, notification scene/code values, Java class names and table names.
+No Lead, order, assignment, public-sea, notification delivery or permission grant data is changed.
+
+Fresh bootstrap sources V159 after V158 so new environments start with the unified wording, while upgraded
+environments receive the same wording through guarded metadata updates. Rollback is forward-only and would
+require another reviewed terminology migration.
+
+### V160 registration close-service button
+
+V160 follows V159 and adds the existing registration public-pool page's server-owned
+`zsjos:registration:close` button metadata under `关闭服务`. It does not change registration
+case state, service-relation behavior, order status, or any historical business row. The
+migration is additive and repeatable; fresh bootstrap sources it after V159, and upgraded
+environments receive the same menu metadata through the guarded insert. Rollback is forward-only:
+hide or remove the button metadata in a later reviewed migration, but keep the registration
+case history intact.
+
+### V161 Media calendar schedule view
+
+V161 follows V160 and adds the server-owned `日历日程` page under the existing `/calendar`
+directory with relative child path `all` and independent permission `zsjos:media-calendar:all-query`.
+It does not change media accounts, maintenance history, notification data, or the existing
+`zsjos:media-calendar:query-all` account-calendar override. Tenant packages that already contain
+the calendar directory receive the page, and role grants are inherited only from roles already holding
+the calendar directory or account-calendar page. The migration is additive and repeatable; rollback is
+forward-only through a later permission/menu migration that disables the page and revokes grants.
 
 ### V149 Feedback management
 

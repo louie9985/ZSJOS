@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountRes
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountStudentCandidateRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarCandidatesRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountLegacyStageRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
@@ -81,6 +82,20 @@ public class MediaAccountController {
     @PreAuthorize("@ss.hasPermission('zsjos:media-calendar:query')")
     public CommonResult<MediaAccountCalendarRespVO> calendar(@Valid MediaAccountCalendarPageReqVO reqVO) {
         return success(maintenanceService.calendar(reqVO, getLoginUserId()));
+    }
+
+    @GetMapping("/calendar/all")
+    @Operation(summary = "分页查询全员日历区间")
+    @PreAuthorize("@ss.hasPermission('zsjos:media-calendar:all-query')")
+    public CommonResult<MediaAccountCalendarRespVO> allCalendar(@Valid MediaAccountCalendarPageReqVO reqVO) {
+        return success(maintenanceService.allCalendar(reqVO, getLoginUserId()));
+    }
+
+    @GetMapping("/calendar/candidates")
+    @Operation(summary = "获得媒体账号日历筛选候选人")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:media-calendar:query','zsjos:media-calendar:all-query')")
+    public CommonResult<MediaAccountCalendarCandidatesRespVO> calendarCandidates() {
+        return success(maintenanceService.calendarCandidates(getLoginUserId()));
     }
 
     @GetMapping("/student-candidates")

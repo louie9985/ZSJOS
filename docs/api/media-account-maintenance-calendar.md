@@ -32,16 +32,35 @@
 
 两个接口都叠加账号对象读取权限。账号响应仅在功能权限和对象权限同时通过时返回 `VIEW_ACCOUNT_HISTORY`；Workbench 以该服务端能力决定是否加载和展示历史。维护版本不提供删除或恢复命令，原阶段日志不被改写。
 
-## 日历总览
+## 账号日历
 
 `GET /zsjos/media-account/calendar` 需要 `zsjos:media-calendar:query`。查询参数：
 
 - 必填：`rangeStart`、`rangeEnd`、`pageNo`、`pageSize`。
 - 可选：`keyword`、`currentStatusValue`、`stageValue`、`directorUserId`、`operatorUserId`。
 
-查询使用闭区间相交规则 `startDate <= rangeEnd && endDate >= rangeStart`。普通查询始终限制为当前用户是所属编导或运营的账号；只有同时具备 `zsjos:media-calendar:query-all` 时才取消该对象范围。编导/运营筛选不扩大可见范围。迁移将原 `zsjos:media-account:query-all` 关系同时继承为日历页面查询和查看全部，避免只有范围按钮而无法访问页面。
+查询使用闭区间相交规则 `startDate <= rangeEnd && endDate >= rangeStart`。普通查询由服务端统一应用账号对象范围：保留 `zsjos:media-calendar:query-all` 作为账号日历全量兜底；否则先按 System 部门数据权限解析当前用户及其可见下属，再匹配账号的所属编导或运营。主管可见范围来自部门数据权限，不靠用户名、角色名或前端推断。编导/运营筛选不扩大可见范围。迁移将原 `zsjos:media-account:query-all` 关系同时继承为日历页面查询和查看全部，避免只有范围按钮而无法访问页面。
 
 响应包含 `list`、`total` 和 `unscheduledCount`。`list` 每个账号只返回当前快照区间一次；日期不完整的账号不进入 `list`，但计入当前其他筛选下的 `unscheduledCount`。
+
+## 日历日程
+
+`GET /zsjos/media-account/calendar/all` 需要独立页面权限 `zsjos:media-calendar:all-query`。查询参数与账号日历一致，响应结构也一致。
+
+日历日程是登录员工使用的共享日程视图，不使用账号对象可见范围，也不复用 `zsjos:media-calendar:query-all`。它仍受当前租户、逻辑删除、日期区间、关键字、状态、阶段、编导和运营筛选约束。`unscheduledCount` 与账号日历保持同一计算口径：当前其他筛选下缺少开始或结束日期的账号数。Workbench 以独立月历界面呈现该视图：左侧提供搜索、迷你月历和候选人筛选，右侧使用主月格展示日程，避免与账号日历的账号排期时间轴重复。
+
+## 日历筛选候选人
+
+`GET /zsjos/media-account/calendar/candidates` 需要 `zsjos:media-calendar:query` 或 `zsjos:media-calendar:all-query`。响应：
+
+```json
+{
+  "directors": [{ "id": 30, "nickname": "编导乙", "username": "director01", "status": 0, "deptId": 100 }],
+  "operators": [{ "id": 20, "nickname": "运营甲", "username": "operator01", "status": 0, "deptId": 100 }]
+}
+```
+
+候选池由 System 角色编码解析：编导为 `content_director`，运营为 `new_media_operator`，并只返回启用角色下的启用用户。前端不得再用 `/system/user/simple-list` 的全量用户列表作为生产筛选候选池。
 
 ## 已移除的旧阶段流转
 

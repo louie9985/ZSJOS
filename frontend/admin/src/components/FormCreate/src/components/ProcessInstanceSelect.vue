@@ -44,77 +44,92 @@
       v-model="selectorVisible"
       title="选择关联审批单"
       width="min(920px, 94vw)"
+      class="process-instance-selector-dialog"
+      append-to-body
       destroy-on-close
     >
-      <el-form :inline="true" :model="query">
-        <el-form-item label="关键词"
-          ><el-input v-model="query.keyword" clearable @keyup.enter="search"
-        /></el-form-item>
-        <el-form-item label="流程标识"
-          ><el-input v-model="query.processDefinitionKey" clearable
-        /></el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="query.status" clearable class="w-140px">
-            <el-option
-              v-for="item in getIntDictOptions(DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS)"
-              :key="item.value"
-              :label="item.label"
-              :value="item.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item><el-button :icon="Search" @click="search">查询</el-button></el-form-item>
-      </el-form>
-      <el-alert
-        v-if="candidateError"
-        :title="candidateError"
-        type="error"
-        show-icon
-        :closable="false"
-      >
-        <el-button link type="primary" @click="loadCandidates">重试</el-button>
-      </el-alert>
-      <el-table
-        v-else
-        v-loading="candidateLoading"
-        :data="candidates"
-        row-key="targetProcessInstanceId"
-        @selection-change="selection = $event"
-      >
-        <el-table-column type="selection" width="46" :selectable="selectable" reserve-selection />
-        <el-table-column label="审批" min-width="240">
-          <template #default="scope"
-            ><b>{{ scope.row.name }}</b
-            ><div class="relation-meta">{{ scope.row.displayNo || '无可读编号' }}</div></template
-          >
-        </el-table-column>
-        <el-table-column prop="processDefinitionName" label="流程类型" min-width="150" />
-        <el-table-column label="状态" width="100"
-          ><template #default="scope"
-            ><dict-tag
-              :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS"
-              :value="scope.row.status" /></template
-        ></el-table-column>
-        <el-table-column label="发起时间" width="170"
-          ><template #default="scope">{{
-            formatDate(scope.row.startTime)
-          }}</template></el-table-column
+      <div class="selector-dialog-content">
+        <el-form class="selector-query-form" :model="query" label-width="72px">
+          <el-form-item label="关键词">
+            <el-input v-model="query.keyword" clearable @keyup.enter="search" />
+          </el-form-item>
+          <el-form-item label="流程标识">
+            <el-input v-model="query.processDefinitionKey" clearable />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="query.status" clearable>
+              <el-option
+                v-for="item in getIntDictOptions(DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS)"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item class="selector-query-action" label-width="0">
+            <el-button :icon="Search" @click="search">查询</el-button>
+          </el-form-item>
+        </el-form>
+
+        <el-alert
+          v-if="candidateError"
+          :title="candidateError"
+          type="error"
+          show-icon
+          :closable="false"
         >
-        <template #empty><el-empty description="暂无可关联审批" /></template>
-      </el-table>
-      <el-pagination
-        v-model:current-page="query.pageNo"
-        v-model:page-size="query.pageSize"
-        :total="candidateTotal"
-        layout="total, prev, pager, next"
-        @current-change="loadCandidates"
-      />
-      <template #footer
-        ><el-button @click="selectorVisible = false">取消</el-button
-        ><el-button type="primary" :disabled="mergedSelection.length > 20" @click="confirmSelection"
-          >确认（{{ mergedSelection.length }}/20）</el-button
-        ></template
-      >
+          <el-button link type="primary" @click="loadCandidates">重试</el-button>
+        </el-alert>
+        <el-table
+          v-else
+          v-loading="candidateLoading"
+          class="selector-table"
+          :data="candidates"
+          height="360"
+          row-key="targetProcessInstanceId"
+          @selection-change="selection = $event"
+        >
+          <el-table-column type="selection" width="46" :selectable="selectable" reserve-selection />
+          <el-table-column label="审批" min-width="240">
+            <template #default="scope">
+              <b>{{ scope.row.name }}</b>
+              <div class="relation-meta">{{ scope.row.displayNo || '无可读编号' }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="processDefinitionName" label="流程类型" min-width="150" />
+          <el-table-column label="状态" width="100">
+            <template #default="scope">
+              <dict-tag :type="DICT_TYPE.BPM_PROCESS_INSTANCE_STATUS" :value="scope.row.status" />
+            </template>
+          </el-table-column>
+          <el-table-column label="发起时间" width="170">
+            <template #default="scope">{{ formatDate(scope.row.startTime) }}</template>
+          </el-table-column>
+          <template #empty><el-empty description="暂无可关联审批" /></template>
+        </el-table>
+
+        <div class="selector-pagination">
+          <el-pagination
+            v-model:current-page="query.pageNo"
+            v-model:page-size="query.pageSize"
+            :total="candidateTotal"
+            layout="total, prev, pager, next"
+            @current-change="loadCandidates"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <div class="selector-footer">
+          <el-button @click="selectorVisible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :disabled="mergedSelection.length > 20"
+            @click="confirmSelection"
+          >
+            确认（{{ mergedSelection.length }}/20）
+          </el-button>
+        </div>
+      </template>
     </el-dialog>
 
     <el-dialog
@@ -384,10 +399,12 @@ watch(() => props.modelValue, hydrateCreateValues, { immediate: true, deep: true
   gap: 12px;
   width: 100%;
 }
+
 .relation-list {
   display: grid;
   gap: 8px;
 }
+
 .relation-row {
   display: flex;
   min-width: 0;
@@ -398,24 +415,111 @@ watch(() => props.modelValue, hydrateCreateValues, { immediate: true, deep: true
   border: 1px solid var(--el-border-color);
   border-radius: 6px;
 }
+
 .relation-main {
   min-width: 0;
   flex: 1;
   cursor: pointer;
 }
+
 .relation-title {
   overflow: hidden;
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
 .relation-no {
   margin-right: 8px;
   color: var(--el-color-primary);
 }
+
 .relation-meta {
   margin-top: 3px;
-  color: var(--el-text-color-secondary);
   font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+:global(.process-instance-selector-dialog) {
+  max-width: 94vw;
+}
+
+:global(.process-instance-selector-dialog .el-dialog__header) {
+  padding: 18px 24px 12px;
+  margin-right: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+}
+
+:global(.process-instance-selector-dialog .el-dialog__body) {
+  padding: 16px 20px 0;
+}
+
+:global(.process-instance-selector-dialog .el-dialog__footer) {
+  padding: 14px 20px 20px;
+}
+
+.selector-dialog-content {
+  display: grid;
+  gap: 12px;
+}
+
+.selector-query-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) minmax(150px, 180px) auto;
+  gap: 12px 16px;
+  align-items: flex-start;
+}
+
+.selector-query-form :deep(.el-form-item) {
+  margin-bottom: 0;
+}
+
+.selector-query-form :deep(.el-input),
+.selector-query-form :deep(.el-select) {
+  width: 100%;
+}
+
+.selector-query-action {
+  justify-self: end;
+}
+
+.selector-table {
+  width: 100%;
+}
+
+.selector-pagination {
+  display: flex;
+  justify-content: flex-start;
+  min-height: 32px;
+  padding-top: 4px;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.selector-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+@media (width <= 768px) {
+  :global(.process-instance-selector-dialog) {
+    width: 94vw !important;
+  }
+
+  :global(.process-instance-selector-dialog .el-dialog__body) {
+    padding-inline: 14px;
+  }
+
+  .selector-query-form {
+    grid-template-columns: 1fr;
+  }
+
+  .selector-query-action {
+    justify-self: stretch;
+  }
+
+  .selector-query-action :deep(.el-button) {
+    width: 100%;
+  }
 }
 </style>

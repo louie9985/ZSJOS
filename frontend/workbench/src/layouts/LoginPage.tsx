@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Card, Input, Typography } from 'antd'
-import { STORAGE_KEYS } from '../constants'
+import { resolveAuthPlatform } from '../constants'
 import { api } from '../services/api'
 
 export default function LoginPage({ onLogin, initialError = '' }: { onLogin: () => void; initialError?: string }) {
@@ -15,7 +15,7 @@ export default function LoginPage({ onLogin, initialError = '' }: { onLogin: () 
     setLoading(true)
     setError('')
     try {
-      const platform = window.location.pathname.startsWith('/zsjos/mobile') ? 'MOBILE' : 'PC'
+      const platform = resolveAuthPlatform()
       await api.login(username, password, platform)
       onLogin()
     } catch (loginError: any) {

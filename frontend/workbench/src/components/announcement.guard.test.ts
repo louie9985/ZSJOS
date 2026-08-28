@@ -4,7 +4,7 @@ import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
 
 describe('announcement surface guards', () => {
   it('registers the server-owned Workbench route', () => {
-    expect(APP_ROUTES.ANNOUNCEMENTS).toBe('/zsjos/announcements')
+    expect(APP_ROUTES.ANNOUNCEMENTS).toBe('/messages/notice')
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.ANNOUNCEMENTS)).toBe(true)
   })
 

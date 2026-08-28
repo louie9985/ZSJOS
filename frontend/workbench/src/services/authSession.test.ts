@@ -1,5 +1,71 @@
 import { describe, expect, it } from 'vitest'
-import { isCurrentRefreshSession, readSharedTenantId, writeSharedTenantId } from './api'
+import { AUTH_PLATFORM_SESSION_KEY, AUTH_STORAGE_KEYS, resolveAuthPlatform } from '../constants'
+import { getAuthAccessToken, isCurrentRefreshSession, migrateLegacyAuthStorage, readSharedTenantId, writeSharedTenantId } from './api'
+
+function memoryStorage(initial: Record<string, string> = {}) {
+  const values = new Map(Object.entries(initial))
+  return {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => { values.set(key, value) },
+    removeItem: (key: string) => { values.delete(key) },
+    values
+  }
+}
+
+describe('authentication platform', () => {
+  it('pins a /zsjos/mobile entry to the Mobile session for later menu routes in the same tab', () => {
+    const storage = memoryStorage()
+    expect(resolveAuthPlatform('/zsjos/mobile', storage)).toBe('MOBILE')
+    expect(resolveAuthPlatform('/zsjos/tasks/today', storage)).toBe('MOBILE')
+    expect(storage.getItem(AUTH_PLATFORM_SESSION_KEY)).toBe('MOBILE')
+  })
+
+  it('uses PC for a regular Workbench/Admin tab without a Mobile entry marker', () => {
+    const storage = memoryStorage()
+    expect(resolveAuthPlatform('/zsjos/tasks/today', storage)).toBe('PC')
+    expect(storage.getItem(AUTH_PLATFORM_SESSION_KEY)).toBe('PC')
+  })
+
+  it('reads independent access-token slots for PC/Admin and Mobile', () => {
+    const storage = memoryStorage({
+      [AUTH_STORAGE_KEYS.PC.accessToken]: 'pc-access',
+      [AUTH_STORAGE_KEYS.MOBILE.accessToken]: 'mobile-access'
+    })
+    expect(getAuthAccessToken('PC', storage)).toBe('pc-access')
+    expect(getAuthAccessToken('MOBILE', storage)).toBe('mobile-access')
+  })
+})
+
+describe('legacy authentication migration', () => {
+  it('moves an unprefixed Mobile session without overwriting an existing Mobile session', () => {
+    const storage = memoryStorage({
+      [AUTH_STORAGE_KEYS.PC.accessToken]: 'legacy-mobile-access',
+      [AUTH_STORAGE_KEYS.PC.refreshToken]: 'legacy-mobile-refresh',
+      [AUTH_STORAGE_KEYS.PC.clientId]: 'zsjos-mobile',
+      [AUTH_STORAGE_KEYS.MOBILE.accessToken]: 'current-mobile-access',
+      [AUTH_STORAGE_KEYS.MOBILE.refreshToken]: 'current-mobile-refresh',
+      [AUTH_STORAGE_KEYS.MOBILE.clientId]: 'zsjos-mobile'
+    })
+    migrateLegacyAuthStorage(storage)
+    expect(storage.getItem(AUTH_STORAGE_KEYS.MOBILE.accessToken)).toBe('current-mobile-access')
+    expect(storage.getItem(AUTH_STORAGE_KEYS.MOBILE.refreshToken)).toBe('current-mobile-refresh')
+    expect(storage.getItem(AUTH_STORAGE_KEYS.PC.accessToken)).toBeNull()
+    expect(storage.getItem(AUTH_STORAGE_KEYS.PC.refreshToken)).toBeNull()
+  })
+
+  it('keeps a complete unprefixed PC session for Vue Admin compatibility', () => {
+    const storage = memoryStorage({
+      zsjos_access_token: 'legacy-pc-access',
+      zsjos_refresh_token: 'legacy-pc-refresh',
+      zsjos_client_id: 'zsjos-pc'
+    })
+    migrateLegacyAuthStorage(storage)
+    expect(storage.getItem(AUTH_STORAGE_KEYS.PC.accessToken)).toBe('legacy-pc-access')
+    expect(storage.getItem(AUTH_STORAGE_KEYS.PC.refreshToken)).toBe('legacy-pc-refresh')
+    expect(storage.getItem(AUTH_STORAGE_KEYS.PC.clientId)).toBe('zsjos-pc')
+    expect(storage.getItem('zsjos_access_token')).toBeNull()
+  })
+})
 
 describe('refresh session generation', () => {
   it('accepts a result only while the refresh token still identifies the same session', () => {

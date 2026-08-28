@@ -1,4 +1,4 @@
-import { STORAGE_KEYS } from '../constants'
+import { AUTH_STORAGE_KEYS, resolveAuthPlatform, type AuthPlatform } from '../constants'
 
 export type RealtimeStatus = 'connecting' | 'open' | 'closed'
 
@@ -7,8 +7,11 @@ export type RealtimeMessage = {
   content: unknown
 }
 
-export function getRealtimeAccessToken(storage: Pick<Storage, 'getItem'>) {
-  return storage.getItem(STORAGE_KEYS.ACCESS_TOKEN)
+export function getRealtimeAccessToken(
+  storage: Pick<Storage, 'getItem'>,
+  platform: AuthPlatform = resolveAuthPlatform()
+) {
+  return storage.getItem(AUTH_STORAGE_KEYS[platform].accessToken)
 }
 
 export function buildWebSocketUrl(apiBaseUrl: string, origin: string, accessToken: string) {

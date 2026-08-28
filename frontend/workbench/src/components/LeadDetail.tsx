@@ -88,6 +88,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [validConfirmOpen, setValidConfirmOpen] = useState(false)
   const [repurchaseOpen, setRepurchaseOpen] = useState(false)
   const [qualificationAction, setQualificationAction] = useState<QualificationAction>()
+  const [qualificationSupervisorAction, setQualificationSupervisorAction] = useState(false)
   const [qualificationReason, setQualificationReason] = useState('')
   const [qualificationSalesUserId, setQualificationSalesUserId] = useState<number>()
   const [qualificationCandidates, setQualificationCandidates] = useState<AssignmentUser[]>([])
@@ -165,16 +166,18 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const closeQualificationAction = () => {
     setQualificationConfirmOpen(false)
     setQualificationAction(undefined)
+    setQualificationSupervisorAction(false)
   }
-  const openQualificationAction = async (action: QualificationAction) => {
+  const openQualificationAction = async (action: QualificationAction, supervisorAction = false) => {
     resetDispositionIntent()
     setQualificationAction(action)
+    setQualificationSupervisorAction(supervisorAction)
     setQualificationReason('')
     setQualificationSalesUserId(undefined)
     setQualificationCandidates([])
     if (action !== 'transfer' && action !== 'releasePublicSea') return
     setQualificationCandidatesLoading(true)
-    try { setQualificationCandidates(managerMode
+    try { setQualificationCandidates(managerMode || supervisorAction
       ? await api.subordinateTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
     catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
     finally { setQualificationCandidatesLoading(false) }
@@ -187,10 +190,11 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const submitQualificationAction = async () => {
     setQualificationConfirmOpen(false)
     const action = qualificationAction
+    const supervisorAction = managerMode || qualificationSupervisorAction
     if (!action) return
     await runDisposition(async ({ idempotencyKey, complete }) => {
       const command = { reason: qualificationReason.trim(), idempotencyKey }
-      if (managerMode) {
+      if (supervisorAction) {
         if (action === 'restore') await api.supervisorRestoreLead(lead.id, command.reason, idempotencyKey)
         if (action === 'transfer') await api.supervisorTransferLead(lead.id, qualificationSalesUserId!, command.reason, idempotencyKey)
         if (action === 'recycle') await api.supervisorRecycleLead(lead.id, command.reason, idempotencyKey)
@@ -215,11 +219,11 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     actions.has('QUALIFICATION_TRANSFER') && { key: 'qualification-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('QUALIFICATION_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
     actions.has('QUALIFICATION_RECYCLE') && { key: 'qualification-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('QUALIFICATION_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
     actions.has('QUALIFICATION_RELEASE') && { key: 'qualification-release', icon: <ExportOutlined/>, label: '释放', danger: true, disabled: !actions.get('QUALIFICATION_RELEASE')?.enabled, onClick: () => void openQualificationAction('release') },
-    actions.has('SUPERVISOR_RESTORE') && { key: 'supervisor-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('SUPERVISOR_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore') },
-    actions.has('SUPERVISOR_TRANSFER') && { key: 'supervisor-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('SUPERVISOR_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
-    actions.has('SUPERVISOR_RECYCLE') && { key: 'supervisor-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('SUPERVISOR_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
-    actions.has('SUPERVISOR_RELEASE_CLAIM_POOL') && { key: 'supervisor-release-claim-pool', icon: <ExportOutlined/>, label: '释放至抢单池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_CLAIM_POOL')?.enabled, onClick: () => void openQualificationAction('release') },
-    actions.has('SUPERVISOR_RELEASE_PUBLIC_SEA') && { key: 'supervisor-release-public-sea', icon: <ExportOutlined/>, label: '释放至公海池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_PUBLIC_SEA')?.enabled, onClick: () => void openQualificationAction('releasePublicSea') },
+    actions.has('SUPERVISOR_RESTORE') && { key: 'supervisor-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('SUPERVISOR_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore', true) },
+    actions.has('SUPERVISOR_TRANSFER') && { key: 'supervisor-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('SUPERVISOR_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer', true) },
+    actions.has('SUPERVISOR_RECYCLE') && { key: 'supervisor-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('SUPERVISOR_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle', true) },
+    actions.has('SUPERVISOR_RELEASE_CLAIM_POOL') && { key: 'supervisor-release-claim-pool', icon: <ExportOutlined/>, label: '释放至抢单池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_CLAIM_POOL')?.enabled, onClick: () => void openQualificationAction('release', true) },
+    actions.has('SUPERVISOR_RELEASE_PUBLIC_SEA') && { key: 'supervisor-release-public-sea', icon: <ExportOutlined/>, label: '释放至公海池', danger: true, disabled: !actions.get('SUPERVISOR_RELEASE_PUBLIC_SEA')?.enabled, onClick: () => void openQualificationAction('releasePublicSea', true) },
   ].filter(Boolean) as ToolbarAction[]
 
   const toolbarActions: ToolbarAction[] = [

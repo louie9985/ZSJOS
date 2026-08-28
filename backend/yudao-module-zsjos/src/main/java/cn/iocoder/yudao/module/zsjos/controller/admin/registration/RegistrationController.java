@@ -16,6 +16,7 @@ import java.io.IOException;
 import org.springframework.web.multipart.MultipartFile;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.module.zsjos.service.registration.RegistrationConstants.PERMISSION_CLOSE;
 
 @Tag(name = "员工工作台 - 报名履约公共池")
 @RestController
@@ -96,5 +97,11 @@ public class RegistrationController {
     @PreAuthorize("@ss.hasPermission('zsjos:registration:complete')")
     public CommonResult<Boolean> complete(@PathVariable Long id, @Valid @RequestBody RegistrationVersionReqVO reqVO) {
         registrationService.complete(id, SecurityFrameworkUtils.getLoginUserId(), reqVO); return success(true);
+    }
+
+    @PostMapping("/{id}/close")
+    @PreAuthorize("@ss.hasPermission('" + PERMISSION_CLOSE + "')")
+    public CommonResult<Boolean> close(@PathVariable Long id, @Valid @RequestBody RegistrationCloseReqVO reqVO) {
+        registrationService.close(id, SecurityFrameworkUtils.getLoginUserId(), reqVO); return success(true);
     }
 }

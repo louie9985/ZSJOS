@@ -4338,7 +4338,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_follow_up_rule` (
   `name` varchar(100) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '规则名称',
   `first_follow_up_timeout_minutes` int NOT NULL COMMENT '接单后首次跟进时限（分钟）',
   `qualification_timeout_minutes` int NOT NULL DEFAULT '4320' COMMENT '首次跟进后有效性判定时限（分钟）',
-  `aging_pool_timeout_days` int NOT NULL DEFAULT '90' COMMENT '超期协同公海期限（自然日）',
+  `aging_pool_timeout_days` int NOT NULL DEFAULT '90' COMMENT '公海期限（自然日）',
   `notification_popup_duration_minutes` int NOT NULL DEFAULT '5' COMMENT '消息通知浮窗时长（分钟）',
   `duplicate_auto_resolution_enabled` bit(1) NOT NULL DEFAULT b'0' COMMENT '重复客资自动判重开关',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '状态：0 启用，1 停用',
@@ -4367,7 +4367,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_cycle` (
   UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
   KEY `idx_tenant_dept_status_entered` (`tenant_id`,`frozen_dept_id`,`status`,`entered_at`,`id`),
   KEY `idx_tenant_lead_status` (`tenant_id`,`lead_id`,`status`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资超期协同公海周期';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资公海周期';
 
 CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_event` (
   `id` bigint NOT NULL AUTO_INCREMENT, `cycle_id` bigint NOT NULL, `lead_id` bigint NOT NULL,
@@ -4380,7 +4380,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_event` (
   PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
   KEY `idx_tenant_cycle_time` (`tenant_id`,`cycle_id`,`occurred_at`,`id`),
   KEY `idx_tenant_lead_time` (`tenant_id`,`lead_id`,`occurred_at`,`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资超期协同公海事件';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 客资公海事件';
 
 CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_notify_stage` (
   `id` bigint NOT NULL AUTO_INCREMENT, `lead_id` bigint NOT NULL, `cycle_no` int NOT NULL,
@@ -4393,7 +4393,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_aging_pool_notify_stage` (
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
   PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_lead_cycle_rule` (`tenant_id`,`lead_id`,`cycle_no`,`notify_rule_id`),
   KEY `idx_tenant_status_retry` (`tenant_id`,`status`,`next_retry_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 超期公海提前通知幂等阶段';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 公海提前通知幂等阶段';
 
 -- zsjos_lead_assignment_rule
 CREATE TABLE IF NOT EXISTS `zsjos_lead_assignment_rule` (
@@ -5363,7 +5363,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_lead_public_sea_record` (
   `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0, PRIMARY KEY (`id`),
   UNIQUE KEY `uk_tenant_lead` (`tenant_id`,`lead_id`), KEY `idx_tenant_owner_released` (`tenant_id`,`owner_user_id`,`released_at`),
   KEY `idx_tenant_collaborator` (`tenant_id`,`collaborator_user_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 人工公海协作记录';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 公海协作记录';
 
 -- zsjos_subordinate_sales_audit_log
 CREATE TABLE IF NOT EXISTS `zsjos_subordinate_sales_audit_log` (

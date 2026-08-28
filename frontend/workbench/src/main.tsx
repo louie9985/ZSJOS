@@ -28,7 +28,7 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, migrateLegacyAuthStorage, type PermissionInfo } from './services/api'
+import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, type PermissionInfo } from './services/api'
 import {
   buildTwoLevelNavigation,
   canOpenLeadDetailDeepLink,
@@ -41,7 +41,7 @@ import {
   getPrimaryTarget,
   type PrimaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, STORAGE_KEYS } from './constants'
+import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, resolveAuthPlatform } from './constants'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
@@ -106,6 +106,7 @@ function NoAccessibleMenu({ hasMenus }: { hasMenus: boolean }) {
 }
 
 function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }) {
+  const authPlatform = resolveAuthPlatform()
   const navigate = useNavigate()
   const location = useLocation()
   const { token } = theme.useToken()
@@ -123,7 +124,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   const previousTabsRef = useRef<TabItem[]>([])
 
   useEffect(() => {
-    const sync = () => setImpersonation(getStoredImpersonation())
+    const sync = () => setImpersonation(authPlatform === 'PC' ? getStoredImpersonation() : undefined)
     sync()
     window.addEventListener('storage', sync)
     window.addEventListener(IMPERSONATION_CHANGE_EVENT, sync)
@@ -131,7 +132,7 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
       window.removeEventListener('storage', sync)
       window.removeEventListener(IMPERSONATION_CHANGE_EVENT, sync)
     }
-  }, [])
+  }, [authPlatform])
 
   // 移动端侧栏由 layout.css 在整个 ≤768px 视口隐藏（抽屉成为唯一导航入口），
   // 无需再用 matchMedia 同步 primarySider 的 collapsed 状态。
@@ -160,7 +161,8 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     () => findMenuByPath(authorizedMenus, location.pathname),
     [authorizedMenus, location.pathname]
   )
-  const activeAdminEmbedPath = currentMenu?.workbenchRenderMode === 'admin_embed'
+  const mobileAdminEmbed = authPlatform === 'MOBILE' && currentMenu?.workbenchRenderMode === 'admin_embed'
+  const activeAdminEmbedPath = authPlatform === 'PC' && currentMenu?.workbenchRenderMode === 'admin_embed'
     ? currentMenu.path
     : undefined
 
@@ -438,13 +440,15 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
       <Layout className="content-layout">
         <Content>
-          <AdminEmbedFrame
-            ref={adminEmbedFrameRef}
-            activePath={activeAdminEmbedPath}
-            title={currentMenu?.name}
-            onRouteChange={handleAdminRouteChange}
-          />
-          {!activeAdminEmbedPath && <Routes>
+          {authPlatform === 'PC' && <AdminEmbedFrame
+              ref={adminEmbedFrameRef}
+              activePath={activeAdminEmbedPath}
+              title={currentMenu?.name}
+              onRouteChange={handleAdminRouteChange}
+            />}
+          {mobileAdminEmbed
+            ? <Result status="info" title="请使用电脑端访问此页面" subTitle="该页面由管理端承载，手机端会话不会复用电脑端登录状态。"/>
+            : !activeAdminEmbedPath && <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
               ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
@@ -473,23 +477,26 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
 }
 
 function Root() {
+  const authPlatform = resolveAuthPlatform()
   const [logged, setLogged] = useState(() => {
     migrateLegacyAuthStorage()
-    return Boolean(localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN))
+    return Boolean(getAuthAccessToken(authPlatform))
   })
   const [info, setInfo] = useState<PermissionInfo>()
   const [error, setError] = useState('')
   const [permissionAttempt, setPermissionAttempt] = useState(0)
 
   useEffect(() => {
-    const onAuthExpired = () => {
+    const onAuthExpired = (event: Event) => {
+      const expiredPlatform = (event as CustomEvent<{ platform?: string }>).detail?.platform
+      if (expiredPlatform && expiredPlatform !== authPlatform) return
       setInfo(undefined)
       setError('')
       setLogged(false)
     }
     window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired)
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired)
-  }, [])
+  }, [authPlatform])
 
   useEffect(() => {
     if (!logged) return

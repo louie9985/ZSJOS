@@ -11,6 +11,7 @@ import LeadAgingPoolPage from '../pages/LeadAgingPoolPage'
 import LeadDuplicateReviewPage from '../pages/LeadDuplicateReviewPage'
 import LeadComplaintPage from '../pages/LeadComplaintPage'
 import TodayTasksPage from '../pages/TodayTasksPage'
+import BpmApprovalCenterPage from '../pages/BpmApprovalCenterPage'
 import WorkPlanPage from '../pages/WorkPlanPage'
 import MessageInboxPage from '../pages/MessageInboxPage'
 import LeadAppealPage from '../pages/LeadAppealPage'
@@ -45,6 +46,7 @@ import MediaCalendarPage from '../pages/MediaCalendarPage'
 import EamAssetPage from '../pages/EamAssetPage'
 import FeedbackPage from '../pages/FeedbackPage'
 import WorkOrderCenterPage from '../pages/WorkOrderCenterPage'
+import AnnouncementCenterPage from '../pages/AnnouncementCenterPage'
 
 interface RouteHostProps {
   menu?: WorkbenchMenu
@@ -62,7 +64,8 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.LEAD_APPEAL) return <LeadAppealPage/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.SUBORDINATE_PARTNER) return <SubordinatePartnerPage permissions={permissions}/>
-  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_ALL_CALENDAR) return <MediaCalendarPage scope="all"/>
+  if (resolveWorkbenchComponent(menu?.component) === WORKBENCH_COMPONENT.MEDIA_CALENDAR) return <MediaCalendarPage scope="account"/>
   if (menu?.path === APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_SUBMISSION) return <LeadSubmissionPage/>
   if (menu?.path === APP_ROUTES.LEAD_SELF_SOURCED) return <LeadSubmissionPage selfSourced/>
@@ -80,6 +83,8 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.SUBORDINATE_SALES) return <SubordinateSalesPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.SUBORDINATE_PARTNERS) return <SubordinatePartnerPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.TODAY_TASKS) return <TodayTasksPage permissions={permissions} onOpenAssignment={onOpenAssignment}/>
+  if (menu?.path === APP_ROUTES.BPM_TODO) return <BpmApprovalCenterPage permissions={permissions} initialView="todo"/>
+  if (menu?.path === APP_ROUTES.BPM_DONE) return <BpmApprovalCenterPage permissions={permissions} initialView="done"/>
   if (menu?.path === APP_ROUTES.WORK_PLANS) return <WorkPlanPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.LEAD_APPEALS) return <LeadAppealPage/>
   if (menu?.path === APP_ROUTES.MY_SALES_ORDERS) return <MySalesOrderPage/>
@@ -101,11 +106,12 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.LEAD_FOLLOW_UP_RULE) return <LeadFollowUpRuleConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.PRODUCT_CONFIG) return <ProductConfigPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.WORK_PLAN_CONFIG) return <WorkPlanConfigPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage/>
+  if (menu?.path === APP_ROUTES.REGISTRATION_POOL) return <RegistrationPoolPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.REGISTRATION_CHECKLIST_CONFIG) return <RegistrationChecklistConfigPage/>
   if (menu?.path === APP_ROUTES.MY_STUDENTS) return <MyStudentsPage permissions={permissions}/>
   if (menu?.path === APP_ROUTES.MEDIA_STUDENTS) return <MediaStudentsPage permissions={permissions}/>
-  if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage/>
+  if (menu?.path === APP_ROUTES.MEDIA_CALENDAR) return <MediaCalendarPage scope="account"/>
+  if (menu?.path === APP_ROUTES.MEDIA_ALL_CALENDAR) return <MediaCalendarPage scope="all"/>
   if (menu?.path === APP_ROUTES.MY_ASSETS) return <EamAssetPage permissions={permissions} view="assets"/>
   if (menu?.path === APP_ROUTES.ASSET_DEMANDS) return <EamAssetPage permissions={permissions} view="demands"/>
   if (menu?.path === APP_ROUTES.FEEDBACK) return <FeedbackPage permissions={permissions}/>
@@ -114,6 +120,7 @@ export default function RouteHost({ menu, permissions, roles, onOpenAssignment }
   if (menu?.path === APP_ROUTES.STUDENT_CONTACT_EXCEPTIONS) return <StudentContactExceptionsPage/>
   if (menu?.path === APP_ROUTES.ALL_MESSAGES) return <MessageInboxPage key={menu.path} view="all"/>
   if (menu?.path === APP_ROUTES.UNREAD_MESSAGES) return <MessageInboxPage key={menu.path} view="unread"/>
+  if (menu?.path === APP_ROUTES.ANNOUNCEMENTS) return <AnnouncementCenterPage/>
   if (menu?.path === APP_ROUTES.MEDIA_PRODUCTION_TICKETS) return <ProductionTicketsPage permissions={permissions}/>
   return <section className="workspace-page"><Card bordered={false} title={menu?.name || '员工工作台'}>
     <Result status="info" title="页面尚未迁移" subTitle="该菜单已由统一权限系统下发，前端页面尚未迁移。"/>

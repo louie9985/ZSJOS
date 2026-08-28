@@ -21,6 +21,8 @@ public class RegistrationCaseRespVO {
     private String studyPlannerUserName;
     private LocalDateTime registrationApprovedAt;
     private LocalDateTime completedAt;
+    private LocalDateTime cancelledAt;
+    private String cancelReason;
     private Integer version;
     private Boolean completable;
     private String completionBlockCode;

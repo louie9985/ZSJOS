@@ -1,4 +1,4 @@
-# 超期协同公海部署说明
+# 公海部署说明
 
 Migration: `script/sql/mysql/migrations/V034__lead_aging_collaboration_pool.sql`.
 

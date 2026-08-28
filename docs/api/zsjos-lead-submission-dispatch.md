@@ -83,7 +83,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `GET /zsjos/lead/qualification-exception/page` | 后端兼容查询接口；Workbench 不再提供独立异常客资路由 |
 | `POST /zsjos/lead/qualification-exception/search-page` | 同异常客资固定范围，组合关键词与高级条件 |
 | `POST /zsjos/lead/search-page` | 通用客资管理范围内组合关键词与高级条件 |
-| `POST /zsjos/lead/aging-pool/search-page` | 商机公海固定范围内组合关键词与高级条件 |
+| `POST /zsjos/lead/aging-pool/search-page` | 公海固定范围内组合关键词与高级条件 |
 | `POST /zsjos/lead/appeal/inbox/search-page`、`search-cursor` | 本人有权处理的申诉任务范围内组合关键词与申诉/关联客资条件 |
 | `POST /zsjos/lead-duplicate-review/search-page` | 租户复核队列内按结构化提交快照和复核字段筛选；不提供原始 JSON 检索 |
 | `POST /zsjos/subordinate-sales/search-page` | 当前用户可见下属范围内先聚合业务指标、再筛选和分页 |
@@ -107,7 +107,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 拒单立即释放预留并重新派发，不对销售实施冷却。自动派单超时继续由数据库 `pending_expires_at` 扫描处理，不能通过扫描已经过期消失的 Redis 键恢复客资。Redis 暂不可用时客资保持 `unassigned`，租户定时任务恢复后重试；三圈确实无人可接或达到最大实际尝试次数时进入抢单池。指定派单不进入在线轮询。
 首次跟进时限独立配置，范围为 5–10080 分钟，默认 1440 分钟；有效性判定时限范围为 5–43200 分钟，默认 4320 分钟。相同租户规则还维护 `notificationPopupDurationMinutes`（1–30 分钟，默认 5）和 `duplicateAutoResolutionEnabled`（默认 `false`）。运行时接口只暴露浮窗时长，管理读取和更新接口返回全部字段；更新请求必须携带读取时的 `version`，版本冲突返回 `1_900_003_079`。首次跟进截止时间从当前归属开始计算；有效性判定截止时间从当前归属周期首次跟进成功时计算。两者均在对应任务创建时固化规则版本和截止时间，修改不追溯已有任务。首次跟进完成前，客资仍属于待判定大类但处理阶段为待首跟，不返回有效性判定截止时间。
 
-提交人、负责人和商机公海筛选配置接口只返回筛选结构与标签，不返回分组或选项数量，也不执行状态统计 SQL。列表分页总数及独立统计接口保持原契约。
+提交人、负责人和公海筛选配置接口只返回筛选结构与标签，不返回分组或选项数量，也不执行状态统计 SQL。列表分页总数及独立统计接口保持原契约。
 
 ## 判定前跟进与今日待办
 
@@ -130,7 +130,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 每分钟按租户扫描已到判定截止时间的 `submitted + owned` 客资，并在行锁下再次校验后改为 `suspended`。截止时间已到但扫描尚未提交时，当前销售仍可判定；扫描先提交后，跟进、判定、资料修改、转派和建单均由服务端拒绝。恢复与转派创建新判定轮次；回收进入 `recycle_pending` 并清除销售；释放进入抢单池，被抢后重新创建首跟任务。
 
 销售主管通过独立的 `zsjos:subordinate-sales:lead-*` 按钮权限处置管理范围内的未成交客资。
-判有效前释放进入抢单池并清除当前归属；判有效后释放创建商机公海周期，保留正式归属，
+判有效前释放进入抢单池并清除当前归属；判有效后释放创建公海周期，保留正式归属，
 可同步指定符合范围的实际跟进销售。挂起状态额外允许恢复，成交和关闭状态不允许这些操作。
 
 普通主管必须是原销售部门或其上级部门负责人，只能转派给本人管理部门及子部门的启用销售专员。`zsjos:lead:qualification:manage-all` 允许当前租户内跨部门处置，但不绕过租户隔离。超时挂起和主管处置通过既有业务通知机制通知相关销售、操作主管及原销售部门负责人链。

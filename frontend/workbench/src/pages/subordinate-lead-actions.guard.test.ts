@@ -8,8 +8,11 @@ describe('subordinate Lead supervisor actions', () => {
     expect(detailSource).toContain("item.code.startsWith('SUPERVISOR_')")
     expect(detailSource).toContain("label: '释放至抢单池'")
     expect(detailSource).toContain("label: '释放至公海池'")
+    expect(detailSource).toContain("openQualificationAction('releasePublicSea', true)")
+    expect(detailSource).toContain('managerMode || supervisorAction')
     expect(detailSource).toContain('api.supervisorRestoreLead')
     expect(detailSource).toContain('api.supervisorReleasePublicSeaLead')
+    expect(detailSource).toContain('api.subordinateTransferCandidates()')
   })
 
   it('shows batch commands only from their server permission identifiers', () => {
@@ -30,10 +33,10 @@ describe('subordinate Lead supervisor actions', () => {
   })
 
   it('declares all server-projected supervisor detail actions in the API type', () => {
-    expect(apiSource).toContain("'SUPERVISOR_RESTORE'")
-    expect(apiSource).toContain("'SUPERVISOR_TRANSFER'")
-    expect(apiSource).toContain("'SUPERVISOR_RECYCLE'")
-    expect(apiSource).toContain("'SUPERVISOR_RELEASE_CLAIM_POOL'")
-    expect(apiSource).toContain("'SUPERVISOR_RELEASE_PUBLIC_SEA'")
+    expect(apiSource).toMatch(/["']SUPERVISOR_RESTORE["']/)
+    expect(apiSource).toMatch(/["']SUPERVISOR_TRANSFER["']/)
+    expect(apiSource).toMatch(/["']SUPERVISOR_RECYCLE["']/)
+    expect(apiSource).toMatch(/["']SUPERVISOR_RELEASE_CLAIM_POOL["']/)
+    expect(apiSource).toMatch(/["']SUPERVISOR_RELEASE_PUBLIC_SEA["']/)
   })
 })

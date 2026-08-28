@@ -23,7 +23,7 @@ public class RegistrationCaseObjectPermissionProvider implements ZsjosObjectPerm
     public boolean hasPermission(Long bizId, String action, Long userId) {
         RegistrationCaseDO item = caseMapper.selectById(bizId);
         if (item == null) return false;
-        return "read".equals(action) || Set.of("update", "complete").contains(action)
+        return "read".equals(action) || Set.of("update", "complete", COMMAND_CLOSE).contains(action)
                 && Set.of(STATUS_PENDING, STATUS_PROCESSING).contains(item.getStatus());
     }
 

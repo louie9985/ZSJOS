@@ -20,7 +20,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 7 | 派单关系配置 | `/zsjos/leads/assignment-relations` | `LeadAssignmentPage` | `zsjos/leadAssignment/index` |
 | 8 | 重复客资复核 | `/zsjos/leads/duplicate-review` | `LeadDuplicateReviewPage` | `zsjos/leadDuplicateReview/index` |
 | 9 | 客资抢单池 | `/zsjos/claim-pool` | `LeadClaimPoolPage` | `zsjos/leadClaimPool/index` |
-| 10 | 商机公海 | `/zsjos/lead-aging-pool` | `LeadAgingPoolPage` | `zsjos/leadAgingPool/index` |
+| 10 | 公海 | `/zsjos/lead-aging-pool` | `LeadAgingPoolPage` | `zsjos/leadAgingPool/index` |
 | 11 | 客资派单规则 | `/zsjos/lead-rule` | `LeadRuleConfigPage` | `zsjos/leadRule/index` |
 | 12 | 客资筛选方案 | `/zsjos/lead-filter` | `LeadFilterConfigPage` | `zsjos/leadFilter/index` |
 | 13 | 客资跟进规则 | `/zsjos/lead-follow-up-rule` | `LeadFollowUpRuleConfigPage` | `zsjos/leadFollowUpRule/index` |
@@ -57,11 +57,12 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 41 | 拍剪工单 | `/zsjos/production-tickets` | `MediaWorkflowPage` | `zsjos-workbench/MediaProductionTicketsPage` |
 | 45 | 我的学员 | `/zsjos/media-students` | `MediaStudentsPage` | `zsjos-workbench/MediaStudentsPage` |
 | 46 | 第三方账号字段配置 | `/zsjos/media-account-field-config` | 不注册（Admin 配置页） | `zsjos/mediaAccountFieldConfig/index` |
-| 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage` | 不注册（员工只读总览） |
+| 47 | 账号日历 | `/calendar/overview` | `MediaCalendarPage(scope=account)` | `zsjos/mediaCalendar/index` |
+| 47.1 | 日历日程 | `/calendar/all` | `MediaCalendarPage(scope=all)` | `zsjos/mediaCalendarAll/index` |
 | 48 | 需求与反馈 | `/zsjos/feedback` | `FeedbackPage` | `zsjos/feedback/index` |
 | 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
 | 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |
-| 51 | 公告中心 | `/zsjos/announcements` | `AnnouncementCenterPage` | `system/notice/index`（公告管理） |
+| 51 | 通知公告 | `/messages/notice` | `AnnouncementCenterPage` | `system/notice/index`（公告管理，原菜单 107；员工只读权限为子按钮 `79913` / `system:notice:read`） |
 
 “我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 
@@ -70,7 +71,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 ## 路径约束
 
 - 申诉正式路径仅为 `/zsjos/appeals`，不提供 `/zsjos/leads/appeals` 兼容跳转。
-- 商机公海正式路径仅为 `/zsjos/lead-aging-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
+- 公海正式路径仅为 `/zsjos/lead-aging-pool`，不提供 `/zsjos/opportunity-public-sea` 兼容跳转。
 - 团队订单正式路径为 `/zsjos/sales-orders/team`，只消费服务端 `zsjos:sales-order:query-team`
   页面授权；详情使用只读 `team` 模式，不投影修改、终止或审批操作。
 - `/zsjos/leads/manage` 是服务端隐藏菜单：具备菜单授权时可以直接访问，但不显示在 React 导航中。

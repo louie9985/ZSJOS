@@ -136,6 +136,10 @@ SOURCE script/sql/mysql/migrations/V154__repair_generic_work_order_idempotency_s
 SOURCE script/sql/mysql/migrations/V155__feedback_ready_notification.sql;
 SOURCE script/sql/mysql/migrations/V156__repair_feedback_number_counter.sql;
 SOURCE script/sql/mysql/migrations/V157__generic_work_order_center.sql;
+SOURCE script/sql/mysql/migrations/V158__retire_announcement_center_duplicate.sql;
+SOURCE script/sql/mysql/migrations/V159__public_sea_terminology.sql;
+SOURCE script/sql/mysql/migrations/V160__registration_case_close_service.sql;
+SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

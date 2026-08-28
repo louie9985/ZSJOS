@@ -467,7 +467,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     @Transactional(rollbackFor = Exception.class)
     public void terminateForOwnerTransfer(Long leadId, Long newOwnerUserId, Long operatorUserId, LocalDateTime now) {
         terminateForOwnerTransfer(leadId, newOwnerUserId, operatorUserId, now,
-                "管理员正式转派，原超期公海周期终止");
+                "管理员正式转派，原公海周期终止");
     }
 
     @Override
@@ -521,16 +521,16 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (order != null) { result.setActiveSalesOrderId(order.getId()); result.setActiveSalesOrderStatus(order.getStatus()); }
         List<String> actions = new ArrayList<>();
         if (canManage(cycle, userId) && !hasActiveApproval(cycle.getLeadId())) { actions.add("ASSIGN"); actions.add("EXIT"); }
-        if (isOwnerOrCollaborator(cycle, userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
+        if (Objects.equals(cycle.getOriginalOwnerUserId(), userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
             actions.add(ACTION_ADD_FOLLOW_UP);
             if (order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())
                     && salesOrderPermissionService.canRevise(order, userId)) {
                 actions.add(ACTION_REVISE_DEAL);
-            } else if (order == null) {
+            } else if (order == null && Objects.equals(lead.getOwnerUserId(), userId)) {
                 actions.add(ACTION_ENTER_DEAL);
             }
         }
-        if (!Objects.equals(userId, cycle.getOriginalOwnerUserId())
+        if (Objects.equals(userId, cycle.getCollaboratorUserId())
                 && canRead(cycle.getLeadId(), userId) && !hasActiveApproval(cycle.getLeadId())
                 && securityFrameworkService.hasPermission("zsjos:lead-aging-pool:transfer-request")) {
             actions.add("REQUEST_TRANSFER");

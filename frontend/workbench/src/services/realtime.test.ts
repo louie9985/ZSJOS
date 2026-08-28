@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { STORAGE_KEYS } from '../constants'
+import { AUTH_STORAGE_KEYS } from '../constants'
 import { buildWebSocketUrl, getRealtimeAccessToken, parseRealtimeMessage } from './realtime'
 
 describe('buildWebSocketUrl', () => {
@@ -13,12 +13,20 @@ describe('buildWebSocketUrl', () => {
 })
 
 describe('getRealtimeAccessToken', () => {
-  it('uses the access token rather than the refresh token for websocket authentication', () => {
+  it('uses the PC access token rather than the refresh token for websocket authentication', () => {
     const values = new Map<string, string>([
-      [STORAGE_KEYS.ACCESS_TOKEN, 'access-token'],
-      [STORAGE_KEYS.REFRESH_TOKEN, 'refresh-token']
+      [AUTH_STORAGE_KEYS.PC.accessToken, 'pc-access-token'],
+      [AUTH_STORAGE_KEYS.PC.refreshToken, 'pc-refresh-token']
     ])
-    expect(getRealtimeAccessToken({ getItem: (key) => values.get(key) ?? null })).toBe('access-token')
+    expect(getRealtimeAccessToken({ getItem: (key) => values.get(key) ?? null }, 'PC')).toBe('pc-access-token')
+  })
+
+  it('keeps Mobile websocket authentication isolated from the PC/Admin token', () => {
+    const values = new Map<string, string>([
+      [AUTH_STORAGE_KEYS.PC.accessToken, 'pc-access-token'],
+      [AUTH_STORAGE_KEYS.MOBILE.accessToken, 'mobile-access-token']
+    ])
+    expect(getRealtimeAccessToken({ getItem: (key) => values.get(key) ?? null }, 'MOBILE')).toBe('mobile-access-token')
   })
 })
 

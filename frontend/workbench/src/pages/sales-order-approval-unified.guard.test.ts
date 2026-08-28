@@ -48,6 +48,16 @@ describe('unified sales-order approval entry', () => {
     expect(supervisor).not.toMatch(/>确认<\/Button>|>不确认<\/Button>/)
   })
 
+  it('lets supervisors switch between todo, done, and all confirmation records', () => {
+    const supervisor = readFileSync('src/components/SalesOrderSupervisorInbox.tsx', 'utf8')
+    const api = readFileSync('src/services/api.ts', 'utf8')
+
+    expect(supervisor).toContain('type SupervisorInboxScope = "todo" | "done" | "all"')
+    expect(supervisor).toContain('scope === "all" ? undefined : scope === "done"')
+    expect(supervisor).toContain('{ label: "全部", value: "all" }')
+    expect(api).toContain('handled?: boolean;')
+  })
+
   it('renders the linked Lead business profile without falling back to an internal id', () => {
     const detail = readFileSync('src/components/SalesOrderDetailCards.tsx', 'utf8')
     const api = readFileSync('src/services/api.ts', 'utf8')

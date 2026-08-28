@@ -115,7 +115,7 @@ function withCompletionState(value: RegistrationCase): RegistrationCase {
   };
 }
 
-export function RegistrationPoolPage() {
+export function RegistrationPoolPage({ permissions = [] }: { permissions?: string[] }) {
   const location = useLocation();
   const routeState = location.state as { registrationCaseId?: number } | null;
   const [rows, setRows] = useState<RegistrationCase[]>([]);
@@ -129,6 +129,9 @@ export function RegistrationPoolPage() {
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [completing, setCompleting] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const [closeOpen, setCloseOpen] = useState(false);
+  const [closeForm] = Form.useForm<{ reason: string }>();
   const [routeSaving, setRouteSaving] = useState(false);
   const [attachmentSavingIds, setAttachmentSavingIds] = useState<Set<number>>(new Set());
   const [savingItemIds, setSavingItemIds] = useState<Set<number>>(new Set());
@@ -331,6 +334,25 @@ export function RegistrationPoolPage() {
       setCompleting(false);
     }
   };
+  const closeService = async (values: { reason: string }) => {
+    if (!selected) return;
+    setClosing(true);
+    try {
+      await api.closeRegistration(selected.id, {
+        version: selected.version,
+        idempotencyKey: key(),
+        reason: values.reason.trim(),
+      });
+      message.success("报名履约已关闭");
+      setCloseOpen(false);
+      closeForm.resetFields();
+      await load(pageNo);
+    } catch (requestError) {
+      message.error(errorMessage(requestError));
+    } finally {
+      setClosing(false);
+    }
+  };
 
   const detailContent = detailLoading ? (
     <Skeleton active paragraph={{ rows: 10 }} />
@@ -362,6 +384,15 @@ export function RegistrationPoolPage() {
           {selected.statusLabel || "未知状态"}
         </Tag>
       </div>
+      {selected.status === "cancelled" && (
+        <Alert
+          className="registration-block-alert"
+          type="info"
+          showIcon
+          title="报名履约已关闭"
+          description={selected.cancelReason || selected.cancelledAt ? `关闭时间：${formatTimestamp(selected.cancelledAt)}${selected.cancelReason ? ` · 原因：${selected.cancelReason}` : ""}` : undefined}
+        />
+      )}
       <section className="registration-summary-card">
         <DetailFieldGrid items={[
           { key: "order", label: "订单号", value: selected.orderNo },
@@ -467,12 +498,17 @@ export function RegistrationPoolPage() {
         </div>
       </section>
       <div className="registration-detail-actions">
-        {selected.status !== "completed" && selected.status !== "cancelled" ? <Button
-          type="primary"
-          disabled={!selected.completable || completing}
-          loading={completing}
-          onClick={() => void complete()}
-        >完成报名履约</Button> : null}
+        {selected.status !== "completed" && selected.status !== "cancelled" ? <>
+          <Button
+            type="primary"
+            disabled={!selected.completable || completing}
+            loading={completing}
+            onClick={() => void complete()}
+          >完成报名履约</Button>
+          {hasPermission(permissions, "zsjos:registration:close") && (
+            <Button danger onClick={() => { closeForm.setFieldsValue({ reason: selected.cancelReason || "" }); setCloseOpen(true); }}>关闭服务</Button>
+          )}
+        </> : null}
       </div>
     </div>
   ) : (
@@ -569,6 +605,26 @@ export function RegistrationPoolPage() {
         </aside>
         <main className="lead-inbox-detail-pane">{detailContent}</main>
       </div>
+      <Modal
+        title="关闭服务"
+        open={closeOpen}
+        confirmLoading={closing}
+        okText="确认关闭"
+        cancelText="取消"
+        onCancel={() => { setCloseOpen(false); closeForm.resetFields(); }}
+        onOk={() => void closeForm.submit()}
+        destroyOnHidden
+      >
+        <Form form={closeForm} layout="vertical" onFinish={closeService}>
+          <Form.Item
+            name="reason"
+            label="关闭原因"
+            rules={[{ required: true, message: "请填写关闭原因" }, { max: 500, message: "关闭原因不能超过 500 个字符" }]}
+          >
+            <Input.TextArea rows={4} placeholder="例如：订单审批后不需要继续服务" />
+          </Form.Item>
+        </Form>
+      </Modal>
     </section>
   );
 }

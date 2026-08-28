@@ -41,7 +41,7 @@
         />
         <span class="unit">分钟</span>
       </el-form-item>
-      <el-form-item label="商机公海期限" prop="agingPoolTimeoutDays">
+      <el-form-item label="公海期限" prop="agingPoolTimeoutDays">
         <el-input-number v-model="formData.agingPoolTimeoutDays" :min="1" :max="3650" :step="1" />
         <span class="unit">自然日</span>
       </el-form-item>
@@ -118,7 +118,7 @@ const rules: FormRules = {
     { type: 'number', min: 5, max: 43200, message: '范围为 5–43200 分钟', trigger: 'change' }
   ],
   agingPoolTimeoutDays: [
-    { required: true, message: '请输入超期公海期限', trigger: 'blur' },
+    { required: true, message: '请输入公海期限', trigger: 'blur' },
     { type: 'number', min: 1, max: 3650, message: '范围为 1–3650 个自然日', trigger: 'change' }
   ],
   noProgressWarningDays: [

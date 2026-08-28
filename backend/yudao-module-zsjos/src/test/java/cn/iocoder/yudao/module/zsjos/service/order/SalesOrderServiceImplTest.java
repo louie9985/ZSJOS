@@ -117,9 +117,7 @@ class SalesOrderServiceImplTest {
         TenantContextHolder.setTenantId(1L);
         lenient().when(advancedFilterService.matchOrderIds(any())).thenReturn(null);
         lenient().doNothing().when(agingPoolService).requireCanOperateForUpdate(anyLong(), anyLong(), anyLong());
-        lenient().when(collaborationService.requireCanOperateForUpdate(any(LeadDO.class), anyLong()))
-                .thenAnswer(invocation -> new LeadCollaborationService.OperationContext(false, null,
-                        invocation.<LeadDO>getArgument(0).getOwnerUserId()));
+        lenient().doNothing().when(collaborationService).requireCanEnterDealForUpdate(any(LeadDO.class), anyLong());
         lenient().when(commandService.fingerprint(any())).thenReturn("fingerprint");
         lenient().when(orderNumberService.next()).thenReturn("OD202608141200000001");
         lenient().when(cashbackService.isEligibleDealLead(anyLong())).thenReturn(false);
@@ -611,6 +609,7 @@ class SalesOrderServiceImplTest {
                 && round.getRoundNo() == 1 && "process-2".equals(round.getProcessInstanceId())
                 && round.getOrderSnapshot() != null));
         verify(registrationService).cancelByOrderId(eq(100L), eq("原订单已被接续"), any());
+        verify(supervisorConfirmationService).cancelPending(eq(200L), any());
         verify(businessTaskCommandService).completeByKey(eq(TASK_REVISION_KEY_PREFIX + 200L), any());
     }
 

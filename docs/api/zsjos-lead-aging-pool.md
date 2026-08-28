@@ -1,4 +1,4 @@
-# ZSJOS 商机公海池 API
+# ZSJOS 公海池 API
 
 Base path: `/admin-api/zsjos/lead/aging-pool`. All endpoints are tenant scoped and return the standard
 `CommonResult` wrapper.

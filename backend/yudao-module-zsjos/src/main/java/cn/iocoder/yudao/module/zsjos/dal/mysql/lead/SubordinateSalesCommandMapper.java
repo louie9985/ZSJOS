@@ -24,7 +24,7 @@ public interface SubordinateSalesCommandMapper extends BaseMapperX<SubordinateSa
 
     @Update("UPDATE zsjos_subordinate_sales_command SET result_json=#{resultJson},completed=b'1',update_time=NOW() "
             + "WHERE tenant_id=#{tenantId} AND operator_user_id=#{operatorUserId} AND idempotency_key=#{key} "
-            + "AND deleted=b'0' AND completed=b'0")
+            + "AND deleted=b'0' AND completed=b'0'")
     int complete(@Param("tenantId") Long tenantId, @Param("operatorUserId") Long operatorUserId,
                  @Param("key") String key, @Param("resultJson") String resultJson);
 }
