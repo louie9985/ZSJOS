@@ -74,7 +74,22 @@ const open = async (id: string) => {
   }
   visible.value = true
 }
-defineExpose({ open })
+const openRelation = async (relationId: number) => {
+  loading.value = true
+  try {
+    const relationData = await ProcessInstanceApi.getRelationPrintData(relationId)
+    printData.value = relationData?.printData
+    if (!printData.value) return
+    printTime.value = formatDate(new Date(), 'YYYY-MM-DD HH:mm')
+    initPrintDataMap()
+    await parseFormFields()
+    initBusinessFormComponent()
+    visible.value = true
+  } finally {
+    loading.value = false
+  }
+}
+defineExpose({ open, openRelation })
 
 const initBusinessFormComponent = () => {
   const businessFormPath =
@@ -375,6 +390,8 @@ const formatPrintField = (rule: FormFieldRule, value: unknown, lookupMaps: Print
       }
       return mapValueWithLabelMap(value, lookupMaps.userMap)
     }
+    case 'ProcessInstanceSelect':
+      return toValueArray(value).length ? '关联审批单（详情中查看）' : ''
     default:
       return formatPrimitiveValue(value)
   }

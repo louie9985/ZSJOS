@@ -9,6 +9,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.util.List;
+import java.util.Collection;
 
 @Mapper
 public interface PartnerOwnershipMapper extends BaseMapperX<PartnerOwnershipDO> {
@@ -31,7 +32,10 @@ public interface PartnerOwnershipMapper extends BaseMapperX<PartnerOwnershipDO> 
             "FROM zsjos_partner_ownership ownership ",
             "JOIN zsjos_partner partner ON partner.id=ownership.partner_id ",
             "AND partner.tenant_id=ownership.tenant_id AND partner.deleted=b'0' ",
-            "WHERE ownership.tenant_id=#{tenantId} AND ownership.employee_user_id=#{employeeUserId} ",
+            "WHERE ownership.tenant_id=#{tenantId} AND ownership.employee_user_id IN ",
+            "<foreach collection='employeeUserIds' item='employeeUserId' open='(' separator=',' close=')'>",
+            "#{employeeUserId}",
+            "</foreach> ",
             "AND ownership.deleted=b'0' ",
             "<if test='status != null and status != &quot;&quot;'>AND partner.status=#{status} </if>",
             "<if test='keyword != null and keyword != &quot;&quot;'>",
@@ -41,18 +45,21 @@ public interface PartnerOwnershipMapper extends BaseMapperX<PartnerOwnershipDO> 
             "ORDER BY ownership.assigned_at DESC,ownership.partner_id DESC ",
             "LIMIT #{offset},#{pageSize}",
             "</script>"})
-    List<SubordinatePartnerRow> selectSubordinatePage(@Param("tenantId") Long tenantId,
-                                                       @Param("employeeUserId") Long employeeUserId,
-                                                       @Param("status") String status,
-                                                       @Param("keyword") String keyword,
-                                                       @Param("offset") long offset,
-                                                       @Param("pageSize") int pageSize);
+    List<SubordinatePartnerRow> selectScopedPage(@Param("tenantId") Long tenantId,
+                                                 @Param("employeeUserIds") Collection<Long> employeeUserIds,
+                                                 @Param("status") String status,
+                                                 @Param("keyword") String keyword,
+                                                 @Param("offset") long offset,
+                                                 @Param("pageSize") int pageSize);
 
     @Select({"<script>",
             "SELECT COUNT(1) FROM zsjos_partner_ownership ownership ",
             "JOIN zsjos_partner partner ON partner.id=ownership.partner_id ",
             "AND partner.tenant_id=ownership.tenant_id AND partner.deleted=b'0' ",
-            "WHERE ownership.tenant_id=#{tenantId} AND ownership.employee_user_id=#{employeeUserId} ",
+            "WHERE ownership.tenant_id=#{tenantId} AND ownership.employee_user_id IN ",
+            "<foreach collection='employeeUserIds' item='employeeUserId' open='(' separator=',' close=')'>",
+            "#{employeeUserId}",
+            "</foreach> ",
             "AND ownership.deleted=b'0' ",
             "<if test='status != null and status != &quot;&quot;'>AND partner.status=#{status} </if>",
             "<if test='keyword != null and keyword != &quot;&quot;'>",
@@ -60,10 +67,10 @@ public interface PartnerOwnershipMapper extends BaseMapperX<PartnerOwnershipDO> 
             "OR partner.partner_no LIKE CONCAT('%',#{keyword},'%') ",
             "OR partner.mobile LIKE CONCAT('%',#{keyword},'%')) </if>",
             "</script>"})
-    long selectSubordinateCount(@Param("tenantId") Long tenantId,
-                                @Param("employeeUserId") Long employeeUserId,
-                                @Param("status") String status,
-                                @Param("keyword") String keyword);
+    long selectScopedCount(@Param("tenantId") Long tenantId,
+                           @Param("employeeUserIds") Collection<Long> employeeUserIds,
+                           @Param("status") String status,
+                           @Param("keyword") String keyword);
 
     @Select({"<script>",
             "SELECT partner.id,partner.partner_no,partner.name,partner.mobile,partner.status,",

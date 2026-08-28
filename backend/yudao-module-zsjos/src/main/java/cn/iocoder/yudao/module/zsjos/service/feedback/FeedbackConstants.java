@@ -30,6 +30,8 @@ public interface FeedbackConstants {
     String SUPPORT_DICT_TYPE = "zsjos_feedback_support_type";
     String ROLE_CHAIRMAN = "boss";
 
+    String NOTIFY_SCENE_READY_FOR_HANDLING = "zsjos.feedback.ready_for_handling";
+
     String PERMISSION_REQUIREMENT_MANAGE = "zsjos:feedback:requirement:manage";
     String PERMISSION_BUG_MANAGE = "zsjos:feedback:bug:manage";
     String PERMISSION_SUPPORT_MANAGE = "zsjos:feedback:support:manage";

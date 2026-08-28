@@ -28,10 +28,40 @@ export const encodeFields = (designerRef: object) => {
 }
 
 /** 解码表单 Fields */
-export const decodeFields = (fields: string[]) => {
+export type ProcessInstanceRelationContext = {
+  mode: 'create' | 'detail'
+  processInstanceId?: string
+}
+
+const injectProcessInstanceRelationContext = (
+  node: any,
+  context?: ProcessInstanceRelationContext
+) => {
+  if (!node || typeof node !== 'object') return
+  if (node.type === 'ProcessInstanceSelect') {
+    node.props = {
+      ...(node.props || {}),
+      mode: context?.mode || 'create',
+      processInstanceId: context?.processInstanceId,
+      formField: node.field,
+      multiple: true,
+      limit: 20
+    }
+  }
+  Object.values(node).forEach((value) => {
+    if (Array.isArray(value))
+      value.forEach((item) => injectProcessInstanceRelationContext(item, context))
+    else if (value && typeof value === 'object')
+      injectProcessInstanceRelationContext(value, context)
+  })
+}
+
+export const decodeFields = (fields: string[], context?: ProcessInstanceRelationContext) => {
   const rule: object[] = []
   fields.forEach((item) => {
-    rule.push(formCreate.parseJson(item))
+    const parsed = formCreate.parseJson(item)
+    injectProcessInstanceRelationContext(parsed, context)
+    rule.push(parsed)
   })
   return rule
 }
@@ -49,7 +79,8 @@ export const setConfAndFields2 = (
   detailPreview: object,
   conf: string,
   fields: string[],
-  value?: object
+  value?: object,
+  relationContext?: ProcessInstanceRelationContext
 ) => {
   if (isRef(detailPreview)) {
     // @ts-ignore
@@ -59,7 +90,7 @@ export const setConfAndFields2 = (
   // @ts-ignore
   detailPreview.option = decodeConf(conf)
   // @ts-ignore
-  detailPreview.rule = decodeFields(fields)
+  detailPreview.rule = decodeFields(fields, relationContext)
 
   if (value) {
     // @ts-ignore

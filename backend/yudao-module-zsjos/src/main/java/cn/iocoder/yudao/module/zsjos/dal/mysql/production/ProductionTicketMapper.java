@@ -63,11 +63,11 @@ public interface ProductionTicketMapper extends BaseMapperX<ProductionTicketDO> 
                 .set(ProductionTicketDO::getStatus,"rejected").set(ProductionTicketDO::getReworkReasonType,reason)
                 .setSql("revision_count = revision_count + 1").set(ProductionTicketDO::getVersion,version+1));
     }
-    default int rejectAssignment(Long id, Integer version) {
+    default int rejectAssignment(Long id, Integer version, String targetStatus) {
         return update(null, new LambdaUpdateWrapper<ProductionTicketDO>()
                 .eq(ProductionTicketDO::getId, id).eq(ProductionTicketDO::getVersion, version)
                 .eq(ProductionTicketDO::getStatus, "pending_accept")
-                .set(ProductionTicketDO::getStatus, "public_pool")
+                .set(ProductionTicketDO::getStatus, targetStatus)
                 .set(ProductionTicketDO::getAssigneeFilmingEditorUserId, null)
                 .set(ProductionTicketDO::getVersion, version + 1));
     }

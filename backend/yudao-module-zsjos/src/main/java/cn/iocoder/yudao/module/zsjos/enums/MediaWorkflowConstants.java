@@ -17,8 +17,6 @@ public final class MediaWorkflowConstants {
     public static final String OWNERSHIP_COMPANY = "company";
     public static final String RUN_STATUS_ACTIVE = "active";
 
-    public static final List<String> ACCOUNT_STAGES = List.of("s0", "s1", "s2", "s3", "s4", "s5", "s6");
-
     public static final String CONTENT_TOPIC = "topic";
     public static final String CONTENT_SCRIPT = "script";
     public static final String CONTENT_IN_PRODUCTION = "in_production";
@@ -71,9 +69,6 @@ public final class MediaWorkflowConstants {
     public static final String ACTION_CLAIM_TICKET = "CLAIM_TICKET";
     public static final String ACTION_CHECK_TICKET = "CHECK_TICKET";
     public static final String ACTION_ACCEPT_CONTENT = "ACCEPT_CONTENT";
-    public static final String ACTION_ADVANCE_STAGE = "ADVANCE_STAGE";
-    public static final String ACTION_ROLLBACK_STAGE = "ROLLBACK_STAGE";
-
     public static final String ACTION_BIND_STUDENT = "BIND_STUDENT";
     public static final String ACTION_UNBIND_STUDENT = "UNBIND_STUDENT";
     public static final String ACTION_EDIT_ACCOUNT = "EDIT_ACCOUNT";

@@ -40,4 +40,13 @@ class MediaAccountObjectPermissionProviderTest {
 
         assertTrue(provider.hasPermission(1L, "maintenance", 251L));
     }
+
+    @Test
+    void retiredStageTransitionActionsAreNeverAuthorized() {
+        when(mapper.selectById(1L)).thenReturn(new MediaAccountDO().setId(1L)
+                .setOwnerOperatorUserId(230L).setDirectorUserId(248L));
+
+        assertFalse(provider.hasPermission(1L, "stage-advance", 230L));
+        assertFalse(provider.hasPermission(1L, "stage-rollback", 248L));
+    }
 }

@@ -47,6 +47,8 @@ public class PartnerManagementController {
     public CommonResult<Boolean> disable(@PathVariable Long id, @Valid @RequestBody PartnerStateReqVO reqVO) { service.disable(id, reqVO); return success(true); }
     @PutMapping("/{id}/enable") @PreAuthorize("@ss.hasPermission('zsjos:partner:manage')")
     public CommonResult<Boolean> enable(@PathVariable Long id, @Valid @RequestBody PartnerStateReqVO reqVO) { service.enable(id, reqVO); return success(true); }
+    @PostMapping("/{id}/convert") @PreAuthorize("@ss.hasPermission('zsjos:partner:manage')")
+    public CommonResult<Boolean> convert(@PathVariable Long id, @Valid @RequestBody PartnerConvertReqVO reqVO) { service.convert(id, reqVO); return success(true); }
     @PutMapping("/{id}/mobile") @PreAuthorize("@ss.hasPermission('zsjos:partner:manage')")
     public CommonResult<Boolean> updateMobile(@PathVariable Long id, @Valid @RequestBody PartnerMobileUpdateReqVO reqVO) { service.updateMobile(id, reqVO); return success(true); }
     @PutMapping("/{id}/reset-password") @PreAuthorize("@ss.hasPermission('zsjos:partner:manage')")

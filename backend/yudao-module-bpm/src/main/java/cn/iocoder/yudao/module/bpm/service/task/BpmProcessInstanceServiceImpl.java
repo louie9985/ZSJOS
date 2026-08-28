@@ -129,6 +129,8 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
 
     @Resource
     private BpmProcessIdRedisDAO processIdRedisDAO;
+    @Resource
+    private BpmProcessInstanceRelationService processInstanceRelationService;
 
     // ========== Query 查询相关方法 ==========
 
@@ -775,6 +777,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     @DataPermission(enable = false) // 关闭数据权限，避免查询不到用户数据。相关案例：https://gitee.com/zhijiantianya/yudao-cloud/issues/ID1UYA
     public String createProcessInstance(Long userId, @Valid BpmProcessInstanceCreateReqDTO createReqDTO) {
         return FlowableUtils.executeAuthenticatedUserId(userId, () -> {
@@ -789,6 +792,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     @DataPermission(enable = false)
     public String createProcessInstance(BpmStartSubjectDTO subject, BpmProcessInstanceCreateReqDTO createReqDTO) {
         String displayName = requireExternalSubject(subject);
@@ -806,6 +810,9 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         if (definition.isSuspended()) throw exception(PROCESS_DEFINITION_IS_SUSPENDED);
         BpmProcessDefinitionInfoDO definitionInfo = processDefinitionService.getProcessDefinitionInfo(definition.getId());
         if (definitionInfo == null) throw exception(PROCESS_DEFINITION_NOT_EXISTS);
+        if (processInstanceRelationService.hasRelationField(definitionInfo)) {
+            throw exception(PROCESS_INSTANCE_RELATION_EXTERNAL_UNSUPPORTED);
+        }
         validateExternalCandidateStrategies(definition.getId(), reqDTO.getStartUserSelectAssignees());
         Map<String, Object> variables = reqDTO.getVariables() == null
                 ? new HashMap<>() : new HashMap<>(reqDTO.getVariables());
@@ -896,6 +903,9 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         }
         // 1.3 校验发起人自选审批人
         validateStartUserSelectAssignees(userId, definition, startUserSelectAssignees, variables);
+        // 关联审批必须在 Flowable 启动前完成全量校验，确保后续关系写入可与启动事务一起回滚。
+        List<BpmProcessInstanceRelationService.PreparedRelation> preparedRelations =
+                processInstanceRelationService.prepare(userId, definition, processDefinitionInfo, variables);
 
         // 2. 创建流程实例
         if (variables == null) {
@@ -926,6 +936,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
         processInstanceBuilder.name(generateProcessInstanceName(userId, definition, processDefinitionInfo, variables));
         // 3.3 发起流程实例
         ProcessInstance instance = processInstanceBuilder.start();
+        processInstanceRelationService.save(instance.getId(), preparedRelations);
         return instance.getId();
     }
 

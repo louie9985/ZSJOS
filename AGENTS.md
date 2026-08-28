@@ -84,12 +84,12 @@ Read only the architecture documents relevant to the task:
 - CRM, ERP, WMS, MES, Mall, AI, IoT, IM, and MP are domain modules, not foundational facilities. Their presence in the repository **MUST NOT** create an implicit ZSJOS runtime dependency or authorize reuse of their tables, DAL, or domain services.
 - Alignment with another Yudao module means reusing engineering patterns and approved facilities. It **MUST NOT** be interpreted as copying that module's domain model, database schema, static data, or private implementation.
 
-## 4. Risk and external state
+## 4. Risk, external state, and database initialization and synchronization
 
 The following require separate, explicit confirmation even when related to the task:
 
 - Clearing or deleting database data, accounts, roles, permissions, or files in bulk.
-- Rewriting an applied migration or performing an irreversible schema change.
+- Rewriting a migration that has been applied to an already-deployed environment whose upgrade compatibility must be preserved, or performing an irreversible schema change.
 - Overwriting a large directory or replacing a runtime implementation wholesale.
 - Changing real account permissions or other shared external state.
 - Starting, stopping, or reconfiguring an external/shared service.
@@ -99,6 +99,24 @@ The following require separate, explicit confirmation even when related to the t
 - **MUST** identify exact targets and expected impact before requesting confirmation.
 - SQL that deletes or rebuilds data **MUST** state deletion scope, insertion order, relationships, repeatability, and recovery approach.
 - **MUST NOT** include tokens, passwords, personal data, or complete sensitive payloads in logs, documentation, or final reports.
+
+Database initialization and synchronization rules:
+
+- MySQL initialization artifacts belong under `script/sql/mysql/`; `bootstrap.sql` is the fresh-environment entry point.
+- The bootstrap is non-destructive: it MUST NOT drop databases or tables or delete business rows in bulk.
+- When a SQL or migration script is incorrect during active development and compatibility with an already-deployed environment is not required, the preferred and required default is to correct the original bootstrap, baseline, or numbered migration script and apply the corresponding schema or data correction directly to the development database in the same change. **MUST NOT** add another numbered migration merely to avoid correcting the current development baseline.
+- Applying a correction directly to the development database does not replace correcting its SQL source. Correcting only the database or only the script is incomplete.
+- Before directly changing a development database, the AI **MUST** inspect the current database state, identify the exact target objects or rows and expected impact, preserve unrelated data, and obtain any confirmation required by this section for shared external state. The development database correction **MUST** be scoped, repeatable or otherwise safely controlled, and recoverable where practical.
+- Numbered migrations under `script/sql/mysql/migrations/` remain required when an already-deployed environment must be upgraded without rebuilding its baseline. Such migrations must be repeatable and record their version in `zsjos_schema_version` where applicable. In this case, historical scripts already used by those environments **MUST NOT** be edited as a substitute for an upgrade migration.
+- Before delivery, the corrected SQL must be executed from its documented prerequisite state in a controlled database. Its resulting schema, data, constraints, version records, and migration order **MUST** match the intended development database state after the direct correction. A successful direct database edit alone is not verification that the SQL can reproduce the result.
+- The final bootstrap and SQL scripts MUST initialize a fresh production database successfully from the baseline through the latest version. The result MUST be checked against the development database with read-only schema and scoped data-difference checks; checking only SQL text, version markers, or command exit status is insufficient.
+- Any intentionally edited baseline or compatibility migration **MUST** document its deployment scope, prerequisites, execution order, repeatability, exact data scope, and rollback limitations.
+- Dictionary types and dictionary data are separate concerns. The bootstrap may include system-owned dictionary data, but ZSJOS business dictionary data requires a separately reviewed file and explicit confirmation before synchronization.
+- The bootstrap must create empty `zsjos_lead_category` and `zsjos_lead_source_channel` types without inventing business options.
+- Fresh-environment seeds must not include local leads, products, SKUs, orders, uploaded files, test accounts, tokens, or machine-specific configuration.
+- The initial administrator password may be stored only as a BCrypt hash in SQL. Plaintext passwords, tokens, and personal data MUST NOT be added to `AGENTS.md`, logs, or operational documentation.
+- Local and production must use the same schema baseline and migration order. A read-only verification script and schema-difference check are required before release.
+- Database scripts must document dependencies, execution order, repeatability, rollback limitations, and the exact data scope they seed.
 
 ## 5. Dependencies, code, and documentation
 
@@ -128,21 +146,7 @@ Verification is proportional to risk, but evidence is mandatory:
 - If a check cannot run, **MUST** report it as unverified, explain why, and state the remaining risk.
 - Long tasks **SHOULD** report milestones as: diagnosis, change scope, then verification result. Repeated failure requires a root-cause update before another attempt.
 
-## 7. Database initialization and synchronization
-
-- MySQL initialization artifacts belong under `script/sql/mysql/`; `bootstrap.sql` is the fresh-environment entry point.
-- The bootstrap is non-destructive: it MUST NOT drop databases or tables or delete business rows in bulk.
-- When a database change is needed during active development, the preferred workflow is to apply the intended schema/data adjustment directly to the development database and update the corresponding bootstrap/SQL initialization script in the same change. Do not add another numbered migration merely to avoid editing the current development baseline when the change does not need to preserve compatibility with already-deployed environments.
-- Numbered migrations under `script/sql/mysql/migrations/` remain required when an already-deployed environment must be upgraded without rebuilding its baseline. Such migrations must be repeatable and record their version in `zsjos_schema_version` where applicable.
-- Before delivery, the final bootstrap and SQL scripts MUST initialize a fresh production database successfully from the baseline through the latest version, and the schema/data result MUST be checked against the development database. Any intentionally edited baseline or compatibility migration MUST document its deployment scope and rollback limitation.
-- Dictionary types and dictionary data are separate concerns. The bootstrap may include system-owned dictionary data, but ZSJOS business dictionary data requires a separately reviewed file and explicit confirmation before synchronization.
-- The bootstrap must create empty `zsjos_lead_category` and `zsjos_lead_source_channel` types without inventing business options.
-- Fresh-environment seeds must not include local leads, products, SKUs, orders, uploaded files, test accounts, tokens, or machine-specific configuration.
-- The initial administrator password may be stored only as a BCrypt hash in SQL. Plaintext passwords, tokens, and personal data MUST NOT be added to `AGENTS.md`, logs, or operational documentation.
-- Local and production must use the same schema baseline and migration order. A read-only verification script and schema-difference check are required before release.
-- Database scripts must document dependencies, execution order, repeatability, rollback limitations, and the exact data scope they seed.
-
-## 8. Default local development and optional workstream isolation
+## 7. Default local development and optional workstream isolation
 
 - Unless the user explicitly requests otherwise, new AI file-changing work **MUST** use the currently checked-out local branch and worktree. In the primary repository, the default development location is the existing local `main` worktree.
 - The AI **MUST NOT** create, delete, or switch Git branches or worktrees for new work unless the user explicitly requests that operation. Branch and worktree operations remain subject to the separate explicit-confirmation requirements in sections 2 and 4.
@@ -153,7 +157,7 @@ Verification is proportional to risk, but evidence is mandatory:
 - For an explicitly requested isolated workstream, the worktree **MUST** belong to exactly one workstream. Before integration, the workstream **MUST** record its final commit, verification evidence, unresolved risks, dependency state, and status as `ready-to-merge`; affected checks **MUST** be rerun on the integration branch before it is marked `merged`.
 - Commit, rebase, merge, push, and publication operations remain subject to the explicit-confirmation requirements in sections 2 and 4.
 
-## 9. AI file-change handoff log
+## 8. AI file-change handoff log
 
 - The repository-root `HANDOFF.md` is the stable handoff guide and legacy-log archive. It **MUST NOT** receive per-turn entries or a dynamically maintained workstream index.
 - Every completed AI task turn that adds, deletes, or modifies any repository file **MUST** append one structured delivery entry to the active workstream's `handoff/<workstream-id>.md` before sending the final response. Only that workstream's owner may append to the file.

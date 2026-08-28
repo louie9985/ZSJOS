@@ -22,6 +22,23 @@ export type ProcessInstanceVO = {
   processDefinition?: ProcessDefinitionVO
 }
 
+export type ProcessInstanceRelationVO = {
+  id?: number
+  formField?: string
+  sort?: number
+  targetProcessInstanceId: string
+  name?: string
+  processDefinitionId?: string
+  processDefinitionName?: string
+  processDefinitionKey?: string
+  displayNo?: string
+  businessKey?: string
+  startUserName?: string
+  startTime?: string
+  status?: number
+  detailAvailable: boolean
+}
+
 // 用户信息
 export type User = {
   id: number
@@ -108,4 +125,29 @@ export const getProcessInstanceBpmnModelView = async (id: string) => {
 // 获取流程实例打印数据
 export const getProcessInstancePrintData = async (id: string) => {
   return await request.get({ url: '/bpm/process-instance/get-print-data?processInstanceId=' + id })
+}
+
+export const getRelationCandidatePage = async (params: any) => {
+  return await request.get({ url: '/bpm/process-instance/relation-candidate-page', params })
+}
+
+export const getRelationList = async (processInstanceId: string) => {
+  return await request.get<Record<string, ProcessInstanceRelationVO[]>>({
+    url: '/bpm/process-instance/relation-list',
+    params: { processInstanceId }
+  })
+}
+
+export const getRelationDetail = async (relationId: number) => {
+  return await request.get({
+    url: '/bpm/process-instance/relation-detail',
+    params: { relationId }
+  })
+}
+
+export const getRelationPrintData = async (relationId: number) => {
+  return await request.get({
+    url: '/bpm/process-instance/relation-print-data',
+    params: { relationId }
+  })
 }

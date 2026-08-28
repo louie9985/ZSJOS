@@ -3,6 +3,7 @@
 -- Data scope: additive account columns/revision table, confirmed dictionary seeds, inherited menu grants and one notify rule per tenant.
 -- Repeatability: guarded DDL, natural-key dictionary/menu/template/rule inserts and version upserts.
 -- Recovery: forward-only. Disable the calendar/maintenance menus to stop new use; retain snapshots and revisions.
+-- Ordered account stage advance/rollback is permanently retired; this migration only disables its legacy menu grants.
 
 DROP PROCEDURE IF EXISTS `zsjos_v146_schema`;
 DELIMITER $$

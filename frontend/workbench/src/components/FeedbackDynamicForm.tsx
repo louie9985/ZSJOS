@@ -1,5 +1,6 @@
-import { DatePicker, Form, Input, Rate, Select, Upload, Button, Space, Typography } from 'antd'
-import { DeleteOutlined, PaperClipOutlined, UploadOutlined } from '@ant-design/icons'
+import { useEffect, useRef } from 'react'
+import { DatePicker, Form, Image, Input, Rate, Select, Upload, Button, Space, Typography } from 'antd'
+import { DeleteOutlined, PaperClipOutlined, PictureOutlined, UploadOutlined } from '@ant-design/icons'
 import type { FormInstance, UploadProps } from 'antd'
 import dayjs from 'dayjs'
 import type { FeedbackAttachment, FeedbackField } from '../services/feedbackApi'
@@ -47,15 +48,38 @@ export function FeedbackAttachmentInput({
   onChange?: (value: FeedbackAttachment[]) => void
   imageOnly?: boolean
 }) {
+  const localPreviewUrls = useRef(new Set<string>())
+
+  useEffect(() => () => {
+    localPreviewUrls.current.forEach(url => URL.revokeObjectURL(url))
+    localPreviewUrls.current.clear()
+  }, [])
+
   const customRequest: UploadProps['customRequest'] = async options => {
+    const file = options.file as File
+    const localPreviewUrl = imageOnly ? URL.createObjectURL(file) : undefined
+    if (localPreviewUrl) localPreviewUrls.current.add(localPreviewUrl)
     try {
-      const uploaded = await feedbackApi.upload(options.file as File)
-      onChange?.([...value, uploaded])
+      const uploaded = await feedbackApi.upload(file)
+      onChange?.([...value, { ...uploaded, previewUrl: localPreviewUrl }])
       options.onSuccess?.(uploaded)
     } catch (cause) {
+      if (localPreviewUrl) {
+        URL.revokeObjectURL(localPreviewUrl)
+        localPreviewUrls.current.delete(localPreviewUrl)
+      }
       options.onError?.(cause as Error)
     }
   }
+
+  const remove = (file: FeedbackAttachment) => {
+    if (file.previewUrl && localPreviewUrls.current.has(file.previewUrl)) {
+      URL.revokeObjectURL(file.previewUrl)
+      localPreviewUrls.current.delete(file.previewUrl)
+    }
+    onChange?.(value.filter(item => item.id !== file.id))
+  }
+
   return <div className="feedback-attachment-input">
     <Upload
       accept={imageOnly ? 'image/*' : undefined}
@@ -66,12 +90,36 @@ export function FeedbackAttachmentInput({
     >
       <Button icon={<UploadOutlined/>}>上传{imageOnly ? '图片' : '附件'}</Button>
     </Upload>
-    {value.map(file => <div className="feedback-attachment-row" key={file.id}>
+    {imageOnly && value.length > 0 ? <Image.PreviewGroup>
+      <div className="feedback-image-grid">
+        {value.map(file => <div className="feedback-image-item" key={file.id}>
+          {file.previewUrl || file.url
+            ? <Image
+                src={file.previewUrl || file.url}
+                alt={file.name || `图片 ${file.id}`}
+                preview={{ mask: '预览' }}
+              />
+            : <div className="feedback-image-missing"><PictureOutlined/><span>{file.name || `图片 ${file.id}`}</span></div>}
+          <Button
+            className="feedback-image-remove"
+            type="text"
+            danger
+            icon={<DeleteOutlined/>}
+            aria-label={`移除${file.name || '图片'}`}
+            title="移除图片"
+            onClick={() => remove(file)}
+          />
+          <Typography.Text ellipsis={{ tooltip: file.name }} className="feedback-image-name">
+            {file.name || `图片 ${file.id}`}
+          </Typography.Text>
+        </div>)}
+      </div>
+    </Image.PreviewGroup> : !imageOnly && value.map(file => <div className="feedback-attachment-row" key={file.id}>
       <Space size={6}>
         <PaperClipOutlined/>
         {file.url ? <Typography.Link href={file.url} target="_blank">{file.name || `附件 ${file.id}`}</Typography.Link> : <span>{file.name || `附件 ${file.id}`}</span>}
       </Space>
-      <Button type="text" danger icon={<DeleteOutlined/>} aria-label="移除附件" onClick={() => onChange?.(value.filter(item => item.id !== file.id))}/>
+      <Button type="text" danger icon={<DeleteOutlined/>} aria-label="移除附件" onClick={() => remove(file)}/>
     </div>)}
   </div>
 }

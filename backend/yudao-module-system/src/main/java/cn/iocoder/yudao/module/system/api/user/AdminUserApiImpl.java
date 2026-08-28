@@ -9,6 +9,8 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCreateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserOrganizationUpdateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserPartnerConversionReqDTO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCandidatePageReqDTO;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
@@ -31,6 +33,12 @@ import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.
  */
 @Service
 public class AdminUserApiImpl implements AdminUserApi {
+
+    @Override
+    public PageResult<AdminUserRespDTO> getCandidateUserPage(AdminUserCandidatePageReqDTO reqDTO) {
+        PageResult<AdminUserDO> page = userService.getCandidateUserPage(reqDTO);
+        return new PageResult<>(BeanUtils.toBean(page.getList(), AdminUserRespDTO.class), page.getTotal());
+    }
 
     @Override
     public Long createUser(AdminUserCreateReqDTO reqDTO) {
@@ -117,6 +125,7 @@ public class AdminUserApiImpl implements AdminUserApi {
     }
 
     @Override
+    @DataPermission(enable = false) // 跨模块组织花名册查询必须完整，不能继承调用方的数据范围
     public List<AdminUserRespDTO> getUserListByDeptIds(Collection<Long> deptIds) {
         List<AdminUserDO> users = userService.getUserListByDeptIds(deptIds);
         return BeanUtils.toBean(users, AdminUserRespDTO.class);

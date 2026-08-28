@@ -8,7 +8,6 @@ class MediaWorkflowConstantsTest {
     @Test
     void ordinaryPositioningBypassesIpReview() {
         assertFalse(MediaWorkflowConstants.CONTENT_TRANSITIONS.isEmpty());
-        assertTrue(MediaWorkflowConstants.ACCOUNT_STAGES.contains("s0"));
         assertEquals("operator_feasibility", MediaWorkflowConstants.POSITIONING_OPERATOR_FEASIBILITY);
     }
 

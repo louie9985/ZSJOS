@@ -129,6 +129,13 @@ SOURCE script/sql/mysql/migrations/V147__workbench_navigation_layout.sql;
 SOURCE script/sql/mysql/migrations/V148__durable_employee_announcements.sql;
 SOURCE script/sql/mysql/migrations/V149__feedback_management.sql;
 SOURCE script/sql/mysql/migrations/V150__claim_pool_read_and_partner_permissions.sql;
+SOURCE script/sql/mysql/migrations/V151__repair_partner_administrator_manage_permission.sql;
+SOURCE script/sql/mysql/migrations/V152__bpm_process_instance_relation.sql;
+SOURCE script/sql/mysql/migrations/V153__sync_media_account_operator_owner.sql;
+SOURCE script/sql/mysql/migrations/V154__repair_generic_work_order_idempotency_schema.sql;
+SOURCE script/sql/mysql/migrations/V155__feedback_ready_notification.sql;
+SOURCE script/sql/mysql/migrations/V156__repair_feedback_number_counter.sql;
+SOURCE script/sql/mysql/migrations/V157__generic_work_order_center.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

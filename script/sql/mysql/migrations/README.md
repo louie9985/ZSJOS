@@ -633,9 +633,63 @@ log remains intact. The `zsjos:media-account:maintenance` operation is a server-
 media-student page `7022` (`/zsjos/media-students`), never under the retired standalone account page `6970`.
 Calendar and maintenance grants are inherited from the effective account query, edit, and query-all grants
 instead of role names. The former stage-advance/rollback menu permissions are disabled
-and their grants retired; the compatibility endpoints return the explicit retired-operation error to users
-with the new maintenance permission. V146 is repeatable and forward-only. Recovery disables the new menus
+and their grants retired; the ordered stage endpoints are removed from the runtime contract (old clients
+receive the standard route-not-found response). Stage remains a freely selected dictionary field in maintenance.
+V146 is repeatable and forward-only. Recovery disables the new menus
 and notification rule while retaining account snapshots and revision history.
+### V153 Media-account operator ownership synchronization
+
+V153 synchronizes each non-deleted media account to the unique active, accepted
+service-relation operator for its student. It blocks when a student has multiple current
+operators, changes no menu or role grants, and increments the account optimistic-lock
+version for each repaired owner. The migration is repeatable and forward-only; take a
+database backup before execution when restoration of previous owner IDs may be required.
+Fresh bootstrap runs V153 after V152.
+
+### V154 Generic work-order idempotency schema repair
+
+V154 repairs legacy databases where `zsjos_work_order` or `zsjos_work_order_history` existed before
+V115 and therefore survived its `CREATE TABLE IF NOT EXISTS` statements without the complete idempotency
+columns. It adds only missing `command_user_id`, `request_fingerprint`, and `operation` columns. Existing
+work orders receive `command_user_id` from their persisted `source_user_id`; the migration blocks if that
+authoritative source is absent. Missing fingerprints and history operations receive stable `legacy` markers,
+so an old idempotency key fails closed instead of being mistaken for an exact replay. No work-order or
+history row is deleted. The migration is repeatable and forward-only; take a schema/data backup before
+execution because later runtime writes depend on the repaired non-null columns. Fresh bootstrap runs V154
+after V153, while the V115 baseline already creates the final schema directly.
+
+### V155 Feedback ready-for-handling notification
+
+V155 depends on V149 and adds the missing `zsjos.feedback.ready_for_handling` notification template plus
+one default in-app dispatcher rule for each enabled tenant that does not already maintain that scene.
+Existing rules are preserved, and no feedback, historical notification, menu, permission or schema row is
+rewritten. BUG, technical-support and approval-disabled requirement submissions become eligible for the
+notification immediately; approval-enabled requirements become eligible only after final approval. The
+runtime event key includes the feedback ID and approval round.
+
+The migration is repeatable and forward-only, records both version registries, and runs after V154 during
+fresh bootstrap. It does not replay historical feedback. Rollback disables the scene rules while retaining
+historical messages and version records.
+
+### V156 Feedback number-counter repair
+
+V156 depends on V149 and V155 and repairs only `zsjos_feedback_no_daily_counter`. For every valid
+`REQ|BUG|SUP-yyyyMMdd-sequence` number found in either the feedback table or a FEEDBACK work order, the
+corresponding tenant/date/type counter is inserted or raised to the greatest persisted suffix. Higher
+counters remain unchanged, logically deleted counter rows are reactivated, and existing feedback, work
+orders, numbers, messages, menus, permissions and configuration are not changed.
+
+Legacy feedback and work-order tables may use different `utf8mb4` collations. V156 converts both business
+number sources and its derived feedback type to binary strings for exact parsing, grouping and counter
+matching, so execution does not depend on either table's collation or the connection default.
+
+The runtime allocator uses that row's `current_value` rather than connection `LAST_INSERT_ID()`, so a new
+counter table auto-increment ID cannot become the first business sequence. It also uses the current maximum
+persisted feedback work-order suffix as the reservation floor, allowing a lagging counter to recover safely
+before a unique-key insert. The migration is repeatable, records both version registries, and fresh bootstrap
+runs it after V155. Lowering a repaired counter is not a supported rollback because it can reissue a historic
+number; retain a backup and use a separately reviewed forward correction if audit evidence requires one.
+
 ### V147 Workbench navigation layout
 
 V147 depends on V146 and adds `system_workbench_layout` for the current draft and
@@ -711,3 +765,38 @@ completed. Explicitly rerun the corrected V150 only when that audit confirms its
 sufficient, then verify its menu/grant result instead of deleting version rows or attempting a destructive
 rollback. If any former granular permission was retired before its grants were copied, use a separately
 reviewed forward repair based on exported pre-migration evidence; a rerun cannot reconstruct deleted history.
+
+### V151 Partner administrator permission repair
+
+V151 depends on V150 and grants the existing Partner page (`6852`) and consolidated manage button
+(`79920`) only to enabled `system_administrator` roles that do not already hold them. It changes no Partner,
+Lead, ownership, user or role row. Both required menu identities are verified before the guarded grants and
+both schema-version markers are recorded. The migration is repeatable and forward-only; revocation requires
+a separately reviewed permission migration.
+
+### V152 BPM related approvals
+
+V152 depends on V151 and creates the empty tenant-scoped `bpm_process_instance_relation` table. Each row
+freezes one direct source-to-target relation, form field, order and target display snapshot. The unique key
+prevents duplicate targets within one source field; source-order and target reverse-lookup indexes support
+display and authorization. No historic process is backfilled and no Flowable `ACT_*` table is modified.
+The migration and fresh baseline use the same additive schema. Reruns are safe; rollback must retain the
+table while any related-approval audit record is required.
+
+### V157 generic work-order center
+
+V157 depends on V156 and adds immutable template versions, tenant-scoped number counters, attachment
+snapshots, qualification and number-rule fields, unified-envelope projection fields, and round/history
+metadata. The extension identity is unique by `(tenant_id,business_type,business_id)`. It creates the empty
+`zsjos_work_order_category` dictionary type and reserves menu IDs `79961-79978` for one unified
+“工单中心” parent: template administration, runtime audit, and the three Workbench pages
+“发起工单”“可接工单”“我的工单”, plus their button permissions. Existing V157 installations
+remove the obsolete standalone menu ID `79960` and move IDs `79961-79963` under `79972`.
+The unified parent uses `/zsjos/work-orders` with `admin_embed` so both frontends retain the
+server-owned hierarchy: Admin renders its `admin_only` template/audit pages, while Workbench
+renders only the three `native` employee pages.
+
+Fresh bootstrap sources V157 after V156. It does not create business templates, category values, roles,
+departments, users, or work-order instances and does not delete historical rows. Verify tables, columns,
+indexes, empty category data, relative Workbench paths, tenant-package coverage, and both version markers with
+`verify-bootstrap.sql`. Rollback is forward-only once published versions or snapshots use the new schema.

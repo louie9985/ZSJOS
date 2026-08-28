@@ -35,6 +35,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.positioning.PositioningCardMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.*;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.task.BusinessTaskMapper;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
@@ -92,6 +93,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private DirectorFormTemplateService directorFormTemplateService;
     @Resource private DirectorConfigService directorConfigService;
     @Resource private PositioningCardMapper positioningCardMapper;
+    @Resource private MediaAccountMapper mediaAccountMapper;
 
     @Override
     @ZsjosPermission(bizType = "student-service", bizId = "#relationId", action = "read")
@@ -1142,6 +1144,13 @@ public class StudentContactServiceImpl implements StudentContactService {
         }
         positioningCardMapper.updateCurrentOperatorByServiceRelations(
                 relations.stream().map(ServiceRelationDO::getId).toList(), request.getUserId());
+        for (var account : mediaAccountMapper.selectByStudent(selected.getPersonId())) {
+            if (!Objects.equals(account.getOwnerOperatorUserId(), request.getUserId())) {
+                if (mediaAccountMapper.updateOwnerOperator(account.getId(), request.getUserId(), account.getVersion()) == 0) {
+                    throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+                }
+            }
+        }
         PersonDO student = personMapper.selectById(selected.getPersonId());
         Map<String, Object> context = new LinkedHashMap<>();
         context.put("operatorUserId", request.getUserId());

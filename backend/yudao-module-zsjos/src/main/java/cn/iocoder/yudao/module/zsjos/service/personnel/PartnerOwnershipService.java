@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Map;
 import java.util.Objects;
 
@@ -62,9 +64,30 @@ public class PartnerOwnershipService {
         if (employeeUserId == null || partnerId == null) return false;
         if (canManage(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
         PartnerOwnershipDO ownership = getByPartnerId(partnerId);
-        return ownership != null && Objects.equals(ownership.getEmployeeUserId(), employeeUserId)
-                && permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION)
-                && isEnabledUser(employeeUserId);
+        return ownership != null && getReadableEmployeeUserIds(employeeUserId).contains(ownership.getEmployeeUserId());
+    }
+
+    /**
+     * 将 System 数据权限投影为可查看的当前员工集合。未分配兼职不会进入该集合。
+     */
+    public Set<Long> getReadableEmployeeUserIds(Long employeeUserId) {
+        if (!canQuery(employeeUserId) || canManage(employeeUserId)) return Set.of();
+        var scope = permissionApi.getDeptDataPermission(employeeUserId);
+        Set<Long> userIds = new HashSet<>();
+        userIds.add(employeeUserId);
+        if (scope == null) return userIds;
+        List<AdminUserRespDTO> scopedUsers;
+        if (Boolean.TRUE.equals(scope.getAll())) {
+            scopedUsers = adminUserApi.getUserListByStatus(CommonStatusEnum.ENABLE.getStatus());
+        } else if (scope.getDeptIds() == null || scope.getDeptIds().isEmpty()) {
+            scopedUsers = List.of();
+        } else {
+            scopedUsers = adminUserApi.getUserListByDeptIds(scope.getDeptIds());
+        }
+        scopedUsers.stream()
+                .filter(user -> CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus()))
+                .map(AdminUserRespDTO::getId).forEach(userIds::add);
+        return userIds;
     }
 
     public void checkRead(Long employeeUserId, Long partnerId) {

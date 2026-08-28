@@ -5,6 +5,8 @@ import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCreateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserOrganizationUpdateReqDTO;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserPartnerConversionReqDTO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCandidatePageReqDTO;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 
 import java.util.Collection;
 import java.util.Collections;
@@ -17,6 +19,9 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface AdminUserApi {
+
+    /** Pages enabled users matching a role/department qualification in the owning System database. */
+    PageResult<AdminUserRespDTO> getCandidateUserPage(AdminUserCandidatePageReqDTO reqDTO);
 
     Long createUser(AdminUserCreateReqDTO reqDTO);
 
@@ -63,6 +68,7 @@ public interface AdminUserApi {
 
     /**
      * 获得指定部门的用户数组
+     * 跨模块组织花名册查询不受当前调用方数据权限影响，调用方仍需自行应用业务范围。
      *
      * @param deptIds 部门数组
      * @return 用户数组

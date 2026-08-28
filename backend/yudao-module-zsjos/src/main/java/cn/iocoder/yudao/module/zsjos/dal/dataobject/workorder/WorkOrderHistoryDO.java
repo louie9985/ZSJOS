@@ -23,4 +23,7 @@ public class WorkOrderHistoryDO extends TenantBaseDO {
     private String idempotencyKey;
     private String operation;
     private String requestFingerprint;
+    private Integer roundNo;
+    private String resultRemark;
+    private String attachmentIdsJson;
 }

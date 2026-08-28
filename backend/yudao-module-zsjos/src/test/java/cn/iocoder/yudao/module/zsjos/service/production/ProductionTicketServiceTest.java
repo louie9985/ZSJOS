@@ -12,6 +12,9 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.production.ProductionTicketMapper
 import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
+import cn.iocoder.yudao.module.zsjos.service.workorder.WorkOrderService;
+import cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo.WorkOrderSceneRespVO;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,6 +26,7 @@ import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
 class ProductionTicketServiceTest {
@@ -36,19 +40,21 @@ class ProductionTicketServiceTest {
     @Mock private PositioningCardSubmissionMapper positioningSubmissionMapper;
     @Mock private LeadAssignmentService relationService;
     @Mock private ProductionTicketCommandService commandService;
+    @Mock private WorkOrderService workOrderService;
 
     @Test
     void createRegistersCommandAndCompletesWithTicketId() {
         ProductionTicketSaveReqVO req = new ProductionTicketSaveReqVO();
-        req.setAccountId(7L); req.setIdempotencyKey("create-key");
-        when(commandService.fingerprint("create", 7L, null, 20L)).thenReturn("fp");
+        req.setSceneCode("production"); req.setAccountId(7L); req.setTargetDeptId(9L);
+        req.setOperatorRemark("  注意前三秒节奏  "); req.setIdempotencyKey("create-key");
+        when(commandService.fingerprint(any(Object[].class))).thenReturn("fp");
         when(commandService.begin(eq("create-key"), any(), eq(Long.class)))
                 .thenReturn(new ProductionTicketCommandService.Claim<>(true, null));
         when(accountMapper.selectById(7L)).thenReturn(new MediaAccountDO().setId(7L)
                 .setAccountNo("MA-7").setNickname("账号七").setOwnerOperatorUserId(20L));
         when(positioningSubmissionMapper.selectCurrentConfirmedByAccount(7L))
                 .thenReturn(new PositioningCardSubmissionDO().setId(70L).setSubmissionNo(70));
-        when(relationService.getConfiguredTargetUsers(anyString(), eq(20L))).thenReturn(java.util.List.of());
+        stubTemplate();
         doAnswer(invocation -> {
             invocation.<ProductionTicketDO>getArgument(0).setId(100L);
             return 1;
@@ -56,9 +62,15 @@ class ProductionTicketServiceTest {
 
         assertEquals(100L, service.create(req, 20L));
 
+        ArgumentCaptor<ProductionTicketDO> ticketCaptor = ArgumentCaptor.forClass(ProductionTicketDO.class);
+        verify(mapper).insert(ticketCaptor.capture());
+        assertTrue(ticketCaptor.getValue().getDispatchContextSnapshotJson()
+                .contains("\"operatorRemark\":\"注意前三秒节奏\""));
         verify(commandService).complete("create-key", 20L, 100L);
         verify(workflowEventService).transition("production-ticket", 100L, 20L, null,
                 "public_pool", null, "ticket-created:100");
+        verify(workOrderService).createProductionEnvelope("production", 100L, 7L, 20L,
+                null, 9L, "注意前三秒节奏", null, null, "create-key");
         verify(workflowEventService, never()).createTaskAndNotify(anyString(), anyString(), anyString(),
                 anyLong(), anyLong(), anyString(), anyString(), anyLong(), anyString(), anyMap());
     }
@@ -66,14 +78,14 @@ class ProductionTicketServiceTest {
     @Test
     void createExactRetryReplaysTicketIdWithoutSideEffects() {
         ProductionTicketSaveReqVO req = new ProductionTicketSaveReqVO();
-        req.setAccountId(7L); req.setAssigneeUserId(30L); req.setIdempotencyKey("create-key");
-        when(commandService.fingerprint("create", 7L, 30L, 20L)).thenReturn("fp");
+        req.setSceneCode("production"); req.setAccountId(7L); req.setAssigneeUserId(30L); req.setIdempotencyKey("create-key");
+        when(commandService.fingerprint(any(Object[].class))).thenReturn("fp");
         when(commandService.begin(eq("create-key"), any(), eq(Long.class)))
                 .thenReturn(new ProductionTicketCommandService.Claim<>(false, 100L));
 
         assertEquals(100L, service.create(req, 20L));
 
-        verifyNoInteractions(accountMapper, positioningSubmissionMapper, relationService, workflowEventService);
+        verifyNoInteractions(accountMapper, positioningSubmissionMapper, relationService, workflowEventService, workOrderService);
         verify(mapper, never()).insert(any(ProductionTicketDO.class));
         verify(commandService, never()).complete(anyString(), anyLong(), any());
     }
@@ -116,5 +128,37 @@ class ProductionTicketServiceTest {
                 "production-ticket", 6L, 230L, "拍剪工单待核对", "START_TICKET_CHECK", null,
                 "ticket-check:6:2", java.util.Map.of("bizNo", "PT-6",
                         "deepLink", "/zsjos/production-tickets?ticketId=6"));
+    }
+
+    @Test
+    void createDoesNotCompleteCommandWhenEnvelopeCreationFails() {
+        ProductionTicketSaveReqVO req = new ProductionTicketSaveReqVO();
+        req.setSceneCode("production"); req.setAccountId(7L); req.setTargetDeptId(9L);
+        req.setOperatorRemark("交接说明"); req.setIdempotencyKey("create-envelope-failure");
+        when(commandService.fingerprint(any(Object[].class))).thenReturn("fp");
+        when(commandService.begin(eq("create-envelope-failure"), any(), eq(Long.class)))
+                .thenReturn(new ProductionTicketCommandService.Claim<>(true, null));
+        when(accountMapper.selectById(7L)).thenReturn(new MediaAccountDO().setId(7L)
+                .setAccountNo("MA-7").setOwnerOperatorUserId(20L));
+        when(positioningSubmissionMapper.selectCurrentConfirmedByAccount(7L))
+                .thenReturn(new PositioningCardSubmissionDO().setId(70L).setSubmissionNo(70));
+        stubTemplate();
+        doAnswer(invocation -> { invocation.<ProductionTicketDO>getArgument(0).setId(100L); return 1; })
+                .when(mapper).insert(any(ProductionTicketDO.class));
+        doThrow(new IllegalStateException("envelope failed")).when(workOrderService)
+                .createProductionEnvelope(anyString(), anyLong(), anyLong(), anyLong(), any(), anyLong(),
+                        anyString(), any(), any(), anyString());
+
+        assertThrows(IllegalStateException.class, () -> service.create(req, 20L));
+
+        verify(commandService, never()).complete(anyString(), anyLong(), any());
+    }
+
+    private void stubTemplate() {
+        WorkOrderSceneRespVO template = new WorkOrderSceneRespVO();
+        template.setCode("production"); template.setName("拍剪工单"); template.setProcessorType("PRODUCTION_TICKET");
+        template.setAllowedAssignmentTypes(java.util.List.of("PERSON", "DEPARTMENT"));
+        when(workOrderService.catalog(1, 500, 20L)).thenReturn(new PageResult<>(java.util.List.of(template), 1L));
+        when(workOrderService.candidatePage(any(), eq(20L))).thenReturn(PageResult.empty());
     }
 }

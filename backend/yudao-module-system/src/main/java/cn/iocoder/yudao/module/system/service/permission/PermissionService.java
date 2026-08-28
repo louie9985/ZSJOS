@@ -119,6 +119,9 @@ public interface PermissionService {
      */
     Set<Long> getUserRoleIdListByUserId(Long userId);
 
+    /** Returns only roles that remain enabled at query time. */
+    Set<Long> getEnabledUserRoleIdListByUserId(Long userId);
+
     /**
      * 获得用户拥有的角色编号集合，从缓存中获取
      *

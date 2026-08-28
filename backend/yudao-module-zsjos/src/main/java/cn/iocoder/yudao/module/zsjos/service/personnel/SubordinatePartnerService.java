@@ -14,6 +14,7 @@ import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
@@ -32,14 +33,15 @@ public class SubordinatePartnerService {
         long offset = ((long) reqVO.getPageNo() - 1L) * reqVO.getPageSize();
         Long tenantId = TenantContextHolder.getRequiredTenantId();
         boolean manage = ownershipService.canManage(userId);
+        Set<Long> readableEmployeeUserIds = manage ? Set.of() : ownershipService.getReadableEmployeeUserIds(userId);
         long total = manage
                 ? ownershipMapper.selectManagedCount(tenantId, reqVO.getStatus(), keyword)
-                : ownershipMapper.selectSubordinateCount(tenantId, userId, reqVO.getStatus(), keyword);
+                : ownershipMapper.selectScopedCount(tenantId, readableEmployeeUserIds, reqVO.getStatus(), keyword);
         if (total == 0 || offset >= total) return new PageResult<>(List.of(), total);
         List<SubordinatePartnerRow> page = manage
                 ? ownershipMapper.selectManagedPage(tenantId, reqVO.getStatus(), keyword, offset, reqVO.getPageSize())
-                : ownershipMapper.selectSubordinatePage(
-                        tenantId, userId, reqVO.getStatus(), keyword, offset, reqVO.getPageSize());
+                : ownershipMapper.selectScopedPage(
+                        tenantId, readableEmployeeUserIds, reqVO.getStatus(), keyword, offset, reqVO.getPageSize());
         List<PartnerRespVO> rows = page
                 .stream().map(this::toResponse).toList();
         return new PageResult<>(rows, total);

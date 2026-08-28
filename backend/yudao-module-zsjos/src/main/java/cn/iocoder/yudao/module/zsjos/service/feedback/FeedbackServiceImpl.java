@@ -77,6 +77,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBA
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.AUTHOR_ADMIN;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.AUTHOR_EMPLOYEE;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.BUSINESS_TYPE_FEEDBACK;
+import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.NOTIFY_SCENE_READY_FOR_HANDLING;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.PROCESS_DEFINITION_KEY;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.ROLE_CHAIRMAN;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.STATUS_APPROVAL_REJECTED;
@@ -115,7 +116,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Resource
     private FeedbackSurveyMapper surveyMapper;
     @Resource
-    private FeedbackConfigMapper configMapper;
+    private FeedbackConfigMapper feedbackConfigMapper;
     @Resource
     private FeedbackNoDailyCounterMapper counterMapper;
     @Resource
@@ -235,6 +236,9 @@ public class FeedbackServiceImpl implements FeedbackService {
         if (TYPE_REQUIREMENT.equals(type)) {
             createRequirementRound(feedback, config, form, normalized.values(), userId, submitter, now);
         }
+        if (STATUS_WAITING.equals(initialStatus)) {
+            publishReadyForHandling(feedback, userId, config);
+        }
         return feedback.getId();
     }
 
@@ -282,6 +286,9 @@ public class FeedbackServiceImpl implements FeedbackService {
         addHistory(requireWorkOrder(row.getWorkOrderId()), STATUS_APPROVAL_REJECTED, nextStatus, userId,
                 "驳回后修改重提", request.getIdempotencyKey(), "RESUBMIT", fingerprint);
         createRequirementRound(row, config, form, normalized.values(), userId, submitter, LocalDateTime.now());
+        if (STATUS_WAITING.equals(nextStatus)) {
+            publishReadyForHandling(row, userId, config);
+        }
     }
 
     @Override
@@ -452,7 +459,7 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     @Override
     public List<FeedbackConfigVO.Resp> getConfigs() {
-        return configMapper.selectAll().stream().map(config -> {
+        return feedbackConfigMapper.selectAll().stream().map(config -> {
             FeedbackConfigVO.Resp response = new FeedbackConfigVO.Resp();
             response.setFeedbackType(config.getFeedbackType());
             response.setFormId(config.getFormId());
@@ -502,7 +509,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 ? request.getBpmProcessDefinitionKey() : null);
         config.setLastIdempotencyKey(request.getIdempotencyKey());
         config.setLastRequestFingerprint(fingerprint);
-        if (configMapper.updateById(config) != 1) throw exception(FEEDBACK_CONFIG_VERSION_CONFLICT);
+        if (feedbackConfigMapper.updateById(config) != 1) throw exception(FEEDBACK_CONFIG_VERSION_CONFLICT);
     }
 
     @Override
@@ -570,6 +577,9 @@ public class FeedbackServiceImpl implements FeedbackService {
             roundMapper.updateById(round);
         }
         syncWorkOrder(row, nextStatus, null, null, null, null);
+        if (STATUS_WAITING.equals(nextStatus)) {
+            publishReadyForHandling(row, null, feedbackConfigMapper.selectByType(row.getFeedbackType()));
+        }
     }
 
     private void reply(Long id, FeedbackActionVO.ReplyReq request, Long userId, String authorType) {
@@ -717,7 +727,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         entry.setFeedbackType(type);
         entry.setTitle(title);
         entry.setDescription(description);
-        FeedbackConfigDO config = configMapper.selectByType(type);
+        FeedbackConfigDO config = feedbackConfigMapper.selectByType(type);
         boolean open = config != null && !effectiveDispatchers(config).isEmpty();
         entry.setOpen(open);
         entry.setUnavailableReason(open ? null : "暂未开放");
@@ -934,6 +944,13 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .build());
     }
 
+    private void publishReadyForHandling(FeedbackDO row, Long operatorUserId, FeedbackConfigDO config) {
+        List<Long> dispatchers = config == null ? List.of() : effectiveDispatchers(config);
+        publish(NOTIFY_SCENE_READY_FOR_HANDLING, row,
+                "ready:round:" + row.getApprovalRoundNo(), operatorUserId,
+                Map.of("dispatcherUserIds", dispatchers));
+    }
+
     private boolean exactReplay(FeedbackDO feedback, String key, String operation,
                                 Long userId, String fingerprint) {
         WorkOrderHistoryDO replay = historyMapper.selectByOrderAndKey(feedback.getWorkOrderId(), key);
@@ -975,9 +992,12 @@ public class FeedbackServiceImpl implements FeedbackService {
     private String nextFeedbackNo(String type) {
         Long tenantId = TenantContextHolder.getRequiredTenantId();
         LocalDate today = LocalDate.now();
-        counterMapper.reserve(tenantId, today, type);
-        long sequence = counterMapper.selectReservedValue();
-        return TYPE_PREFIX.get(type) + "-" + NUMBER_DATE.format(today) + "-" + String.format("%04d", sequence);
+        String prefix = TYPE_PREFIX.get(type) + "-" + NUMBER_DATE.format(today) + "-";
+        long minimumValue = workOrderMapper.selectMaxFeedbackNumber(
+                tenantId, type, "^" + prefix + "[0-9]+$") + 1;
+        counterMapper.reserve(tenantId, today, type, minimumValue);
+        long sequence = counterMapper.selectReservedValue(tenantId, today, type);
+        return prefix + String.format("%04d", sequence);
     }
 
     private FeedbackDO require(Long id) {
@@ -993,7 +1013,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     private FeedbackConfigDO requireConfig(String type) {
-        FeedbackConfigDO config = configMapper.selectByType(type);
+        FeedbackConfigDO config = feedbackConfigMapper.selectByType(type);
         if (config == null) throw exception(FEEDBACK_NOT_OPEN);
         return config;
     }

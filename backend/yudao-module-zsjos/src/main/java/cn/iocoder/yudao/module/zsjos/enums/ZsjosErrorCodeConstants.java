@@ -88,6 +88,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode WORK_ORDER_FIELD_INVALID = new ErrorCode(1_900_003_107, "工单表单字段无效");
     ErrorCode WORK_ORDER_ATTACHMENT_INVALID = new ErrorCode(1_900_003_108, "工单附件无效");
     ErrorCode WORK_ORDER_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_109, "工单幂等键已被其他请求使用");
+    ErrorCode WORK_ORDER_NUMBER_OVERFLOW = new ErrorCode(1_900_003_110, "工单编号流水已超出模板配置位数");
+    ErrorCode WORK_ORDER_RELATED_ACCOUNT_REQUIRED = new ErrorCode(1_900_003_111, "拍剪工单必须选择相关账号");
     ErrorCode LEAD_COLLABORATION_POOL_CONFLICT = new ErrorCode(1_900_003_082, "客资同时存在人工公海与超期公海记录，请联系管理员核查");
     ErrorCode LEAD_QUALIFICATION_STATE_INVALID = new ErrorCode(1_900_003_029, "当前客资状态不允许进行有效性判定");
     ErrorCode LEAD_INVALID_REASON_INVALID = new ErrorCode(1_900_003_030, "无效原因不存在或已停用");
@@ -264,14 +266,11 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode MEDIA_ACCOUNT_VERSION_CONFLICT = new ErrorCode(1_900_011_003, "第三方账号已被其他人修改，请刷新后重试");
     ErrorCode MEDIA_ACCOUNT_PERMISSION_DENIED = new ErrorCode(1_900_011_004, "无权查看或操作该第三方账号");
     ErrorCode MEDIA_ACCOUNT_STUDENT_INVALID = new ErrorCode(1_900_011_005, "绑定学员不存在或不属于当前租户");
-    ErrorCode MEDIA_ACCOUNT_STAGE_INVALID = new ErrorCode(1_900_011_006, "账号S阶段流转无效");
-    ErrorCode MEDIA_ACCOUNT_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_011_007, "账号操作幂等键已被其他请求使用");
-    ErrorCode MEDIA_ACCOUNT_STAGE_BASIS_REQUIRED = new ErrorCode(1_900_011_008, "请填写账号阶段判断依据");
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_INVALID = new ErrorCode(1_900_011_009, "第三方账号字段配置或字段值无效");
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_NOT_PUBLISHED = new ErrorCode(1_900_011_010, "第三方账号字段配置尚未发布");
     ErrorCode MEDIA_ACCOUNT_FIELD_CONFIG_VERSION_CONFLICT = new ErrorCode(1_900_011_011, "第三方账号字段配置已变化，请刷新后重试");
-    ErrorCode MEDIA_ACCOUNT_STAGE_TRANSITION_RETIRED = new ErrorCode(1_900_011_012, "账号阶段推进功能已停用，请使用状态维护");
     ErrorCode MEDIA_ACCOUNT_MAINTENANCE_INVALID = new ErrorCode(1_900_011_013, "账号状态维护内容无效，请检查字典选项和日期范围");
+    ErrorCode MEDIA_ACCOUNT_OPERATOR_ASSIGNMENT_CONFLICT = new ErrorCode(1_900_011_014, "该学员存在多个现任运营，请先纠正运营分配");
     ErrorCode MEDIA_REBIND_REVIEWER_INVALID = new ErrorCode(1_900_011_009, "账号换绑审批人未配置或不可用");
     ErrorCode MEDIA_REBIND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_011_008, "账号换绑流程尚未部署或暂不可用");
 

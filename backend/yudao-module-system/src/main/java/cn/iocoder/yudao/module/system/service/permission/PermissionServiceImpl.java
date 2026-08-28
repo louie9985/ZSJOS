@@ -289,6 +289,11 @@ public class PermissionServiceImpl implements PermissionService {
     }
 
     @Override
+    public Set<Long> getEnabledUserRoleIdListByUserId(Long userId) {
+        return convertSet(getEnableUserRoleListByUserIdFromCache(userId), RoleDO::getId);
+    }
+
+    @Override
     @Cacheable(value = RedisKeyConstants.USER_ROLE_ID_LIST, key = "#userId")
     public Set<Long> getUserRoleIdListByUserIdFromCache(Long userId) {
         return getUserRoleIdListByUserId(userId);

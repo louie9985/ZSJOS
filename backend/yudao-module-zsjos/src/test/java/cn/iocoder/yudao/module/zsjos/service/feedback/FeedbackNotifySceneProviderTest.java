@@ -9,10 +9,37 @@ import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FeedbackNotifySceneProviderTest {
 
     private final FeedbackNotifySceneProvider provider = new FeedbackNotifySceneProvider();
+
+    @Test
+    void readySceneIsRegisteredForDispatchers() {
+        assertTrue(provider.getScenes().stream().anyMatch(scene ->
+                FeedbackConstants.NOTIFY_SCENE_READY_FOR_HANDLING.equals(scene.getCode())
+                        && scene.getRecipientRoles().stream()
+                        .anyMatch(role -> "dispatcher".equals(role.getCode()))));
+    }
+
+    @Test
+    void readyFeedbackTargetsAllConfiguredDispatchersButNotSubmitter() {
+        Set<NotifyRecipientDTO> recipients = provider.resolveRecipients(event(Map.of(
+                "submitterUserId", 11L,
+                "dispatcherUserIds", List.of(21L, 22L))), Set.of("dispatcher"));
+
+        assertEquals(Set.of(NotifyRecipientDTO.admin(21L), NotifyRecipientDTO.admin(22L)), recipients);
+    }
+
+    @Test
+    void readyFeedbackWithoutDispatchersHasNoRecipients() {
+        Set<NotifyRecipientDTO> recipients = provider.resolveRecipients(event(Map.of(
+                "submitterUserId", 11L,
+                "dispatcherUserIds", List.of())), Set.of("dispatcher"));
+
+        assertEquals(Set.of(), recipients);
+    }
 
     @Test
     void employeeReplyTargetsAssigneeWhenPresent() {

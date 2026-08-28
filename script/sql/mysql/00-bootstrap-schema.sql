@@ -1642,6 +1642,33 @@ CREATE TABLE IF NOT EXISTS `bpm_process_instance_copy` (
   KEY `idx_process_instance_id` (`process_instance_id`) USING BTREE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='BPM 流程实例抄送表';
 
+-- bpm_process_instance_relation
+CREATE TABLE IF NOT EXISTS `bpm_process_instance_relation` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
+  `tenant_id` bigint NOT NULL DEFAULT '0' COMMENT '租户编号',
+  `source_process_instance_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '来源流程实例编号',
+  `target_process_instance_id` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '目标流程实例编号',
+  `form_field` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '表单字段',
+  `sort` int NOT NULL DEFAULT '0' COMMENT '冻结顺序',
+  `target_name_snapshot` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '目标标题快照',
+  `target_process_definition_id_snapshot` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '目标流程定义编号快照',
+  `target_process_definition_name_snapshot` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '目标流程定义名称快照',
+  `target_display_no_snapshot` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '目标可读流程编号快照',
+  `target_business_key_snapshot` varchar(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '目标业务键快照',
+  `target_start_user_name_snapshot` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '目标发起人名称快照',
+  `target_start_time_snapshot` datetime DEFAULT NULL COMMENT '目标发起时间快照',
+  `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  `deleted` bit(1) NOT NULL DEFAULT b'0' COMMENT '是否删除',
+  PRIMARY KEY (`id`) USING BTREE,
+  UNIQUE KEY `uk_bpm_relation_source_field_target` (`tenant_id`,`source_process_instance_id`,`form_field`,`target_process_instance_id`),
+  KEY `idx_bpm_relation_source_field_sort` (`tenant_id`,`source_process_instance_id`,`form_field`,`sort`),
+  KEY `idx_bpm_relation_target` (`tenant_id`,`target_process_instance_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='BPM 流程实例关联审批表';
+
+
 -- bpm_process_listener
 CREATE TABLE IF NOT EXISTS `bpm_process_listener` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '编号',
@@ -5567,27 +5594,65 @@ CREATE TABLE IF NOT EXISTS `zsjos_work_order_scene` (
  `code` varchar(64) NOT NULL, `name` varchar(128) NOT NULL, `remark` varchar(500) DEFAULT NULL,
  `source_post_code` varchar(64) NOT NULL, `target_post_code` varchar(64) NOT NULL,
  `assignment_mode` varchar(32) NOT NULL, `fields_json` json NOT NULL, `status` tinyint NOT NULL DEFAULT 1,
+ `category_value` varchar(100) DEFAULT NULL, `category_label_snapshot` varchar(128) DEFAULT NULL, `icon` varchar(64) DEFAULT NULL, `sort` int NOT NULL DEFAULT 0,
+ `processor_type` varchar(32) DEFAULT 'GENERIC', `allowed_assignment_types_json` json DEFAULT NULL,
+ `source_qualification_mode` varchar(32) DEFAULT NULL, `source_role_scopes_json` json DEFAULT NULL, `source_dept_scopes_json` json DEFAULT NULL,
+ `target_qualification_mode` varchar(32) DEFAULT NULL, `target_role_scopes_json` json DEFAULT NULL, `target_dept_scopes_json` json DEFAULT NULL,
+ `rejection_strategy` varchar(32) DEFAULT NULL, `number_prefix` varchar(12) DEFAULT NULL, `number_reset_period` varchar(16) DEFAULT NULL, `number_sequence_width` int DEFAULT NULL,
+ `lifecycle_status` varchar(16) NOT NULL DEFAULT 'DRAFT', `published_version_id` bigint DEFAULT NULL, `published_version_no` int DEFAULT NULL,
  `version` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '',
  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL,
  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_code` (`tenant_id`,`code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工单场景';
+CREATE TABLE IF NOT EXISTS `zsjos_work_order_scene_version` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0, `scene_id` bigint NOT NULL, `version_no` int NOT NULL,
+ `code` varchar(64) NOT NULL, `name` varchar(128) NOT NULL, `remark` varchar(500) DEFAULT NULL, `category_value` varchar(100) NOT NULL,
+ `category_label_snapshot` varchar(128) DEFAULT NULL, `icon` varchar(64) DEFAULT NULL, `sort` int NOT NULL DEFAULT 0, `processor_type` varchar(32) NOT NULL,
+ `allowed_assignment_types_json` json NOT NULL, `source_qualification_mode` varchar(32) NOT NULL, `source_role_scopes_json` json DEFAULT NULL,
+ `source_dept_scopes_json` json DEFAULT NULL, `target_qualification_mode` varchar(32) NOT NULL, `target_role_scopes_json` json DEFAULT NULL,
+ `target_dept_scopes_json` json DEFAULT NULL, `rejection_strategy` varchar(32) NOT NULL, `number_prefix` varchar(12) NOT NULL,
+ `number_reset_period` varchar(16) NOT NULL, `number_sequence_width` int NOT NULL, `fields_json` json NOT NULL, `published_by` bigint NOT NULL,
+ `published_at` datetime NOT NULL, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL, PRIMARY KEY (`id`),
+ UNIQUE KEY `uk_scene_version` (`tenant_id`,`scene_id`,`version_no`), KEY `idx_scene_code` (`tenant_id`,`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工单模板发布版本';
+CREATE TABLE IF NOT EXISTS `zsjos_work_order_number_counter` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0, `number_prefix` varchar(12) NOT NULL,
+ `reset_key` varchar(16) NOT NULL, `current_value` bigint NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '',
+ `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '',
+ `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0',
+ `deleted_time` datetime DEFAULT NULL, PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_prefix_period` (`tenant_id`,`number_prefix`,`reset_key`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工单编号计数器';
+CREATE TABLE IF NOT EXISTS `zsjos_work_order_attachment` (
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0, `work_order_id` bigint NOT NULL,
+ `round_no` int NOT NULL, `phase` varchar(16) NOT NULL, `file_id` bigint NOT NULL,
+ `file_name_snapshot` varchar(255) NOT NULL, `mime_type_snapshot` varchar(128) DEFAULT NULL, `file_size_snapshot` bigint DEFAULT NULL,
+ `sort` int NOT NULL DEFAULT 0, `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL, PRIMARY KEY (`id`),
+ UNIQUE KEY `uk_order_phase_round_file` (`tenant_id`,`work_order_id`,`phase`,`round_no`,`file_id`),
+ KEY `idx_order_attachment` (`tenant_id`,`work_order_id`,`round_no`,`phase`,`sort`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 工单附件快照';
 CREATE TABLE IF NOT EXISTS `zsjos_work_order` (
- `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0, `business_type` varchar(16) NOT NULL DEFAULT 'GENERIC',
+ `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0, `business_type` varchar(32) NOT NULL DEFAULT 'GENERIC', `business_id` bigint DEFAULT NULL,
  `order_no` varchar(64) NOT NULL, `scene_code` varchar(64) NOT NULL,
- `scene_name_snapshot` varchar(128) NOT NULL, `assignment_mode` varchar(32) NOT NULL,
+ `scene_name_snapshot` varchar(128) NOT NULL, `assignment_mode` varchar(32) NOT NULL, `scene_version_id` bigint DEFAULT NULL, `processor_type` varchar(32) NOT NULL DEFAULT 'GENERIC',
+ `target_dept_id` bigint DEFAULT NULL, `rejection_strategy_snapshot` varchar(32) DEFAULT NULL, `candidate_qualification_mode` varchar(32) DEFAULT NULL, `candidate_role_scopes_json` json DEFAULT NULL, `candidate_dept_scopes_json` json DEFAULT NULL,
  `source_user_id` bigint NOT NULL, `target_user_id` bigint DEFAULT NULL,
  `source_name_snapshot` varchar(128) DEFAULT NULL, `target_name_snapshot` varchar(128) DEFAULT NULL,
  `status` varchar(40) NOT NULL, `field_snapshot_json` json NOT NULL, `value_json` json NOT NULL,
- `attachment_ids_json` json NOT NULL, `idempotency_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
+ `attachment_ids_json` json NOT NULL, `remark` varchar(2000) DEFAULT NULL, `current_round` int NOT NULL DEFAULT 1, `completion_remark` varchar(4000) DEFAULT NULL, `completion_attachment_ids_json` json DEFAULT NULL,
+ `idempotency_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
  `command_user_id` bigint NOT NULL, `request_fingerprint` varchar(64) NOT NULL,
  `return_reason` varchar(1000) DEFAULT NULL, `claimed_at` datetime DEFAULT NULL,
  `completed_at` datetime DEFAULT NULL, `accepted_at` datetime DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL,
- PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_order_no` (`tenant_id`,`order_no`),
+ PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_order_no` (`tenant_id`,`order_no`), UNIQUE KEY `uk_tenant_business` (`tenant_id`,`business_type`,`business_id`),
  UNIQUE KEY `uk_tenant_idempotency` (`tenant_id`,`idempotency_key`),
  KEY `idx_pool` (`tenant_id`,`scene_code`,`status`,`create_time`),
  KEY `idx_source_user` (`tenant_id`,`source_user_id`,`status`,`create_time`),
@@ -5598,7 +5663,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_work_order_history` (
  `work_order_id` bigint NOT NULL, `from_status` varchar(40) DEFAULT NULL, `to_status` varchar(40) NOT NULL,
  `operator_user_id` bigint NOT NULL, `reason` varchar(1000) DEFAULT NULL,
  `operated_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `idempotency_key` varchar(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL,
- `operation` varchar(32) NOT NULL, `request_fingerprint` varchar(64) NOT NULL,
+ `operation` varchar(32) NOT NULL, `request_fingerprint` varchar(64) NOT NULL, `round_no` int DEFAULT NULL, `result_remark` varchar(4000) DEFAULT NULL, `attachment_ids_json` json DEFAULT NULL,
  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
  `deleted` bit(1) NOT NULL DEFAULT b'0', `deleted_time` datetime DEFAULT NULL,

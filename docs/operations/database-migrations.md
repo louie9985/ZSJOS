@@ -517,18 +517,59 @@ V149 follows V147 and is the only migration for the requirement, BUG and technic
 workspace. V148 is intentionally skipped because that number is owned elsewhere. The migration adds
 `business_type` to the generic work-order table (`GENERIC` for existing records, `FEEDBACK` for this
 feature), six tenant-scoped feedback tables, menu/button metadata, four default BPM dynamic forms,
-feedback settings, the approved support-type dictionary, and four notification templates/rules.
+feedback settings, the approved support-type dictionary, and four original notification templates/rules.
 
 All schema and seed writes are additive and repeatable. Fixed menu IDs, routes, permissions, BPM form
 markers and dictionary identities are checked before writes; conflicts stop execution instead of
 overwriting existing administrator data. Existing feedback and work-order rows are never deleted or
 rebuilt. Both `zsjos_schema_version` and `zsjos_module_schema_version` record V149 with the file SHA-256.
 
+V149 exclusively reserves menu IDs `79940-79957`: `79940-79946` are the Workbench feedback page and
+buttons, while `79947-79957` are the Admin feedback root, pages and buttons. It must not reuse V148
+announcement IDs `79910-79912` or the V150/V151 Partner-manage ID `79920`.
+
 Before an existing-environment execution, review the migration plan, retain a database backup, and run
 the read-only checks in `script/sql/mysql/verify-bootstrap.sql`. Afterward verify the six tables,
 business-type index, binary idempotency keys, four forms/settings per enabled tenant, five dictionary
 values, menu/package coverage, notification defaults, and both version markers. Rollback is
 forward-only; retain feedback history, snapshots, surveys and notification messages.
+
+## V155 feedback ready-for-handling notification
+
+V155 is the deployed-environment repair for the missing dispatcher notification when a feedback record
+becomes actionable. It depends on V149 and fresh bootstrap executes it after V154. The migration inserts
+one `ZSJOS_FEEDBACK_READY_FOR_HANDLING` in-app template and adds a default
+`zsjos.feedback.ready_for_handling` rule only for enabled tenants that do not already have an active rule
+for that scene. Existing administrator-maintained rules, feedback rows and notification messages are
+preserved; historical feedback is not replayed.
+
+The migration is repeatable and forward-only, records both schema-version registries, and changes no
+schema or business rows. Validate the template identity, every enabled tenant's scene coverage and both
+version checks after controlled execution. Retirement disables the rules rather than deleting historical
+messages or version records.
+
+## V156 feedback number-counter repair
+
+V156 depends on V149 and V155. It repairs the feedback daily-counter metadata by taking the greatest valid
+persisted suffix for each tenant, date and feedback type from both `zsjos_feedback.feedback_no` and FEEDBACK
+work-order numbers. A missing counter is inserted and a lagging counter is raised; an already higher counter
+is never lowered. Existing feedback, work orders, business numbers, notification messages and configuration
+are unchanged.
+
+Because upgraded feedback and work-order tables can retain different `utf8mb4` collations, V156 parses and
+matches their business numbers and derived feedback types with binary exact comparisons. It does not alter
+the charset or collation of either source table, the counter table, or any stored business value.
+
+The runtime allocator no longer reads connection `LAST_INSERT_ID()`, which can expose the counter table's
+auto-increment primary key on the first insert. It atomically reserves the counter row, uses the current
+maximum persisted feedback work-order suffix as a lower bound, then reads `current_value` from the locked
+tenant/date/type row. V156 is repeatable, registers both version tables, and fresh bootstrap executes it
+after V155. Rollback must not lower counters because doing so can reissue an existing business number.
+
+Before controlled execution, audit the affected counter rows and matching feedback/work-order numbers and
+retain a backup. Afterward run `verify-bootstrap.sql` and confirm that no valid persisted suffix exceeds its
+counter. Re-executing V156 must leave aligned or leading counters unchanged.
+
 ### V150 claim-pool and Partner permissions
 
 `V150__claim_pool_read_and_partner_permissions.sql` depends on V143, does not require V149, and changes only
@@ -554,3 +595,16 @@ before deciding whether an idempotent rerun is sufficient. If an old permission 
 were copied, a rerun cannot infer those former grants; restore them only through a separately reviewed forward
 repair backed by the pre-migration export. Any destructive cleanup or permission rollback remains a separately
 reviewed operation.
+
+## V157 generic work-order center
+
+V157 is the non-destructive, repeatable migration for template drafts and immutable versions, controlled
+numbering, role/department qualification snapshots, unified generic/production envelopes, per-round attachment
+snapshots, and server-owned menus. It depends on V156 and is sourced by fresh bootstrap. The
+`zsjos_work_order_category` dictionary type is created without business values; no template, role, department,
+person or work-order instance is seeded.
+
+Before deployment, confirm menu IDs `79960-79978` and the dictionary type are not owned by another feature.
+After deployment run the V157 section of `verify-bootstrap.sql`, including version markers, tables, columns,
+unique extension identity, relative Workbench paths, empty category values, and tenant-package inheritance.
+Rollback is forward-only because published versions and work-order snapshots may reference the new schema.

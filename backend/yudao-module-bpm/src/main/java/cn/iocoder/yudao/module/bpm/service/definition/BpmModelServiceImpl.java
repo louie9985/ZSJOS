@@ -21,6 +21,7 @@ import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.BpmnModelUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.FlowableUtils;
 import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.SimpleModelUtils;
 import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceCopyService;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceRelationService;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import lombok.extern.slf4j.Slf4j;
@@ -77,6 +78,8 @@ public class BpmModelServiceImpl implements BpmModelService {
     private TaskService taskService;
     @Resource
     private BpmProcessInstanceCopyService processInstanceCopyService;
+    @Resource
+    private BpmProcessInstanceRelationService processInstanceRelationService;
 
     @Override
     public List<Model> getModelList(String name) {
@@ -258,6 +261,7 @@ public class BpmModelServiceImpl implements BpmModelService {
         validateBpmnXml(bpmnBytes, metaInfo.getType());
         // 1.3 校验表单已配
         BpmFormDO form = validateFormConfig(metaInfo);
+        validateRelationFieldOnlyOnStartForm(bpmnBytes, form);
         // 1.4 校验任务分配规则已配置
         taskCandidateInvoker.validateBpmnConfig(bpmnBytes);
         // 1.5 获取仿钉钉流程设计器模型数据
@@ -301,6 +305,20 @@ public class BpmModelServiceImpl implements BpmModelService {
         Integer candidateStrategy = parseCandidateStrategy(firUserTask);
         if (Objects.equals(candidateStrategy, BpmTaskCandidateStrategyEnum.APPROVE_USER_SELECT.getStrategy())) {
             throw exception(MODEL_DEPLOY_FAIL_FIRST_USER_TASK_CANDIDATE_STRATEGY_ERROR, firUserTask.getName());
+        }
+    }
+
+    private void validateRelationFieldOnlyOnStartForm(byte[] bpmnBytes, BpmFormDO form) {
+        if (form == null) return;
+        Set<String> relationFields = new HashSet<>(processInstanceRelationService.getRelationFields(form.getFields()));
+        if (relationFields.isEmpty()) return;
+        BpmnModel bpmnModel = BpmnModelUtils.getBpmnModel(bpmnBytes);
+        for (UserTask userTask : BpmnModelUtils.getBpmnModelElements(bpmnModel, UserTask.class)) {
+            Map<String, String> permissions = BpmnModelUtils.parseFormFieldsPermission(bpmnModel, userTask.getId());
+            if (permissions != null && relationFields.stream()
+                    .anyMatch(field -> Objects.equals("2", permissions.get(field)))) {
+                throw exception(MODEL_DEPLOY_FAIL_RELATION_TASK_FORM_UNSUPPORTED);
+            }
         }
     }
 

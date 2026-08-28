@@ -130,7 +130,11 @@ default and are updated only when the administrator explicitly requests migratio
 
 ## Menu and route flow
 
-Media-account stage is an operator-maintained dictionary snapshot rather than an enforced S0-S6 state
+Media-account stage is an operator-maintained dictionary snapshot rather than an enforced S0-S6 state.
+The current accepted service-relation operator is synchronized to the media-account
+operator owner in the same transaction as operator assignment; account maintenance still
+requires both the configured `zsjos:media-account:maintenance` permission and the account
+object relationship.
 machine. The current snapshot lives on the account and every actual change appends an immutable revision;
 the pre-existing stage log is retained as read-only legacy history. Maintenance requires both
 `zsjos:media-account:maintenance` and the account object relationship. Any changed maintenance field emits
@@ -517,14 +521,33 @@ The independent `zsjos:subordinate-sales:pause-all` command resolves that same l
 
 Partner ownership is an explicit ZSJOS relationship because Partner is an independent `PARTNER`
 subject and has no System department or post. One Partner has at most one current employee owner; an
-employee may own multiple Partners. `zsjos:partner:query` grants the consolidated Partner page but
-ordinary readers still see only Partners currently assigned to them. `zsjos:partner:manage` grants the
+employee may own multiple Partners. `zsjos:partner:query` grants the consolidated Partner page. Its object
+scope always includes the current employee and also includes enabled employees returned by the current
+System department data-permission projection, including configured child departments; no role or department
+name is interpreted as a supervisor. Unassigned Partners remain invisible to query-only users.
+`zsjos:partner:manage` grants the
 same page with tenant-wide Partner scope and the create, enable/disable, mobile, password and ownership
 commands. Every Partner and Partner-Lead detail request independently checks that scope. Reassignment
 moves all historical and future Partner Lead visibility to the new employee, while each new Partner Lead
 continues to snapshot the configured employee ID and name at submission time. Historical null snapshots
 remain `未记录` and are never inferred from the current relationship. The former subordinate-Partner
 permission and separate page are retired; their endpoints remain temporary rolling-release aliases.
+
+### BPM related-approval authorization
+
+`ProcessInstanceSelect` is a launch-form-only FormCreate system field. The deployed launch schema, rather
+than a second client-supplied relation payload, determines which `string[]` variables become frozen direct
+relations. A source can contain at most 20 unique targets per field, and every target must be a same-tenant
+historic instance started by the current ADMIN user. Validation completes before Flowable starts; relation
+rows and the new process instance share one transaction. External start subjects and task-node writable use
+of the component are rejected with stable BPM errors.
+
+Reading a relation never expands the ordinary process-detail object scope. Dedicated relation endpoints
+authorize against the source instance's actual participants: its ADMIN starter, historic or current task
+assignee/owner, and persisted copy recipient. Candidate-only users are excluded. The grant permits only a
+read-only aggregate and print projection of the direct target; it does not authorize target commands and
+does not propagate through a target's own relations. If Flowable history is later unavailable, the frozen
+snapshot remains visible with `detailAvailable=false`.
 
 The claim-pool page uses `zsjos:lead:claim-pool:query`, independently of the
 `zsjos:lead:claim` command. Read-only users can list and search tenant claim-pool records but cannot
@@ -626,6 +649,13 @@ submitted the record and how it entered the system for display, traceability and
 provider and performance attribution when the Lead first becomes countable. Provider permissions, provider
 notifications, cashback eligibility and media-screen statistics consume the canonical fields and do not fall
 back to current organization or Partner ownership.
+
+The realtime media-screen roster is a separate current-organization projection. It expands every configured
+new-media root through the System department API and displays every enabled user in those trees without role,
+post or contribution filters. The System cross-module department-roster API ignores the caller's data scope;
+ZSJOS then applies the configured media-screen tree. A transferred user appears only under the current root,
+while frozen contribution remains in its original root aggregate, so visible member totals need not reconcile
+to the department aggregate after a transfer.
 
 New-media operators and eligible managers freeze themselves as System providers. Sales self-sourced submissions
 freeze a System provider only when one was explicitly selected; an unselected provider remains `null`. Partner

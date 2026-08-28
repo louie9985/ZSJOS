@@ -136,7 +136,7 @@ const initProcessInfo = async (row: any, formVariables?: any) => {
         delete formVariables[key]
       }
     }
-    setConfAndFields2(detailForm, row.formConf, row.formFields, formVariables)
+    setConfAndFields2(detailForm, row.formConf, row.formFields, formVariables, { mode: 'create' })
 
     await nextTick()
     fApi.value?.btn.show(false) // 隐藏提交按钮

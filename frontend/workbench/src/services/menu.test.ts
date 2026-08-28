@@ -168,14 +168,42 @@ describe('workbench menu conversion', () => {
     ])
   })
 
+  it('keeps native work-order pages under a shared admin-embed center', () => {
+    const routes = filterRenderableMenus(buildMenuTree([
+      menu({
+        id: 79972,
+        name: '工单中心',
+        path: '/zsjos/work-orders',
+        workbenchRenderMode: 'admin_embed',
+        children: [
+          menu({ id: 79973, parentId: 79972, name: '工单模板', path: 'templates', workbenchRenderMode: 'admin_only' }),
+          menu({ id: 79977, parentId: 79972, name: '运行审计', path: 'audit', workbenchRenderMode: 'admin_only' }),
+          menu({ id: 79961, parentId: 79972, name: '发起工单', path: 'create', workbenchRenderMode: 'native' }),
+          menu({ id: 79962, parentId: 79972, name: '可接工单', path: 'available', workbenchRenderMode: 'native' }),
+          menu({ id: 79963, parentId: 79972, name: '我的工单', path: 'mine', workbenchRenderMode: 'native' })
+        ]
+      })
+    ]), RENDERABLE_APP_ROUTES)
+
+    expect(routes[0]?.name).toBe('工单中心')
+    expect(routes[0]?.children.map(child => child.path)).toEqual([
+      '/zsjos/work-orders/create',
+      '/zsjos/work-orders/available',
+      '/zsjos/work-orders/mine'
+    ])
+  })
+
   it('covers all server-owned page routes and excludes obsolete aliases', () => {
     // 迁移基线包含 HRM 员工设置、历史工资表和账号日历等正式服务端页面。
-    expect(RENDERABLE_APP_ROUTES.size).toBe(48)
+    expect(RENDERABLE_APP_ROUTES.size).toBe(52)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/media-students')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/calendar/overview')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/my-assets')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/asset-demands')).toBe(true)
     expect(RENDERABLE_APP_ROUTES.has('/zsjos/feedback')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/work-orders/create')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/work-orders/available')).toBe(true)
+    expect(RENDERABLE_APP_ROUTES.has('/zsjos/work-orders/mine')).toBe(true)
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/accounts')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/content')
     expect([...RENDERABLE_APP_ROUTES]).not.toContain('/zsjos/positioning')

@@ -160,6 +160,14 @@
 .feedback-modal-files { margin-top: var(--crm-sp-5); }
 .feedback-attachment-input { display: flex; flex-direction: column; align-items: flex-start; gap: var(--crm-sp-3); }
 .feedback-attachment-row { display: flex; align-items: center; justify-content: space-between; gap: var(--crm-sp-3); width: 100%; min-height: var(--crm-control-h); }
+.feedback-image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: var(--crm-sp-3); width: 100%; }
+.feedback-image-item { position: relative; display: grid; min-width: 0; grid-template-rows: 92px minmax(20px, auto); gap: var(--crm-sp-1); }
+.feedback-image-item .ant-image { width: 100%; height: 92px; overflow: hidden; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-sm); background: var(--crm-bg-sunken); }
+.feedback-image-item .ant-image-img { width: 100%; height: 100%; object-fit: cover; }
+.feedback-image-remove { position: absolute; top: var(--crm-sp-1); right: var(--crm-sp-1); background: color-mix(in srgb, var(--crm-bg-elevated) 90%, transparent); }
+.feedback-image-name { min-width: 0; text-align: center; }
+.feedback-image-missing { display: grid; min-width: 0; height: 92px; place-items: center; align-content: center; gap: var(--crm-sp-1); overflow: hidden; border: 1px solid var(--crm-border); border-radius: var(--crm-radius-sm); color: var(--crm-text-secondary); background: var(--crm-bg-sunken); }
+.feedback-image-missing span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .feedback-global-loading { position: fixed; inset: 0; z-index: var(--crm-z-above-modal); display: grid; place-items: center; background: var(--crm-bg-overlay); }
 
 @media (max-width: 900px) {

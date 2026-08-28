@@ -12,6 +12,9 @@ import java.util.Set;
  */
 public interface PermissionApi extends PermissionCommonApi {
 
+    /** Returns the enabled role ids currently assigned to the user. */
+    Set<Long> getEnabledRoleIdsByUserId(Long userId);
+
     /**
      * 获得拥有多个角色的用户编号集合
      *

@@ -24,11 +24,11 @@ import cn.iocoder.yudao.module.eam.enums.asset.EamChangeTypeEnum;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
 import cn.hutool.crypto.digest.DigestUtil;
 import org.springframework.dao.DuplicateKeyException;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -367,7 +367,7 @@ public class EamStockServiceImpl implements EamStockService {
         try {
             String canonical = objectMapper.writeValueAsString(new TreeMap<>(extFields == null ? Map.of() : extFields));
             return DigestUtil.sha256Hex(canonical);
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw exception(FIELD_VALUE_INVALID, "自定义字段");
         }
     }

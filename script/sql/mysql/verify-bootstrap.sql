@@ -109,7 +109,16 @@ SELECT 'media_account_maintenance_calendar' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=73603 AND parent_id=7022 AND type=3
                       AND permission='zsjos:media-account:maintenance' AND status=0 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback') AND status=0 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu rm JOIN system_menu m ON m.id=rm.menu_id
+                          WHERE rm.deleted=b'0' AND m.permission IN ('zsjos:media-account:stage-advance','zsjos:media-account:stage-rollback')
+                            AND m.deleted=b'0' AND m.status=0)
           AND EXISTS (SELECT 1 FROM system_notify_template WHERE code='ZSJOS_MEDIA_ACCOUNT_MAINTENANCE_CHANGED' AND deleted=b'0'), 'PASS','FAIL') AS result;
+SELECT 'media_account_operator_owner_sync' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V153')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_media_account ma JOIN zsjos_service_relation sr
+             ON sr.tenant_id=ma.tenant_id AND sr.person_id=ma.student_person_id
+             AND sr.status='active' AND sr.acceptance_status='accepted' AND sr.operator_user_id IS NOT NULL AND sr.deleted=b'0'
+             WHERE ma.deleted=b'0' AND ma.owner_operator_user_id<>sr.operator_user_id), 'PASS','FAIL') AS result;
 SELECT 'generic_work_order_schema' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V115')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V115')
@@ -120,6 +129,93 @@ SELECT 'generic_work_order_schema' AS check_name,
                  OR (table_name='zsjos_work_order_history' AND column_name IN ('operation','request_fingerprint'))))=4
           AND (SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema=DATABASE()
                AND table_name='zsjos_work_order' AND index_name IN ('idx_source_user','idx_target_user'))=8,
+          'PASS','FAIL') AS result;
+SELECT 'generic_work_order_idempotency_schema_repair' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V154')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V154')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_work_order'
+                 AND column_name IN ('command_user_id','request_fingerprint')
+                 AND is_nullable='NO')=2
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_work_order_history'
+                 AND column_name IN ('operation','request_fingerprint')
+                 AND is_nullable='NO')=2
+          AND NOT EXISTS (SELECT 1 FROM zsjos_work_order
+                          WHERE command_user_id IS NULL OR request_fingerprint IS NULL
+                             OR request_fingerprint='')
+          AND NOT EXISTS (SELECT 1 FROM zsjos_work_order_history
+                          WHERE operation IS NULL OR operation=''
+                             OR request_fingerprint IS NULL OR request_fingerprint=''),
+          'PASS','FAIL') AS result;
+SELECT 'feedback_ready_notification' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V155'
+                    AND checksum=SHA2('V155__feedback_ready_notification.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V155'
+                        AND checksum=SHA2('V155__feedback_ready_notification.sql',256))
+          AND EXISTS (SELECT 1 FROM system_notify_template
+                      WHERE code='ZSJOS_FEEDBACK_READY_FOR_HANDLING'
+                        AND scene_code='zsjos.feedback.ready_for_handling'
+                        AND type=2 AND status=0 AND deleted=b'0')
+          AND NOT EXISTS (
+            SELECT 1 FROM system_tenant tenant
+            WHERE tenant.deleted=b'0' AND tenant.status=0
+              AND NOT EXISTS (
+                SELECT 1 FROM system_notify_rule rule_row
+                WHERE rule_row.tenant_id=tenant.id
+                  AND rule_row.scene_code='zsjos.feedback.ready_for_handling'
+                  AND rule_row.deleted=b'0'))
+          AND NOT EXISTS (
+            SELECT 1 FROM system_notify_rule rule_row
+            WHERE rule_row.creator='migration-V155'
+              AND rule_row.scene_code='zsjos.feedback.ready_for_handling'
+              AND rule_row.deleted=b'0'
+              AND (rule_row.channel_code<>'in_app'
+                OR NOT JSON_CONTAINS(rule_row.recipient_roles,'"dispatcher"','$'))),
+           'PASS','FAIL') AS result;
+SELECT 'feedback_number_counter_repair' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version
+                  WHERE version='V156'
+                    AND checksum=SHA2('V156__repair_feedback_number_counter.sql',256))
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+                      WHERE module_code='core' AND version='V156'
+                        AND checksum=SHA2('V156__repair_feedback_number_counter.sql',256))
+          AND NOT EXISTS (
+            SELECT 1
+            FROM (
+              SELECT parsed.tenant_id,parsed.sequence_date,parsed.feedback_type,
+                     MAX(parsed.sequence_value) AS required_value
+              FROM (
+                SELECT source_row.tenant_id,
+                       STR_TO_DATE(SUBSTRING(source_row.number_value,5,8),'%Y%m%d') AS sequence_date,
+                       CASE SUBSTRING(source_row.number_value,1,3)
+                         WHEN BINARY 'REQ' THEN BINARY 'REQUIREMENT'
+                         WHEN BINARY 'BUG' THEN BINARY 'BUG'
+                         WHEN BINARY 'SUP' THEN BINARY 'SUPPORT'
+                       END AS feedback_type,
+                       CAST(SUBSTRING(source_row.number_value,14) AS UNSIGNED) AS sequence_value,
+                       source_row.number_value
+                FROM (
+                  SELECT tenant_id,CAST(feedback_no AS BINARY) AS number_value FROM zsjos_feedback
+                  UNION ALL
+                  SELECT tenant_id,CAST(order_no AS BINARY) AS number_value FROM zsjos_work_order
+                  WHERE CAST(business_type AS BINARY)=BINARY 'FEEDBACK'
+                ) source_row
+                WHERE source_row.number_value REGEXP BINARY '^(REQ|BUG|SUP)-[0-9]{8}-[0-9]+$'
+              ) parsed
+              WHERE parsed.sequence_date IS NOT NULL
+                AND CAST(DATE_FORMAT(parsed.sequence_date,'%Y%m%d') AS BINARY)=SUBSTRING(parsed.number_value,5,8)
+              GROUP BY parsed.tenant_id,parsed.sequence_date,parsed.feedback_type
+            ) required_counter
+            LEFT JOIN zsjos_feedback_no_daily_counter counter_row
+              ON counter_row.tenant_id=required_counter.tenant_id
+             AND counter_row.sequence_date=required_counter.sequence_date
+             AND CAST(counter_row.feedback_type AS BINARY)=required_counter.feedback_type
+            WHERE counter_row.id IS NULL OR counter_row.deleted=b'1'
+               OR counter_row.current_value<required_counter.required_value),
           'PASS','FAIL') AS result;
 SELECT 'student_delivery_stages_checksums' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V114' AND checksum='student-delivery-stages-v6')
@@ -1685,20 +1781,19 @@ SELECT 'V149 feedback support dictionary' AS check_name,
 
 SELECT 'V149 feedback menus and permissions' AS check_name,
        IF((SELECT COUNT(*) FROM system_menu
-           WHERE id IN (79910,79911,79912,79913,79914,79915,79916,
-                        79920,79921,79922,79923,79924,79925,79926,79927,79928,79929,79930)
+           WHERE id BETWEEN 79940 AND 79957
              AND status=0 AND deleted=b'0')=18
           AND EXISTS (SELECT 1 FROM system_menu
-                      WHERE id=79910 AND parent_id=6735 AND path='feedback'
+                      WHERE id=79940 AND parent_id=6735 AND path='feedback'
                         AND component='zsjos/feedback/index'
                         AND permission='zsjos:feedback:query'
                         AND workbench_render_mode='native' AND type=2 AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu
-                      WHERE id=79920 AND parent_id=0 AND path='feedback-management'
+                      WHERE id=79947 AND parent_id=0 AND path='feedback-management'
                         AND workbench_render_mode='admin_only' AND type=1 AND deleted=b'0')
           AND (SELECT COUNT(DISTINCT permission) FROM system_menu
-               WHERE id IN (79910,79911,79912,79913,79914,79915,79916,
-                            79921,79922,79923,79924,79925,79926,79927,79928,79929,79930)
+               WHERE id IN (79940,79941,79942,79943,79944,79945,79946,
+                            79948,79949,79950,79951,79952,79953,79954,79955,79956,79957)
                  AND permission LIKE 'zsjos:feedback:%' AND deleted=b'0')=17,
           'PASS','FAIL') AS result;
 
@@ -1707,12 +1802,12 @@ SELECT 'V149 feedback tenant-package coverage' AS check_name,
             SELECT 1 FROM system_tenant_package package
             WHERE package.deleted=b'0' AND JSON_CONTAINS(package.menu_ids,'6735','$')
               AND (SELECT COUNT(*)
-                   FROM (SELECT 79910 AS menu_id UNION ALL SELECT 79911 UNION ALL SELECT 79912
-                         UNION ALL SELECT 79913 UNION ALL SELECT 79914 UNION ALL SELECT 79915
-                         UNION ALL SELECT 79916 UNION ALL SELECT 79920 UNION ALL SELECT 79921
-                         UNION ALL SELECT 79922 UNION ALL SELECT 79923 UNION ALL SELECT 79924
-                         UNION ALL SELECT 79925 UNION ALL SELECT 79926 UNION ALL SELECT 79927
-                         UNION ALL SELECT 79928 UNION ALL SELECT 79929 UNION ALL SELECT 79930) expected
+                   FROM (SELECT 79940 AS menu_id UNION ALL SELECT 79941 UNION ALL SELECT 79942
+                         UNION ALL SELECT 79943 UNION ALL SELECT 79944 UNION ALL SELECT 79945
+                         UNION ALL SELECT 79946 UNION ALL SELECT 79947 UNION ALL SELECT 79948
+                         UNION ALL SELECT 79949 UNION ALL SELECT 79950 UNION ALL SELECT 79951
+                         UNION ALL SELECT 79952 UNION ALL SELECT 79953 UNION ALL SELECT 79954
+                         UNION ALL SELECT 79955 UNION ALL SELECT 79956 UNION ALL SELECT 79957) expected
                    WHERE JSON_CONTAINS(package.menu_ids,CAST(expected.menu_id AS JSON),'$'))<>18),
           'PASS','FAIL') AS result;
 
@@ -1726,9 +1821,11 @@ SELECT 'V149 feedback notification defaults' AS check_name,
             WHERE tenant.deleted=b'0' AND tenant.status=0
               AND (SELECT COUNT(DISTINCT rule_row.scene_code) FROM system_notify_rule rule_row
                    WHERE rule_row.tenant_id=tenant.id AND rule_row.deleted=b'0'
-                     AND rule_row.scene_code IN (
-                       'zsjos.feedback.employee_replied','zsjos.feedback.admin_replied',
-                       'zsjos.feedback.completed','zsjos.feedback.survey_requested'))<4),
+                      AND rule_row.scene_code IN (
+                        'zsjos.feedback.employee_replied','zsjos.feedback.admin_replied',
+                        'zsjos.feedback.completed','zsjos.feedback.survey_requested'))<4),
+          'PASS','FAIL') AS result;
+
 SELECT 'V148 durable employee announcements' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V148')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
@@ -1773,4 +1870,64 @@ SELECT 'V150 claim-pool read and Partner permissions' AS check_name,
             JOIN system_menu menu_row ON menu_row.id=grant_row.menu_id
               AND menu_row.permission='zsjos:lead:claim' AND menu_row.deleted=b'0'
             WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V151 Partner administrator manage permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V151')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V151')
+          AND NOT EXISTS (SELECT 1 FROM system_role role_row
+            WHERE role_row.code='system_administrator' AND role_row.status=0 AND role_row.deleted=b'0'
+              AND (NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
+                    WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
+                      AND grant_row.menu_id=6852 AND grant_row.deleted=b'0')
+                OR NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
+                    WHERE grant_row.role_id=role_row.id AND grant_row.tenant_id=role_row.tenant_id
+                      AND grant_row.menu_id=79920 AND grant_row.deleted=b'0'))),
+          'PASS','FAIL') AS result;
+
+SELECT 'V152 BPM process instance relation schema' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V152')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V152')
+          AND EXISTS (SELECT 1 FROM information_schema.tables
+            WHERE table_schema=DATABASE() AND table_name='bpm_process_instance_relation')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+            WHERE table_schema=DATABASE() AND table_name='bpm_process_instance_relation'
+              AND column_name IN ('tenant_id','source_process_instance_id','target_process_instance_id',
+                'form_field','sort','target_name_snapshot','target_process_definition_id_snapshot',
+                'target_process_definition_name_snapshot','target_display_no_snapshot',
+                'target_business_key_snapshot','target_start_user_name_snapshot','target_start_time_snapshot',
+                'creator','create_time','updater','update_time','deleted'))=17
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+            WHERE table_schema=DATABASE() AND table_name='bpm_process_instance_relation'
+              AND index_name='uk_bpm_relation_source_field_target' AND non_unique=0)
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+            WHERE table_schema=DATABASE() AND table_name='bpm_process_instance_relation'
+              AND index_name='idx_bpm_relation_source_field_sort')
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+            WHERE table_schema=DATABASE() AND table_name='bpm_process_instance_relation'
+              AND index_name='idx_bpm_relation_target'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V157 generic work-order center schema and menus' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V157')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V157')
+          AND (SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+            AND table_name IN ('zsjos_work_order_scene_version','zsjos_work_order_number_counter','zsjos_work_order_attachment'))=3
+          AND (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='zsjos_work_order'
+            AND column_name IN ('business_id','scene_version_id','processor_type','target_dept_id','current_round',
+              'rejection_strategy_snapshot','candidate_qualification_mode','candidate_role_scopes_json','candidate_dept_scopes_json'))=9
+          AND EXISTS (SELECT 1 FROM information_schema.statistics WHERE table_schema=DATABASE()
+            AND table_name='zsjos_work_order' AND index_name='uk_tenant_business' AND non_unique=0)
+          AND EXISTS (SELECT 1 FROM system_dict_type WHERE type='zsjos_work_order_category' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_dict_data WHERE dict_type='zsjos_work_order_category' AND deleted=b'0')
+          AND (SELECT COUNT(*) FROM system_menu WHERE id BETWEEN 79960 AND 79978 AND deleted=b'0')=18
+          AND NOT EXISTS (SELECT 1 FROM system_menu WHERE id=79960 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79972 AND name='工单中心' AND parent_id=0
+            AND path='/zsjos/work-orders' AND workbench_render_mode='admin_embed' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79961 AND parent_id=79972 AND path='create' AND workbench_render_mode='native' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79962 AND parent_id=79972 AND path='available' AND workbench_render_mode='native' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79963 AND parent_id=79972 AND path='mine' AND workbench_render_mode='native' AND deleted=b'0')
+          AND (SELECT COUNT(*) FROM system_menu WHERE id IN (79973,79977) AND workbench_render_mode='admin_only' AND deleted=b'0')=2,
           'PASS','FAIL') AS result;

@@ -93,6 +93,14 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
                 .orderByDesc(MediaAccountDO::getUpdateTime).orderByDesc(MediaAccountDO::getId));
     }
 
+    default int updateOwnerOperator(Long id, Long operatorUserId, Integer version) {
+        return update(null, new LambdaUpdateWrapper<MediaAccountDO>()
+                .eq(MediaAccountDO::getId, id)
+                .eq(MediaAccountDO::getVersion, version)
+                .set(MediaAccountDO::getOwnerOperatorUserId, operatorUserId)
+                .set(MediaAccountDO::getVersion, version + 1));
+    }
+
     default List<MediaAccountDO> selectRecentByParticipantAndStudent(Long userId, Long studentPersonId) {
         return selectList(new LambdaQueryWrapperX<MediaAccountDO>()
                 .eq(MediaAccountDO::getStudentPersonId, studentPersonId)
@@ -141,15 +149,6 @@ public interface MediaAccountMapper extends BaseMapperX<MediaAccountDO> {
     long countParticipantByLead(@Param("userId") Long userId, @Param("leadId") Long leadId,
                                 @Param("tenantId") Long tenantId);
 
-    default int updateStage(Long id, Integer version, String fromStage, String toStage, String stageVersion,
-                            Long judgedByUserId, java.time.LocalDateTime enteredAt) {
-        return update(null, new LambdaUpdateWrapper<MediaAccountDO>()
-                .eq(MediaAccountDO::getId, id).eq(MediaAccountDO::getVersion, version)
-                .eq(MediaAccountDO::getSStage, fromStage)
-                .set(MediaAccountDO::getSStage, toStage).set(MediaAccountDO::getSStageVersion, stageVersion)
-                .set(MediaAccountDO::getSStageJudgedByUserId, judgedByUserId)
-                .set(MediaAccountDO::getSStageEnteredAt, enteredAt).set(MediaAccountDO::getVersion, version + 1));
-    }
     default int updateProfile(MediaAccountDO account, Integer version) {
         account.setVersion(version + 1);
         return update(account, new LambdaUpdateWrapper<MediaAccountDO>().eq(MediaAccountDO::getId, account.getId()).eq(MediaAccountDO::getVersion, version));

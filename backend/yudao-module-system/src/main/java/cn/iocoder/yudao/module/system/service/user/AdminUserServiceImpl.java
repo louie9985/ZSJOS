@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserImportEx
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserImportRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCandidatePageReqDTO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.UserPostDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
@@ -42,6 +43,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -92,6 +94,26 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     @Resource
     private AdminUserProducer adminUserProducer;
+
+    @Override
+    public PageResult<AdminUserDO> getCandidateUserPage(AdminUserCandidatePageReqDTO reqDTO) {
+        String mode = reqDTO.getQualificationMode();
+        if (!("ROLE".equals(mode) || "DEPARTMENT".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode))) {
+            return PageResult.empty();
+        }
+        if (("ROLE".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode)) && CollUtil.isEmpty(reqDTO.getRoleIds())) {
+            return PageResult.empty();
+        }
+        if (("DEPARTMENT".equals(mode) || "ROLE_AND_DEPARTMENT".equals(mode)) && CollUtil.isEmpty(reqDTO.getDeptIds())) {
+            return PageResult.empty();
+        }
+        int pageNo = Math.max(1, Objects.requireNonNullElse(reqDTO.getPageNo(), 1));
+        int pageSize = Math.min(100, Math.max(1, Objects.requireNonNullElse(reqDTO.getPageSize(), 20)));
+        Page<AdminUserDO> page = new Page<>(pageNo, pageSize);
+        userMapper.selectCandidatePage(page, mode, reqDTO.getRoleIds(), reqDTO.getDeptIds(),
+                StrUtil.trim(reqDTO.getKeyword()));
+        return new PageResult<>(page.getRecords(), page.getTotal());
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

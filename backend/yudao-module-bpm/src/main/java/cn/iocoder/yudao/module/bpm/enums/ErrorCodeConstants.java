@@ -46,6 +46,14 @@ public interface ErrorCodeConstants {
     ErrorCode PROCESS_INSTANCE_HTTP_CALL_ERROR = new ErrorCode(1_009_004_006, "流程 Http 请求调用失败");
     ErrorCode PROCESS_INSTANCE_APPROVE_USER_SELECT_ASSIGNEES_NOT_CONFIG = new ErrorCode(1_009_004_007, "下一个任务({})的审批人未配置");
     ErrorCode PROCESS_INSTANCE_CANCEL_CHILD_FAIL_NOT_ALLOW = new ErrorCode(1_009_004_008, "子流程取消失败，子流程不允许取消");
+    ErrorCode PROCESS_INSTANCE_RELATION_VALUE_INVALID = new ErrorCode(1_009_004_012, "关联审批字段({})必须是非空字符串编号数组");
+    ErrorCode PROCESS_INSTANCE_RELATION_TOO_MANY = new ErrorCode(1_009_004_013, "关联审批单最多选择{}条");
+    ErrorCode PROCESS_INSTANCE_RELATION_DUPLICATE = new ErrorCode(1_009_004_014, "关联审批单({})重复");
+    ErrorCode PROCESS_INSTANCE_RELATION_TARGET_FORBIDDEN = new ErrorCode(1_009_004_015, "关联审批单({})不存在或不是当前用户发起");
+    ErrorCode PROCESS_INSTANCE_RELATION_EXTERNAL_UNSUPPORTED = new ErrorCode(1_009_004_016, "外部主体不支持关联审批单");
+    ErrorCode PROCESS_INSTANCE_RELATION_NOT_EXISTS = new ErrorCode(1_009_004_017, "关联审批记录不存在");
+    ErrorCode PROCESS_INSTANCE_RELATION_FORBIDDEN = new ErrorCode(1_009_004_018, "无权查看该关联审批记录");
+    ErrorCode MODEL_DEPLOY_FAIL_RELATION_TASK_FORM_UNSUPPORTED = new ErrorCode(1_009_002_010, "部署流程失败，关联审批单仅支持发起表单，不能用于任务节点表单");
 
     // ========== 流程任务 1-009-005-000 ==========
     ErrorCode TASK_OPERATE_FAIL_ASSIGN_NOT_SELF = new ErrorCode(1_009_005_001, "操作失败，原因：该任务的审批人不是你");

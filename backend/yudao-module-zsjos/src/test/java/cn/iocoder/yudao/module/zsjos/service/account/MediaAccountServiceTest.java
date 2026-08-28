@@ -8,11 +8,13 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 
 import java.util.List;
 import java.util.Map;
@@ -20,8 +22,6 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,9 +36,11 @@ class MediaAccountServiceTest {
     @Mock private AdminUserApi adminUserApi;
     @Mock private MediaAccountFieldConfigService fieldConfigService;
     @Mock private MediaAccountObjectPermissionProvider objectPermissionProvider;
+    @Mock private ServiceRelationMapper relationMapper;
 
     @Test
     void ordinaryCreatorIsBoundAsDirectorAndSnapshotsConfiguredDetails() {
+        TenantContextHolder.setTenantId(1L);
         MediaAccountSaveReqVO request = new MediaAccountSaveReqVO();
         request.setStudentPersonId(40L); request.setDirectorUserId(999L);
         request.setPlatformValue("douyin"); request.setPlatformLabelSnapshot("抖音");
@@ -63,16 +65,6 @@ class MediaAccountServiceTest {
                         && account.getNickname().equals("中世健课堂")
                         && account.getDetailConfigVersionId().equals(12L)));
         verify(adminUserApi).validateUser(248L);
-    }
-
-    @Test
-    void legacyStageCommandsReturnTheRetiredContractError() {
-        ServiceException advance = assertThrows(ServiceException.class,
-                () -> service.advanceStage(1L, "s2", 0, "{}", "legacy", "advance", 20L));
-        ServiceException rollback = assertThrows(ServiceException.class,
-                () -> service.rollbackStage(1L, "s0", 0, "{}", "legacy", "rollback", 20L));
-        assertEquals(1_900_011_012, advance.getCode());
-        assertEquals(1_900_011_012, rollback.getCode());
     }
 
     @Test

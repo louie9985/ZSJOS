@@ -50,41 +50,41 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM `system_menu`
-    WHERE (`id` = 79910 AND (`type` <> 2 OR `parent_id` <> 6735 OR `path` <> 'feedback'
+    WHERE (`id` = 79940 AND (`type` <> 2 OR `parent_id` <> 6735 OR `path` <> 'feedback'
             OR NOT (`component` <=> 'zsjos/feedback/index')
             OR NOT (`permission` <=> 'zsjos:feedback:query')))
-       OR (`id` = 79911 AND (`type` <> 3 OR `parent_id` <> 79910
+       OR (`id` = 79941 AND (`type` <> 3 OR `parent_id` <> 79940
             OR `permission` <> 'zsjos:feedback:requirement:create'))
-       OR (`id` = 79912 AND (`type` <> 3 OR `parent_id` <> 79910
+       OR (`id` = 79942 AND (`type` <> 3 OR `parent_id` <> 79940
             OR `permission` <> 'zsjos:feedback:bug:create'))
-       OR (`id` = 79913 AND (`type` <> 3 OR `parent_id` <> 79910
+       OR (`id` = 79943 AND (`type` <> 3 OR `parent_id` <> 79940
             OR `permission` <> 'zsjos:feedback:support:create'))
-       OR (`id` = 79914 AND (`type` <> 3 OR `parent_id` <> 79910
+       OR (`id` = 79944 AND (`type` <> 3 OR `parent_id` <> 79940
             OR `permission` <> 'zsjos:feedback:reply-self'))
-       OR (`id` = 79915 AND (`type` <> 3 OR `parent_id` <> 79910
+       OR (`id` = 79945 AND (`type` <> 3 OR `parent_id` <> 79940
             OR `permission` <> 'zsjos:feedback:survey:submit'))
-       OR (`id` = 79916 AND (`type` <> 3 OR `parent_id` <> 79910
+       OR (`id` = 79946 AND (`type` <> 3 OR `parent_id` <> 79940
             OR `permission` <> 'zsjos:feedback:read'))
-       OR (`id` = 79920 AND (`type` <> 1 OR `parent_id` <> 0 OR `path` <> 'feedback-management'))
-       OR (`id` = 79921 AND (`type` <> 2 OR `parent_id` <> 79920 OR `path` <> 'requirements'
+       OR (`id` = 79947 AND (`type` <> 1 OR `parent_id` <> 0 OR `path` <> '/feedback-management'))
+       OR (`id` = 79948 AND (`type` <> 2 OR `parent_id` <> 79947 OR `path` <> 'requirements'
             OR `permission` <> 'zsjos:feedback:requirement:manage'))
-       OR (`id` = 79922 AND (`type` <> 2 OR `parent_id` <> 79920 OR `path` <> 'bugs'
+       OR (`id` = 79949 AND (`type` <> 2 OR `parent_id` <> 79947 OR `path` <> 'bugs'
             OR `permission` <> 'zsjos:feedback:bug:manage'))
-       OR (`id` = 79923 AND (`type` <> 2 OR `parent_id` <> 79920 OR `path` <> 'support'
+       OR (`id` = 79950 AND (`type` <> 2 OR `parent_id` <> 79947 OR `path` <> 'support'
             OR `permission` <> 'zsjos:feedback:support:manage'))
-       OR (`id` = 79924 AND (`type` <> 2 OR `parent_id` <> 79920 OR `path` <> 'settings'
+       OR (`id` = 79951 AND (`type` <> 2 OR `parent_id` <> 79947 OR `path` <> 'settings'
             OR `permission` <> 'zsjos:feedback:settings'))
-       OR (`id` = 79925 AND (`type` <> 3 OR `parent_id` <> 79920
+       OR (`id` = 79952 AND (`type` <> 3 OR `parent_id` <> 79947
             OR `permission` <> 'zsjos:feedback:query-admin'))
-       OR (`id` = 79926 AND (`type` <> 3 OR `parent_id` <> 79920
+       OR (`id` = 79953 AND (`type` <> 3 OR `parent_id` <> 79947
             OR `permission` <> 'zsjos:feedback:assign'))
-       OR (`id` = 79927 AND (`type` <> 3 OR `parent_id` <> 79920
+       OR (`id` = 79954 AND (`type` <> 3 OR `parent_id` <> 79947
             OR `permission` <> 'zsjos:feedback:reply'))
-       OR (`id` = 79928 AND (`type` <> 3 OR `parent_id` <> 79920
+       OR (`id` = 79955 AND (`type` <> 3 OR `parent_id` <> 79947
             OR `permission` <> 'zsjos:feedback:complete'))
-       OR (`id` = 79929 AND (`type` <> 3 OR `parent_id` <> 79920
+       OR (`id` = 79956 AND (`type` <> 3 OR `parent_id` <> 79947
             OR `permission` <> 'zsjos:feedback:survey'))
-       OR (`id` = 79930 AND (`type` <> 3 OR `parent_id` <> 79920
+       OR (`id` = 79957 AND (`type` <> 3 OR `parent_id` <> 79947
             OR `permission` <> 'zsjos:feedback:settings:save'))
   ) THEN
     SIGNAL SQLSTATE '45000'
@@ -93,7 +93,7 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM `system_menu`
-    WHERE `deleted` = b'0' AND `id` NOT BETWEEN 79910 AND 79930
+    WHERE `deleted` = b'0' AND `id` NOT BETWEEN 79940 AND 79957
       AND `permission` IN (
         'zsjos:feedback:query',
         'zsjos:feedback:requirement:create',
@@ -120,12 +120,12 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM `system_menu`
-    WHERE `deleted` = b'0' AND `id` <> 79910
+    WHERE `deleted` = b'0' AND `id` <> 79940
       AND `parent_id` = 6735 AND `path` = 'feedback'
   ) OR EXISTS (
     SELECT 1 FROM `system_menu`
-    WHERE `deleted` = b'0' AND `id` <> 79920
-      AND `parent_id` = 0 AND `path` = 'feedback-management'
+    WHERE `deleted` = b'0' AND `id` <> 79947
+      AND `parent_id` = 0 AND `path` = '/feedback-management'
   ) THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'A V149 feedback route already uses another menu ID';
@@ -133,7 +133,7 @@ BEGIN
 
   IF EXISTS (
     SELECT 1 FROM `system_menu`
-    WHERE `id` BETWEEN 79910 AND 79930 AND `deleted` = b'1'
+    WHERE `id` BETWEEN 79940 AND 79957 AND `deleted` = b'1'
   ) THEN
     SIGNAL SQLSTATE '45000'
       SET MESSAGE_TEXT = 'A V149 feedback menu ID is retired; review before restoring it';
@@ -468,120 +468,120 @@ SELECT seed.`id`,seed.`name`,seed.`permission`,seed.`type`,seed.`sort`,seed.`par
        seed.`icon`,seed.`component`,seed.`component_name`,seed.`render_mode`,0,b'1',b'1',b'1',
        'migration-V149',NOW(),'migration-V149',NOW(),b'0'
 FROM (
-  SELECT 79910 AS `id`,'需求与反馈' AS `name`,'zsjos:feedback:query' AS `permission`,
+  SELECT 79940 AS `id`,'需求与反馈' AS `name`,'zsjos:feedback:query' AS `permission`,
          2 AS `type`,40 AS `sort`,6735 AS `parent_id`,'feedback' AS `path`,
          'ep:chat-line-square' AS `icon`,'zsjos/feedback/index' AS `component`,
          'ZsjosFeedback' AS `component_name`,'native' AS `render_mode`
-  UNION ALL SELECT 79911,'创建需求','zsjos:feedback:requirement:create',3,1,79910,'','','',NULL,'native'
-  UNION ALL SELECT 79912,'创建 BUG 反馈','zsjos:feedback:bug:create',3,2,79910,'','','',NULL,'native'
-  UNION ALL SELECT 79913,'创建技术支持','zsjos:feedback:support:create',3,3,79910,'','','',NULL,'native'
-  UNION ALL SELECT 79914,'员工回复反馈','zsjos:feedback:reply-self',3,4,79910,'','','',NULL,'native'
-  UNION ALL SELECT 79915,'提交满意度','zsjos:feedback:survey:submit',3,5,79910,'','','',NULL,'native'
-  UNION ALL SELECT 79916,'查看本人反馈','zsjos:feedback:read',3,6,79910,'','','',NULL,'native'
-  UNION ALL SELECT 79920,'反馈管理','',1,40,0,'feedback-management','ep:service','',NULL,'admin_only'
-  UNION ALL SELECT 79921,'需求管理','zsjos:feedback:requirement:manage',2,1,79920,'requirements','ep:document','zsjos/feedback/requirement','ZsjosFeedbackRequirement','admin_only'
-  UNION ALL SELECT 79922,'BUG 管理','zsjos:feedback:bug:manage',2,2,79920,'bugs','ep:warning','zsjos/feedback/bug','ZsjosFeedbackBug','admin_only'
-  UNION ALL SELECT 79923,'技术支持','zsjos:feedback:support:manage',2,3,79920,'support','ep:question-filled','zsjos/feedback/support','ZsjosFeedbackSupport','admin_only'
-  UNION ALL SELECT 79924,'反馈设置','zsjos:feedback:settings',2,4,79920,'settings','ep:setting','zsjos/feedback/settings','ZsjosFeedbackSettings','admin_only'
-  UNION ALL SELECT 79925,'查询反馈','zsjos:feedback:query-admin',3,1,79920,'','','',NULL,'admin_only'
-  UNION ALL SELECT 79926,'分派反馈','zsjos:feedback:assign',3,2,79920,'','','',NULL,'admin_only'
-  UNION ALL SELECT 79927,'回复反馈','zsjos:feedback:reply',3,3,79920,'','','',NULL,'admin_only'
-  UNION ALL SELECT 79928,'完成反馈','zsjos:feedback:complete',3,4,79920,'','','',NULL,'admin_only'
-  UNION ALL SELECT 79929,'发起满意度','zsjos:feedback:survey',3,5,79920,'','','',NULL,'admin_only'
-  UNION ALL SELECT 79930,'保存反馈设置','zsjos:feedback:settings:save',3,6,79920,'','','',NULL,'admin_only'
+  UNION ALL SELECT 79941,'创建需求','zsjos:feedback:requirement:create',3,1,79940,'','','',NULL,'native'
+  UNION ALL SELECT 79942,'创建 BUG 反馈','zsjos:feedback:bug:create',3,2,79940,'','','',NULL,'native'
+  UNION ALL SELECT 79943,'创建技术支持','zsjos:feedback:support:create',3,3,79940,'','','',NULL,'native'
+  UNION ALL SELECT 79944,'员工回复反馈','zsjos:feedback:reply-self',3,4,79940,'','','',NULL,'native'
+  UNION ALL SELECT 79945,'提交满意度','zsjos:feedback:survey:submit',3,5,79940,'','','',NULL,'native'
+  UNION ALL SELECT 79946,'查看本人反馈','zsjos:feedback:read',3,6,79940,'','','',NULL,'native'
+  UNION ALL SELECT 79947,'反馈管理','',1,40,0,'/feedback-management','ep:service','',NULL,'admin_only'
+  UNION ALL SELECT 79948,'需求管理','zsjos:feedback:requirement:manage',2,1,79947,'requirements','ep:document','zsjos/feedback/requirement','ZsjosFeedbackRequirement','admin_only'
+  UNION ALL SELECT 79949,'BUG 管理','zsjos:feedback:bug:manage',2,2,79947,'bugs','ep:warning','zsjos/feedback/bug','ZsjosFeedbackBug','admin_only'
+  UNION ALL SELECT 79950,'技术支持','zsjos:feedback:support:manage',2,3,79947,'support','ep:question-filled','zsjos/feedback/support','ZsjosFeedbackSupport','admin_only'
+  UNION ALL SELECT 79951,'反馈设置','zsjos:feedback:settings',2,4,79947,'settings','ep:setting','zsjos/feedback/settings','ZsjosFeedbackSettings','admin_only'
+  UNION ALL SELECT 79952,'查询反馈','zsjos:feedback:query-admin',3,1,79947,'','','',NULL,'admin_only'
+  UNION ALL SELECT 79953,'分派反馈','zsjos:feedback:assign',3,2,79947,'','','',NULL,'admin_only'
+  UNION ALL SELECT 79954,'回复反馈','zsjos:feedback:reply',3,3,79947,'','','',NULL,'admin_only'
+  UNION ALL SELECT 79955,'完成反馈','zsjos:feedback:complete',3,4,79947,'','','',NULL,'admin_only'
+  UNION ALL SELECT 79956,'发起满意度','zsjos:feedback:survey',3,5,79947,'','','',NULL,'admin_only'
+  UNION ALL SELECT 79957,'保存反馈设置','zsjos:feedback:settings:save',3,6,79947,'','','',NULL,'admin_only'
 ) seed
 WHERE NOT EXISTS (SELECT 1 FROM `system_menu` existing WHERE existing.`id` = seed.`id`);
 
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79910),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79940),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79910', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79940', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79911),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79941),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79911', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79941', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79912),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79942),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79912', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79942', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79913),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79943),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79913', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79943', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79914),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79944),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79914', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79944', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79915),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79945),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79915', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79945', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79916),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79946),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79916', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79946', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79920),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79947),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79920', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79947', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79921),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79948),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79921', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79948', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79922),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79949),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79922', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79949', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79923),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79950),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79923', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79950', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79924),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79951),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79924', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79951', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79925),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79952),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79925', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79952', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79926),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79953),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79926', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79953', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79927),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79954),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79927', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79954', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79928),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79955),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79928', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79955', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79929),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79956),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79929', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79956', '$');
 UPDATE `system_tenant_package` package
-SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79930),
+SET package.`menu_ids` = JSON_ARRAY_APPEND(package.`menu_ids`, '$', 79957),
     package.`updater` = 'migration-V149', package.`update_time` = NOW()
 WHERE package.`deleted` = b'0' AND JSON_CONTAINS(package.`menu_ids`, '6735', '$')
-  AND NOT JSON_CONTAINS(package.`menu_ids`, '79930', '$');
+  AND NOT JSON_CONTAINS(package.`menu_ids`, '79957', '$');
 
 INSERT INTO `zsjos_schema_version` (`version`,`description`,`checksum`,`installed_at`)
 SELECT 'V149','Feedback management workspace',

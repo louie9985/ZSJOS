@@ -65,12 +65,24 @@ describe('director and operator My Students', () => {
   it('keeps account maintenance in the account context instead of a student-level tab', () => {
     expect(page).toContain("const MEDIA_STUDENT_TABS = new Set(['overview', 'accounts', 'content'])")
     expect(page).not.toContain("key: 'maintenance', label: '状态维护'")
-    expect(page).toContain("x.availableActions.includes('MAINTAIN_ACCOUNT')")
-    expect(page).toContain("x.availableActions.includes('VIEW_ACCOUNT_HISTORY')")
-    expect(page).toContain('状态：{x.currentStatusLabelSnapshot')
-    expect(page).toContain('selectAccount(x.id, canMaintainAccount)')
+    expect(page).toContain("selectedAccount.availableActions.includes('MAINTAIN_ACCOUNT')")
+    expect(page).toContain('<dt>当下状态</dt><dd>{x.currentStatusLabelSnapshot')
     expect(page).toContain('initiallyEditing={maintenanceEditorAccountId === selectedAccount.id}')
-    expect(page).toContain('{selectedAccount && <AccountMaintenancePanel')
+    expect(page).toContain('<AccountMaintenancePanel key={`${selectedAccount.id}')
+  })
+
+  it('presents account selection and detail as a responsive workspace', () => {
+    expect(page).toContain('className="media-account-grid"')
+    expect(page).toContain('className={`media-account-card${selected ? \' active\' : \'\'}`}')
+    expect(page).toContain('className="media-account-card-select" aria-pressed={selected}')
+    expect(page).toContain('className="media-account-workspace-shell"')
+    expect(page).toContain('className="media-account-workspace"')
+    expect(page).toContain('className="media-account-context-bar"')
+    expect(page).toContain('className="media-students-card media-account-positioning"')
+    expect(style).toContain('grid-template-columns: repeat(2, minmax(0, 1fr))')
+    expect(style).toContain('grid-template-columns: minmax(0, 7fr) minmax(320px, 5fr)')
+    expect(style).toContain('@container (max-width: 899px)')
+    expect(style).toContain('.media-account-workspace { grid-template-columns: minmax(0, 1fr); }')
   })
 
   it('autosaves only server-backed director business drafts', () => {
@@ -115,6 +127,20 @@ describe('director and operator My Students', () => {
     expect(page).not.toContain('确认试跑')
   })
 
+  it('keeps positioning view and edit actions in the card heading without duplicates', () => {
+    expect(page).toContain('const selectedPositioningView = selectedAccountLatest || selectedAccountEffective')
+    expect(page).toContain('<Button size="small" onClick={() => void viewPositioning(selectedPositioningView.id)}>查看定位卡</Button>')
+    expect(page).toContain("row.availableActions?.filter(action => action !== 'START_POSITIONING_REVISION')")
+    expect(page.match(/\{selectedPositioningButtonVisible &&/g)).toHaveLength(1)
+    expect(page).not.toContain('icon={<EyeOutlined />}')
+  })
+
+  it('uses only the interview appointment time in the director flow', () => {
+    expect(page.match(/name="interviewAt"/g)).toHaveLength(1)
+    expect(page).toContain('name="interviewAt" label="访谈预约时间"')
+    expect(page).not.toContain('下次联系时间')
+  })
+
   it('imports only server-projected submitted positioning snapshots', () => {
     expect(api).toContain("http.get('/zsjos/positioning-card/import-sources'")
     expect(api).toContain("http.post('/zsjos/positioning-card/import'")
@@ -124,5 +150,15 @@ describe('director and operator My Students', () => {
     expect(page).toContain('覆盖当前定位卡草稿？')
     expect(page).toContain('targetDraftId: currentDraft?.id')
     expect(page).toContain('result.skippedFieldKeys.length')
+  })
+
+  it('offers local JSON import independently from positioning query permission', () => {
+    expect(page).toContain("from '../services/positioningJsonImport'")
+    expect(page).toContain('导入 JSON')
+    expect(page).toContain('仅按当前模板字段 key 匹配')
+    expect(page).toContain('确认导入并保存')
+    expect(page).toContain("dialog === 'positioning' && <><div className=\"media-students-positioning-toolbar\"")
+    expect(page).toContain("hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />}")
+    expect(page).toContain("await autoSaveCoordinator.current!.saveNow(draftSaveTask())")
   })
 })

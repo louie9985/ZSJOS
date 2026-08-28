@@ -33,6 +33,7 @@ import {
 } from "../services/api";
 import { hasPermission } from "../services/managementAccess";
 import { formatTimestamp, type Timestamp } from "../services/time";
+import ProductionTicketPositioningCard from "../components/ProductionTicketPositioningCard";
 
 export type MediaFeature =
   | "accounts"
@@ -46,13 +47,6 @@ type Row = (
   | PositioningCard
 ) & { id: number; version: number; availableActions: string[] };
 const labels: Record<string, string> = {
-  s0: "S0",
-  s1: "S1",
-  s2: "S2",
-  s3: "S3",
-  s4: "S4",
-  s5: "S5",
-  s6: "S6",
   active: "进行中",
   completed: "已完成",
   cancelled: "已取消",
@@ -85,8 +79,6 @@ const titles: Record<MediaFeature, string> = {
   positioning: "账号定位",
 };
 const actionLabels: Record<string, string> = {
-  ADVANCE_STAGE: "推进阶段",
-  ROLLBACK_STAGE: "回退阶段",
   BIND_STUDENT: "绑定学员",
   UNBIND_STUDENT: "解除绑定",
   EDIT_ACCOUNT: "编辑账号",
@@ -418,21 +410,7 @@ export default function MediaFeaturePage({
       const values = await accountActionForm.validateFields();
       const account = selected as MediaAccount;
       setAccountActionLoading(true);
-      if (accountAction === "ADVANCE_STAGE")
-        await api.mediaAccount.advanceStage(
-          account.id,
-          String(values.toStage),
-          account.version,
-          String(values.basis),
-        );
-      else if (accountAction === "ROLLBACK_STAGE")
-        await api.mediaAccount.rollbackStage(
-          account.id,
-          String(values.toStage),
-          account.version,
-          String(values.basis),
-        );
-      else if (accountAction === "BIND_STUDENT")
+      if (accountAction === "BIND_STUDENT")
         await api.mediaAccount.bindStudent(
           account.id,
           Number(values.studentPersonId),
@@ -535,7 +513,7 @@ export default function MediaFeaturePage({
             },
             {
               label: "阶段",
-              value: (r: Row) => statusText((r as MediaAccount).sStage),
+              value: (r: Row) => (r as MediaAccount).sStageLabelSnapshot || (r as MediaAccount).sStage || "未记录",
             },
           ]
         : feature === "content"
@@ -775,13 +753,6 @@ function AccountActionModal({
   onCancel: () => void;
   onSubmit: () => void;
 }) {
-  const stages = ["s0", "s1", "s2", "s3", "s4", "s5", "s6"];
-  const currentIndex = stages.indexOf(account.sStage);
-  const stageOptions = stages
-    .filter((_, index) =>
-      action === "ADVANCE_STAGE" ? index > currentIndex : index < currentIndex,
-    )
-    .map((value) => ({ value, label: value.toUpperCase() }));
   const studentOptions = students
     .filter((item) => item.personId !== account.studentPersonId)
     .map((item) => ({
@@ -803,24 +774,6 @@ function AccountActionModal({
       destroyOnClose
     >
       <Form form={form} layout="vertical">
-        {(action === "ADVANCE_STAGE" || action === "ROLLBACK_STAGE") && (
-          <>
-            <Form.Item
-              name="toStage"
-              label="目标阶段"
-              rules={[{ required: true, message: "请选择目标阶段" }]}
-            >
-              <Select options={stageOptions} />
-            </Form.Item>
-            <Form.Item
-              name="basis"
-              label="判断依据"
-              rules={[{ required: true, message: "请填写判断依据" }]}
-            >
-              <Input.TextArea rows={3} maxLength={500} />
-            </Form.Item>
-          </>
-        )}
         {action === "BIND_STUDENT" && (
           <>
             <Form.Item
@@ -1163,7 +1116,7 @@ function ProductionTicketSnapshot({ ticket }: { ticket?: ProductionTicket }) {
   if (!ticket) return null;
   const context = ticket.dispatchContext;
   if (!context) return <Empty description="暂无派单快照" />;
-  return <div className="media-ticket-snapshot"><Typography.Paragraph><strong>学员：</strong>{context.studentName || '未记录'}</Typography.Paragraph><Typography.Paragraph><strong>账号：</strong>{context.platformLabel || '平台未记录'} · {context.accountName || context.accountNo || ticket.accountId}</Typography.Paragraph>{context.accountFields?.map(field => <Typography.Paragraph key={field.key}><strong>{field.label}：</strong>{field.displayValue || String(field.value ?? '未记录')}</Typography.Paragraph>)}<Typography.Title level={5}>完整定位卡</Typography.Title><pre>{JSON.stringify(context.positioning || {}, null, 2)}</pre></div>;
+  return <div className="media-ticket-snapshot"><Typography.Paragraph><strong>学员：</strong>{context.studentName || '未记录'}</Typography.Paragraph><Typography.Paragraph><strong>账号：</strong>{context.platformLabel || '平台未记录'} · {context.accountName || context.accountNo || ticket.accountId}</Typography.Paragraph>{context.accountFields?.map(field => <Typography.Paragraph key={field.key}><strong>{field.label}：</strong>{field.displayValue || String(field.value ?? '未记录')}</Typography.Paragraph>)}<ProductionTicketPositioningCard snapshot={context.positioning} title="完整定位卡" /><section className="media-ticket-operator-remark"><Typography.Text strong>运营备注</Typography.Text><Typography.Paragraph>{context.operatorRemark || '未填写'}</Typography.Paragraph></section></div>;
 }
 
 export function ProductionTicketAssignmentHost({ permissions = [] }: { permissions?: string[] }) {

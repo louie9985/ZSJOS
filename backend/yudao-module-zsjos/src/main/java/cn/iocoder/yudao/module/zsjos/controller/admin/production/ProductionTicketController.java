@@ -28,8 +28,9 @@ public class ProductionTicketController {
     public CommonResult<Long> create(@Valid @RequestBody ProductionTicketSaveReqVO req) { return success(service.create(req, getLoginUserId())); }
 
     @GetMapping("/create-context") @PreAuthorize("@ss.hasPermission('zsjos:production-ticket:create')")
-    public CommonResult<ProductionTicketCreateContextRespVO> createContext(@RequestParam Long accountId) {
-        return success(service.getCreateContext(accountId, getLoginUserId()));
+    public CommonResult<ProductionTicketCreateContextRespVO> createContext(@RequestParam Long accountId,
+                                                                            @RequestParam String sceneCode) {
+        return success(service.getCreateContext(accountId, sceneCode, getLoginUserId()));
     }
 
     @GetMapping("/get") @PreAuthorize("@ss.hasPermission('zsjos:production-ticket:query')")

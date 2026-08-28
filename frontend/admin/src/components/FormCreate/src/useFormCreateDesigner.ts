@@ -104,6 +104,19 @@ export const useFormCreateDesigner = async (designer: Ref) => {
     props: [...apiSelectRule],
     event: ['click', 'change', 'visibleChange', 'clear', 'blur', 'focus']
   })
+  const processInstanceSelectRule = useSelectRule({
+    name: 'ProcessInstanceSelect',
+    label: '关联审批单',
+    icon: 'icon-link',
+    props: []
+  })
+  const createProcessInstanceRule = processInstanceSelectRule.rule
+  processInstanceSelectRule.rule = () => {
+    const rule = createProcessInstanceRule()
+    rule.value = []
+    rule.props = { multiple: true, limit: 20, mode: 'create' }
+    return rule
+  }
 
   /**
    * 构建系统字段菜单
@@ -113,7 +126,13 @@ export const useFormCreateDesigner = async (designer: Ref) => {
     // designer.value?.removeMenuItem('select')
     // designer.value?.removeMenuItem('radio')
     // designer.value?.removeMenuItem('checkbox')
-    const components = [userSelectRule, deptSelectRule, dictSelectRule, apiSelectRule0]
+    const components = [
+      userSelectRule,
+      deptSelectRule,
+      dictSelectRule,
+      apiSelectRule0,
+      processInstanceSelectRule
+    ]
     const menu: Menu = {
       name: 'system',
       title: '系统字段',

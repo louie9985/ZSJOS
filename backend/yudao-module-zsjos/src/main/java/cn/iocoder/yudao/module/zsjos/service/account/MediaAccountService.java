@@ -7,6 +7,8 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountStudentLinkDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountStudentLinkMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.registration.ServiceRelationDO;
 import cn.iocoder.yudao.module.zsjos.service.media.MediaWorkflowEventService;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
@@ -43,6 +45,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class MediaAccountService {
     @Resource private MediaAccountMapper mapper;
     @Resource private MediaAccountStudentLinkMapper linkMapper;
+    @Resource private ServiceRelationMapper relationMapper;
     @Resource private MediaAccountNumberService numberService;
     @Resource private PermissionApi permissionApi;
     @Resource private MediaAccountObjectPermissionProvider objectPermissionProvider;
@@ -58,6 +61,7 @@ public class MediaAccountService {
     public Long create(MediaAccountSaveReqVO req, Long userId) {
         if (req.getStudentPersonId() == null) throw exception(MEDIA_ACCOUNT_STUDENT_INVALID);
         validateStudent(req.getStudentPersonId());
+        Long assignedOperator = resolveAssignedOperator(req.getStudentPersonId());
         Long directorUserId = permissionApi.hasAnyPermissions(userId, "zsjos:media-account:query-all")
                 && req.getDirectorUserId() != null ? req.getDirectorUserId() : userId;
         adminUserApi.validateUser(directorUserId);
@@ -69,7 +73,7 @@ public class MediaAccountService {
         MediaAccountDO account = new MediaAccountDO();
         account.setAccountNo(numberService.next()).setStudentPersonId(req.getStudentPersonId())
                 .setOwnershipType(req.getStudentPersonId() == null ? OWNERSHIP_COMPANY : OWNERSHIP_STUDENT)
-                .setOwnerOperatorUserId(userId).setDirectorUserId(directorUserId)
+                .setOwnerOperatorUserId(assignedOperator == null ? userId : assignedOperator).setDirectorUserId(directorUserId)
                 .setPlatformValue(req.getPlatformValue()).setPlatformLabelSnapshot(req.getPlatformLabelSnapshot())
                 .setPlatformAccountId(uid).setNickname(nickname)
                 .setDetailConfigVersionId(details.configVersionId())
@@ -82,14 +86,13 @@ public class MediaAccountService {
         return account.getId();
     }
 
-    public void advanceStage(Long accountId, String toStage, Integer version, String criteriaSnapshotJson,
-                             String basis, String idempotencyKey, Long userId) {
-        throw exception(MEDIA_ACCOUNT_STAGE_TRANSITION_RETIRED);
-    }
-
-    public void rollbackStage(Long accountId, String toStage, Integer version, String criteriaSnapshotJson,
-                              String basis, String idempotencyKey, Long userId) {
-        throw exception(MEDIA_ACCOUNT_STAGE_TRANSITION_RETIRED);
+    private Long resolveAssignedOperator(Long studentPersonId) {
+        List<Long> operators = relationMapper
+                .selectActiveAcceptedByPersonForUpdate(studentPersonId,
+                        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())
+                .stream().map(ServiceRelationDO::getOperatorUserId).filter(java.util.Objects::nonNull).distinct().toList();
+        if (operators.size() > 1) throw exception(MEDIA_ACCOUNT_OPERATOR_ASSIGNMENT_CONFLICT);
+        return operators.isEmpty() ? null : operators.get(0);
     }
 
     public MediaAccountDO require(Long id) {

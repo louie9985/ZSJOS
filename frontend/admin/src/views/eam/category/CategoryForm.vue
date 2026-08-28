@@ -92,7 +92,9 @@ import * as CategoryApi from '@/api/eam/category'
 defineOptions({ name: 'EamCategoryForm' })
 
 const props = defineProps<{ categoryList: CategoryApi.CategoryVO[] }>()
-const emit = defineEmits(['success'])
+const emit = defineEmits<{
+  success: [payload: { id?: number; parentId: number; name: string }]
+}>()
 
 const { t } = useI18n()
 const message = useMessage()
@@ -158,15 +160,16 @@ const submitForm = async () => {
   formLoading.value = true
   try {
     const data = formData.value as CategoryApi.CategoryVO
+    let savedId = data.id
     if (formType.value === 'create') {
-      await CategoryApi.createCategory(data)
+      savedId = await CategoryApi.createCategory(data)
       message.success(t('common.createSuccess'))
     } else {
       await CategoryApi.updateCategory(data)
       message.success(t('common.updateSuccess'))
     }
     dialogVisible.value = false
-    emit('success')
+    emit('success', { id: savedId, parentId: data.parentId, name: data.name })
   } finally {
     formLoading.value = false
   }

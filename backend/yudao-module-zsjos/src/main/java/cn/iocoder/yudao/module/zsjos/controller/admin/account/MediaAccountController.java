@@ -90,34 +90,6 @@ public class MediaAccountController {
         return success(mediaAccountService.studentCandidates(keyword, getLoginUserId()));
     }
 
-    @PostMapping("/{id}/advance-stage")
-    @Operation(summary = "推进账号阶段")
-    @PreAuthorize("@ss.hasPermission('zsjos:media-account:maintenance')")
-    public CommonResult<Boolean> stageAdvance(@PathVariable Long id, @RequestParam String toStage,
-                                               @RequestParam Integer version,
-                                               @RequestParam(required = false) String criteriaSnapshotJson,
-                                               @RequestParam(required = false) String basis,
-                                               @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey) {
-        mediaAccountService.advanceStage(id, toStage, version, criteriaSnapshotJson, basis,
-                idempotencyKey == null ? "stage:" + id + ":" + version + ":" + toStage : idempotencyKey,
-                getLoginUserId());
-        return success(true);
-    }
-
-    @PostMapping("/{id}/rollback-stage")
-    @Operation(summary = "回退账号阶段")
-    @PreAuthorize("@ss.hasPermission('zsjos:media-account:maintenance')")
-    public CommonResult<Boolean> stageRollback(@PathVariable Long id, @RequestParam String toStage,
-                                               @RequestParam Integer version,
-                                               @RequestParam(required = false) String criteriaSnapshotJson,
-                                               @RequestParam(required = false) String basis,
-                                               @RequestHeader(value = "X-Idempotency-Key", required = false) String idempotencyKey) {
-        mediaAccountService.rollbackStage(id, toStage, version, criteriaSnapshotJson, basis,
-                idempotencyKey == null ? "stage-rollback:" + id + ":" + version + ":" + toStage : idempotencyKey,
-                getLoginUserId());
-        return success(true);
-    }
-
     @PostMapping("/{id}/bind-student")
     @Operation(summary = "绑定学员")
     @PreAuthorize("@ss.hasPermission('zsjos:media-account:bind-student')")

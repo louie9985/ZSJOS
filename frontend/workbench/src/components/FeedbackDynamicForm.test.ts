@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   normalizeFeedbackInitialValues,
@@ -45,5 +46,16 @@ describe('feedback dynamic form values', () => {
       supportType: 'account_permission',
       attachments: [12, 13]
     })
+  })
+
+  it('renders image fields as previewable thumbnails while retaining attachment links', () => {
+    const source = readFileSync(new URL('./FeedbackDynamicForm.tsx', import.meta.url), 'utf8')
+
+    expect(source).toContain('<Image.PreviewGroup>')
+    expect(source).toContain('preview={{ mask: \'预览\' }}')
+    expect(source).toContain('previewUrl: localPreviewUrl')
+    expect(source).toContain('URL.revokeObjectURL')
+    expect(source).toContain('!imageOnly && value.map')
+    expect(source).toContain('<Typography.Link href={file.url}')
   })
 })

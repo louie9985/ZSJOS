@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserImportRe
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserPageReqVO;
 import cn.iocoder.yudao.module.system.controller.admin.user.vo.user.UserSaveReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserCandidatePageReqDTO;
 import jakarta.validation.Valid;
 import org.springframework.lang.Nullable;
 
@@ -25,6 +26,8 @@ import java.util.Map;
  * @author 芋道源码
  */
 public interface AdminUserService {
+
+    PageResult<AdminUserDO> getCandidateUserPage(AdminUserCandidatePageReqDTO reqDTO);
 
     /**
      * 创建用户

@@ -6,6 +6,8 @@
 
 `PUT /zsjos/media-account/{id}/maintenance` 需要 `zsjos:media-account:maintenance`。请求体：
 
+服务关系指派运营后，服务端在同一事务内同步该学员现有媒体账号的运营负责人；新建账号在存在唯一现任运营时使用该运营作为负责人。账号状态维护仍同时受按钮权限和账号对象关系约束。
+
 ```json
 {
   "version": 3,
@@ -41,6 +43,6 @@
 
 响应包含 `list`、`total` 和 `unscheduledCount`。`list` 每个账号只返回当前快照区间一次；日期不完整的账号不进入 `list`，但计入当前其他筛选下的 `unscheduledCount`。
 
-## 兼容路由
+## 已移除的旧阶段流转
 
-`POST /zsjos/media-account/{id}/advance-stage` 和 `rollback-stage` 仅保留一个兼容周期，不再执行阶段流转，统一返回“阶段推进功能已停用，请使用状态维护”。
+`POST /zsjos/media-account/{id}/advance-stage` 和 `rollback-stage` 已从运行时 Controller 和 Service 移除，旧客户端请求按标准路由不存在处理（404）。阶段不再通过推进或回退命令改变，只能在上述状态维护接口中作为普通字典字段自由选择。原阶段日志仍通过 `legacy-stage-history` 只读保留。

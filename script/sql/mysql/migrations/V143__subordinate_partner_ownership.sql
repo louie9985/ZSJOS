@@ -90,15 +90,15 @@ DROP PROCEDURE `zsjos_v143_assert_menu_contract`;
 
 START TRANSACTION;
 
-INSERT INTO `system_menu`
-(`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
-SELECT '下属兼职','zsjos:subordinate-partner:query',2,16,root.id,'subordinate-partners','ep:user-filled',
-       'zsjos/subordinatePartner/index','ZsjosSubordinatePartner',0,b'1',b'1',b'0',
-       'migration-V143',NOW(),'migration-V143',NOW(),b'0'
-FROM `system_menu` root
-WHERE root.path='/zsjos' AND root.type=1 AND root.deleted=b'0'
-  AND NOT EXISTS (SELECT 1 FROM `system_menu` existing
-                  WHERE existing.permission='zsjos:subordinate-partner:query' AND existing.deleted=b'0');
+# INSERT INTO `system_menu`
+# (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)
+# SELECT '下属兼职','zsjos:subordinate-partner:query',2,16,root.id,'subordinate-partners','ep:user-filled',
+#        'zsjos/subordinatePartner/index','ZsjosSubordinatePartner',0,b'1',b'1',b'0',
+#        'migration-V143',NOW(),'migration-V143',NOW(),b'0'
+# FROM `system_menu` root
+# WHERE root.path='/zsjos' AND root.type=1 AND root.deleted=b'0'
+#   AND NOT EXISTS (SELECT 1 FROM `system_menu` existing
+#                   WHERE existing.permission='zsjos:subordinate-partner:query' AND existing.deleted=b'0');
 
 INSERT INTO `system_menu`
 (`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`)

@@ -10,4 +10,6 @@ import lombok.EqualsAndHashCode;
 public class WorkOrderMyPageReqVO extends PageParam {
     @Size(max = 40)
     private String status;
+    @Size(max = 32)
+    private String view;
 }

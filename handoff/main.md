@@ -5437,3 +5437,130 @@
 - Verification evidence: fetch 后 ahead/behind 为 `0/0`；提交前 `git diff --check` 通过；无暂存或未跟踪的其他文件。未运行完整测试、类型检查或构建。
 - Dependency or integration impact: 无新增依赖、API、权限、菜单、数据库、服务、分支或历史变更。
 - Remaining work: 推送后核对本地与远端哈希及工作区状态。
+
+## Delivery Entry - 2026-08-28 11:30:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 将工单中心直接放在工单管理目录下，并将“工单管理”改名为“工单中心”；统一包含工单模板、运行审计、发起工单、可接工单、我的工单；同步迁移脚本和数据库，不新建迁移脚本。
+- Key decisions: 复用 V157 和现有菜单 ID；将 `79972` 作为唯一“工单中心”父菜单，保留 Admin 路径 `/work-order-management`；将 Workbench 页面 `79961-79963` 改挂 `79972` 并保持相对路径；旧 `79960` 逻辑删除并从租户包 JSON 移除；权限标识、业务数据和公开 Workbench URL不变。
+- Execution or analysis result: 修改 V157 菜单种子及幂等修复逻辑、verify-bootstrap 菜单断言、V157 迁移说明；开发库 `ruoyi-vue-pro` 已完成定向更新并回读成功。
+- Changed files: `script/sql/mysql/migrations/V157__generic_work_order_center.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; 本 handoff 记录。`bootstrap.sql`、`00-bootstrap-schema.sql` 无需额外改动，其菜单由 V157 SOURCE 初始化。
+- Verification evidence: MySQL JDBC 回读断言 `active_count_ok=true, old_deleted=true, parent_ok=true, children_ok=true, package_ok=true`；Workbench `src/services/menu.test.ts` 16/16 通过；`git diff --check` 通过（仅既有行尾转换警告）。未运行完整 Workbench typecheck/build；未执行全量 bootstrap 重建验证。
+- Dependency or integration impact: 无新增依赖；仅影响工单菜单层级、租户菜单包和校验脚本；不改 API、角色权限标识、工单业务行或版本号。
+- Remaining work: 完整 bootstrap 重建及前端 typecheck/build 仍需在发布流水线或可用环境执行；当前无其他必需代码工作。
+
+## Delivery Entry - 2026-08-28 11:36:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 修复 V157 无法重复执行的 SQL 语法错误。
+- Key decisions: 修正派生表首行，恢复合法的 `SELECT 79972 ... UNION ALL ...` 结构；保留既有幂等菜单修复逻辑，不新增迁移脚本。
+- Execution or analysis result: 原错误由首条 `SELECT 79972` 被误删导致 `FROM ( UNION ALL SELECT ...)`。已恢复并在开发库重复执行等价更新，父菜单回读正常。
+- Changed files: `script/sql/mysql/migrations/V157__generic_work_order_center.sql`; 本 handoff 记录。
+- Verification evidence: JDBC 重跑定向更新成功，`rerun_parent_ok=true`；`git diff --check` 通过。完整迁移文件在当前客户端的存储过程批处理执行尚未再次端到端跑完，建议用原客户端重跑 V157 验证。
+- Dependency or integration impact: 无新增依赖、版本号或业务数据变更。
+- Remaining work: 用支持 DELIMITER/存储过程的迁移客户端重新执行 V157 全文件并确认 14,274 字符脚本无错误。
+
+## Delivery Entry - 2026-08-28 11:42:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 修复 V157 重复执行时 CALL 阶段报 `Duplicate column name ''`。
+- Key decisions: 保留存储过程幂等守卫，但不再把带反引号的列定义直接拼接；改由 `p_column` 作为唯一列名来源，清理 `p_definition` 首个反引号标识后拼接标准 `ADD COLUMN` SQL，避免批处理客户端解析为空列名。
+- Execution or analysis result: 已修改 V157 加列过程；菜单修复逻辑不变。当前开发库列已存在，未再执行结构变更。
+- Changed files: `script/sql/mysql/migrations/V157__generic_work_order_center.sql`; 本 handoff 记录。
+- Verification evidence: `git diff --check` 通过；迁移脚本已静态检查所有 29 个调用均提供非空 `p_column`。需用原批处理客户端重新端到端执行 V157 验证存储过程创建与 CALL。
+- Dependency or integration impact: 无新增依赖、迁移版本或业务数据变更。
+- Remaining work: 用户侧重跑 V157，确认不再出现空列名错误。
+
+## Delivery Entry - 2026-08-28 11:46:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 继续修复 V157 批处理客户端在 CALL 阶段报 `Duplicate column name ''`。
+- Key decisions: 在 `zsjos_v157_add_column` 内增加 SQLSTATE `42S21` 的 CONTINUE HANDLER；重复列视为幂等成功，其他错误继续抛出。保留参数化列名生成逻辑。
+- Execution or analysis result: 已更新 V157；当前库重复列场景可安全跳过，迁移后续菜单和版本写入可继续执行。
+- Changed files: `script/sql/mysql/migrations/V157__generic_work_order_center.sql`; 本 handoff 记录。
+- Verification evidence: `git diff --check` 通过；JDBC 已验证生成的动态 ALTER 语句合法。原批处理客户端端到端重跑待用户确认。
+- Dependency or integration impact: 无新增依赖、版本号或业务数据变更；重复列容错仅作用于 V157 加列过程。
+- Remaining work: 请重新执行 V157 全文件并反馈结果；若仍失败，需根据下一条具体错误定位非加列语句。
+
+## Delivery Entry - 2026-08-28 11:52:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 完整定位并修复 V157 在批处理客户端 CALL 阶段报 `Duplicate column name ''`。
+- Key decisions: 根因是 `system_menu` 派生表首个 SELECT 的字面量列无别名，MySQL 推导出重复空列名；为首行 11 个字段显式增加别名。保留加列过程的幂等与重复列容错。
+- Execution or analysis result: 使用本地 MySQL JDBC 对 V157 完整执行流程（删除旧过程、创建两个过程、CALL、删除过程）端到端验证通过；`CALL OK`。
+- Changed files: `script/sql/mysql/migrations/V157__generic_work_order_center.sql`; 本 handoff 记录。
+- Verification evidence: 完整 V157 过程创建与 CALL 成功；临时过程清理成功；此前数据库菜单定向更新状态保留；`git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖、版本号或业务数据变更。
+- Remaining work: 用户可直接使用原批处理客户端重跑 V157；如客户端仍报错，需提供新的具体语句错误（当前已覆盖此前三类错误）。
+
+## Delivery Entry - 2026-08-28 12:02:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 修复 Workbench 看不到“工单中心”菜单。
+- Key decisions: 唯一父菜单 `79972` 使用 `/zsjos/work-orders` 与 `admin_embed`，让两端保留同一服务端层级；模板/审计保持 `admin_only`，发起/可接/我的工单强制校正为 `native`；不改权限标识和公开页面 URL。
+- Execution or analysis result: V157 增加对存量菜单 path/render_mode 的幂等修复；开发库完整重跑 V157 成功；普通员工角色已有 `79972` 和 `79961-79963` 授权；数据库回读三个 Workbench 子页均为 native，两个 Admin 子页均为 admin_only。
+- Changed files: `script/sql/mysql/migrations/V157__generic_work_order_center.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `frontend/workbench/src/services/menu.test.ts`; 本 handoff 记录。
+- Verification evidence: 完整 V157 存储过程创建、CALL、清理成功；数据库 `native_children=3`、`admin_children=2`；Workbench 菜单聚焦测试 17/17 通过；Workbench typecheck 通过；`git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖、权限标识、角色授权或业务数据变更；运行中客户端需重新获取菜单响应。
+- Remaining work: 未进行真实登录浏览器验收；运行中的 Workbench 应刷新或重新登录以重新拉取菜单。
+
+## Workstream Registration - 2026-08-28 12:10:00 +08:00
+
+- Workstream ID: main-work-order-dynamic-attachment
+- Goal: 为工单模板动态表单新增附件字段，支持配置、上传、必填校验、文件归属校验、字段关系快照与详情展示。
+- Non-goals: 不改变顶层附件功能、文件存储机制、权限模型、数据库结构或迁移版本；不新增依赖；不处理无关工作区改动。
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- Base commit: $base，并保留当前工作树全部既有未提交改动。
+- Target branch: main
+- Ownership scope: 工单模板 Admin 页面/API 类型；通用工单后端字段定义、校验/规范化及聚焦测试；Workbench 工单动态表单、附件选择器使用、详情展示及测试；直接相关 API 文档；本 handoff 记录。
+- Owner: Codex /root
+- Dependencies: 现有 Infra 文件上传 API、WorkOrderAttachmentPicker、工单附件快照表与工单创建接口；无新增依赖。
+- Integration order: 扩展字段契约 -> 后端校验/规范化 -> Workbench 渲染/提交/展示 -> 文档 -> 聚焦与构建验证。
+- Verification plan: ZSJOS WorkOrderServiceImpl 聚焦测试；Workbench 新增动态附件测试、全量相关测试/typecheck/build；Admin typecheck；scoped diff/check。
+
+## Delivery Entry - 2026-08-28 12:12:19 +08:00
+
+- Workstream ID: main-work-order-dynamic-attachment
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: $head（未创建提交）。
+- User goal: 工单模板动态表单支持附件字段。
+- Key decisions: 新增 ttachment 字段类型；动态字段保存文件 ID 数组并与顶层请求附件去重合并；服务端统一校验上传人和工单文件命名空间并保存单份附件快照；字段值保留字段到文件 ID 的关系；详情与运行审计按快照文件名展示；不新增表、迁移或依赖。
+- Execution or analysis result: Admin 模板设计器可配置附件及必填；Workbench 使用现有附件选择器上传，每字段最多 20 个，提交时序列化为 ID；后端支持定义校验、必填空数组拒绝、重复/非正 ID 拒绝、文件归属校验、最多 100 个合并请求附件和历史快照；详情响应新增 equestAttachments 快照元数据，两端详情按字段显示。
+- Changed files: ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImpl.java; ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderAttachmentMapper.java; ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderRespVO.java; ackend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImplTest.java; rontend/admin/src/api/zsjos/workOrder/index.ts; rontend/admin/src/views/zsjos/workOrderTemplate/index.vue; rontend/admin/src/views/zsjos/workOrderAudit/index.vue; rontend/workbench/src/services/workOrderApi.ts; rontend/workbench/src/services/workOrderForm.ts; rontend/workbench/src/services/workOrderForm.test.ts; rontend/workbench/src/pages/WorkOrderCenterPage.tsx; docs/api/generic-work-order-center.md; 本 handoff 记录。
+- Verification evidence: ZSJOS WorkOrderServiceImplTest 20/20 通过，依赖 reactor 全部成功；ZSJOS reactor compile 成功；Workbench 聚焦测试 18/18、typecheck、生产 build 通过；Workbench 全量 440/446 通过，本次附件测试通过，6 个失败来自既有公告路径、定位卡 API、主管动作契约漂移；Admin 本次文件 scoped ESLint 通过，uild:local 通过（仅既有 lightningcss *zoom 警告）；Admin 全量 typecheck 被既有 BPM/EAM/MES/System 等无关错误阻塞，未出现本次文件错误；scoped git diff --check 通过。浏览器可连接本地 Workbench，但无登录态，仅到登录页，未完成授权后的桌面/移动交互验收。
+- Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；WorkOrderRespVO 增加兼容字段 equestAttachments。
+- Remaining work: 在有效登录态下补做模板创建/发布、动态附件上传、必填校验、工单详情和 Admin 审计的桌面/移动真实交互验收；仓库既有 6 个 Workbench 守卫测试及 Admin 全量 typecheck 错误需由对应工作流修复。
+
+## Delivery Entry Correction - 2026-08-28 12:13:23 +08:00
+
+- Workstream ID: `main-work-order-dynamic-attachment`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `15412036e243742b63ed8355ec757254b4c34b4f`（未创建提交）。
+- User goal: 工单模板动态表单支持附件字段。
+- Key decisions: 上一条登记与交付记录受 PowerShell 插值影响，本条更正其中的占位符和字段名；正确动态字段类型为 `attachment`，详情兼容字段为 `requestAttachments`；无数据库、迁移、权限或依赖变更。
+- Execution or analysis result: Admin 模板设计器支持附件字段及必填配置；Workbench 支持按动态字段上传、序列化文件 ID 数组、与顶层附件合并提交及详情回显；后端完成数组规范化、必填、数量、重复 ID、上传归属和路径校验，并复用附件快照持久化。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderAttachmentMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderRespVO.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImplTest.java`; `frontend/admin/src/api/zsjos/workOrder/index.ts`; `frontend/admin/src/views/zsjos/workOrderTemplate/index.vue`; `frontend/admin/src/views/zsjos/workOrderAudit/index.vue`; `frontend/workbench/src/services/workOrderApi.ts`; `frontend/workbench/src/services/workOrderForm.ts`; `frontend/workbench/src/services/workOrderForm.test.ts`; `frontend/workbench/src/pages/WorkOrderCenterPage.tsx`; `docs/api/generic-work-order-center.md`; 本 handoff 记录。
+- Verification evidence: `WorkOrderServiceImplTest` 20/20 通过且后端 reactor compile 成功；Workbench 聚焦测试 18/18、typecheck、生产 build 通过；Admin 受影响文件 scoped ESLint 和 `build:local` 通过；受影响源文件 `git diff --check` 通过。
+- Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；响应新增向后兼容的 `requestAttachments` 字段。
+- Remaining work: 无有效登录态，尚未完成授权后的桌面与移动端真实交互验收；Workbench 全量测试仍有 6 个无关既有失败，Admin 全量 typecheck 仍被无关既有错误阻塞。

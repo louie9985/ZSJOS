@@ -229,3 +229,21 @@ an item. The V129 seed is repeatable and is not executed by application startup.
 导入始终使用当前发布模板，按稳定字段 `key` 复制类型兼容的值。新增字段留空，已删除、类型不兼容或
 字典类型改变的字段跳过；未改变的字典选择沿用来源提交中的 value 与 label 快照。来源提交只读，导入
 不会修改历史定位卡、提交序号、审核状态或学员决定，也不会导入历史试运行日期。
+
+Workbench 的“导入 JSON”是定位卡草稿表单的本地辅助能力，不新增后端导入接口，也不读取
+历史定位卡，因此只沿用填写定位卡所需的 `zsjos:positioning-card:create` 权限。浏览器接受
+不超过 1 MiB 的 UTF-8 `.json` 文件或粘贴文本，原始文件不会上传。JSON 顶层必须是普通对象，
+仅按当前草稿冻结模板的稳定字段 `key` 匹配，例如：
+
+```json
+{
+  "identityTags": ["expert"],
+  "strongStoryHook": "十年一线实战经验",
+  "recommendedMatchRate": 85
+}
+```
+
+字典字段必须使用 System 接口返回的稳定 `value`，不得使用展示 label。`null` 表示清空命中
+字段；未提供、未知、附件、类型不符、字典无效或违反模板约束的字段不会覆盖当前值。界面先按
+“可导入 / 将清空 / 已跳过”预览，确认后仅合并合法字段并立即调用现有定位卡草稿创建或更新
+接口。后端仍按冻结模板版本重新校验完整草稿、解析字典 label 快照并执行对象权限与乐观锁检查。

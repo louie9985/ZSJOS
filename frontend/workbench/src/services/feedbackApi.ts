@@ -16,6 +16,7 @@ export type FeedbackAttachment = {
   type?: string
   size?: number
   url?: string
+  previewUrl?: string
 }
 
 export type FeedbackField = {

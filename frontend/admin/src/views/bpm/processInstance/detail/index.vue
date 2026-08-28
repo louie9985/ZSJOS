@@ -237,7 +237,8 @@ const getApprovalDetail = async () => {
           detailForm,
           processDefinition.value.formConf,
           processDefinition.value.formFields,
-          processInstance.value.formVariables
+          processInstance.value.formVariables,
+          { mode: 'detail', processInstanceId: props.id }
         )
       }
       nextTick().then(() => {

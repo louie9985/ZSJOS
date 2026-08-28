@@ -11,12 +11,19 @@ public interface FeedbackNoDailyCounterMapper extends BaseMapperX<FeedbackNoDail
     @Insert("""
             INSERT INTO zsjos_feedback_no_daily_counter
               (sequence_date,feedback_type,current_value,creator,create_time,updater,update_time,deleted,tenant_id)
-            VALUES (#{date},#{type},LAST_INSERT_ID(1),'',NOW(),'',NOW(),b'0',#{tenantId})
-            ON DUPLICATE KEY UPDATE current_value=LAST_INSERT_ID(current_value+1),update_time=NOW()
+            VALUES (#{date},#{type},#{minimumValue},'',NOW(),'',NOW(),b'0',#{tenantId})
+            ON DUPLICATE KEY UPDATE current_value=GREATEST(current_value+1,#{minimumValue}),
+              update_time=NOW(),deleted=b'0',deleted_time=NULL
             """)
     int reserve(@Param("tenantId") Long tenantId, @Param("date") LocalDate date,
-                @Param("type") String type);
+                @Param("type") String type, @Param("minimumValue") long minimumValue);
 
-    @Select("SELECT LAST_INSERT_ID()")
-    long selectReservedValue();
+    @Select("""
+            SELECT current_value
+            FROM zsjos_feedback_no_daily_counter
+            WHERE tenant_id=#{tenantId} AND sequence_date=#{date} AND feedback_type=#{type}
+            FOR UPDATE
+            """)
+    long selectReservedValue(@Param("tenantId") Long tenantId, @Param("date") LocalDate date,
+                             @Param("type") String type);
 }
