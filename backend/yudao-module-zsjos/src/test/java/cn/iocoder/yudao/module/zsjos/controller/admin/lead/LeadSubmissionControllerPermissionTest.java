@@ -16,4 +16,12 @@ class LeadSubmissionControllerPermissionTest {
                 + "'zsjos:lead:update', 'zsjos:lead:submitter-supplement')", authorization.value());
     }
 
+    @Test
+    void salesUserSimpleListRequiresSpecifyPermission() throws NoSuchMethodException {
+        PreAuthorize authorization = LeadSalesUserController.class.getMethod("getSalesUserSimpleList")
+                .getAnnotation(PreAuthorize.class);
+
+        assertEquals("@ss.hasPermission('zsjos:lead:submit:specify')", authorization.value());
+    }
+
 }

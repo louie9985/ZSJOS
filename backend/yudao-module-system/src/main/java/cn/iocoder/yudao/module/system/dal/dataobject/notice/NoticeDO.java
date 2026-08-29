@@ -48,5 +48,7 @@ public class NoticeDO extends BaseDO {
     private String publishStatus;
     private LocalDateTime publishTime;
     private LocalDateTime offlineTime;
+    /** 高亮提醒截止时间；为空表示不高亮。 */
+    private LocalDateTime highlightUntil;
 
 }

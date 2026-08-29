@@ -66,6 +66,9 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         if (!agingPoolService.canRead(cycle, requesterUserId)) throw exception(LEAD_PERMISSION_DENIED);
+        if (!Objects.equals(cycle.getCollaboratorUserId(), requesterUserId)) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
         LeadTransferRequestDO replay = requestMapper.selectByIdempotencyKey(request.getIdempotencyKey());
         if (replay != null) {
             if (!Objects.equals(replay.getLeadId(), leadId)

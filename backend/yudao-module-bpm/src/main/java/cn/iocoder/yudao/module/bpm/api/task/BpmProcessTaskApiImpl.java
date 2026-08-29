@@ -140,6 +140,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             ProcessInstance process = processes.get(task.getProcessInstanceId());
             BpmTaskRespDTO result = new BpmTaskRespDTO();
             result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+            result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
             result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
@@ -161,6 +162,7 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
             HistoricProcessInstance process = processes.get(task.getProcessInstanceId());
             BpmTaskRespDTO result = new BpmTaskRespDTO();
             result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+            result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
             result.setBusinessKey(process == null ? null : process.getBusinessKey());
             result.setTaskDefinitionKey(task.getTaskDefinitionKey());
             result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
@@ -177,9 +179,29 @@ public class BpmProcessTaskApiImpl implements BpmProcessTaskApi {
         ProcessInstance process = processInstanceService.getProcessInstance(task.getProcessInstanceId());
         BpmTaskRespDTO result = new BpmTaskRespDTO();
         result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+        result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
         result.setBusinessKey(process == null ? null : process.getBusinessKey());
         result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
         result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
+        return result;
+    }
+
+    @Override
+    public BpmTaskRespDTO getDoneTask(Long userId, String taskId) {
+        HistoricTaskInstance task = bpmTaskService.getHistoricTask(taskId);
+        if (task == null || task.getEndTime() == null || !String.valueOf(userId).equals(task.getAssignee())) {
+            return null;
+        }
+        HistoricProcessInstance process = processInstanceService.getHistoricProcessInstance(task.getProcessInstanceId());
+        BpmTaskRespDTO result = new BpmTaskRespDTO();
+        result.setId(task.getId()); result.setProcessInstanceId(task.getProcessInstanceId());
+        result.setProcessDefinitionKey(process == null ? null : process.getProcessDefinitionKey());
+        result.setBusinessKey(process == null ? null : process.getBusinessKey());
+        result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setCreateTime(toLocalDateTime(task.getCreateTime()));
+        result.setEndTime(toLocalDateTime(task.getEndTime()));
+        result.setParentTaskId(task.getParentTaskId()); result.setSignTask(task.getParentTaskId() != null);
+        result.setStatus(task.getTaskLocalVariables() == null ? null : (Integer) task.getTaskLocalVariables().get("status"));
+        result.setReason(task.getDescription());
         return result;
     }
 

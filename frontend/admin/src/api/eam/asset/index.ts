@@ -153,3 +153,8 @@ export const commitLedgerImport = async (file: File, updateExisting = false) => 
 export const getQrCodeUrl = (id: number, size = 300) => {
   return `/admin-api/eam/asset/qrcode?id=${id}&size=${size}`
 }
+
+// Download the PNG through axios so auth, tenant and impersonation headers are included.
+export const downloadQrCode = async (id: number, size = 300) => {
+  return await request.download({ url: '/eam/asset/qrcode', params: { id, size } })
+}

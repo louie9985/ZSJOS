@@ -25,7 +25,14 @@ router.onError((error, to) => {
     error.message.includes('Failed to fetch dynamically imported module') ||
     error.message.includes('Importing a module script failed')
   ) {
-    window.location.assign(to.fullPath)
+    const retryKey = `route-dynamic-import-retry:${to.fullPath}`
+    if (!sessionStorage.getItem(retryKey)) {
+      sessionStorage.setItem(retryKey, '1')
+      window.location.assign(to.fullPath)
+      return
+    }
+    sessionStorage.removeItem(retryKey)
+    router.replace('/404')
   }
 })
 

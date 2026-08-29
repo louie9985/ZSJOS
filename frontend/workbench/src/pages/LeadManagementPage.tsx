@@ -82,7 +82,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const routeState = location.state as { leadId?: number; openFollowUp?: boolean; relationScope?: 'submitted' | 'owned' } | null
+  const routeState = location.state as { leadId?: number; openFollowUp?: boolean; openSubmitterSupplement?: boolean; relationScope?: 'submitted' | 'owned' } | null
   const queryLeadId = Number(searchParams.get('leadId')) || undefined
   const screens = Grid.useBreakpoint()
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -336,6 +336,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       : detail
         ? <LeadDetail lead={detail} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           mode={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
+          autoOpenSubmitterSupplement={Boolean(routeState?.openSubmitterSupplement && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
           onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)}/>
         : <Empty description="从左侧选择一条客资"/>

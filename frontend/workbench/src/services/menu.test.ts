@@ -9,6 +9,7 @@ import {
   findPageByPath,
   findPrimaryByPath,
   getInaccessiblePathFallback,
+  getAuthenticatedHomeTarget,
   getInitialTarget,
   getPrimaryTarget
 } from './menu'
@@ -318,6 +319,20 @@ describe('workbench menu conversion', () => {
 
     expect(getPrimaryTarget(navigation[0])).toBe('https://example.com')
     expect(getInitialTarget(navigation)).toBe('/crm/leads')
+  })
+
+  it('uses the authorized Today Tasks menu as the post-login home', () => {
+    const authorized = buildMenuTree([menu({
+      id: 6735,
+      name: 'Workbench',
+      path: '/zsjos',
+      children: [menu({ id: 6780, parentId: 6735, name: '首页', path: 'tasks/today' })]
+    })])
+
+    expect(getAuthenticatedHomeTarget(authorized)).toBe(APP_ROUTES.TODAY_TASKS)
+    expect(getAuthenticatedHomeTarget(buildMenuTree([
+      menu({ id: 1, name: 'Other', path: '/other' })
+    ]))).toBeUndefined()
   })
 
   it('replaces an inaccessible route with the first authorized internal page', () => {

@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.system.api.permission.dto.RoleRespDTO;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountCalendarScheduleReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountMaintenanceReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountMaintenanceRevisionDO;
@@ -222,15 +223,20 @@ class MediaAccountMaintenanceServiceTest {
 
     @Test
     void allCalendarDoesNotApplyAccountObjectScope() {
-        MediaAccountCalendarPageReqVO req = new MediaAccountCalendarPageReqVO();
+        MediaAccountCalendarScheduleReqVO req = new MediaAccountCalendarScheduleReqVO();
         req.setRangeStart(LocalDate.of(2026, 8, 1)); req.setRangeEnd(LocalDate.of(2026, 8, 31));
-        when(accountMapper.selectCalendarPage(req, Set.of(), true)).thenReturn(new PageResult<>(List.of(), 0L));
-        when(accountMapper.selectCalendarUnscheduledCount(req, Set.of(), true)).thenReturn(2L);
+        when(accountMapper.selectCalendarPage(any(MediaAccountCalendarPageReqVO.class), eq(Set.of()), eq(true)))
+                .thenReturn(new PageResult<>(List.of(), 0L));
+        when(accountMapper.selectCalendarUnscheduledCount(any(MediaAccountCalendarPageReqVO.class), eq(Set.of()), eq(true)))
+                .thenReturn(2L);
 
         assertEquals(2, service.allCalendar(req, 20L).getUnscheduledCount());
 
         verifyNoInteractions(mediaDataScopeService);
-        verify(accountMapper).selectCalendarPage(req, Set.of(), true);
+        ArgumentCaptor<MediaAccountCalendarPageReqVO> pageReq = ArgumentCaptor.forClass(MediaAccountCalendarPageReqVO.class);
+        verify(accountMapper).selectCalendarPage(pageReq.capture(), eq(Set.of()), eq(true));
+        assertEquals(1, pageReq.getValue().getPageNo());
+        assertEquals(-1, pageReq.getValue().getPageSize());
     }
 
     @Test

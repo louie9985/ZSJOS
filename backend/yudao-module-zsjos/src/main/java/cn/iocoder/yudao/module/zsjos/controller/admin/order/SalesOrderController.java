@@ -237,8 +237,10 @@ public class SalesOrderController {
     @GetMapping("/approval/task-target")
     @Operation(summary = "定位当前用户的成交审批任务")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm')")
-    public CommonResult<SalesOrderApprovalTaskTargetRespVO> getApprovalTaskTarget(@RequestParam String taskId) {
-        return success(supervisorConfirmationService.getTaskTarget(taskId, WebFrameworkUtils.getLoginUserId()));
+    public CommonResult<SalesOrderApprovalTaskTargetRespVO> getApprovalTaskTarget(
+            @RequestParam String taskId, @RequestParam(defaultValue = "todo") String view) {
+        return success(supervisorConfirmationService.getTaskTarget(
+                taskId, WebFrameworkUtils.getLoginUserId(), "done".equals(view)));
     }
 
     @GetMapping("/approval/notification-target")

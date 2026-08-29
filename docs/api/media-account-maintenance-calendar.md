@@ -45,7 +45,7 @@
 
 ## 日历日程
 
-`GET /zsjos/media-account/calendar/all` 需要独立页面权限 `zsjos:media-calendar:all-query`。查询参数与账号日历一致，响应结构也一致。
+`GET /zsjos/media-account/calendar/all` 需要独立页面权限 `zsjos:media-calendar:all-query`。响应结构与账号日历一致，但查询不带 `pageNo` / `pageSize`，由后端一次性返回当前日期窗口内的完整共享日程结果。
 
 日历日程是登录员工使用的共享日程视图，不使用账号对象可见范围，也不复用 `zsjos:media-calendar:query-all`。它仍受当前租户、逻辑删除、日期区间、关键字、状态、阶段、编导和运营筛选约束。`unscheduledCount` 与账号日历保持同一计算口径：当前其他筛选下缺少开始或结束日期的账号数。Workbench 以独立月历界面呈现该视图：左侧提供搜索、迷你月历和候选人筛选，右侧使用主月格展示日程，避免与账号日历的账号排期时间轴重复。
 

@@ -36,7 +36,10 @@ const DISPATCH_MODE_HINTS: Record<string, string> = {
   [LEAD_ASSIGNMENT_MODE.SPECIFIED]: '跳过派单规则，直接指派给选定的销售'
 }
 
-export default function LeadSubmissionPage({ selfSourced = false }: { selfSourced?: boolean }) {
+export default function LeadSubmissionPage({
+  selfSourced = false,
+  permissions = []
+}: { selfSourced?: boolean; permissions?: string[] }) {
   const [form] = Form.useForm<FormValues>()
   const mobile = Form.useWatch('mobile', form)
   const wechatId = Form.useWatch('wechatId', form)
@@ -63,6 +66,7 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
   const [pendingValues, setPendingValues] = useState<FormValues>()
   const [current, setCurrent] = useState(0)
   const [invalidSteps, setInvalidSteps] = useState<StepKey[]>([])
+  const canSpecifySales = permissions.includes('zsjos:lead:submit:specify')
 
   const loadOptions = useCallback(async () => {
     setRemote({ loading: true })
@@ -95,7 +99,14 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
       try { setSales(await api.salesUsers()); salesLoaded.current = true; setSalesState({ loading: false }) }
     catch (error) { setSalesState({ loading: false, error: error instanceof Error ? error.message : '销售列表加载失败' }) }
   }, [])
-  useEffect(() => { if (assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && !salesLoaded.current) void loadSales() }, [assignmentMode, loadSales])
+  useEffect(() => {
+    if (assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED && canSpecifySales && !salesLoaded.current) void loadSales()
+  }, [assignmentMode, canSpecifySales, loadSales])
+  useEffect(() => {
+    if (!canSpecifySales && assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED) {
+      form.setFieldValue('dispatchMode', LEAD_ASSIGNMENT_MODE.AUTO)
+    }
+  }, [assignmentMode, canSpecifySales, form])
 
   const loadProviders = useCallback(async () => {
     setProviderState({ loading: true })
@@ -123,7 +134,8 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
   /** 校验单步：字段规则 + 该步特有的非表单校验（意向课程、附件上传状态）。 */
   const validateStep = async (key: StepKey, notify: boolean) => {
     const fields = STEP_FIELDS[key].filter(field => {
-      if (field === 'specifiedSalesUserId') return !selfSourced && form.getFieldValue('dispatchMode') === LEAD_ASSIGNMENT_MODE.SPECIFIED
+      if (field === 'specifiedSalesUserId') return !selfSourced && canSpecifySales
+        && form.getFieldValue('dispatchMode') === LEAD_ASSIGNMENT_MODE.SPECIFIED
       if (field === 'dispatchMode') return !selfSourced
       if (field === 'newMediaProviderUserId') return selfSourced
       return true
@@ -287,13 +299,13 @@ export default function LeadSubmissionPage({ selfSourced = false }: { selfSource
             {/* 卡片式单选：Radio 仍是真正的控件（键盘可达），整卡 onClick 只是放大鼠标命中区。 */}
             <Form.Item name="dispatchMode" rules={[{ required: true, message: '请选择派单模式' }]}>
               <Radio.Group className="lead-dispatch-options">
-                {LEAD_ASSIGNMENT_OPTIONS.map(option => <div key={option.value}
+                {LEAD_ASSIGNMENT_OPTIONS.filter(option => canSpecifySales || option.value === LEAD_ASSIGNMENT_MODE.AUTO).map(option => <div key={option.value}
                   className={`lead-dispatch-option${assignmentMode === option.value ? ' selected' : ''}`}
                   onClick={() => form.setFieldValue('dispatchMode', option.value)}>
                   <Radio value={option.value}>{option.label}</Radio>
                   <Text type="secondary" className="lead-dispatch-hint">{DISPATCH_MODE_HINTS[option.value]}</Text>
                   {/* 人员下拉长在卡片内部：卡片撑高，但两列布局不变，外面的汇总表不跳。 */}
-                  {option.value === LEAD_ASSIGNMENT_MODE.SPECIFIED && assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED
+                  {canSpecifySales && option.value === LEAD_ASSIGNMENT_MODE.SPECIFIED && assignmentMode === LEAD_ASSIGNMENT_MODE.SPECIFIED
                     && <Form.Item className="lead-dispatch-nested" name="specifiedSalesUserId" preserve={false} rules={[{ required: true, message: '请选择指定销售' }]}>
                       <EmployeeSelect users={sales} loading={salesState.loading} showSearch optionFilterProp="label" placeholder="请选择销售"
                         notFoundContent={salesState.error ? <Button icon={<ReloadOutlined />} onClick={() => void loadSales()}>重新加载</Button> : '暂未配置可指定销售'} />

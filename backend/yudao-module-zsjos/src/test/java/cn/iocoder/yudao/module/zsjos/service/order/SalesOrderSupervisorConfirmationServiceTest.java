@@ -212,6 +212,20 @@ class SalesOrderSupervisorConfirmationServiceTest {
     }
 
     @Test
+    void taskTargetSupportsDoneTasksForReadOnlyEntry() {
+        when(processTaskApi.getDoneTask(REQUESTER_ID, "task-1")).thenReturn(ordinaryTask());
+
+        var target = service.getTaskTarget("task-1", REQUESTER_ID, true);
+
+        assertEquals("approval", target.getWorkType());
+        assertEquals(ORDER_ID, target.getOrderId());
+        assertEquals("task-1", target.getTaskId());
+        verify(processTaskApi).getDoneTask(REQUESTER_ID, "task-1");
+        verify(processTaskApi, never()).getTodoTask(anyLong(), anyString());
+        verify(objectPermissionService).check(ORDER_ID, "read");
+    }
+
+    @Test
     void rejectEndsThroughBpmAndNonSupervisorCannotDecide() {
         SalesOrderSupervisorConfirmationDO confirmation = pendingConfirmation();
         when(confirmationMapper.selectByIdForUpdate(300L, 1L)).thenReturn(confirmation);

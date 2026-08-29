@@ -521,12 +521,14 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         if (order != null) { result.setActiveSalesOrderId(order.getId()); result.setActiveSalesOrderStatus(order.getStatus()); }
         List<String> actions = new ArrayList<>();
         if (canManage(cycle, userId) && !hasActiveApproval(cycle.getLeadId())) { actions.add("ASSIGN"); actions.add("EXIT"); }
-        if (Objects.equals(cycle.getOriginalOwnerUserId(), userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
+        if (isOwnerOrCollaborator(cycle, userId) && AGING_POOL_ASSIGNED.equals(cycle.getStatus())) {
             actions.add(ACTION_ADD_FOLLOW_UP);
-            if (order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())
+            if (Objects.equals(cycle.getOriginalOwnerUserId(), userId)
+                    && order != null && STATUS_REVISION_REQUIRED.equals(order.getStatus())
                     && salesOrderPermissionService.canRevise(order, userId)) {
                 actions.add(ACTION_REVISE_DEAL);
-            } else if (order == null && Objects.equals(lead.getOwnerUserId(), userId)) {
+            } else if (Objects.equals(cycle.getOriginalOwnerUserId(), userId)
+                    && order == null && Objects.equals(lead.getOwnerUserId(), userId)) {
                 actions.add(ACTION_ENTER_DEAL);
             }
         }

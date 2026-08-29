@@ -7,12 +7,20 @@ typed `NotifyBusinessEvent` values through `NotifyBusinessEventApi`. Administrat
 tenant rules against that catalog; arbitrary request interception and executable expressions are
 not supported.
 
-The ZSJOS catalog contains 40 lead scenes covering creation, dispatch and ownership, follow-up,
+The ZSJOS catalog contains 41 lead scenes covering creation, dispatch and ownership, follow-up,
 qualification, appeal, complaint, public-pool, duplicate, and transfer workflows. Complaint
 decisions use distinct `zsjos.lead.complaint_founded` and `zsjos.lead.complaint_unfounded` scenes.
 Both resolve the complaint record's actual employee or partner complainant; the founded scene also
 retains the snapshotted owner and current direct-leader recipients. The scene response is the source
 of truth for available variables, recipient roles, sensitive markers, and actions.
+
+`zsjos.lead.submitter_assist_requested` is published when the current owner records the first
+follow-up as `unreachable` for a `submitted + owned` Lead. Its `submitter` recipient resolves to the
+original internal `lead.sourceUserId`; for partner-submitted Leads it resolves through the bound
+partner account. The template uses `{{lead.no}}` for the user-visible Lead number and may include the
+follow-up result, remark, and occurrence time. Internal submitters also receive a ZSJOS
+`lead_submitter_assist` business task with action `OPEN_LEAD_SUBMITTER_SUPPLEMENT`; partner
+submitters receive only the configured message because partner IDs are not ADMIN user IDs.
 
 Fresh environments and migration V016 provide one enabled global template for every registered
 scene. Templates do not send messages by themselves. Notification rules remain tenant-owned. V075
@@ -67,7 +75,9 @@ and internal business ID. Appeal scenes target `tab=appeals`, complaint result s
 `tab=overview`. The resulting route is
 `/zsjos/leads/manage?leadId={internalLeadId}&tab={overview|follow-ups|orders|appeals|complaints}`.
 `zsjos.lead.appeal_submitted` keeps its reviewer-inbox action when that task is available and uses
-the Lead appeal tab only as its authorized fallback.
+the Lead appeal tab only as its authorized fallback. Submitter-assist message clicks use the same
+authorized Lead overview fallback; the dedicated Workbench todo action opens the submitter
+supplement panel directly.
 
 The backend persists the rendered title, summary, full content, rule, scene, business identity,
 action, and source event key. After commit it emits:

@@ -38,18 +38,14 @@ class LeadProviderAttributionServiceTest {
     }
 
     @Test
-    void freezesNewMediaOperatorAndManagerOrganizationSnapshots() {
+    void freezesInternalNewMediaOrganizationSnapshots() {
         stubOrganization();
-        for (LeadSubmissionIdentityService.Identity identity : new LeadSubmissionIdentityService.Identity[]{
-                LeadSubmissionIdentityService.Identity.NEW_MEDIA,
-                LeadSubmissionIdentityService.Identity.NEW_MEDIA_MANAGER}) {
-            LeadDO lead = new LeadDO().setSourceUserId(10L);
-            LocalDateTime countedAt = LocalDateTime.of(2026, 8, 27, 9, 0);
+        LeadDO lead = new LeadDO().setSourceUserId(10L);
+        LocalDateTime countedAt = LocalDateTime.of(2026, 8, 27, 9, 0);
 
-            service.apply(lead, identity, null, countedAt);
+        service.apply(lead, LeadSubmissionIdentityService.Identity.NEW_MEDIA, null, countedAt);
 
-            assertSystemAttribution(lead, 10L, "成员甲", countedAt);
-        }
+        assertSystemAttribution(lead, 10L, "成员甲", countedAt);
     }
 
     @Test

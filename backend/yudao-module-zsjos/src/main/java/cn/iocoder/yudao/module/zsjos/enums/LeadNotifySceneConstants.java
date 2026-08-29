@@ -13,6 +13,7 @@ public interface LeadNotifySceneConstants {
     String CLAIMED = "zsjos.lead.claimed";
     String TRANSFERRED = "zsjos.lead.transferred";
     String FOLLOW_UP_RECORDED = "zsjos.lead.follow_up_recorded";
+    String SUBMITTER_ASSIST_REQUESTED = "zsjos.lead.submitter_assist_requested";
     String CATEGORY_CHANGED = "zsjos.lead.category_changed";
     String QUALIFICATION_SUSPENDED = "zsjos.lead.qualification_suspended";
     String QUALIFIED_VALID = "zsjos.lead.qualified_valid";

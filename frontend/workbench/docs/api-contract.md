@@ -56,6 +56,7 @@
 - `GET /zsjos/media-account/{id}/maintenance-history`：分页查看维护版本，接受账号查询或维护功能权限并叠加账号对象读取权限；账号投影仅在两层权限都通过时返回 `VIEW_ACCOUNT_HISTORY`，Workbench 未收到该能力时不得请求或展示历史。Workbench 不再展示或请求后端保留的旧阶段历史接口。
 - Workbench 将状态摘要、维护入口和维护版本归属到具体账号：账号行只根据该账号的 `MAINTAIN_ACCOUNT`/`VIEW_ACCOUNT_HISTORY` 投影操作，选中账号后在“账号”页签内展示完整状态与维护版本，不提供学员级“状态维护”页签；旧 `tab=maintenance` 链接兼容进入 `accounts`。
 - `GET /zsjos/media-account/calendar`：查询与日期窗口相交的当前账号区间，并返回当前范围下的未排期数量；普通用户限本人所属编导/运营账号，`zsjos:media-calendar:query-all` 扩展为全量。
+- `GET /zsjos/media-account/calendar/all`：查询“日历日程”共享页的整窗数据，不传 `pageNo` / `pageSize`，也不使用账号对象可见范围；页面权限为 `zsjos:media-calendar:all-query`。
 - `POST /zsjos/media-account/{id}/advance-stage`、`rollback-stage`：旧阶段推进/回退路由已移除；旧客户端请求按标准 404 处理。阶段只能通过账号维护接口作为普通字典字段自由选择。
 - `PUT /zsjos/media-account/{id}`：编辑账号资料，必须携带版本号。
 - `POST /zsjos/media-account/{id}/rescue`：更新挽救状态，必须携带版本号。
@@ -77,7 +78,7 @@
 
 认证失败既可能使用 HTTP 401，也可能使用 HTTP 200 包裹业务码 `401`。工作台对两种响应执行同一套单次刷新与请求回放；刷新失败通过全局事件立即卸载工作台并进入登录页。HTTP 403 保留当前会话并显示无权限，网络错误和服务端错误保留独立的重试状态。
 
-`/messages/all` 调用 `my-page` 获取当前用户全部消息；`/messages/unread` 固定传递 `readStatus=false`。两个页面均由权限接口中的服务端菜单决定是否可见，前端不自行制造入口权限。
+`/messages/all` 调用 `my-page` 获取当前用户全部消息；`/messages/unread` 固定传递 `readStatus=false`。完整消息页的左侧列表采用 cursor 懒加载，不提供前端分页控件。两个页面均由权限接口中的服务端菜单决定是否可见，前端不自行制造入口权限。
 
 消息中心和实时消息弹窗的业务跳转会携带新的导航上下文。目标页面即使已经处于当前路由，也必须重新读取消息指向的列表/详情数据；当前筛选条件保留，目标记录不在筛选结果时临时置顶。消息导航会清理未提交的临时表单状态，以服务端最新详情为准，不使用浏览器整站刷新。
 

@@ -31,6 +31,8 @@ public interface WebFilterOrderEnum {
 
     int FLOWABLE_FILTER = -98; // 需要保证在 Spring Security 过滤后面
 
+    int FORCED_FORM_FILTER = FLOWABLE_FILTER + 1; // 需要保证在 Spring Security 过滤后面且晚于租户安全过滤器
+
     int DEMO_FILTER = Integer.MAX_VALUE;
 
 }

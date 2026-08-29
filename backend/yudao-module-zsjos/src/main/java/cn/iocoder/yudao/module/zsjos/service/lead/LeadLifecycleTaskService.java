@@ -65,6 +65,24 @@ public class LeadLifecycleTaskService {
         return taskCommandService.completeByKey("lead-first-follow-up:" + assignmentHistoryId, completedAt);
     }
 
+    public void createSubmitterAssistTask(LeadDO lead, Long followUpRecordId, LocalDateTime occurredAt,
+                                          String followUpResult, String followUpRemark) {
+        if (lead.getSourceUserId() == null) return;
+        taskCommandService.create(command(TASK_TYPE_SUBMITTER_ASSIST, lead.getId(), lead.getSourceUserId(),
+                "协助处理客资：" + leadName(lead), ACTION_OPEN_SUBMITTER_SUPPLEMENT, null,
+                JsonUtils.toJsonString(Map.of("followUpRecordId", followUpRecordId,
+                        "followUpResult", followUpResult == null ? "" : followUpResult,
+                        "followUpRemark", followUpRemark == null ? "" : followUpRemark,
+                        "requestedAt", occurredAt.toString())),
+                "lead-submitter-assist:" + followUpRecordId));
+    }
+
+    public int completeSubmitterAssistTasks(Long leadId, Long submitterUserId, LocalDateTime completedAt) {
+        if (submitterUserId == null) return 0;
+        return taskCommandService.completePendingByTypeAndBizAndAssignee(TASK_TYPE_SUBMITTER_ASSIST,
+                BIZ_TYPE_LEAD, leadId, submitterUserId, completedAt);
+    }
+
     public void replaceFollowUpReminder(Long leadId, Long assigneeId, String recordScope, Long recordId,
                                         LocalDateTime dueAt, LocalDateTime changedAt) {
         taskCommandService.complete(TASK_TYPE_FOLLOW_UP_REMINDER, leadId, assigneeId, changedAt);

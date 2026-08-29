@@ -37,18 +37,20 @@ import {
   findPageByPath,
   findPrimaryByPath,
   getInaccessiblePathFallback,
+  getAuthenticatedHomeTarget,
   getInitialTarget,
   getPrimaryTarget,
   type PrimaryNavigationItem
 } from './services/menu'
-import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, resolveAuthPlatform } from './constants'
+import { APP_ROUTES, LAYOUT_SIZES, MINI_RAIL_W, NAV_INLINE_INDENT, RENDERABLE_APP_ROUTES, type AuthPlatform } from './constants'
+import { initializeAuthPlatform, redirectToMobileEntryForPlatformReload, resolveAdminEmbedPresentation, shouldReloadForMobileEntry } from './services/authSession'
 import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
 import { NotifyMessageProvider } from './components/NotifyMessageProvider'
 import MessageCenter from './components/MessageCenter'
 import { AnnouncementProvider } from './components/AnnouncementProvider'
-import { AnnouncementBar, AnnouncementButton } from './components/AnnouncementEntry'
+import { ForcedFormProvider } from './components/ForcedFormProvider'
 import SalesDispatchStatusControl from './components/SalesDispatchStatusControl'
 import { SalesDispatchStatusProvider } from './components/SalesDispatchStatusProvider'
 import SalesDispatchStatusAlert from './components/SalesDispatchStatusAlert'
@@ -105,8 +107,18 @@ function NoAccessibleMenu({ hasMenus }: { hasMenus: boolean }) {
   />
 }
 
-function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }) {
-  const authPlatform = resolveAuthPlatform()
+function MobileEntryReloadGuard({ platform }: { platform: AuthPlatform }) {
+  const location = useLocation()
+
+  useEffect(() => {
+    if (!shouldReloadForMobileEntry(platform, location.pathname)) return
+    redirectToMobileEntryForPlatformReload(`${location.pathname}${location.search}${location.hash}`)
+  }, [location.hash, location.pathname, location.search, platform])
+
+  return null
+}
+
+function Shell({ info, authPlatform, onLogout, onUserChange }: { info: PermissionInfo; authPlatform: AuthPlatform; onLogout: () => void; onUserChange: (user: { nickname: string; avatar?: string }) => void }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { token } = theme.useToken()
@@ -161,9 +173,10 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
     () => findMenuByPath(authorizedMenus, location.pathname),
     [authorizedMenus, location.pathname]
   )
-  const mobileAdminEmbed = authPlatform === 'MOBILE' && currentMenu?.workbenchRenderMode === 'admin_embed'
-  const activeAdminEmbedPath = authPlatform === 'PC' && currentMenu?.workbenchRenderMode === 'admin_embed'
-    ? currentMenu.path
+  const adminEmbedPresentation = resolveAdminEmbedPresentation(authPlatform, currentMenu?.workbenchRenderMode)
+  const mobileAdminEmbed = adminEmbedPresentation === 'mobile-blocked'
+  const activeAdminEmbedPath = adminEmbedPresentation === 'frame'
+    ? currentMenu?.path
     : undefined
 
   const handleAdminRouteChange = useCallback((path: string) => {
@@ -412,7 +425,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
           <SettingsDrawer/>
           <span className="ai-action"><Tooltip title={aiOpen ? '收起 AI 助手' : '打开 AI 助手'}><Button type={aiOpen ? 'primary' : 'text'} icon={<RobotOutlined/>} onClick={() => setAiOpen(value => !value)}/></Tooltip></span>
           <MessageCenter/>
-          {(info.permissions || []).includes('system:notice:read') && <AnnouncementButton/>}
           {(info.permissions || []).includes('zsjos:lead:accept') && (
             <Tooltip title="待接客资"><Badge count={pendingAssignmentCount}><Button type="text" aria-label="待接客资" icon={<InboxOutlined/>} onClick={() => setOpenAssignmentRequest(value => value + 1)}/></Badge></Tooltip>
           )}
@@ -435,7 +447,6 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
         message={`只读借视图：当前以 ${impersonation.targetNameSnapshot} 的数据权限查看，所有 ZSJOS 写操作均会被服务端拒绝。`}
       />}
       <SalesDispatchStatusAlert />
-      {(info.permissions || []).includes('system:notice:read') && <AnnouncementBar/>}
       <ProductionTicketAssignmentHost permissions={info.permissions || []} />
       {tabsEnabled && <TabBar currentMenu={currentMenu} initialPath={initialTarget} tabStyle={tabStyle} tabs={tabs} setTabs={setTabs}/>}
       <Layout className="content-layout">
@@ -467,17 +478,18 @@ function Shell({ info, onLogout, onUserChange }: { info: PermissionInfo; onLogou
   )
 
   return <>
-    <RealtimeProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
+    <RealtimeProvider platform={authPlatform}><ForcedFormProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
       {showWatermark
         ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
         : <div className="crm-watermark-wrapper">{shellContent}</div>
       }
-    </NotifyMessageProvider></SalesDispatchStatusProvider></AnnouncementProvider></RealtimeProvider>
+    </NotifyMessageProvider></SalesDispatchStatusProvider></AnnouncementProvider></ForcedFormProvider></RealtimeProvider>
   </>
 }
 
-function Root() {
-  const authPlatform = resolveAuthPlatform()
+function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
+  const navigate = useNavigate()
+  const navigateRef = useRef(navigate)
   const [logged, setLogged] = useState(() => {
     migrateLegacyAuthStorage()
     return Boolean(getAuthAccessToken(authPlatform))
@@ -499,32 +511,48 @@ function Root() {
   }, [authPlatform])
 
   useEffect(() => {
+    // useNavigate() 在这个路由器里会随着当前位置变化而变；这里只想在登录态建立时做一次首页落点，
+    // 不能让每次路由切换都把页面重新拉回首页。
+    navigateRef.current = navigate
+  }, [navigate])
+
+  useEffect(() => {
     if (!logged) return
     api.permissionInfo()
-      .then(setInfo)
+      .then(permissionInfo => {
+        const authorizedMenus = buildMenuTree(permissionInfo.menus || [])
+        const homeTarget = getAuthenticatedHomeTarget(authorizedMenus)
+        const fallbackTarget = getInitialTarget(buildTwoLevelNavigation(
+          filterRenderableMenus(authorizedMenus, RENDERABLE_APP_ROUTES)
+        ))
+        navigateRef.current(homeTarget || fallbackTarget || '/', { replace: true })
+        setInfo(permissionInfo)
+      })
       .catch(permissionError => {
         setInfo(undefined)
         if (permissionError instanceof AuthenticationError) {
-          clearAuthStorage()
+          clearAuthStorage(authPlatform)
           setError('登录状态已失效，请重新登录')
           setLogged(false)
           return
         }
         setError(permissionError.response?.data?.msg || permissionError.message || '权限信息加载失败')
       })
-  }, [logged, permissionAttempt])
+  }, [authPlatform, logged, permissionAttempt])
 
-  if (!logged) return <LoginPage initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLogged(true) }}/>
-  if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(); setError(''); setInfo(undefined); setLogged(false) }}>返回登录</Button></Space></Card></div>
+  if (!logged) return <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLogged(true) }}/>
+  if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setLogged(false) }}>返回登录</Button></Space></Card></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
-  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
+  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)
-      await api.logout()
+      await api.logout(authPlatform)
     } finally { setInfo(undefined); setError(''); setLogged(false) }
   }}/></OverlayCoordinatorProvider></DefaultEmployeeAvatarProvider>
 }
 
+const authPlatform = initializeAuthPlatform()
+
 createRoot(document.getElementById('root')!).render(
-  <React.StrictMode><RuntimeBoundary><ThemeProvider><BrowserRouter><App><Root/></App></BrowserRouter></ThemeProvider></RuntimeBoundary></React.StrictMode>
+  <React.StrictMode><RuntimeBoundary><ThemeProvider><BrowserRouter><App><MobileEntryReloadGuard platform={authPlatform}/><Root authPlatform={authPlatform}/></App></BrowserRouter></ThemeProvider></RuntimeBoundary></React.StrictMode>
 )

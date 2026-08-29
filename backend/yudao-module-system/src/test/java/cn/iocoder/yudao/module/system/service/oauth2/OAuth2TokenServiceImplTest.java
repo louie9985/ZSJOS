@@ -1,6 +1,5 @@
 package cn.iocoder.yudao.module.system.service.oauth2;
 
-import cn.hutool.core.date.LocalDateTimeUtil;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -65,10 +64,10 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
         LocalDateTime now = LocalDateTime.now();
         OAuth2RefreshTokenDO oldRefresh = randomPojo(OAuth2RefreshTokenDO.class, o -> o.setId(null)
                 .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId(clientId)
-                .setRefreshToken("old-refresh-token").setExpiresTime(now.plusDays(7)));
+                .setRefreshToken("old-refresh-token").setExpiresTime(now.plusDays(7)).setCreateTime(now.minusMinutes(1)));
         OAuth2RefreshTokenDO newRefresh = randomPojo(OAuth2RefreshTokenDO.class, o -> o.setId(null)
                 .setUserId(userId).setUserType(UserTypeEnum.ADMIN.getValue()).setClientId(clientId)
-                .setRefreshToken("new-refresh-token").setExpiresTime(now.plusDays(7)));
+                .setRefreshToken("new-refresh-token").setExpiresTime(now.plusDays(7)).setCreateTime(now));
         oauth2RefreshTokenMapper.insert(oldRefresh);
         oauth2RefreshTokenMapper.insert(newRefresh);
         OAuth2AccessTokenDO oldToken = randomPojo(OAuth2AccessTokenDO.class, o -> o.setId(null)
@@ -418,7 +417,7 @@ public class OAuth2TokenServiceImplTest extends BaseDbAndRedisUnitTest {
         // 测试 userType 不匹配
         oauth2AccessTokenMapper.insert(cloneIgnoreId(dbAccessToken, o -> o.setClientId("it_client")));
         // 测试 expireTime 不匹配
-        oauth2AccessTokenMapper.insert(cloneIgnoreId(dbAccessToken, o -> o.setExpiresTime(LocalDateTimeUtil.now())));
+        oauth2AccessTokenMapper.insert(cloneIgnoreId(dbAccessToken, o -> o.setExpiresTime(LocalDateTime.now().minusMinutes(1))));
         // 准备参数
         OAuth2AccessTokenPageReqVO reqVO = new OAuth2AccessTokenPageReqVO();
         reqVO.setUserId(10L);

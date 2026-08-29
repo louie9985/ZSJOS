@@ -11,13 +11,20 @@ import {
 } from '@/utils/routeParams'
 
 const modules = import.meta.glob('../views/**/*.{vue,tsx}')
+const componentPathAliases: Record<string, string> = {
+  // Avoid browser/client blockers that intercept source-module URLs containing /asset/.
+  'eam/asset/index': 'eam/assetLedger/index'
+}
+const resolveComponentPath = (componentPath?: string) =>
+  componentPath ? componentPathAliases[componentPath] || componentPath : ''
 /**
  * 注册一个异步组件
  * @param componentPath 例:/bpm/oa/leave/detail
  */
 export const registerComponent = (componentPath: string) => {
+  const resolvedComponentPath = resolveComponentPath(componentPath)
   for (const item in modules) {
-    if (item.includes(componentPath)) {
+    if (item.includes(resolvedComponentPath)) {
       // 使用异步组件的方式来动态加载组件
       // @ts-ignore
       return defineAsyncComponent(modules[item])
@@ -75,7 +82,7 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
   const res: AppRouteRecordRaw[] = []
   const modulesRoutesKeys = Object.keys(modules)
   for (const route of routes) {
-    const componentRoute = splitRoutePath(route.component)
+    const componentRoute = splitRoutePath(resolveComponentPath(route.component))
     const pathRoute = isUrl(route.path)
       ? parseExternalRouteLocation(route.path)
       : splitRoutePath(route.path)
@@ -147,7 +154,7 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
         meta: meta
       }
       const index = route?.component
-        ? modulesRoutesKeys.findIndex((ev) => ev.includes(route.component))
+        ? modulesRoutesKeys.findIndex((ev) => ev.includes(resolveComponentPath(route.component)))
         : modulesRoutesKeys.findIndex((ev) => ev.includes(route.path))
       childrenData.component = modules[modulesRoutesKeys[index]]
       data.children = [childrenData]
@@ -184,7 +191,7 @@ export const generateRoute = (routes: AppCustomRouteRecordRaw[]): AppRouteRecord
       } else {
         // 对后端传component组件路径和不传做兼容（如果后端传component组件路径，那么path可以随便写，如果不传，component组件路径会根path保持一致）
         const index = route?.component
-          ? modulesRoutesKeys.findIndex((ev) => ev.includes(route.component))
+          ? modulesRoutesKeys.findIndex((ev) => ev.includes(resolveComponentPath(route.component)))
           : modulesRoutesKeys.findIndex((ev) => ev.includes(route.path))
         data.component = modules[modulesRoutesKeys[index]]
       }

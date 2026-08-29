@@ -22,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -101,5 +102,35 @@ class LeadLifecycleTaskServiceTest {
         assertNotEquals(tasks.get(0).idempotencyKey(), tasks.get(1).idempotencyKey());
         assertTrue(tasks.get(0).payload().contains("\"followUpRecordScope\":\"lead\""));
         assertTrue(tasks.get(1).payload().contains("\"followUpRecordScope\":\"opportunity\""));
+    }
+
+    @Test
+    void createsSubmitterAssistTaskForInternalSubmitterOnly() {
+        LeadDO lead = new LeadDO();
+        lead.setId(1L); lead.setLeadNo("KZ202608160000000001"); lead.setSourceUserId(30L);
+        LocalDateTime occurredAt = LocalDateTime.of(2026, 8, 29, 10, 0);
+
+        service.createSubmitterAssistTask(lead, 40L, occurredAt, "未联系上", "电话未接");
+
+        ArgumentCaptor<BusinessTaskCreateCommand> taskCaptor = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(taskCommandService).create(taskCaptor.capture());
+        BusinessTaskCreateCommand task = taskCaptor.getValue();
+        assertEquals("lead_submitter_assist", task.taskType());
+        assertEquals("lead", task.bizType());
+        assertEquals(1L, task.bizId());
+        assertEquals(30L, task.assigneeId());
+        assertEquals("OPEN_LEAD_SUBMITTER_SUPPLEMENT", task.actionCode());
+        assertEquals("lead-submitter-assist:40", task.idempotencyKey());
+        assertTrue(task.payload().contains("\"followUpRecordId\":40"));
+    }
+
+    @Test
+    void skipsSubmitterAssistTaskForPartnerSubmitterWithoutAdminUser() {
+        LeadDO lead = new LeadDO();
+        lead.setId(1L); lead.setLeadNo("KZ202608160000000001");
+
+        service.createSubmitterAssistTask(lead, 40L, LocalDateTime.now(), "未联系上", "电话未接");
+
+        verifyNoInteractions(taskCommandService);
     }
 }

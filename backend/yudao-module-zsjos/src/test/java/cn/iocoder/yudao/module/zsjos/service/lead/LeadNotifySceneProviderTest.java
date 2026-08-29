@@ -54,14 +54,15 @@ class LeadNotifySceneProviderTest {
     void registersAllScenesWithSceneSpecificVariables() {
         List<NotifySceneRespDTO> scenes = provider.getScenes();
 
-        assertEquals(40, scenes.size());
-        assertEquals(40, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertEquals(41, scenes.size());
+        assertEquals(41, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("lead.no"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("lead.name"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("followUp.result"));
         assertTrue(variableKeys(scene(scenes, FOLLOW_UP_RECORDED)).contains("followUp.result"));
         assertFalse(variableKeys(scene(scenes, FOLLOW_UP_RECORDED)).contains("assignment.attempt"));
+        assertTrue(variableKeys(scene(scenes, SUBMITTER_ASSIST_REQUESTED)).contains("followUp.remark"));
         assertTrue(variableKeys(scene(scenes, APPEAL_SUBMITTED)).contains("appeal.roundNo"));
         assertTrue(variableKeys(scene(scenes, SUBMITTER_URGED)).contains("urge.reason"));
         assertTrue(scenes.stream().anyMatch(item -> COMPLAINT_FOUNDED.equals(item.getCode())));
@@ -85,6 +86,32 @@ class LeadNotifySceneProviderTest {
 
         assertEquals(Set.of(NotifyRecipientDTO.admin(10L), NotifyRecipientDTO.admin(20L)),
                 provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER, ROLE_OPERATOR)));
+    }
+
+    @Test
+    void resolvesSubmitterAssistToOriginalSourceUserInsteadOfProvider() {
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(SUBMITTER_ASSIST_REQUESTED)
+                .bizId(1L).operatorUserId(20L).build();
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setSourceUserId(30L)
+                .setProviderOwnerType("system_user").setProviderOwnerId(99L));
+
+        assertEquals(Set.of(NotifyRecipientDTO.admin(30L)),
+                provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER)));
+    }
+
+    @Test
+    void resolvesPartnerSubmitterAssistToPartnerAccount() {
+        PartnerAccountDO partnerAccount = new PartnerAccountDO();
+        partnerAccount.setId(71L); partnerAccount.setPartnerId(70L);
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setPartnerId(70L)
+                .setProviderOwnerType("partner").setProviderOwnerId(70L));
+        when(partnerAccountMapper.selectByPartnerId(70L)).thenReturn(partnerAccount);
+
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(SUBMITTER_ASSIST_REQUESTED)
+                .bizId(1L).operatorUserId(20L).build();
+
+        assertEquals(Set.of(NotifyRecipientDTO.partner(71L)),
+                provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER)));
     }
 
     @Test

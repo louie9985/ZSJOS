@@ -223,7 +223,7 @@ import * as EmployeeApi from '@/api/hrm/employee'
 import { UploadFile } from '@/components/UploadFile'
 import { getIntDictOptions } from '@/utils/dict'
 import { handleTree } from '@/utils/tree'
-import DynamicFields from '@/views/eam/asset/DynamicFields.vue'
+import DynamicFields from '@/views/eam/assetLedger/DynamicFields.vue'
 
 defineOptions({ name: 'EamPurchaseForm' })
 const emit = defineEmits(['success'])

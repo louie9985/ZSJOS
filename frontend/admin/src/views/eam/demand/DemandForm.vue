@@ -114,7 +114,7 @@ import * as CategoryApi from '@/api/eam/category'
 import * as EmployeeApi from '@/api/hrm/employee'
 import * as EmployeeAssetApi from '@/api/eam/employeeAsset'
 import { handleTree } from '@/utils/tree'
-import DynamicFields from '@/views/eam/asset/DynamicFields.vue'
+import DynamicFields from '@/views/eam/assetLedger/DynamicFields.vue'
 
 defineOptions({ name: 'EamDemandForm' })
 const emit = defineEmits(['success'])

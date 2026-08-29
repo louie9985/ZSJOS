@@ -3,6 +3,16 @@ package cn.iocoder.yudao.module.zsjos.enums;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface ZsjosErrorCodeConstants {
+    ErrorCode FORCED_FORM_NOT_EXISTS = new ErrorCode(1_900_004_001, "强制表单不存在");
+    ErrorCode FORCED_FORM_FIELD_INVALID = new ErrorCode(1_900_004_002, "强制表单字段配置无效");
+    ErrorCode FORCED_FORM_DICT_INVALID = new ErrorCode(1_900_004_003, "强制表单字典配置无效");
+    ErrorCode FORCED_FORM_ATTACHMENT_INVALID = new ErrorCode(1_900_004_004, "强制表单附件配置无效");
+    ErrorCode FORCED_FORM_SUBMIT_INVALID = new ErrorCode(1_900_004_005, "强制表单提交内容无效");
+    ErrorCode FORCED_FORM_REQUIRED = new ErrorCode(1_900_004_006, "存在必须完成的强制表单");
+    ErrorCode FORCED_FORM_VERSION_INVALID = new ErrorCode(1_900_004_007, "强制表单版本状态无效");
+    ErrorCode FORCED_FORM_PERMISSION_DENIED = new ErrorCode(1_900_004_008, "无权查看或提交该强制表单");
+    ErrorCode FORCED_FORM_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_004_009, "强制表单已提交，请勿重复操作");
+    ErrorCode FORCED_FORM_BATCH_INVALID = new ErrorCode(1_900_004_010, "强制表单批次无效");
 
     ErrorCode PURCHASE_INTENT_NOT_EXISTS = new ErrorCode(1_900_017_001, "购买草稿不存在");
     ErrorCode PURCHASE_INTENT_VERSION_CONFLICT = new ErrorCode(1_900_017_002, "购买草稿已被其他人修改，请刷新后重试");

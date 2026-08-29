@@ -36,6 +36,7 @@ public class LeadSubmitterActionService {
     @Resource private LeadUrgeMapper urgeMapper; @Resource private LeadNotifyEventPublisher notifyPublisher;
     @Resource private LeadSubmissionIdentityService identityService;
     @Resource private LeadCategorySnapshotService categorySnapshotService;
+    @Resource private LeadLifecycleTaskService lifecycleTaskService;
 
     @Transactional(rollbackFor = Exception.class)
     public void supplement(Long leadId, Long userId, LeadSubmitterSupplementReqVO req) {
@@ -69,6 +70,9 @@ public class LeadSubmitterActionService {
         event.setAggregateType(BIZ_TYPE_LEAD); event.setAggregateId(leadId); event.setOperatorUserId(userId);
         event.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("before", before))); event.setOccurredAt(LocalDateTime.now());
         event.setIdempotencyKey(req.getIdempotencyKey()); eventMapper.insert(event);
+        if (userId != null) {
+            lifecycleTaskService.completeSubmitterAssistTasks(leadId, userId, event.getOccurredAt());
+        }
     }
 
     @Transactional(rollbackFor = Exception.class)

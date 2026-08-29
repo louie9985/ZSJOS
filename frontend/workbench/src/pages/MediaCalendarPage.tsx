@@ -1,5 +1,5 @@
 import { CalendarOutlined, LeftOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
-import { Alert, Button, Empty, Input, Pagination, Segmented, Select, Skeleton, Space, Tooltip, Typography } from 'antd'
+import { Alert, Button, Empty, Input, Segmented, Select, Skeleton, Space, Tooltip, Typography } from 'antd'
 import dayjs, { type Dayjs } from 'dayjs'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { DICT_TYPE } from '../constants'
@@ -89,7 +89,6 @@ function AllScheduleCalendar({
   stage,
   director,
   operator,
-  page,
   onAnchorChange,
   onKeywordInputChange,
   onKeywordSearch,
@@ -97,7 +96,6 @@ function AllScheduleCalendar({
   onStageChange,
   onDirectorChange,
   onOperatorChange,
-  onPageChange,
   onReload
 }: {
   anchor: Dayjs
@@ -116,7 +114,6 @@ function AllScheduleCalendar({
   stage?: string
   director?: number
   operator?: number
-  page: number
   onAnchorChange: (next: Dayjs | ((current: Dayjs) => Dayjs)) => void
   onKeywordInputChange: (value: string) => void
   onKeywordSearch: (value: string) => void
@@ -124,7 +121,6 @@ function AllScheduleCalendar({
   onStageChange: (value?: string) => void
   onDirectorChange: (value?: number) => void
   onOperatorChange: (value?: number) => void
-  onPageChange: (page: number) => void
   onReload: () => void
 }) {
   const weeks = useMemo(() => buildScheduleCells(anchor, rows), [anchor, rows])
@@ -134,12 +130,6 @@ function AllScheduleCalendar({
     const start = monthStart.startOf('week')
     return Array.from({ length: 42 }, (_, index) => start.add(index, 'day'))
   }, [monthStart])
-  const selectedDayEntries = useMemo(() => rows.filter(row => {
-    const start = dayjs(row.startDate)
-    const end = dayjs(row.endDate)
-    return (anchor.isAfter(start, 'day') || anchor.isSame(start, 'day'))
-      && (anchor.isBefore(end, 'day') || anchor.isSame(end, 'day'))
-  }), [anchor, rows])
   const activeFilters = [keyword, status, stage, director, operator].filter(value => value !== undefined && value !== '').length
 
   return <section className="workspace-page media-schedule-page">
@@ -178,8 +168,6 @@ function AllScheduleCalendar({
         </div>)}</div>}
       </div>}
       {!error && !loading && !rows.length && <Empty className="media-schedule-empty" description="当前月份没有日程" />}
-      <div className="media-schedule-day-list"><div><strong>{anchor.format('M月D日')}</strong><span>{selectedDayEntries.length ? `${selectedDayEntries.length} 项日程` : '暂无日程'}</span></div>{selectedDayEntries.slice(0, 5).map(row => <div className="media-schedule-day-item" key={row.id}><strong>{itemTitle(row)}</strong><span>{itemMeta(row)} · {row.startDate} 至 {row.endDate}</span></div>)}</div>
-      {total > 50 && <Pagination className="media-schedule-pagination" current={page} pageSize={50} total={total} showSizeChanger={false} onChange={onPageChange} />}
     </main>
   </section>
 }
@@ -217,12 +205,19 @@ export default function MediaCalendarPage({ scope = 'account' }: { scope?: Calen
   const load = useCallback(async (targetPage = 1) => {
     setLoading(true); setError('')
     try {
-      const result = await (isAllCalendar ? api.mediaAccount.calendarAll : api.mediaAccount.calendar)({
-        pageNo: targetPage, pageSize: 50, rangeStart: range.start.format('YYYY-MM-DD'), rangeEnd: range.end.format('YYYY-MM-DD'),
-        keyword: keyword || undefined, currentStatusValue: status, stageValue: stage,
-        directorUserId: director, operatorUserId: operator
-      })
-      setRows(result.list); setTotal(result.total); setUnscheduled(result.unscheduledCount); setPage(targetPage)
+      const params = {
+        rangeStart: range.start.format('YYYY-MM-DD'),
+        rangeEnd: range.end.format('YYYY-MM-DD'),
+        keyword: keyword || undefined,
+        currentStatusValue: status,
+        stageValue: stage,
+        directorUserId: director,
+        operatorUserId: operator,
+      }
+      const result = isAllCalendar
+        ? await api.mediaAccount.calendarAll(params)
+        : await api.mediaAccount.calendar({ pageNo: targetPage, pageSize: 50, ...params })
+      setRows(result.list); setTotal(result.total); setUnscheduled(result.unscheduledCount); setPage(isAllCalendar ? 1 : targetPage)
     } catch (cause) {
       setRows([]); setTotal(0); setUnscheduled(0)
       setError(cause instanceof ApiError && cause.code === 403 ? `无权查看${title}` : cause instanceof Error ? cause.message : '日历加载失败')
@@ -239,11 +234,10 @@ export default function MediaCalendarPage({ scope = 'account' }: { scope?: Calen
   if (isAllCalendar) return <AllScheduleCalendar
     anchor={anchor} rows={rows} total={total} unscheduled={unscheduled} loading={loading} error={error}
     keywordInput={keywordInput} keyword={keyword} statuses={statuses} stages={stages} directors={directors} operators={operators}
-    status={status} stage={stage} director={director} operator={operator} page={page}
+    status={status} stage={stage} director={director} operator={operator}
     onAnchorChange={setAnchor} onKeywordInputChange={setKeywordInput} onKeywordSearch={setKeyword}
     onStatusChange={setStatus} onStageChange={setStage} onDirectorChange={setDirector} onOperatorChange={setOperator}
-    onPageChange={value => void load(value)}
-    onReload={() => void load(page)}
+    onReload={() => void load(1)}
   />
 
   return <section className="workspace-page media-calendar-page">
@@ -270,6 +264,5 @@ export default function MediaCalendarPage({ scope = 'account' }: { scope?: Calen
         })}{todayIndex >= 0 && todayIndex < days.length && <div className="media-calendar-today" style={{ left: todayIndex * DAY_WIDTH + DAY_WIDTH / 2 }} />}</div>
       </div>
     </div>}
-    {total > 50 && <Pagination current={page} pageSize={50} total={total} showSizeChanger={false} onChange={value => void load(value)} />}
   </section>
 }

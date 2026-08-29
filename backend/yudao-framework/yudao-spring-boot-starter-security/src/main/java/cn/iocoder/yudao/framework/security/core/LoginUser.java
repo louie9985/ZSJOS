@@ -40,6 +40,10 @@ public class LoginUser {
      */
     private Long tenantId;
     /**
+     * 客户端编号
+     */
+    private String clientId;
+    /**
      * 授权范围
      */
     private List<String> scopes;

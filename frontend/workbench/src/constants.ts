@@ -143,20 +143,6 @@ export const AUTH_STORAGE_KEYS = {
   }
 } as const
 
-export const resolveAuthPlatform = (
-  pathname = window.location.pathname,
-  storage: Pick<Storage, 'getItem' | 'setItem'> = sessionStorage
-): AuthPlatform => {
-  if (/(?:^|\/)zsjos\/mobile(?:\/|$)/i.test(pathname)) {
-    storage.setItem(AUTH_PLATFORM_SESSION_KEY, 'MOBILE')
-    return 'MOBILE'
-  }
-  const stored = storage.getItem(AUTH_PLATFORM_SESSION_KEY)
-  if (stored === 'MOBILE') return 'MOBILE'
-  storage.setItem(AUTH_PLATFORM_SESSION_KEY, 'PC')
-  return 'PC'
-}
-
 export const RENDERABLE_APP_ROUTES = new Set([
   APP_ROUTES.LEAD_SUBMISSION,
   APP_ROUTES.LEAD_MANAGEMENT,

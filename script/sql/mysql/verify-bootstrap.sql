@@ -2009,3 +2009,48 @@ SELECT 'V161 media calendar schedule view' AS check_name,
                      AND all_calendar_grant.tenant_id=account_calendar_grant.tenant_id
                      AND all_calendar_grant.menu_id=73604 AND all_calendar_grant.deleted=b'0')),
           'PASS','FAIL') AS result;
+
+SELECT 'V162 lead submit specify permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V162')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V162')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=6820 AND parent_id=6736 AND name='指定销售'
+                 AND permission='zsjos:lead:submit:specify' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu
+               WHERE id=6736 AND permission='zsjos:lead:submit' AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_menu
+               WHERE id=6820 AND deleted=b'0' AND permission<>'zsjos:lead:submit:specify')
+          AND NOT EXISTS (SELECT 1 FROM system_menu
+               WHERE deleted=b'0' AND id<>6820 AND permission='zsjos:lead:submit:specify')
+          AND NOT EXISTS (SELECT 1 FROM system_role_menu
+               WHERE menu_id=6820 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package
+               WHERE deleted=b'0' AND JSON_CONTAINS(menu_ids,'6736','$')
+                 AND NOT JSON_CONTAINS(menu_ids,'6820','$')),
+          'PASS','FAIL') AS result;
+
+SELECT 'V163 lead unreachable submitter assist' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V163')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V163')
+          AND EXISTS (SELECT 1 FROM system_dict_data
+               WHERE dict_type='zsjos_lead_follow_up_result' AND value='unreachable'
+                 AND label='未联系上' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_notify_template
+               WHERE code='ZSJOS_LEAD_SUBMITTER_ASSIST_REQUESTED'
+                 AND scene_code='zsjos.lead.submitter_assist_requested'
+                 AND JSON_CONTAINS(params, JSON_QUOTE('lead.no'))
+                 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_notify_template
+               WHERE code='ZSJOS_LEAD_SUBMITTER_ASSIST_REQUESTED' AND deleted=b'0'
+                 AND (scene_code<>'zsjos.lead.submitter_assist_requested'
+                      OR JSON_CONTAINS(params, JSON_QUOTE('lead.id'))))
+          AND NOT EXISTS (SELECT 1 FROM system_tenant tenant
+               WHERE tenant.deleted=b'0' AND NOT EXISTS (
+                 SELECT 1 FROM system_notify_rule rule_row
+                 WHERE rule_row.tenant_id=tenant.id
+                   AND rule_row.scene_code='zsjos.lead.submitter_assist_requested'
+                   AND rule_row.channel_code='in_app'
+                   AND JSON_CONTAINS(rule_row.recipient_roles, JSON_QUOTE('submitter'))
+                   AND rule_row.action_type='business_detail'
+                   AND rule_row.deleted=b'0')),
+          'PASS','FAIL') AS result;

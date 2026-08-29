@@ -9,6 +9,7 @@ public class BpmTaskRespDTO {
 
     private String id;
     private String processInstanceId;
+    private String processDefinitionKey;
     private String businessKey;
     private String taskDefinitionKey;
     private String parentTaskId;

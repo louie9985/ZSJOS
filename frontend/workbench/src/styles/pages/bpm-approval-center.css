@@ -89,6 +89,25 @@
   white-space: normal;
 }
 
+.bpm-approval-load-state {
+  display: flex;
+  min-height: 36px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+}
+
+.bpm-approval-load-sentinel {
+  height: 1px;
+  flex: none;
+}
+
+.bpm-approval-load-error {
+  flex: none;
+}
+
 @media (max-width: 768px) {
   .bpm-approval-header {
     gap: var(--crm-sp-3);

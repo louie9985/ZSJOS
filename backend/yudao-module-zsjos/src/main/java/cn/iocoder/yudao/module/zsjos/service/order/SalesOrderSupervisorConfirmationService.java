@@ -165,10 +165,14 @@ public class SalesOrderSupervisorConfirmationService {
     }
 
     public SalesOrderApprovalTaskTargetRespVO getTaskTarget(String taskId, Long userId) {
+        return getTaskTarget(taskId, userId, false);
+    }
+
+    public SalesOrderApprovalTaskTargetRespVO getTaskTarget(String taskId, Long userId, boolean done) {
         SalesOrderSupervisorConfirmationDO confirmation = confirmationMapper.selectBySupervisorTaskId(taskId);
         if (confirmation != null) {
             if (!Objects.equals(confirmation.getSupervisorUserId(), userId)) throw exception(SALES_ORDER_PERMISSION_DENIED);
-            if (SUPERVISOR_PENDING.equals(confirmation.getStatus())) {
+            if (!done && SUPERVISOR_PENDING.equals(confirmation.getStatus())) {
                 BpmTaskRespDTO task = processTaskApi.getTodoTask(userId, taskId);
                 if (task == null || !Boolean.TRUE.equals(task.getSignTask())) throw exception(SALES_ORDER_SUPERVISOR_TASK_EXPIRED);
             }
@@ -176,15 +180,15 @@ public class SalesOrderSupervisorConfirmationService {
             return taskTarget("supervisor", confirmation.getOrderId(), taskId, confirmation.getTaskDefinitionKey(),
                     confirmation.getId(), confirmation.getStatus());
         }
-        BpmTaskRespDTO task = processTaskApi.getTodoTask(userId, taskId);
+        BpmTaskRespDTO task = done ? processTaskApi.getDoneTask(userId, taskId) : processTaskApi.getTodoTask(userId, taskId);
         if (task == null || Boolean.TRUE.equals(task.getSignTask())
                 || !Set.of(TASK_REGISTRATION, TASK_FINANCE).contains(task.getTaskDefinitionKey())) {
             throw exception(SALES_ORDER_PERMISSION_DENIED);
         }
         Long orderId = parseOrderId(task.getBusinessKey());
         if (orderId == null) throw exception(SALES_ORDER_PERMISSION_DENIED);
-        objectPermissionService.check(orderId, "review");
-        return taskTarget("approval", orderId, taskId, task.getTaskDefinitionKey(), null, "pending");
+        objectPermissionService.check(orderId, done ? "read" : "review");
+        return taskTarget("approval", orderId, taskId, task.getTaskDefinitionKey(), null, done ? "handled" : "pending");
     }
 
     public SalesOrderApprovalTaskTargetRespVO getNotificationTarget(Long orderId, String sceneCode,

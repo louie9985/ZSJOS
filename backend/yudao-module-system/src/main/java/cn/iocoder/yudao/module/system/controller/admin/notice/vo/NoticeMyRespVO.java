@@ -14,6 +14,8 @@ public class NoticeMyRespVO {
     private Integer type;
     private String content;
     private LocalDateTime publishTime;
+    private LocalDateTime highlightUntil;
+    private Boolean highlighted;
     private Boolean read;
     private LocalDateTime readTime;
     private List<NoticeAttachmentVO> attachments;

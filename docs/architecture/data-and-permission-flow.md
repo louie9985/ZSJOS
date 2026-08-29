@@ -46,6 +46,51 @@ The workbench HTTP client centralizes:
 - One-time refresh and request replay after an HTTP `401` or a successful HTTP response whose business envelope has `code=401`.
 - Authentication storage cleanup on logout or failed recovery; failed recovery also emits one global event that unmounts the workbench and returns directly to login.
 - Unwrapping the backend's standard response envelope.
+- Forced-form blocking errors: `FORCED_FORM_REQUIRED` is a business gate, not an authentication failure, and emits a local forced-form event without clearing tokens or returning to login.
+
+### Forced form gate
+
+ZSJOS owns forced-form definitions, immutable versions, send batches, recipient snapshots,
+submissions, dictionary snapshots, and submission-file bindings. System remains authoritative for
+employees, departments, posts, dictionaries, OAuth clients, menus, and permissions; Infra remains
+authoritative for file storage. The feature deliberately does not create BPM tasks, notification read
+records, or a parallel System identity source.
+
+Administrators configure forms in Vue Admin through server-owned menu/button permissions
+`zsjos:forced-form:*`. Saving and publishing both run the same server-side field validator. Field
+definitions accept only `text`, `textarea`, `radio`, `multi-select`, `checkbox`, and `attachment`.
+Dictionary-backed fields must reference a System dictionary type and cannot use static production
+options. Publishing creates an immutable version snapshot; later edits require a new version rather
+than modifying historical submissions.
+
+Sending a form resolves the selected range at send time through System APIs:
+
+- `ALL` selects enabled ADMIN employee accounts in the current tenant.
+- `USERS` validates the selected enabled employee users.
+- `DEPARTMENTS` expands child departments and then selects enabled employees.
+- `POSTS` validates posts and then selects enabled employees.
+
+The send transaction de-duplicates users, filters disabled/deleted/non-employee subjects, writes one
+batch, and freezes nickname, department, post, scope and source snapshots on recipients. A tenant/user
+can complete a form only once; a later batch or newer version of the same form does not re-require a
+completed user.
+
+After Workbench permission information is available, the forced-form provider queries pending forms.
+Pending forms are sorted by publish time and ID, and the client displays only the first pending form in
+a non-dismissible PC modal or mobile blocking surface. Runtime data exposes normalized field DTOs,
+dictionary options, and attachment limits, not raw designer JSON. Submit validates against the current
+published schema, rejects schema-external fields, requires current valid dictionary values, stores
+dictionary labels as submission snapshots, and binds only temporary attachment upload tokens owned by
+the same user/form/field. Historical detail, exports, and audit projections must use stored labels and
+file bindings rather than re-resolving current dictionary names or unbound temporary files.
+
+The authentication-complete ZSJOS web filter applies only to `/admin-api/**` requests that are marked
+as Workbench requests with `X-ZSJOS-Workbench-Platform`, have ADMIN identity, and use OAuth client
+`zsjos-pc` or `zsjos-mobile`. Vue Admin does not send the marker and is not blocked. Login, refresh,
+permission-info, logout, and forced-form pending/status/runtime/upload/submit endpoints are whitelisted
+so a user can complete the obligation. Non-whitelisted Workbench business requests with pending forms
+return HTTP 200 with the standard business envelope code `FORCED_FORM_REQUIRED` and pending summary
+data; they must not be converted to 401 or trigger logout.
 
 ### Workbench/Admin shared rendering and session contract
 
@@ -69,19 +114,26 @@ The PC Workbench and Vue Admin share the same-origin `localStorage` keys `ACCESS
 `REFRESH_TOKEN`, `CLIENT_ID`, and `EXPIRES_TIME`. The Mobile Workbench uses the isolated
 `MOBILE_ACCESS_TOKEN`, `MOBILE_REFRESH_TOKEN`, `MOBILE_CLIENT_ID`, and
 `MOBILE_EXPIRES_TIME` keys, so the same browser can retain one PC/Admin session and one Mobile
-session without one login overwriting the other. Entering through `/zsjos/mobile` pins that tab
-to the Mobile session in `sessionStorage`; subsequent server-owned menu navigation in the same
-tab remains Mobile even though menu URLs do not repeat the entry prefix. A newly opened ordinary
-Workbench or Admin tab defaults to PC.
+session without one login overwriting the other. The Workbench authentication platform is
+initialized once at page startup. Entering through `/zsjos/mobile` pins that tab to the Mobile
+session in `sessionStorage`; subsequent server-owned menu navigation in the same tab remains
+Mobile even though menu URLs do not repeat the entry prefix. A newly opened ordinary Workbench or
+Admin tab defaults to PC. If an already-running PC Workbench page navigates to `/zsjos/mobile`, it
+marks the tab as Mobile and performs a full document reload instead of hot-switching authentication
+state.
 
-Existing Workbench keys are migrated on first load according to the stored `CLIENT_ID`; an old
-Mobile session moves to the Mobile slot, while a PC or unclassified session remains compatible
-with Vue Admin. Login, request authorization, token refresh, 401 recovery, WebSocket authentication,
-and logout all use the current tab's slot. A refresh failure or ordinary logout clears only that
-platform. When one PC context receives a 401, it first checks whether the shared PC access token
-has changed before starting a refresh, which prevents an embedded Admin page from replacing a
-token refreshed by the PC Workbench context. Mobile never reads or writes the PC/Admin slot and
-does not render `admin_embed` pages; those pages direct the user to the computer entry.
+Existing Workbench keys are migrated on first load by treating the PC, Mobile, and legacy lowercase
+key families atomically. A complete legacy Mobile session moves to the Mobile slot unless a valid
+Mobile slot already exists; a complete PC or unclassified session remains compatible with Vue Admin.
+Fields from different families are never combined. Partial sessions, unknown client IDs, and
+conflicting legacy data are cleared and require account-password login again. Login, request
+authorization, token refresh, 401 recovery, WebSocket authentication, permission-info failure
+cleanup, and logout all use the startup platform captured by that page or request. A refresh
+failure or ordinary logout clears only that platform. When one PC context receives a 401, it first
+checks whether the shared PC access token has changed before starting a refresh, which prevents an
+embedded Admin page from replacing a token refreshed by the PC Workbench context. Mobile never reads
+or writes the PC/Admin slot and does not render `admin_embed` pages; those pages direct the user to
+the computer entry.
 
 The Today Tasks page may show the ZSJOS business-task panel to users with
 `zsjos:business-task:query`. It requests and renders the separate BPM task panel only when the
@@ -216,7 +268,7 @@ WebSocket events are refresh hints, while the persisted message page remains aut
 
 - System owns announcement drafts, lifecycle, attachment snapshots and per-ADMIN-user read records. Existing `system_notice` rows remain `DRAFT` after the upgrade and are never exposed implicitly.
 - Vue Admin uses the existing System notice page for draft editing, attachment upload, publishing, taking offline and copying to a new draft. Published content is immutable; corrections require taking the announcement offline and copying it.
-- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Its permanent header entry, unread bar and `/messages/notice` center are enabled only when the server permission response contains that permission. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu as a read-only page.
+- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Notices are shown in the employee home announcement panel and the `/messages/notice` center; the former header entry and unread bar are no longer rendered. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu as a read-only page. V164 adds an optional `highlight_until` deadline; active highlights are sorted first server-side, then by publish time descending.
 - `system_notice_read` is unique by tenant, notice and ADMIN user. Reconnects and offline sessions therefore preserve unread truth. The `notice-published` WebSocket event carries only an invalidation hint; clients always refresh the unread summary API.
 - Announcement body HTML is cleaned by the backend XSS cleaner before persistence and defensively sanitized again in Workbench. Attachments store the Infra file ID plus name, MIME type, size and sort snapshots; download URLs are short-lived and never persisted. Missing Infra files retain their snapshot metadata and render as unavailable.
 
@@ -605,7 +657,7 @@ The subordinate Lead detail reuses the same presentation component in read-only 
 - BPM owns the two parallel user-task groups and their history. Each center is an any-sign pool with no claim step; the first valid decision closes sibling tasks in that center. Both centers must approve, while any rejection ends the round.
 - 订单详情通过 BPM 公共 API 汇总当前轮次两个节点的 `pending/approved/rejected/cancelled` 状态并展示给已有订单读取权限的用户；汇总优先保留实际通过或驳回决定，不能让同组后续取消的会签任务覆盖结果。ZSJOS 不新增审批任务或节点状态表。
 - 上线后轮次允许普通审批人每轮唯一一次申请销售主管审批，因此整轮最多是报名履约、财务和主管三方。主管只取订单正式销售当前直属部门的 `leaderUserId`，必须启用、不能是正式销售本人且必须持有 `zsjos:sales-order:supervisor-confirm`；BPM 通过并行加签拥有主管任务、评论和历史，ZSJOS 的 `zsjos_order_supervisor_confirmation` 只保存业务申请、决定、状态和 BPM 引用，不复制任务。`pending` 不锁定普通审批任务，报名履约、财务与主管任务可同时可见和处理；一旦申请加签，该中心普通审批与对应主管审批都成为通过条件，先通过的一方等待另一方，二者通过后该中心节点才完成，另一中心状态不受影响。任一中心或主管驳回都由 BPM 驳回整轮；申请中心通过不取消主管记录，中心驳回、销售终止或流程取消才取消未完成申请。普通审批与主管审批共用服务端“成交订单审批”页面，功能权限和本人 BPM 任务仍分别校验。
-- 今日任务和业务消息通过 `/zsjos/sales-order/approval/task-target` 校验 BPM 任务关系后深链到统一审批页；从客户档案返回时仅允许 `/zsjos/sales-order-approvals` 白名单相对路径，禁止站外跳转。
+- 今日任务和业务消息通过 `/zsjos/bpm/business-task-target` 校验 BPM 任务关系后深链到员工端业务页；成交订单仍保留 `/zsjos/sales-order/approval/task-target` 作为订单专用兼容入口。从客户档案返回时仅允许 `/zsjos/sales-order-approvals` 白名单相对路径，禁止站外跳转。
 - 成交普通审批累计要求 Controller 功能权限 `zsjos:sales-order:review`、配置部门范围及本人普通 BPM 任务；主管确认累计要求 `zsjos:sales-order:supervisor-confirm`、本人主管 BPM 子任务、申请记录指定主管和订单对象关系。菜单可见、部门成员、对象可读和 BPM 任务所有权互不替代。
 - 首购订单强制关联同一客户的主客资和商机；复购订单只关联客户，客资仅作为系统客户复购的对象权限上下文。正式销售归属与实际提交人分别固化。产品上只有一个公海池，现行入口统一使用 `zsjos_lead_aging_pool_cycle`；旧 `zsjos_lead_public_sea_record` 仅作历史兼容审计，不得成为新的业务事实源。公海协同销售不得直接提交首购订单，必须先通过线上转派申请或主管直接转派成为正式负责人；转派完成后才允许成交录入。订单驳回、取消或终止不回滚已完成的正式转派。
 - 报名履约和财务任务处理、驳回、创建人或正式负责人终止均按“订单→当前审批轮次”顺序加锁，并校验当前 BPM 任务、轮次、订单/轮次版本与节点幂等键。终止由 BPM 业务授权公共 API 执行并记录真实操作人、授权类型和原因；ZSJOS 保存订单业务状态、轮次和原因快照。

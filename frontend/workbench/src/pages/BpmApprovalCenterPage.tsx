@@ -8,7 +8,6 @@ import {
   Drawer,
   Empty,
   Grid,
-  Pagination,
   Result,
   Skeleton,
   Space,
@@ -28,11 +27,13 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
 import DateTimeText from '../components/DateTimeText'
 import DetailFieldGrid from '../components/DetailFieldGrid'
-import { api, AuthenticationError, type BpmTask } from '../services/api'
+import { api, ApiError, AuthenticationError, type BpmTask } from '../services/api'
 
 type BpmTaskView = 'todo' | 'done'
 
 const PAGE_SIZE = 20
+const SALES_ORDER_PERMISSION_DENIED = 1_900_006_011
+const LEAD_APPEAL_PERMISSION_DENIED = 1_900_003_041
 
 const TASK_STATUS_LABELS: Record<number, string> = {
   [-2]: '已跳过',
@@ -167,20 +168,25 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const screens = Grid.useBreakpoint()
   const resolvedInitialView = initialView || (location.pathname === APP_ROUTES.BPM_DONE ? 'done' : 'todo')
   const [view, setView] = useState<BpmTaskView>(resolvedInitialView)
-  const [pageNo, setPageNo] = useState(1)
   const [tasks, setTasks] = useState<BpmTask[]>([])
   const [selectedId, setSelectedId] = useState<string>()
   const [total, setTotal] = useState(0)
+  const [loadedPage, setLoadedPage] = useState(0)
   const [counts, setCounts] = useState<Record<BpmTaskView, number>>({ todo: 0, done: 0 })
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [countLoading, setCountLoading] = useState(true)
   const [error, setError] = useState('')
+  const [loadMoreError, setLoadMoreError] = useState('')
   const [countError, setCountError] = useState('')
   const [unauthorized, setUnauthorized] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [locatingTaskId, setLocatingTaskId] = useState<string>()
   const requestSeq = useRef(0)
   const countSeq = useRef(0)
+  const listRef = useRef<HTMLDivElement>(null)
+  const sentinelRef = useRef<HTMLDivElement>(null)
+  const loadingMoreRef = useRef(false)
 
   const canQuery = permissions.includes('bpm:task:query')
   const canUpdate = permissions.includes('bpm:task:update')
@@ -210,39 +216,87 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     }
   }, [canQuery])
 
-  const loadPage = useCallback(async () => {
+  const appendTasks = (current: BpmTask[], incoming: BpmTask[]) => {
+    const rows = new Map(current.map(task => [task.id, task]))
+    incoming.forEach(task => rows.set(task.id, task))
+    return Array.from(rows.values())
+  }
+
+  const loadFirstPage = useCallback(async (preserveSelection = false) => {
     if (!canQuery) return
     const seq = ++requestSeq.current
     setLoading(true)
     setError('')
+    setLoadMoreError('')
     setUnauthorized(false)
     try {
-      const result = await api.bpmTaskPage(view, { pageNo, pageSize: PAGE_SIZE })
+      const result = await api.bpmTaskPage(view, { pageNo: 1, pageSize: PAGE_SIZE })
       if (seq !== requestSeq.current) return
       setTasks(result.list)
       setTotal(result.total)
+      setLoadedPage(1)
       setCounts(current => ({ ...current, [view]: result.total }))
-      setSelectedId(current => result.list.some(item => item.id === current) ? current : result.list[0]?.id)
+      setSelectedId(current => preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
     } catch (loadError) {
       if (seq !== requestSeq.current) return
       setTasks([])
       setSelectedId(undefined)
       setTotal(0)
+      setLoadedPage(0)
       setUnauthorized(loadError instanceof AuthenticationError)
       setError(loadError instanceof Error ? loadError.message : '审批任务加载失败')
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [canQuery, pageNo, view])
+  }, [canQuery, view])
+
+  const loadMore = useCallback(async () => {
+    if (!canQuery || loading || loadingMoreRef.current || tasks.length >= total) return
+    loadingMoreRef.current = true
+    setLoadingMore(true)
+    setLoadMoreError('')
+    const seq = requestSeq.current
+    const nextPage = loadedPage + 1
+    try {
+      const result = await api.bpmTaskPage(view, { pageNo: nextPage, pageSize: PAGE_SIZE })
+      if (seq !== requestSeq.current) return
+      setTasks(current => appendTasks(current, result.list))
+      setTotal(result.total)
+      setLoadedPage(nextPage)
+      setCounts(current => ({ ...current, [view]: result.total }))
+    } catch (loadError) {
+      if (seq !== requestSeq.current) return
+      setLoadMoreError(loadError instanceof Error ? loadError.message : '更多审批任务加载失败')
+    } finally {
+      loadingMoreRef.current = false
+      if (seq === requestSeq.current) setLoadingMore(false)
+    }
+  }, [canQuery, loadedPage, loading, tasks.length, total, view])
 
   useEffect(() => {
     const nextView = location.pathname === APP_ROUTES.BPM_DONE ? 'done' : 'todo'
     setView(nextView)
-    setPageNo(1)
+    setTasks([])
+    setTotal(0)
+    setLoadedPage(0)
+    setSelectedId(undefined)
+    setError('')
+    setLoadMoreError('')
+    listRef.current?.scrollTo({ top: 0 })
   }, [location.pathname])
 
   useEffect(() => { void loadCounts() }, [loadCounts])
-  useEffect(() => { void loadPage() }, [loadPage])
+  useEffect(() => { void loadFirstPage() }, [loadFirstPage])
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    const root = listRef.current
+    if (!sentinel || !root || loading || loadMoreError || tasks.length >= total) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void loadMore()
+    }, { root, rootMargin: "240px 0px" })
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [loadMore, loadMoreError, loading, tasks.length, total])
   useEffect(() => {
     if (screens.md) setDrawerOpen(false)
   }, [screens.md])
@@ -250,13 +304,13 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const changeView = (next: string) => {
     const nextView = next as BpmTaskView
     setView(nextView)
-    setPageNo(1)
     navigate(nextView === 'done' ? APP_ROUTES.BPM_DONE : APP_ROUTES.BPM_TODO)
   }
 
   const reload = () => {
     void loadCounts()
-    void loadPage()
+    listRef.current?.scrollTo({ top: 0 })
+    void loadFirstPage(true)
   }
 
   const selectTask = (task: BpmTask) => {
@@ -267,18 +321,25 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const openBusiness = async (task: BpmTask) => {
     setLocatingTaskId(task.id)
     try {
-      const target = await api.salesOrderApprovalTaskTarget(task.id)
-      const params = new URLSearchParams({
-        workType: target.workType,
-        orderId: String(target.orderId),
-        taskId: target.taskId
+      const target = await api.bpmBusinessTaskTarget(task.id, view)
+      if (!target.supported) {
+        message.info(target.message)
+        return
+      }
+      const params = new URLSearchParams()
+      Object.entries(target.query).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) params.set(key, String(value))
       })
-      if (target.confirmationId) params.set('confirmationId', String(target.confirmationId))
-      navigate(`${APP_ROUTES.SALES_ORDER_APPROVALS}?${params.toString()}`)
+      const route = target.route.startsWith('/') ? target.route : `/${target.route}`
+      navigate(params.toString() ? `${route}?${params.toString()}` : route, { state: target.query })
     } catch (locateError) {
-      message.info(locateError instanceof AuthenticationError
-        ? '当前账号无权打开该业务审批'
-        : '暂未匹配到该流程的员工端业务页，请在完整 BPM 表单中处理')
+      if (locateError instanceof AuthenticationError
+        || (locateError instanceof ApiError
+          && [SALES_ORDER_PERMISSION_DENIED, LEAD_APPEAL_PERMISSION_DENIED].includes(locateError.code))) {
+        message.info('当前账号无权打开该业务审批')
+        return
+      }
+      message.error('审批任务定位失败，请重试')
     } finally {
       setLocatingTaskId(undefined)
     }
@@ -344,14 +405,15 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
             type="error"
             showIcon
             message={error}
-            action={<Button size="small" onClick={() => void loadPage()}>重试</Button>}
+            action={<Button size="small" onClick={() => { listRef.current?.scrollTo({ top: 0 }); void loadFirstPage() }}>重试</Button>}
           />}
-          <div className="business-inbox-scroll">
+          <div className="business-inbox-scroll" ref={listRef}>
             {loading && tasks.length === 0
               ? <Skeleton active paragraph={{ rows: 8 }}/>
               : !loading && tasks.length === 0 && !error
                 ? <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'}/>
-                : tasks.map(task => {
+                : <>
+                {tasks.map(task => {
                   const active = task.id === selectedId
                   const summary = taskSummary(task)
                   return <button
@@ -377,17 +439,20 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
                     </div>
                   </button>
                 })}
+                <div ref={sentinelRef} className="bpm-approval-load-sentinel" aria-hidden="true" />
+                {loadingMore && <div className="bpm-approval-load-state"><Button type="text" size="small" loading>正在加载更多</Button></div>}
+                {loadMoreError && <Alert
+                  className="bpm-approval-load-error"
+                  type="error"
+                  showIcon
+                  message={loadMoreError}
+                  action={<Button size="small" onClick={() => void loadMore()}>重试</Button>}
+                />}
+                {!loadingMore && !loadMoreError && tasks.length >= total && total > 0 && (
+                  <div className="bpm-approval-load-state">已加载全部 {total} 条</div>
+                )}
+              </>}
           </div>
-          <Pagination
-            className="business-inbox-pagination"
-            size="small"
-            current={pageNo}
-            pageSize={PAGE_SIZE}
-            total={total}
-            showSizeChanger={false}
-            showTotal={value => `共 ${value} 条`}
-            onChange={setPageNo}
-          />
         </aside>
         <main className="business-inbox-detail-pane">{detail}</main>
       </div>}

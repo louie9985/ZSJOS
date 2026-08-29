@@ -24,10 +24,23 @@ export const getFileExtension = (filename: string): string => {
   return cleanName.split('.').pop()?.toLowerCase() || ''
 }
 
+const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'heic', 'heif']
+const audioExtensions = ['mp3', 'wav', 'm4a', 'aac', 'flac', 'ogg']
+const videoExtensions = ['mp4', 'avi', 'mov', 'wmv', 'mkv', 'webm', 'flv']
+const archiveExtensions = ['zip', 'rar', '7z', 'tar', 'gz', 'bz2']
+const textExtensions = ['txt', 'md', 'log']
+const excelExtensions = ['xls', 'xlsx', 'xlsm', 'xlsb']
+const wordExtensions = ['doc', 'docx', 'docm']
+const powerpointExtensions = ['ppt', 'pptx', 'pptm']
+
+const mimeTypeMatches = (mimeType: string | undefined, prefix: string): boolean => {
+  return Boolean(mimeType?.toLowerCase().startsWith(prefix))
+}
+
 /** 判断是否为图片 */
 export const isImage = (filename: string): boolean => {
   const ext = getFileExtension(filename)
-  return ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg'].includes(ext)
+  return imageExtensions.includes(ext)
 }
 
 /** 格式化文件大小 */
@@ -40,10 +53,36 @@ export const formatFileSize = (bytes: number): string => {
 }
 
 /** 获取文件图标 */
-export const getFileIcon = (filename: string): string => {
+export const getFileIcon = (filename: string, mimeType?: string): string => {
   const ext = getFileExtension(filename)
-  if (isImage(ext)) {
-    return 'ep:picture'
-  }
-  return 'ep:document'
+  if (imageExtensions.includes(ext) || mimeTypeMatches(mimeType, 'image/')) return 'fa-solid:file-image'
+  if (
+    excelExtensions.includes(ext) ||
+    mimeTypeMatches(mimeType, 'application/vnd.ms-excel') ||
+    mimeTypeMatches(mimeType, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+  ) return 'fa-solid:file-excel'
+  if (
+    wordExtensions.includes(ext) ||
+    mimeTypeMatches(mimeType, 'application/msword') ||
+    mimeTypeMatches(mimeType, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')
+  ) return 'fa-solid:file-word'
+  if (
+    powerpointExtensions.includes(ext) ||
+    mimeTypeMatches(mimeType, 'application/vnd.ms-powerpoint') ||
+    mimeTypeMatches(mimeType, 'application/vnd.openxmlformats-officedocument.presentationml.presentation')
+  ) return 'fa-solid:file-powerpoint'
+  if (ext === 'pdf' || mimeTypeMatches(mimeType, 'application/pdf')) return 'fa-solid:file-pdf'
+  if (
+    archiveExtensions.includes(ext) ||
+    mimeTypeMatches(mimeType, 'application/zip') ||
+    mimeTypeMatches(mimeType, 'application/x-zip') ||
+    mimeTypeMatches(mimeType, 'application/x-rar') ||
+    mimeTypeMatches(mimeType, 'application/x-7z')
+  ) return 'fa-solid:file-archive'
+  if (audioExtensions.includes(ext) || mimeTypeMatches(mimeType, 'audio/')) return 'fa-solid:file-audio'
+  if (videoExtensions.includes(ext) || mimeTypeMatches(mimeType, 'video/')) return 'fa-solid:file-video'
+  if (ext === 'csv' || mimeTypeMatches(mimeType, 'text/csv')) return 'fa-solid:file-csv'
+  if (textExtensions.includes(ext) || mimeTypeMatches(mimeType, 'text/')) return 'fa-solid:file-alt'
+  if (ext === 'code' || ext === 'json' || ext === 'xml' || ext === 'yml' || ext === 'yaml') return 'fa-solid:file-code'
+  return 'fa-solid:file'
 }

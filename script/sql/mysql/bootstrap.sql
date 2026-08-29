@@ -142,6 +142,11 @@ SOURCE script/sql/mysql/migrations/V160__registration_case_close_service.sql;
 SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
 SOURCE script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql;
 SOURCE script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql;
+SOURCE script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql;
+SOURCE script/sql/mysql/migrations/V163__lead_unreachable_submitter_assist.sql;
+SOURCE script/sql/mysql/migrations/V164__notice_highlight_until.sql;
+SOURCE script/sql/mysql/migrations/V165__zsjos_forced_form.sql;
+SOURCE script/sql/mysql/migrations/V166__zsjos_forced_form_formal_model.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

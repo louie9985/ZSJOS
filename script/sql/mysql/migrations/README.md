@@ -761,6 +761,33 @@ Fresh bootstrap sources V159 after V158 so new environments start with the unifi
 environments receive the same wording through guarded metadata updates. Rollback is forward-only and would
 require another reviewed terminology migration.
 
+## V166 - 强制表单正式模型
+
+V166 follows V165 and upgrades the development forced-form skeleton to the formal forward-only model.
+It creates `zsjos_forced_form_version`, `zsjos_forced_form_batch`, and
+`zsjos_forced_form_submission_file`; adds `current_version_id`, recipient batch and organization
+snapshots, submission `version_id`, tenant-scoped unique constraints for recipient/submission
+one-form-one-user completion, and the indexes used by tenant, form, version, user, status, and time
+queries. The attachment table stores temporary upload tokens, Infra file IDs, form/version/user/field
+ownership and lifecycle status so only successfully bound files become historical submission records.
+
+The migration also seeds the server-owned Vue Admin page/button permissions `79980`-`79989` for
+`zsjos:forced-form:*` and adds them to tenant packages that already include the ZSJOS root menu. It
+does not insert business dictionaries, form definitions, batches, recipients, submissions, files, test
+accounts, or local environment data.
+
+Execution order is V165 then V166; `bootstrap.sql` sources both in that order. The script is guarded by
+`information_schema` checks and `INSERT IGNORE` so it can be rerun after partial development attempts.
+Rollback is forward-only: preserve business rows and use a later reviewed migration to hide permissions
+or add compatibility columns. Physically dropping the new tables/columns is only a controlled
+development or maintenance operation after dependent application versions are stopped.
+### V164 Notice highlight reminder deadline
+
+V164 follows V163 and adds the nullable `system_notice.highlight_until` column. A published notice is
+considered highlighted only while its deadline is later than the current server time; no scheduler is needed.
+The employee notice query sorts active highlights first, then publish time descending and ID descending.
+The migration is additive and repeatable, does not alter existing notice rows, and must be applied after V163.
+
 ### V160 registration close-service button
 
 V160 follows V159 and adds the existing registration public-pool page's server-owned
@@ -780,6 +807,24 @@ It does not change media accounts, maintenance history, notification data, or th
 the calendar directory receive the page, and role grants are inherited only from roles already holding
 the calendar directory or account-calendar page. The migration is additive and repeatable; rollback is
 forward-only through a later permission/menu migration that disables the page and revokes grants.
+
+### V162 lead submit specify permission
+
+V162 follows V161 and adds the ungranted server-owned button permission `zsjos:lead:submit:specify`
+under the existing lead submit page `6736` as `指定销售`. It does not change lead submission data,
+dispatch logic, or any existing role-menu grant. Tenant packages that already contain the submit page
+receive the new button menu, but no role is auto-granted this permission. The migration is additive,
+repeatable, and forward-only; rollback should disable or retire the button in a later reviewed
+permission migration while preserving historical permissions already referenced by administrators.
+
+### V163 lead unreachable submitter assist
+
+V163 follows V162 and makes the `unreachable` value in `zsjos_lead_follow_up_result` explicit for
+sales first follow-up. It adds the default `zsjos.lead.submitter_assist_requested` in-app notification
+template and tenant rules for the source submitter, using `lead.no` as the user-visible Lead identifier.
+The migration creates no business tasks for historical records, changes no Lead state, grants no role,
+and does not extend business tasks to PARTNER accounts. Rollback is forward-only through a later reviewed
+notification migration that disables the seeded rule/template while retaining historical message snapshots.
 
 ### V149 Feedback management
 

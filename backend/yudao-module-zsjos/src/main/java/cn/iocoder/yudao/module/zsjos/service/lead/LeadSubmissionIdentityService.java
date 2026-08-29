@@ -26,7 +26,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosPostCodeConstants.*;
 
 @Service
 public class LeadSubmissionIdentityService {
-    public enum Identity { NEW_MEDIA, NEW_MEDIA_MANAGER, PARTNER, SALES }
+    public enum Identity { NEW_MEDIA, PARTNER, SALES }
     public record Resolution(Identity identity, Long partnerId) {}
 
     @Resource private AdminUserApi adminUserApi;
@@ -37,11 +37,8 @@ public class LeadSubmissionIdentityService {
 
     public Resolution requireOrdinarySubmitter(Long userId) {
         AdminUserRespDTO user = requireEnabledAccount(userId);
-        if (isValidInternalUser(user) && hasPost(user, NEW_MEDIA_OPERATOR)) {
+        if (isValidInternalUser(user)) {
             return new Resolution(Identity.NEW_MEDIA, null);
-        }
-        if (isValidInternalUser(user) && hasPost(user, DEPT_MANAGER) && hasManagedNewMediaEmployee(userId)) {
-            return new Resolution(Identity.NEW_MEDIA_MANAGER, null);
         }
         PartnerDO partner = partnerMapper.selectEnabledByUserId(userId);
         if (partner != null) return new Resolution(Identity.PARTNER, partner.getId());

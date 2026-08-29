@@ -2,10 +2,8 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
-import cn.iocoder.yudao.module.system.api.dept.DeptApi;
-import cn.iocoder.yudao.module.system.api.dept.PostApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
-import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
@@ -37,7 +35,6 @@ class LeadSubmissionIdentityServiceTest {
 
     @InjectMocks private LeadSubmissionIdentityService service;
     @Mock private AdminUserApi adminUserApi;
-    @Mock private PostApi postApi;
     @Mock private DeptApi deptApi;
     @Mock private PartnerMapper partnerMapper;
     @Mock private PersonnelStateService personnelStateService;
@@ -47,34 +44,15 @@ class LeadSubmissionIdentityServiceTest {
     }
 
     @Test
-    void ordinarySubmissionAllowsNewMediaOperator() {
+    void ordinarySubmissionAllowsEnabledInternalUserWithoutPost() {
         allowEnabledPersonnel(1L);
-        AdminUserRespDTO user = user(1L, 10L, Set.of(100L));
+        AdminUserRespDTO user = user(1L, 10L, Set.of());
         when(adminUserApi.getUser(1L)).thenReturn(user);
         DeptRespDTO dept = new DeptRespDTO(); dept.setId(10L); dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
         when(deptApi.getDept(10L)).thenReturn(dept);
-        when(postApi.getPostByCode("new_media_operator")).thenReturn(post(100L));
 
         assertEquals(LeadSubmissionIdentityService.Identity.NEW_MEDIA,
                 service.requireOrdinarySubmitter(1L).identity());
-    }
-
-    @Test
-    void ordinarySubmissionAllowsLeaderWithManagerPostAndNewMediaStaff() {
-        allowEnabledPersonnel(2L);
-        AdminUserRespDTO manager = user(2L, 20L, Set.of(200L));
-        AdminUserRespDTO operator = user(3L, 20L, Set.of(100L));
-        DeptRespDTO dept = new DeptRespDTO(); dept.setId(20L); dept.setLeaderUserId(2L);
-        dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        when(adminUserApi.getUser(2L)).thenReturn(manager);
-        when(deptApi.getDept(20L)).thenReturn(dept);
-        when(postApi.getPostByCode("new_media_operator")).thenReturn(post(100L));
-        when(postApi.getPostByCode("dept_manager")).thenReturn(post(200L));
-        when(deptApi.getDeptListByLeaderUserId(2L)).thenReturn(List.of(dept));
-        when(adminUserApi.getUserListByDeptIds(List.of(20L))).thenReturn(List.of(manager, operator));
-
-        assertEquals(LeadSubmissionIdentityService.Identity.NEW_MEDIA_MANAGER,
-                service.requireOrdinarySubmitter(2L).identity());
     }
 
     @Test
@@ -111,9 +89,5 @@ class LeadSubmissionIdentityServiceTest {
     private AdminUserRespDTO user(Long id, Long deptId, Set<Long> postIds) {
         AdminUserRespDTO user = new AdminUserRespDTO(); user.setId(id); user.setDeptId(deptId);
         user.setPostIds(postIds); user.setStatus(CommonStatusEnum.ENABLE.getStatus()); return user;
-    }
-
-    private PostRespDTO post(Long id) {
-        PostRespDTO post = new PostRespDTO(); post.setId(id); post.setStatus(CommonStatusEnum.ENABLE.getStatus()); return post;
     }
 }

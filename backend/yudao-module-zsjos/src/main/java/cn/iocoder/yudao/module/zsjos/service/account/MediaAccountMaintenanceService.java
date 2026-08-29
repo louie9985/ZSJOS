@@ -33,6 +33,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.framework.common.pojo.PageParam.PAGE_SIZE_NONE;
 import static cn.iocoder.yudao.module.zsjos.enums.MediaWorkflowConstants.BIZ_TYPE_MEDIA_ACCOUNT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
@@ -157,9 +158,19 @@ public class MediaAccountMaintenanceService {
         return calendarResult(req, scope.userIds(), scope.all());
     }
 
-    public MediaAccountCalendarRespVO allCalendar(MediaAccountCalendarPageReqVO req, Long userId) {
+    public MediaAccountCalendarRespVO allCalendar(MediaAccountCalendarScheduleReqVO req, Long userId) {
         if (req.getRangeEnd().isBefore(req.getRangeStart())) throw exception(MEDIA_ACCOUNT_MAINTENANCE_INVALID);
-        return calendarResult(req, Set.of(), true);
+        MediaAccountCalendarPageReqVO pageReq = new MediaAccountCalendarPageReqVO();
+        pageReq.setPageNo(1);
+        pageReq.setPageSize(PAGE_SIZE_NONE);
+        pageReq.setRangeStart(req.getRangeStart());
+        pageReq.setRangeEnd(req.getRangeEnd());
+        pageReq.setKeyword(req.getKeyword());
+        pageReq.setCurrentStatusValue(req.getCurrentStatusValue());
+        pageReq.setStageValue(req.getStageValue());
+        pageReq.setDirectorUserId(req.getDirectorUserId());
+        pageReq.setOperatorUserId(req.getOperatorUserId());
+        return calendarResult(pageReq, Set.of(), true);
     }
 
     public MediaAccountCalendarCandidatesRespVO calendarCandidates(Long userId) {

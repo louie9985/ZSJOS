@@ -1,5 +1,5 @@
 import { createContext, type PropsWithChildren, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { APP_CONFIG } from '../constants'
+import { APP_CONFIG, type AuthPlatform } from '../constants'
 import { buildWebSocketUrl, getRealtimeAccessToken, parseRealtimeMessage, type RealtimeMessage, type RealtimeStatus } from '../services/realtime'
 
 type RealtimeHandler = (message: RealtimeMessage) => void
@@ -11,7 +11,7 @@ type RealtimeContextValue = {
 
 const RealtimeContext = createContext<RealtimeContextValue | null>(null)
 
-export function RealtimeProvider({ children }: PropsWithChildren) {
+export function RealtimeProvider({ children, platform }: PropsWithChildren<{ platform: AuthPlatform }>) {
   const [status, setStatus] = useState<RealtimeStatus>('connecting')
   const listeners = useRef(new Map<string, Set<RealtimeHandler>>())
 
@@ -37,7 +37,7 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       heartbeatTimer = undefined
     }
     const connect = () => {
-      const accessToken = getRealtimeAccessToken(localStorage)
+      const accessToken = getRealtimeAccessToken(localStorage, platform)
       if (!active || !accessToken) {
         setStatus('closed')
         return
@@ -75,7 +75,7 @@ export function RealtimeProvider({ children }: PropsWithChildren) {
       clearHeartbeat()
       socket?.close()
     }
-  }, [])
+  }, [platform])
 
   const value = useMemo(() => ({ status, subscribe }), [status, subscribe])
   return <RealtimeContext.Provider value={value}>{children}</RealtimeContext.Provider>

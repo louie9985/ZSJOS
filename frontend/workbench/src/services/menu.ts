@@ -124,6 +124,10 @@ export function getInitialTarget(items: PrimaryNavigationItem[]) {
   }
 }
 
+export function getAuthenticatedHomeTarget(menus: WorkbenchMenu[]) {
+  return findMenuByPath(menus, APP_ROUTES.TODAY_TASKS)?.path
+}
+
 export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path: string, authorizedMenus?: WorkbenchMenu[]) {
   if (path === '/' || path === APP_ROUTES.USER_PROFILE || findPageByPath(items, path)
     || (authorizedMenus && findMenuByPath(authorizedMenus, path))) return

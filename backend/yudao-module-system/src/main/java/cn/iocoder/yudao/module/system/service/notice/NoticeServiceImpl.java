@@ -280,12 +280,14 @@ public class NoticeServiceImpl implements NoticeService {
 
     private NoticeRespVO toAdminResp(NoticeDO notice) {
         NoticeRespVO result = BeanUtils.toBean(notice, NoticeRespVO.class);
+        result.setHighlighted(isHighlighted(notice));
         result.setAttachments(attachmentMapper.selectListByNoticeId(notice.getId()).stream().map(this::toAttachmentVO).toList());
         return result;
     }
 
     private NoticeMyRespVO toMyResp(NoticeDO notice, NoticeReadDO read, boolean withContent) {
         NoticeMyRespVO result = BeanUtils.toBean(notice, NoticeMyRespVO.class);
+        result.setHighlighted(isHighlighted(notice));
         if (!withContent) result.setContent(null);
         result.setRead(read != null);
         result.setReadTime(read == null ? null : read.getReadTime());
@@ -293,6 +295,10 @@ public class NoticeServiceImpl implements NoticeService {
                 ? attachmentMapper.selectListByNoticeId(notice.getId()).stream().map(this::toAttachmentVO).toList()
                 : List.of());
         return result;
+    }
+
+    private boolean isHighlighted(NoticeDO notice) {
+        return notice.getHighlightUntil() != null && notice.getHighlightUntil().isAfter(LocalDateTime.now());
     }
 
     private NoticeAttachmentVO toAttachmentVO(NoticeAttachmentDO row) {

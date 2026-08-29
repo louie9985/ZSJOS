@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Alert, Button, Card, Input, Typography } from 'antd'
-import { resolveAuthPlatform } from '../constants'
+import type { AuthPlatform } from '../constants'
 import { api } from '../services/api'
 
-export default function LoginPage({ onLogin, initialError = '' }: { onLogin: () => void; initialError?: string }) {
+export default function LoginPage({ onLogin, platform, initialError = '' }: { onLogin: () => void; platform: AuthPlatform; initialError?: string }) {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
@@ -15,7 +15,6 @@ export default function LoginPage({ onLogin, initialError = '' }: { onLogin: () 
     setLoading(true)
     setError('')
     try {
-      const platform = resolveAuthPlatform()
       await api.login(username, password, platform)
       onLogin()
     } catch (loginError: any) {

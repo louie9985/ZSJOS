@@ -1,12 +1,20 @@
 import axios, { type AxiosRequestConfig } from "axios";
+import type { AxiosHeaderValue } from "axios";
 import {
   APP_CONFIG,
   AUTH_CLIENT_IDS,
-  AUTH_STORAGE_KEYS,
   STORAGE_KEYS,
-  resolveAuthPlatform,
   type AuthPlatform,
 } from "../constants";
+import {
+  clearAuthStorage as clearPlatformAuthStorage,
+  getAuthAccessToken,
+  getAuthPlatform,
+  getAuthStorageKeys,
+  migrateLegacyAuthStorage,
+} from "./authSession";
+
+export { getAuthAccessToken, migrateLegacyAuthStorage } from "./authSession";
 import {
   handleImpersonationInvalid,
   resolveImpersonationSessionHeader,
@@ -1701,6 +1709,76 @@ export type SalesOrderApprovalTaskTarget = {
   confirmationId?: number;
   status: string;
 };
+export type ForcedFormField = {
+  key: string
+  type: 'text' | 'textarea' | 'radio' | 'checkbox' | 'multi-select' | 'attachment'
+  label: string
+  required?: boolean
+  dictType?: string
+  maxLength?: number
+  maxCount?: number
+  maxSizeMb?: number
+  allowedExtensions?: string[]
+  options?: Array<{ label: string; value: string }>
+}
+export type ForcedForm = {
+  id: number
+  formId?: number
+  batchId?: number
+  versionId?: number
+  recipientId?: number
+  name: string
+  description?: string
+  fieldsJson?: string
+  status: string
+  version?: number
+  sentAt?: Timestamp
+  recipientCount?: number
+  completedCount?: number
+  pendingCount?: number
+  lastSentAt?: Timestamp
+  currentVersionId?: number
+}
+export type ForcedFormRuntime = {
+  formId: number
+  versionId: number
+  version: number
+  name: string
+  description?: string
+  recipientId: number
+  batchId: number
+  fields: ForcedFormField[]
+}
+export type ForcedFormAttachmentUploadResult = {
+  formId: number
+  versionId: number
+  fieldKey: string
+  infraFileId: number
+  uploadToken: string
+  fileName: string
+  fileSize: number
+  contentType?: string
+}
+export type ForcedFormStatus = {
+  pendingCount: number
+  firstPendingFormId?: number
+  firstPendingFormName?: string
+}
+export type BpmBusinessTaskTarget =
+  | {
+      supported: true;
+      route: string;
+      query: Record<string, string | number | boolean>;
+      bizType: "sales_order" | "lead_appeal";
+      message?: string;
+    }
+  | {
+      supported: false;
+      route?: string;
+      query: Record<string, string | number | boolean>;
+      bizType: "unsupported";
+      message: string;
+    };
 export type BusinessTaskBucket = "unscheduled" | "overdue" | "today" | "future";
 export type BusinessTaskSummary = Record<BusinessTaskBucket, number>;
 export type BusinessTask = {
@@ -1720,6 +1798,7 @@ export type BusinessTask = {
   actionCode?:
     | "OPEN_LEAD_ASSIGNMENT"
     | "OPEN_LEAD_FOLLOW_UP"
+    | "OPEN_LEAD_SUBMITTER_SUPPLEMENT"
     | "OPEN_WORK_TASK"
     | "CONFIRM_WORK_TASK"
     | "SUMMARIZE_WORK_PLAN"
@@ -1745,6 +1824,7 @@ export type BpmTask = {
   assigneeUser?: { id: number; nickname: string };
   ownerUser?: { id: number; nickname: string };
   processInstanceId: string;
+  processDefinitionKey?: string;
   taskDefinitionKey?: string;
   parentTaskId?: string;
   formName?: string;
@@ -2229,6 +2309,8 @@ export type Announcement = {
   type: number;
   content?: string;
   publishTime: Timestamp;
+  highlightUntil?: Timestamp;
+  highlighted?: boolean;
   read: boolean;
   readTime?: Timestamp;
   attachments: AnnouncementAttachment[];
@@ -2248,6 +2330,11 @@ export const http = axios.create({
   baseURL: APP_CONFIG.API_BASE_URL,
   timeout: 30000,
 });
+type AuthAxiosRequestConfig = AxiosRequestConfig & {
+  _retry?: boolean;
+  _zsjosAuthPlatform?: AuthPlatform;
+  _zsjosImpersonationSessionId?: number;
+};
 type RefreshResult =
   | { status: "refreshed"; accessToken: string }
   | { status: "failed"; expectedRefreshToken: string | null }
@@ -2272,32 +2359,26 @@ export class ApiError extends Error {
   }
 }
 
-export const getAuthStorageKeys = (
-  platform: AuthPlatform = resolveAuthPlatform(),
-) => AUTH_STORAGE_KEYS[platform];
-
-export const getAuthAccessToken = (
-  platform: AuthPlatform = resolveAuthPlatform(),
-  storage: Pick<Storage, "getItem"> = localStorage,
-) => storage.getItem(getAuthStorageKeys(platform).accessToken);
+export const FORCED_FORM_REQUIRED_CODE = 1_900_004_006;
 
 export const clearAuthStorage = (
-  platform: AuthPlatform = resolveAuthPlatform(),
+  platform: AuthPlatform,
 ) => {
   delete refreshing[platform];
-  const keys = getAuthStorageKeys(platform);
-  localStorage.removeItem(keys.accessToken);
-  localStorage.removeItem(keys.refreshToken);
-  localStorage.removeItem(keys.clientId);
-  localStorage.removeItem(keys.expiresTime);
-  if (platform === "PC") {
-    // 旧 Workbench key 只属于 PC/Admin 兼容协议；Mobile 退出不能触碰 PC 会话。
-    localStorage.removeItem("zsjos_access_token");
-    localStorage.removeItem("zsjos_refresh_token");
-    localStorage.removeItem("zsjos_client_id");
-    localStorage.removeItem("zsjos_expires_time");
-    localStorage.removeItem(STORAGE_KEYS.IMPERSONATION);
-  }
+  clearPlatformAuthStorage(platform);
+};
+
+export const resolveRequestAuthPlatform = (
+  requestPlatform: AuthPlatform | undefined,
+  currentPlatform: AuthPlatform,
+) => requestPlatform ?? currentPlatform;
+
+export const applyAuthorizationHeader = (
+  headers: { delete: (name: string) => void; Authorization?: AxiosHeaderValue },
+  accessToken: string | null,
+) => {
+  headers.delete("Authorization");
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
 };
 export type SubordinatePartner = {
   id: number;
@@ -2361,60 +2442,6 @@ const authenticatedTenantId = (platform: AuthPlatform) => {
   throw new AuthenticationError("租户信息缺失，请重新登录");
 };
 
-const LEGACY_AUTH_KEYS = {
-  accessToken: "zsjos_access_token",
-  refreshToken: "zsjos_refresh_token",
-  clientId: "zsjos_client_id",
-  expiresTime: "zsjos_expires_time",
-} as const;
-
-export const migrateLegacyAuthStorage = (
-  storage: Pick<Storage, "getItem" | "setItem" | "removeItem"> = localStorage,
-) => {
-  const pcKeys = AUTH_STORAGE_KEYS.PC;
-  const source = {
-    accessToken:
-      storage.getItem(pcKeys.accessToken) ||
-      storage.getItem(LEGACY_AUTH_KEYS.accessToken),
-    refreshToken:
-      storage.getItem(pcKeys.refreshToken) ||
-      storage.getItem(LEGACY_AUTH_KEYS.refreshToken),
-    clientId:
-      storage.getItem(pcKeys.clientId) ||
-      storage.getItem(LEGACY_AUTH_KEYS.clientId),
-    expiresTime:
-      storage.getItem(pcKeys.expiresTime) ||
-      storage.getItem(LEGACY_AUTH_KEYS.expiresTime),
-  };
-  const complete = Boolean(source.accessToken && source.refreshToken);
-  const platform: AuthPlatform =
-    source.clientId === AUTH_CLIENT_IDS.MOBILE ? "MOBILE" : "PC";
-  const target = AUTH_STORAGE_KEYS[platform];
-  if (complete) {
-    const values = {
-      accessToken: source.accessToken!,
-      refreshToken: source.refreshToken!,
-      clientId: source.clientId || AUTH_CLIENT_IDS[platform],
-      expiresTime: source.expiresTime,
-    };
-    for (const field of [
-      "accessToken",
-      "refreshToken",
-      "clientId",
-      "expiresTime",
-    ] as const) {
-      const value = values[field];
-      if (value && !storage.getItem(target[field]))
-        storage.setItem(target[field], value);
-    }
-  }
-  // 无前缀 key 若标记为 mobile，必须移走，避免 Vue Admin/PC 误用 Mobile Token。
-  if (platform === "MOBILE") {
-    Object.values(pcKeys).forEach((key) => storage.removeItem(key));
-  }
-  Object.values(LEGACY_AUTH_KEYS).forEach((key) => storage.removeItem(key));
-};
-
 export const AUTH_EXPIRED_EVENT = "zsjos-auth-expired";
 const authExpiredDispatched: Record<AuthPlatform, boolean> = {
   PC: false,
@@ -2445,13 +2472,16 @@ const expireAuthentication = (
 };
 
 http.interceptors.request.use((config) => {
-  const platform = resolveAuthPlatform();
-  const keys = getAuthStorageKeys(platform);
   const request = config as typeof config & {
     _zsjosAuthPlatform?: AuthPlatform;
     _zsjosImpersonationSessionId?: number;
   };
+  const platform = resolveRequestAuthPlatform(
+    request._zsjosAuthPlatform,
+    getAuthPlatform(),
+  );
   request._zsjosAuthPlatform = platform;
+  const keys = getAuthStorageKeys(platform);
   const expectedOrigin = new URL(
     config.baseURL || APP_CONFIG.API_BASE_URL,
     window.location.origin,
@@ -2463,13 +2493,15 @@ http.interceptors.request.use((config) => {
     config.headers.delete("tenant-id");
     config.headers.delete("Authorization");
     config.headers.delete("X-ZSJOS-Impersonation-Session");
+    config.headers.delete("X-ZSJOS-Workbench-Platform");
     return config;
   }
   const token = localStorage.getItem(keys.accessToken);
+  applyAuthorizationHeader(config.headers, token);
   config.headers["tenant-id"] = token
     ? authenticatedTenantId(platform)
     : readSharedTenantId() || APP_CONFIG.DEFAULT_TENANT_ID;
-  if (token) config.headers.Authorization = `Bearer ${token}`;
+  config.headers["X-ZSJOS-Workbench-Platform"] = platform;
   const impersonation =
     platform === "PC"
       ? localStorage.getItem(STORAGE_KEYS.IMPERSONATION)
@@ -2512,7 +2544,7 @@ const retryAfterRefresh = async (
   if (request._retry || isAuthEndpoint(request.url))
     return Promise.reject(originalError);
   request._retry = true;
-  const platform = request._zsjosAuthPlatform || resolveAuthPlatform();
+  const platform = request._zsjosAuthPlatform ?? getAuthPlatform();
   const keys = getAuthStorageKeys(platform);
   // Admin iframe 可能已经完成刷新；先复用共享存储中的新 token，避免两个窗口同时刷新。
   const sharedAccessToken = localStorage.getItem(keys.accessToken);
@@ -2527,6 +2559,7 @@ const retryAfterRefresh = async (
       ...request.headers,
       Authorization: `Bearer ${sharedAccessToken}`,
     };
+    request._zsjosAuthPlatform = platform;
     return http(request);
   }
   if (!refreshing[platform]) {
@@ -2546,6 +2579,7 @@ const retryAfterRefresh = async (
     ...request.headers,
     Authorization: `Bearer ${result.accessToken}`,
   };
+  request._zsjosAuthPlatform = platform;
   return http(request);
 };
 
@@ -2583,11 +2617,17 @@ export const unwrap = <T>(response: { data: any }): T => {
   const payload = response.data;
   if (payload && typeof payload.code === "number") {
     if (payload.code === 401) throw new AuthenticationError(payload.msg);
-    if (payload.code !== 0)
+    if (payload.code !== 0) {
+      if (payload.code === FORCED_FORM_REQUIRED_CODE) {
+        window.dispatchEvent(
+          new CustomEvent("zsjos-forced-form-required", { detail: payload.data }),
+        );
+      }
       throw new ApiError(
         payload.code,
         payload.msg || `请求失败（${payload.code}）`,
       );
+    }
     return payload.data as T;
   }
   return payload as T;
@@ -2598,10 +2638,9 @@ async function refreshToken(platform: AuthPlatform): Promise<RefreshResult> {
   const refresh = localStorage.getItem(keys.refreshToken);
   if (!refresh) return { status: "failed", expectedRefreshToken: null };
   try {
-    const clientId = localStorage.getItem(keys.clientId);
-    const clientIdParam = clientId
-      ? `&clientId=${encodeURIComponent(clientId)}`
-      : "";
+    const expectedClientId = AUTH_CLIENT_IDS[platform];
+    const clientId = localStorage.getItem(keys.clientId) || expectedClientId;
+    const clientIdParam = `&clientId=${encodeURIComponent(clientId)}`;
     const tenantId = authenticatedTenantId(platform);
     const response = await axios.post(
       `${APP_CONFIG.API_BASE_URL}/system/auth/refresh-token?refreshToken=${encodeURIComponent(refresh)}${clientIdParam}`,
@@ -2613,6 +2652,8 @@ async function refreshToken(platform: AuthPlatform): Promise<RefreshResult> {
       refreshToken: string;
       clientId?: string;
     }>(response);
+    if (result.clientId && result.clientId !== expectedClientId)
+      throw new AuthenticationError("登录端类型不匹配，请重新登录");
     if (
       !isCurrentRefreshSession(
         refresh,
@@ -2623,8 +2664,7 @@ async function refreshToken(platform: AuthPlatform): Promise<RefreshResult> {
     }
     localStorage.setItem(keys.accessToken, result.accessToken);
     localStorage.setItem(keys.refreshToken, result.refreshToken);
-    if (result.clientId)
-      localStorage.setItem(keys.clientId, result.clientId);
+    localStorage.setItem(keys.clientId, expectedClientId);
     return { status: "refreshed", accessToken: result.accessToken };
   } catch {
     return isCurrentRefreshSession(
@@ -2681,23 +2721,27 @@ export const api = {
       expiresTime: string;
       clientId?: string;
     }>(await http.post("/system/auth/login", { username, password, platform }));
+    const expectedClientId = AUTH_CLIENT_IDS[platform];
+    if (result.clientId && result.clientId !== expectedClientId) {
+      clearAuthStorage(platform);
+      throw new AuthenticationError("登录端类型不匹配，请重新登录");
+    }
     const keys = getAuthStorageKeys(platform);
     localStorage.setItem(keys.accessToken, result.accessToken);
     localStorage.setItem(keys.refreshToken, result.refreshToken);
     localStorage.setItem(keys.expiresTime, result.expiresTime);
-    localStorage.setItem(
-      keys.clientId,
-      result.clientId || AUTH_CLIENT_IDS[platform],
-    );
+    localStorage.setItem(keys.clientId, expectedClientId);
     delete refreshing[platform];
     authExpiredDispatched[platform] = false;
     return result;
   },
-  logout: async () => {
+  logout: async (platform: AuthPlatform = getAuthPlatform()) => {
     try {
-      await http.post("/system/auth/logout");
+      await http.post("/system/auth/logout", undefined, {
+        _zsjosAuthPlatform: platform,
+      } as AuthAxiosRequestConfig);
     } finally {
-      clearAuthStorage();
+      clearAuthStorage(platform);
     }
   },
   permissionInfo: async () =>
@@ -2891,8 +2935,6 @@ export const api = {
         await http.get("/zsjos/media-account/calendar", { params }),
       ),
     calendarAll: async (params: {
-      pageNo: number;
-      pageSize: number;
       rangeStart: string;
       rangeEnd: string;
       keyword?: string;
@@ -3848,10 +3890,16 @@ export const api = {
     unwrap<SalesOrderApprovalFilterProfile>(
       await http.get("/zsjos/sales-order/approval/filter-profile"),
     ),
-  salesOrderApprovalTaskTarget: async (taskId: string) =>
+  salesOrderApprovalTaskTarget: async (taskId: string, view: "todo" | "done" = "todo") =>
     unwrap<SalesOrderApprovalTaskTarget>(
       await http.get("/zsjos/sales-order/approval/task-target", {
-        params: { taskId },
+        params: { taskId, view },
+      }),
+    ),
+  bpmBusinessTaskTarget: async (taskId: string, view: "todo" | "done") =>
+    unwrap<BpmBusinessTaskTarget>(
+      await http.get("/zsjos/bpm/business-task-target", {
+        params: { taskId, view },
       }),
     ),
   salesOrderApprovalNotificationTarget: async (
@@ -4555,6 +4603,32 @@ export const api = {
     unwrap<AnnouncementUnreadSummary>(
       await http.get("/system/notice/unread-summary"),
     ),
+  forcedFormsPending: async () =>
+    unwrap<ForcedForm[]>(await http.get("/zsjos/forced-form/pending")),
+  forcedFormStatus: async () =>
+    unwrap<ForcedFormStatus>(await http.get("/zsjos/forced-form/status")),
+  forcedForm: async (id: number) =>
+    unwrap<ForcedForm>(await http.get(`/zsjos/forced-form/${id}`)),
+  forcedFormRuntime: async (id: number) =>
+    unwrap<ForcedFormRuntime>(await http.get(`/zsjos/forced-form/${id}/runtime`)),
+  uploadForcedFormAttachment: async (
+    id: number,
+    fieldKey: string,
+    file: File,
+  ) => {
+    const data = new FormData();
+    data.append("file", file);
+    return unwrap<ForcedFormAttachmentUploadResult>(
+      await http.post(`/zsjos/forced-form/${id}/attachment/upload`, data, {
+        params: { fieldKey },
+      }),
+    );
+  },
+  submitForcedForm: async (
+    id: number,
+    payload: { answersJson: string; platform: string },
+  ) =>
+    unwrap<boolean>(await http.post(`/zsjos/forced-form/${id}/submit`, payload)),
   markAnnouncementRead: async (id: number) =>
     unwrap<boolean>(
       await http.put("/system/notice/mark-read", undefined, { params: { id } }),

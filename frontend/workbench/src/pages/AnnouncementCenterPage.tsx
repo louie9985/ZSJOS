@@ -1,10 +1,11 @@
 import { Alert, Badge, Button, Drawer, Empty, Grid, List, Pagination, Skeleton, Space, Tag, Typography } from 'antd'
-import { FileOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { api, type Announcement } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import { useAnnouncements } from '../components/AnnouncementProvider'
+import AnnouncementAttachmentIcon from '../components/AnnouncementAttachmentIcon'
 import SafeRichText from '../components/SafeRichText'
 
 const PAGE_SIZE = 20
@@ -15,17 +16,17 @@ function AnnouncementDetail({ item }: { item?: Announcement }) {
     <header>
       <Space wrap><Tag color="blue">{item.type === 1 ? '通知' : '公告'}</Tag>{!item.read && <Badge status="processing" text="未读"/>}</Space>
       <Typography.Title level={3}>{item.title}</Typography.Title>
-      <Typography.Text type="secondary">发布于 {formatTimestamp(item.publishTime)}</Typography.Text>
+      <Typography.Text type="secondary">发布于 {formatTimestamp(item.publishTime)} {item.highlighted && <Tag color="gold">高亮中</Tag>}</Typography.Text>
     </header>
     <SafeRichText html={item.content || ''}/>
     {item.attachments.length > 0 && <section className="announcement-files">
       <Typography.Title level={5}>附件</Typography.Title>
       {item.attachments.map(file => file.downloadUrl
         ? <a key={file.infraFileId} href={file.downloadUrl} target="_blank" rel="noopener noreferrer" className="announcement-file">
-          <FileOutlined/><span>{file.fileName}</span><small>{formatFileSize(file.fileSize)}</small>
+          <AnnouncementAttachmentIcon name={file.fileName} mimeType={file.mimeType}/><span>{file.fileName}</span><small>{formatFileSize(file.fileSize)}</small>
         </a>
         : <div key={file.infraFileId} className="announcement-file unavailable">
-          <FileOutlined/><span>{file.fileName}</span><small>文件不可用</small>
+          <AnnouncementAttachmentIcon name={file.fileName} mimeType={file.mimeType}/><span>{file.fileName}</span><small>文件不可用</small>
         </div>)}
     </section>}
   </article>
@@ -91,7 +92,7 @@ export default function AnnouncementCenterPage() {
       <aside className="announcement-list-pane">
         {loading ? <Skeleton active paragraph={{ rows: 8 }}/> : items.length === 0 ? <Empty description="暂无公告"/> : <>
           <List dataSource={items} renderItem={item => <button type="button" className={`announcement-list-item${selected?.id === item.id ? ' active' : ''}${item.read ? '' : ' unread'}`} onClick={() => void openDetail(item.id)}>
-            <span className="announcement-list-title">{item.title}</span>
+            <span className="announcement-list-title">{item.highlighted && <Tag color="gold">高亮</Tag>}{item.title}</span>
             <span className="announcement-list-meta"><Badge status={item.read ? 'default' : 'processing'}/>{formatTimestamp(item.publishTime)}</span>
           </button>}/>
           <Pagination simple current={pageNo} pageSize={PAGE_SIZE} total={total} onChange={setPageNo}/>

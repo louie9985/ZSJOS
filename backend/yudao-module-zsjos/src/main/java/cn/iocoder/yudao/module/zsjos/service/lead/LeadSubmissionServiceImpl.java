@@ -12,6 +12,7 @@ import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.*;
@@ -53,6 +54,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     @Resource private LeadAttachmentMapper attachmentMapper;
     @Resource private AreaApi areaApi;
     @Resource private DictDataApi dictDataApi;
+    @Resource private PermissionApi permissionApi;
     @Resource private ZsjosProductSkuService productSkuService;
     @Resource private LeadDispatchService dispatchService;
     @Resource private LeadAttachmentService attachmentService;
@@ -128,6 +130,12 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             result.setDeptName(dept == null ? null : dept.getName());
             return result;
         }).toList();
+    }
+
+    @Override
+    public List<LeadAssignmentUserRespVO> getSpecifiedSalesUsers(Long operatorUserId) {
+        requireSpecifiedDispatchPermission(operatorUserId);
+        return dispatchService.getEligibleSalesUsers();
     }
 
     private LeadCreateRespVO create(LeadCreateReqVO reqVO, Long actorUserId, Long sourceUserId,
@@ -361,10 +369,16 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         if (identity == LeadSubmissionIdentityService.Identity.PARTNER
                 && !DISPATCH_AUTO.equals(reqVO.getDispatchMode())) throw exception(LEAD_DISPATCH_MODE_INVALID);
         if (!DISPATCH_SPECIFIED.equals(reqVO.getDispatchMode())) return;
-        boolean allowed = identity == LeadSubmissionIdentityService.Identity.NEW_MEDIA_MANAGER
-                ? dispatchService.getEligibleSalesUsers().stream().anyMatch(user -> Objects.equals(user.getId(), reqVO.getSpecifiedSalesUserId()))
-                : dispatchService.getAssignableSalesUsers(userId).stream().anyMatch(user -> Objects.equals(user.getId(), reqVO.getSpecifiedSalesUserId()));
+        requireSpecifiedDispatchPermission(userId);
+        boolean allowed = dispatchService.getEligibleSalesUsers().stream()
+                .anyMatch(user -> Objects.equals(user.getId(), reqVO.getSpecifiedSalesUserId()));
         if (!allowed) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
+    }
+
+    private void requireSpecifiedDispatchPermission(Long userId) {
+        if (!permissionApi.hasAnyPermissions(userId, PERMISSION_SUBMIT_SPECIFY)) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
     }
 
     private LeadDO createLead(PersonDO person, LeadCreateReqVO reqVO, String mobile, String wechatId,

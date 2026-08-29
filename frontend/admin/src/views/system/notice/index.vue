@@ -36,6 +36,12 @@
         <el-table-column label="公告类型" prop="type" width="110" align="center">
           <template #default="scope"><dict-tag :type="DICT_TYPE.SYSTEM_NOTICE_TYPE" :value="scope.row.type" /></template>
         </el-table-column>
+        <el-table-column label="高亮" width="80" align="center">
+          <template #default="scope">
+            <el-tag v-if="scope.row.highlighted" type="warning">高亮中</el-tag>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="发布状态" prop="publishStatus" width="110" align="center">
           <template #default="scope">
             <el-tag :type="statusMeta[scope.row.publishStatus].type">{{ statusMeta[scope.row.publishStatus].label }}</el-tag>

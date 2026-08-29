@@ -73,11 +73,11 @@
       <el-form-item v-if="!selfSourced" label="派单方式" prop="dispatchMode"
         ><el-radio-group v-model="form.dispatchMode"
           ><el-radio value="auto">自动分配</el-radio
-          ><el-radio value="specified">指定销售</el-radio></el-radio-group
+          ><el-radio v-if="canSpecifySales" value="specified">指定销售</el-radio></el-radio-group
         ></el-form-item
       >
       <el-form-item
-        v-if="!selfSourced && form.dispatchMode === 'specified'"
+        v-if="!selfSourced && canSpecifySales && form.dispatchMode === 'specified'"
         label="指定销售"
         prop="specifiedSalesUserId"
         ><el-select v-model="form.specifiedSalesUserId" filterable class="w-100%"
@@ -104,9 +104,11 @@ import type { FormInstance, FormRules } from 'element-plus'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
 import * as AreaApi from '@/api/system/area'
 import { getSimpleDictDataList, type DictDataVO } from '@/api/system/dict/dict.data'
+import { useUserStoreWithOut } from '@/store/modules/user'
 const props = defineProps<{ selfSourced?: boolean }>()
 const emit = defineEmits<{ success: [] }>()
 const message = useMessage()
+const userStore = useUserStoreWithOut()
 const visible = ref(false)
 const saving = ref(false)
 const optionLoading = ref(false)
@@ -117,6 +119,7 @@ const sourceOptions = ref<DictDataVO[]>([])
 const categoryOptions = ref<DictDataVO[]>([])
 const sales = ref<Array<{ id: number; nickname: string }>>([])
 const catalog = reactive<{ spus: any[]; skus: any[] }>({ spus: [], skus: [] })
+const canSpecifySales = computed(() => userStore.getPermissions.has('zsjos:lead:submit:specify'))
 const emptyForm = () => ({
   name: '',
   mobile: '',
@@ -172,7 +175,7 @@ const loadOptions = async () => {
     )
     catalog.spus = products.spus || []
     catalog.skus = products.skus || []
-    if (!props.selfSourced) sales.value = await MenuApi.leadSalesCandidates()
+    if (!props.selfSourced && canSpecifySales.value) sales.value = await MenuApi.leadSalesCandidates()
   } catch (e: any) {
     optionError.value = e?.msg || e?.message || '表单配置加载失败'
   } finally {
@@ -181,6 +184,7 @@ const loadOptions = async () => {
 }
 const open = () => {
   Object.assign(form, emptyForm())
+  if (!canSpecifySales.value) form.dispatchMode = 'auto'
   visible.value = true
   void loadOptions()
 }

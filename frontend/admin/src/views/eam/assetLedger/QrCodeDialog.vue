@@ -1,12 +1,11 @@
 <template>
   <Dialog v-model="dialogVisible" title="资产二维码" width="380px">
     <div ref="printAreaRef" class="flex flex-col items-center gap-3 py-2">
-      <img
-        v-if="asset.id"
-        :src="qrSrc"
-        alt="资产二维码"
-        class="h-[240px] w-[240px] border border-gray-200"
-      />
+      <div class="flex h-[240px] w-[240px] items-center justify-center border border-gray-200">
+        <img v-if="qrSrc" :src="qrSrc" alt="资产二维码" class="h-full w-full" />
+        <el-text v-else-if="qrLoading">加载中...</el-text>
+        <el-text v-else type="danger">二维码加载失败</el-text>
+      </div>
       <div class="text-center">
         <div class="text-base font-medium">{{ asset.name }}</div>
         <div class="mt-1 font-mono text-sm text-gray-600">{{ asset.assetCode }}</div>
@@ -17,6 +16,7 @@
       <el-button type="primary" @click="handlePrint">
         <Icon icon="ep:printer" class="mr-5px" /> 打 印
       </el-button>
+      <el-button v-if="qrError" @click="loadQrCode">重 试</el-button>
       <el-button @click="dialogVisible = false">关 闭</el-button>
     </template>
   </Dialog>
@@ -30,19 +30,55 @@ defineOptions({ name: 'EamAssetQrCodeDialog' })
 const dialogVisible = ref(false)
 const asset = ref<AssetApi.AssetVO>({} as AssetApi.AssetVO)
 const printAreaRef = ref<HTMLElement>()
+const qrSrc = ref('')
+const qrLoading = ref(false)
+const qrError = ref(false)
 
-const qrSrc = computed(() => (asset.value.id ? AssetApi.getQrCodeUrl(asset.value.id) : ''))
+const revokeQrSrc = () => {
+  if (qrSrc.value) {
+    URL.revokeObjectURL(qrSrc.value)
+    qrSrc.value = ''
+  }
+}
+
+const loadQrCode = async () => {
+  if (!asset.value.id) {
+    return
+  }
+  revokeQrSrc()
+  qrError.value = false
+  qrLoading.value = true
+  try {
+    const blob = await AssetApi.downloadQrCode(asset.value.id)
+    qrSrc.value = URL.createObjectURL(blob)
+  } catch {
+    qrError.value = true
+  } finally {
+    qrLoading.value = false
+  }
+}
 
 const open = (row: AssetApi.AssetVO) => {
   asset.value = row
   dialogVisible.value = true
+  loadQrCode()
 }
 defineExpose({ open })
+
+watch(dialogVisible, (visible) => {
+  if (!visible) {
+    revokeQrSrc()
+    qrError.value = false
+    qrLoading.value = false
+  }
+})
+
+onBeforeUnmount(revokeQrSrc)
 
 /** 只打印标签区域，避免带出后台页面的导航和表格 */
 const handlePrint = () => {
   const content = printAreaRef.value?.innerHTML
-  if (!content) {
+  if (!content || !qrSrc.value) {
     return
   }
   const win = window.open('', '_blank', 'width=420,height=520')

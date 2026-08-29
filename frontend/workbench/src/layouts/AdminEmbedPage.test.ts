@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { resolveAdminEmbedPresentation } from '../services/authSession'
 import {
   ADMIN_EMBED_MESSAGE,
   buildAdminEmbedUrl,
@@ -44,5 +45,11 @@ describe('global Admin embed frame', () => {
     expect(shell.match(/<AdminEmbedFrame\b/g)).toHaveLength(1)
     expect(routeHost).not.toContain('AdminEmbedPage')
     Object.values(ADMIN_EMBED_MESSAGE).forEach(type => expect(adminBridge).toContain(type))
+  })
+
+  it('mounts the iframe for PC admin_embed pages and blocks them on Mobile', () => {
+    expect(resolveAdminEmbedPresentation('PC', 'admin_embed')).toBe('frame')
+    expect(resolveAdminEmbedPresentation('MOBILE', 'admin_embed')).toBe('mobile-blocked')
+    expect(resolveAdminEmbedPresentation('MOBILE', 'native')).toBe('routes')
   })
 })

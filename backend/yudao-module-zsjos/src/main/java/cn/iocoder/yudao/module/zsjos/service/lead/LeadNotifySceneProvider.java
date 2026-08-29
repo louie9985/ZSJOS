@@ -63,6 +63,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(CLAIMED, "抢单成功", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(TRANSFERRED, "管理员转派", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(FOLLOW_UP_RECORDED, "新增跟进", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
+                scene(SUBMITTER_ASSIST_REQUESTED, "提交人协助处理", ROLE_SUBMITTER),
                 scene(CATEGORY_CHANGED, "客资分类变化", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(QUALIFICATION_SUSPENDED, "客资判定超时挂起", ROLE_OWNER, ROLE_QUALIFICATION_MANAGERS),
                 scene(QUALIFIED_VALID, "客资判定有效", ROLE_SUBMITTER),
@@ -132,7 +133,11 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 continue;
             }
             Long id = switch (role) {
-                case ROLE_SUBMITTER, ROLE_NEW_MEDIA_PROVIDER -> lead != null
+                case ROLE_SUBMITTER -> SUBMITTER_ASSIST_REQUESTED.equals(event.getSceneCode()) && lead != null
+                        ? lead.getSourceUserId() : lead != null
+                        && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                        ? lead.getProviderOwnerId() : null;
+                case ROLE_NEW_MEDIA_PROVIDER -> lead != null
                         && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                         ? lead.getProviderOwnerId() : null;
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
@@ -281,7 +286,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         } else if (CATEGORY_CHANGED.equals(sceneCode)) {
             variables.add(variable("category.before", "变更前分类"));
             variables.add(variable("category.after", "变更后分类"));
-        } else if (FOLLOW_UP_RECORDED.equals(sceneCode)) {
+        } else if (Set.of(FOLLOW_UP_RECORDED, SUBMITTER_ASSIST_REQUESTED).contains(sceneCode)) {
             variables.add(variable("followUp.method", "跟进方式"));
             variables.add(variable("followUp.result", "跟进结果"));
             variables.add(variable("followUp.remark", "跟进内容"));

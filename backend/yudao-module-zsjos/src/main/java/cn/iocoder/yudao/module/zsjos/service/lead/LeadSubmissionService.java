@@ -11,4 +11,5 @@ public interface LeadSubmissionService {
     LeadCreateRespVO createForPartner(LeadCreateReqVO reqVO, Long accountId, Long partnerId);
     LeadCreateRespVO createSelfSourced(LeadCreateReqVO reqVO, Long salesUserId);
     List<LeadAssignmentUserRespVO> getNewMediaProviders();
+    List<LeadAssignmentUserRespVO> getSpecifiedSalesUsers(Long operatorUserId);
 }

@@ -12,7 +12,7 @@ Base path: `/admin-api/zsjos/lead/aging-pool`. All endpoints are tenant scoped a
 | GET | `/{id}/candidates` | manage or manage-all | Enabled same-department B candidates |
 | POST | `/{id}/assign` | manage or manage-all | Assign or reassign B |
 | POST | `/{id}/exit` | manage or manage-all | Exit with a required reason |
-| POST | `/{id}/transfer-request` | `zsjos:lead-aging-pool:transfer-request` | Same-team non-owner requests formal transfer to self |
+| POST | `/{id}/transfer-request` | `zsjos:lead-aging-pool:transfer-request` | Current public-sea collaborator B requests formal transfer to self; other visible same-team sales are rejected |
 
 Assign body:
 

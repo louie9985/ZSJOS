@@ -30,7 +30,7 @@ public class LeadProviderAttributionService {
                       Long selectedProviderUserId, LocalDateTime countedAt) {
         lead.setCountedAt(countedAt);
         switch (identity) {
-            case NEW_MEDIA, NEW_MEDIA_MANAGER -> applySystemUser(lead, lead.getSourceUserId());
+            case NEW_MEDIA -> applySystemUser(lead, lead.getSourceUserId());
             case SALES -> {
                 if (selectedProviderUserId != null) applySystemUser(lead, selectedProviderUserId);
             }

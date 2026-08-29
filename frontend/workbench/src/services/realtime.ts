@@ -1,4 +1,4 @@
-import { AUTH_STORAGE_KEYS, resolveAuthPlatform, type AuthPlatform } from '../constants'
+import { AUTH_STORAGE_KEYS, type AuthPlatform } from '../constants'
 
 export type RealtimeStatus = 'connecting' | 'open' | 'closed'
 
@@ -9,7 +9,7 @@ export type RealtimeMessage = {
 
 export function getRealtimeAccessToken(
   storage: Pick<Storage, 'getItem'>,
-  platform: AuthPlatform = resolveAuthPlatform()
+  platform: AuthPlatform,
 ) {
   return storage.getItem(AUTH_STORAGE_KEYS[platform].accessToken)
 }

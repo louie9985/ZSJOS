@@ -53,6 +53,7 @@ public interface LeadConstants {
     String ACTION_REVISE_DEAL = "REVISE_DEAL";
     String ACTION_ENTER_REPURCHASE = "ENTER_REPURCHASE";
     String ACTION_SUBMITTER_SUPPLEMENT = "SUBMITTER_SUPPLEMENT";
+    String ACTION_OPEN_SUBMITTER_SUPPLEMENT = "OPEN_LEAD_SUBMITTER_SUPPLEMENT";
     String ACTION_SUBMITTER_URGE = "SUBMITTER_URGE";
     String ACTION_SUBMITTER_COMPLAINT = "SUBMITTER_COMPLAINT";
     String ACTION_QUALIFICATION_RESTORE = "QUALIFICATION_RESTORE";
@@ -75,6 +76,7 @@ public interface LeadConstants {
     String INBOX_AUDIENCE_AGING_POOL = "agingPool";
     String PERMISSION_QUERY_SUBMITTED = "zsjos:lead:query-submitted";
     String PERMISSION_QUERY_OWNED = "zsjos:lead:query-owned";
+    String PERMISSION_SUBMIT_SPECIFY = "zsjos:lead:submit:specify";
     String PERMISSION_DETAIL_FOLLOW_UP_READ = "zsjos:lead-detail:follow-up-read";
     String PERMISSION_DETAIL_APPEAL_READ = "zsjos:lead-detail:appeal-read";
     String PERMISSION_DETAIL_COMPLAINT_READ = "zsjos:lead-detail:complaint-read";
@@ -131,6 +133,7 @@ public interface LeadConstants {
     String WS_MESSAGE_TYPE = "zsjos_lead_assignment";
     String TASK_TYPE_ASSIGNMENT_ACCEPT = "lead_assignment_accept";
     String TASK_TYPE_FIRST_FOLLOW_UP = "lead_first_follow_up";
+    String TASK_TYPE_SUBMITTER_ASSIST = "lead_submitter_assist";
     String TASK_TYPE_FOLLOW_UP_REMINDER = "lead_follow_up_reminder";
     String TASK_TYPE_QUALIFICATION = "lead_qualification";
     String TASK_STATUS_PENDING = "pending";

@@ -2,6 +2,10 @@
 
 本矩阵记录父子菜单解析后的正式 URL。数据库中直接挂在 `/zsjos`“工作台”父菜单下的页面保存相对子路径，例如正式 URL `/zsjos/my-students` 对应菜单 `path=my-students`。React Workbench 的路由与直接访问使用原授权 `menus`，导航使用 System 计算的 `workbenchMenus` 投影；编排只改变分组、顺序和导航显隐，不改变本表的正式 URL、组件或权限身份。Vue Admin 继续通过服务端 `component` 字段动态解析组件。两端不得维护独立菜单树或旧路径别名。
 
+`/zsjos/tasks/today` 是员工工作台“首页”。密码登录或已有令牌恢复并重新读取权限菜单后，拥有该授权菜单的用户固定进入首页；未获授权的用户进入首个可访问的服务端菜单。首页按权限分别加载业务待办、BPM 审批计数和公告，并从月历跳转到服务端授权的 `/calendar/all` 日历日程页。
+
+审批中心是 BPM 任务统一入口，不复制业务审批页。能接入员工端业务页的流程由服务端统一定位接口深链到真实业务页，未接入流程回到完整 BPM 表单。待办任务和已办任务的左侧列表使用系统 20 条追加懒加载模式，不提供前端分页器。
+
 Vue Admin 的 `/system/workbench-layout`（`system/workbenchLayout/index`）是
 `workbenchRenderMode=admin_only` 的系统配置页，不属于员工业务页面，也不计入下表的
 双前端覆盖数量。全局候选页面来自租户套餐，角色覆盖候选页面来自所选角色当前直接授权的有效页面；发布后由所有 Workbench 桌面布局与移动抽屉
@@ -27,7 +31,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 14 | 产品配置 | `/zsjos/product` | `ProductConfigPage` | `zsjos/product/index` |
 | 15 | 计划配置 | `/zsjos/work-plan-config` | `WorkPlanConfigPage` | `zsjos/workPlanConfig/index` |
 | 16 | 下属销售 | `/zsjos/subordinate-sales` | `SubordinateSalesPage` | `zsjos/subordinateSales/index` |
-| 17 | 今日待办 | `/zsjos/tasks/today` | `TodayTasksPage` | `zsjos/todayTask/index` |
+| 17 | 首页 | `/zsjos/tasks/today` | `TodayTasksPage` | `zsjos/todayTask/index` |
 | 18 | 工作计划 | `/zsjos/work-plans` | `WorkPlanPage` | `zsjos/workPlan/index` |
 | 20 | 申诉处理 | `/zsjos/appeals` | `LeadAppealPage` | `zsjos/leadAppeal/index` |
 | 21 | 我的订单 | `/zsjos/sales-orders/my` | `MySalesOrderPage` | `zsjos/mySalesOrder/index` |
@@ -63,6 +67,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 49 | 我的资产 | `/zsjos/my-assets` | `EamAssetPage(view=assets)` | 不注册（员工自助；管理员从 HRM 员工档案查看） |
 | 50 | 采购申请 | `/zsjos/asset-demands` | `EamAssetPage(view=demands)` | 不注册（员工自助；EAM 后台独立管理） |
 | 51 | 通知公告 | `/messages/notice` | `AnnouncementCenterPage` | `system/notice/index`（公告管理，原菜单 107；员工只读权限为子按钮 `79913` / `system:notice:read`） |
+| 52 | 强制表单 | `/zsjos/forced-form` | 不注册（全局强制填写 Provider） | `zsjos/forcedForm/index`（Admin 配置页，`workbenchRenderMode=admin_only`） |
 
 “我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 
@@ -80,6 +85,7 @@ Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落�
 - 订单、学员、审批和业务通知可深链到 `/zsjos/leads/manage?leadId={内部客资ID}&tab={overview|follow-ups|orders|appeals|complaints|flow-history}`；省略或传入非法 `tab` 时进入概览。该入口只加载指定详情，不扩大客资列表。通知按场景选择跟进、申诉、投诉或概览页签，当前不自动改投流转记录；前端只会激活服务端 `visibleTabs` 中的目标页签，不可见时回退概览。五个业务标签权限在 System 角色权限管理中独立配置，`flow-history` 对应 `zsjos:lead-detail:flow-read`，不得由角色名或前端 mode 推断。
 - 历史 `/zsjos/sales-order-supervisor-confirmations` 仅由 React 重定向到 `/zsjos/sales-order-approvals`，服务端不再发布独立主管确认页面菜单。
 - 新增或修改页面菜单时，必须同步服务端菜单种子、React `APP_ROUTES`/`RENDERABLE_APP_ROUTES`/`RouteHost`、Vue `component` 文件和本矩阵。
+- 强制表单管理页是 Vue Admin 配置面，使用服务端权限 `zsjos:forced-form:*`，不作为 Workbench 可导航页面注册。员工端通过全局 `ForcedFormProvider` 在登录、刷新、路由切换、401 恢复和 WebSocket 重连后查询 `/zsjos/forced-form/pending`，有待办时显示不可关闭填写面并阻断普通业务接口。
 - `/zsjos/my-students` 仅属于 `study_planner`；`content_director` 和 `new_media_operator` 共用 `/zsjos/media-students` 与 `zsjos:media-student:query-my`，后端分别按服务关系、账号责任关系和本人任务限制学员范围。
 - `/zsjos/accounts`、`/zsjos/content`、`/zsjos/positioning` 的页面菜单由 V113 退役。稳定的查询和操作权限字符串保留，并调整到学员菜单下；账号、内容和定位只能从具体学员的相应标签进入。
 The subordinate-sales left pane uses the shared 20-row append lazy-loading pattern with a scroll-root sentinel, stable server ordering, deduplication, stale-request rejection, and retryable load-more failure. The `一键下班` command is rendered only from `zsjos:subordinate-sales:pause-all`; its scope is entirely server-owned. The home page and header consume one dispatch-status provider so mode, heartbeat, page-offline state, retry, and eligibility remain synchronized without duplicate polling.

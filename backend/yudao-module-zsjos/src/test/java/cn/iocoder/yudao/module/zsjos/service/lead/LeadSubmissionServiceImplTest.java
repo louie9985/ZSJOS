@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
+import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCreateReqVO;
@@ -63,6 +64,7 @@ class LeadSubmissionServiceImplTest {
     @Mock private AreaApi areaApi;
     @Mock private DictDataApi dictDataApi;
     @Mock private DeptApi deptApi;
+    @Mock private PermissionApi permissionApi;
     @Mock private LeadProductCatalogPort productCatalogPort;
     @Mock private LeadDispatchService dispatchService;
     @Mock private LeadAttachmentService attachmentService;
@@ -101,6 +103,34 @@ class LeadSubmissionServiceImplTest {
         ServiceException error = assertThrows(ServiceException.class, () -> service.create(req, 1L));
 
         assertEquals(LEAD_MOBILE_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void specifiedDispatchRequiresPermission() {
+        LeadCreateReqVO req = baseRequest();
+        req.setDispatchMode("specified");
+        req.setSpecifiedSalesUserId(10L);
+        when(permissionApi.hasAnyPermissions(1L, "zsjos:lead:submit:specify")).thenReturn(false);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> ReflectionTestUtils.invokeMethod(service, "validateOrdinaryDispatch", req, 1L,
+                        LeadSubmissionIdentityService.Identity.NEW_MEDIA));
+
+        assertEquals(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_PERMISSION_DENIED.getCode(),
+                error.getCode());
+    }
+
+    @Test
+    void specifiedSalesCandidatesRequirePermissionAndReturnEligibleUsers() {
+        when(permissionApi.hasAnyPermissions(1L, "zsjos:lead:submit:specify")).thenReturn(true);
+        LeadAssignmentUserRespVO sales = new LeadAssignmentUserRespVO();
+        sales.setId(20L);
+        sales.setNickname("销售A");
+        when(dispatchService.getEligibleSalesUsers()).thenReturn(List.of(sales));
+
+        List<LeadAssignmentUserRespVO> result = service.getSpecifiedSalesUsers(1L);
+
+        assertEquals(List.of(20L), result.stream().map(LeadAssignmentUserRespVO::getId).toList());
     }
 
     @Test

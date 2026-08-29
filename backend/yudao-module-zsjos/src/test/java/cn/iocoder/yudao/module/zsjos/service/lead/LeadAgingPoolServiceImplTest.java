@@ -38,6 +38,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
@@ -79,6 +80,26 @@ class LeadAgingPoolServiceImplTest {
         cycle.setStatus(AGING_POOL_DEAL_PENDING);
         assertTrue(service.canOperate(1L, 10L, 10L));
         assertTrue(service.canOperate(1L, 10L, 20L));
+    }
+
+    @Test
+    void collaboratorRetainsFollowUpButNotDealActions() {
+        LeadAgingPoolCycleDO cycle = cycle(AGING_POOL_ASSIGNED, 20L);
+        LeadDO lead = new LeadDO(); lead.setId(1L); lead.setOwnerUserId(10L);
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(cycleMapper.selectById(100L)).thenReturn(cycle);
+        when(cycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+        when(orderMapper.selectActiveByLeadId(1L, cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES)).thenReturn(null);
+        when(securityFrameworkService.hasPermission(anyString())).thenReturn(false);
+        AdminUserRespDTO owner = new AdminUserRespDTO(); owner.setId(10L); owner.setDeptId(30L);
+        AdminUserRespDTO collaboratorUser = new AdminUserRespDTO(); collaboratorUser.setId(20L); collaboratorUser.setDeptId(30L);
+        when(adminUserApi.getUser(10L)).thenReturn(owner);
+        when(adminUserApi.getUser(20L)).thenReturn(collaboratorUser);
+
+        var collaborator = service.get(100L, 20L);
+        assertTrue(collaborator.getAvailableActions().contains(ACTION_ADD_FOLLOW_UP));
+        assertFalse(collaborator.getAvailableActions().contains(ACTION_ENTER_DEAL));
+        assertFalse(collaborator.getAvailableActions().contains(ACTION_REVISE_DEAL));
     }
 
     @Test

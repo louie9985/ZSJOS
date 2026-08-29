@@ -126,7 +126,7 @@
 <script setup lang="ts">
 import * as ProcurementApi from '@/api/eam/procurement'
 import { UploadFile } from '@/components/UploadFile'
-import DynamicFields from '@/views/eam/asset/DynamicFields.vue'
+import DynamicFields from '@/views/eam/assetLedger/DynamicFields.vue'
 
 defineOptions({ name: 'EamPurchaseActionDialog' })
 type ActionType = 'receive' | 'return' | 'close' | 'expense'

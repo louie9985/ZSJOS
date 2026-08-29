@@ -36,6 +36,8 @@ public interface BpmProcessTaskApi {
 
     BpmTaskRespDTO getTodoTask(Long userId, String taskId);
 
+    BpmTaskRespDTO getDoneTask(Long userId, String taskId);
+
     void approveTask(Long userId, BpmTaskDecisionReqDTO reqDTO);
 
     void rejectTask(Long userId, BpmTaskDecisionReqDTO reqDTO);

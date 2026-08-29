@@ -29,6 +29,10 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="高亮提醒截止时间" prop="highlightUntil">
+          <el-date-picker v-model="formData.highlightUntil" type="datetime" value-format="x" clearable placeholder="不设置则不高亮" :disabled-date="disabledHighlightDate" />
+          <div class="el-form-item__tip">截止时间前将在员工首页公告栏优先置顶</div>
+        </el-form-item>
         <el-form-item label="正文" prop="content">
           <Editor v-model="formData.content" height="480px" directory="system-notice-content" />
         </el-form-item>
@@ -49,7 +53,7 @@
           </el-upload>
           <div v-if="uploadTasks.length" class="notice-attachment-list">
             <div v-for="task in uploadTasks" :key="task.uid" class="notice-attachment-row">
-              <Icon icon="ep:upload" />
+              <Icon :icon="getFileIcon(task.name)" class="notice-attachment-icon" />
               <span class="notice-attachment-name">{{ task.name }}</span>
               <el-progress
                 v-if="task.status === 'uploading'"
@@ -63,7 +67,7 @@
           </div>
           <div v-if="formData.attachments.length" class="notice-attachment-list">
             <div v-for="(file, index) in formData.attachments" :key="file.infraFileId" class="notice-attachment-row">
-              <Icon icon="ep:document" />
+              <Icon :icon="getFileIcon(file.fileName, file.mimeType)" class="notice-attachment-icon" />
               <span class="notice-attachment-name">{{ file.fileName }}</span>
               <span class="notice-attachment-size">{{ formatFileSize(file.fileSize) }}</span>
               <el-link v-if="file.downloadUrl" :href="file.downloadUrl" target="_blank">预览</el-link>
@@ -81,7 +85,7 @@
         <section v-if="formData.attachments.length" class="notice-preview-files">
           <h3>附件</h3>
           <div v-for="file in formData.attachments" :key="file.infraFileId">
-            <Icon icon="ep:paperclip" /> {{ file.fileName }} · {{ formatFileSize(file.fileSize) }}
+            <Icon :icon="getFileIcon(file.fileName, file.mimeType)" class="notice-attachment-icon" /> {{ file.fileName }} · {{ formatFileSize(file.fileSize) }}
           </div>
         </section>
       </article>
@@ -98,6 +102,7 @@ import type {
   UploadRequestOptions
 } from 'element-plus'
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
+import { getFileIcon } from '@/utils/file'
 import * as NoticeApi from '@/api/system/notice'
 
 const props = defineProps<{ id?: number }>()
@@ -114,6 +119,7 @@ const formData = reactive({
   type: undefined as number | undefined,
   content: '',
   status: 0,
+  highlightUntil: undefined as number | undefined,
   attachments: [] as NoticeApi.NoticeAttachmentVO[]
 })
 const rules: FormRules = {
@@ -141,6 +147,7 @@ const load = async () => {
     formData.title = data.title
     formData.type = data.type
     formData.content = data.content
+    formData.highlightUntil = data.highlightUntil
     formData.attachments = data.attachments || []
   } finally {
     loading.value = false
@@ -175,6 +182,8 @@ const publish = async () => {
     publishing.value = false
   }
 }
+
+const disabledHighlightDate = (date: Date) => date.getTime() < Date.now() - 60 * 1000
 
 const allowedExtensions = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'zip']
 const beforeUpload = (file: UploadRawFile) => {
@@ -234,6 +243,7 @@ onMounted(load)
 .notice-attachment-list { width: 100%; margin-top: 12px; }
 .notice-attachment-row { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; background: var(--el-fill-color-light); border-radius: 6px; }
 .notice-attachment-row + .notice-attachment-row { margin-top: 8px; }
+.notice-attachment-icon { flex: 0 0 auto; color: var(--el-text-color-secondary); }
 .notice-attachment-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notice-attachment-size { color: var(--el-text-color-secondary); }
 .notice-upload-progress { width: 180px; }

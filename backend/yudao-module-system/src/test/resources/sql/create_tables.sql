@@ -235,6 +235,7 @@ CREATE TABLE IF NOT EXISTS "system_notice" (
 	"publish_status" varchar(16) NOT NULL DEFAULT 'DRAFT',
 	"publish_time" datetime DEFAULT NULL,
 	"offline_time" datetime DEFAULT NULL,
+	"highlight_until" datetime DEFAULT NULL,
 	"creator" varchar(64) DEFAULT '' COMMENT '创建者',
 	"create_time" datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
 	"updater" varchar(64) DEFAULT '' COMMENT '更新者',

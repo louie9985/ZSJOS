@@ -11,6 +11,8 @@ export interface NoticeVO {
   publishStatus: 'DRAFT' | 'PUBLISHED' | 'OFFLINE'
   publishTime?: number
   offlineTime?: number
+  highlightUntil?: number
+  highlighted?: boolean
   attachments: NoticeAttachmentVO[]
   creator: string
   createTime: Date

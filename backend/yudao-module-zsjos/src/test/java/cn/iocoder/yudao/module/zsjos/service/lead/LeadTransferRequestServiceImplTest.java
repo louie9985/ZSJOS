@@ -71,7 +71,7 @@ class LeadTransferRequestServiceImplTest {
     @Test
     void createRejectsEndedCycleAfterLockAndAuthorizationWhenNoReplayExists() {
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
-        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("exited");
+        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("exited"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
@@ -90,7 +90,7 @@ class LeadTransferRequestServiceImplTest {
     @Test
     void createReplaysCompletedRequestBeforeCheckingMutableCycleState() {
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
-        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("exited");
+        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("exited"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         LeadTransferRequestDO replay = new LeadTransferRequestDO();
         replay.setId(9L); replay.setLeadId(2L); replay.setRequestedOwnerUserId(20L);
@@ -131,9 +131,28 @@ class LeadTransferRequestServiceImplTest {
     }
 
     @Test
+    void createRejectsVisibleSalesWhoAreNotCurrentCollaborator() {
+        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
+        LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
+        when(cycleMapper.selectById(3L)).thenReturn(cycle);
+        when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);
+        when(leadMapper.selectByIdForUpdate(2L, 1L)).thenReturn(lead);
+        when(agingPoolService.canRead(cycle, 30L)).thenReturn(true);
+
+        var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
+                () -> service.create(3L, 30L,
+                        new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.agingpool.LeadTransferRequestCreateReqVO()
+                                .setIdempotencyKey("transfer-not-b").setReason("持续跟进")));
+
+        assertEquals(LEAD_PERMISSION_DENIED.getCode(), error.getCode());
+        verifyNoInteractions(adminUserApi, deptApi, processInstanceApi, notifyEventPublisher);
+    }
+
+    @Test
     void createRejectsIdempotencyReplayFromAnotherCycleAfterAuthorization() {
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
-        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned");
+        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setOwnerUserId(10L);
         LeadTransferRequestDO replay = new LeadTransferRequestDO();
         replay.setId(9L); replay.setLeadId(99L); replay.setRequestedOwnerUserId(20L);
@@ -209,7 +228,7 @@ class LeadTransferRequestServiceImplTest {
 
     private void prepareCreateThroughInsert(String idempotencyKey) {
         LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
-        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned");
+        cycle.setId(3L); cycle.setLeadId(2L); cycle.setStatus("assigned"); cycle.setCollaboratorUserId(20L);
         LeadDO lead = new LeadDO(); lead.setId(2L); lead.setLeadNo("KZ202608160000000002"); lead.setOwnerUserId(10L);
         when(cycleMapper.selectById(3L)).thenReturn(cycle);
         when(cycleMapper.selectByIdForUpdate(3L, 1L)).thenReturn(cycle);

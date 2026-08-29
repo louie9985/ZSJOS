@@ -76,7 +76,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             leadMapper.updateById(lead); return;
         }
         if (DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) {
-            boolean allowed = assignmentService.getAssignableSalesUsers(submitterUserId).stream()
+            boolean allowed = assignmentService.getEligibleSalesUsers().stream()
                     .anyMatch(user -> Objects.equals(user.getId(), specifiedSalesUserId));
             if (!allowed) throw exception(LEAD_SPECIFIED_SALES_REQUIRED);
             lead.setAssignmentStatus(ASSIGNMENT_PENDING);

@@ -31,6 +31,8 @@ public class NoticeRespVO {
     private String publishStatus;
     private LocalDateTime publishTime;
     private LocalDateTime offlineTime;
+    private LocalDateTime highlightUntil;
+    private Boolean highlighted;
     private List<NoticeAttachmentVO> attachments;
 
 }
