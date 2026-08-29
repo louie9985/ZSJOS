@@ -8,6 +8,8 @@
 
 需求来源包括《客资和订单字段》原始字段清单以及本轮已确认业务流程；两者冲突时，以本轮已确认业务决策和本文明确替代关系为准。
 
+支付一期只保留一个实现来源：[ZSJOS 通联支付一期开发实施文档](./payment-module-development.md)。购买意向、通联报文、支付确认、手工补录订单、成交链路八态投影及整单全额退款均以该文档为准；本文只描述它们与客资、订单、BPM、报名和服务生命周期的关系。
+
 提交人补充、每日催促和销售投诉是客资主状态之外的审计动作。它们不改变客资、商机或订单状态；无效、关闭和已成交客资不接受新的提交人动作。投诉成立仅产生销售及直属主管通知，不触发自动处罚、回收、停派或绩效变更。
 
 ## 1. 文档结论
@@ -19,8 +21,9 @@
 | 谁提交了线索、线索是否有效、分给谁 | 客资 `Lead` |
 | 已有客户再次提交了什么、为何重新进入跟进 | 客资激活 `LeadActivation` |
 | 当前正式销售转化或复购意向由谁跟进、成功或流失 | 销售机会 `Opportunity` |
+| 本次首购或复购在订单创建前后属于哪条独立交易链路 | 购买意向 `PurchaseIntent` |
 | 本次买了什么、金额和提交资料是什么 | 订单 `Order`、订单项 `OrderItem` |
-| 为哪条客资、哪些 SKU 发起收款，渠道是否支付成功 | 支付单 `PaymentOrder`、支付流水 `PaymentTransaction` |
+| 为哪次购买、哪些 SKU 发起收款，渠道是否支付成功 | 支付意向 `PaymentIntent`、支付流水 `PaymentTransaction` |
 | 一笔资金如何用于订单，预充值余额如何变化 | 订单资金分配 `OrderPaymentAllocation`、客户资金账户与账本 |
 | 报名服务中心和财务是否通过本轮审核 | ZSJOS 审批轮次 `ApprovalRound`、BPM 流程实例与审批任务 |
 | 报名节点通过后履约做了什么、留下什么凭证 | 报名服务单 `RegistrationCase`、服务记录 `RegistrationItem` |
@@ -37,28 +40,32 @@
 3. 手机号和微信号交叉查重指向不同客户时，提交校验不通过，不创建 `Person`、`Lead` 或 `LeadActivation`，由提交人先处理身份信息。
 4. 客资判定前的联系记录归 Lead，不提前创建机会；判定有效后才创建 `initial_conversion` Opportunity，后续销售跟进和订单提交归机会。判定有效只表示客资有效，不表示已经成交。
 5. 只有当前正式负责人可对已判有效客资直接录入成交订单；公海协同跟进销售必须先完成主管正式转派，转派成功后才取得成交录入资格。
-6. 销售从全部启用 SKU 中选择成交课程，填写实际成交金额、付款时间、缴费方式、支付方式和缴费凭证后直接提交审批；订单固化客户、产品、金额和文件快照。
-7. 本流程的付款信息是销售提交并由财务复核的业务事实，不等同于支付渠道回调。后续如接入渠道流水，必须以独立外部引用关联，不得改写本轮订单快照。
-8. 是否需要销售机会、BPM 审批、报名服务和持续学生服务由下单时固化的产品规则结果决定；具体产品和规则模型留给产品模块单独设计。
-9. 需要双会签的订单提交后，由 BPM 同时创建报名服务中心和财务审批任务。
-10. 两个中心都通过，本轮审批才通过，订单才成为有效订单；只有关联销售机会的正式销售转化订单才同时确认机会成交。
-11. 任一中心驳回，本轮立即失败；BPM 关闭本流程未完成的审批任务，ZSJOS 向提交人创建补正任务。
-12. 补正后重新提交必须创建新的 ZSJOS 审批轮次和 BPM 流程实例，两个中心都重新审批，不复用上一轮结果。
-13. 主动撤回审批会取消当前轮次并使订单返回可编辑状态；取消订单表示放弃本次交易，是不同的业务动作。
-14. `registrationReview` 首次通过后即幂等创建报名服务单，并发布新报名履约任务通知；订单生效前或财务待补正时可编辑清单。只有订单 `effective`、人工项全部完成、必传附件齐全、至少选择一个流转部门且各部门负责人仍有效时才可完成。完成时固化部门与负责人快照，将 Person 转为学员并按订单明细建立服务关系，再向学习规划师发布可直达该 Person 的分配通知；被分配的学习规划师和编导均在“我的学员”按 Person 去重查看。
-15. 报名服务完成后，仅为产品规则要求持续学生服务的订单项创建并激活新的学生服务关系；一次性项目只完成报名或履约记录。
-16. 预充值使用独立客户资金账户和只追加账本。余额归 `Person` 本人，可跨本人的多张订单分次使用，不允许转给其他客户或直接提现。
-17. 复购从系统客户客资详情或系统外历史客户入口发起，每次复购创建新订单，不创建或关联商机。
-18. 线下动作可以与系统流程同步或提前发生，系统不限制实际操作；系统允许事后补录实际发生时间和凭证。
-19. 审批页面可查看订单全部信息。系统只提供通过和驳回，不规定两个中心具体审核哪些字段。
+6. 每次首购或复购先建立独立 PurchaseIntent。在线通联支付是现有线下凭证和经授权零元订单之外的可选路径，不是所有订单提交的前置条件。
+7. 销售从全部启用 SKU 中选择成交课程，PurchaseIntent 固化产品、SKU 和金额快照；选择通联支付时生成专属 PaymentIntent，可信到账只更新支付事实并通知责任人补录订单，不自动创建 Order。
+8. 补录订单时重新校验业务资格和产品状态；使用通联支付的订单明细汇总金额必须与 PaymentIntent 及成功 PaymentTransaction 完全一致，线下路径继续由财务复核销售提交的付款和凭证业务事实。
+9. 本流程的付款信息是销售提交并由财务复核的业务事实，不等同于支付渠道回调。渠道流水必须以独立外部引用关联，不得改写本轮订单快照。
+10. 是否需要销售机会、BPM 审批、报名服务和持续学生服务由下单时固化的产品规则结果决定；具体产品和规则模型留给产品模块单独设计。
+11. 需要双会签的订单提交后，由 BPM 同时创建报名服务中心和财务审批任务。
+12. 两个中心都通过，本轮审批才通过，订单才成为有效订单；只有关联销售机会的正式销售转化订单才同时确认机会成交。
+13. 任一中心驳回，本轮立即失败；BPM 关闭本流程未完成的审批任务，ZSJOS 向提交人创建补正任务。
+14. 补正后重新提交必须创建 successor Order、其第 1 个 ZSJOS 审批轮次和新的 BPM 流程实例，两个中心都重新审批，不复用上一轮结果。
+15. 主动撤回审批会取消当前轮次并终止当前 Order；需要继续交易时通过 successor Order 补正重提。取消整个购买意向表示放弃本次交易，是不同的业务动作。
+16. `registrationReview` 首次通过后即幂等创建报名服务单，并发布新报名履约任务通知；订单生效前或财务待补正时可编辑清单。只有订单 `effective`、人工项全部完成、必传附件齐全、至少选择一个流转部门且各部门负责人仍有效时才可完成。完成时固化部门与负责人快照，将 Person 转为学员并按订单明细建立服务关系，再向学习规划师发布可直达该 Person 的分配通知；被分配的学习规划师和编导均在“我的学员”按 Person 去重查看。
+17. 报名服务完成后，仅为产品规则要求持续学生服务的订单项创建并激活新的学生服务关系；一次性项目只完成报名或履约记录。
+18. 预充值使用独立客户资金账户和只追加账本。余额归 `Person` 本人，可跨本人的多张订单分次使用，不允许转给其他客户或直接提现。
+19. 复购从系统客户客资详情或系统外历史客户入口发起，每次复购创建独立 PurchaseIntent，提交时创建新订单；不强制创建复购商机，可按既有业务规则关联。
+20. 线下动作可以与系统流程同步或提前发生，系统不限制实际操作；系统允许事后补录实际发生时间和凭证。
+21. 审批页面可查看订单全部信息。系统只提供通过和驳回，不规定两个中心具体审核哪些字段。
 
 ### 2.1 对旧方案的明确替代
 
 旧的“订单提交 -> 报名办理 -> 财务审核 -> 完成”顺序废止。目标顺序为：
 
 ```text
-销售从符合条件的既有客资录入成交
-  -> 选择全部启用 SKU 并填写金额、付款与凭证信息
+从符合条件的 Lead、Person 或服务关系创建首购/复购 PurchaseIntent
+  -> 选择全部启用 SKU 并固化金额与规则快照
+  -> 可选：生成专属通联支付链接并等待可信到账
+  -> 责任人补录订单；在线支付金额必须完全一致
   -> 创建订单并固化客户、产品、金额和文件快照
   -> 按规则决定是否进入报名服务中心 + 财务双会签
   -> 订单生效
@@ -84,7 +91,7 @@
 - 记录客户、客资、机会、订单和服务关系之间的关联。
 - 提交、分配、审批、驳回、补正、提醒和留痕。
 - 保存订单每轮审批时的业务快照、BPM 关联标识、服务凭证和实际发生时间；审批意见和任务历史由 BPM 保存。
-- 保存支付单、渠道支付事实、订单资金分配、客户账户余额与不可覆盖账本；支付渠道只负责执行资金动作。
+- 保存购买意向、支付意向、渠道支付事实、订单资金分配、客户账户余额与不可覆盖账本；一期通联适配负责执行渠道动作，但不能成为业务状态所有者。
 - 保存下单时的产品、SKU 和规则结果快照；产品规则的定义和维护由后续确认的产品能力负责。
 - 在跨对象动作中保证原子性、幂等性、权限和数据范围。
 
@@ -114,8 +121,8 @@
 | 报名服务单、报名记录、学生服务关系 | `yudao-module-zsjos` | 独立表；报名完成后按固化产品规则决定是否激活服务关系 |
 | 业务任务、提醒、业务事件、审计 | `yudao-module-zsjos` | 独立表，事件只追加不覆盖 |
 | 用户、部门、岗位、角色、字典、权限 | `yudao-module-system` | 仅复用基础身份和权限 API，不复制系统表 |
-| 支付单、渠道流水引用、订单资金分配、客户资金账户、退款申请和业务审核 | `yudao-module-zsjos` | 独立业务表、账户账本、独立状态和业务事务 |
-| 支付/退款渠道执行 | 外部支付或财务基础能力 | 仅执行资金动作；渠道流水号作为 ZSJOS 记录的外部引用 |
+| 购买意向、支付意向、渠道流水引用、订单资金分配、客户资金账户、退款申请和业务审核 | `yudao-module-zsjos` | 独立业务表、账户账本、独立状态和业务事务 |
+| 一期通联支付/退款渠道执行 | `yudao-module-zsjos` 的独立通联适配边界 | 仅执行资金动作；不依赖 `yudao-module-pay`，渠道流水号仍是外部引用 |
 | 产品、SKU 和产品业务规则 | 后续确认的产品能力 | 通过公开契约提供稳定引用和规则结果；本文不定义其内部模型 |
 
 现有 CRM 的 Customer、Clue、Business、Contract 等表和服务**不是本模型的数据来源、持久化目标或运行时业务依赖**。ZSJOS 不读取 CRM 表完成查重、机会、订单、合同或服务流程，也不调用 CRM 领域 Service 代替本模块逻辑。未来如果确需同步 CRM，必须作为单独的外部集成需求确认，通过公开 API 或消息同步，并在 ZSJOS 表中保存自己的业务副本和外部引用；禁止跨模块 DAL、Mapper、表或领域 Service 直接调用。
@@ -130,11 +137,12 @@
 | 兼职提交主体 | `zsjos_partner` |
 | 客资、提交时意向课程、附件、激活、分配历史、申诉 | `zsjos_lead`、`zsjos_lead_intended_product`、`zsjos_lead_attachment`、`zsjos_lead_activation`、`zsjos_lead_assignment_history`、`zsjos_lead_appeal` |
 | 销售机会 | `zsjos_opportunity` |
+| 首购/复购购买意向 | 建议新增 `zsjos_purchase_intent`；具体迁移另行评审 |
 | 订单和订单项 | `zsjos_order`、`zsjos_order_item` |
 | 审批轮次、快照和 BPM 关联 | `zsjos_order_approval_round`；不创建重复 BPM 任务状态的 ZSJOS 审批任务表 |
 | 报名服务单和服务记录项 | `zsjos_registration_case`、`zsjos_registration_item` |
 | 学生服务关系和服务记录 | `zsjos_service_relation`、`zsjos_service_record` |
-| 支付单、渠道交易和订单资金分配 | `zsjos_payment_order`、`zsjos_payment_transaction`、`zsjos_order_payment_allocation` |
+| 支付意向、渠道事件、渠道交易和订单资金分配 | 现有 `zsjos_payment_order` 作为 PaymentIntent 基线，并评审 `zsjos_payment_gateway_event`、`zsjos_payment_transaction`、`zsjos_order_payment_allocation` |
 | 客户资金账户和只追加账本 | `zsjos_customer_account`、`zsjos_customer_account_ledger` |
 | 退款业务记录和订单项明细 | `zsjos_refund_case`、`zsjos_refund_item` |
 | 普通业务任务和业务事件 | `zsjos_business_task`、`zsjos_business_event` |
@@ -156,14 +164,18 @@
 Person 0:N Lead
 Person 0:N LeadActivation
 Person 0:N Opportunity
+Person 0:N PurchaseIntent
 Partner 0:N Lead（仅兼职来源）
 Lead 0:1 Opportunity（首次销售转化机会）
 Lead 1:N LeadIntendedProduct（提交时课程快照，恰好一个主意向）
-Lead 0:N PaymentOrder
+Lead 0:N PurchaseIntent（首购）
 ServiceRelation 0:N Opportunity（复购来源）
+ServiceRelation 0:N PurchaseIntent（复购来源）
 Opportunity 0:1 Order（正式销售转化订单）
-PaymentOrder 0:1 PaymentTransaction（当前专属支付链接成功后只形成一笔渠道流水）
-PaymentOrder 0:1 Order（支付成功后幂等自动创建；零元订单无支付单）
+PurchaseIntent 0:1 PaymentIntent（一期每次购买最多一个支付意向）
+PurchaseIntent 0:N Order（驳回重提形成 successor 链，其中最多一个当前订单）
+PaymentIntent 0:1 PaymentTransaction（专属支付链接成功后只形成一笔成功渠道流水）
+PaymentIntent 0:1 Order（责任人补录时绑定；到账不自动创建，线下或零元订单可无支付意向）
 PaymentTransaction N:M Order（通过 OrderPaymentAllocation）
 Person 0:N CustomerAccount（每币种最多一条）
 CustomerAccount 1:N CustomerAccountLedger
@@ -186,9 +198,9 @@ ServiceRelation 1:N ServiceRecord
 - 一个 `Person` 可以有多条历史客资、多个机会、多个订单和多个服务关系。`Person` 是 ZSJOS 自己维护的业务身份，不等同于系统用户，也不等同于 CRM 客户。
 - 客资转换后保留，不被订单覆盖；客资只负责首次需求入口。
 - `LeadIntendedProduct` 是客资提交时的原始意向快照。Opportunity 可以继承该快照作为初始意向，但不得覆盖或替代它；后续正式交易仍以订单项及其产品规则快照为准。
-- 同一客资最多创建一个 `initial_conversion` 机会。每个销售购买意向对应一个机会和最多一张订单；产品规则不要求销售机会的订单可以不关联 Opportunity。
-- V023 成交录入不以支付单为前置；同一客资存在 `pending_approval` 或 `revision_required` 订单时禁止再创建活动订单。
-- 驳回补正不覆盖原订单：重提事务创建独立 successor 订单，原订单转为 `superseded` 并保留审批、明细、凭证和原因审计；主动撤回结束当前轮次并返回可编辑状态，不等同于取消订单。
+- 同一客资最多创建一个 `initial_conversion` 机会。首购 PurchaseIntent 可关联该机会；复购 PurchaseIntent 一期不强制创建 Opportunity。
+- 在线支付不是 V023 成交录入的统一前置。每个 PurchaseIntent 同一时刻最多一个当前 Order；同一客资或 Person 的活动购买并发继续受既有订单和购买意向约束。
+- 驳回或主动撤回不复活原订单：重提事务创建独立 successor 订单，原订单转为 `superseded` 并保留审批、明细、凭证和原因审计；取消整个购买意向才表示放弃本次交易。
 - 复购从已有客户发起新订单，不修改原客资、原机会、原订单和原服务关系；客资只可作为发起上下文。
 - 一张订单包含多个购买服务时，只为产品规则要求持续服务的订单项创建服务关系；每条关系必须能追溯到订单项。
 
@@ -274,14 +286,15 @@ ServiceRelation 1:N ServiceRecord
 | `shelved_until`、`shelved_reason` | datetime/varchar | 条件必填 | 暂缓期限和原因 |
 | `won_at`、`lost_at`、`lost_reason` | datetime/varchar | 条件必填 | 结果事实 |
 
-首次销售转化机会由销售转化中心负责；复购机会由学生服务与交付中心发起。`initial_conversion` 不表示 Person 的第一次付款。责任部门不能仅按岗位或部门中文名称推断，应由权限和业务分配关系确定。
+首次销售转化机会由销售转化中心负责。复购一期由学生服务与交付中心从 Person 或现有服务关系发起 PurchaseIntent，不强制创建复购机会。`initial_conversion` 不表示 Person 的第一次付款。责任部门不能仅按岗位或部门中文名称推断，应由权限和业务分配关系确定。
 
 ### 7.8 订单 `Order` 与订单项 `OrderItem`
 
 | 字段 | 类型建议 | 必填 | 含义 |
 | --- | --- | --- | --- |
-| `lead_id` | bigint | 是 | 订单来源客资；必须与支付单绑定客资一致 |
-| `source_payment_order_id` | bigint | 条件必填 | 支付成功自动创建的订单必须填写且唯一；授权零元订单为空 |
+| `purchase_intent_id` | bigint | 是 | 本次首购或复购的稳定购买链路；successor Order 沿用 |
+| `lead_id` | bigint | 条件必填 | 首购订单来源客资；必须与 PurchaseIntent 和 PaymentIntent 绑定客资一致，复购可为空 |
+| `source_payment_order_id` | bigint | 条件必填 | 兼容现有物理命名；在线支付补录订单时引用 PaymentIntent 且唯一，线下或零元订单为空 |
 | `opportunity_id` | bigint | 条件必填 | 正式销售转化订单必须关联且一对一唯一；产品规则不要求销售机会时可为空 |
 | `person_id` | bigint | 是 | 与 Lead 的 `person_id` 一致；存在机会时还必须与机会 `person_id` 一致 |
 | `order_no` | varchar | 是 | 全局或租户内唯一业务编号 |
@@ -291,12 +304,12 @@ ServiceRelation 1:N ServiceRecord
 | `total_amount`、`discount_amount`、`payable_amount` | decimal | 是 | 本次交易金额事实 |
 | `contract_refs` | json/关联表 | 否 | 合同或附件引用 |
 | `current_approval_round_id` | bigint | 否 | 当前审批轮次引用；未提交审批或产品规则不要求审批时为空 |
-| `submitted_at`、`effective_at`、`cancelled_at` | datetime | 条件必填 | 关键业务时间 |
-| `cancel_reason` | varchar | 条件必填 | 生效前取消原因 |
+| `submitted_at`、`effective_at`、`terminated_at` | datetime | 条件必填 | 关键业务时间 |
+| `termination_reason` | varchar | 条件必填 | 生效前主动终止或流程取消原因 |
 
 `OrderItem` 至少包含 `order_id`、`product_id`、`sku_id`、`quantity`、`unit_price`、`discount_amount`、`payable_amount`、`product_snapshot`、`product_rule_snapshot`、`product_rule_version`。产品规则快照记录当时已经解析的审批、报名和持续服务规则结果，创建后不可修改；具体规则结构留给产品模块设计。后续服务关系必须引用形成它的订单项。
 
-销售直接提交成交订单；订单总额由订单项实际成交金额汇总，所有订单必须上传 1–6 份缴费凭证，包括零元订单。订单应展示本次提交的完整信息。模型不增加“报名审核字段清单”或“财务审核字段清单”。财务点击通过表示对销售提交的付款、金额、产品和凭证信息完成复核，不产生支付渠道到账事实。
+新流程在正式提交时才创建 Order，不落 `order.status=draft`；提交前的可编辑交易草稿由 PurchaseIntent 承担。责任人从 PurchaseIntent 补录并提交成交订单，订单总额由订单项实际成交金额汇总。在线支付路径必须与 PaymentIntent 及成功流水金额完全一致；线下和零元路径继续遵循既有凭证与授权规则。订单应展示本次提交的完整信息。模型不增加“报名审核字段清单”或“财务审核字段清单”。财务点击通过表示对支付归属、订单金额、产品和凭证信息完成复核，不产生支付渠道到账事实。
 
 ### 7.9 审批轮次 `ApprovalRound` 与 BPM 流程
 
@@ -304,20 +317,20 @@ ServiceRelation 1:N ServiceRecord
 
 | 字段 | 类型建议 | 必填 | 含义 |
 | --- | --- | --- | --- |
-| `order_id`、`round_no` | bigint/int | 是 | 同一订单内轮次唯一且连续递增 |
+| `order_id`、`round_no` | bigint/int | 是 | 同一 Order 内唯一；successor Order 从第 1 轮开始 |
 | `status` | varchar | 是 | 本轮汇总状态 |
 | `order_snapshot` | json | 是 | 本轮提交时的完整订单快照 |
 | `process_instance_id` | varchar | 是 | 当前轮次关联的 BPM 流程实例，租户内唯一 |
 | `process_definition_key` | varchar | 是 | 本轮使用的稳定 BPM 流程定义 Key |
 | `submitted_by`、`submitted_at` | bigint/datetime | 是 | 本轮提交事实 |
-| `completed_at` | datetime | 否 | 本轮通过或驳回时间 |
+| `completed_at` | datetime | 否 | 本轮通过、驳回或终止时间 |
 | `rejected_bpm_task_id` | varchar | 否 | 导致本轮失败的 BPM 审批任务引用 |
 
 `ApprovalRound` 是 ZSJOS 业务审计对象，不是工作流任务副本。每轮使用独立
 `processInstanceId`，订单 ID 或轮次 ID 作为稳定 `businessKey`。报名服务中心与财务
 两条并行任务、任务处理人、审批意见、附件、通过、驳回、取消和历史均由 BPM
 持有。ZSJOS 通过 BPM 公共 API 发起流程，并通过按流程定义 Key 过滤的事件监听器
-幂等更新轮次、订单、机会和相关业务状态。为支持 `partially_approved`、财务节点核对结果和驳回任务引用，BPM 公共任务结果事件必须至少提供流程实例 ID、任务 ID、任务定义 Key、动作、处理人、发生时间和幂等事件 ID。
+幂等更新轮次、订单、机会和相关业务状态。部分任务通过仍保持 `ApprovalRound.status=pending`，具体通过方和待办方从 BPM 当前流程事实读取。为支持财务节点核对结果、主管加签和驳回任务引用，BPM 公共任务结果事件必须至少提供流程实例 ID、任务 ID、任务定义 Key、动作、处理人、发生时间和幂等事件 ID。
 
 ### 7.10 报名服务单 `RegistrationCase` 与记录 `RegistrationItem`
 
@@ -368,15 +381,9 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 事件日志只追加不覆盖，至少包含 `event_type`、`aggregate_type`、`aggregate_id`、`operator_user_id`、`from_status`、`to_status`、`reason`、`evidence_refs`、`related_object_refs`、`occurred_at`、`idempotency_key`。状态字段只表达当前值，事件负责解释“为什么变成现在这样”。
 
-### 7.14 支付单、渠道流水与订单资金分配
+### 7.14 购买意向、支付意向、渠道流水与订单资金分配
 
-`PaymentOrder` 是生成支付链接前创建的 ZSJOS 收款请求，至少包含 `payment_order_no`、`lead_id`、`person_id`、`opportunity_id`、`status`、`expected_amount`、`currency`、`product_items_snapshot`、`product_rule_snapshot`、`initiator_user_id`、`link_token_hash`、`expires_at`、`paid_at`。`lead_id` 创建后不可修改；正式销售转化收款可以同时绑定未结束 Opportunity，其他产品规则不要求销售机会时为空。支付链接只供该支付单使用，不是通用链接。
-
-`PaymentTransaction` 是支付渠道成功回调形成的不可伪造资金事实，至少包含 `payment_order_id`、`amount`、`currency`、`payment_method`、`paid_at`、`external_channel`、`external_transaction_no`、`payer_reference`、`callback_event_id`。渠道流水号和回调事件 ID 必须幂等唯一；实际付款人可以不同于订单 Person，不改变支付归属。
-
-`OrderPaymentAllocation` 表达支付流水或客户余额用于哪张订单，至少包含 `order_id`、`payment_transaction_id`、`customer_account_ledger_id`、`allocated_amount`、`allocated_at`、`idempotency_key`。渠道资金和账户余额二选一作为本条分配来源，同一资金来源的累计分配不得超过其可用金额。
-
-支付回调无法按内部支付单号处理等特殊技术或数据异常进入独立异常审批，不创建“待匹配客资”正常状态。异常审批对象、状态和处置权限在支付异常流程评审时单独确认。
+`PurchaseIntent` 是一次首购或复购在 Order 创建前后的稳定链路锚点；`PaymentIntent`、`PaymentGatewayEvent`、`PaymentTransaction` 和 `OrderPaymentAllocation` 分别表达收款意图、渠道事件、可信资金事实和订单资金归属。字段、状态、幂等及异常处理不在本文重复定义，统一执行支付一期开发实施文档。
 
 ### 7.15 客户资金账户与账本
 
@@ -386,9 +393,9 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 ### 7.16 退款申请 `RefundCase` 与退款明细 `RefundItem`
 
-`RefundCase` 是 ZSJOS 自己维护的退款业务聚合，至少包含 `order_id`、`status`、`requested_amount`、`approved_amount`、`refunded_amount`、`reason`、`evidence_refs`、`requested_by_user_id`、`approved_by_user_id`、`process_instance_id`、`external_refund_no`、`completed_at`。需要审批时由 BPM 执行退款流程，ZSJOS 消费流程结果并负责申请业务状态、资金及服务关系联动；实际渠道退款可以委托外部能力执行。
+`RefundCase` 是已生效订单的 ZSJOS 退款业务审批聚合。需要审批时由 BPM 执行退款流程，ZSJOS 消费流程结果并负责申请业务状态、资金及服务关系联动；审批通过只授权渠道执行，不代表资金已经退回。
 
-`RefundItem` 至少包含 `refund_case_id`、`order_item_id`、`service_relation_id`、`requested_amount`、`approved_amount`、`refunded_amount`。退款按订单项精确处理，只调整明细关联的资金和服务关系，不按整张订单笼统终止所有服务。
+支付一期的退款范围、通联执行和成功判定统一执行支付一期开发实施文档。
 
 ## 8. 扁平状态字典
 
@@ -418,7 +425,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | 报名记录类型 | `zsjos_registration_item_type` | `registration_item.item_type` | 可扩展分类 |
 | 学生服务关系状态 | `zsjos_service_relation_status` | `service_relation.status` | 持久化状态 |
 | 业务任务状态 | `zsjos_business_task_status` | `business_task.status` | 持久化状态 |
-| 支付单状态 | `zsjos_payment_order_status` | `payment_order.status` | 持久化状态 |
+| 支付意向状态 | `zsjos_payment_order_status` | `payment_intent.status`；字典类型名暂保留物理兼容 | 持久化状态 |
 | 退款申请状态 | `zsjos_refund_case_status` | `refund_case.status` | 过程状态 |
 
 ### 8.3 字典数据清单
@@ -453,16 +460,15 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | `zsjos_opportunity_status` | 40 | 已成交 | `won` | success | 关联正式销售订单按固化产品规则生效 |
 | `zsjos_opportunity_status` | 50 | 已流失 | `lost` | danger | 本次购买意向失败 |
 | `zsjos_opportunity_status` | 60 | 已取消 | `cancelled` | default | 机会在成交前被合法取消 |
-| `zsjos_order_status` | 10 | 草稿 | `draft` | default | 订单可编辑，尚未提交审批 |
-| `zsjos_order_status` | 20 | 审批中 | `pending_approval` | warning | 当前轮次关联的 BPM 双会签流程处理中 |
-| `zsjos_order_status` | 30 | 待补正 | `revision_required` | danger | 当前轮次被驳回，等待提交人修改 |
-| `zsjos_order_status` | 40 | 已生效 | `effective` | success | 已满足固化产品规则要求的生效条件 |
-| `zsjos_order_status` | 50 | 已取消 | `cancelled` | default | 生效前取消；历史仍保留 |
-| `zsjos_approval_round_status` | 10 | 待审批 | `pending` | warning | BPM 双会签流程尚未产生通过结果 |
-| `zsjos_approval_round_status` | 20 | 部分通过 | `partially_approved` | primary | 一个中心已通过，另一个仍待处理 |
-| `zsjos_approval_round_status` | 30 | 已通过 | `approved` | success | 两个中心均已通过 |
-| `zsjos_approval_round_status` | 40 | 已驳回 | `rejected` | danger | 任一中心驳回，本轮结束 |
-| `zsjos_approval_round_status` | 50 | 已取消 | `cancelled` | default | 主动撤回审批或取消审批中订单，本轮结束 |
+| `zsjos_order_status` | 10 | 审批中 | `pending_approval` | warning | 当前轮次关联的 BPM 双会签或主管加签流程处理中 |
+| `zsjos_order_status` | 20 | 待补正 | `revision_required` | danger | 当前轮次被驳回，等待创建 successor Order |
+| `zsjos_order_status` | 30 | 已生效 | `effective` | success | 已满足固化产品规则要求的生效条件 |
+| `zsjos_order_status` | 40 | 已被接续 | `superseded` | default | successor 已创建，本 Order 仅保留历史 |
+| `zsjos_order_status` | 50 | 已终止 | `terminated` | default | 主动终止或流程取消，历史仍保留 |
+| `zsjos_approval_round_status` | 10 | 待审批 | `pending` | warning | BPM 双会签或主管加签尚未完成；部分任务通过仍保持该值 |
+| `zsjos_approval_round_status` | 30 | 已通过 | `approved` | success | 本轮所需审批方均已通过 |
+| `zsjos_approval_round_status` | 40 | 已驳回 | `rejected` | danger | 任一必要审批方驳回，本轮结束 |
+| `zsjos_approval_round_status` | 50 | 已终止 | `terminated` | default | 主动终止或流程取消，本轮结束 |
 | `zsjos_registration_case_status` | 10 | 待处理 | `pending` | warning | 报名节点通过后已创建报名服务单 |
 | `zsjos_registration_case_status` | 20 | 处理中 | `processing` | primary | 报名服务正在记录和办理 |
 | `zsjos_registration_case_status` | 30 | 已完成 | `completed` | success | 报名服务完成；按产品规则决定是否激活服务关系 |
@@ -481,16 +487,17 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | `zsjos_business_task_status` | 20 | 处理中 | `processing` | primary | 责任人已开始处理 |
 | `zsjos_business_task_status` | 30 | 已完成 | `completed` | success | 任务目标已完成 |
 | `zsjos_business_task_status` | 40 | 已关闭 | `cancelled` | default | 因业务分支结束而关闭 |
-| `zsjos_payment_order_status` | 10 | 待支付 | `pending_payment` | warning | 已绑定客资和 SKU 并生成专属支付链接 |
-| `zsjos_payment_order_status` | 20 | 已支付 | `paid` | success | 支付渠道成功回调并已生成唯一支付流水 |
-| `zsjos_payment_order_status` | 30 | 已过期 | `expired` | default | 超过有效期且未支付，不再接受付款 |
-| `zsjos_payment_order_status` | 40 | 已关闭 | `closed` | default | 支付成功前由授权业务动作关闭 |
+| `zsjos_payment_order_status` | 10 | 已创建 | `created` | info | 专属支付链接已创建，尚未成功向具体通联产品下单 |
+| `zsjos_payment_order_status` | 20 | 等待支付 | `waiting` | warning | 已向选定通联产品下单，等待客户支付或渠道确认 |
+| `zsjos_payment_order_status` | 30 | 已支付 | `paid` | success | 可信渠道结果已确认到账并生成唯一成功流水 |
+| `zsjos_payment_order_status` | 40 | 已过期 | `expired` | default | 超过有效期且未支付，不再接受付款 |
+| `zsjos_payment_order_status` | 50 | 已关闭 | `closed` | default | 支付成功前经授权关闭并取得适用的可靠关单结果 |
 | `zsjos_refund_case_status` | 10 | 草稿 | `draft` | default | 退款申请尚未提交 |
 | `zsjos_refund_case_status` | 20 | 审核中 | `pending_review` | warning | 退款申请等待授权审核 |
 | `zsjos_refund_case_status` | 30 | 已批准 | `approved` | primary | 退款申请获批，等待渠道执行 |
 | `zsjos_refund_case_status` | 40 | 已拒绝 | `rejected` | danger | 当前退款申请未获批准 |
 | `zsjos_refund_case_status` | 50 | 退款处理中 | `processing` | warning | 已向外部渠道或财务发起资金退款 |
-| `zsjos_refund_case_status` | 60 | 部分退款 | `partially_refunded` | warning | 已退金额大于零且小于批准金额 |
+| `zsjos_refund_case_status` | 60 | 部分退款 | `partially_refunded` | warning | 后续能力预留，非通联支付一期可达状态 |
 | `zsjos_refund_case_status` | 70 | 已完成退款 | `refunded` | success | 已完成本申请批准金额的退款 |
 | `zsjos_refund_case_status` | 80 | 已取消 | `cancelled` | default | 资金执行前撤销退款申请 |
 
@@ -534,19 +541,13 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 机会创建订单不代表成交；`Opportunity.status.won` 只能与其关联的 `Order.status.effective` 同时出现。订单处于 `pending_approval` 或 `revision_required` 时，不允许机会独立进入 `shelved`、`lost` 或 `cancelled`。
 
-### 9.3 支付单、支付成功与自动建单
+### 9.3 购买意向、支付成功与手工补录订单
 
-1. 业务人员从既有客资选择 SKU 创建 `PaymentOrder.status.pending_payment`，固化 `lead_id`、Person、产品、SKU、金额和规则快照并生成专属支付链接。
-2. 待支付的支付单可以在支付成功前过期或由授权业务动作关闭；`paid`、`expired`、`closed` 均为终态，禁止重新打开或改绑客资。
-3. 渠道成功回调必须携带内部支付单号。ZSJOS 以渠道流水号和回调事件 ID 幂等创建 `PaymentTransaction`，并把支付单改为 `paid`。
-4. 销售提交时在同一事务创建唯一活动订单、订单项和第一轮审批快照；服务端重新校验客资资格、SKU 启用状态、金额汇总、联系方式和凭证条件。
-5. 自动建单失败不得回退真实支付成功事实；系统必须可靠重试并产生可运维告警。重复回调或重试不得创建重复支付流水、订单或订单项。
-
-正常流程不提供付款后人工匹配或改绑客资。无法按内部支付单号处理的特殊异常进入独立审批流程；该异常流程不改变正常支付单状态协议。
+在线支付是线下凭证和授权零元订单之外的可选路径。可信到账只通知 PurchaseIntent 当前责任人补录订单，不自动创建 Order，也不提前驱动 Lead 或 Opportunity 成交；完整收款、确认和补录门禁统一执行支付一期开发实施文档。
 
 ### 9.4 订单提交与产品规则分支
 
-提交订单必须先校验订单为 `draft` 或 `revision_required`、产品和规则快照完整、资金分配满足当前订单要求或订单为经授权的零元订单。存在关联机会时，还必须校验机会未结束。
+首次提交必须校验 PurchaseIntent 尚无当前 Order；补正提交必须校验原 Order 为 `revision_required` 或已授权终止且可重提。两者都要校验产品和规则快照完整、在线支付金额完全一致，或满足线下凭证/授权零元订单规则；存在关联机会时还必须校验机会未结束。
 
 - 产品规则要求双会签时，进入 9.5 的 BPM 流程。
 - 产品规则不要求双会签时，在一个事务中将订单改为 `effective`；存在关联 Opportunity 时同时改为 `won`；产品规则要求报名服务时创建唯一报名服务单，否则只写入生效和后续履约事件。
@@ -558,7 +559,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 1. 执行 9.4 的通用提交校验，并确认固化规则要求双会签。
 2. 固化完整 `order_snapshot`。
-3. 创建递增的新 `ApprovalRound.status.pending`。
+3. 为本次新 Order 创建第 1 个 `ApprovalRound.status.pending`。
 4. 使用稳定流程定义 Key 和本轮业务 Key 调用 BPM 公共 API，启动包含报名服务中心与财务两条并行任务的流程实例。
 5. 将 BPM `processInstanceId` 写入本轮，并更新 `Order.status.pending_approval` 和 `current_approval_round_id`。
 6. 若是补正重提，完成对应补正任务。
@@ -570,7 +571,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 
 | BPM 当前动作 | 本轮另一 BPM 任务 | ZSJOS 轮次结果 | 订单结果 |
 | --- | --- | --- | --- |
-| 第一个任务通过 | `pending` | `partially_approved` | 保持 `pending_approval` |
+| 第一个任务通过 | `pending` | 保持 `pending` | 保持 `pending_approval` |
 | 第二个任务通过 | `approved` | `approved` | 原子变为 `effective` |
 | 任一任务驳回 | `pending` 或 `approved` | `rejected` | 原子变为 `revision_required` |
 
@@ -594,9 +595,9 @@ BPM 负责审批任务并发和终态，ZSJOS 监听器仍须使用版本号、�
 
 ### 9.7 撤回、补正与重提
 
-主动撤回审批时，必须先通过 BPM 取消当前流程实例并关闭未完成任务，再幂等地把当前轮次标记为 `cancelled`、订单返回 `draft`。撤回表示继续本次交易，不得把订单或机会标记为 `cancelled`。
+主动终止或取消审批时，必须先通过 BPM 取消当前流程实例并关闭未完成任务，再幂等地结束当前轮次和当前 Order；已支付事实保持不变。当前成交链路投影为“已终止”，而不是把 Order 复活为草稿。
 
-补正不是复活旧 BPM 流程或任务。提交人修改后重新提交，必须创建独立 successor 订单及其第 1 个新快照、新 BPM 流程实例；旧订单进入 `superseded`，上一轮结果仅供审计，不参与新订单聚合。
+补正不是复活旧 BPM 流程或任务。提交人修改后重新提交，必须创建独立 successor Order 及其第 1 个新快照、新 BPM 流程实例；旧 Order 进入 `superseded`，PurchaseIntent 原子指向 successor，上一轮结果仅供审计，不参与当前聚合。
 
 ### 9.8 报名完成与服务激活
 
@@ -620,7 +621,7 @@ BPM 负责审批任务并发和终态，ZSJOS 监听器仍须使用版本号、�
 
 ### 9.10 复购
 
-当前交付范围内复购不创建或关联新商机，只创建关联客户的新订单和审批轮次。原客资、原商机、原订单及首次成交时间保持不变。
+当前交付范围内复购不强制创建新商机，可按既有业务规则关联。每次复购先创建关联 Person 的独立 PurchaseIntent，责任人按线下/零元路径或通联可信到账事实补录新订单和审批轮次。原客资、原商机、原购买意向、原订单及首次成交时间保持不变。
 
 复购链路通过 `person_id`、`source_service_relation_id` 和可选 `previous_order_id` 追溯，不通过修改历史对象来表示。
 
@@ -641,32 +642,30 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 
 ### 9.12 取消、退款与服务终止
 
-- `draft`、`pending_approval`、`revision_required` 订单可按权限正式取消；取消审批中的订单必须通过 BPM 取消当前流程实例并关闭其未完成任务，将轮次标记为 `cancelled`，再幂等更新订单和适用的机会终态。
-- `effective` 订单不得改为 `cancelled`，退款必须通过 ZSJOS 自有 `RefundCase` 处理；外部支付能力只执行资金动作。
-- 部分或全额退款不改变订单曾经生效的事实。退款通过 RefundItem 按订单项精确处理，只调整明细关联的资金和服务关系并留痕。
-- 退款业务状态在 ZSJOS `RefundCase` 中表达，不复用订单审批轮次；需要审批时启动独立 BPM 流程实例。
+退款不得删除或回退 Order、服务关系和 BPM 的历史事实。已生效订单先完成 RefundCase BPM，资金执行范围、通联协议和最终展示状态统一执行支付一期开发实施文档。
 
 ## 10. 数据不变量与约束
 
 1. 一次全新客资提交必须原子创建 `Person + Lead`；命中已有 Person 时只创建 LeadActivation；交叉身份冲突不得写入三者中的任何一个。
-2. 同一 Lead 最多一条 `Opportunity.type.initial_conversion`；复购机会不得重新打开历史客资，建议关联来源服务关系或上一订单。
-3. 支付单必须绑定既有 `lead_id`，其 Person 必须与 Lead 一致；支付单创建后不得修改 Lead，正常流程不存在无归属支付。
-4. 同一支付单最多自动创建一张订单，`Order.source_payment_order_id` 必须唯一；支付回调事件 ID、渠道流水号和自动建单业务键必须唯一且幂等。
-5. `Order.lead_id` 必须与来源支付单一致；存在 Opportunity 时，`Opportunity.person_id = Order.person_id`，且一个机会最多一张订单。无机会订单不得驱动任何机会为 `won`。
-6. 产品、SKU 和产品规则快照在支付单、订单项或审批快照固化后不可修改。状态机只执行固化规则，不按名称、价格或展示标签推断规则。
-7. 产品规则要求 BPM 双会签的订单，只有当前轮次流程通过后才能进入 `effective`；规则不要求审批的订单可按 9.4 的直接生效事务进入 `effective`。
-8. 双会签流程必须包含报名服务中心和财务两个并行审批方；审批任务及其唯一性由 BPM 保证，ZSJOS 通过任务结果公共事件维护轮次汇总状态。
-9. 每次补正重提创建 successor 订单、第 1 个新轮次和新 BPM 流程实例；新旧订单通过 `supersedes_order_id` / `superseded_by_order_id` 双向关联，旧订单进入 `superseded` 且不可再次重提。主动撤回或正式取消审批中订单时，当前轮次必须进入 `cancelled`。
-10. 审批轮次的 `order_snapshot` 和 BPM 关联标识创建后不可修改。
-11. 一张订单最多一张报名服务单；报名节点通过后创建，订单生效后才允许完成。
-12. 服务关系只能由已完成的报名服务单创建，且只对应固化规则要求持续服务的有效订单项。
-13. 一条 PaymentTransaction 的累计渠道资金分配不得超过交易金额；一条账户资金消费的累计分配不得超过对应可用余额，单条分配只能选择一种资金来源。
-14. CustomerAccount 当前余额必须等于只追加账本的可核对汇总；充值、消费和退款导致的余额变化必须与账本、资金分配在同一事务完成，余额不得为负。
-15. 退款必须通过 RefundItem 精确关联订单项；服务终止只作用于退款明细关联的 ServiceRelation。
-16. 状态改变、事件写入和必要的跨对象联动必须同事务提交；跨事务回调和自动建单采用幂等消费、可靠重试和可运维告警，不允许静默部分成功。
-17. 所有命令接口都要验证租户、权限、数据范围、前置状态和版本；越权与状态冲突返回可区分错误。
-18. 历史轮次、激活记录、账户账本、服务记录和业务事件不可物理覆盖或删除；更正通过新增记录表达。
-19. 业务请求使用幂等键，消息、通知和提醒采用事务后可靠投递，避免重复业务对象。
+2. 同一 Lead 最多一条 `Opportunity.type.initial_conversion`；复购 PurchaseIntent 不得重新打开历史客资，一期不强制创建复购 Opportunity。
+3. 每次首购或复购必须有独立 PurchaseIntent。首购绑定既有 Lead 且 Person 必须一致；复购绑定 Person 和适用来源，创建后不得改绑业务主体。
+4. 同一 PurchaseIntent 一期最多一个 PaymentIntent；失效后不复活，重新收款必须新建 PurchaseIntent。一个 PaymentIntent 最多一笔成功 PaymentTransaction 和一笔整单全额 PaymentRefund。
+5. 在线支付到账不自动建单。责任人补录的 Order 必须关联 PurchaseIntent；在线路径同时唯一关联 PaymentIntent，支付回调事件、渠道流水号和补录命令都必须幂等。
+6. `Order.lead_id` 必须与首购 PurchaseIntent 和 PaymentIntent 一致；存在 Opportunity 时，`Opportunity.person_id = Order.person_id`，且一个首次转化机会最多一条当前订单链。无机会订单不得驱动任何机会为 `won`。
+7. 产品、SKU 和产品规则快照在 PurchaseIntent、PaymentIntent、订单项或审批快照固化后不可修改。状态机只执行固化规则，不按名称、价格或展示标签推断规则。
+8. 产品规则要求 BPM 双会签的订单，只有当前轮次流程通过后才能进入 `effective`；规则不要求审批的订单可按 9.4 的直接生效事务进入 `effective`。
+9. 双会签流程必须包含报名服务中心和财务两个并行审批方；审批任务及其唯一性由 BPM 保证，ZSJOS 通过任务结果公共事件维护轮次汇总状态。
+10. 每次补正重提创建 successor Order、第 1 个新轮次和新 BPM 流程实例；新旧 Order 双向关联，旧 Order 进入 `superseded` 且不可再次重提，PurchaseIntent 只能指向当前 successor。
+11. 审批轮次的 `order_snapshot` 和 BPM 关联标识创建后不可修改。
+12. 一张订单最多一张报名服务单；报名节点通过后创建，订单生效后才允许完成。
+13. 服务关系只能由已完成的报名服务单创建，且只对应固化规则要求持续服务的有效订单项。
+14. 一条 PaymentTransaction 的累计渠道资金分配不得超过交易金额；一条账户资金消费的累计分配不得超过对应可用余额，单条分配只能选择一种资金来源。
+15. CustomerAccount 当前余额必须等于只追加账本的可核对汇总；充值、消费和退款导致的余额变化必须与账本、资金分配在同一事务完成，余额不得为负。
+16. 一期 PaymentRefund 必须等于原 PaymentIntent 全额；部分退款及 RefundItem 拆分留待后续专项设计。
+17. 状态改变、事件写入和必要的跨对象联动必须同事务提交；跨事务支付/退款回调、主动查询和补偿采用幂等消费、可靠重试和可运维告警，不允许静默部分成功。
+18. 所有命令接口都要验证租户、功能权限、数据范围、对象权限、前置状态和版本；越权与状态冲突返回可区分错误。
+19. 历史轮次、激活记录、账户账本、服务记录和业务事件不可物理覆盖或删除；更正通过新增记录表达。
+20. 业务请求使用幂等键，消息、通知和提醒采用事务后可靠投递，避免重复业务对象。
 
 ## 11. 提醒、展示与计算状态
 
@@ -714,43 +713,47 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 
 1. 新媒体员工或兼职人员一次提交姓名、手机号、微信号和来源信息。
 2. 手机号和微信号均未命中，系统在同一事务创建 Person 和 Lead；判定有效并完成分配后，销售创建唯一 `initial_conversion` 机会，客资变为 `converted`。
-3. 销售从全部启用 SKU 中选择成交课程，填写学员、金额、付款方式和缴费凭证并直接提交成交订单。
-4. ZSJOS 在同一事务创建订单、订单项和不可变审批快照，并启动报名履约中心与财务结算中心双会签。
-5. 两个中心都通过后订单生效；任一中心驳回则原订单进入补正，重提时创建独立 successor 订单、第 1 个审批轮次和新的 BPM 实例。
-6. 报名节点通过时幂等创建报名服务单；订单生效时，存在关联机会则机会变为 `won`，并解除报名履约最终完成门禁。
-7. 报名服务中心补录实际动作、时间和凭证并完成服务单。系统只为规则要求持续服务的订单项创建并激活服务关系，一次性项目不创建。学习规划师完成学习计划后直接进入常规督学，不设置入群或教研对接阶段。
+3. 销售从全部启用 SKU 中选择成交课程，创建关联 Lead、Person 和 `initial_conversion` Opportunity 的首购 PurchaseIntent，并固化产品、金额和规则快照。
+4. 销售可以按现有线下凭证或授权零元路径补录订单，也可以生成专属 PaymentIntent；通联可信到账后只通知责任人补录，不自动创建 Order。
+5. 责任人补录时重新校验业务资格、产品快照和金额；在线支付路径还必须与 PaymentIntent 和成功 PaymentTransaction 金额完全一致。
+6. ZSJOS 在同一事务创建订单、订单项和不可变审批快照，并启动报名履约中心与财务结算中心双会签。
+7. 两个中心都通过后订单生效；任一中心驳回则当前 Order 终止，重提时创建独立 successor Order、第 1 个审批轮次和新的 BPM 实例。
+8. 报名节点通过时幂等创建报名服务单；订单生效时，存在关联机会则机会变为 `won`，并解除报名履约最终完成门禁。
+9. 报名服务中心补录实际动作、时间和凭证并完成服务单。系统只为规则要求持续服务的订单项创建并激活服务关系，一次性项目不创建。学习规划师完成学习计划后直接进入常规督学，不设置入群或教研对接阶段。
 
 ### 12.2 已有客资再次激活
 
 1. 提交表单中的手机号或微信号命中同一已有 Person。
 2. 系统不新增 Person 或 Lead，创建独立 LeadActivation，保存来源、提交人、表单快照和激活时间。
 3. 有活动服务关系时通知学生服务负责人；否则有未结束机会时通知机会负责人；否则通知客资负责人或进入销售分配。
-4. 后续业务人员需要收款时，再从既有 Lead 独立发起支付链接；客资提交本身不生成支付链接。
+4. 客资激活本身不生成支付链接。后续出现独立购买需求时，业务人员从该 Person 及适用的 Lead、服务关系或上一订单创建新的 PurchaseIntent，再选择线下/零元补录或通联在线支付路径。
 
 ### 12.3 驳回、撤回与补正
 
 1. 财务或报名服务中心驳回第一轮。
 2. BPM 关闭同流程未完成任务，ZSJOS 将订单改为 `revision_required` 并向本轮提交人派发补正任务。
-3. 提交人修改订单后重提，ZSJOS 创建第二轮快照并启动新的 BPM 流程实例。
-4. 第一轮任何已通过结果不复用；第二轮两者均通过后订单生效。
+3. 成交链路投影为“已终止”，PaymentIntent 和到账事实不回退。
+4. 提交人补正后重提，ZSJOS 在同一 PurchaseIntent 下创建 successor Order、其第 1 个审批快照和新的 BPM 流程实例，旧 Order 转为 `superseded`。
+5. 第一轮任何已通过结果不复用；successor 的两个节点均通过后订单生效。
 
-主动撤回与驳回不同：提交人撤回时，BPM 取消当前流程，轮次变为 `cancelled`，订单返回 `draft`；修改后仍创建新轮次。正式取消订单才表示放弃交易。
+主动撤回与驳回的原因不同，但版本规则相同：提交人撤回时，BPM 取消当前流程，轮次和当前 Order 均变为 `terminated`，成交链路显示“已终止”；继续交易必须创建 successor Order。取消整个 PurchaseIntent 才表示放弃本次交易。
 
 补正任务仅对应明确业务驳回，包括报名履约驳回、财务驳回和主管驳回导致整轮驳回。任务类型为 `sales_order_revision`，无截止时间，只派给本轮提交人；正式负责人代为重提成功也完成该任务。新订单及其第 1 轮 BPM 启动成功后才完成旧补正任务；任一步骤失败时旧订单保持原状态。BPM 异常取消或异常终止不创建任务，功能上线前的历史 `revision_required` 订单不回填。
 
 ### 12.4 预充值与余额消费
 
-1. 业务人员从既有 Lead 选择预充值 SKU 创建专属支付单。
-2. 渠道支付成功后创建支付流水，并按固化产品规则给该 Person 的 CustomerAccount 入账，追加充值账本。
+1. 业务人员从既有 Person 及适用来源创建预充值 PurchaseIntent，选择预充值 SKU；使用在线支付时创建专属 PaymentIntent。
+2. 渠道可信支付成功后创建 PaymentTransaction，并按固化产品规则给该 Person 的 CustomerAccount 入账，追加充值账本；回跳页面不作为入账凭证。
 3. Person 后续购买其他产品时，可以分次使用本人余额；扣款、消费账本和订单资金分配原子完成。
 4. 余额不能转给其他 Person，也不能直接提现；余额退款去向留待支付与退款设计阶段确认。
 
 ### 12.5 复购
 
-1. 学生服务与交付中心从 ZSJOS `Person` 或现有服务关系创建 `repurchase` 机会。
-2. 新机会创建新订单，由该次提交人提交审批。
-3. 支付、审批、补正、报名和服务分支均执行本次订单固化的产品规则。
-4. 需要持续服务时创建新的活动服务关系，旧订单和旧服务关系不变。
+1. 学生服务与交付中心从 ZSJOS `Person`、现有服务关系或上一订单创建新的复购 PurchaseIntent，一期不强制创建 `repurchase` Opportunity。
+2. 本次复购可以按现有线下凭证或授权零元路径补录，也可以生成专属 PaymentIntent；通联可信到账只通知责任人补录 Order。
+3. 责任人补录新订单并提交审批；在线支付路径的购买意向金额、支付金额和订单明细汇总金额必须完全一致。
+4. 支付、审批、补正、报名和服务分支均执行本次 PurchaseIntent 与订单固化的产品规则。
+5. 需要持续服务时创建新的活动服务关系，旧购买意向、旧订单和旧服务关系不变。
 
 ## 13. 旧模型迁移映射
 
@@ -759,20 +762,21 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 | 旧概念 | 目标归属 | 迁移原则 |
 | --- | --- | --- |
 | 客资中的首触、跟进、暂缓、流失 | `Opportunity.status` | 按每次购买意向迁入机会，不能继续留在客资 |
-| 客资中的待付款、已付款、已录单 | 支付单、支付流水、订单资金分配、订单和审批事件 | 不再作为客资状态；需按客资、订单和渠道流水重建事实 |
+| 客资中的一次首购或复购进度 | `PurchaseIntent` | 按能够可靠区分的独立交易链路迁入；无法区分的记录进入人工核验，不按更新时间猜测 |
+| 客资中的待付款、已付款、已录单 | `PurchaseIntent`、`PaymentIntent`、支付流水、订单资金分配、Order 和审批事件 | 不再作为客资状态；需按购买主体、订单和可信渠道流水重建事实，最终展示状态在查询时投影 |
 | “客资已转订单” | `Lead.status.won` | 只有订单生效才记为成交；仅创建机会或提交订单的历史记录分别归入机会和订单事实 |
 | 订单中的报名中、财务待审 | 审批轮次或报名服务单 | 根据真实发生时间拆分，不能机械一对一改值 |
 | 单一订单审核状态 | ZSJOS `ApprovalRound` + BPM 流程历史 | 缺少双中心历史时标记迁移来源，不伪造 BPM 任务、操作人和审批意见 |
 | 报名 16 步或固定布尔字段 | `RegistrationItem` | 按记录类型迁移实际完成事实和凭证 |
 | 旧订单完成 | `Order.status.effective` + 报名/服务事实 | 必须判断是仅审批通过，还是报名已完成并已交付 |
-| 复购覆盖原订单或原服务状态 | 新机会、新订单、新服务关系 | 拆分历史版本；无法可靠拆分的记录进入人工校验清单 |
+| 复购覆盖原订单或原服务状态 | 新 PurchaseIntent、新订单、新服务关系 | 拆分历史版本；一期不强制补造复购 Opportunity，无法可靠拆分的记录进入人工校验清单 |
 
 被替代的旧字典类型：
 
 - `zsjos_lead_deal_progress_status`：删除目标配置，迁移到机会状态及订单事实。
 - `zsjos_order_enrollment_status`：删除目标配置，由报名服务单状态承担。
 - `zsjos_order_review_status`：删除目标配置，由 ZSJOS 审批轮次状态和 BPM 流程状态共同承担。
-- 旧付款数据按可核验事实迁入 `PaymentOrder`、`PaymentTransaction` 和 `OrderPaymentAllocation`；旧退款迁入 `RefundCase` 与 `RefundItem`。外部流水号只作为引用，不得继续把外部表作为业务主表。
+- 旧付款数据按可核验事实迁入 `PurchaseIntent`、`PaymentIntent`、`PaymentTransaction` 和 `OrderPaymentAllocation`；当前 `zsjos_payment_order` 物理表是否演进为 PaymentIntent 需单独评审。旧退款按实际业务审批和渠道执行事实分别迁入 `RefundCase` 与 `PaymentRefund`，不得为一期补造部分退款或 RefundItem 明细。外部流水号只作为引用，不得继续把外部表作为业务主表。
 - 历史重复提交若没有独立激活事实，不得根据更新时间伪造 LeadActivation；只能标记迁移来源或进入人工核验。
 
 迁移不得重写已执行的生产迁移。正式迁移前需要单独设计可重复执行、可核对、可回滚的数据脚本，并经明确确认后执行。
@@ -781,10 +785,10 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 
 1. 确认 ZSJOS 各业务实体的物理表、主键、索引、金额精度、币种和公共审计字段。
 2. 固化客资查重与激活协议、字典值、权限点、错误码和命令接口。
-3. 设计支付单、渠道回调、自动建单、订单资金分配、客户账户账本及特殊支付异常审批边界。
+3. 按支付一期开发实施文档实现 PurchaseIntent、通联支付、手工补录订单和成交链路投影；本文不另设支付实施顺序。
 4. 确认产品能力的公开规则结果契约；ZSJOS 只保存稳定引用和快照，不设计或直查产品内部表。
 5. 实现订单审批轮次、BPM 双会签任务结果事件及业务事务不变量，再接报名服务和服务关系。
-6. 接入首次销售转化、复购和按订单项精确退款。
+6. 接入首次销售转化、复购及其支付一期边界。
 7. 设计历史数据盘点与迁移，不从旧混合状态直接猜测业务事实。
 
 本文不包含 SQL、接口实现或数据库执行授权。
@@ -794,19 +798,17 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 - [ ] 每个状态只属于一个明确实体和状态字段。
 - [ ] 客资中不存在付款、录单、成交跟进或复购状态。
 - [ ] 一次表单在未命中时原子创建 Person 与 Lead，命中时只创建 LeadActivation，交叉身份冲突不进入业务表。
-- [ ] 同一 Lead 最多一条 `initial_conversion` 机会；复购创建新 Opportunity 且不修改历史对象。
-- [ ] 支付单必须绑定既有 Lead 和 SKU，绑定后不可修改；正常流程不存在无归属支付、通用链接或线下转账。
-- [ ] 渠道成功回调幂等创建支付流水并自动创建唯一订单草稿，提交人不重新选择支付归属。
+- [ ] 同一 Lead 最多一条 `initial_conversion` 机会；每次首购或复购创建独立 PurchaseIntent，复购一期不强制创建 Opportunity，且不修改历史对象。
+- [ ] 支付模型、渠道确认、手工补录、八态投影和退款全部通过支付一期开发实施文档的验收矩阵。
 - [ ] 财务审批只核对支付与订单一致性，不创建或改变渠道到账事实。
 - [ ] 无 Opportunity 订单不得驱动机会成交；有 Opportunity 时订单与机会 Person 必须一致。
 - [ ] 每轮审批只创建一个新的 BPM 流程实例，并由已部署流程定义产生报名服务中心和财务两条并行任务。
 - [ ] 产品规则要求双会签时两条审批都通过订单才生效；机会和报名服务只在各自条件满足时联动。
 - [ ] 任一驳回会关闭本轮未完成任务并创建提交人补正任务。
-- [ ] 主动撤回将当前轮次取消并使订单返回草稿；正式取消订单才终止交易。
-- [ ] 补正或撤回后重提创建全新轮次、快照和 BPM 流程实例，不复用旧结果。
+- [ ] 主动撤回取消当前轮次并终止当前 Order；继续交易时创建 successor，取消整个 PurchaseIntent 才放弃本次交易。
+- [ ] 补正或撤回后重提创建 successor Order、其第 1 个新轮次、快照和 BPM 流程实例，不复用旧结果。
 - [ ] 报名完成只为固化产品规则要求持续服务的订单项创建服务关系。
 - [ ] 预充值使用 Person 独立账户和只追加账本，余额只供本人跨订单使用且不能直接提现或转移。
-- [ ] 退款通过 RefundItem 精确关联订单项和适用的服务关系。
 - [ ] 线下动作允许按实际发生时间补录，系统不限制实际操作。
 - [ ] 状态转换、权限、幂等和并发规则不依赖字典标签。
 - [ ] 所有业务实体、Mapper、Service 和事务均属于 `yudao-module-zsjos`，不存在 CRM 表或 CRM Service 运行时依赖。
@@ -819,7 +821,6 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 以下问题不影响当前领域拆分，但在对应数据库和接口设计前必须单独确认，本文不预设答案：
 
 - 产品模块或产品能力的实际所有者、物理表、SKU 规则结构、版本协议和公开 API。
-- 特殊支付异常的业务对象、审批状态、权限、补偿动作和与 BPM 的具体集成方式。
 - 哪些 `Lead.status` 允许创建支付单，以及已关闭、无效或已转换客资被再次激活后允许发起哪些后续业务动作。
 - 同一 Person 存在多条历史 Lead 时，LeadActivation 关联哪一条当前 Lead；激活本身是否以及如何影响历史终态。
 - `Person.identity_status`、`Partner.status` 的稳定协议值和合法转换。
@@ -827,7 +828,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 - 预充值余额退款是退回原支付渠道、退回账户余额还是按业务类型选择，以及管理员调账的审批规则。
 - 报名服务完成所需的最低记录项由哪一项业务配置提供。
 - 兼职主体的结算信息及结算记录使用哪些独立 ZSJOS 子表。
-- 金额精度、币种范围、支付链接有效期、支付渠道能力和退款渠道执行契约。
+- 支付与通联未决项统一见支付一期开发实施文档第 22 节，不在本文重复维护。
 
 ## 17. 客资三级申诉状态机（V015）
 
@@ -861,11 +862,10 @@ waiting_assignment/assigned --主管填写原因退出--> exited
 - 通知只包含一个或多个提前规则和实际入池到期通知，不发送逾期通知。
 ### 公海接续成交
 
-- B 补正自己提交的驳回订单时，继续使用原订单并保持 `submitter_user_id` 不变。
-- B 接续 A 提交的驳回订单时，新建 `continuation_sale` 订单；A 的原订单转为 `superseded`。
+- B 补正自己提交的驳回订单时，在同一 PurchaseIntent 下新建 successor Order，并保持本次实际提交人审计。
+- B 接续 A 提交的驳回订单时，同样在原 PurchaseIntent 下新建 `continuation_sale` successor Order；A 的原订单转为 `superseded`。
 - 新旧订单通过 `supersedes_order_id` / `superseded_by_order_id` 双向关联，历史不可覆盖。
-- 同一客资仍只能存在一张 `pending_approval` 或 `revision_required` 活动订单；`superseded`
-  订单退出活动唯一约束但继续保留审计与审批历史。
+- 同一 PurchaseIntent 同一时刻只能指向一张当前 Order；`superseded` Order 退出活动唯一约束但继续保留审计与审批历史。
 
 ## 19. 主管公海标记（V035）
 

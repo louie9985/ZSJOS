@@ -51,6 +51,15 @@ export function wasMockedEndpoint(prefix: string): boolean {
   return [...usedMockEndpoints].some(endpoint => endpoint.startsWith(prefix))
 }
 
+export function wasMockedExactEndpoint(endpoint: string): boolean {
+  void mockUsageVersion.value
+  return usedMockEndpoints.has(endpoint)
+}
+
+export function clearMockedEndpoint(endpoint: string): void {
+  if (usedMockEndpoints.delete(endpoint)) mockUsageVersion.value += 1
+}
+
 const mockCards = [
   { id: 30001, accountName: '演示用户', maskedCardNumber: '**** **** **** 1234', bankName: '中国银行', branchName: '合肥市演示支行', defaultCard: true }
 ]
@@ -119,6 +128,10 @@ function lead(id = 10001) {
 
 function leadActivity(id: number) {
   return {
+    currentStatus: {
+      code: 'following', text: '处理中', description: '平台已开始处理，请关注后续进度',
+      tone: 'primary', updatedAt: '2026-08-24T14:00:00'
+    },
     followUps: [{
       id: 1, leadId: id, occurredAt: '2026-08-24T14:00:00', firstInAssignment: true,
       result: 'connected', resultLabel: '已联系客户', method: 'phone', methodLabel: '电话',
@@ -126,11 +139,12 @@ function leadActivity(id: number) {
       categoryAfterLabel: '成人教育', remark: '客户希望进一步了解课程安排', nextFollowUpAt: '2026-08-26T10:00:00', images: []
     }],
     timeline: [
-      { id: 1, title: '客资已提交', description: '进入兼职客资处理流程', occurredAt: '2026-08-24T10:00:00' },
-      { id: 2, title: '销售已跟进', description: '销售完成首次电话联系', occurredAt: '2026-08-24T14:00:00' }
+      { id: 'lead-submitted', type: 'submitted', title: '客资已提交', description: '提交成功，已进入平台处理流程', occurredAt: '2026-08-24T10:00:00', tone: 'success', current: false },
+      { id: 'lead-processing', type: 'processing', title: '平台开始处理', description: '客资已进入处理阶段', occurredAt: '2026-08-24T10:15:00', tone: 'success', current: false },
+      { id: 'first-follow-up', type: 'followed', title: '已完成首次跟进', description: '平台已完成首次联系，正在持续跟进', occurredAt: '2026-08-24T14:00:00', tone: 'primary', current: true }
     ],
     cashbackItems: [{ id: 1, typeText: '有效客资奖励', statusText: '待结算', amount: 10, availableAt: '2026-09-01T00:00:00' }],
-    complaints: [{ id: 1, recordNo: 'CP-MOCK-001', status: 'handled', statusText: '已反馈', content: '演示投诉内容', result: '已提醒销售及时跟进', createdAt: '2026-08-24T16:00:00', attachments: [] }],
+    complaints: [{ id: 1, recordNo: 'CP-MOCK-001', status: 'handled', statusText: '已反馈', content: '演示投诉内容', result: '平台已受理并跟进', createdAt: '2026-08-24T16:00:00', attachments: [] }],
     orders: [{ id: 1, orderNo: 'SO-MOCK-001', status: 'pending', statusText: '待审核', purchaseTypeText: '首次购买', totalAmount: 2980, createdAt: '2026-08-24T17:00:00' }]
   }
 }
@@ -148,6 +162,113 @@ const mockLeaderboardConfig = {
     { key: 'lead_count', label: '客资数', valueLabel: '客资数量', valueUnit: 'count', ruleText: '按周期内成功提交的客资数量排序。' },
     { key: 'valid_lead_count', label: '有效客资', valueLabel: '有效客资数', valueUnit: 'count', ruleText: '按周期内审核有效的客资数量排序。' }
   ]
+}
+
+const mockHomeStatistics = {
+  today: { leadCount: 3, withdrawnAmount: 0, validLeadCount: 2, convertedLeadCount: 1 },
+  week: { leadCount: 18, withdrawnAmount: 240, validLeadCount: 11, convertedLeadCount: 4 },
+  month: { leadCount: 64, withdrawnAmount: 860, validLeadCount: 39, convertedLeadCount: 14 },
+  year: { leadCount: 520, withdrawnAmount: 7680, validLeadCount: 318, convertedLeadCount: 106 },
+  total: { leadCount: 680, withdrawnAmount: 10240, validLeadCount: 412, convertedLeadCount: 148 }
+} as const
+
+function homeStatisticsData(config: MockRequestConfig) {
+  const period = String(config.params?.period || 'total') as keyof typeof mockHomeStatistics
+  const resolvedPeriod = period in mockHomeStatistics ? period : 'total'
+  return { period: resolvedPeriod, ...mockHomeStatistics[resolvedPeriod] }
+}
+
+const mockWithdrawalCounts = { today: 0, week: 4, month: 10, year: 48, total: 64 } as const
+
+function localDateTime(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
+}
+
+function mockPeriodDate(period: keyof typeof mockHomeStatistics, index: number, hour: number): string {
+  const date = new Date()
+  const dayOfWeek = (date.getDay() + 6) % 7
+  const yearStart = new Date(date.getFullYear(), 0, 1)
+  const dayOfYear = Math.floor((date.getTime() - yearStart.getTime()) / 86400000)
+  const availableDays = period === 'today' ? 1
+    : period === 'week' ? dayOfWeek + 1
+      : period === 'month' ? date.getDate()
+        : period === 'year' ? dayOfYear + 1 : 720
+  date.setDate(date.getDate() - (index % Math.max(1, availableDays)))
+  date.setHours(hour, (index * 7) % 60, 0, 0)
+  return localDateTime(date)
+}
+
+function addHours(value: string, hours: number): string {
+  const date = new Date(value)
+  date.setHours(date.getHours() + hours)
+  return localDateTime(date)
+}
+
+function mockLeadDetail(period: keyof typeof mockHomeStatistics, metric: string, index: number) {
+  const status = metric === 'converted_lead_count' ? 'won'
+    : metric === 'valid_lead_count' ? (index % 4 === 0 ? 'won' : 'valid')
+      : ['submitted', 'closed', 'valid', 'won', 'invalid'][index % 5]
+  const submittedAt = mockPeriodDate(period, index, 9 + (index % 7))
+  const timeline = [
+    { id: `submitted-${index}`, title: '客资已提交', description: '演示客资已提交到平台', occurredAt: submittedAt }
+  ]
+  if (status !== 'submitted') {
+    timeline.push({ id: `followed-${index}`, title: '销售已跟进', description: '销售已完成首次联系', occurredAt: addHours(submittedAt, 1) })
+  }
+  if (status === 'valid' || status === 'won') {
+    timeline.push({ id: `valid-${index}`, title: '判定为有效客资', description: '平台已完成有效性判定', occurredAt: addHours(submittedAt, 2) })
+  }
+  if (status === 'won') {
+    timeline.push({ id: `won-${index}`, title: '客户已成交', description: '关联订单已确认成交', occurredAt: addHours(submittedAt, 4) })
+  }
+  if (status === 'invalid') {
+    timeline.push({ id: `invalid-${index}`, title: '判定为无效客资', description: '演示数据未包含真实无效原因', occurredAt: addHours(submittedAt, 2) })
+  }
+  const sequence = String(index + 1).padStart(4, '0')
+  return {
+    kind: 'lead', id: -(100000 + index), mock: true,
+    leadNo: `KZ-MOCK-${period.toUpperCase()}-${sequence}`, submittedName: `演示客户${String((index % 99) + 1).padStart(2, '0')}`,
+    status, courseName: `演示课程 ${(index % 4) + 1}`, submittedAt, sourceLabel: '演示渠道',
+    mobileMasked: '138****0000', location: '演示地区', timeline
+  }
+}
+
+function mockWithdrawalDetail(period: keyof typeof mockHomeStatistics, index: number, total: number, totalAmount: number) {
+  const totalCents = Math.round(totalAmount * 100)
+  const baseCents = total ? Math.floor(totalCents / total) : 0
+  const amount = (baseCents + (index < totalCents % Math.max(1, total) ? 1 : 0)) / 100
+  const submittedAt = mockPeriodDate(period, index, 10 + (index % 5))
+  const sequence = String(index + 1).padStart(4, '0')
+  return {
+    kind: 'withdrawal', id: -(200000 + index), mock: true,
+    withdrawalNo: `TX-MOCK-${period.toUpperCase()}-${sequence}`, status: 'paid',
+    applicationAmount: amount, approvedAmount: amount, submittedAt, paidAt: addHours(submittedAt, 3),
+    accountNameSnapshot: '演示用户', bankNameSnapshot: '演示银行', maskedCardNumber: '**** **** **** 1234'
+  }
+}
+
+function homeStatisticsDetailData(config: MockRequestConfig) {
+  const requestedPeriod = String(config.params?.period || 'total') as keyof typeof mockHomeStatistics
+  const period = requestedPeriod in mockHomeStatistics ? requestedPeriod : 'total'
+  const requestedMetric = String(config.params?.metric || 'lead_count')
+  const metric = ['lead_count', 'withdrawn_amount', 'valid_lead_count', 'converted_lead_count'].includes(requestedMetric)
+    ? requestedMetric : 'lead_count'
+  const { pageNo, pageSize } = pageParams(config)
+  const summary = mockHomeStatistics[period]
+  const total = metric === 'withdrawn_amount' ? mockWithdrawalCounts[period]
+    : metric === 'valid_lead_count' ? summary.validLeadCount
+      : metric === 'converted_lead_count' ? summary.convertedLeadCount : summary.leadCount
+  const totalAmount = metric === 'withdrawn_amount' ? summary.withdrawnAmount : undefined
+  const start = Math.max(0, (pageNo - 1) * pageSize)
+  const end = Math.min(total, start + pageSize)
+  const list = Array.from({ length: Math.max(0, end - start) }, (_, offset) => {
+    const index = start + offset
+    return metric === 'withdrawn_amount'
+      ? mockWithdrawalDetail(period, index, total, totalAmount || 0)
+      : mockLeadDetail(period, metric, index)
+  })
+  return { period, metric, list, total, ...(totalAmount == null ? {} : { totalAmount }) }
 }
 
 const mockLeaderboardRows = [
@@ -209,6 +330,11 @@ function mockData(config: MockRequestConfig, endpoint: string): unknown {
 
   if (endpoint === '/zsjos/partner/leaderboard/config' && method === 'get') return mockLeaderboardConfig
   if (endpoint === '/zsjos/partner/leaderboard' && method === 'get') return leaderboardData(config)
+  if (endpoint === '/zsjos/partner/home-statistics' && method === 'get') return homeStatisticsData(config)
+  if (endpoint === '/zsjos/partner/home-statistics/details' && method === 'get') return homeStatisticsDetailData(config)
+  if (endpoint === '/zsjos/lead/inbox/submitted/summary' && method === 'get') {
+    return { followUpPendingCount: 3, unreachableCount: 1, invalidCount: 2 }
+  }
 
   if (endpoint === '/zsjos/feedback/options' && method === 'get') return mockFeedbackOptions
   if (endpoint === '/zsjos/feedback/my-page' && method === 'get') {
@@ -315,11 +441,15 @@ function mockData(config: MockRequestConfig, endpoint: string): unknown {
   }
   if (endpoint === '/zsjos/lead/inbox/submitted/page') {
     const { pageNo, pageSize } = pageParams(config)
+    const view = String(params.view || '')
     const item = lead()
+    if (view === 'invalid') item.status = 'invalid'
+    if (view === 'unreachable') item.status = 'valid'
     const keyword = String(params.keyword || '').trim().toLowerCase()
     const matched = (!keyword || [item.leadNo, item.submittedName, item.submittedMobile].some(value => String(value).toLowerCase().includes(keyword)))
       && (!params.status || item.status === params.status)
       && (!params.simpleStatus || params.simpleStatus === item.simpleStatus)
+      && (!view || ['follow_up_pending', 'unreachable', 'invalid'].includes(view))
       && (!params.assignmentStatus || item.assignmentStatus === params.assignmentStatus)
       && (!params.sourceChannel || item.sourceChannel === params.sourceChannel)
       && (!params.leadCategory || item.leadCategory === params.leadCategory)
@@ -383,12 +513,15 @@ export function resolveFeatureMock(config: MockRequestConfig, status?: number, m
   const supportsRead = method === 'get' && (
     endpoint === '/zsjos/partner/leaderboard/config' ||
     endpoint === '/zsjos/partner/leaderboard' ||
+    endpoint === '/zsjos/partner/home-statistics' ||
+    endpoint === '/zsjos/partner/home-statistics/details' ||
     endpoint === '/zsjos/feedback/options' ||
     endpoint === '/zsjos/feedback/my-page' ||
     /^\/zsjos\/feedback\/my\/\d+$/.test(endpoint) ||
     endpoint === '/zsjos/messages/groups' ||
     endpoint === '/zsjos/messages/page' ||
     endpoint === '/zsjos/lead/inbox/submitted/page' ||
+    endpoint === '/zsjos/lead/inbox/submitted/summary' ||
     endpoint === '/zsjos/lead/partner-filter-options' ||
     /^\/zsjos\/lead\/\d+\/partner-activity$/.test(endpoint)
   )
@@ -413,4 +546,17 @@ export function resolveFeatureMock(config: MockRequestConfig, status?: number, m
 export function resolveReadMock(config: MockRequestConfig, status?: number, message?: unknown): FeatureMockResult | undefined {
   if (config.method?.toLowerCase() !== 'get') return undefined
   return resolveFeatureMock(config, status, message)
+}
+
+export function resolveHomeStatisticsDetailMock(config: MockRequestConfig): FeatureMockResult | undefined {
+  const endpoint = endpointOf(config)
+  if (!import.meta.env.DEV || endpoint !== '/zsjos/partner/home-statistics/details' || config.method?.toLowerCase() !== 'get') {
+    return undefined
+  }
+  const data = mockData(config, endpoint)
+  if (data === undefined) return undefined
+  usedMockEndpoints.add(endpoint)
+  mockUsageVersion.value += 1
+  console.warn(`[H5 mock] 使用开发环境 Mock：GET ${endpoint}`)
+  return { data, endpoint }
 }

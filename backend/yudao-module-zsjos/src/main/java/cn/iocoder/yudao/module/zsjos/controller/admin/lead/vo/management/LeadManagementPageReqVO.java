@@ -33,6 +33,9 @@ public class LeadManagementPageReqVO extends PageParam {
     @Pattern(regexp = VALIDATION_PATTERN, message = "客资简单状态不正确")
     private String simpleStatus;
 
+    @Pattern(regexp = "all|follow_up_pending|unreachable|invalid", message = "客资提醒视图不正确")
+    private String view;
+
     @Pattern(regexp = "[a-z][a-z0-9_]{1,63}", message = "客资收件箱分组不正确")
     private String inboxGroup;
 

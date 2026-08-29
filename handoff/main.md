@@ -1,5 +1,104 @@
-<<<<<<< HEAD
 # Main Workstream
+
+## Delivery Entry - 2026-08-29 16:42:23 +08:00
+
+- Workstream ID: `main-partner-h5-leaderboard-visual-20260829`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb` (no commit created; existing user changes preserved)
+- User goal: 将排行榜详情页 Top3 改成参考图那种固定三人横排领奖台样式，不再出现并列分组卡。
+- Key decisions: Top3 固定按左 2、居中 1、右 3 展示；只有 1 人时居中，2 人时左/中展示；并列名次只保留真实“第 N 名”文案，不再改变组件结构；第一名头像放大并加浅粉外圈，左右头像略小。
+- Execution or analysis result: `frontend/h5/src/pages/leaderboard/index.vue` 已移除并列分组渲染和残留样式选择器，`podiumMembers` 改为固定 slot 结构，领奖台视觉改为更接近参考图的三人横排形态。
+- Changed files: `frontend/h5/src/pages/leaderboard/index.vue`; `handoff/main.md`.
+- Verification evidence: `frontend/h5 npm run build` 通过（`vue-tsc -b` + Vite production build，577 modules transformed）；scoped `git diff --check` 通过，仅有 `frontend/h5/src/pages/home/index.vue`、`frontend/h5/src/pages/leaderboard/index.vue` 的 LF/CRLF 转换提示；`Select-String` 确认详情页无 `podium-group`、`groupTop3ByRank`、`hasTopTie`、`isTopTie` 残留。
+- Dependency or integration impact: 无新增依赖；未修改后端、数据库、接口路径、权限标识、路由语义或业务统计口径；保留工作区其他既有未提交改动。
+- Remaining work: 未启动真实 H5 浏览器做截图验收；建议后续用实际设备宽度确认头像间距、指标胶囊和底部“我的排名”卡的最终观感。
+
+## Delivery Entry - 2026-08-29 16:32:16 +08:00
+
+- Workstream ID: `main-partner-h5-leaderboard-visual-20260829`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb` (no commit created; existing user changes preserved)
+- User goal: 按两张参考图调整排行榜：完整页 Top3 改成指标胶囊 + 三人领奖台，首页排行榜改成红色摘要卡 + 白色三行预览列表。
+- Key decisions: 删除完整页 Top3 区域的“领先伙伴”标题，改为居中指标胶囊；普通无并列 Top3 使用第 2、第 1、第 3 的舞台排布；首页预览行加入圆形头像、名称、榜首/超越上一名文案和右侧金额，整体改为白色列表卡。
+- Execution or analysis result: `frontend/h5/src/pages/leaderboard/index.vue` 的 Top3 区域已按第一张图调整；`frontend/h5/src/pages/home/index.vue` 的首页榜单预览已按第二张图调整，并复用 `leaderboardRowGapText` 生成追赶文案。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/leaderboard/index.vue`; `handoff/main.md`.
+- Verification evidence: `frontend/h5 npm run build` 通过（`vue-tsc -b` + Vite production build，577 modules transformed）；`git diff --check` 仅有仓库既有 LF/CRLF 转换警告。
+- Dependency or integration impact: 无新增依赖；未修改后端、数据库、接口路径、权限标识、路由语义或业务状态机；保留工作区其他既有未提交改动。
+- Remaining work: 仍建议在真实 H5 浏览器中确认 390×844 与宽屏下首页排行榜卡片、完整页领奖台和底部我的排名卡的实际观感。
+
+## Delivery Entry - 2026-08-29 15:58:00 +08:00
+
+- Workstream ID: `main-partner-h5-leaderboard-visual-20260829`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb` (no commit created; existing user changes preserved)
+- User goal: 按 PartTimeCRM 兼职端排行榜风格优化 ZSJOS 兼职端首页与完整排行榜页的视觉层级、领奖台和激励表达，先实现前端，不改后端。
+- Key decisions: 新增排行榜展示工具文件统一追赶文案、并列分组、差距条和首字；完整榜单页改成激励 Hero、周期/指标切换、Top3 领奖台、普通列表差距条和浮动“我的排名”卡；首页排行榜模块改成摘要卡 + Top3 预览列表，保留现有路由与接口契约。
+- Execution or analysis result: `frontend/h5/src/pages/leaderboard/index.vue` 已重构为领奖台/列表/我的排名卡布局；`frontend/h5/src/pages/home/index.vue` 的排行榜区域已替换为红色摘要卡和三行预览；新增 `frontend/h5/src/utils/leaderboard.ts` 供两处共用展示逻辑。
+- Changed files: `frontend/h5/src/pages/home/index.vue`; `frontend/h5/src/pages/leaderboard/index.vue`; `frontend/h5/src/utils/leaderboard.ts`; `handoff/main.md`.
+- Verification evidence: `frontend/h5 npm run build` 通过（`vue-tsc -b` + Vite production build，577 modules transformed）；`git diff --check` 仅有仓库既有 LF/CRLF 转换警告。
+- Dependency or integration impact: 无新增依赖；未修改后端、数据库、接口路径、权限标识、路由语义或业务状态机；保留工作区其他既有未提交改动。
+- Remaining work: 建议在真实 H5 浏览器里确认 390×844 与更宽屏下的摘要卡、领奖台、差距条、固定我的排名卡和空/错/禁用状态是否与预期一致。
+
+## Workstream Registration - 2026-08-29 15:58:00 +08:00
+
+- Workstream ID: `main-partner-h5-leaderboard-visual-20260829`
+- Goal: 参考 PartTimeCRM 兼职端排行榜视觉，优化 ZSJOS 兼职端首页排行榜摘要与完整榜单页的层级、领奖台、当前排名激励和列表扫读体验。
+- Non-goals: 不新增后端接口、权限、数据库、字典、菜单、npm 依赖、分支、提交、推送或部署；不改变排行榜统计口径；不整理无关既有改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb` plus existing user changes
+- Target branch: current local `main`
+- Ownership scope: `frontend/h5/src/pages/leaderboard/index.vue`、`frontend/h5/src/pages/home/index.vue`、可选排行榜展示工具文件、本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: Existing Vue 3, Vant, H5 theme variables, leaderboard mock/API types; no new dependency.
+- Integration order: 抽取/补齐榜单展示文案与差距计算 -> 重排完整排行榜页 -> 升级首页排行榜摘要 -> 运行 H5 build 和 scoped diff check -> 追加交付记录。
+- Verification plan: `frontend/h5 npm run build`; scoped `git diff --check`; 静态检查 loading、success、empty、error、retry、unauthorized/disabled 展示路径；不启动或重配外部服务。
+
+## Workstream Registration - 2026-08-28 16:20:00 +08:00
+
+- Workstream ID: `main-sales-order-refund-reconciliation`
+- Goal: 在现有 ZSJOS 双收款路径基础上实现通联整单全额退款、完整网关事件审计和后台主动对账，并提供无数据库/无真实通联环境下的可测试实现。
+- Non-goals: 不支持部分退款、线下通联退款、真实通联联调、数据库执行、真实密钥、运行时生产 Mock、订单履约状态擅自变更、分支/提交/推送或无关改动。
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- Base commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb` plus existing user changes
+- Target branch: current local `main`
+- Ownership scope: ZSJOS payment refund domain, Allinpay refund protocol, gateway event audit fields, reconciliation service/job, admin/public refund APIs, V152 refund schema and focused tests/documentation.
+- Owner: Codex `/root`
+- Dependencies: existing ZSJOS payment/order persistence, BPM public API, Spring scheduler/transaction facilities, JDK crypto/HTTP; no new dependencies.
+- Integration order: inspect PartTimeCRM and current BPM/payment contracts -> add refund persistence/protocol/service/controllers -> add reconciliation and schema/docs -> focused tests and compile/static checks.
+- Verification plan: Maven module compile and focused refund tests where environment permits; SQL static/repeatability checks only; `git diff --check`; no database migration or live gateway.
+
+## Delivery Entry - 2026-08-29 16:37:31 +08:00
+
+- Workstream ID: `main-sales-order-refund-reconciliation`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb`（未创建提交）。
+- User goal: 为工作台消息通知补上 `全部 / 客资 / 提现 / 收益 / 申诉 / 系统` 分类展示，不改后端代码。
+- Key decisions: 消息分类放在 Workbench 前端做聚合，分类规则独立为 helper；保留 `/messages/all` 和 `/messages/unread` 的现有后端契约；消息中心弹窗继续只展示未读列表，不新增后端分类筛选参数。
+- Execution or analysis result: 新增消息分类 helper 和测试；消息收件箱加入分类 Segmented、深链消息自动切换分类、分类空态与加载更多按钮；同步更新 Workbench 架构和 API 约定文档。
+- Changed files: `frontend/workbench/src/services/notifyMessageCategory.ts`; `frontend/workbench/src/services/notifyMessageCategory.test.ts`; `frontend/workbench/src/pages/messageinboxpage.tsx`; `frontend/workbench/src/pages/messageinboxpage.guard.test.ts`; `frontend/workbench/src/styles/pages/message-inbox.css`; `frontend/workbench/docs/api-contract.md`; `frontend/workbench/docs/architecture.md`; `handoff/main.md`.
+- Verification evidence: `npx vitest run src/services/notifyMessageCategory.test.ts src/pages/messageinboxpage.guard.test.ts src/services/notifyMessage.test.ts` 通过；`npm run typecheck` 通过；`npm run build` 通过，仅有既有大 chunk 警告；全量 `npm test` 失败，原因是仓库里既有的 announcement / media-students / subordinate-lead-actions guard 断言与本次消息分类改动无关；`git diff --check` 仅提示既有换行转换警告。
+- Dependency or integration impact: 无新增依赖、后端接口、数据库、权限、菜单或外部状态变更。
+- Remaining work: 若要把分类能力推进到后端筛选或铃铛弹窗，也需要单独再改接口和文案；当前改动只覆盖工作台收件箱展示层。
+
+## Delivery Entry - 2026-08-28 16:45:00 +08:00
+
+- Workstream ID: `main-sales-order-refund-reconciliation`
+- Branch: `main`
+- Worktree: `D:\code\ZSJOS`
+- HEAD commit: `d4b1de1f7b5b35abd6ece0a578844424c300c8bb`（未创建提交）。
+- User goal: 在现有 ZSJOS 支付链接基础上实现通联全额退款、网关事件记录和后台主动对账。
+- Key decisions: 仅线上通联整单全额退款；线下不调用网关；退款超时复用 `refund_reqsn` 查询；BPM 与直退分流；原支付事实保留。
+- Execution or analysis result: 新增 PaymentRefund 领域、通联退款提交/查询/回调、退款审批监听、主动对账任务、管理端接口、V158 迁移与基线、Workbench API 类型，并补充支付查单/关单事件记录及配置。
+- Changed files: ZSJOS 支付退款/通联/对账 Java 文件；服务配置；Workbench API 类型；MySQL 基线与 V158；支付开发文档；本 handoff。
+- Verification evidence: `git diff --check` 通过（仅行尾转换警告）；未能执行 Maven 编译，环境未安装 `mvn`；未执行数据库、真实通联或真实 BPM。
+- Dependency or integration impact: 无新增 Maven/npm 依赖；新增 V158 退款表和网关事件扩展；生产需配置退款地址/通知地址并部署退款 BPM。
+- Remaining work: 补充退款服务单元测试、Workbench 退款 UI、BPM 回调全量验收、数据库受控执行和通联沙箱联调。
 
 ## Workstream Registration - 2026-08-27 11:45:00 +08:00
 
@@ -5546,10 +5645,12 @@
 - HEAD commit: $head（未创建提交）。
 - User goal: 工单模板动态表单支持附件字段。
 - Key decisions: 新增 ttachment 字段类型；动态字段保存文件 ID 数组并与顶层请求附件去重合并；服务端统一校验上传人和工单文件命名空间并保存单份附件快照；字段值保留字段到文件 ID 的关系；详情与运行审计按快照文件名展示；不新增表、迁移或依赖。
-- Execution or analysis result: Admin 模板设计器可配置附件及必填；Workbench 使用现有附件选择器上传，每字段最多 20 个，提交时序列化为 ID；后端支持定义校验、必填空数组拒绝、重复/非正 ID 拒绝、文件归属校验、最多 100 个合并请求附件和历史快照；详情响应新增 equestAttachments 快照元数据，两端详情按字段显示。
+- Execution or analysis result: Admin 模板设计器可配置附件及必填；Workbench 使用现有附件选择器上传，每字段最多 20 个，提交时序列化为 ID；后端支持定义校验、必填空数组拒绝、重复/非正 ID 拒绝、文件归属校验、最多 100 个合并请求附件和历史快照；详情响应新增
+equestAttachments 快照元数据，两端详情按字段显示。
 - Changed files: ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImpl.java; ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/workorder/WorkOrderAttachmentMapper.java; ackend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/workorder/vo/WorkOrderRespVO.java; ackend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/workorder/WorkOrderServiceImplTest.java; rontend/admin/src/api/zsjos/workOrder/index.ts; rontend/admin/src/views/zsjos/workOrderTemplate/index.vue; rontend/admin/src/views/zsjos/workOrderAudit/index.vue; rontend/workbench/src/services/workOrderApi.ts; rontend/workbench/src/services/workOrderForm.ts; rontend/workbench/src/services/workOrderForm.test.ts; rontend/workbench/src/pages/WorkOrderCenterPage.tsx; docs/api/generic-work-order-center.md; 本 handoff 记录。
 - Verification evidence: ZSJOS WorkOrderServiceImplTest 20/20 通过，依赖 reactor 全部成功；ZSJOS reactor compile 成功；Workbench 聚焦测试 18/18、typecheck、生产 build 通过；Workbench 全量 440/446 通过，本次附件测试通过，6 个失败来自既有公告路径、定位卡 API、主管动作契约漂移；Admin 本次文件 scoped ESLint 通过，uild:local 通过（仅既有 lightningcss *zoom 警告）；Admin 全量 typecheck 被既有 BPM/EAM/MES/System 等无关错误阻塞，未出现本次文件错误；scoped git diff --check 通过。浏览器可连接本地 Workbench，但无登录态，仅到登录页，未完成授权后的桌面/移动交互验收。
-- Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；WorkOrderRespVO 增加兼容字段 equestAttachments。
+- Dependency or integration impact: 无新增 npm/Maven 依赖、数据库结构、迁移、权限或菜单变更；WorkOrderRespVO 增加兼容字段
+equestAttachments。
 - Remaining work: 在有效登录态下补做模板创建/发布、动态附件上传、必填校验、工单详情和 Admin 审计的桌面/移动真实交互验收；仓库既有 6 个 Workbench 守卫测试及 Admin 全量 typecheck 错误需由对应工作流修复。
 
 ## Delivery Entry Correction - 2026-08-28 12:13:23 +08:00
@@ -5593,9 +5694,21 @@
 - Verification evidence: Workbench `npm run typecheck` 通过；聚焦测试 `lead-management-unified`(7)、`desktop-detail-drawer`(9，含新增的 `pages/LeadManagementPage.tsx`)、`styles.guard`(26) 共 42/42 通过；`npm run build` 生产构建通过（仅有既有的 chunk >500kB 警告）。Workbench 全量 `npm test` 有 7 个失败，全部来自本次改动无关的既有未提交改动/契约漂移：`announcement.guard`(1)、`media-students.guard`(4)、`subordinate-lead-actions.guard`(1)——这 6 项通过 `git stash push`（仅暂存本工作流的 3 个源文件）后复现仍失败、`git stash pop` 还原，证明在本工作流改动前即存在；另 1 项 `styles.guard`(字体走 token) 失败来源为 `src/styles/pages/lead-submission.css:57  font-size: 12px;`，该文件是会话开始时即存在的并发工作流未提交改动，不在本工作流改动范围、也未触碰。
 - Dependency or integration impact: 无新增 npm 依赖、后端接口、数据库、权限或菜单变更；仅前端展示层改动。
 - Remaining work: 仓库后端（192.168.2.17:48080）在本环境不可达，且无 Playwright 脚本/登录态，无法在真实浏览器完成 375×667、390×844、412×915、1440×900 的授权前交互验收；需在有效登录态下补做移动端抽屉开合、列表占满高度、无横向溢出、loading/empty/error 状态及桌面端无回归的真实浏览器检查。既有 7 个 Workbench guard 测试失败中，6 项属仓库既有问题、1 项（`styles.guard` 字体 token）由并发的 `LeadSubmissionPage` 工作流未提交改动引入，均需对应工作流修复。
+
+## Delivery Entry - 2026-08-29 19:35:49 +08:00
+
+- Workstream ID: main
+- Branch: main
+- Worktree: D:\code\ZSJOS
+- HEAD commit: 23bbf32f7daf2e7a7b8ee8c23b8c5ae7335038ab（快进到 origin/main；未创建提交）。
+- User goal: 保存本地修改代码，拉取远程最新代码并合并到本地。
+- Key decisions: 使用 `git stash push -u` 保存已跟踪和未跟踪本地修改，不保存忽略文件、不删除旧 stash、不提交、不推送；远程为 `0 2` 可快进，因此执行 `git merge --ff-only origin/main`；恢复本地修改时保留远程新增契约与本地支付/退款草稿改动，解决迁移编号冲突时将本地未提交支付迁移顺延为 `V162`、退款迁移顺延为 `V163`。
+- Execution or analysis result: 本地 `main` 从 d4b1de1f7b5b35abd6ece0a578844424c300c8bb 快进到 23bbf32f7daf2e7a7b8ee8c23b8c5ae7335038ab；本地修改已恢复为未暂存状态；处理了 5 个 stash 恢复冲突：`docs/business/lead-order-state-machine.md` 合并正式负责人限制与 PurchaseIntent/通联支付规则，`frontend/workbench/src/components/SalesOrderEntryModal.tsx` 合并支付锁定禁用与地区“其他”提示，`frontend/workbench/tsconfig.tsbuildinfo` 采用当前远程缓存版本，`script/sql/mysql/bootstrap.sql` 接入远程 V158-V161 与本地顺延后的 V162/V163，`handoff/main.md` 保留远程和本地追加日志并移除本次冲突标记。
+- Changed files: `docs/business/lead-order-state-machine.md`; `frontend/workbench/src/components/SalesOrderEntryModal.tsx`; `frontend/workbench/tsconfig.tsbuildinfo`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql`; `script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql`; `docs/business/payment-module-development.md`; `handoff/main.md`。
+- Verification evidence: `git rev-list --left-right --count HEAD...origin/main` 为 `0 0`；`git diff --name-only --diff-filter=U` 无输出；`git diff --cached --name-only` 为 0；冲突文件 `rg "^(<<<<<<<|=======|>>>>>>>)"` 无命中；未跟踪恢复抽样路径均存在；迁移目录当前为 V150-V163 连续且支付相关文档引用已更新到 V162/V163；`git diff --check` 通过，仅保留 Git 行尾转换 warning。
+- Dependency or integration impact: 无新增依赖、无数据库执行、无服务启停、无分支/工作树切换、无提交、无推送；保留新建 stash `codex-before-pull-2026-08-29-2026-08-29-192433` 和 `codex-generated-after-stash-2026-08-29-2026-08-29-192451` 作为恢复备份。
+- Remaining work: None。
 - Remaining work: 无有效登录态，尚未完成授权后的桌面与移动端真实交互验收；Workbench 全量测试仍有 6 个无关既有失败，Admin 全量 typecheck 仍被无关既有错误阻塞。
-=======
-# Main Workstream
 
 ## Workstream Registration - 2026-08-28 16:28:05 +08:00
 
@@ -11537,4 +11650,3 @@ equestAttachments。
 - Verification evidence: Workbench `npm run typecheck` 通过；聚焦测试 `lead-management-unified`(7)、`desktop-detail-drawer`(9，含新增的 `pages/LeadManagementPage.tsx`)、`styles.guard`(26) 共 42/42 通过；`npm run build` 生产构建通过（仅有既有的 chunk >500kB 警告）。Workbench 全量 `npm test` 有 7 个失败，全部来自本次改动无关的既有未提交改动/契约漂移：`announcement.guard`(1)、`media-students.guard`(4)、`subordinate-lead-actions.guard`(1)——这 6 项通过 `git stash push`（仅暂存本工作流的 3 个源文件）后复现仍失败、`git stash pop` 还原，证明在本工作流改动前即存在；另 1 项 `styles.guard`(字体走 token) 失败来源为 `src/styles/pages/lead-submission.css:57  font-size: 12px;`，该文件是会话开始时即存在的并发工作流未提交改动，不在本工作流改动范围、也未触碰。
 - Dependency or integration impact: 无新增 npm 依赖、后端接口、数据库、权限或菜单变更；仅前端展示层改动。
 - Remaining work: 仓库后端（192.168.2.17:48080）在本环境不可达，且无 Playwright 脚本/登录态，无法在真实浏览器完成 375×667、390×844、412×915、1440×900 的授权前交互验收；需在有效登录态下补做移动端抽屉开合、列表占满高度、无横向溢出、loading/empty/error 状态及桌面端无回归的真实浏览器检查。既有 7 个 Workbench guard 测试失败中，6 项属仓库既有问题、1 项（`styles.guard` 字体 token）由并发的 `LeadSubmissionPage` 工作流未提交改动引入，均需对应工作流修复。
->>>>>>> 20ef02c6cd (chore: sync workspace changes)

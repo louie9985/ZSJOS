@@ -140,6 +140,8 @@ SOURCE script/sql/mysql/migrations/V158__retire_announcement_center_duplicate.sq
 SOURCE script/sql/mysql/migrations/V159__public_sea_terminology.sql;
 SOURCE script/sql/mysql/migrations/V160__registration_case_close_service.sql;
 SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
+SOURCE script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql;
+SOURCE script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

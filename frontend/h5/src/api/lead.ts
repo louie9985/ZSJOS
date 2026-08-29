@@ -157,6 +157,12 @@ export interface LeadListItem {
   opportunity?: { id: number; status: string; nextFollowUpAt?: ApiDateValue; wonAt?: ApiDateValue }
 }
 
+export interface LeadFollowUpSummary {
+  followUpPendingCount: number
+  unreachableCount: number
+  invalidCount: number
+}
+
 export interface LeadFollowUpItem {
   id: number
   leadId: number
@@ -185,11 +191,24 @@ export interface LeadFollowUpItem {
   }>
 }
 
+export type PartnerLeadActivityTone = 'default' | 'primary' | 'success' | 'warning' | 'danger'
+
+export interface PartnerLeadCurrentStatus {
+  code: string
+  text: string
+  description?: string
+  tone: PartnerLeadActivityTone
+  updatedAt?: ApiDateValue
+}
+
 export interface LeadTimelineItem {
-  id: number
+  id: number | string
+  type?: string
   title: string
   description?: string
   occurredAt: ApiDateValue
+  tone?: PartnerLeadActivityTone
+  current?: boolean
 }
 
 export interface LeadCashbackActivityItem {
@@ -222,6 +241,7 @@ export interface LeadOrderActivityItem {
 }
 
 export interface PartnerLeadActivity {
+  currentStatus?: PartnerLeadCurrentStatus
   followUps: LeadFollowUpItem[]
   timeline: LeadTimelineItem[]
   cashbackItems: LeadCashbackActivityItem[]
@@ -406,11 +426,17 @@ export function getMyLeadPage(params: {
   mainProductRef?: string
   appealStatus?: string
   orderReviewStatus?: string
+  view?: 'follow_up_pending' | 'unreachable' | 'invalid'
 }) {
   return request.get<never, { list: LeadListItem[]; total: number }>(
     '/zsjos/lead/inbox/submitted/page',
     { params }
   )
+}
+
+/** 获取当前兼职伙伴的客资跟进提醒摘要 */
+export function getLeadFollowUpSummary() {
+  return request.get<never, LeadFollowUpSummary>('/zsjos/lead/inbox/submitted/summary')
 }
 
 /** 获取客资详情 */

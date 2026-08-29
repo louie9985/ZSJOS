@@ -4590,6 +4590,7 @@ CREATE TABLE IF NOT EXISTS `zsjos_order` (
   `order_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单业务编号',
   `lead_id` bigint DEFAULT NULL COMMENT '首购来源客资编号；复购为空',
   `source_payment_order_id` bigint DEFAULT NULL COMMENT '来源支付单编号，支付自动建单时唯一',
+  `purchase_intent_id` bigint DEFAULT NULL COMMENT '购买意向编号',
   `opportunity_id` bigint DEFAULT NULL COMMENT '正式销售机会编号，按产品规则条件必填',
   `person_id` bigint NOT NULL COMMENT 'Person 编号',
   `order_type` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单业务类型，具体协议待确认',
@@ -4870,14 +4871,35 @@ CREATE TABLE IF NOT EXISTS `zsjos_partner_account` (
   UNIQUE KEY `uk_tenant_mobile` (`tenant_id`,`mobile`), KEY `idx_tenant_status` (`tenant_id`,`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS Partner 独立登录账号';
 
+-- zsjos_purchase_intent
+CREATE TABLE IF NOT EXISTS `zsjos_purchase_intent` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `purchase_intent_no` varchar(64) NOT NULL,
+  `collection_mode` varchar(32) NOT NULL COMMENT 'online_link/offline_paid', `purchase_type` varchar(32) NOT NULL,
+  `lead_id` bigint DEFAULT NULL, `person_id` bigint NOT NULL, `opportunity_id` bigint DEFAULT NULL, `source_key` varchar(128) DEFAULT NULL,
+  `initiator_user_id` bigint NOT NULL, `owner_user_id` bigint NOT NULL, `draft_json` json NOT NULL,
+  `item_snapshot_json` json NOT NULL, `total_amount` decimal(18,2) NOT NULL, `currency` varchar(16) NOT NULL DEFAULT 'CNY',
+  `current_order_id` bigint DEFAULT NULL, `snapshot_locked` bit(1) NOT NULL DEFAULT b'0', `status` varchar(32) NOT NULL DEFAULT 'draft',
+  `last_idempotency_key` varchar(128) DEFAULT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_purchase_intent_no` (`tenant_id`,`purchase_intent_no`),
+  KEY `idx_tenant_purchase_source` (`tenant_id`,`lead_id`,`person_id`,`purchase_type`,`initiator_user_id`,`status`),
+  KEY `idx_tenant_purchase_order` (`tenant_id`,`current_order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 订单购买草稿';
+
 -- zsjos_payment_order
 CREATE TABLE IF NOT EXISTS `zsjos_payment_order` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '支付单编号',
+  `purchase_intent_id` bigint DEFAULT NULL COMMENT '购买意向编号',
   `payment_order_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '支付单业务编号',
-  `lead_id` bigint NOT NULL COMMENT '绑定客资编号，创建后不可修改',
+  `lead_id` bigint DEFAULT NULL COMMENT '首购来源客资编号；复购可为空',
   `person_id` bigint NOT NULL COMMENT 'Person 编号',
   `opportunity_id` bigint DEFAULT NULL COMMENT '可选正式销售机会编号',
-  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'pending_payment/paid/expired/closed',
+  `status` varchar(32) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT 'created/waiting/paid/expired/closed',
+  `provider` varchar(32) DEFAULT NULL COMMENT '支付提供方',
+  `channel` varchar(32) DEFAULT NULL COMMENT 'wechat/alipay',
+  `reqsn` varchar(64) DEFAULT NULL COMMENT '通联商户订单号',
   `expected_amount` decimal(18,2) NOT NULL COMMENT '应收金额',
   `currency` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY' COMMENT '币种',
   `product_items_snapshot` json NOT NULL COMMENT '收款时产品 SKU 快照',
@@ -4885,9 +4907,11 @@ CREATE TABLE IF NOT EXISTS `zsjos_payment_order` (
   `product_rule_version` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '产品规则版本',
   `initiator_user_id` bigint NOT NULL COMMENT '发起人用户编号',
   `link_token_hash` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '支付链接令牌摘要',
+  `link_url` varchar(1024) DEFAULT NULL COMMENT '公开支付链接',
   `expires_at` datetime DEFAULT NULL COMMENT '链接过期时间',
   `paid_at` datetime DEFAULT NULL COMMENT '支付成功时间',
   `closed_at` datetime DEFAULT NULL COMMENT '关闭时间',
+  `queried_at` datetime DEFAULT NULL COMMENT '最近查单时间',
   `close_reason` varchar(500) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '关闭原因',
   `version` int NOT NULL DEFAULT '0' COMMENT '乐观锁版本',
   `creator` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
@@ -4907,12 +4931,17 @@ CREATE TABLE IF NOT EXISTS `zsjos_payment_order` (
 CREATE TABLE IF NOT EXISTS `zsjos_payment_transaction` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '支付流水编号',
   `payment_order_id` bigint NOT NULL COMMENT '支付单编号',
+  `reqsn` varchar(64) DEFAULT NULL COMMENT '通联商户订单号',
   `amount` decimal(18,2) NOT NULL COMMENT '渠道实付金额',
+  `amount_fen` int DEFAULT NULL COMMENT '金额分',
+  `source` varchar(16) DEFAULT NULL COMMENT 'notify/query',
   `currency` varchar(16) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'CNY' COMMENT '币种',
   `payment_method` varchar(64) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '渠道支付方式',
   `paid_at` datetime NOT NULL COMMENT '渠道支付成功时间',
   `external_channel` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '外部支付渠道',
   `external_transaction_no` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '外部渠道流水号',
+  `trx_id` varchar(128) DEFAULT NULL COMMENT '通联交易号',
+  `channel_transaction_no` varchar(128) DEFAULT NULL COMMENT '通联渠道流水号',
   `payer_reference` varchar(256) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '实际付款人引用，不作为业务归属',
   `callback_event_id` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '支付回调事件编号',
   `evidence_refs` json DEFAULT NULL COMMENT '渠道凭证引用',
@@ -4927,6 +4956,31 @@ CREATE TABLE IF NOT EXISTS `zsjos_payment_transaction` (
   UNIQUE KEY `uk_tenant_callback_event` (`tenant_id`,`callback_event_id`),
   UNIQUE KEY `uk_tenant_payment_order` (`tenant_id`,`payment_order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 支付渠道成功流水';
+
+CREATE TABLE IF NOT EXISTS `zsjos_payment_gateway_event` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `event_id` varchar(128) NOT NULL, `payment_order_id` bigint DEFAULT NULL,
+  `event_type` varchar(32) NOT NULL, `business_type` varchar(32) DEFAULT NULL, `operation` varchar(32) DEFAULT NULL, `direction` varchar(16) DEFAULT NULL, `business_id` bigint DEFAULT NULL, `request_no` varchar(128) DEFAULT NULL, `http_status` int DEFAULT NULL, `gateway_retcode` varchar(32) DEFAULT NULL, `gateway_trxstatus` varchar(32) DEFAULT NULL, `error_category` varchar(64) DEFAULT NULL, `payload_digest` varchar(128) DEFAULT NULL, `request_payload` json DEFAULT NULL, `response_payload` json DEFAULT NULL,
+  `signature_valid` bit(1) NOT NULL DEFAULT b'0', `processing_result` varchar(64) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_payment_event` (`tenant_id`,`event_id`),
+  KEY `idx_tenant_payment_event_order` (`tenant_id`,`payment_order_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 通联支付网关事件';
+
+CREATE TABLE IF NOT EXISTS `zsjos_payment_refund` (
+  `id` bigint NOT NULL AUTO_INCREMENT, `refund_no` varchar(64) NOT NULL, `purchase_intent_id` bigint DEFAULT NULL,
+  `payment_order_id` bigint NOT NULL, `payment_transaction_id` bigint NOT NULL, `order_id` bigint DEFAULT NULL,
+  `refund_amount` decimal(18,2) NOT NULL, `currency` varchar(16) NOT NULL DEFAULT 'CNY', `reason` varchar(500) NOT NULL,
+  `requester_user_id` bigint NOT NULL, `executor_user_id` bigint DEFAULT NULL, `approval_mode` varchar(32) NOT NULL,
+  `process_instance_id` varchar(64) DEFAULT NULL, `status` varchar(32) NOT NULL, `provider` varchar(32) NOT NULL DEFAULT 'allinpay',
+  `refund_reqsn` varchar(64) NOT NULL, `original_reqsn` varchar(64) DEFAULT NULL, `original_trx_id` varchar(128) DEFAULT NULL,
+  `accepted_at` datetime DEFAULT NULL, `refunded_at` datetime DEFAULT NULL, `failed_at` datetime DEFAULT NULL,
+  `last_queried_at` datetime DEFAULT NULL, `next_reconcile_at` datetime DEFAULT NULL, `retry_count` int NOT NULL DEFAULT 0,
+  `last_error_code` varchar(64) DEFAULT NULL, `last_error_message` varchar(500) DEFAULT NULL, `idempotency_key` varchar(128) NOT NULL, `version` int NOT NULL DEFAULT 0,
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_tenant_refund_no` (`tenant_id`,`refund_no`), UNIQUE KEY `uk_tenant_refund_reqsn` (`tenant_id`,`refund_reqsn`), UNIQUE KEY `uk_tenant_refund_idem` (`tenant_id`,`idempotency_key`), KEY `idx_tenant_refund_reconcile` (`tenant_id`,`status`,`next_reconcile_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='ZSJOS 通联退款单';
 
 -- zsjos_person
 CREATE TABLE IF NOT EXISTS `zsjos_person` (

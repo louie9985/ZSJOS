@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Cascader, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Select, Space, Spin, Typography, message } from 'antd'
-import { DeleteOutlined, PlusOutlined, ReloadOutlined } from '@ant-design/icons'
+import { Alert, Button, Cascader, Col, DatePicker, Divider, Form, Input, InputNumber, Modal, Row, Segmented, Select, Space, Spin, Typography, message } from 'antd'
+import { CopyOutlined, DeleteOutlined, LinkOutlined, PlusOutlined, ReloadOutlined, SaveOutlined } from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
-import { api, type AreaNode, type DictData, type LeadCatalog, type SalesOrder, type SalesOrderSubmitRequest, type SalesOrderVoucher } from '../services/api'
+import { api, type AreaNode, type CollectionMode, type DictData, type LeadCatalog, type PurchaseIntent, type PurchaseIntentDraftRequest, type SalesOrder, type SalesOrderSubmitRequest, type SalesOrderVoucher } from '../services/api'
+import { createIdempotencyKey } from '../services/idempotency'
 import { DICT_TYPE, PHONE_PATTERN } from '../constants'
 import { buildLeadAreaOptions, normalizeLeadAreaPath, resolveLeadAreaPath } from '../services/area'
 import { validateSalesOrderSubmission } from '../services/salesOrder'
@@ -31,7 +32,7 @@ function findRegion(areas: AreaNode[], path: string[]) {
 }
 
 export type SalesOrderEntryLead = {
-  id: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
+  id: number; personId?: number; submittedName: string; submittedMobile?: string; submittedWechatId?: string
   provinceCode?: string; provinceName?: string; cityCode?: string; cityName?: string
   primaryProduct?: { spuRef?: string; skuRef?: string }
 }
@@ -55,10 +56,18 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [pendingValues, setPendingValues] = useState<Values>()
   const [orderNo, setOrderNo] = useState<string>()
+  const [collectionMode, setCollectionMode] = useState<CollectionMode>('offline_paid')
+  const [purchaseIntent, setPurchaseIntent] = useState<PurchaseIntent>()
+  const [draftSaving, setDraftSaving] = useState(false)
 
   const items = Form.useWatch('items', form) || []
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
+  const purchaseType: PurchaseIntentDraftRequest['purchaseType'] = externalCustomer ? 'external_repurchase'
+    : studentRepurchase ? 'student_repurchase' : repurchase ? 'lead_repurchase' : 'lead_first_purchase'
+  const purchaseSource = { purchaseType, leadId: externalCustomer || studentRepurchase ? undefined : lead.id,
+    personId: studentRepurchase ? lead.id : lead.personId,
+    sourceKey: `${purchaseType}:${lead.id}:${lead.submittedMobile || lead.submittedWechatId || lead.submittedName}` }
 
   const load = async () => {
     setLoading(true); setLoadError('')
@@ -90,6 +99,14 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
       })
       setVouchers((order?.paymentVouchers || []).map(file => ({ uid: String(file.infraFileId), name: file.originalName,
         type: file.contentType, status: 'done', url: file.fileUrl, uploaded: file })))
+      if (!orderId) {
+        const current = await api.currentPurchaseIntent(purchaseSource)
+        setPurchaseIntent(current); setCollectionMode(current?.collectionMode || 'offline_paid')
+        if (current?.draft) {
+          const draft = current.draft as Partial<Values> & { customerPaidAt?: number }
+          form.setFieldsValue({ ...draft, customerPaidAt: draft.customerPaidAt ? dayjs(draft.customerPaidAt) : undefined } as Partial<Values>)
+        }
+      } else { setPurchaseIntent(undefined); setCollectionMode('offline_paid') }
     } catch (error) {
       setAreas([]); setCatalog(emptyCatalog); setDicts({}); setLoadError(errorText(error))
     } finally { setLoading(false) }
@@ -105,9 +122,36 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const close = () => { setConfirmOpen(false); setPendingValues(undefined); onClose() }
 
   const options = (type: string) => (dicts[type] || []).map(item => ({ value: item.value, label: item.label }))
+  const buildDraftRequest = (values: Partial<Values>, idempotencyKey: string): PurchaseIntentDraftRequest | undefined => {
+    const draftItems = (values.items || []).flatMap(item => {
+      if (!item.courseKey || item.actualAmount == null) return []
+      const [spuRef, skuRef] = item.courseKey.split('::')
+      return spuRef && skuRef ? [{ spuRef, skuRef, actualAmount: Number(item.actualAmount) }] : []
+    })
+    const draftTotal = draftItems.reduce((sum, item) => sum + item.actualAmount, 0)
+    if (!draftItems.length || draftTotal <= 0) { message.warning('保存草稿前请至少选择一个课程并填写有效金额'); return undefined }
+    return { ...purchaseSource, id: purchaseIntent?.id, version: purchaseIntent?.version, collectionMode,
+      draft: { ...values, customerPaidAt: values.customerPaidAt?.valueOf(), studentMobile: values.mobile, studentWechatId: values.wechatId },
+      items: draftItems, totalAmount: Number(draftTotal.toFixed(2)), idempotencyKey }
+  }
+  const saveDraft = async (createLink = false) => {
+    const request = buildDraftRequest(form.getFieldsValue(true), createIdempotencyKey())
+    if (!request) return undefined
+    setDraftSaving(true)
+    try {
+      const saved = createLink ? await api.createPurchasePaymentLink(request) : await api.savePurchaseIntentDraft(request)
+      setPurchaseIntent(saved); setCollectionMode(saved.collectionMode)
+      message.success(createLink ? '支付链接已生成' : '草稿已保存')
+      return saved
+    } catch (error) { message.error(errorText(error)); return undefined }
+    finally { setDraftSaving(false) }
+  }
   const validateContact = () => form.getFieldValue('mobile')?.trim() || form.getFieldValue('wechatId')?.trim()
     ? Promise.resolve() : Promise.reject(new Error('请填写手机号或微信号'))
   const prepareSubmit = async () => {
+    if (!orderId && collectionMode === 'online_link' && purchaseIntent?.paymentStatus !== 'paid') {
+      message.warning('线上支付尚未确认到账，不能提交审批'); return
+    }
     const values = await form.validateFields().catch(() => undefined)
     if (!values) return
     const validationError = validateSalesOrderSubmission(values.mobile, values.wechatId, total, vouchers.length)
@@ -135,6 +179,12 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         paymentVouchers: [], idempotencyKey
       }
       try {
+        if (!orderId) {
+          const draftRequest = buildDraftRequest(values, `purchase:${idempotencyKey}`)
+          if (!draftRequest) return
+          const saved = await api.savePurchaseIntentDraft(draftRequest)
+          setPurchaseIntent(saved); request.purchaseIntentId = saved.id
+        }
         const uploadResult = await uploadDeferredFiles(vouchers, api.uploadSalesOrderVoucher, setVouchers)
         if (uploadResult.failed) { message.error('有缴费凭证上传失败，请重试失败项'); return }
         request.paymentVouchers = uploadResult.items.filter(file => file.uploaded).map(file => ({ infraFileId: file.uploaded!.infraFileId }))
@@ -169,7 +219,18 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
     {loadError && <Alert type="error" showIcon message="成交配置加载失败" description={loadError}
       action={<Button size="small" icon={<ReloadOutlined/>} onClick={() => void load()}>重试</Button>}/>}
     <Spin spinning={loading}>
-      <Form form={form} layout="vertical" disabled={Boolean(loadError) || saving}>
+      <Form form={form} layout="vertical" disabled={Boolean(loadError) || saving || draftSaving}>
+        {!orderId && <><Divider titlePlacement="start">收款路径</Divider>
+          <Segmented block value={collectionMode} disabled={Boolean(purchaseIntent?.paymentLocked)} onChange={value => setCollectionMode(value as CollectionMode)}
+            options={[{ label: '线上支付链接', value: 'online_link' }, { label: '线下已支付', value: 'offline_paid' }]}/>
+          {collectionMode === 'online_link' && purchaseIntent?.paymentUrl && <Alert style={{ marginTop: 12 }} showIcon
+            type={purchaseIntent.paymentStatus === 'paid' ? 'success' : purchaseIntent.displayStatus === 'invalid' ? 'warning' : 'info'}
+            message={purchaseIntent.paymentStatus === 'paid' ? '通联已确认到账' : '支付链接已生成'}
+            description={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text copyable>{purchaseIntent.paymentUrl}</Typography.Text>
+              <Typography.Text type="secondary">状态：{purchaseIntent.paymentStatus}，有效期至 {purchaseIntent.paymentExpiresAt ? dayjs(purchaseIntent.paymentExpiresAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</Typography.Text>
+              <Space><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
+                <Button size="small" icon={<ReloadOutlined/>} onClick={async () => setPurchaseIntent(await api.refreshPurchasePayment(purchaseIntent.id))}>刷新状态</Button></Space>
+            </Space>}/>}</>}
          {repurchase && <Form.Item name="repurchaseReason" label="复购说明"
            rules={[{ required: true, whitespace: true, message: '请填写复购说明' }, { max: 1000 }]}>
            <Input.TextArea rows={3} maxLength={1000} showCount/>
@@ -177,10 +238,10 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Divider titlePlacement="start">学员信息</Divider>
         <Row gutter={16}>
           <Col xs={24} md={8}><Form.Item name="buyerName" label="购买方" extra="不填则默认同学员姓名"><Input maxLength={100}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="studentName" label="学员姓名" rules={[{ required: true }, { max: 100 }]}><Input disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="studentNature" label="学员性质" rules={[{ required: true }]}><Select options={options(DICT_TYPE.ORDER_STUDENT_NATURE)}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32}/></Form.Item></Col>
-          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="mobile" label="手机号" required={!wechatId?.trim()} extra="手机号、微信号必填其中一个" dependencies={['wechatId']} rules={[{ pattern: PHONE_PATTERN, message: '手机号格式不正确' }, { validator: validateContact }]}><Input maxLength={32} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+          <Col xs={24} md={8}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
           <Col xs={24} md={8}><Form.Item name="regionPath" label="所在省市" rules={[{ required: true, message: '请选择所在省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】"/></Form.Item></Col>
         </Row>
         <Divider titlePlacement="start">报名与服务</Divider>
@@ -194,8 +255,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
         <Form.List name="items" rules={[{ validator: async (_, value) => value?.length ? undefined : Promise.reject(new Error('至少添加一个成交课程')) }]}>
           {(fields, { add, remove }, { errors }) => <>
             {fields.map((field, index) => <Row gutter={12} key={field.key} align="top">
-              <Col flex="auto"><Form.Item name={[field.name, 'courseKey']} label={`成交课程 ${index + 1}`} rules={[{ required: true, message: '请选择成交课程' }]}><SalesOrderCoursePicker catalog={catalog}/></Form.Item></Col>
-              <Col xs={24} md={6}><Form.Item name={[field.name, 'actualAmount']} label={`实际成交金额 ${index + 1}`} rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={0} precision={2} prefix="¥" style={{ width: '100%' }}/></Form.Item></Col>
+              <Col flex="auto"><Form.Item name={[field.name, 'courseKey']} label={`成交课程 ${index + 1}`} rules={[{ required: true, message: '请选择成交课程' }]}><SalesOrderCoursePicker catalog={catalog} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
+              <Col xs={24} md={6}><Form.Item name={[field.name, 'actualAmount']} label={`实际成交金额 ${index + 1}`} rules={[{ required: true, message: '请输入金额' }]}><InputNumber min={0} precision={2} prefix="¥" style={{ width: '100%' }} disabled={Boolean(purchaseIntent?.paymentLocked)}/></Form.Item></Col>
               <Col><Button aria-label="删除成交课程" title="删除成交课程" icon={<DeleteOutlined/>} danger disabled={fields.length === 1} onClick={() => remove(field.name)} style={{ marginTop: 30 }}/></Col>
             </Row>)}
             <Button type="dashed" icon={<PlusOutlined/>} onClick={() => add({ actualAmount: 0 })}>添加成交课程</Button><Form.ErrorList errors={errors}/>
@@ -214,7 +275,9 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
             <DeferredAttachmentPicker value={vouchers} onChange={setVouchers} accept="image/jpeg,image/png,image/webp,application/pdf" imageOnly={false} maxCount={6}/>
           </Form.Item></Col>
         </Row>
-        <Space><IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
+        <Space wrap>{!orderId && <Button icon={<SaveOutlined/>} loading={draftSaving} onClick={() => void saveDraft(false)}>保存草稿</Button>}
+          {!orderId && collectionMode === 'online_link' && !purchaseIntent?.paymentLocked && <Button type="primary" icon={<LinkOutlined/>} loading={draftSaving} onClick={() => void saveDraft(true)}>生成支付链接</Button>}
+          <IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>
   </Modal>

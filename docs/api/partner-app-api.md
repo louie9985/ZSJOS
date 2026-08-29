@@ -2,7 +2,7 @@
 
 独立兼职前端统一使用 `/part-api/zsjos/**`。响应均为 `CommonResult<T>`，成功时 `code=0`、业务数据在 `data`。该子路径只接受 `PARTNER(3)` Bearer token；ADMIN 和 MEMBER token 均拒绝。普通 `/app-api/**` 仍按 MEMBER 解析，`/admin-api/**` 仍按 ADMIN 解析。
 
-当前 H5 有 37 个实际 HTTP 调用契约；原第 38 个企微登录能力按最新口径只保留入口路径，不形成后端调用。
+当前 H5 有 39 个实际 HTTP 调用契约；企微登录能力按最新口径只保留入口路径，不形成后端调用。
 
 ## 认证与个人信息
 
@@ -24,6 +24,16 @@ Token 恢复由 HTTP 客户端内部单航班完成。普通业务请求的 HTTP
 
 主动退出不进入刷新流程。服务端直接从持久化记录按预期 `PARTNER` 类型撤销 access token、关联 refresh token 和缓存，因此 token 已过期、已删除或重复退出均返回成功；ADMIN/MEMBER token 不会被该接口删除。客户端确认退出后以本地清理为最终结果，服务端 401、网络错误或审计失败均不阻止清理 token、clientId、用户资料和权限，并且直接进入登录页而不携带回跳地址。
 
+## 首页统计（待后端实现）
+
+| Method | Path | Request / Result |
+| --- | --- | --- |
+| GET | `/part-api/zsjos/partner/home-statistics` | query: `period=today|week|month|year|total` / `{period,leadCount,withdrawnAmount,validLeadCount,convertedLeadCount}` |
+
+该接口必须限定当前 Partner 本人的数据。时间边界使用北京时间，本周从周一开始，全年从当年 1 月 1 日开始，累计不限制时间。客资数统计周期内提交的客资；有效客资统计其中当前 `status in (valid, won)` 的记录；成交客资统计其中当前 `status=won` 的记录；已提现金额按提现实际支付时间 `paidAt` 汇总。金额返回两位小数，数量返回非负整数。
+
+当前后端尚未实现该接口。H5 只在 Vite 开发环境且响应为 `404/405/501` 或明确的未实现错误时使用固定演示数据；真实空数据、`401`、`403`、其他 `5xx`、网络和业务失败不回退。生产环境不包含该演示数据，接口缺失时显示不可用状态和重试入口。
+
 ## System 公共参考数据
 
 | Method | Path | Authentication |
@@ -41,6 +51,7 @@ Token 恢复由 HTTP 客户端内部单航班完成。普通业务请求的 HTTP
 | POST | `/part-api/zsjos/lead/attachment/upload` | `zsjos:lead:submit` |
 | POST | `/part-api/zsjos/lead/create` | `zsjos:lead:submit` |
 | GET | `/part-api/zsjos/lead/inbox/submitted/page` | `zsjos:lead:query-submitted` |
+| GET | `/part-api/zsjos/lead/inbox/submitted/summary` | `zsjos:lead:query-submitted` / 当前 Partner 三类客资提醒数量 |
 | GET | `/part-api/zsjos/lead/get?id={id}` | `zsjos:lead:query-submitted` |
 | PUT | `/part-api/zsjos/lead/{id}/submitter-supplement` | `zsjos:lead:submitter-supplement` |
 | POST | `/part-api/zsjos/lead/{id}/urge` | `zsjos:lead:urge` |
@@ -51,6 +62,8 @@ Token 恢复由 HTTP 客户端内部单航班完成。普通业务请求的 HTTP
 | POST | `/part-api/zsjos/lead/appeal/attachment/upload` | `zsjos:lead:appeal:create` |
 
 来源和分类不使用前端静态值。分别调用 `GET /app-api/system/dict-data/type?type=zsjos_lead_source_channel` 和 `GET /app-api/system/dict-data/type?type=zsjos_lead_category` 获取启用项。
+
+兼职端首页的“客资跟进提醒”进入独立 `/lead/follow-up` 页面；该页面读取 `/lead/inbox/submitted/summary`，返回 `followUpPendingCount`、`unreachableCount` 和 `invalidCount`，并在页面内按三个分类分别分页，不跳转或复用“我的客资”主列表页面状态。分页接口支持服务端视图参数 `view=follow_up_pending|unreachable|invalid`：待跟进覆盖待首跟、待判定和有效后仍在跟进，未联系上取 Lead 与 Opportunity 合并后的最新跟进结果 `unreachable`，已判无效取当前 `lead.status=invalid`。三个统计允许同一客资重叠，均限定当前 Partner 的客资范围；前端不得自行拼接状态条件。
 
 `availableActions` 的结构为 `{ code, enabled }[]`。H5 只消费启用的大写编码：`SUBMITTER_SUPPLEMENT`、`URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`。补充资料先读取详情并提交省、市、分类和至少一个产品的完整替换载荷。所有用户可见客资编号只展示 `leadNo`；缺失时显示“客资编号暂未生成”，不得回退到 `id` 或 `leadId`。
 

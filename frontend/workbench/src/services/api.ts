@@ -1413,6 +1413,7 @@ export type LeadAppeal = {
 };
 export type SalesOrderVoucher = LeadAttachment;
 export type SalesOrderSubmitRequest = {
+  purchaseIntentId?: number;
   buyerName?: string;
   studentName: string;
   studentNature: string;
@@ -1435,6 +1436,72 @@ export type SalesOrderSubmitRequest = {
   items: Array<{ spuRef: string; skuRef: string; actualAmount: number }>;
   paymentVouchers: Array<{ infraFileId: number }>;
   idempotencyKey: string;
+};
+export type CollectionMode = "online_link" | "offline_paid";
+export type PurchaseIntentDraftRequest = {
+  id?: number;
+  version?: number;
+  collectionMode: CollectionMode;
+  purchaseType:
+    | "lead_first_purchase"
+    | "lead_repurchase"
+    | "student_repurchase"
+    | "external_repurchase";
+  leadId?: number;
+  personId?: number;
+  sourceKey: string;
+  draft: Record<string, unknown>;
+  items: Array<{
+    spuRef: string;
+    skuRef: string;
+    skuName?: string;
+    actualAmount: number;
+  }>;
+  totalAmount: number;
+  idempotencyKey: string;
+};
+export type PurchaseIntent = {
+  id: number;
+  purchaseIntentNo: string;
+  collectionMode: CollectionMode;
+  purchaseType: string;
+  leadId?: number;
+  personId: number;
+  draft: Record<string, unknown>;
+  itemSnapshotJson: string;
+  totalAmount: number;
+  currency: string;
+  version: number;
+  paymentLocked: boolean;
+  paymentIntentId?: number;
+  paymentIntentNo?: string;
+  paymentUrl?: string;
+  paymentStatus?: "created" | "waiting" | "paid" | "expired" | "closed";
+  paymentExpiresAt?: Timestamp;
+  displayStatus:
+    | "order_draft"
+    | "pending_payment"
+    | "paid_pending_submission"
+    | "invalid";
+};
+
+export type PaymentRefund = {
+  id: number;
+  refundNo: string;
+  paymentTransactionId: number;
+  orderId?: number;
+  refundAmount: number;
+  currency: string;
+  reason: string;
+  approvalMode: string;
+  status: string;
+  refundReqsn?: string;
+  originalReqsn?: string;
+  originalTrxId?: string;
+  acceptedAt?: Timestamp;
+  refundedAt?: Timestamp;
+  lastQueriedAt?: Timestamp;
+  lastErrorMessage?: string;
 };
 export type SalesOrder = {
   id: number;
@@ -3638,6 +3705,36 @@ export const api = {
   },
   salesOrderCatalog: async () =>
     unwrap<LeadCatalog>(await http.get("/zsjos/sales-order/product/catalog")),
+  currentPurchaseIntent: async (
+    data: Pick<
+      PurchaseIntentDraftRequest,
+      "purchaseType" | "leadId" | "personId" | "sourceKey"
+    >,
+  ) =>
+    unwrap<PurchaseIntent | undefined>(
+      await http.post("/zsjos/purchase-intent/current", data),
+    ),
+  savePurchaseIntentDraft: async (data: PurchaseIntentDraftRequest) =>
+    unwrap<PurchaseIntent>(
+      await http.post("/zsjos/purchase-intent/save-draft", data),
+    ),
+  createPurchasePaymentLink: async (data: PurchaseIntentDraftRequest) =>
+    unwrap<PurchaseIntent>(
+      await http.post(
+        "/zsjos/purchase-intent/save-and-create-payment-link",
+        data,
+      ),
+    ),
+  refreshPurchasePayment: async (id: number) =>
+    unwrap<PurchaseIntent>(
+      await http.post(`/zsjos/purchase-intent/${id}/refresh-payment`),
+    ),
+  applyPaymentRefund: async (data: { paymentTransactionId: number; orderId?: number; reason: string; idempotencyKey: string }) =>
+    unwrap<PaymentRefund>(await http.post("/zsjos/payment-refund/apply", data)),
+  directPaymentRefund: async (data: { paymentTransactionId: number; orderId?: number; reason: string; idempotencyKey: string }) =>
+    unwrap<PaymentRefund>(await http.post("/zsjos/payment-refund/direct", data)),
+  paymentRefund: async (id: number) => unwrap<PaymentRefund>(await http.get(`/zsjos/payment-refund/${id}`)),
+  refreshPaymentRefund: async (id: number) => unwrap<PaymentRefund>(await http.post(`/zsjos/payment-refund/${id}/refresh`)),
   submitSalesOrder: async (leadId: number, data: SalesOrderSubmitRequest) =>
     unwrap<number>(
       await http.post(`/zsjos/sales-order/lead/${leadId}/submit`, data),

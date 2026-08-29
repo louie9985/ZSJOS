@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerLeadFollowUpSummaryRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadManagementRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
@@ -139,6 +140,15 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         return new PageResult<>(page.getList().stream().map(lead -> convert(lead, null, users,
                 products.getOrDefault(lead.getId(), List.of()), List.of(), Map.of(), false,
                 opportunities, partners)).toList(), page.getTotal());
+    }
+
+    @Override
+    public PartnerLeadFollowUpSummaryRespVO getPartnerLeadFollowUpSummary(Long partnerId) {
+        PartnerLeadFollowUpSummaryRespVO result = new PartnerLeadFollowUpSummaryRespVO();
+        result.setFollowUpPendingCount(leadMapper.countPartnerFollowUpPending(partnerId));
+        result.setUnreachableCount(leadMapper.countPartnerUnreachable(partnerId));
+        result.setInvalidCount(leadMapper.countPartnerInvalid(partnerId));
+        return result;
     }
 
     @Override

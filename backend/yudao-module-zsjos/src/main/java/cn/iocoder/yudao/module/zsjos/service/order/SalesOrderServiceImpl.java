@@ -29,6 +29,7 @@ import cn.iocoder.yudao.module.system.api.notify.dto.NotifyBusinessEvent;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.inboxfilter.LeadInboxFilterConfigVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.order.vo.*;
+import cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo.PurchaseIntentSaveDraftReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAppealDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.OpportunityDO;
@@ -41,6 +42,14 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.OpportunityMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.order.*;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentIntentDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PaymentTransactionDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.PurchaseIntentDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.payment.OrderPaymentAllocationDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.OrderPaymentAllocationMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentIntentMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PaymentTransactionMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.payment.PurchaseIntentMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.registration.ServiceRelationMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import cn.iocoder.yudao.module.zsjos.service.advancedfilter.AdvancedFilterService;
@@ -113,6 +122,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     @Resource private RegistrationChecklistConfigService registrationChecklistConfigService;
     @Resource private RegistrationService registrationService;
     @Resource private LeadCollaborationService collaborationService;
+    @Resource private PurchaseIntentMapper purchaseIntentMapper;
+    @Resource private PaymentIntentMapper paymentIntentMapper;
+    @Resource private PaymentTransactionMapper paymentTransactionMapper;
+    @Resource private OrderPaymentAllocationMapper orderPaymentAllocationMapper;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -129,15 +142,20 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (orderMapper.hasEffectiveOrder(lead.getPersonId())) throw exception(SALES_ORDER_REPURCHASE_CUSTOMER_INVALID);
         OpportunityDO opportunity = requireEligibleOpportunity(lead);
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
+        PaymentIntentDO paymentIntent = validatePurchaseIntent(reqVO, validated.total(), lead.getPersonId(), null);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
         order.setLeadId(leadId); order.setOpportunityId(opportunity.getId()); order.setPersonId(lead.getPersonId());
+        order.setPurchaseIntentId(reqVO.getPurchaseIntentId());
+        order.setSourcePaymentOrderId(paymentIntent == null ? null : paymentIntent.getId());
         order.setOrderType(ORDER_TYPE_FIRST_PURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(lead.getOwnerUserId());
         order.setSubmitterCenterType(SUBMITTER_CENTER_SALES);
         applySubmission(order, reqVO, validated, now);
         order.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey()); order.setVersion(0);
         insertOrderWithNumber(order);
+        bindPurchaseIntent(order);
+        allocateOnlinePayment(order, paymentIntent, now);
         List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
         createDealCashbacks(leadId, order.getId(), createdItems, validated.items());
         startRound(order, opportunity, userId, reqVO.getIdempotencyKey(), validated, 1, now);
@@ -210,16 +228,21 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             throw exception(SALES_ORDER_CUSTOMER_ACTIVE_REPURCHASE);
         }
         ValidatedSubmission validated = validateSubmission(submission, userId);
+        PaymentIntentDO paymentIntent = validatePurchaseIntent(submission, validated.total(), personId, null);
         LocalDateTime now = LocalDateTime.now();
         SalesOrderDO order = new SalesOrderDO();
         order.setPersonId(personId); order.setLeadId(null); order.setOpportunityId(null);
         order.setOrderType(ORDER_TYPE_REPURCHASE); order.setStatus(STATUS_PENDING_APPROVAL);
         order.setSubmitterUserId(userId); order.setFormalSalesUserId(formalSalesUserId);
         order.setSubmitterCenterType(submitterCenterType); order.setRepurchaseReason(reason.trim());
+        order.setPurchaseIntentId(submission.getPurchaseIntentId());
+        order.setSourcePaymentOrderId(paymentIntent == null ? null : paymentIntent.getId());
         applySubmission(order, submission, validated, now);
         order.setSubmissionIdempotencyKey(submission.getIdempotencyKey());
         order.setSubmissionRequestFingerprint(requestFingerprint); order.setVersion(0);
         insertOrderWithNumber(order);
+        bindPurchaseIntent(order);
+        allocateOnlinePayment(order, paymentIntent, now);
         List<SalesOrderItemDO> createdItems = insertItems(order.getId(), validated.items());
         createDealCashbacks(sourceLeadId, order.getId(), createdItems, validated.items());
         startRound(order, null, userId, submission.getIdempotencyKey(), validated, 1, now);
@@ -280,6 +303,8 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             requireNoOtherActiveOrder(order.getId(), null, order.getPersonId());
         }
         ValidatedSubmission validated = validateSubmission(reqVO, userId);
+        if (reqVO.getPurchaseIntentId() == null) reqVO.setPurchaseIntentId(order.getPurchaseIntentId());
+        validatePurchaseIntent(reqVO, validated.total(), order.getPersonId(), order.getId());
         LocalDateTime now = LocalDateTime.now();
         SalesOrderApprovalRoundDO latest = roundMapper.selectLatestByOrderId(orderId);
         if (order.getSupersededByOrderId() != null || orderMapper.selectBySupersedesOrderId(orderId) != null) {
@@ -297,6 +322,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         successor.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey());
         applySubmission(successor, reqVO, validated, now);
         insertOrderWithNumber(successor);
+        bindPurchaseIntent(successor);
+        allocateOnlinePayment(successor, successor.getSourcePaymentOrderId() == null ? null
+                : paymentIntentMapper.selectById(successor.getSourcePaymentOrderId()), now);
         order.setSupersededByOrderId(successor.getId()); orderMapper.updateById(order);
         List<SalesOrderItemDO> createdItems = insertItems(successor.getId(), validated.items());
         createDealCashbacks(successor.getLeadId(), successor.getId(), createdItems, validated.items());
@@ -309,6 +337,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     private SalesOrderDO copyForSuccessor(SalesOrderDO source, Long userId, LocalDateTime now) {
         SalesOrderDO target = new SalesOrderDO();
         target.setLeadId(source.getLeadId()); target.setOpportunityId(source.getOpportunityId()); target.setPersonId(source.getPersonId());
+        target.setPurchaseIntentId(source.getPurchaseIntentId()); target.setSourcePaymentOrderId(source.getSourcePaymentOrderId());
         target.setOrderType(source.getOrderType()); target.setStatus(STATUS_PENDING_APPROVAL);
         target.setSubmitterUserId(userId); target.setFormalSalesUserId(source.getFormalSalesUserId());
         target.setSubmitterCenterType(source.getSubmitterCenterType()); target.setRepurchaseReason(source.getRepurchaseReason());
@@ -1030,6 +1059,57 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         SalesOrderDO order = orderMapper.selectByIdForUpdate(orderId, TenantContextHolder.getRequiredTenantId());
         if (order == null) throw exception(SALES_ORDER_NOT_EXISTS);
         return order;
+    }
+
+    private PaymentIntentDO validatePurchaseIntent(SalesOrderSubmitReqVO req, BigDecimal total, Long personId,
+                                                    Long allowedCurrentOrderId) {
+        if (req.getPurchaseIntentId() == null) return null;
+        PurchaseIntentDO intent = purchaseIntentMapper.selectByIdForUpdate(req.getPurchaseIntentId());
+        if (intent == null) throw exception(PURCHASE_INTENT_NOT_EXISTS);
+        if (!Objects.equals(intent.getPersonId(), personId)
+                || !Objects.equals(intent.getCurrentOrderId(), allowedCurrentOrderId)
+                || !(allowedCurrentOrderId == null
+                    ? Set.of("draft", "paid_pending_submission").contains(intent.getStatus())
+                    : "submitted".equals(intent.getStatus()))
+                || intent.getTotalAmount().setScale(2).compareTo(total.setScale(2)) != 0) {
+            throw exception(PURCHASE_INTENT_DRAFT_INVALID);
+        }
+        List<PurchaseIntentSaveDraftReqVO.Item> snapshots = JsonUtils.parseArray(
+                intent.getItemSnapshotJson(), PurchaseIntentSaveDraftReqVO.Item.class);
+        Map<String, BigDecimal> expected = snapshots.stream().collect(java.util.stream.Collectors.toMap(
+                item -> item.getSpuRef() + "\n" + item.getSkuRef(), item -> item.getActualAmount().setScale(2)));
+        Map<String, BigDecimal> actual = req.getItems().stream().collect(java.util.stream.Collectors.toMap(
+                item -> item.getSpuRef() + "\n" + item.getSkuRef(), item -> item.getActualAmount().setScale(2)));
+        if (!expected.equals(actual)) throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+        if (!"online_link".equals(intent.getCollectionMode())) return null;
+        PaymentIntentDO payment = paymentIntentMapper.selectLatestByPurchaseIntent(intent.getId());
+        if (payment == null || !"paid".equals(payment.getStatus())) throw exception(PURCHASE_INTENT_PAYMENT_REQUIRED);
+        PaymentTransactionDO transaction = paymentTransactionMapper.selectByPaymentOrderId(payment.getId());
+        int totalFen = total.movePointRight(2).intValueExact();
+        if (transaction == null || transaction.getAmountFen() == null || transaction.getAmountFen() != totalFen
+                || payment.getExpectedAmount().setScale(2).compareTo(total.setScale(2)) != 0) {
+            throw exception(PURCHASE_INTENT_PAYMENT_CONFLICT);
+        }
+        return payment;
+    }
+
+    private void bindPurchaseIntent(SalesOrderDO order) {
+        if (order.getPurchaseIntentId() == null) return;
+        PurchaseIntentDO intent = purchaseIntentMapper.selectByIdForUpdate(order.getPurchaseIntentId());
+        if (intent == null) throw exception(PURCHASE_INTENT_NOT_EXISTS);
+        intent.setCurrentOrderId(order.getId()).setStatus("submitted");
+        purchaseIntentMapper.updateById(intent);
+    }
+
+    private void allocateOnlinePayment(SalesOrderDO order, PaymentIntentDO payment, LocalDateTime now) {
+        if (payment == null) return;
+        PaymentTransactionDO transaction = paymentTransactionMapper.selectByPaymentOrderId(payment.getId());
+        if (transaction == null) throw exception(PURCHASE_INTENT_PAYMENT_REQUIRED);
+        OrderPaymentAllocationDO allocation = new OrderPaymentAllocationDO()
+                .setOrderId(order.getId()).setPaymentTransactionId(transaction.getId())
+                .setAllocatedAmount(transaction.getAmount()).setCurrency(transaction.getCurrency())
+                .setAllocatedAt(now).setIdempotencyKey("purchase-intent:" + order.getPurchaseIntentId() + ":order:" + order.getId());
+        orderPaymentAllocationMapper.insert(allocation);
     }
 
     private ValidatedSubmission validateSubmission(SalesOrderSubmitReqVO req, Long userId) {

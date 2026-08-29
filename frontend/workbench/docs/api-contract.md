@@ -25,6 +25,8 @@
 - `PUT /admin-api/system/notify-message/update-all-read`
 - `GET /admin-api/system/area/tree`
 
+消息页仍使用 `/messages/all` 与 `/messages/unread` 进入同一个收件箱页面；页面内按 `全部 / 客资 / 提现 / 收益 / 申诉 / 系统` 做前端业务分类聚合，当前不新增后端分类筛选参数。
+
 菜单来自权限接口返回的 `data.menus`，这是员工工作台菜单的唯一事实源。前端只做路径规范化和布局所需的展示转换，并保留服务端递归层级；不按角色名称推断菜单，也不使用管理接口或静态数组重建另一套权限事实。后端 `component` 只作为显示和本地注册表映射信息，不能作为动态代码执行。
 
 所有 HTTP 路径、租户头、Token 刷新和响应解包集中在 `src/services`。组件不得直接调用 Axios。

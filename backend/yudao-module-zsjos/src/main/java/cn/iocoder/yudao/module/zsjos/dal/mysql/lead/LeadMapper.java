@@ -358,10 +358,85 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .eqIfPresent(LeadDO::getLeadCategory, reqVO.getLeadCategory())
                 .betweenIfPresent(LeadDO::getSubmittedAt, reqVO.getSubmittedAt());
         if (reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank()) applyLeadKeyword(query, reqVO.getKeyword());
-        applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
+        applyPartnerView(query, reqVO.getView());
+        if (reqVO.getView() == null || reqVO.getView().isBlank() || "all".equals(reqVO.getView())) {
+            applySimpleStatus(query, LeadSimpleStatusQuery.resolve(reqVO.getSimpleStatus()));
+        }
         query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
         return selectPage(reqVO, query);
     }
+
+    private static void applyPartnerView(LambdaQueryWrapperX<LeadDO> query, String view) {
+        if (view == null || view.isBlank() || "all".equals(view)) return;
+        switch (view) {
+            case "invalid" -> query.eq(LeadDO::getStatus, "invalid");
+            case "follow_up_pending" -> query.apply("(" +
+                    "(status='submitted' AND assignment_status='owned')" +
+                    " OR (status='valid' AND EXISTS (" +
+                    "SELECT 1 FROM zsjos_opportunity o WHERE o.lead_id=zsjos_lead.id " +
+                    "AND o.tenant_id=zsjos_lead.tenant_id AND o.type='initial_conversion' " +
+                    "AND o.deleted=b'0' AND o.status IN ('open','following')))" +
+                    ")");
+            case "unreachable" -> query.apply(latestFollowUpResultSql("unreachable"));
+            default -> throw new IllegalArgumentException("Unsupported partner lead view: " + view);
+        }
+    }
+
+    private static String latestFollowUpResultSql(String result) {
+        return "(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_record current_lead " +
+                "WHERE current_lead.lead_id=zsjos_lead.id AND current_lead.tenant_id=zsjos_lead.tenant_id " +
+                "AND current_lead.deleted=b'0' AND current_lead.result_value='" + result + "' " +
+                "AND NOT EXISTS (SELECT 1 FROM zsjos_lead_follow_up_record newer_lead " +
+                "WHERE newer_lead.lead_id=zsjos_lead.id AND newer_lead.tenant_id=zsjos_lead.tenant_id " +
+                "AND newer_lead.deleted=b'0' AND (newer_lead.occurred_at>current_lead.occurred_at " +
+                "OR (newer_lead.occurred_at=current_lead.occurred_at AND newer_lead.id>current_lead.id))) " +
+                "AND NOT EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record newer_opp " +
+                "WHERE newer_opp.lead_id=zsjos_lead.id AND newer_opp.tenant_id=zsjos_lead.tenant_id " +
+                "AND newer_opp.deleted=b'0' AND (newer_opp.occurred_at>current_lead.occurred_at " +
+                "OR (newer_opp.occurred_at=current_lead.occurred_at AND newer_opp.id>current_lead.id))) ) " +
+                "OR EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record current_opp " +
+                "WHERE current_opp.lead_id=zsjos_lead.id AND current_opp.tenant_id=zsjos_lead.tenant_id " +
+                "AND current_opp.deleted=b'0' AND current_opp.result_value='" + result + "' " +
+                "AND NOT EXISTS (SELECT 1 FROM zsjos_lead_follow_up_record newer_lead " +
+                "WHERE newer_lead.lead_id=zsjos_lead.id AND newer_lead.tenant_id=zsjos_lead.tenant_id " +
+                "AND newer_lead.deleted=b'0' AND (newer_lead.occurred_at>current_opp.occurred_at " +
+                "OR (newer_lead.occurred_at=current_opp.occurred_at AND newer_lead.id>current_opp.id))) " +
+                "AND NOT EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record newer_opp " +
+                "WHERE newer_opp.lead_id=zsjos_lead.id AND newer_opp.tenant_id=zsjos_lead.tenant_id " +
+                "AND newer_opp.deleted=b'0' AND (newer_opp.occurred_at>current_opp.occurred_at " +
+                "OR (newer_opp.occurred_at=current_opp.occurred_at AND newer_opp.id>current_opp.id))))");
+    }
+
+    @Select("SELECT COUNT(*) FROM zsjos_lead WHERE partner_id=#{partnerId} AND deleted=b'0' " +
+            "AND ((status='submitted' AND assignment_status='owned') " +
+            "OR (status='valid' AND EXISTS (SELECT 1 FROM zsjos_opportunity o WHERE o.lead_id=zsjos_lead.id " +
+            "AND o.tenant_id=zsjos_lead.tenant_id AND o.type='initial_conversion' AND o.deleted=b'0' " +
+            "AND o.status IN ('open','following'))))")
+    long countPartnerFollowUpPending(@Param("partnerId") Long partnerId);
+
+    @Select("SELECT COUNT(*) FROM zsjos_lead WHERE partner_id=#{partnerId} AND deleted=b'0' " +
+            "AND " +
+            "(EXISTS (SELECT 1 FROM zsjos_lead_follow_up_record current_lead WHERE current_lead.lead_id=zsjos_lead.id " +
+            "AND current_lead.tenant_id=zsjos_lead.tenant_id AND current_lead.deleted=b'0' AND current_lead.result_value='unreachable' " +
+            "AND NOT EXISTS (SELECT 1 FROM zsjos_lead_follow_up_record newer_lead WHERE newer_lead.lead_id=zsjos_lead.id " +
+            "AND newer_lead.tenant_id=zsjos_lead.tenant_id AND newer_lead.deleted=b'0' AND (newer_lead.occurred_at>current_lead.occurred_at " +
+            "OR (newer_lead.occurred_at=current_lead.occurred_at AND newer_lead.id>current_lead.id))) " +
+            "AND NOT EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record newer_opp WHERE newer_opp.lead_id=zsjos_lead.id " +
+            "AND newer_opp.tenant_id=zsjos_lead.tenant_id AND newer_opp.deleted=b'0' AND (newer_opp.occurred_at>current_lead.occurred_at " +
+            "OR (newer_opp.occurred_at=current_lead.occurred_at AND newer_opp.id>current_lead.id)))) " +
+            "OR EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record current_opp WHERE current_opp.lead_id=zsjos_lead.id " +
+            "AND current_opp.tenant_id=zsjos_lead.tenant_id AND current_opp.deleted=b'0' AND current_opp.result_value='unreachable' " +
+            "AND NOT EXISTS (SELECT 1 FROM zsjos_lead_follow_up_record newer_lead WHERE newer_lead.lead_id=zsjos_lead.id " +
+            "AND newer_lead.tenant_id=zsjos_lead.tenant_id AND newer_lead.deleted=b'0' AND (newer_lead.occurred_at>current_opp.occurred_at " +
+            "OR (newer_lead.occurred_at=current_opp.occurred_at AND newer_lead.id>current_opp.id))) " +
+            "AND NOT EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record newer_opp WHERE newer_opp.lead_id=zsjos_lead.id " +
+            "AND newer_opp.tenant_id=zsjos_lead.tenant_id AND newer_opp.deleted=b'0' AND (newer_opp.occurred_at>current_opp.occurred_at " +
+            "OR (newer_opp.occurred_at=current_opp.occurred_at AND newer_opp.id>current_opp.id))))")
+    long countPartnerUnreachable(@Param("partnerId") Long partnerId);
+
+    @Select("SELECT COUNT(*) FROM zsjos_lead WHERE partner_id=#{partnerId} " +
+            "AND deleted=b'0' AND status='invalid'")
+    long countPartnerInvalid(@Param("partnerId") Long partnerId);
 
     default void touchActivity(Long leadId, java.time.LocalDateTime occurredAt) {
         update(new LeadDO().setLastActivityAt(occurredAt),

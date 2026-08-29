@@ -7,6 +7,7 @@ import {
   Drawer,
   Empty,
   Grid,
+  Segmented,
   Skeleton,
   Space,
   Tag,
@@ -18,10 +19,16 @@ import {
   ReloadOutlined,
   LinkOutlined
 } from '@ant-design/icons'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { api, AuthenticationError, type NotifyMessage } from '../services/api'
 import { applyReadStatus, buildNotifyMessageCursorParams, type NotifyMessageView } from '../services/notifyMessage'
+import {
+  NOTIFY_MESSAGE_CATEGORY_ORDER,
+  notifyMessageCategoryLabel,
+  notifyMessageCategoryOf,
+  type NotifyMessageCategory
+} from '../services/notifyMessageCategory'
 import { formatTimestamp } from '../services/time'
 import { useNotifyMessages } from '../components/NotifyMessageProvider'
 import { useRealtime, useRealtimeEvent } from '../components/RealtimeProvider'
@@ -106,6 +113,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const { unreadCount, refreshUnreadCount } = useNotifyMessages()
   const requestSequence = useRef(0)
   const [messages, setMessages] = useState<NotifyMessage[]>([])
+  const [category, setCategory] = useState<NotifyMessageCategory>('all')
   const [selected, setSelected] = useState<NotifyMessage>()
   const [cursor, setCursor] = useState<string>()
   const [hasMore, setHasMore] = useState(true)
@@ -119,6 +127,10 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const [leadActionProbe, setLeadActionProbe] = useState<LeadActionProbe>()
   const [leadProbeAttempt, setLeadProbeAttempt] = useState(0)
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const visibleMessages = useMemo(
+    () => messages.filter(item => category === 'all' || notifyMessageCategoryOf(item) === category),
+    [category, messages]
+  )
 
   const load = useCallback(async (append = false) => {
     const requestId = ++requestSequence.current
@@ -143,6 +155,11 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   }, [cursor, view])
 
   useEffect(() => { void load() }, [view])
+  useEffect(() => { setCategory('all') }, [view])
+  useEffect(() => {
+    if (selected && visibleMessages.some(item => item.id === selected.id)) return
+    setSelected(visibleMessages[0])
+  }, [selected, visibleMessages])
   useEffect(() => {
     const node = loadMoreRef.current
     if (!node || !hasMore || loading || loadingMore) return
@@ -156,7 +173,9 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
     const messageId = Number(searchParams.get('messageId'))
     if (!Number.isFinite(messageId) || messageId <= 0) return
     void api.myNotifyMessage(messageId).then(item => {
+      setMessages(current => current.some(existing => existing.id === item.id) ? current : [item, ...current])
       setSelected(item)
+      setCategory(notifyMessageCategoryOf(item))
       if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
       void markRead(item)
     }).catch(() => toast.warning('消息不存在或当前账号无权查看'))
@@ -240,8 +259,11 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
     }
   }
 
-  const emptyText = view === 'unread' ? '暂无未读消息' : '暂无消息'
+  const emptyText = category === 'all'
+    ? (view === 'unread' ? '暂无未读消息' : '暂无消息')
+    : `${notifyMessageCategoryLabel[category]}暂无消息`
   const pageTitle = view === 'unread' ? '未读消息' : '全部消息'
+  const canLoadMoreForCategory = category !== 'all' && visibleMessages.length === 0 && hasMore && !loading
   const errorAlert = error && <Alert
     className="business-inbox-error"
     type={unauthorized ? 'warning' : 'error'}
@@ -263,11 +285,19 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       </div>
       <Space><Button icon={<ReloadOutlined/>} onClick={() => { void load(); void refreshUnreadCount(); setLeadActions({}); setLeadProbeAttempt(value => value + 1) }}>刷新</Button><Button type="primary" icon={<CheckOutlined/>} loading={markingAll} disabled={unreadCount === 0} onClick={() => void markAllRead()}>全部已读</Button></Space>
     </header>
+    <div className="message-inbox-category-bar">
+      <Segmented
+        block
+        value={category}
+        options={NOTIFY_MESSAGE_CATEGORY_ORDER.map(item => ({ label: notifyMessageCategoryLabel[item], value: item }))}
+        onChange={value => setCategory(value as NotifyMessageCategory)}
+      />
+    </div>
     {errorAlert}
     <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">
         <div className="business-inbox-scroll message-center-list" aria-label={`${pageTitle}列表`}>
-          {loading ? <div className="message-inbox-skeleton"><Skeleton active paragraph={{ rows: 8 }}/></div> : messages.length ? messages.map(item => {
+          {loading ? <div className="message-inbox-skeleton"><Skeleton active paragraph={{ rows: 8 }}/></div> : visibleMessages.length ? visibleMessages.map(item => {
             const active = selected?.id === item.id
             const sender = senderName(item)
             return <button
@@ -291,8 +321,11 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
                 <span>{formatTimestamp(item.createTime)}</span>
               </div>
             </button>
-          }) : !error && <Empty description={emptyText}/>} 
-          {!loading && messages.length > 0 && <div ref={loadMoreRef} className="message-inbox-load-more">
+          }) : !error && <Empty description={emptyText} image={Empty.PRESENTED_IMAGE_SIMPLE} />}
+          {canLoadMoreForCategory && <div className="message-inbox-load-more">
+            <Button size="small" icon={<ReloadOutlined/>} onClick={() => void load(true)}>加载更多</Button>
+          </div>}
+          {!loading && visibleMessages.length > 0 && <div ref={loadMoreRef} className="message-inbox-load-more">
             {loadingMore ? '加载中…' : hasMore ? '继续下滑加载' : '已加载全部消息'}
           </div>}
         </div>

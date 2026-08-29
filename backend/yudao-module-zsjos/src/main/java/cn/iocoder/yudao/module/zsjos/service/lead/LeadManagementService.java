@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerLeadFollowUpSummaryRespVO;
 
 import java.util.List;
 
@@ -14,6 +15,7 @@ public interface LeadManagementService {
 
     PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId);
     PageResult<LeadManagementRespVO> getPartnerLeadPage(LeadManagementPageReqVO reqVO, Long partnerId);
+    PartnerLeadFollowUpSummaryRespVO getPartnerLeadFollowUpSummary(Long partnerId);
     CursorPageResult<LeadManagementRespVO> getLeadCursor(LeadManagementPageReqVO reqVO, Long userId);
 
     LeadManagementRespVO getLead(Long id, Long userId);

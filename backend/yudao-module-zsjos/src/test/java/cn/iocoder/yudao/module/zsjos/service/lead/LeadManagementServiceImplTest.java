@@ -126,6 +126,22 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void partnerFollowUpSummaryUsesPartnerScopedCounts() {
+        when(leadMapper.countPartnerFollowUpPending(20L)).thenReturn(3L);
+        when(leadMapper.countPartnerUnreachable(20L)).thenReturn(1L);
+        when(leadMapper.countPartnerInvalid(20L)).thenReturn(2L);
+
+        var result = service.getPartnerLeadFollowUpSummary(20L);
+
+        assertEquals(3L, result.getFollowUpPendingCount());
+        assertEquals(1L, result.getUnreachableCount());
+        assertEquals(2L, result.getInvalidCount());
+        verify(leadMapper).countPartnerFollowUpPending(20L);
+        verify(leadMapper).countPartnerUnreachable(20L);
+        verify(leadMapper).countPartnerInvalid(20L);
+    }
+
+    @Test
     void pageAllowsQueryAllPermissionWithoutRelationScope() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);

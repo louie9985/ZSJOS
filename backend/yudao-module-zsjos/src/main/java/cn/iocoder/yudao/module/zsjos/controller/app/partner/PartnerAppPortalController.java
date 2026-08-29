@@ -67,6 +67,11 @@ public class PartnerAppPortalController {
         return success(leadManagementService.getPartnerLeadPage(request, partnerId()));
     }
 
+    @GetMapping("/lead/inbox/submitted/summary")
+    public CommonResult<PartnerLeadFollowUpSummaryRespVO> submittedSummary() {
+        return success(leadManagementService.getPartnerLeadFollowUpSummary(partnerId()));
+    }
+
     @GetMapping("/lead/get")
     public CommonResult<LeadManagementRespVO> lead(@RequestParam Long id) {
         return success(leadManagementService.getPartnerLead(id, partnerId()));

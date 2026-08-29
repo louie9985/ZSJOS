@@ -12,6 +12,18 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
+      path: '/pay/:paymentIntentNo',
+      name: 'PublicPayment',
+      component: () => import('@/pages/payment/index.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/payment-result',
+      name: 'PaymentResult',
+      component: () => import('@/pages/payment/result.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/',
       redirect: '/home'
     },
@@ -31,6 +43,12 @@ const router = createRouter({
       path: '/lead/list',
       name: 'LeadList',
       component: () => import('@/pages/lead/list.vue'),
+      meta: { permission: 'zsjos:lead:query-submitted' }
+    },
+    {
+      path: '/lead/follow-up',
+      name: 'LeadFollowUp',
+      component: () => import('@/pages/lead/follow-up.vue'),
       meta: { permission: 'zsjos:lead:query-submitted' }
     },
     {

@@ -27,6 +27,15 @@
   margin-bottom: var(--crm-sp-4);
 }
 
+.message-inbox-category-bar {
+  flex: none;
+  margin-bottom: var(--crm-sp-4);
+}
+
+.message-inbox-category-bar .ant-segmented {
+  width: 100%;
+}
+
 .message-inbox-layout {
   display: grid;
   min-height: 0;
@@ -243,6 +252,10 @@
   .message-inbox-layout {
     display: block;
     min-height: 0;
+  }
+
+  .message-inbox-category-bar {
+    margin-bottom: var(--crm-sp-3);
   }
 
   .message-inbox-list-pane {

@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 public class SalesOrderDO extends TenantBaseDO {
     @TableId private Long id;
     private String orderNo;
+    private Long sourcePaymentOrderId;
+    private Long purchaseIntentId;
     private Long leadId;
     private Long opportunityId;
     private Long personId;

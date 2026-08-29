@@ -262,6 +262,30 @@ zsjos:
   positioning:
     public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
     confirmation-link-ttl-hours: ${ZSJOS_POSITIONING_CONFIRMATION_LINK_TTL_HOURS:168}
+  payment:
+    allinpay:
+      enabled: ${ZSJOS_ALLINPAY_ENABLED:false}
+      cusid: ${ZSJOS_ALLINPAY_CUSID:}
+      appid: ${ZSJOS_ALLINPAY_APPID:}
+      orgid: ${ZSJOS_ALLINPAY_ORGID:}
+      unionorder-url: ${ZSJOS_ALLINPAY_UNIONORDER_URL:https://syb-test.allinpay.com/apiweb/h5unionpay/unionorder}
+      unitorder-pay-url: ${ZSJOS_ALLINPAY_UNITORDER_PAY_URL:https://syb-test.allinpay.com/apiweb/unitorder/pay}
+      query-url: ${ZSJOS_ALLINPAY_QUERY_URL:https://syb-test.allinpay.com/apiweb/tranx/query}
+      close-url: ${ZSJOS_ALLINPAY_CLOSE_URL:https://syb-test.allinpay.com/apiweb/tranx/close}
+      refund-url: ${ZSJOS_ALLINPAY_REFUND_URL:https://syb-test.allinpay.com/apiweb/tranx/refund}
+      refund-query-url: ${ZSJOS_ALLINPAY_REFUND_QUERY_URL:}
+      refund-notify-url: ${ZSJOS_ALLINPAY_REFUND_NOTIFY_URL:}
+      refund-version: ${ZSJOS_ALLINPAY_REFUND_VERSION:11}
+      return-url: ${ZSJOS_ALLINPAY_RETURN_URL:}
+      notify-url: ${ZSJOS_ALLINPAY_NOTIFY_URL:}
+      public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
+      merchant-private-key-location: ${ZSJOS_ALLINPAY_PRIVATE_KEY:}
+      platform-public-key-location: ${ZSJOS_ALLINPAY_PUBLIC_KEY:}
+      link-hmac-secret: ${ZSJOS_PAYMENT_LINK_HMAC_SECRET:}
+      allowed-payinfo-hosts: ${ZSJOS_ALLINPAY_PAYINFO_HOSTS:}
+      link-ttl-hours: ${ZSJOS_PAYMENT_LINK_TTL_HOURS:24}
+      connect-timeout-seconds: ${ZSJOS_ALLINPAY_CONNECT_TIMEOUT_SECONDS:10}
+      read-timeout-seconds: ${ZSJOS_ALLINPAY_READ_TIMEOUT_SECONDS:20}
 
 yudao:
   info:

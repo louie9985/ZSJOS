@@ -29,7 +29,7 @@ export function formatLeadNo(value?: string | null): string {
 }
 
 const LEAD_STATUS_LABELS: Record<string, string> = {
-  submitted: '已提交',
+  submitted: '待判定',
   suspended: '已挂起',
   valid: '有效',
   invalid: '无效',

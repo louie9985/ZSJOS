@@ -4,6 +4,21 @@ import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface ZsjosErrorCodeConstants {
 
+    ErrorCode PURCHASE_INTENT_NOT_EXISTS = new ErrorCode(1_900_017_001, "购买草稿不存在");
+    ErrorCode PURCHASE_INTENT_VERSION_CONFLICT = new ErrorCode(1_900_017_002, "购买草稿已被其他人修改，请刷新后重试");
+    ErrorCode PURCHASE_INTENT_DRAFT_INVALID = new ErrorCode(1_900_017_003, "购买草稿至少需要购买主体、一个有效课程和大于零的金额");
+    ErrorCode PURCHASE_INTENT_PERMISSION_DENIED = new ErrorCode(1_900_017_004, "无权操作该购买草稿");
+    ErrorCode PURCHASE_INTENT_PAYMENT_CONFLICT = new ErrorCode(1_900_017_005, "当前购买草稿已有未结束的支付链接");
+    ErrorCode PURCHASE_INTENT_PAYMENT_REQUIRED = new ErrorCode(1_900_017_006, "线上支付尚未确认到账");
+    ErrorCode PAYMENT_LINK_INVALID = new ErrorCode(1_900_017_007, "支付链接无效或已失效");
+    ErrorCode PAYMENT_GATEWAY_UNAVAILABLE = new ErrorCode(1_900_017_008, "支付渠道暂不可用");
+    ErrorCode PAYMENT_CALLBACK_INVALID = new ErrorCode(1_900_017_009, "支付通知无效");
+    ErrorCode PAYMENT_REFUND_NOT_EXISTS = new ErrorCode(1_900_017_010, "退款单不存在");
+    ErrorCode PAYMENT_REFUND_NOT_ELIGIBLE = new ErrorCode(1_900_017_011, "当前支付流水不满足退款条件");
+    ErrorCode PAYMENT_REFUND_STATE_INVALID = new ErrorCode(1_900_017_012, "当前退款状态不允许该操作");
+    ErrorCode PAYMENT_REFUND_PROCESS_UNAVAILABLE = new ErrorCode(1_900_017_013, "退款审批流程暂不可用");
+    ErrorCode PAYMENT_REFUND_GATEWAY_UNKNOWN = new ErrorCode(1_900_017_014, "退款结果待通联确认");
+
     ErrorCode PERSONNEL_USER_NOT_EXISTS = new ErrorCode(1_900_000_001, "人员账号不存在");
     ErrorCode PERSONNEL_STATE_INVALID = new ErrorCode(1_900_000_002, "人员业务状态无效");
     ErrorCode PARTNER_NOT_EXISTS = new ErrorCode(1_900_000_003, "兼职主体不存在");

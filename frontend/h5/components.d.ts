@@ -10,6 +10,8 @@ declare module 'vue' {
   export interface GlobalComponents {
     AreaPicker: typeof import('./src/components/AreaPicker.vue')['default']
     ImageUploader: typeof import('./src/components/ImageUploader.vue')['default']
+    LiquidSegmentedControl: typeof import('./src/components/LiquidSegmentedControl.vue')['default']
+    LiquidTabbar: typeof import('./src/components/LiquidTabbar.vue')['default']
     ProductPicker: typeof import('./src/components/ProductPicker.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
