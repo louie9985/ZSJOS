@@ -140,9 +140,12 @@ SOURCE script/sql/mysql/migrations/V158__retire_announcement_center_duplicate.sq
 SOURCE script/sql/mysql/migrations/V159__public_sea_terminology.sql;
 SOURCE script/sql/mysql/migrations/V160__registration_case_close_service.sql;
 SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
+SOURCE script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql;
+-- The purchase-draft file shares the historical V162 marker and uses
+-- INSERT IGNORE for compatibility. Run the canonical permission migration
+-- first so the legacy V162 registry row is created exactly once.
 SOURCE script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql;
 SOURCE script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql;
-SOURCE script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql;
 SOURCE script/sql/mysql/migrations/V164__notice_highlight_until.sql;
 SOURCE script/sql/mysql/migrations/V165__zsjos_forced_form.sql;
 SOURCE script/sql/mysql/migrations/V166__zsjos_forced_form_formal_model.sql;
@@ -154,8 +157,45 @@ SOURCE script/sql/mysql/migrations/V171__lead_duplicate_rule_contract.sql;
 SOURCE script/sql/mysql/migrations/V172__lead_owner_self_actions.sql;
 SOURCE script/sql/mysql/migrations/V173__lead_submitter_assist_request.sql;
 SOURCE script/sql/mysql/migrations/V174__complete_zsjos_business_audit.sql;
+SOURCE script/sql/mysql/migrations/V175__lead_source_channel_snapshots.sql;
+SOURCE script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 SELECT 'core', `version`, `description`, SHA2(COALESCE(`checksum`, `version`), 256), 'baseline', `installed_at`
 FROM `zsjos_schema_version`;
+
+-- Optional database modules enabled for the production baseline. EAM depends on
+-- the Core schema and System menu/permission rows above. Its migrations are
+-- module-local (V001..V011) and seed only administrator-maintained metadata;
+-- asset, inventory, procurement and employee-ownership rows remain empty.
+SOURCE script/sql/mysql/schema/eam.sql;
+SOURCE script/sql/mysql/migrations/eam/V001__eam_schema.sql;
+SOURCE script/sql/mysql/migrations/eam/V002__eam_menu.sql;
+SOURCE script/sql/mysql/migrations/eam/V003__eam_dict.sql;
+SOURCE script/sql/mysql/migrations/eam/V004__eam_import_and_quantity.sql;
+SOURCE script/sql/mysql/migrations/eam/V005__eam_normalized_asset_fields.sql;
+SOURCE script/sql/mysql/migrations/eam/V006__eam_category_baseline.sql;
+SOURCE script/sql/mysql/migrations/eam/V007__eam_office_procurement_and_employee_assets.sql;
+SOURCE script/sql/mysql/migrations/eam/V008__eam_employee_ownership.sql;
+SOURCE script/sql/mysql/migrations/eam/V009__eam_public_asset_access.sql;
+SOURCE script/sql/mysql/migrations/eam/V010__eam_asset_transfer_approval.sql;
+SOURCE script/sql/mysql/migrations/eam/V011__eam_asset_data_scope.sql;
+
+-- EAM migrations predate the shared registry contract. Register the applied
+-- module versions after successful execution so db tooling and verification can
+-- report the same Core/EAM baseline without importing business instances.
+INSERT IGNORE INTO `zsjos_module_schema_version`
+  (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
+VALUES
+  ('eam','V001','eam schema',SHA2('V001__eam_schema.sql',256),'baseline',NOW()),
+  ('eam','V002','eam menu',SHA2('V002__eam_menu.sql',256),'baseline',NOW()),
+  ('eam','V003','eam dict',SHA2('V003__eam_dict.sql',256),'baseline',NOW()),
+  ('eam','V004','eam import and quantity',SHA2('V004__eam_import_and_quantity.sql',256),'baseline',NOW()),
+  ('eam','V005','eam normalized asset fields',SHA2('V005__eam_normalized_asset_fields.sql',256),'baseline',NOW()),
+  ('eam','V006','eam category baseline',SHA2('V006__eam_category_baseline.sql',256),'baseline',NOW()),
+  ('eam','V007','eam office procurement and employee assets',SHA2('V007__eam_office_procurement_and_employee_assets.sql',256),'baseline',NOW()),
+  ('eam','V008','eam employee ownership',SHA2('V008__eam_employee_ownership.sql',256),'baseline',NOW()),
+  ('eam','V009','eam public asset access',SHA2('V009__eam_public_asset_access.sql',256),'baseline',NOW()),
+  ('eam','V010','eam asset transfer approval',SHA2('V010__eam_asset_transfer_approval.sql',256),'baseline',NOW()),
+  ('eam','V011','eam asset data scope',SHA2('V011__eam_asset_data_scope.sql',256),'baseline',NOW());

@@ -1,9 +1,10 @@
 package cn.iocoder.yudao.module.eam.dal.dataobject.asset;
 
-import cn.iocoder.yudao.framework.mybatis.core.dataobject.BaseDO;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO;
 import cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum;
 import com.baomidou.mybatisplus.annotation.KeySequence;
 import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.FieldStrategy;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
@@ -30,7 +31,7 @@ import java.util.Map;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class EamAssetDO extends BaseDO {
+public class EamAssetDO extends TenantBaseDO {
 
     /**
      * 资产编号（主键）
@@ -100,14 +101,17 @@ public class EamAssetDO extends BaseDO {
     /**
      * 使用部门
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long useDeptId;
     /**
      * 使用人
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private Long useEmployeeId;
     /**
      * 使用员工姓名快照；员工匹配失败或历史名称变化时保留
      */
+    @TableField(updateStrategy = FieldStrategy.ALWAYS)
     private String useEmployeeNameSnapshot;
     /**
      * 直属上级员工
@@ -160,5 +164,8 @@ public class EamAssetDO extends BaseDO {
      * 状态变更前的状态（用于维修完成/报废驳回/解冻 恢复原状态）
      */
     private Integer previousStatus;
+
+    /** 乐观锁版本，公开编辑与后台编辑共用。 */
+    private Integer version;
 
 }

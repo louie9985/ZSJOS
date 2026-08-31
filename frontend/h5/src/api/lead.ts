@@ -84,6 +84,7 @@ export interface LeadListItem {
   sourceType?: string
   sourceLabel?: string
   sourceChannel: string
+  sourceChannelLabelSnapshot?: string
   leadCategory: string
   leadCategoryLabelSnapshot?: string
   status: string

@@ -406,8 +406,17 @@ public class EamEmployeeAssetServiceImpl implements EamEmployeeAssetService {
             }
             items.add(item);
         }
-        List<EamEmployeeAssetTaskRespVO> tasks = taskMapper.selectListByEmployeeId(employeeId).stream()
-                .map(task -> getTask(task.getId())).toList();
+        List<EamEmployeeAssetTaskDO> taskRows = taskMapper.selectListByEmployeeId(employeeId);
+        Map<Long, List<EamEmployeeAssetTaskItemDO>> itemsByTaskId =
+                taskItemMapper.selectListByTaskIds(taskRows.stream()
+                                .map(EamEmployeeAssetTaskDO::getId).toList())
+                        .stream().collect(Collectors.groupingBy(EamEmployeeAssetTaskItemDO::getTaskId));
+        List<EamEmployeeAssetTaskRespVO> tasks = taskRows.stream().map(task -> {
+            EamEmployeeAssetTaskRespVO response = BeanUtils.toBean(task, EamEmployeeAssetTaskRespVO.class);
+            response.setItems(BeanUtils.toBean(itemsByTaskId.getOrDefault(task.getId(), List.of()),
+                    EamEmployeeAssetTaskItemRespVO.class));
+            return response;
+        }).toList();
         EamEmployeeAssetSummaryRespVO result = new EamEmployeeAssetSummaryRespVO();
         result.setEmployeeId(employeeId); result.setItems(items); result.setTasks(tasks);
         result.setPendingSignCount((int) items.stream().filter(i -> i.getItemType().endsWith("HOLDING")

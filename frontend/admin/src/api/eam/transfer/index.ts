@@ -7,12 +7,17 @@ export interface TransferVO {
   assetId: number
   assetName?: string
   assetCode?: string
+  assetCodeSnapshot?: string
+  assetNameSnapshot?: string
+  typeLabelSnapshot?: string
   fromEmployeeId?: number
   fromEmployeeName?: string
   fromDeptId?: number
+  fromDeptName?: string
   toEmployeeId?: number
   toEmployeeName?: string
   toDeptId?: number
+  toDeptName?: string
   expectedReturnDate?: string
   actualReturnDate?: string
   status?: number
@@ -21,6 +26,11 @@ export interface TransferVO {
   applyUserId?: number
   applyUserName?: string
   applyTime?: Date
+  inspectionResult?: number
+  inspectionRemark?: string
+  inspectionFileUrls?: string[]
+  inspectedByUserId?: number
+  inspectedAt?: Date
 }
 
 /** 流转类型 */
@@ -44,7 +54,11 @@ export const TransferStatus = {
   APPROVING: 0,
   APPROVED: 1,
   REJECTED: 2,
-  CANCELLED: 3
+  CANCELLED: 3,
+  DRAFT: 4,
+  PENDING_INSPECTION: 5,
+  COMPLETED: 6,
+  EXCEPTION: 7
 } as const
 
 // 查询流转单分页
@@ -62,19 +76,12 @@ export const createTransfer = async (data: TransferVO) => {
   return await request.post({ url: '/eam/transfer/create', data })
 }
 
-// 审批通过
-export const approveTransfer = async (id: number) => {
-  return await request.put({ url: '/eam/transfer/approve?id=' + id })
-}
-
-// 驳回
-export const rejectTransfer = async (id: number, reason?: string) => {
-  return await request.put({
-    url: `/eam/transfer/reject?id=${id}${reason ? '&reason=' + encodeURIComponent(reason) : ''}`
-  })
-}
-
 // 取消
 export const cancelTransfer = async (id: number) => {
   return await request.put({ url: '/eam/transfer/cancel?id=' + id })
 }
+
+export const inspectTransfer = async (
+  id: number,
+  data: { result: number; remark?: string; fileUrls?: string[] }
+) => request.put({ url: `/eam/transfer/${id}/inspect`, data })

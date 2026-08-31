@@ -63,7 +63,7 @@ public class EamCategoryFieldController {
     @GetMapping("/list")
     @Operation(summary = "获得分类直接定义的字段列表")
     @Parameter(name = "categoryId", description = "分类编号", required = true, example = "1")
-    @PreAuthorize("@ss.hasPermission('eam:category-field:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:category-field:query', 'eam:asset:query', 'eam:asset:query-self', 'eam:asset:query-dept', 'eam:manage-all')")
     public CommonResult<List<EamCategoryFieldRespVO>> getFieldList(
             @RequestParam("categoryId") Long categoryId) {
         List<EamCategoryFieldDO> list = fieldService.getFieldListByCategoryId(categoryId);
@@ -75,7 +75,7 @@ public class EamCategoryFieldController {
     @GetMapping("/effective-list")
     @Operation(summary = "获得分类生效的字段列表（含继承）", description = "资产表单按此列表渲染动态字段")
     @Parameter(name = "categoryId", description = "分类编号", required = true, example = "1")
-    @PreAuthorize("@ss.hasPermission('eam:category-field:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:category-field:query', 'eam:asset:query', 'eam:asset:query-self', 'eam:asset:query-dept', 'eam:manage-all')")
     public CommonResult<List<EamCategoryFieldRespVO>> getEffectiveFieldList(
             @RequestParam("categoryId") Long categoryId) {
         List<EamCategoryFieldDO> list = fieldService.getEffectiveFieldList(categoryId);

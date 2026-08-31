@@ -20,6 +20,14 @@
     </el-alert>
   </ContentWrap>
 
+  <ZsjosAdvancedFilter
+    scene="registration"
+    placeholder="订单号 / 学员姓名 / 手机号 / 客资编号"
+    :keyword="query.keyword || ''"
+    @search="(value) => { query.keyword = value; handleQuery() }"
+    @change="(value) => { query.advancedFilter = value; handleQuery() }"
+  />
+
   <ContentWrap>
     <el-table v-loading="loading" :data="list" row-key="id" stripe>
       <el-table-column label="订单编号" prop="orderNo" min-width="190" fixed="left" />
@@ -205,6 +213,7 @@
 import * as RegistrationApi from '@/api/zsjos/registration'
 import { useUserStore } from '@/store/modules/user'
 import { useMessage } from '@/hooks/web/useMessage'
+import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosRegistrationPool' })
 
@@ -214,7 +223,7 @@ const loading = ref(false)
 const error = ref('')
 const list = ref<RegistrationApi.RegistrationCase[]>([])
 const total = ref(0)
-const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined })
+const query = reactive({ pageNo: 1, pageSize: 10, status: undefined as string | undefined, keyword: '', advancedFilter: undefined as any })
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -263,6 +272,8 @@ const handleQuery = () => {
 const resetQuery = () => {
   query.pageNo = 1
   query.status = undefined
+  query.keyword = ''
+  query.advancedFilter = undefined
   void load()
 }
 const openDetail = async (id: number) => {
@@ -381,7 +392,6 @@ const changeRouteAssignee = async (
 }
 const uploadAttachment = async (item: RegistrationApi.RegistrationChecklistItem, file: File) => {
   if (!detail.value) return
-  if (file.size > 20 * 1024 * 1024) return message.error('单个附件不能超过 20 MB')
   savingItemId.value = item.id
   try {
     await RegistrationApi.uploadRegistrationAttachment(

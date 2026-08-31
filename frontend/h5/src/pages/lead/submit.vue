@@ -341,7 +341,7 @@ const categoryLabel = computed(() => leadCategories.value.find(c => c.value === 
             autosize
           />
           <div class="field-label">图片附件</div>
-          <p class="field-desc">可选，最多 9 张，JPG/PNG/WebP，单张不超过 10MB</p>
+          <p class="field-desc">可选，最多 9 张，JPG/PNG/WebP</p>
           <ImageUploader ref="uploaderRef" :max-count="9" />
         </div>
 

@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.eam.service.asset.EamAssetChangeLogService;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetLedgerImportService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
+import cn.iocoder.yudao.module.eam.service.publicedit.EamPublicEditService;
 import cn.iocoder.yudao.module.eam.util.EamQrCodeUtil;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
@@ -51,6 +52,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Set;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -80,17 +82,19 @@ public class EamAssetController {
     private HrmEmployeeApi employeeApi;
     @Resource
     private DeptApi deptApi;
+    @Resource
+    private EamPublicEditService publicEditService;
 
     @PostMapping("/create")
     @Operation(summary = "创建资产")
-    @PreAuthorize("@ss.hasPermission('eam:asset:create')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:asset:create', 'eam:manage-all')")
     public CommonResult<Long> createAsset(@Valid @RequestBody EamAssetSaveReqVO reqVO) {
         return success(assetService.createAsset(reqVO));
     }
 
     @PutMapping("/update")
     @Operation(summary = "更新资产")
-    @PreAuthorize("@ss.hasPermission('eam:asset:update')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:asset:update', 'eam:manage-all')")
     public CommonResult<Boolean> updateAsset(@Valid @RequestBody EamAssetSaveReqVO reqVO) {
         assetService.updateAsset(reqVO);
         return success(true);
@@ -99,7 +103,7 @@ public class EamAssetController {
     @DeleteMapping("/delete")
     @Operation(summary = "删除资产")
     @Parameter(name = "id", description = "资产编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('eam:asset:delete')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:asset:delete', 'eam:manage-all')")
     public CommonResult<Boolean> deleteAsset(@RequestParam("id") Long id) {
         assetService.deleteAsset(id);
         return success(true);
@@ -108,9 +112,10 @@ public class EamAssetController {
     @GetMapping("/get")
     @Operation(summary = "获得资产")
     @Parameter(name = "id", description = "资产编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('eam:asset:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:asset:query', 'eam:asset:query-self', 'eam:asset:query-dept', 'eam:manage-all')")
     public CommonResult<EamAssetRespVO> getAsset(@RequestParam("id") Long id) {
-        EamAssetDO asset = assetService.getAsset(id);
+        EamAssetDO asset = assetService.getAsset(id,
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId());
         if (asset == null) {
             return success(null);
         }
@@ -119,9 +124,10 @@ public class EamAssetController {
 
     @GetMapping("/page")
     @Operation(summary = "获得资产分页")
-    @PreAuthorize("@ss.hasPermission('eam:asset:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:asset:query', 'eam:asset:query-self', 'eam:asset:query-dept', 'eam:manage-all')")
     public CommonResult<PageResult<EamAssetRespVO>> getAssetPage(@Valid EamAssetPageReqVO reqVO) {
-        PageResult<EamAssetDO> pageResult = assetService.getAssetPage(reqVO);
+        PageResult<EamAssetDO> pageResult = assetService.getAssetPage(reqVO,
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId());
         return success(new PageResult<>(buildAssetVOList(pageResult.getList()), pageResult.getTotal()));
     }
 
@@ -150,48 +156,20 @@ public class EamAssetController {
     public void exportAssetExcel(@Valid EamAssetPageReqVO reqVO, HttpServletResponse response)
             throws IOException {
         reqVO.setPageSize(PageParam.PAGE_SIZE_NONE);
-        List<EamAssetDO> list = assetService.getAssetPage(reqVO).getList();
+        List<EamAssetDO> list = assetService.getAssetPage(reqVO,
+                cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId()).getList();
         ExcelUtils.write(response, "资产台账.xlsx", "资产列表",
                 EamAssetRespVO.class, buildAssetVOList(list));
     }
 
     @GetMapping("/qrcode")
-    @Operation(summary = "生成资产二维码", description = "返回 PNG 图片流，内容为资产公开业务快照")
+    @Operation(summary = "生成资产二维码", description = "返回 PNG 图片流，内容为统一公开页面地址和资产编号")
     @Parameter(name = "id", description = "资产编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('eam:asset:qrcode')")
     public ResponseEntity<byte[]> getAssetQrCode(@RequestParam("id") Long id,
                                                  @RequestParam(value = "size", required = false) Integer size) {
-        EamAssetDO asset = assetService.getAsset(id);
-        if (asset == null) {
-            throw exception(ASSET_NOT_EXISTS);
-        }
-        EamAssetRespVO vo = buildAssetVOList(List.of(asset)).get(0);
-        // 二维码直接携带公开业务快照，排除内部主键、部门/员工 ID 等技术字段。
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("资产编号", vo.getAssetCode());
-        snapshot.put("资产名称", vo.getName());
-        snapshot.put("分类", vo.getCategoryName());
-        snapshot.put("管理模式", vo.getManagementMode());
-        snapshot.put("数量", vo.getQuantity());
-        snapshot.put("单位", vo.getUnit());
-        snapshot.put("状态", vo.getStatus());
-        snapshot.put("品牌", vo.getBrand());
-        snapshot.put("规格", vo.getSpecification());
-        snapshot.put("序列号", vo.getSn());
-        snapshot.put("条码", vo.getBarcode());
-        snapshot.put("原值", vo.getOriginalValue());
-        snapshot.put("净值", vo.getNetValue());
-        snapshot.put("购入日期", vo.getPurchaseDate());
-        snapshot.put("资产来源", vo.getSourceLabelSnapshot());
-        snapshot.put("保修到期日", vo.getWarrantyDate());
-        snapshot.put("使用部门", vo.getUseDeptName());
-        snapshot.put("使用人", vo.getUseEmployeeName());
-        snapshot.put("存放地点", vo.getLocation());
-        snapshot.put("预计使用年限(月)", vo.getExpectedLife());
-        snapshot.put("备注", vo.getRemark());
-        snapshot.put("扩展字段", vo.getExtFieldLabels() == null || vo.getExtFieldLabels().isEmpty()
-                ? vo.getExtFields() : vo.getExtFieldLabels());
-        byte[] png = EamQrCodeUtil.generatePng(JsonUtils.toJsonString(snapshot), size);
+        EamAssetDO asset = assetService.validateAssetExists(id);
+        byte[] png = EamQrCodeUtil.generatePng(publicEditService.buildUrl(asset.getAssetCode()), size);
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")
@@ -242,11 +220,12 @@ public class EamAssetController {
         }
         Map<Long, String> categoryNameMap = categoryService.getCategoryList().stream()
                 .collect(Collectors.toMap(EamCategoryDO::getId, EamCategoryDO::getName, (a, b) -> a));
-        Map<Long, HrmEmployeeRespDTO> employeeMap = employeeApi.getEmployeeList(
-                        convertSet(list, EamAssetDO::getUseEmployeeId)).stream()
+        Set<Long> employeeIds = convertSet(list, EamAssetDO::getUseEmployeeId);
+        Map<Long, HrmEmployeeRespDTO> employeeMap = employeeIds.isEmpty() ? Map.of() : employeeApi.getEmployeeList(
+                        employeeIds).stream()
                 .collect(Collectors.toMap(HrmEmployeeRespDTO::getId, item -> item, (a, b) -> a));
-        Map<Long, DeptRespDTO> deptMap =
-                deptApi.getDeptMap(convertSet(list, EamAssetDO::getUseDeptId));
+        Set<Long> deptIds = convertSet(list, EamAssetDO::getUseDeptId);
+        Map<Long, DeptRespDTO> deptMap = deptIds.isEmpty() ? Map.of() : deptApi.getDeptMap(deptIds);
 
         result.forEach(vo -> {
             vo.setCategoryName(categoryNameMap.get(vo.getCategoryId()));

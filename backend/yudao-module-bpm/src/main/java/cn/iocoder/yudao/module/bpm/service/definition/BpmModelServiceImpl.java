@@ -66,6 +66,8 @@ public class BpmModelServiceImpl implements BpmModelService {
     private BpmProcessDefinitionService processDefinitionService;
     @Resource
     private BpmFormService bpmFormService;
+    @Resource
+    private BpmCategoryService categoryService;
 
     @Resource
     private BpmTaskCandidateInvoker taskCandidateInvoker;
@@ -124,7 +126,7 @@ public class BpmModelServiceImpl implements BpmModelService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public String importModel(@Valid BpmModelSaveReqVO reqVO) {
+    public String importModel(Long userId, @Valid BpmModelSaveReqVO reqVO) {
         if (!ValidationUtils.isXmlNCName(reqVO.getKey())) {
             throw exception(MODEL_KEY_VALID);
         }
@@ -133,14 +135,20 @@ public class BpmModelServiceImpl implements BpmModelService {
         if (keyModel != null) {
             throw exception(MODEL_KEY_EXISTS, reqVO.getKey());
         }
+        if (StrUtil.isNotEmpty(reqVO.getCategory())
+                && CollUtil.isEmpty(categoryService.getCategoryListByCode(Collections.singleton(reqVO.getCategory())))) {
+            throw exception(CATEGORY_NOT_EXISTS);
+        }
 
-        // 2. 创建 Model 对象，并归属到当前租户
+        // 2. 导入文件不能携带跨环境的管理员关系，模型由当前导入人负责管理
+        reqVO.setManagerUserIds(List.of(userId));
+        // 3. 创建 Model 对象，并归属到当前租户
         reqVO.setSort(System.currentTimeMillis());
         Model model = repositoryService.newModel();
         BpmModelConvert.INSTANCE.copyToModel(model, reqVO);
         model.setTenantId(FlowableUtils.getTenantId());
 
-        // 3. 保存模型
+        // 4. 保存模型
         saveModel(model, reqVO);
         return model.getId();
     }

@@ -1,6 +1,5 @@
 import type { StudentContactFormField } from './api'
 
-export const POSITIONING_JSON_MAX_BYTES = 1024 * 1024
 
 export type PositioningJsonImportItem = {
   key: string
@@ -22,8 +21,6 @@ export type PositioningJsonImportContext = {
   dictionaryValues: Record<string, string[]>
   areaCodes?: number[]
 }
-
-const byteLength = (text: string) => new TextEncoder().encode(text).byteLength
 
 const validDate = (value: string) => {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
@@ -105,7 +102,6 @@ export const parsePositioningJson = (
   text: string,
   context: PositioningJsonImportContext,
 ): PositioningJsonImportPreview => {
-  if (byteLength(text) > POSITIONING_JSON_MAX_BYTES) throw new Error('JSON 内容不能超过 1 MiB')
   let parsed: unknown
   try {
     parsed = JSON.parse(text)

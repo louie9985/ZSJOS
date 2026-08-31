@@ -183,13 +183,26 @@ wx: # 参见 https://github.com/Wechat-Group/WxJava/blob/develop/spring-boot-sta
 --- #################### 芋道相关配置 ####################
 
 # 芋道配置项，设置当前项目所有自定义的配置
-yudao:
-  pay:
-    order-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
-    refund-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址
-    transfer-notify-url: https://yunai.natapp1.cc/admin-api/pay/notify/transfer # 支付渠道的【转账】回调地址
-  demo: false # 开启演示模式
-  tencent-lbs-key: TVDBZ-TDILD-4ON4B-PFDZA-RNLKH-VVF6E # QQ 地图的密钥 https://lbs.qq.com/service/staticV2/staticGuide/staticDoc
+yudao.sms-code.expire-times: 10m
+yudao.sms-code.send-frequency: 1m
+yudao.sms-code.send-maximum-quantity-per-day: 10
+yudao.sms-code.begin-code: 9999
+yudao.sms-code.end-code: 9999
+yudao.codegen.base-package: cn.iocoder.yudao
+yudao.codegen.db-schemas: ${spring.datasource.dynamic.datasource.master.name}
+yudao.codegen.front-type: 20
+yudao.codegen.vo-type: 10
+yudao.codegen.delete-batch-enable: true
+yudao.codegen.unit-test-enable: false
+yudao.codegen.import-enable: false
+yudao.websocket.enable: true
+yudao.websocket.path: /infra/ws
+yudao.websocket.sender-type: local
+yudao.pay.order-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/order
+yudao.pay.refund-notify-url: http://yunai.natapp1.cc/admin-api/pay/notify/refund
+yudao.pay.transfer-notify-url: https://yunai.natapp1.cc/admin-api/pay/notify/transfer
+yudao.demo: false
+yudao.tencent-lbs-key: TVDBZ-TDILD-4ON4B-PFDZA-RNLKH-VVF6E
 
 justauth:
   enabled: true

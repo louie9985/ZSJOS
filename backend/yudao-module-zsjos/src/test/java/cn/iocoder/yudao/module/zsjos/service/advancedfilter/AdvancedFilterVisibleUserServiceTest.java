@@ -83,12 +83,15 @@ class AdvancedFilterVisibleUserServiceTest {
     }
 
     @Test
-    void unsupportedSceneDoesNotResolveAnyPersonnel() {
+    void orderSceneUsesTheSameAuthorizedEmployeeScope() {
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(false);
+        when(leadObjectPermissionService.getRelatedAndManagedUserIds(7L)).thenReturn(Set.of(7L));
+        when(adminUserApi.getUserList(Set.of(7L))).thenReturn(List.of(user(7L, "钱七", 0)));
+
         var result = service.resolve("order", 7L);
 
-        assertFalse(result.supported());
-        assertTrue(result.options().isEmpty());
-        verifyNoInteractions(leadObjectPermissionService, serviceRelationMapper, adminUserApi);
+        assertTrue(result.supported());
+        assertEquals(List.of("7"), result.options().stream().map(option -> option.value()).toList());
     }
 
     private static AdminUserRespDTO user(Long id, String nickname, Integer status) {

@@ -1,6 +1,6 @@
 # EAM database module
 
-Execution order is `V001` through `V008`. `V007` adds lightweight office procurement,
+Execution order is `V001` through `V011`. `V007` adds lightweight office procurement,
 company-wide inventory, employee holdings, lifecycle tasks, and their menu permissions.
 `V008` makes HRM `employee_id` the only EAM ownership key. Historical System user IDs
 in ownership columns are discarded rather than reinterpreted as employee IDs; development
@@ -28,6 +28,18 @@ The BPM definitions `eam_asset_demand`, `eam_office_purchase`,
 `eam_purchase_expense`, and `eam_employee_asset_review` must be deployed through the BPM
 module. Approval users, countersigning, rejection, cancellation, copying, and history are
 owned by BPM, not by EAM tables.
+
+V010 adds immutable transfer snapshots, return/loan-return inspection fields, optimistic locking,
+and the transfer cancel/inspect/workbench permissions. New receive, borrow and allocation records
+start versioned SIMPLE BPM key `eam_asset_transfer`; its `process-model.json` is imported through
+the BPM model administration page. Return and give-back records wait for administrator
+inspection. Existing transfer rows are not rewritten, and legacy `eam-transfer` instances remain
+readable until they finish.
+
+V011 adds `eam:asset:query-self`, `eam:asset:query-dept`,
+`eam:transfer:query-self`, `eam:transfer:query-dept`, and explicit
+`eam:manage-all`. Department visibility includes the current department and all child
+departments; full management is controlled only by the explicit permission.
 
 Rollback is schema-retaining once business rows exist. Disable the added menus and stop
 the EAM jobs if runtime rollback is required; do not drop populated tables.

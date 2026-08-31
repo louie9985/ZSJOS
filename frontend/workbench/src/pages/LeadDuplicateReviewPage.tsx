@@ -29,7 +29,34 @@ const legacyResultLabels: Record<string, string> = {
   reactivate_lead: '旧记录：激活客资',
   notify_owner: '旧记录：提醒所属销售'
 }
+const duplicateFlagLabels: Record<string, string> = {
+  none: '未发现重复', strong_duplicate: '强重复', suspected_duplicate: '疑似重复'
+}
 const resultLabel = (value?: string) => value ? (labels[value as ResultType] ?? legacyResultLabels[value] ?? value) : value
+
+type DuplicateReviewSnapshot = {
+  submission: Record<string, unknown>
+  rules: unknown[]
+  candidates: unknown[]
+}
+
+function parseReviewSnapshot(item: LeadDuplicateReview): DuplicateReviewSnapshot | undefined {
+  try {
+    const submission = JSON.parse(item.submissionSnapshot)
+    const rules = JSON.parse(item.matchRules)
+    const candidates = JSON.parse(item.candidateSnapshot)
+    return {
+      submission: submission && typeof submission === 'object' && !Array.isArray(submission) ? submission : {},
+      rules: Array.isArray(rules) ? rules : [],
+      candidates: Array.isArray(candidates) ? candidates : []
+    }
+  } catch { return undefined }
+}
+
+function snapshotValue(snapshot: DuplicateReviewSnapshot | undefined, keys: string[]) {
+  const value = keys.map(key => snapshot?.submission[key]).find(item => typeof item === 'string' && item.trim())
+  return typeof value === 'string' ? value : '-'
+}
 
 export default function LeadDuplicateReviewPage({ permissions }: { permissions: string[] }) {
   const [status, setStatus] = useState<'pending' | 'completed'>('pending')
@@ -46,6 +73,10 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   const [files, setFiles] = useState<DeferredUploadItem<LeadAttachment>[]>([])
   const canProcess = permissions.includes('zsjos:lead-duplicate-review:process')
   const { useTableLayout } = useInboxTableLayout()
+  const reviewSnapshots = useMemo(
+    () => new Map(items.map(item => [item.id, parseReviewSnapshot(item)])),
+    [items]
+  )
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -65,8 +96,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   const resultType = Form.useWatch('resultType', form)
   const parsed = useMemo(() => {
     if (!selected) return undefined
-    try { return { submission: JSON.parse(selected.submissionSnapshot), rules: JSON.parse(selected.matchRules), candidates: JSON.parse(selected.candidateSnapshot) } }
-    catch { return undefined }
+    return parseReviewSnapshot(selected)
   }, [selected])
   const processingCandidates = useMemo<DuplicateCandidate[]>(() => {
     if (!processing) return []
@@ -137,14 +167,22 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       loading={loading}
       dataSource={items}
       pagination={false}
-      scroll={{ x: 920 }}
+      scroll={{ x: 2600 }}
       locale={{ emptyText: <Empty description="暂无复核任务" /> }}
       columns={[
-        { title: '复核任务', render: (_, item) => `复核任务 #${item.id}`, width: 180 },
+        { title: '提交姓名', width: 140, render: (_, item) => snapshotValue(reviewSnapshots.get(item.id), ['submittedName', 'name', 'studentName']) },
+        { title: '手机号', width: 150, render: (_, item) => snapshotValue(reviewSnapshots.get(item.id), ['submittedMobile', 'mobile', 'studentMobile']) },
+        { title: '微信号', width: 150, render: (_, item) => snapshotValue(reviewSnapshots.get(item.id), ['submittedWechatId', 'wechatId', 'studentWechatId']) },
         { title: '状态', render: (_, item) => <Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag>, width: 110 },
+        { title: '重复标记', dataIndex: 'duplicateFlag', width: 140, render: value => value ? duplicateFlagLabels[String(value)] || value : '-' },
         { title: '结论', render: (_, item) => resultLabel(item.duplicateResult || item.resultType) || '-' },
+        { title: '主规则', dataIndex: 'primaryRuleCode', width: 180, ellipsis: true, render: value => value || '-' },
+        { title: '命中规则', width: 260, ellipsis: true, render: (_, item) => reviewSnapshots.get(item.id)?.rules.map(rule => typeof rule === 'string' ? rule : JSON.stringify(rule)).join('；') || '-' },
+        { title: '候选对象', width: 110, render: (_, item) => `${reviewSnapshots.get(item.id)?.candidates.length || 0} 个` },
+        { title: '复核意见', dataIndex: 'reviewOpinion', width: 260, ellipsis: true, render: value => value || '-' },
         { title: '创建时间', dataIndex: 'createTime', render: (_, item) => formatTimestamp(item.createTime), width: 170 },
-        { title: '操作', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => selectReview(item)}>详细</Button> }
+        { title: '复核时间', dataIndex: 'reviewedAt', render: (_, item) => formatTimestamp(item.reviewedAt), width: 170 },
+        { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => selectReview(item)}>详细</Button> }
       ]}
     /> : <div className="message-inbox-layout">
       <aside className="message-inbox-list-pane">

@@ -335,7 +335,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
           <Form.Item label="遇到的问题" required><Input.TextArea value={assistProblem} onChange={event => setAssistProblem(event.target.value)} rows={4} maxLength={1000} showCount placeholder="说明当前遇到的问题"/></Form.Item>
           <Form.Item label="希望协助方式" required><Input.TextArea value={assistExpected} onChange={event => setAssistExpected(event.target.value)} rows={4} maxLength={1000} showCount placeholder="说明希望提交人如何协助"/></Form.Item>
           <Form.Item label="备注"><Input.TextArea value={assistRemark} onChange={event => setAssistRemark(event.target.value)} rows={3} maxLength={2000} showCount placeholder="补充说明（选填）"/></Form.Item>
-          <Form.Item label="附件"><DeferredAttachmentPicker value={assistAttachments} onChange={setAssistAttachments} accept="image/jpeg,image/png,image/webp" maxCount={9} maxSize={10 * 1024 * 1024} disabled={assistSaving}/></Form.Item>
+          <Form.Item label="附件"><DeferredAttachmentPicker value={assistAttachments} onChange={setAssistAttachments} accept="image/jpeg,image/png,image/webp" maxCount={9} disabled={assistSaving}/></Form.Item>
         </Form>
       </Modal>
       <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined} open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)} onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>

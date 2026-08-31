@@ -73,7 +73,6 @@ const props = defineProps({
   modelValue: propTypes.string.def(''),
   drag: propTypes.bool.def(true), // 是否支持拖拽上传 ==> 非必传（默认为 true）
   disabled: propTypes.bool.def(false), // 是否禁用上传组件 ==> 非必传（默认为 false）
-  fileSize: propTypes.number.def(5), // 图片大小限制 ==> 非必传（默认为 5M）
   fileType: propTypes.array.def(['image/jpeg', 'image/png', 'image/gif']), // 图片类型限制 ==> 非必传（默认为 ["image/jpeg", "image/png", "image/gif"]）
   height: propTypes.string.def('150px'), // 组件高度 ==> 非必传（默认为 150px）
   width: propTypes.string.def('150px'), // 组件宽度 ==> 非必传（默认为 150px）
@@ -116,12 +115,10 @@ const editImg = () => {
 }
 
 const beforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
-  const imgSize = rawFile.size / 1024 / 1024 < props.fileSize
   const imgType = props.fileType
   if (!imgType.includes(rawFile.type as FileTypes))
     message.notifyWarning('上传图片不符合所需的格式！')
-  if (!imgSize) message.notifyWarning(`上传图片大小不能超过 ${props.fileSize}M！`)
-  return imgType.includes(rawFile.type as FileTypes) && imgSize
+  return imgType.includes(rawFile.type as FileTypes)
 }
 
 // 图片上传成功提示

@@ -23,6 +23,10 @@ public interface EamAssetChangeLogService {
      */
     void record(EamAssetDO before, EamAssetDO after, Integer changeType, Long bizId, String content);
 
+    /** 以明确的 System 用户记录匿名等无登录上下文场景的操作人。 */
+    void record(EamAssetDO before, EamAssetDO after, Integer changeType, Long bizId, String content,
+                Long operatorUserId);
+
     /**
      * 获得资产的变更时间线
      */

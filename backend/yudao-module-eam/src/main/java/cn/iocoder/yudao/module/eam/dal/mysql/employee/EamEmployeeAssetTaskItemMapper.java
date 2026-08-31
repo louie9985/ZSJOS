@@ -6,12 +6,21 @@ import cn.iocoder.yudao.module.eam.dal.dataobject.employee.EamEmployeeAssetTaskI
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
+import java.util.Collection;
 
 @Mapper
 public interface EamEmployeeAssetTaskItemMapper extends BaseMapperX<EamEmployeeAssetTaskItemDO> {
     default List<EamEmployeeAssetTaskItemDO> selectListByTaskId(Long taskId) {
         return selectList(new LambdaQueryWrapperX<EamEmployeeAssetTaskItemDO>()
                 .eq(EamEmployeeAssetTaskItemDO::getTaskId, taskId));
+    }
+
+    default List<EamEmployeeAssetTaskItemDO> selectListByTaskIds(Collection<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return List.of();
+        }
+        return selectList(new LambdaQueryWrapperX<EamEmployeeAssetTaskItemDO>()
+                .in(EamEmployeeAssetTaskItemDO::getTaskId, taskIds));
     }
 
     default List<EamEmployeeAssetTaskItemDO> selectListByHoldingId(Long holdingId) {

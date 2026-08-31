@@ -23,7 +23,7 @@
           <Icon class="upload-icon" icon="ep:upload-filled" />
           <div class="el-upload__text">将文件拖到此处，或<em>点击选择文件</em></div>
           <template #tip>
-            <div class="el-upload__tip">仅支持 xls、xlsx 格式，文件不能超过 2MB</div>
+            <div class="el-upload__tip">仅支持 xls、xlsx 格式</div>
           </template>
         </el-upload>
       </div>
@@ -132,10 +132,6 @@ async function submitImport() {
   const rawFile = fileList.value[0]?.raw
   if (!rawFile || !auxiliaryType.value) {
     message.warning('请选择需要导入的文件')
-    return
-  }
-  if (rawFile.size > 2 * 1024 * 1024) {
-    message.error('导入文件不能超过 2MB')
     return
   }
   formLoading.value = true

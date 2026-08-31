@@ -19,6 +19,24 @@ import java.util.Map;
 @Mapper
 public interface HrmEmployeeContractMapper extends BaseMapperX<HrmEmployeeContractDO> {
 
+    default List<Map<String, Object>> selectReminderCandidates(java.util.Collection<Integer> entryStatuses,
+                                                                Integer contractStatus,
+                                                                java.time.LocalDate targetDate) {
+        return selectMaps(new MPJLambdaWrapperX<HrmEmployeeContractDO>()
+                .selectAs(HrmEmployeeContractDO::getId, "contractId")
+                .selectAs(HrmEmployeeContractDO::getEmployeeId, "employeeId")
+                .selectAs(HrmEmployeeDO::getName, "employeeName")
+                .selectAs(HrmEmployeeDO::getDeptId, "deptId")
+                .innerJoin(HrmEmployeeDO.class, HrmEmployeeDO::getId, HrmEmployeeContractDO::getEmployeeId)
+                .eq(HrmEmployeeContractDO::getExpireRemind, true)
+                .eq(HrmEmployeeContractDO::getStatus, contractStatus)
+                .in(HrmEmployeeDO::getEntryStatus, entryStatuses)
+                .isNotNull(HrmEmployeeContractDO::getEndTime)
+                .apply("DATE(end_time) = {0}", targetDate)
+                .notExists("SELECT 1 FROM hrm_employee_contract newer WHERE newer.employee_id = hrm_employee_contract.employee_id AND newer.deleted = 0 AND newer.end_time > hrm_employee_contract.end_time")
+                .orderByAsc(HrmEmployeeDO::getName).orderByAsc(HrmEmployeeContractDO::getId));
+    }
+
     default List<HrmEmployeeContractDO> selectListByEmployeeId(Long employeeId) {
         return selectList(new LambdaQueryWrapperX<HrmEmployeeContractDO>()
                 .eq(HrmEmployeeContractDO::getEmployeeId, employeeId)

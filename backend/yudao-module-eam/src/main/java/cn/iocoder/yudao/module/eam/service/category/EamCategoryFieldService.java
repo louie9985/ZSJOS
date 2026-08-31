@@ -44,6 +44,11 @@ public interface EamCategoryFieldService {
      */
     NormalizedExtFields validateAndNormalizeExtFieldsWithSnapshots(Long categoryId, Map<String, Object> extFields);
 
+    NormalizedExtFields validateAndNormalizeExtFieldsWithSnapshots(Long categoryId, Map<String, Object> extFields,
+                                                                    Map<String, Object> previousValues,
+                                                                    Map<String, String> previousLabels,
+                                                                    Map<String, String> previousDictTypes);
+
     record NormalizedExtFields(Map<String, Object> values, Map<String, String> labels,
                                Map<String, String> dictTypes) {
     }

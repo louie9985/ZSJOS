@@ -474,7 +474,36 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         Map<Long, AdminUserRespDTO> users = getUserMap(List.of(lead));
         List<LeadIntendedProductDO> products = intendedProductMapper.selectListByLeadId(id);
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
-        return convert(lead, null, users, products, attachments, resolveAttachmentUrls(attachments), true);
+        LeadManagementRespVO result = convert(lead, null, users, products, attachments,
+                resolveAttachmentUrls(attachments), true);
+        // Partner accounts are a separate identity type from System users. Project their
+        // own-lead visibility/actions explicitly instead of passing a Partner account id
+        // through the ADMIN permission evaluator.
+        result.setVisibleTabs(List.of(DETAIL_TAB_OVERVIEW, DETAIL_TAB_FOLLOW_UPS,
+                DETAIL_TAB_APPEALS, DETAIL_TAB_COMPLAINTS, DETAIL_TAB_ORDERS,
+                DETAIL_TAB_FLOW_HISTORY));
+        result.setAvailableActions(resolvePartnerActions(lead, partnerId));
+        return result;
+    }
+
+    private List<LeadManagementRespVO.ActionVO> resolvePartnerActions(LeadDO lead, Long partnerId) {
+        if (!PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())
+                || !Objects.equals(lead.getProviderOwnerId(), partnerId)
+                || lead.getStatus() == null) {
+            return List.of();
+        }
+        List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
+        if (STATUS_INVALID.equals(lead.getStatus())) {
+            actions.add(new LeadManagementRespVO.ActionVO("CREATE_APPEAL", true));
+            return actions;
+        }
+        if (Set.of(STATUS_CLOSED, STATUS_WON).contains(lead.getStatus())) return actions;
+        actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_SUPPLEMENT, true));
+        if (lead.getOwnerUserId() != null) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_URGE, true));
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_SUBMITTER_COMPLAINT, true));
+        }
+        return actions;
     }
 
     private boolean isBlindIdentity(LeadDO lead, Long currentUserId) {

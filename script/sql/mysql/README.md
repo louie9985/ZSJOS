@@ -27,6 +27,29 @@ drop a database, delete rows, or seed products, SKUs, leads, orders, uploads,
 or business dictionary options. The admin password is stored as a BCrypt hash;
 the plaintext password is intentionally not documented here.
 
+## Production fresh-bootstrap seed policy
+
+The production fresh baseline intentionally includes the current System tenant,
+department and post tree, System roles, menus, button permissions, tenant-package
+menu coverage, the initial administrator, all repository dictionary types/data,
+ZSJOS runtime defaults, notification templates/default rules, and the EAM
+classification tree, category fields and global asset-code rule. Existing role
+menu grants are imported; employee accounts other than the initial administrator
+are not.
+
+For this production baseline set `ZSJOS_DB_MODULES=core,eam`. EAM is installed after Core (`schema/eam.sql`, then `migrations/eam/V001` through
+the latest available version). EAM asset instances, procurement, inventory,
+transfers, repairs, scrap, holdings, reminders and employee tasks remain empty.
+ZSJOS Person/Lead/Partner/student-service, order/payment/refund, media/content,
+feedback and generic-work-order instances also remain empty. BPM definitions are
+deployed separately from the reviewed `script/bpm/manifest.json` assets; BPM
+instances, tasks and history are never seeded by SQL.
+
+Runtime logs, audit rows, notification messages and Outbox rows remain empty;
+number counters are created but start on first real business use. Environment
+secrets and endpoints (storage, OAuth, WeCom, SMS, payment and domains) are
+provided through deployment configuration, never this repository's SQL.
+
 For an existing environment, apply files in `migrations/` in version order,
 after a backup and a read-only structure check. Do not re-run historical files
 from `script/sql/` against an already migrated database.

@@ -158,3 +158,9 @@ export const getQrCodeUrl = (id: number, size = 300) => {
 export const downloadQrCode = async (id: number, size = 300) => {
   return await request.download({ url: '/eam/asset/qrcode', params: { id, size } })
 }
+
+export interface PublicEditCodeVO { employeeId: number; code: string }
+export const getMyPublicEditCode = async () => request.get<PublicEditCodeVO>({ url: '/eam/public-edit-code/me' })
+export const generateMyPublicEditCode = async () => request.post<PublicEditCodeVO>({ url: '/eam/public-edit-code/generate' })
+export const updateMyPublicEditCode = async (code: string) => request.put<PublicEditCodeVO>({ url: '/eam/public-edit-code/me', data: { code } })
+export const resetPublicEditCode = async (userId: number) => request.put<PublicEditCodeVO>({ url: '/eam/public-edit-code/reset/' + userId })

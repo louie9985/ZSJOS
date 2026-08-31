@@ -43,7 +43,10 @@ const submit = async () => {
     endpoint="/zsjos/lead-duplicate-review/page"
     description="重复客资复核队列"
     :query="{ status: 'pending' }"
-    ><template #row-actions="{ row, reload }"
+    advanced-scene="duplicate_review"
+    advanced-search-endpoint="/zsjos/lead-duplicate-review/search-page"
+    advanced-placeholder="客资编号 / 姓名 / 手机号"
+  ><template #row-actions="{ row, reload }"
       ><el-button
         link
         type="primary"

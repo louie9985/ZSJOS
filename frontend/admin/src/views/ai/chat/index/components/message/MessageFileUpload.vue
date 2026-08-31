@@ -108,10 +108,6 @@ const props = defineProps({
     type: Number,
     default: 5
   },
-  maxSize: {
-    type: Number,
-    default: 10 // MB
-  },
   acceptTypes: {
     type: String,
     default: '.jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.txt,.xls,.xlsx,.ppt,.pptx,.csv,.md'
@@ -182,10 +178,6 @@ const handleFileSelect = (event: Event) => {
   }
   // 处理每个文件
   files.forEach((file) => {
-    if (file.size > props.maxSize * 1024 * 1024) {
-      message.error(`文件 ${file.name} 大小超过 ${props.maxSize}MB`)
-      return
-    }
     const fileItem: FileItem = {
       name: file.name,
       size: file.size,

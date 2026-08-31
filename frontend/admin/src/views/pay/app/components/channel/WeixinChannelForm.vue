@@ -327,11 +327,7 @@ const fileBeforeUpload = (file, fileAccept) => {
     message.error('请上传指定格式"' + fileAccept + '"文件')
     return false
   }
-  let isRightSize = file.size / 1024 / 1024 < 2
-  if (!isRightSize) {
-    message.error('文件大小超过 2MB')
-  }
-  return isRightSize
+  return true
 }
 
 const p12FileBeforeUpload = (file) => {

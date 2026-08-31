@@ -2,7 +2,7 @@
   <Dialog v-model="dialogVisible" title="导入流程模型" width="640">
     <el-alert
       class="mb-15px"
-      description="导入会完整保留流程配置，并将新模型归属到当前租户。请确认人员、部门、表单、子流程等关联在当前租户有效后再发布。"
+      description="导入会保留流程配置，将新模型归属到当前租户，并以当前导入人作为模型管理员。请确认人员、部门、表单、子流程等关联在当前租户有效后再发布。"
       show-icon
       title="导入说明"
       type="info"
@@ -28,6 +28,16 @@
       <el-form-item label="流程名称" prop="name" :rules="formRules.name">
         <el-input v-model="formData.name" placeholder="请输入流程名称" />
       </el-form-item>
+      <el-form-item label="流程分类" prop="category" :rules="formRules.category">
+        <el-select v-model="formData.category" class="w-full" placeholder="请选择流程分类" clearable>
+          <el-option
+            v-for="category in categoryList"
+            :key="category.code"
+            :label="category.name"
+            :value="category.code"
+          />
+        </el-select>
+      </el-form-item>
     </el-form>
     <template #footer>
       <el-button :disabled="formLoading" type="primary" @click="submitForm">确 定</el-button>
@@ -40,6 +50,7 @@
 import type { FormInstance, FormRules, UploadFile, UploadUserFile } from 'element-plus'
 
 import * as ModelApi from '@/api/bpm/model'
+import { CategoryApi, type CategoryVO } from '@/api/bpm/category'
 
 defineOptions({ name: 'BpmModelImportForm' })
 
@@ -50,15 +61,18 @@ const formLoading = ref(false)
 const file = ref<File>()
 const fileList = ref<UploadUserFile[]>([])
 const formRef = ref<FormInstance>()
-const formData = reactive({ key: '', name: '' })
+const formData = reactive({ key: '', name: '', category: '' })
+const categoryList = ref<CategoryVO[]>([])
 const formRules: FormRules = {
   key: [{ required: true, message: '请输入流程标识' }],
-  name: [{ required: true, message: '请输入流程名称' }]
+  name: [{ required: true, message: '请输入流程名称' }],
+  category: [{ required: true, message: '请选择流程分类' }]
 }
 
 const open = () => {
   dialogVisible.value = true
   resetForm()
+  loadCategories()
 }
 defineExpose({ open })
 
@@ -74,6 +88,7 @@ const handleChange = async (uploadFile: UploadFile) => {
     file.value = uploadFile.raw
     formData.key = data.key || ''
     formData.name = data.name || ''
+    formData.category = data.category || ''
   } catch {
     resetFile()
     message.error('JSON 文件格式不正确')
@@ -85,7 +100,7 @@ const submitForm = async () => {
   await formRef.value?.validate()
   formLoading.value = true
   try {
-    await ModelApi.importModel(file.value, formData.key, formData.name)
+    await ModelApi.importModel(file.value, formData.key, formData.name, formData.category)
     message.success('导入成功')
     dialogVisible.value = false
     emit('success')
@@ -103,6 +118,11 @@ const resetForm = () => {
   resetFile()
   formData.key = ''
   formData.name = ''
+  formData.category = ''
   formRef.value?.clearValidate()
+}
+
+const loadCategories = async () => {
+  categoryList.value = await CategoryApi.getCategorySimpleList()
 }
 </script>

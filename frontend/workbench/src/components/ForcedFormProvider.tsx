@@ -442,7 +442,6 @@ function AttachmentField({ formId, field }: { formId: number; field: ForcedFormF
       rules={field.required ? [{ required: true, message: `请上传${field.label}` }] : undefined}
       extra={[
         field.maxCount ? `最多 ${field.maxCount} 个` : undefined,
-        field.maxSizeMb ? `单个不超过 ${field.maxSizeMb}MB` : undefined,
         field.allowedExtensions?.length ? `允许：${field.allowedExtensions.join('、')}` : undefined,
       ].filter(Boolean).join('；')}
     >

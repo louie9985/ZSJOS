@@ -172,7 +172,6 @@ import { useMessage } from '@/hooks/web/useMessage'
 import { getCurrentUserId } from '@/utils/auth'
 import { useMessageSender } from '@/views/im/home/composables/useMessageSender'
 import {
-  ensureMediaSizeWithinLimit,
   useMediaUploader
 } from '@/views/im/home/composables/useMediaUploader'
 import { useMuteOverlay } from '@/views/im/home/composables/useMuteOverlay'
@@ -1049,9 +1048,6 @@ async function probeVideoFile(file: File): Promise<VideoProbe> {
  * 4. 视频链路始终使用开始上传时捕获的会话发送
  */
 async function uploadAndSendVideo(file: File) {
-  if (!ensureMediaSizeWithinLimit(file, ImContentType.VIDEO, message.warning)) {
-    return
-  }
   const context = prepareMediaUpload()
   if (!context) {
     return

@@ -193,12 +193,12 @@ function BusinessTaskPanel({
     }
   }
 
-  const completeBirthdayCare = async (task: BusinessTask) => {
+  const completeEmployeeReminder = async (task: BusinessTask) => {
     try {
-      await api.completeBirthdayCare(task.id)
+      await api.completeEmployeeReminder(task.id)
       await refresh()
     } catch (taskError) {
-      setError(errorText(taskError, '生日关怀完成失败'))
+      setError(errorText(taskError, '员工提醒完成失败'))
     }
   }
 
@@ -275,8 +275,8 @@ function BusinessTaskPanel({
                   </div>
                   {task.actionCode && workPlanActions.has(task.actionCode) && view === 'pending' ? (
                     <Tag>已搁置</Tag>
-                  ) : task.actionCode === 'COMPLETE_BIRTHDAY_CARE' && view === 'pending' ? (
-                    <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成生日关怀" onClick={() => void completeBirthdayCare(task)} />
+                  ) : task.actionCode && ['COMPLETE_BIRTHDAY_CARE', 'COMPLETE_EMPLOYEE_CONTRACT_EXPIRY', 'COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY'].includes(task.actionCode) && view === 'pending' ? (
+                    <Button type="text" icon={<CheckCircleOutlined />} aria-label="完成员工提醒" onClick={() => void completeEmployeeReminder(task)} />
                   ) : task.actionable && view === 'pending' ? (
                     <Button type="text" icon={<RightOutlined />} aria-label="处理业务任务" onClick={() => open(task)} />
                   ) : null}

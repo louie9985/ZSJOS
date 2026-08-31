@@ -44,7 +44,7 @@
           <el-button type="primary">点击上传</el-button>
           <template #tip>
             <div class="el-upload__tip">
-              格式支持 mp3/wma/wav/amr，文件大小不超过 2M，播放长度不超过 60s
+              格式支持 mp3/wma/wav/amr，播放长度不超过 60s
             </div>
           </template>
         </el-upload>

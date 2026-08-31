@@ -17,6 +17,8 @@ public class EamAssetSaveReqVO {
     @Schema(description = "资产编号（更新时必填）", example = "1")
     private Long id;
 
+    private Integer version;
+
     @Schema(description = "资产业务编号；导入时可沿用已有资产标签", example = "ZSJ-001")
     private String assetCode;
 

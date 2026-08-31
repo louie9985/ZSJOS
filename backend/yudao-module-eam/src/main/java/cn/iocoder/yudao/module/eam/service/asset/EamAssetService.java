@@ -21,13 +21,19 @@ public interface EamAssetService {
 
     void updateAsset(@Valid EamAssetSaveReqVO reqVO);
 
+    void updateAsset(@Valid EamAssetSaveReqVO reqVO, Long operatorUserId);
+
+    void clearUsageAndSetIdle(Long assetId, Integer expectedVersion, Long operatorUserId);
+
     void deleteAsset(Long id);
 
     EamAssetDO getAsset(Long id);
+    EamAssetDO getAsset(Long id, Long userId);
 
     List<EamAssetDO> getAssetList(Collection<Long> ids);
 
     PageResult<EamAssetDO> getAssetPage(EamAssetPageReqVO reqVO);
+    PageResult<EamAssetDO> getAssetPage(EamAssetPageReqVO reqVO, Long userId);
 
     EamAssetDO validateAssetExists(Long id);
 

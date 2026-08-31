@@ -92,4 +92,14 @@ public class BusinessTaskCommandService {
         return taskMapper.completeBirthdayCare(taskId, userId, completedAt) > 0;
     }
 
+    public boolean completeEmployeeReminder(Long taskId, Long userId, LocalDateTime completedAt) {
+        BusinessTaskDO task = taskMapper.selectByIdForUpdate(taskId, TenantContextHolder.getRequiredTenantId());
+        if (task == null) throw exception(BUSINESS_TASK_NOT_EXISTS);
+        if (!java.util.Set.of("EMPLOYEE_BIRTHDAY_CARE", "EMPLOYEE_CONTRACT_EXPIRY", "EMPLOYEE_ENTRY_ANNIVERSARY").contains(task.getTaskType())
+                || !userId.equals(task.getAssigneeId())) throw exception(BUSINESS_TASK_COMPLETE_FORBIDDEN);
+        if ("completed".equals(task.getStatus())) return true;
+        if (!"pending".equals(task.getStatus())) throw exception(BUSINESS_TASK_COMPLETE_FORBIDDEN);
+        return taskMapper.completePending(task.getTaskType(), task.getBizId(), userId, completedAt) > 0;
+    }
+
 }

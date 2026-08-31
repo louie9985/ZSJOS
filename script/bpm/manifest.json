@@ -2,6 +2,20 @@
   "schemaVersion": 1,
   "assets": [
     {
+      "processKey": "eam_asset_transfer",
+      "assetVersion": "1.0.0",
+      "recommended": true,
+      "assetFormat": "simple",
+      "taskKeys": ["departmentLeaderReview", "sourceDepartmentReview", "targetDepartmentReview", "assetAdministratorReview", "receiverSign"],
+      "businessVariables": ["transferId", "transferType", "assetId", "assetCode", "fromEmployeeId", "fromDeptId", "toEmployeeId", "toDeptId", "expectedReturnDate", "isAllocate", "sameDepartment"],
+      "assigneeVariables": ["departmentLeaderUsers", "sourceDepartmentUsers", "targetDepartmentUsers", "assetAdministratorUsers", "receiverUsers"],
+      "runtimeOnlyVariables": ["transferId", "transferType", "assetId", "assetCode", "fromEmployeeId", "fromDeptId", "toEmployeeId", "toDeptId", "expectedReturnDate", "isAllocate", "sameDepartment"],
+      "businessKeyFormat": "asset-transfer:{transferId}:round:{roundNo}",
+      "minimumMigration": "EAM-V010",
+      "path": "eam_asset_transfer/1.0.0/process-model.json",
+      "sha256": "a12d0e51087c1ac4b4d2a6e789947bbeccc02c73da2a962fb26c9a300ad8ed44"
+    },
+    {
       "processKey": "zsjos_feedback_requirement_approval",
       "assetVersion": "1.0.0",
       "recommended": true,

@@ -80,6 +80,15 @@ function taskSummary(task?: BpmTask) {
     .filter(Boolean)
 }
 
+function formatDuration(duration?: number) {
+  if (duration == null) return '-'
+  const minutes = Math.max(0, Math.floor(duration / 60_000))
+  const days = Math.floor(minutes / 1440)
+  const hours = Math.floor((minutes % 1440) / 60)
+  const remainder = minutes % 60
+  return [days ? `${days} 天` : '', hours ? `${hours} 小时` : '', `${remainder} 分钟`].filter(Boolean).join(' ')
+}
+
 function BpmTaskDetail({
   task,
   view,
@@ -410,14 +419,23 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         loading={loading}
         dataSource={tasks}
         pagination={false}
-        scroll={{ x: 1000 }}
+        scroll={{ x: 2300 }}
         locale={{ emptyText: <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'} /> }}
         columns={[
           { title: '任务', render: (_, task) => taskSubject(task), width: 220 },
-          { title: '流程节点', dataIndex: 'name', render: value => value || '流程节点' },
-          { title: '发起人', render: (_, task) => task.processInstance?.startUser?.nickname || '-' },
-          { title: view === 'todo' ? '到达时间' : '完成时间', render: (_, task) => <DateTimeText value={view === 'todo' ? task.createTime : task.endTime} /> },
-          { title: '操作', width: 88, fixed: 'right', render: (_, task) => <Button type="link" onClick={() => selectTask(task)}>详细</Button> }
+          { title: '状态', dataIndex: 'status', width: 110, render: value => <Tag color={taskStatusColor(Number(value))}>{taskStatusLabel(Number(value))}</Tag> },
+          { title: '流程名称', width: 200, ellipsis: true, render: (_, task) => task.processInstance?.name || '-' },
+          { title: '流程节点', dataIndex: 'name', width: 160, ellipsis: true, render: value => value || '流程节点' },
+          { title: '流程摘要', width: 300, ellipsis: true, render: (_, task) => taskSummary(task).join('；') || '-' },
+          { title: '发起人', width: 130, render: (_, task) => task.processInstance?.startUser?.nickname || '-' },
+          { title: view === 'todo' ? '当前处理人' : '已处理人', width: 130, render: (_, task) => task.assigneeUser?.nickname || task.ownerUser?.nickname || '-' },
+          { title: '流程发起时间', width: 170, render: (_, task) => <DateTimeText value={task.processInstance?.createTime}/> },
+          { title: '任务到达时间', dataIndex: 'createTime', width: 170, render: value => <DateTimeText value={value as BpmTask['createTime']}/> },
+          { title: '任务完成时间', dataIndex: 'endTime', width: 170, render: value => <DateTimeText value={value as BpmTask['endTime']}/> },
+          { title: '处理耗时', dataIndex: 'durationInMillis', width: 150, render: value => formatDuration(value as number | undefined) },
+          { title: '表单名称', dataIndex: 'formName', width: 180, ellipsis: true, render: value => value || '-' },
+          { title: '审批意见', dataIndex: 'reason', width: 240, ellipsis: true, render: value => value || '-' },
+          { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, task) => <Button type="link" onClick={() => selectTask(task)}>详细</Button> }
         ]}
       /> : <div className="business-inbox-layout bpm-approval-layout">
         <aside className="business-inbox-list-pane">

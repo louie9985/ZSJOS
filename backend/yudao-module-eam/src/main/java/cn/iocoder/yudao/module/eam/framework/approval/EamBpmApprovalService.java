@@ -40,8 +40,13 @@ public class EamBpmApprovalService implements EamApprovalService {
 
     @Override
     public void terminate(String processInstanceId, String reason) {
+        terminate(processInstanceId, "HRM_EMPLOYEE_LIFECYCLE", reason);
+    }
+
+    @Override
+    public void terminate(String processInstanceId, String authorizationType, String reason) {
         processInstanceApi.terminateProcessInstanceByBusiness(SecurityFrameworkUtils.getLoginUserId(),
-                processInstanceId, "HRM_EMPLOYEE_LIFECYCLE", reason);
+                processInstanceId, authorizationType, reason);
     }
 
 }

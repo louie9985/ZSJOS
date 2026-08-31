@@ -48,7 +48,7 @@
             <Icon icon="ep:upload-filled" :size="28" />
             <div>拖拽文件到此处，或点击上传</div>
             <template #tip>
-              <div class="el-upload__tip">最多 10 个，单个不超过 20MB，支持图片、Office、PDF 和 ZIP</div>
+              <div class="el-upload__tip">最多 10 个，支持图片、Office、PDF 和 ZIP</div>
             </template>
           </el-upload>
           <div v-if="uploadTasks.length" class="notice-attachment-list">
@@ -190,7 +190,6 @@ const beforeUpload = (file: UploadRawFile) => {
   const extension = file.name.split('.').pop()?.toLowerCase() || ''
   if (formData.attachments.length + activeUploadCount.value >= 10) { message.error('公告附件不能超过 10 个'); return false }
   if (!allowedExtensions.includes(extension)) { message.error('不支持该文件格式'); return false }
-  if (file.size > 20 * 1024 * 1024) { message.error('单个附件不能超过 20MB'); return false }
   return true
 }
 

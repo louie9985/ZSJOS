@@ -3,9 +3,8 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { isAxiosError } from 'axios'
 import { showToast, showConfirmDialog, showImagePreview } from 'vant'
-import { getDictByType, getLeadAppeals, getLeadDetail, getPartnerLeadActivity, urgeLead, type LeadAppealItem, type LeadListItem, type LeadTimelineItem, type PartnerLeadActivity, type PartnerLeadActivityTone } from '@/api/lead'
+import { getLeadAppeals, getLeadDetail, getPartnerLeadActivity, urgeLead, type LeadAppealItem, type LeadListItem, type LeadTimelineItem, type PartnerLeadActivity, type PartnerLeadActivityTone } from '@/api/lead'
 import { formatAmount, formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
-import type { DictItem } from '@/stores/app'
 import type { ApiDateValue } from '@/utils/format'
 
 defineOptions({ name: 'LeadDetail' })
@@ -24,9 +23,6 @@ const activityError = ref('')
 const appeals = ref<LeadAppealItem[]>([])
 const appealsLoading = ref(false)
 const appealsError = ref('')
-const sourceChannelOptions = ref<DictItem[]>([])
-const sourceChannelLoading = ref(false)
-const sourceChannelError = ref('')
 
 async function loadLead() {
   loading.value = true
@@ -43,20 +39,7 @@ async function loadLead() {
   await Promise.all([loadActivity(), loadAppeals()])
 }
 
-async function loadSourceChannels() {
-  sourceChannelLoading.value = true
-  sourceChannelError.value = ''
-  try {
-    sourceChannelOptions.value = await getDictByType('zsjos_lead_source_channel')
-  } catch (cause) {
-    sourceChannelOptions.value = []
-    sourceChannelError.value = cause instanceof Error ? cause.message : '来源渠道加载失败'
-  } finally {
-    sourceChannelLoading.value = false
-  }
-}
-
-onMounted(() => { void loadLead(); void loadSourceChannels() })
+onMounted(() => { void loadLead() })
 
 const actions = computed(() => new Set(
   (lead.value?.availableActions || []).filter(action => action.enabled).map(action => action.code)
@@ -71,9 +54,7 @@ const detailProducts = computed(() => {
 })
 const canViewTab = (tab: string) => !lead.value?.visibleTabs?.length || lead.value.visibleTabs.includes(tab)
 const sourceChannelLabel = computed(() => {
-  const value = lead.value?.sourceChannel
-  if (!value) return '来源渠道未配置'
-  return sourceChannelOptions.value.find(item => item.value === value)?.label || '来源渠道未配置'
+  return lead.value?.sourceChannelLabelSnapshot || '历史未记录'
 })
 function timelineTimestamp(value: ApiDateValue): number {
   if (Array.isArray(value)) {
@@ -295,9 +276,7 @@ function goAppeal() {
             <van-cell title="来源类型" :value="lead.sourceLabel || '来源未配置'" />
             <van-cell title="来源渠道">
               <template #value>
-                <span v-if="sourceChannelLoading">加载中...</span>
-                <span v-else>{{ sourceChannelLabel }}</span>
-                <van-button v-if="sourceChannelError" size="mini" type="primary" plain @click="loadSourceChannels">重试</van-button>
+                <span>{{ sourceChannelLabel }}</span>
               </template>
             </van-cell>
             <van-cell title="客资分类" :value="lead.leadCategoryLabelSnapshot || lead.leadCategory" />
@@ -357,6 +336,14 @@ function goAppeal() {
           </div>
         </div>
 
+        <template v-if="activityLoading">
+          <div class="card"><van-skeleton :loading="true" :row="4" /></div>
+        </template>
+        <div v-else-if="activityError" class="card">
+          <van-empty image="error" :description="activityError" :image-size="64">
+            <van-button size="small" type="primary" @click="loadActivity">重新加载</van-button>
+          </van-empty>
+        </div>
         <template v-else-if="activity">
         <div v-if="canViewTab('follow-ups')" class="card">
           <div class="section-title">跟进记录</div>

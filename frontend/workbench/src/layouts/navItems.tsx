@@ -3,6 +3,8 @@ import type { MenuProps } from 'antd'
 import type { PrimaryNavigationItem, SecondaryNavigationItem } from '../services/menu'
 import type { WorkbenchMenu } from '../services/api'
 import BackendMenuIcon from './BackendMenuIcon'
+import { Badge } from 'antd'
+import type { MenuTaskBadgeResolver } from '../services/menuTaskBadge'
 
 type MenuItem = Required<MenuProps>['items'][number]
 
@@ -27,17 +29,20 @@ export function buildNavMenuItems(
     groupChildren?: boolean
     /** 透传给 SubMenu 弹层的 class，供浮层单独取样式 */
     popupClassName?: string
+    badgeResolver?: MenuTaskBadgeResolver
   } = {}
 ): MenuItem[] {
-  const { childIcons = true, expandSuffix, groupChildren = false, popupClassName } = options
+  const { childIcons = true, expandSuffix, groupChildren = false, popupClassName, badgeResolver } = options
+  const labelFor = (label: string, path: string) => { const badge = badgeResolver?.(path); return badge?.count ? <Badge count={badge.count} overflowCount={99} offset={[8, 0]}><span>{label}</span></Badge> : label }
   const buildChildren = (nodes: SecondaryNavigationItem[]): MenuItem[] => nodes.map(node => {
     const icon = childIcons ? <BackendMenuIcon icon={node.icon}/> : undefined
     if (node.children.length === 0) {
-      return { key: node.menu.path, label: node.label, title: node.label, ...(icon ? { icon } : {}) }
+      return { key: node.menu.path, label: labelFor(node.label, node.menu.path), title: node.label, ...(icon ? { icon } : {}) }
     }
+    const childCount = node.children.reduce((sum, child) => sum + (badgeResolver?.(child.menu.path)?.count ?? 0), 0)
     return {
       key: node.key,
-      label: node.label,
+      label: childCount ? <Badge count={childCount} overflowCount={99}><span>{node.label}</span></Badge> : node.label,
       title: node.label,
       ...(icon ? { icon } : {}),
       ...(popupClassName ? { popupClassName } : {}),
@@ -49,16 +54,17 @@ export function buildNavMenuItems(
     const icon = <BackendMenuIcon icon={primary.icon}/>
     // 自身即页面：叶子项，key 用 path
     if (primary.pages.length === 0) {
-      return { key: primary.menu.path, label: primary.label, title: primary.label, icon }
+      return { key: primary.menu.path, label: labelFor(primary.label, primary.menu.path), title: primary.label, icon }
     }
     const pages = buildChildren(primary.pages)
+    const primaryCount = primary.pages.reduce((sum, page) => sum + (badgeResolver?.(page.menu.path)?.count ?? 0), 0)
     const children = groupChildren
       ? [{ type: 'group' as const, key: `${primary.key}-group`, label: primary.label, children: pages }]
       : pages
     return {
       key: primary.key,
       // 展开标记只加在真有二级的项上
-      label: expandSuffix ? <span>{primary.label}{expandSuffix}</span> : primary.label,
+      label: expandSuffix ? <span>{primaryCount ? <Badge count={primaryCount} overflowCount={99}><span>{primary.label}</span></Badge> : primary.label}{expandSuffix}</span> : (primaryCount ? <Badge count={primaryCount} overflowCount={99}><span>{primary.label}</span></Badge> : primary.label),
       title: primary.label,
       icon,
       ...(popupClassName ? { popupClassName } : {}),
@@ -71,15 +77,17 @@ type HierarchicalMenuOptions = {
   childIcons?: boolean
   expandSuffix?: ReactNode
   popupClassName?: string
+  badgeResolver?: MenuTaskBadgeResolver
 }
 
 function buildHierarchicalItems(menus: WorkbenchMenu[], options: HierarchicalMenuOptions): MenuItem[] {
-  const { childIcons = true, expandSuffix, popupClassName } = options
+  const { childIcons = true, expandSuffix, popupClassName, badgeResolver } = options
   return menus.filter(menu => !menu.hidden).map(menu => {
     const children = buildHierarchicalItems(menu.children, options)
     const icon = childIcons ? <BackendMenuIcon icon={menu.icon}/> : undefined
     if (children.length === 0) {
-      return { key: menu.path, label: menu.name, title: menu.name, ...(icon ? { icon } : {}) }
+      const badge = badgeResolver?.(menu.path)
+      return { key: menu.path, label: badge?.count ? <Badge count={badge.count} overflowCount={99}><span>{menu.name}</span></Badge> : menu.name, title: menu.name, ...(icon ? { icon } : {}) }
     }
     return {
       key: menu.path,

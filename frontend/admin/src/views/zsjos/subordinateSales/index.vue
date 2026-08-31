@@ -3,6 +3,9 @@
     title="下属销售"
     endpoint="/zsjos/subordinate-sales/page"
     description="下属销售与业绩概览"
+    advanced-scene="subordinate_sales"
+    advanced-search-endpoint="/zsjos/subordinate-sales/search-page"
+    advanced-placeholder="姓名 / 账号 / 手机号"
   >
     <template #row-actions="{ row, reload }">
       <el-button link type="primary" @click="showLeads(row)">查看客资</el-button>

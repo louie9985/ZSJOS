@@ -12,8 +12,8 @@ spring:
   servlet:
     # 文件上传相关配置项
     multipart:
-      max-file-size: 16MB # 单个文件大小
-      max-request-size: 32MB # 设置总上传的文件大小
+      max-file-size: 1024MB # 单个文件大小
+      max-request-size: 2048MB # 设置总上传的文件大小
     encoding:
       enabled: true
       charset: UTF-8 # 必须设置 UTF-8，避免 WebFlux 流式返回（AI 场景）会乱码问题
@@ -314,6 +314,7 @@ yudao:
     permit-all_urls:
       - /admin-api/mp/open/** # 微信公众号开放平台，微信回调接口，不需要登录
       - /public-api/zsjos/media-screen/**
+      - /public-api/eam/asset/**
   media-screen:
     # Public media-screen access is fail-closed. Override these values in the runtime environment;
     # see docs/operations/media-screen-deployment.md. Never commit real tenant/IP allowlists here.
@@ -326,6 +327,15 @@ yudao:
       maintenance-ttl-seconds: 5
       refresh-interval-seconds: 5
       stale-if-error-seconds: 60
+
+eam:
+  public-asset:
+    # 二维码必须编码绝对 URL；未单独配置 EAM 地址时复用公开 H5 地址。
+    h5-base-url: ${EAM_PUBLIC_H5_BASE_URL:${ZSJOS_PUBLIC_H5_BASE_URL:http://192.168.2.17:10086}}
+    passcode-encryption-key: ${EAM_PUBLIC_PASSCODE_ENCRYPTION_KEY:}
+    rate-limit:
+      max-failures: 5
+      lock-minutes: 30
     limits:
       max-history-days: 366
     new-media:

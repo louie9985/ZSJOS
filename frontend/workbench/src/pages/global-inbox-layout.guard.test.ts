@@ -22,10 +22,13 @@ describe('global inbox layout mode', () => {
   it('keeps eligible inbox pages wired to the shared setting', () => {
     for (const page of pages) {
       const source = readFileSync(new URL(page, root), 'utf8')
+      const detailActionSource = ['MySalesOrderPage.tsx', 'SalesOrderApprovalPage.tsx'].includes(page)
+        ? `${source}\n${readFileSync(new URL('../components/SalesOrderTableColumns.tsx', root), 'utf8')}`
+        : source
       if (page !== 'MessageInboxPage.tsx') expect(source).toContain('useInboxTableLayout')
       expect(source).toContain('ProTable')
       expect(source).toContain('columnsState')
-      expect(source).toContain('详细')
+      expect(detailActionSource).toContain('详细')
     }
   })
 

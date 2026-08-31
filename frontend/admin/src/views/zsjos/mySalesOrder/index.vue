@@ -4,6 +4,9 @@
     :endpoint="isTeam ? '/zsjos/sales-order/team-page' : '/zsjos/sales-order/my-page'"
     :description="isTeam ? '当前部门及下属部门的成交订单' : '当前用户成交订单'"
     :query="queryParams"
+    advanced-scene="order"
+    :advanced-search-endpoint="isTeam ? '/zsjos/sales-order/team-search-page' : '/zsjos/sales-order/my-search-page'"
+    advanced-placeholder="订单号 / 学员姓名 / 手机号"
   >
     <template #actions="{ reload }">
       <el-input

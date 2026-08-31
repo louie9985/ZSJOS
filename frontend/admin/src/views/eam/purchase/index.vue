@@ -119,11 +119,19 @@ const load = async () => {
   error.value = ''
   stockError.value = ''
   try {
-    rows.value = await ProcurementApi.getPurchaseList()
-    try {
-      stocks.value = await ProcurementApi.getStockList()
-    } catch (e: any) {
+    const [purchaseResult, stockResult] = await Promise.allSettled([
+      ProcurementApi.getPurchaseList(),
+      ProcurementApi.getStockList()
+    ])
+    if (purchaseResult.status === 'rejected') {
+      throw purchaseResult.reason
+    }
+    rows.value = purchaseResult.value
+    if (stockResult.status === 'fulfilled') {
+      stocks.value = stockResult.value
+    } else {
       stocks.value = []
+      const e: any = stockResult.reason
       stockError.value = e?.msg || e?.message || '库存品项加载失败；批量物品退货暂不可用'
     }
   } catch (e: any) {

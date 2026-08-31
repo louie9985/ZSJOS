@@ -1,4 +1,5 @@
 import request from '@/config/axios'
+import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export interface RegistrationChecklistItem {
   id: number
@@ -90,8 +91,10 @@ export interface MyStudent {
 type VersionCommand = { version: number; idempotencyKey: string }
 
 export const getRegistrationPoolPage = (
-  params: PageParam & { status?: string; keyword?: string }
-) => request.get<PageResult<RegistrationCase[]>>({ url: '/zsjos/registration/pool-page', params })
+  params: PageParam & { status?: string; keyword?: string; advancedFilter?: AdvancedFilterGroup }
+) => params.advancedFilter
+  ? request.post<PageResult<RegistrationCase[]>>({ url: '/zsjos/registration/pool/search-page', data: params })
+  : request.get<PageResult<RegistrationCase[]>>({ url: '/zsjos/registration/pool-page', params })
 
 export const getRegistrationCase = (id: number) =>
   request.get<RegistrationCase>({ url: `/zsjos/registration/${id}` })
@@ -160,8 +163,10 @@ export const completeRegistration = (id: number, version: number) =>
     data: { version, idempotencyKey: crypto.randomUUID() } satisfies VersionCommand
   })
 
-export const getMyStudentPage = (params: PageParam & { keyword?: string }) =>
-  request.get<PageResult<MyStudent[]>>({ url: '/zsjos/student/my-page', params })
+export const getMyStudentPage = (params: PageParam & { keyword?: string; advancedFilter?: AdvancedFilterGroup }) =>
+  params.advancedFilter
+    ? request.post<PageResult<MyStudent[]>>({ url: '/zsjos/student/my/search-page', data: params })
+    : request.get<PageResult<MyStudent[]>>({ url: '/zsjos/student/my-page', params })
 
 export const getMyStudent = (personId: number) =>
   request.get<MyStudent>({ url: `/zsjos/student/my/${personId}` })

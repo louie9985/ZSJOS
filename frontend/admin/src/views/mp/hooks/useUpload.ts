@@ -8,7 +8,7 @@ enum UploadType {
   Video = 'video'
 }
 
-const useBeforeUpload = (type: UploadType, maxSizeMB: number) => {
+const useBeforeUpload = (type: UploadType, _maxSizeMB?: number) => {
   const fn = (rawFile: UploadRawFile): boolean => {
     let allowTypes: string[] = []
     let name = ''
@@ -16,17 +16,14 @@ const useBeforeUpload = (type: UploadType, maxSizeMB: number) => {
     switch (type) {
       case UploadType.Image:
         allowTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/bmp', 'image/jpg']
-        maxSizeMB = 2
         name = '图片'
         break
       case UploadType.Voice:
         allowTypes = ['audio/mp3', 'audio/mpeg', 'audio/wma', 'audio/wav', 'audio/amr']
-        maxSizeMB = 2
         name = '语音'
         break
       case UploadType.Video:
         allowTypes = ['video/mp4']
-        maxSizeMB = 10
         name = '视频'
         break
     }
@@ -35,12 +32,6 @@ const useBeforeUpload = (type: UploadType, maxSizeMB: number) => {
       message.error(`上传${name}格式不对!`)
       return false
     }
-    // 大小不正确
-    if (rawFile.size / 1024 / 1024 > maxSizeMB) {
-      message.error(`上传${name}大小不能超过${maxSizeMB}M!`)
-      return false
-    }
-
     return true
   }
 

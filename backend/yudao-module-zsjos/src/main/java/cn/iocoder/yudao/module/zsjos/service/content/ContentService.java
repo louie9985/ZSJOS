@@ -4,7 +4,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
-import cn.iocoder.yudao.module.system.api.dict.dto.DictDataRespDTO;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentSaveReqVO;

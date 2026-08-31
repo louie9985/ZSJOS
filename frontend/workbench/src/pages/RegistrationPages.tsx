@@ -295,8 +295,8 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
   };
   const uploadAttachment = async (item: NonNullable<RegistrationCase["items"]>[number], file: File) => {
     if (!selected) return;
-    if (file.size > 20 * 1024 * 1024 || !/\.(jpe?g|png|webp|pdf|docx?|xlsx?)$/i.test(file.name)) {
-      message.error("仅支持 JPG、PNG、WebP、PDF、Word、Excel，单个文件不超过 20 MB"); return;
+    if (!/\.(jpe?g|png|webp|pdf|docx?|xlsx?)$/i.test(file.name)) {
+      message.error("仅支持 JPG、PNG、WebP、PDF、Word、Excel"); return;
     }
     setAttachmentSavingIds((current) => new Set(current).add(item.id));
     try {
@@ -452,7 +452,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
               <div className="registration-checklist-row registration-attachment-row" key={item.id}>
                 <div className="registration-checklist-copy">
                   <strong>{item.title}{item.attachmentRequired ? "（必传）" : "（选传）"}</strong>
-                  <span>最多 9 个文件，单个不超过 20 MB</span>
+                  <span>最多 9 个文件</span>
                   <div className="registration-attachment-list">
                     {item.attachments?.map((attachment) => (
                       <div className="registration-attachment-entry" key={attachment.id}>

@@ -939,6 +939,26 @@ export type AdvancedFilterCondition = {
   valueFrom?: unknown;
   valueTo?: unknown;
 };
+export type EamTransfer = {
+  id: number;
+  no: string;
+  type: number;
+  assetId: number;
+  assetCodeSnapshot?: string;
+  assetNameSnapshot?: string;
+  status: number;
+  processInstanceId?: string;
+  expectedReturnDate?: string;
+  inspectionResult?: number;
+  inspectionRemark?: string;
+  applyTime?: Timestamp;
+};
+export type EamTransferAsset = { id: number; assetCode: string; name: string; status: number };
+export type MenuTaskSummary = {
+  generatedAt: number;
+  total: number;
+  items: Array<{ menuPath: string; count: number; severity: 'normal' | 'urgent'; sourceTypes: string[]; target?: { path: string; query?: string } }>;
+};
 export type AdvancedFilterGroup = {
   logic: "AND" | "OR";
   conditions: AdvancedFilterCondition[];
@@ -1171,6 +1191,7 @@ export type ManagedLead = {
   sourceUserId?: number;
   sourceUserName?: string;
   sourceChannel?: string;
+  sourceChannelLabelSnapshot?: string;
   partnerOwnerNameSnapshot?: string;
   providerOwnerType?: "system_user" | "partner";
   providerOwnerId?: number;
@@ -1722,9 +1743,37 @@ export type SalesOrderListItem = Pick<
   | "approvalRoundNo"
   | "submittedAt"
   | "effectiveAt"
-> & {
+> & Partial<Pick<
+  SalesOrder,
+  | "buyerName"
+  | "studentWechatId"
+  | "provinceName"
+  | "cityName"
+  | "agreedExamTime"
+  | "classType"
+  | "customerPaidAt"
+  | "remark"
+  | "studentSpecialRequirements"
+  | "materialDeliveryContact"
+  | "repurchaseReason"
+  | "terminationReason"
+>> & {
   personId?: number;
   orderType?: SalesOrder["orderType"];
+  studentNatureLabelSnapshot?: string;
+  servicePeriodLabelSnapshot?: string;
+  studentSourceLabelSnapshot?: string;
+  feeModeLabelSnapshot?: string;
+  paymentMethodLabelSnapshot?: string;
+  productSummary?: string;
+  leadNo?: string;
+  leadSourceLabel?: string;
+  leadSourceUserName?: string;
+  leadOwnerUserName?: string;
+  leadCategoryLabelSnapshot?: string;
+  leadSourceChannelLabelSnapshot?: string;
+  leadProvinceName?: string;
+  leadCityName?: string;
   taskId?: string;
   taskDefinitionKey?: "registrationReview" | "financeReview";
   taskStatus?: number;
@@ -1890,6 +1939,8 @@ export type BusinessTask = {
     | "SUMMARIZE_WORK_PLAN"
     | "OPEN_SALES_ORDER_REVISION"
     | "COMPLETE_BIRTHDAY_CARE"
+    | "COMPLETE_EMPLOYEE_CONTRACT_EXPIRY"
+    | "COMPLETE_EMPLOYEE_ENTRY_ANNIVERSARY"
     | "OPEN_STUDENT_FIRST_CONTACT"
     | "OPEN_STUDENT_STUDY_PLAN"
     | "OPEN_STUDENT_CONTACT"
@@ -2907,6 +2958,12 @@ export const api = {
   eam: {
     myAssets: async () =>
       unwrap<EamAssetSummary>(await http.get("/eam/workbench/my-assets")),
+    myTransfers: async () =>
+      unwrap<EamTransfer[]>(await http.get("/eam/workbench/my-transfers")),
+    transferAssets: async (keyword?: string) =>
+      unwrap<EamTransferAsset[]>(await http.get("/eam/workbench/transfer-assets", { params: { keyword } })),
+    createTransfer: async (data: { type: number; assetId: number; expectedReturnDate?: string; actualReturnDate?: string; reason?: string }) =>
+      unwrap<number>(await http.post("/eam/workbench/transfer", data)),
     myDemands: async () =>
       unwrap<EamDemand[]>(await http.get("/eam/workbench/my-demands")),
     categories: async () =>
@@ -4239,6 +4296,8 @@ export const api = {
     unwrap<BusinessTaskSummary>(
       await http.get("/zsjos/business-task/my-summary"),
     ),
+  menuTaskSummary: async () =>
+    unwrap<MenuTaskSummary>(await http.get("/zsjos/business-task/menu-task-summary")),
   businessTaskPage: async (
     bucket: BusinessTaskBucket,
     params: { pageNo: number; pageSize: number },
@@ -4261,6 +4320,8 @@ export const api = {
     unwrap<boolean>(
       await http.post(`/zsjos/business-task/${id}/complete-birthday-care`),
     ),
+  completeEmployeeReminder: async (id: number) =>
+    unwrap<boolean>(await http.post(`/zsjos/business-task/${id}/complete-employee-reminder`)),
   createExportTask: async (
     exportType: ExportTask["exportType"],
     filter: unknown,

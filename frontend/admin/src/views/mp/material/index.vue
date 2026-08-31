@@ -21,7 +21,7 @@
           :type="UploadType.Image"
           @uploaded="getList"
         >
-          支持 bmp/png/jpeg/jpg/gif 格式，大小不超过 2M
+          支持 bmp/png/jpeg/jpg/gif 格式
         </UploadFile>
         <!-- 列表 -->
         <ImageTable :loading="loading" :list="list" @delete="handleDelete" />
@@ -44,7 +44,7 @@
           :type="UploadType.Voice"
           @uploaded="getList"
         >
-          格式支持 mp3/wma/wav/amr，文件大小不超过 2M，播放长度不超过 60s
+          格式支持 mp3/wma/wav/amr，播放长度不超过 60s
         </UploadFile>
         <!-- 列表 -->
         <VoiceTable :list="list" :loading="loading" @delete="handleDelete" />

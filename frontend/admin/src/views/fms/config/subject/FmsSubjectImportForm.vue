@@ -17,7 +17,7 @@
       <template #tip>
         <div class="el-upload__tip text-center">
           <div>一级科目的上级科目编码填写 0，多项辅助核算使用“/”分隔</div>
-          <span>仅允许导入 xls、xlsx 格式文件，且不超过 2 MB。</span>
+          <span>仅允许导入 xls、xlsx 格式文件。</span>
           <el-link
             :disabled="templateLoading"
             :underline="false"
@@ -99,10 +99,6 @@ async function submitForm() {
     return
   }
   const file = fileList.value[0].raw
-  if (file.size > 2 * 1024 * 1024) {
-    message.error('导入文件不能超过 2 MB')
-    return
-  }
   // 提交请求
   formLoading.value = true
   try {

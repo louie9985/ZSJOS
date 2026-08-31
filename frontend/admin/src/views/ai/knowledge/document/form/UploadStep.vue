@@ -29,7 +29,7 @@
                 <em class="text-[#409eff] not-italic cursor-pointer">选择文件</em>
               </div>
               <div class="el-upload__tip mt-10px text-[#909399] text-[12px]">
-                已支持 {{ supportedFileTypes.join('、') }}，每个文件不超过 {{ maxFileSize }} MB。
+                已支持 {{ supportedFileTypes.join('、') }}。
               </div>
             </div>
           </el-upload>
@@ -89,7 +89,7 @@ const message = useMessage() // 消息弹窗
 const fileList = ref([]) // 文件列表
 const uploadingCount = ref(0) // 上传中的文件数量
 
-// 支持的文件类型和大小限制
+// 支持的文件类型
 const supportedFileTypes = [
   'TXT',
   'MARKDOWN',
@@ -111,7 +111,6 @@ const supportedFileTypes = [
   'HTM'
 ]
 const allowedExtensions = supportedFileTypes.map((ext) => ext.toLowerCase()) // 小写的扩展名列表
-const maxFileSize = 15 // 最大文件大小(MB)
 
 // 构建 accept 属性值，用于限制文件选择对话框中可见的文件类型
 const acceptedFileTypes = computed(() => generateAcceptedFileTypes(supportedFileTypes))
@@ -140,7 +139,7 @@ const isAllUploaded = computed(() => {
 })
 
 /**
- * 上传前检查文件类型和大小
+ * 上传前检查文件类型
  *
  * @param file 待上传的文件
  * @returns 是否允许上传
@@ -153,12 +152,6 @@ const beforeUpload = (file) => {
     message.error('不支持的文件类型！')
     return false
   }
-  // 1.2 检查文件大小
-  if (!(file.size / 1024 / 1024 < maxFileSize)) {
-    message.error(`文件大小不能超过 ${maxFileSize} MB！`)
-    return false
-  }
-
   // 2. 增加上传中的文件计数
   uploadingCount.value++
   return true

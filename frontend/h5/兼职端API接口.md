@@ -565,7 +565,7 @@ submittedAt
 GET /part-api/zsjos/lead/get?id={leadId}
 ```
 
-只能查看本人有提交人历史权限的客资。
+只能查看当前 Partner 所属的客资。详情响应中的 `visibleTabs` 和 `availableActions` 由服务端按 Partner 对象归属与客资状态投影，H5 不按角色名称或本地静态权限推断。Partner 客资详情通常返回 `overview`、`follow-ups`、`complaints`、`appeals`、`orders`、`flow-history` 标签；可用操作使用 `SUBMITTER_SUPPLEMENT`、`SUBMITTER_URGE`、`SUBMITTER_COMPLAINT` 和无效客资的 `CREATE_APPEAL` 编码。
 
 所有页面只把非空 `leadNo` 展示为客资编号；缺失时显示“客资编号暂未生成”，不能回退展示 `id` 或 `leadId`。现有后端的催办/投诉动作编码为 `SUBMITTER_URGE`、`SUBMITTER_COMPLAINT`，H5 兼容这两个编码，同时支持后续统一契约 `URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`；前端不根据状态自行补显示写操作按钮。
 

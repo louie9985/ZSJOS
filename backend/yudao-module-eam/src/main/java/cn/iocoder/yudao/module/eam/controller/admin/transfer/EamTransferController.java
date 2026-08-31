@@ -6,6 +6,8 @@ import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.transfer.vo.EamTransferCreateReqVO;
 import cn.iocoder.yudao.module.eam.controller.admin.transfer.vo.EamTransferPageReqVO;
 import cn.iocoder.yudao.module.eam.controller.admin.transfer.vo.EamTransferRespVO;
+import cn.iocoder.yudao.module.eam.controller.admin.transfer.vo.EamTransferInspectReqVO;
+import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.transfer.EamTransferDO;
 import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
@@ -23,6 +25,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -54,46 +57,36 @@ public class EamTransferController {
     private HrmEmployeeApi employeeApi;
 
     @PostMapping("/create")
-    @Operation(summary = "创建流转单", description = "领用/借用/调拨走审批，退还/归还直接生效")
-    @PreAuthorize("@ss.hasPermission('eam:transfer:create')")
+    @Operation(summary = "创建流转单", description = "领用/借用/调拨走审批，退还/归还进入管理员验收")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:transfer:create', 'eam:manage-all')")
     public CommonResult<Long> createTransfer(@Valid @RequestBody EamTransferCreateReqVO reqVO) {
         return success(transferService.createTransfer(reqVO));
-    }
-
-    @PutMapping("/approve")
-    @Operation(summary = "审批通过流转单")
-    @Parameter(name = "id", description = "单据编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('eam:transfer:update')")
-    public CommonResult<Boolean> approveTransfer(@RequestParam("id") Long id) {
-        transferService.approveTransfer(id);
-        return success(true);
-    }
-
-    @PutMapping("/reject")
-    @Operation(summary = "驳回流转单")
-    @Parameter(name = "id", description = "单据编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('eam:transfer:update')")
-    public CommonResult<Boolean> rejectTransfer(@RequestParam("id") Long id,
-                                                @RequestParam(value = "reason", required = false) String reason) {
-        transferService.rejectTransfer(id, reason);
-        return success(true);
     }
 
     @PutMapping("/cancel")
     @Operation(summary = "取消流转单")
     @Parameter(name = "id", description = "单据编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('eam:transfer:update')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:transfer:cancel', 'eam:manage-all')")
     public CommonResult<Boolean> cancelTransfer(@RequestParam("id") Long id) {
-        transferService.cancelTransfer(id);
+        transferService.cancelTransfer(id, SecurityFrameworkUtils.getLoginUserId());
+        return success(true);
+    }
+
+    @PutMapping("/{id}/inspect")
+    @Operation(summary = "验收退还或归还资产")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:transfer:inspect', 'eam:manage-all')")
+    public CommonResult<Boolean> inspectTransfer(@PathVariable("id") Long id,
+                                                  @Valid @RequestBody EamTransferInspectReqVO reqVO) {
+        transferService.inspectTransfer(id, reqVO, SecurityFrameworkUtils.getLoginUserId());
         return success(true);
     }
 
     @GetMapping("/get")
     @Operation(summary = "获得流转单")
     @Parameter(name = "id", description = "单据编号", required = true, example = "1024")
-    @PreAuthorize("@ss.hasPermission('eam:transfer:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:transfer:query', 'eam:transfer:query-self', 'eam:transfer:query-dept', 'eam:manage-all')")
     public CommonResult<EamTransferRespVO> getTransfer(@RequestParam("id") Long id) {
-        EamTransferDO transfer = transferService.getTransfer(id);
+        EamTransferDO transfer = transferService.getTransfer(id, SecurityFrameworkUtils.getLoginUserId());
         if (transfer == null) {
             return success(null);
         }
@@ -102,9 +95,10 @@ public class EamTransferController {
 
     @GetMapping("/page")
     @Operation(summary = "获得流转单分页")
-    @PreAuthorize("@ss.hasPermission('eam:transfer:query')")
+    @PreAuthorize("@ss.hasAnyPermissions('eam:transfer:query', 'eam:transfer:query-self', 'eam:transfer:query-dept', 'eam:manage-all')")
     public CommonResult<PageResult<EamTransferRespVO>> getTransferPage(@Valid EamTransferPageReqVO reqVO) {
-        PageResult<EamTransferDO> pageResult = transferService.getTransferPage(reqVO);
+        PageResult<EamTransferDO> pageResult = transferService.getTransferPage(reqVO,
+                SecurityFrameworkUtils.getLoginUserId());
         return success(new PageResult<>(buildTransferVOList(pageResult.getList()), pageResult.getTotal()));
     }
 
@@ -126,13 +120,16 @@ public class EamTransferController {
 
         result.forEach(vo -> {
             EamAssetDO asset = assetMap.get(vo.getAssetId());
-            if (asset != null) {
-                vo.setAssetName(asset.getName());
-                vo.setAssetCode(asset.getAssetCode());
-            }
-            vo.setFromEmployeeName(nameOf(employeeMap, vo.getFromEmployeeId()));
-            vo.setToEmployeeName(nameOf(employeeMap, vo.getToEmployeeId()));
-            vo.setApplyUserName(nicknameOf(userMap, vo.getApplyUserId()));
+            vo.setAssetName(vo.getAssetNameSnapshot() != null ? vo.getAssetNameSnapshot()
+                    : asset == null ? null : asset.getName());
+            vo.setAssetCode(vo.getAssetCodeSnapshot() != null ? vo.getAssetCodeSnapshot()
+                    : asset == null ? null : asset.getAssetCode());
+            vo.setFromEmployeeName(vo.getFromEmployeeNameSnapshot() != null ? vo.getFromEmployeeNameSnapshot()
+                    : nameOf(employeeMap, vo.getFromEmployeeId()));
+            vo.setToEmployeeName(vo.getToEmployeeNameSnapshot() != null ? vo.getToEmployeeNameSnapshot()
+                    : nameOf(employeeMap, vo.getToEmployeeId()));
+            vo.setApplyUserName(vo.getApplyUserNameSnapshot() != null ? vo.getApplyUserNameSnapshot()
+                    : nicknameOf(userMap, vo.getApplyUserId()));
         });
         return result;
     }

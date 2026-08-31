@@ -30,6 +30,10 @@ public interface EamApprovalService {
     default void terminate(String processInstanceId, String reason) {
     }
 
+    default void terminate(String processInstanceId, String authorizationType, String reason) {
+        terminate(processInstanceId, reason);
+    }
+
     /**
      * 当前实现是否会真正产生审批环节
      *

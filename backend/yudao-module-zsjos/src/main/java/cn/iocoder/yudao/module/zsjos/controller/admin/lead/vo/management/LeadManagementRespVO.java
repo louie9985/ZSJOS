@@ -31,6 +31,7 @@ public class LeadManagementRespVO {
     private String contributionDeptNameSnapshot;
     private LocalDateTime countedAt;
     private String sourceChannel;
+    private String sourceChannelLabelSnapshot;
     private String provinceCode;
     private String provinceName;
     private String cityCode;

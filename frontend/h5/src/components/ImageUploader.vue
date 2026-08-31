@@ -37,11 +37,6 @@ function onFileChange(event: Event) {
       showToast(`${file.name} 仅支持 JPG、PNG、WebP`)
       continue
     }
-    // 校验大小（10MB）
-    if (file.size > 10 * 1024 * 1024) {
-      showToast(`${file.name} 超过 10MB 限制`)
-      continue
-    }
     addFile(file)
   }
   // 清空 input 以便重复选择相同文件

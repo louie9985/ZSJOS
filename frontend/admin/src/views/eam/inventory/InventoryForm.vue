@@ -152,7 +152,11 @@ const submitForm = async () => {
 }
 
 onMounted(async () => {
-  deptTree.value = handleTree(await DeptApi.getSimpleDeptList())
-  categoryTree.value = handleTree((await CategoryApi.getCategoryList()) as any, 'id', 'parentId')
+  const [departments, categories] = await Promise.all([
+    DeptApi.getSimpleDeptList(),
+    CategoryApi.getCategoryList()
+  ])
+  deptTree.value = handleTree(departments)
+  categoryTree.value = handleTree(categories as any, 'id', 'parentId')
 })
 </script>

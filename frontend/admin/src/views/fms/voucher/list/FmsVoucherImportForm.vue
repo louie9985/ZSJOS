@@ -15,9 +15,6 @@
           <el-button link type="primary" :loading="templateLoading" @click="downloadTemplate">
             <Icon icon="ep:download" /> 下载《凭证导入模板》
           </el-button>
-          <div class="mt-8px text-13px text-[var(--el-text-color-secondary)]">
-            导入文件请勿超过 2MB
-          </div>
         </div>
       </div>
       <div>
@@ -140,10 +137,6 @@ async function submitImport() {
   const rawFile = fileList.value[0]?.raw
   if (!rawFile) {
     message.warning('请选择需要导入的文件')
-    return
-  }
-  if (rawFile.size > 2 * 1024 * 1024) {
-    message.error('导入文件不能超过 2MB')
     return
   }
   step.value = 1

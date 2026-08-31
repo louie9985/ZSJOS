@@ -23,6 +23,12 @@ public class EamAssetChangeLogServiceImpl implements EamAssetChangeLogService {
 
     @Override
     public void record(EamAssetDO before, EamAssetDO after, Integer changeType, Long bizId, String content) {
+        record(before, after, changeType, bizId, content, SecurityFrameworkUtils.getLoginUserId());
+    }
+
+    @Override
+    public void record(EamAssetDO before, EamAssetDO after, Integer changeType, Long bizId, String content,
+                       Long operatorUserId) {
         EamAssetChangeLogDO log = EamAssetChangeLogDO.builder()
                 .assetId(after.getId())
                 .changeType(changeType)
@@ -34,7 +40,7 @@ public class EamAssetChangeLogServiceImpl implements EamAssetChangeLogService {
                 .afterDeptId(after.getUseDeptId())
                 .bizId(bizId)
                 .content(content)
-                .operatorId(SecurityFrameworkUtils.getLoginUserId())
+                .operatorId(operatorUserId)
                 .operateTime(LocalDateTime.now())
                 .build();
         changeLogMapper.insert(log);

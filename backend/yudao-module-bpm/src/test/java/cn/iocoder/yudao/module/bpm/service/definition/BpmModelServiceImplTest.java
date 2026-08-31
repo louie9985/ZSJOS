@@ -2,13 +2,18 @@ package cn.iocoder.yudao.module.bpm.service.definition;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.framework.test.core.ut.BaseMockitoUnitTest;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.BpmModelMetaInfoVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.BpmModelSaveReqVO;
 import cn.iocoder.yudao.module.bpm.controller.admin.definition.vo.model.simple.BpmSimpleModelNodeVO;
+import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmCategoryDO;
 import cn.iocoder.yudao.module.bpm.enums.definition.BpmModelTypeEnum;
 import cn.iocoder.yudao.module.bpm.enums.definition.BpmSimpleModelNodeTypeEnum;
+import cn.iocoder.yudao.module.bpm.framework.flowable.core.util.SimpleModelUtils;
+import org.flowable.bpmn.model.BpmnModel;
+import org.flowable.bpmn.model.UserTask;
 import org.flowable.engine.RepositoryService;
 import org.flowable.engine.repository.Model;
 import org.flowable.engine.repository.ModelQuery;
@@ -22,6 +27,8 @@ import org.mockito.Mock;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.MODEL_NOT_EXISTS;
@@ -47,6 +54,8 @@ public class BpmModelServiceImplTest extends BaseMockitoUnitTest {
     private RepositoryService repositoryService;
     @Mock
     private ModelQuery modelQuery;
+    @Mock
+    private BpmCategoryService categoryService;
 
     @BeforeEach
     public void setUp() {
@@ -134,9 +143,11 @@ public class BpmModelServiceImplTest extends BaseMockitoUnitTest {
         when(modelQuery.modelKey(eq(reqVO.getKey()))).thenReturn(modelQuery);
         when(modelQuery.singleResult()).thenReturn(null);
         when(repositoryService.newModel()).thenReturn(model);
+        when(categoryService.getCategoryListByCode(anyCollection()))
+                .thenReturn(Collections.singletonList(new BpmCategoryDO()));
 
         // 调用
-        String result = modelService.importModel(reqVO);
+        String result = modelService.importModel(50L, reqVO);
 
         // 断言
         assertEquals(MODEL_ID, result);
@@ -150,7 +161,38 @@ public class BpmModelServiceImplTest extends BaseMockitoUnitTest {
         assertNotNull(metaInfo);
         assertEquals(Arrays.asList(10L, 20L), metaInfo.getStartUserIds());
         assertEquals(Collections.singletonList(30L), metaInfo.getStartDeptIds());
-        assertEquals(Collections.singletonList(40L), metaInfo.getManagerUserIds());
+        assertEquals(Collections.singletonList(50L), metaInfo.getManagerUserIds());
+    }
+
+    @Test
+    public void testEamAssetTransferSimpleAsset() throws Exception {
+        Path root = Path.of("").toAbsolutePath();
+        Path asset = null;
+        while (root != null) {
+            Path candidate = root.resolve("script/bpm/eam_asset_transfer/1.0.0/process-model.json");
+            if (Files.isRegularFile(candidate)) {
+                asset = candidate;
+                break;
+            }
+            root = root.getParent();
+        }
+        assertNotNull(asset);
+        BpmModelSaveReqVO reqVO = JsonUtils.parseObject(Files.readString(asset), BpmModelSaveReqVO.class);
+        reqVO.setManagerUserIds(Collections.singletonList(50L));
+        ValidationUtils.validate(reqVO);
+
+        BpmnModel bpmnModel = SimpleModelUtils.buildBpmnModel(
+                reqVO.getKey(), reqVO.getName(), reqVO.getSimpleModel());
+        for (String taskKey : Arrays.asList("departmentLeaderReview", "sourceDepartmentReview",
+                "targetDepartmentReview", "assetAdministratorReview", "receiverSign")) {
+            assertInstanceOf(UserTask.class, bpmnModel.getMainProcess().getFlowElement(taskKey));
+        }
+        assertEquals("${isAllocate == true}", ((UserTask) bpmnModel.getMainProcess()
+                .getFlowElement("departmentLeaderReview")).getSkipExpression());
+        assertEquals("${isAllocate != true}", ((UserTask) bpmnModel.getMainProcess()
+                .getFlowElement("sourceDepartmentReview")).getSkipExpression());
+        assertEquals("${isAllocate != true || sameDepartment == true}", ((UserTask) bpmnModel.getMainProcess()
+                .getFlowElement("targetDepartmentReview")).getSkipExpression());
     }
 
     private Model mockModel(Integer type) {

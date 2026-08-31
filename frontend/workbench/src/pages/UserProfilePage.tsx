@@ -61,7 +61,6 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
   }
   const upload = async (file: File) => {
     if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { message.error('仅支持 JPG、PNG、WebP 图片'); return false }
-    if (file.size > 5 * 1024 * 1024) { message.error('头像不能超过 5MB'); return false }
     const requestId = ++avatarUploadRequest.current
     try {
       const avatar = await api.uploadAvatar(file)

@@ -46,7 +46,7 @@
           <el-button type="primary">上传图片</el-button>
           <template #tip>
             <span>
-              <div class="el-upload__tip">支持 bmp/png/jpeg/jpg/gif 格式，大小不超过 2M</div>
+              <div class="el-upload__tip">支持 bmp/png/jpeg/jpg/gif 格式</div>
             </span>
           </template>
         </el-upload>

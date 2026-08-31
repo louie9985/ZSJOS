@@ -38,7 +38,7 @@
             素材库选择
           </el-button>
           <template #tip>
-            <div class="el-upload__tip">支持 bmp/png/jpeg/jpg/gif 格式，大小不超过 2M</div>
+            <div class="el-upload__tip">支持 bmp/png/jpeg/jpg/gif 格式</div>
           </template>
         </el-upload>
       </div>

@@ -674,7 +674,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">渠道</span>
-                    <span className="lead-field-value">{channelLabel(lead.sourceChannel)}</span>
+                    <span className="lead-field-value">{lead.sourceChannelLabelSnapshot || "历史未记录"}</span>
                   </div>
                   <div className="lead-profile-row">
                     <span className="lead-field-label">地区</span>

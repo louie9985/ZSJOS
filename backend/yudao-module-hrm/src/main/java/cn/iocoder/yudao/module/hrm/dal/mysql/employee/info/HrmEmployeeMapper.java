@@ -84,6 +84,17 @@ public interface HrmEmployeeMapper extends BaseMapperX<HrmEmployeeDO> {
         return selectList(query);
     }
 
+    default List<HrmEmployeeDO> selectEntryAnniversaryList(Collection<Integer> entryStatuses, LocalDate targetDate) {
+        LambdaQueryWrapperX<HrmEmployeeDO> query = new LambdaQueryWrapperX<>();
+        query.in(HrmEmployeeDO::getEntryStatus, entryStatuses)
+                .isNotNull(HrmEmployeeDO::getEntryTime)
+                .and(w -> w.and(x -> x.apply("MONTH(entry_time) = {0} AND DAYOFMONTH(entry_time) = {1}", targetDate.getMonthValue(), targetDate.getDayOfMonth()))
+                        .or(x -> x.apply("MONTH(entry_time) = 2 AND DAYOFMONTH(entry_time) = 29")
+                                .apply("{0} = 3 AND {1} = 1", targetDate.getMonthValue(), targetDate.getDayOfMonth())))
+                .orderByAsc(HrmEmployeeDO::getName).orderByAsc(HrmEmployeeDO::getId);
+        return selectList(query);
+    }
+
     default List<HrmEmployeeDO> selectListByLeaderEmployeeId(Long leaderEmployeeId) {
         return selectList(new LambdaQueryWrapperX<HrmEmployeeDO>()
                 .eq(HrmEmployeeDO::getLeaderEmployeeId, leaderEmployeeId)

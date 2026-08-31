@@ -19,7 +19,7 @@ import jakarta.annotation.Resource;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
-import cn.iocoder.yudao.module.system.api.dict.dto.DictDataRespDTO;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
@@ -177,10 +177,10 @@ public class MediaAccountService {
                     .setPlatformAccountId(stringValue(details.values().get("uid"), req.getPlatformAccountId()))
                     .setNickname(stringValue(details.values().get("nickname"), req.getNickname()));
         }
+        requireSnapshotValueUnchanged(account.getAccountGradeValue(), req.getAccountGradeValue());
+        requireSnapshotValueUnchanged(account.getHealthStatusValue(), req.getHealthStatusValue());
+        requireSnapshotValueUnchanged(account.getRiskLevelValue(), req.getRiskLevelValue());
         account.setLeadDirection(req.getLeadDirection()).setDirectorUserId(directorUserId)
-                .setAccountGradeValue(req.getAccountGradeValue()).setAccountGradeLabelSnapshot(req.getAccountGradeLabelSnapshot())
-                .setHealthStatusValue(req.getHealthStatusValue()).setHealthStatusLabelSnapshot(req.getHealthStatusLabelSnapshot())
-                .setRiskLevelValue(req.getRiskLevelValue()).setRiskLevelLabelSnapshot(req.getRiskLevelLabelSnapshot())
                 .setHealthJson(req.getHealthJson());
         if (mapper.updateProfile(account, req.getVersion()) == 0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
     }
@@ -191,6 +191,13 @@ public class MediaAccountService {
                 .filter(item -> java.util.Objects.equals(item.getValue(), value))
                 .map(DictDataRespDTO::getLabel).findFirst()
                 .orElseThrow(() -> exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
+    }
+
+    private void requireSnapshotValueUnchanged(String storedValue, String requestedValue) {
+        if (requestedValue != null && !java.util.Objects.equals(storedValue, requestedValue)) {
+            // These legacy fields have no configured dictionary type; accepting a label would make the client authoritative.
+            throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
+        }
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#id", action = "rescue")

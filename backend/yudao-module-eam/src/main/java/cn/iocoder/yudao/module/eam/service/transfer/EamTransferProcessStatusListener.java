@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.eam.service.transfer;
 
 import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEvent;
 import cn.iocoder.yudao.module.bpm.api.event.BpmProcessInstanceStatusEventListener;
-import cn.iocoder.yudao.module.bpm.enums.task.BpmProcessInstanceStatusEnum;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Component;
 
@@ -14,19 +13,13 @@ public class EamTransferProcessStatusListener extends BpmProcessInstanceStatusEv
 
     @Override
     protected String getProcessDefinitionKey() {
-        return "eam-transfer";
+        return EamTransferServiceImpl.PROCESS_DEFINITION_KEY;
     }
 
     @Override
     protected void onEvent(BpmProcessInstanceStatusEvent event) {
-        Long id = Long.valueOf(event.getBusinessKey());
-        if (BpmProcessInstanceStatusEnum.APPROVE.getStatus().equals(event.getStatus())) {
-            transferService.approveTransfer(id);
-        } else if (BpmProcessInstanceStatusEnum.REJECT.getStatus().equals(event.getStatus())) {
-            transferService.rejectTransfer(id, event.getReason());
-        } else if (BpmProcessInstanceStatusEnum.CANCEL.getStatus().equals(event.getStatus())) {
-            transferService.cancelTransfer(id);
-        }
+        String[] parts = event.getBusinessKey().split(":");
+        transferService.handleProcessResult(Long.valueOf(parts[1]), event.getStatus(), event.getReason());
     }
 
 }

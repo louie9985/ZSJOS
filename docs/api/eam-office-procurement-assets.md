@@ -93,6 +93,23 @@ Workbench 使用以下 `/admin-api/eam/workbench` 接口，不直接调用 Axios
 结果为 1 完好、2 损坏、3 缺件/遗失、4 不符驳回；完好回到可用库存，损坏进入冻结库存，
 缺件/遗失结清持有但不增加库存，不符驳回恢复持有中。只有单件资产可以发起现有报修流程。
 
+## 公开资产页面
+
+二维码继续承载统一 H5 页面地址和 `assetCode`。以下接口使用 `/public-api` 前缀，查看不要求
+登录；修改请求每次都必须在 `X-EAM-Edit-Code` 提交 6 位个人口令，不签发长期编辑凭证。
+
+| 场景 | 方法与路径 | 约束 |
+| --- | --- | --- |
+| 查看资产 | `GET /eam/asset?assetCode=` | 返回中文字段、字典快照、分类/部门树、员工选项和只读附件 |
+| 验证口令 | `POST /eam/asset/verify?assetCode=` | 口令必须属于拥有 `eam:asset:public-edit-code` 权限的启用员工 |
+| 修改资产 | `PUT /eam/asset?assetCode=` | 只接收公开可编辑字段；按 `version` 原子更新，附件、编号和状态不可由表单修改 |
+| 清除归属并置闲 | `PUT /eam/asset/clear-usage?assetCode=` | 仅闲置/使用中资产；有待签收、持有中或待退还验收记录时拒绝 |
+
+口令匹配同时保留 HRM `employeeId` 和 System `userId`：公开编辑审计记录 HRM 员工，资产
+变更时间线和资产更新人记录 System 用户，使管理端可以通过 `AdminUserApi` 显示真实操作人。
+一键置闲会原子清空使用员工、使用部门和员工姓名快照，将状态改为闲置并递增版本；它不会
+代替员工资产退还流程，也不会自动关闭未完成持有记录。
+
 ## BPM 契约
 
 四个流程必须由管理员在统一审批中心建模、发布并启用。EAM SQL 不创建流程定义，也不固化
@@ -105,6 +122,21 @@ Workbench 使用以下 `/admin-api/eam/workbench` 接口，不直接调用 Axios
 | `eam_office_purchase` | 采购单 ID | `summary` |
 | `eam_purchase_expense` | 采购单 ID | `summary`、`paymentMode`、`actualAmount` |
 | `eam_employee_asset_review` | 员工资产任务 ID | 配资时包含 `summary`、员工及直属负责人变量；异动/离职复核当前只保证 `summary` |
+
+通用资产流转另使用版本化 Simple 流程 `eam_asset_transfer`。领用、借用由申请部门负责人审批，调拨由
+转出部门负责人和不同部门时的接收部门负责人审批，随后均由资产管理员确认并由接收员工签收。
+业务键为 `asset-transfer:{transferId}:round:{roundNo}`；候选人由 EAM 通过 System/HRM 公共
+API 解析并作为变量传入，不按显示名称推断。旧 key `eam-transfer` 只保留状态监听器以完成
+已存在的在途实例，新单不得再启动该 key。
+
+发布资产为 `script/bpm/eam_asset_transfer/1.0.0/process-model.json`，通过 BPM“导入模型”
+入口导入，不使用 BPMN XML 设计器。Simple 模型使用流程表达式候选人和节点跳过表达式，
+服务端仍是候选人、租户和业务状态的权威来源。
+
+退还和归还不创建主管审批流程。创建后流转单进入待验收，资产管理员通过
+`PUT /eam/transfer/{id}/inspect` 提交完好、损坏、缺件/遗失或不符结果；只有验收完成才改变
+资产状态。员工持有记录的退还验收仍使用 `/eam/employee-asset/holding/{id}/inspect-return`，
+两条链路不复制 BPM 任务或持有记录。
 
 BPM `APPROVE` 映射业务已通过或进入履行，`REJECT` 映射已驳回，`CANCEL` 映射已取消。
 监听器按 process key 过滤，并只在业务仍处于审批中时更新，因此重复状态事件不会重复入库、
@@ -133,7 +165,7 @@ BPM `APPROVE` 映射业务已通过或进入履行，`REJECT` 映射已驳回，
 
 ## 数据库与任务
 
-EAM 数据库模块执行顺序为 V001 至 V008。V007 及 `schema/eam.sql` 创建空业务表和权限菜单，
+EAM 数据库模块执行顺序为 V001 至 V010。V007 及 `schema/eam.sql` 创建空业务表和权限菜单，
 不创建采购、库存、员工资产或测试数据；`eam_purchase_payment_mode` 只创建空字典类型，选项
 由管理员另行配置。V008 删除旧资产归属 System 用户编号，且不会把其数值推断为 HRM 员工
 编号；需要保留的开发记录应通过员工选择器重新指定归属。Workbench 根菜单使用相对子路径

@@ -31,15 +31,13 @@ const selectAndUpload = async () => {
  * @param {boolean} [options.multiple=true] - 是否支持多选
  * @param {string} [options.accept=''] - 文件上传格式限制
  * @param {number} [options.limit=1] - 单次上传最大文件数
- * @param {number} [options.fileSize=500] - 单个文件大小限制（单位：MB）
  * @returns {Promise<Array>} 选择的文件列表，每个文件带有一个uid
  */
 async function getFiles(options = {}) {
-  const { multiple, accept, limit, fileSize } = {
+  const { multiple, accept, limit } = {
     multiple: true,
     accept: 'image/jpeg, image/png, image/gif', // 默认选择图片
     limit: 1,
-    fileSize: 500,
     ...options
   }
 
@@ -68,13 +66,6 @@ async function getFiles(options = {}) {
         // 判断是否超出上传数量限制
         if (filesArray.length > limit) {
           reject({ errorType: 'limit', files: filesArray })
-          return
-        }
-
-        // 判断是否超出上传文件大小限制
-        const overSizedFiles = filesArray.filter((file: File) => file.size / 1024 ** 2 > fileSize)
-        if (overSizedFiles.length > 0) {
-          reject({ errorType: 'fileSize', files: overSizedFiles })
           return
         }
 

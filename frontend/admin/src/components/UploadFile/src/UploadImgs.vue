@@ -77,7 +77,6 @@ const props = defineProps({
   drag: propTypes.bool.def(true), // 是否支持拖拽上传 ==> 非必传（默认为 true）
   disabled: propTypes.bool.def(false), // 是否禁用上传组件 ==> 非必传（默认为 false）
   limit: propTypes.number.def(5), // 最大图片上传数 ==> 非必传（默认为 5张）
-  fileSize: propTypes.number.def(5), // 图片大小限制 ==> 非必传（默认为 5M）
   fileType: propTypes.array.def(['image/jpeg', 'image/png', 'image/gif']), // 图片类型限制 ==> 非必传（默认为 ["image/jpeg", "image/png", "image/gif"]）
   height: propTypes.string.def('150px'), // 组件高度 ==> 非必传（默认为 150px）
   width: propTypes.string.def('150px'), // 组件宽度 ==> 非必传（默认为 150px）
@@ -101,22 +100,18 @@ const uploadList = ref<UploadUserFile[]>([])
  * @param rawFile 上传的文件
  * */
 const beforeUpload: UploadProps['beforeUpload'] = (rawFile) => {
-  const imgSize = rawFile.size / 1024 / 1024 < props.fileSize
   const imgType = props.fileType
   const isValidType = imgType.includes(rawFile.type as FileTypes)
-  const isValidSize = imgSize
 
   if (!isValidType)
     ElMessage.warning('上传图片不符合所需的格式！')
-  if (!isValidSize)
-    ElMessage.warning(`上传图片大小不能超过 ${props.fileSize}M！`)
 
   // 只有在验证通过后才增加计数器
-  if (isValidType && isValidSize) {
+  if (isValidType) {
     uploadNumber.value++
   }
 
-  return isValidType && isValidSize
+  return isValidType
 }
 
 // 图片上传成功

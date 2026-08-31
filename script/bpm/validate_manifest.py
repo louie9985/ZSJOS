@@ -51,7 +51,11 @@ def validate_asset(asset, registered, current):
         if key in current:
             fail(f"multiple recommended versions for {key}")
         current.add(key)
-    expected_path = pathlib.PurePosixPath(key) / version / "process.bpmn20.xml"
+    asset_format = asset.get("assetFormat", "bpmn")
+    filename = "process-model.json" if asset_format == "simple" else "process.bpmn20.xml"
+    if asset_format not in {"bpmn", "simple"}:
+        fail(f"unsupported asset format {asset_format} for {key}@{version}")
+    expected_path = pathlib.PurePosixPath(key) / version / filename
     if pathlib.PurePosixPath(asset["path"]) != expected_path:
         fail(f"asset path must be {expected_path}, got {asset['path']}")
     path = (ROOT / asset["path"]).resolve()
@@ -62,6 +66,9 @@ def validate_asset(asset, registered, current):
     data = path.read_bytes()
     if hashlib.sha256(data).hexdigest() != asset["sha256"]:
         fail(f"checksum mismatch {asset['path']}")
+    if asset_format == "simple":
+        validate_simple_asset(asset, data)
+        return
     root = ET.fromstring(data)
     processes = root.findall("b:process", NS)
     if len(processes) != 1 or processes[0].get("id") != key:
@@ -76,6 +83,33 @@ def validate_asset(asset, registered, current):
         strategy = extension.find("flowable:candidateStrategy", NS) if extension is not None else None
         if strategy is None or not (strategy.text or "").strip():
             fail(f"missing candidate strategy for task {task.get('id')} in {asset['path']}")
+    text = data.decode("utf-8")
+    for variable in asset["businessVariables"] + asset["assigneeVariables"]:
+        if variable not in text and variable not in asset.get("runtimeOnlyVariables", []):
+            fail(f"variable {variable} missing from {asset['path']}")
+
+
+def validate_simple_asset(asset, data):
+    try:
+        model = json.loads(data)
+    except json.JSONDecodeError as error:
+        fail(f"invalid SIMPLE model {asset['path']}: {error}")
+    if model.get("key") != asset["processKey"] or model.get("type") != 20:
+        fail(f"SIMPLE model key/type mismatch {asset['path']}")
+    root = model.get("simpleModel")
+    if not isinstance(root, dict) or root.get("id") != "StartUserNode" or root.get("type") != 10:
+        fail(f"invalid SIMPLE start node {asset['path']}")
+    tasks = {}
+    node = root
+    while isinstance(node, dict):
+        if node.get("type") in {11, 13}:
+            tasks[node.get("id")] = node
+        node = node.get("childNode")
+    if set(tasks) != set(asset["taskKeys"]):
+        fail(f"task keys mismatch {asset['path']}")
+    for task_id, task in tasks.items():
+        if task.get("candidateStrategy") != 60 or not task.get("candidateParam"):
+            fail(f"invalid SIMPLE candidate expression for task {task_id} in {asset['path']}")
     text = data.decode("utf-8")
     for variable in asset["businessVariables"] + asset["assigneeVariables"]:
         if variable not in text and variable not in asset.get("runtimeOnlyVariables", []):

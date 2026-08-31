@@ -2028,6 +2028,23 @@ SELECT 'V162 lead submit specify permission' AS check_name,
                  AND NOT JSON_CONTAINS(menu_ids,'6820','$')),
           'PASS','FAIL') AS result;
 
+SELECT 'EAM production baseline' AS check_name,
+       IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
+             AND table_name IN ('eam_category','eam_category_field','eam_asset','eam_code_rule'))=4
+          AND (SELECT COUNT(*) FROM eam_category WHERE tenant_id=0 AND parent_id=0 AND deleted=b'0'
+               AND code IN ('IT','DIGITAL','FURNITURE','SUPPLIES','BOOKS','OTHER'))=6
+          AND (SELECT COUNT(*) FROM eam_category_field WHERE tenant_id=0 AND deleted=b'0')>=6
+          AND EXISTS (SELECT 1 FROM eam_code_rule WHERE tenant_id=0 AND category_id IS NULL AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM eam_asset WHERE deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM eam_stock_balance WHERE deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM eam_purchase WHERE deleted=b'0'), 'PASS','FAIL') AS result;
+
+SELECT 'EAM module registry' AS check_name,
+       IF((SELECT COUNT(*) FROM zsjos_module_schema_version
+             WHERE module_code='eam' AND version IN
+               ('V001','V002','V003','V004','V005','V006','V007','V008','V009','V010','V011'))=11,
+          'PASS','FAIL') AS result;
+
 SELECT 'V171 lead duplicate rule contract' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V171')
           AND EXISTS (SELECT 1 FROM zsjos_module_schema_version

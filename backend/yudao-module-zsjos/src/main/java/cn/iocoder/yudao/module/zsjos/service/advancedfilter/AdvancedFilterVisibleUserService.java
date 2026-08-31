@@ -33,7 +33,8 @@ public class AdvancedFilterVisibleUserService {
 
     public Resolution resolve(String scene, Long userId) {
         return switch (scene) {
-            case "lead" -> Resolution.supported(leadUsers(userId));
+            case "lead", "order", "lead_appeal", "duplicate_review", "registration" ->
+                    Resolution.supported(leadUsers(userId));
             case "subordinate_sales" -> Resolution.supported(
                     enabledOptions(leadObjectPermissionService.getManagedUserIds(userId)));
             case "student" -> Resolution.supported(serviceRelationMapper.existsActiveByOwner(userId)

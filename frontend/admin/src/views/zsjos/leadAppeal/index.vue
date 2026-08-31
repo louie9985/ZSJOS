@@ -40,7 +40,10 @@ const submit = async () => {
     endpoint="/zsjos/lead/appeal/inbox-page"
     description="客资申诉处理队列"
     :query="{ handled: false }"
-    ><template #row-actions="{ row, reload }"
+    advanced-scene="lead_appeal"
+    advanced-search-endpoint="/zsjos/lead/appeal/inbox/search-page"
+    advanced-placeholder="客资编号 / 姓名 / 手机号"
+  ><template #row-actions="{ row, reload }"
       ><el-button link type="primary" :disabled="!row.taskId" @click="show(row, reload)"
         >处理</el-button
       ></template

@@ -76,7 +76,7 @@ class LeadDuplicateReviewServiceImplTest {
         when(reviewMapper.selectByIdForUpdate(1L, 1L)).thenReturn(review);
         when(attachmentService.validateReferences(List.of(), 99L)).thenReturn(Map.of());
         when(submissionService.createApprovedFromReview(any(), eq(5L), eq(null), eq(null), eq(null),
-                eq("提交时分类"))).thenReturn(new LeadCreateRespVO(50L, "created", "unassigned", null));
+                eq("提交时分类"), eq("提交时渠道"))).thenReturn(new LeadCreateRespVO(50L, "created", "unassigned", null));
         LeadDO created = new LeadDO();
         created.setId(50L);
         created.setPersonId(60L);
@@ -88,7 +88,7 @@ class LeadDuplicateReviewServiceImplTest {
         assertEquals(DUPLICATE_REVIEW_ACTION_ALLOW_FLOW, review.getResultType());
         assertEquals(DUPLICATE_RESULT_ALLOWED, review.getDuplicateResult());
         verify(submissionService).createApprovedFromReview(any(), eq(5L), eq(null), eq(null), eq(null),
-                eq("提交时分类"));
+                eq("提交时分类"), eq("提交时渠道"));
         verify(reviewMapper).updateById(review);
     }
 
@@ -103,7 +103,7 @@ class LeadDuplicateReviewServiceImplTest {
         assertEquals("completed", review.getStatus());
         assertEquals(DUPLICATE_REVIEW_ACTION_CLOSE_DUPLICATE, review.getResultType());
         assertEquals(DUPLICATE_RESULT_CLOSED, review.getDuplicateResult());
-        verify(submissionService, never()).createApprovedFromReview(any(), any(), any(), any(), any(), any());
+        verify(submissionService, never()).createApprovedFromReview(any(), any(), any(), any(), any(), any(), any());
         verify(reviewMapper).updateById(review);
     }
 
@@ -120,6 +120,7 @@ class LeadDuplicateReviewServiceImplTest {
         LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
         review.setId(id); review.setStatus("pending"); review.setSubmitterUserId(5L);
         review.setLeadCategoryLabelSnapshot("提交时分类");
+        review.setSourceChannelLabelSnapshot("提交时渠道");
         review.setSubmissionIdempotencyKey("submission-1"); review.setVersion(0);
         review.setSubmissionSnapshot("{\"name\":\"新客户\",\"mobile\":\"13800138000\","
                 + "\"provinceCode\":\"OTHER\",\"cityCode\":\"OTHER\","

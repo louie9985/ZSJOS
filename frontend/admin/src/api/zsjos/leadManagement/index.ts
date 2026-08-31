@@ -43,11 +43,13 @@ export interface LeadManagementVO {
   contributionDeptNameSnapshot?: string
   countedAt?: Timestamp
   sourceChannel?: string
+  sourceChannelLabelSnapshot?: string
   provinceCode?: string
   provinceName?: string
   cityCode?: string
   cityName?: string
   leadCategory?: string
+  leadCategoryLabelSnapshot?: string
   remark?: string
   status: string
   assignmentStatus: string

@@ -378,27 +378,39 @@ class SalesOrderServiceImplTest {
     }
 
     @Test
-    void myPageUsesSubmitterScopeAndDoesNotLoadHeavyDetails() {
+    void myPageUsesSubmitterScopeAndProjectsVisibleBusinessFields() {
         SalesOrderMyPageReqVO reqVO = new SalesOrderMyPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setStatus(STATUS_PENDING_APPROVAL); reqVO.setKeyword("测试");
         SalesOrderDO order = new SalesOrderDO();
         order.setId(100L); order.setCurrentApprovalRoundId(200L); order.setOrderNo("SO-100"); order.setLeadId(1L);
         order.setStatus(STATUS_PENDING_APPROVAL); order.setStudentName("测试学员"); order.setTotalAmount(BigDecimal.TEN);
         SalesOrderApprovalRoundDO round = new SalesOrderApprovalRoundDO(); round.setId(200L); round.setRoundNo(2);
+        round.setOrderSnapshot(JsonUtils.toJsonString(Map.of(
+                "orderLabels", Map.of("studentNature", "在职", "servicePeriod", "一年"),
+                "leadProfile", Map.of("leadNo", "KZ-100", "sourceLabel", "销售自拓录"))));
+        SalesOrderItemDO item = new SalesOrderItemDO(); item.setOrderId(100L);
+        item.setProductRef("course-1"); item.setSkuRef("sku-1"); item.setProductSnapshot("{malformed");
         when(orderMapper.selectMyPage(20L, reqVO, null)).thenReturn(new PageResult<>(List.of(order), 1L));
         when(roundMapper.selectBatchIds(List.of(200L))).thenReturn(List.of(round));
+        when(itemMapper.selectListByOrderIds(List.of(100L))).thenReturn(List.of(item));
 
         var result = service.getMyPage(reqVO, 20L);
 
         assertEquals(1L, result.getTotal()); assertEquals(1, result.getList().size());
         assertEquals("SO-100", result.getList().getFirst().getOrderNo());
         assertEquals(2, result.getList().getFirst().getApprovalRoundNo());
+        assertEquals("在职", result.getList().getFirst().getStudentNatureLabelSnapshot());
+        assertEquals("一年", result.getList().getFirst().getServicePeriodLabelSnapshot());
+        assertEquals("KZ-100", result.getList().getFirst().getLeadNo());
+        assertEquals("销售自拓录", result.getList().getFirst().getLeadSourceLabel());
+        assertEquals("course-1 / sku-1", result.getList().getFirst().getProductSummary());
         verify(orderMapper).selectMyPage(20L, reqVO, null);
-        verifyNoInteractions(itemMapper, fileApi);
+        verify(itemMapper).selectListByOrderIds(List.of(100L));
+        verifyNoInteractions(fileApi);
     }
 
     @Test
-    void teamPageUsesResolvedDepartmentMembersAndDoesNotLoadHeavyDetails() {
+    void teamPageUsesResolvedDepartmentMembersAndBatchLoadsVisibleItems() {
         SalesOrderTeamPageReqVO reqVO = new SalesOrderTeamPageReqVO();
         reqVO.setPageNo(1); reqVO.setPageSize(20); reqVO.setStatus(STATUS_PENDING_APPROVAL);
         SalesOrderDO order = new SalesOrderDO();
@@ -409,12 +421,14 @@ class SalesOrderServiceImplTest {
         when(permissionService.teamUserIds(30L)).thenReturn(teamUserIds);
         when(orderMapper.selectTeamPage(teamUserIds, reqVO, null)).thenReturn(new PageResult<>(List.of(order), 1L));
         when(roundMapper.selectBatchIds(List.of(200L))).thenReturn(List.of(round));
+        when(itemMapper.selectListByOrderIds(List.of(100L))).thenReturn(List.of());
 
         var result = service.getTeamPage(reqVO, 30L);
 
         assertEquals(1L, result.getTotal()); assertEquals("SO-100", result.getList().getFirst().getOrderNo());
         verify(orderMapper).selectTeamPage(teamUserIds, reqVO, null);
-        verifyNoInteractions(itemMapper, fileApi);
+        verify(itemMapper).selectListByOrderIds(List.of(100L));
+        verifyNoInteractions(fileApi);
     }
 
     @Test

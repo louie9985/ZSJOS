@@ -188,10 +188,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         values.put("lead.mobile", fullContact ? lead.getSubmittedMobile() : DesensitizedUtil.mobilePhone(lead.getSubmittedMobile()));
         values.put("lead.wechatId", fullContact ? lead.getSubmittedWechatId() : maskWechat(lead.getSubmittedWechatId()));
         values.put("lead.sourceType", lead.getSourceType());
-        values.put("lead.sourceChannel", dictLabel(DICT_SOURCE_CHANNEL, lead.getSourceChannelId()));
+        values.put("lead.sourceChannel", lead.getSourceChannelLabelSnapshot());
         values.put("lead.province", lead.getProvinceName());
         values.put("lead.city", lead.getCityName());
-        values.put("lead.category", dictLabel(DICT_CATEGORY, lead.getLeadCategory()));
+        values.put("lead.category", lead.getLeadCategoryLabelSnapshot());
         values.put("lead.remark", lead.getRemark());
         values.put("lead.status", lead.getStatus());
         values.put("lead.assignmentStatus", lead.getAssignmentStatus());

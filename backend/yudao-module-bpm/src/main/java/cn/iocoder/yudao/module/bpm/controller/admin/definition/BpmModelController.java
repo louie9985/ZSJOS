@@ -140,12 +140,14 @@ public class BpmModelController {
     @Parameters({
             @Parameter(name = "file", description = "流程模型 JSON 文件", required = true),
             @Parameter(name = "key", description = "流程标识，替换导入文件中的标识", example = "process_yudao"),
-            @Parameter(name = "name", description = "流程名称，替换导入文件中的名称", example = "芋道")
+            @Parameter(name = "name", description = "流程名称，替换导入文件中的名称", example = "芋道"),
+            @Parameter(name = "category", description = "流程分类编码，替换导入文件中的分类", example = "general-module")
     })
     @PreAuthorize("@ss.hasPermission('bpm:model:import')")
     public CommonResult<String> importModel(@RequestParam("file") MultipartFile file,
                                             @RequestParam(value = "key", required = false) String key,
-                                            @RequestParam(value = "name", required = false) String name) throws IOException {
+                                            @RequestParam(value = "name", required = false) String name,
+                                            @RequestParam(value = "category", required = false) String category) throws IOException {
         BpmModelSaveReqVO reqVO;
         try {
             reqVO = JsonUtils.parseObject(file.getBytes(), BpmModelSaveReqVO.class);
@@ -161,8 +163,13 @@ public class BpmModelController {
         if (StrUtil.isNotEmpty(name)) {
             reqVO.setName(name);
         }
+        if (StrUtil.isNotEmpty(category)) {
+            reqVO.setCategory(category);
+        }
+        Long loginUserId = getLoginUserId();
+        reqVO.setManagerUserIds(List.of(loginUserId));
         ValidationUtils.validate(reqVO);
-        return success(modelService.importModel(reqVO));
+        return success(modelService.importModel(loginUserId, reqVO));
     }
 
     @PutMapping("/update")

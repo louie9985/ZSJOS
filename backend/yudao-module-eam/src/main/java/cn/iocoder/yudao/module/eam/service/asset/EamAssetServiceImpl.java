@@ -10,9 +10,11 @@ import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportExcel
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetImportRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetPageReqVO;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetSaveReqVO;
+import cn.iocoder.yudao.module.eam.service.common.EamDataScopeService;
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.category.EamCategoryDO;
 import cn.iocoder.yudao.module.eam.dal.mysql.asset.EamAssetMapper;
+import cn.iocoder.yudao.module.eam.dal.mysql.stock.EamStockHoldingMapper;
 import cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum;
 import cn.iocoder.yudao.module.eam.enums.asset.EamChangeTypeEnum;
 import cn.iocoder.yudao.module.eam.enums.category.EamManagementModeEnum;
@@ -42,6 +44,7 @@ import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_IMPORT_
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_CODE_DUPLICATE;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_NOT_EXISTS;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_STATUS_INVALID;
+import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_PUBLIC_CLEAR_USAGE_HOLDING_ACTIVE;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.FIELD_VALUE_INVALID;
 import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.EMPLOYEE_NOT_EXISTS;
 
@@ -51,6 +54,7 @@ import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.EMPLOYEE_NOT_
 @Service
 @Validated
 public class EamAssetServiceImpl implements EamAssetService {
+    @Resource private EamDataScopeService dataScopeService;
 
     @Resource
     private EamAssetMapper assetMapper;
@@ -62,6 +66,8 @@ public class EamAssetServiceImpl implements EamAssetService {
     private EamCodeRuleService codeRuleService;
     @Resource
     private EamAssetChangeLogService changeLogService;
+    @Resource
+    private EamStockHoldingMapper stockHoldingMapper;
     @Resource
     private HrmEmployeeApi employeeApi;
     @Resource
@@ -81,6 +87,7 @@ public class EamAssetServiceImpl implements EamAssetService {
         applySourceSnapshot(asset);
         applyUserSnapshots(asset);
         asset.setStatus(EamAssetStatusEnum.IDLE.getStatus());
+        asset.setVersion(0);
         applyManagementSnapshot(asset, category, reqVO.getQuantity());
         // 3. 导入可沿用已有标签；普通建档仍由编号规则生成
         if (StrUtil.isBlank(reqVO.getAssetCode())) {
@@ -103,10 +110,17 @@ public class EamAssetServiceImpl implements EamAssetService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void updateAsset(EamAssetSaveReqVO reqVO) {
+        updateAsset(reqVO, null);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateAsset(EamAssetSaveReqVO reqVO, Long operatorUserId) {
         EamAssetDO before = validateAssetExists(reqVO.getId());
         EamCategoryDO category = categoryService.validateCategoryExists(reqVO.getCategoryId());
         NormalizedExtFields extFields = categoryFieldService
-                .validateAndNormalizeExtFieldsWithSnapshots(reqVO.getCategoryId(), reqVO.getExtFields());
+                .validateAndNormalizeExtFieldsWithSnapshots(reqVO.getCategoryId(), reqVO.getExtFields(),
+                        before.getExtFields(), before.getExtFieldLabels(), before.getExtFieldDictTypes());
 
         // 状态与资产编号不通过编辑表单变更：状态归状态机，编号归编号规则
         EamAssetDO updateObj = BeanUtils.toBean(reqVO, EamAssetDO.class);
@@ -116,10 +130,43 @@ public class EamAssetServiceImpl implements EamAssetService {
         applyManagementSnapshot(updateObj, category, reqVO.getQuantity());
         updateObj.setStatus(null);
         updateObj.setAssetCode(null);
-        assetMapper.updateById(updateObj);
+        updateObj.setVersion(before.getVersion() == null ? 1 : before.getVersion() + 1);
+        if (operatorUserId != null) {
+            updateObj.setUpdater(String.valueOf(operatorUserId));
+        }
+        int updated = operatorUserId == null ? assetMapper.updateById(updateObj)
+                : assetMapper.updateByIdAndVersion(updateObj, before.getVersion());
+        if (updated == 0) {
+            throw exception(ASSET_STATUS_INVALID, before.getAssetCode());
+        }
 
         EamAssetDO after = assetMapper.selectById(reqVO.getId());
-        changeLogService.record(before, after, EamChangeTypeEnum.EDIT.getType(), null, "编辑资产信息");
+        if (operatorUserId == null) {
+            changeLogService.record(before, after, EamChangeTypeEnum.EDIT.getType(), null, "编辑资产信息");
+        } else {
+            changeLogService.record(before, after, EamChangeTypeEnum.EDIT.getType(), null,
+                    "公开页面编辑资产信息", operatorUserId);
+        }
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void clearUsageAndSetIdle(Long assetId, Integer expectedVersion, Long operatorUserId) {
+        EamAssetDO before = validateAssetExists(assetId);
+        validateStatusTransition(before, Set.of(EamAssetStatusEnum.IDLE.getStatus(),
+                EamAssetStatusEnum.IN_USE.getStatus()));
+        if (stockHoldingMapper.selectOpenByAssetId(assetId) != null) {
+            throw exception(ASSET_PUBLIC_CLEAR_USAGE_HOLDING_ACTIVE);
+        }
+        int currentVersion = before.getVersion() == null ? 0 : before.getVersion();
+        if (expectedVersion == null || expectedVersion != currentVersion
+                || assetMapper.clearUsageAndSetIdle(assetId, before.getVersion(), currentVersion + 1,
+                String.valueOf(operatorUserId)) == 0) {
+            throw exception(ASSET_STATUS_INVALID, before.getAssetCode());
+        }
+        EamAssetDO after = assetMapper.selectById(assetId);
+        changeLogService.record(before, after, EamChangeTypeEnum.RETURN.getType(), null,
+                "公开页面清除使用归属并置为闲置", operatorUserId);
     }
 
     @Override
@@ -134,6 +181,17 @@ public class EamAssetServiceImpl implements EamAssetService {
     }
 
     @Override
+    public EamAssetDO getAsset(Long id, Long userId) {
+        EamAssetDO asset = assetMapper.selectById(id);
+        if (asset == null) return null;
+        var scope = dataScopeService.resolve(userId, EamDataScopeService.ASSET_QUERY_SELF,
+                EamDataScopeService.ASSET_QUERY_DEPT);
+        if (scope.all() || (scope.self() && userId.equals(asset.getUseEmployeeId()))
+                || (asset.getUseDeptId() != null && scope.deptIds().contains(asset.getUseDeptId()))) return asset;
+        return null;
+    }
+
+    @Override
     public List<EamAssetDO> getAssetList(Collection<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return Collections.emptyList();
@@ -144,6 +202,12 @@ public class EamAssetServiceImpl implements EamAssetService {
     @Override
     public PageResult<EamAssetDO> getAssetPage(EamAssetPageReqVO reqVO) {
         return assetMapper.selectPage(reqVO);
+    }
+
+    @Override
+    public PageResult<EamAssetDO> getAssetPage(EamAssetPageReqVO reqVO, Long userId) {
+        return assetMapper.selectPage(reqVO, dataScopeService.resolve(userId,
+                EamDataScopeService.ASSET_QUERY_SELF, EamDataScopeService.ASSET_QUERY_DEPT));
     }
 
     @Override

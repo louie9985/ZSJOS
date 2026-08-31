@@ -8,6 +8,14 @@
         ><slot name="actions" :reload="load"></slot><el-button @click="load">刷新</el-button></div
       ></div
     >
+    <ZsjosAdvancedFilter
+      v-if="advancedScene"
+      :scene="advancedScene"
+      :placeholder="advancedPlaceholder"
+      :keyword="String(props.query.keyword || '')"
+      @search="handleAdvancedSearch"
+      @change="handleAdvancedFilter"
+    />
     <el-alert
       v-if="unauthorized"
       title="暂无该列表的查询权限"
@@ -76,7 +84,10 @@
   >
 </template>
 <script setup lang="ts">
+import type { AdvancedFilterGroup, AdvancedFilterScene } from '@/api/zsjos/advancedFilter'
+import request from '@/config/axios'
 import * as MenuApi from '@/api/zsjos/workbenchMenus'
+import ZsjosAdvancedFilter from './ZsjosAdvancedFilter.vue'
 const props = withDefaults(
   defineProps<{
     title: string
@@ -85,8 +96,17 @@ const props = withDefaults(
     query?: Record<string, unknown>
     numberField?: string
     numberLabel?: string
+    advancedScene?: AdvancedFilterScene
+    advancedSearchEndpoint?: string
+    advancedPlaceholder?: string
   }>(),
-  { description: '服务端数据列表', query: () => ({}), numberField: 'id', numberLabel: '编号' }
+  {
+    description: '服务端数据列表',
+    query: () => ({}),
+    numberField: 'id',
+    numberLabel: '编号',
+    advancedPlaceholder: '关键字搜索'
+  }
 )
 const loading = ref(false)
 const error = ref('')
@@ -95,6 +115,8 @@ const rows = ref<MenuApi.WorkbenchListItem[]>([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const advancedFilter = ref<AdvancedFilterGroup>()
+const advancedKeyword = ref('')
 const selected = ref<MenuApi.WorkbenchListItem>()
 const detailOpen = ref(false)
 const detailEntries = computed(() => Object.entries(selected.value || {})
@@ -108,16 +130,34 @@ const display = (value: unknown) =>
     : typeof value === 'object'
       ? JSON.stringify(value)
       : String(value)
+const handleAdvancedSearch = (value: string) => {
+  advancedKeyword.value = value
+  pageNo.value = 1
+  void load()
+}
+const handleAdvancedFilter = (value?: AdvancedFilterGroup) => {
+  advancedFilter.value = value
+  pageNo.value = 1
+  void load()
+}
 const load = async () => {
   loading.value = true
   error.value = ''
   unauthorized.value = false
   try {
-    const result = await MenuApi.page(props.endpoint, {
+    const params = {
       ...props.query,
+      ...(advancedKeyword.value ? { keyword: advancedKeyword.value } : {}),
+      ...(advancedFilter.value ? { advancedFilter: advancedFilter.value } : {}),
       pageNo: pageNo.value,
       pageSize: pageSize.value
-    })
+    }
+    const result = props.advancedSearchEndpoint && advancedFilter.value
+      ? await request.post<MenuApi.WorkbenchListResult>({
+          url: props.advancedSearchEndpoint,
+          data: params
+        })
+      : await MenuApi.page(props.endpoint, params)
     rows.value = result.list || []
     total.value = result.total || 0
   } catch (e: any) {

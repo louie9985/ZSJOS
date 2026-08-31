@@ -109,6 +109,16 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
     @Override
     public NormalizedExtFields validateAndNormalizeExtFieldsWithSnapshots(
             Long categoryId, Map<String, Object> extFields) {
+        return validateAndNormalizeExtFieldsWithSnapshots(categoryId, extFields, Map.of(), Map.of(), Map.of());
+    }
+
+    @Override
+    public NormalizedExtFields validateAndNormalizeExtFieldsWithSnapshots(
+            Long categoryId, Map<String, Object> extFields, Map<String, Object> previousValues,
+            Map<String, String> previousLabels, Map<String, String> previousDictTypes) {
+        previousValues = previousValues == null ? Map.of() : previousValues;
+        previousLabels = previousLabels == null ? Map.of() : previousLabels;
+        previousDictTypes = previousDictTypes == null ? Map.of() : previousDictTypes;
         List<EamCategoryFieldDO> definitions = getEffectiveFieldList(categoryId);
         Map<String, Object> normalized = new LinkedHashMap<>();
         Map<String, String> labels = new LinkedHashMap<>();
@@ -121,12 +131,19 @@ public class EamCategoryFieldServiceImpl implements EamCategoryFieldService {
             if (blank) {
                 continue; // 管理端字段全部选填；员工收集表规则由独立表单执行
             }
-            Object value = convertValue(def, raw);
+            String fieldKey = def.getFieldKey();
+            boolean unchangedDictionarySelection = Objects.equals(def.getFieldType(), EamFieldTypeEnum.SELECT.getType())
+                    && "SYSTEM_DICT".equals(def.getOptionSource())
+                    && Objects.equals(String.valueOf(raw).trim(), String.valueOf(previousValues.get(fieldKey)))
+                    && previousLabels.containsKey(fieldKey);
+            Object value = unchangedDictionarySelection ? String.valueOf(raw).trim() : convertValue(def, raw);
             normalized.put(def.getFieldKey(), value);
             if (Objects.equals(def.getFieldType(), EamFieldTypeEnum.SELECT.getType())) {
-                labels.put(def.getFieldKey(), resolveSelectLabel(def, String.valueOf(value)));
+                labels.put(fieldKey, unchangedDictionarySelection ? previousLabels.get(fieldKey)
+                        : resolveSelectLabel(def, String.valueOf(value)));
                 if ("SYSTEM_DICT".equals(def.getOptionSource())) {
-                    dictTypes.put(def.getFieldKey(), def.getDictType());
+                    dictTypes.put(fieldKey, unchangedDictionarySelection
+                            ? previousDictTypes.getOrDefault(fieldKey, def.getDictType()) : def.getDictType());
                 }
             }
         }

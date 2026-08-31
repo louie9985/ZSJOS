@@ -43,10 +43,11 @@ public interface BpmModelService {
     /**
      * 导入流程模型
      *
+     * @param userId 导入人用户编号
      * @param reqVO 导入信息
      * @return 创建的流程模型的编号
      */
-    String importModel(@Valid BpmModelSaveReqVO reqVO);
+    String importModel(Long userId, @Valid BpmModelSaveReqVO reqVO);
 
     /**
      * 导出流程模型

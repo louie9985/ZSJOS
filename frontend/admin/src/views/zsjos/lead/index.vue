@@ -85,12 +85,12 @@
       </el-table-column>
       <el-table-column label="客资分类" min-width="120">
         <template #default="scope">{{
-          dictLabel(zsjosLeadCategory, scope.row.leadCategory)
+          scope.row.leadCategoryLabelSnapshot || '历史未记录'
         }}</template>
       </el-table-column>
       <el-table-column label="来源渠道" min-width="120">
         <template #default="scope">{{
-          dictLabel(zsjosLeadSourceChannel, scope.row.sourceChannel)
+          scope.row.sourceChannelLabelSnapshot || '历史未记录'
         }}</template>
       </el-table-column>
       <el-table-column label="主意向产品" min-width="180">
@@ -161,10 +161,10 @@
         </el-descriptions>
         <el-descriptions title="客资信息" :column="2" border class="mt-20px">
           <el-descriptions-item label="客资分类">{{
-            dictLabel(zsjosLeadCategory, detail.leadCategory)
+            detail.leadCategoryLabelSnapshot || '历史未记录'
           }}</el-descriptions-item>
           <el-descriptions-item label="来源渠道">{{
-            dictLabel(zsjosLeadSourceChannel, detail.sourceChannel)
+            detail.sourceChannelLabelSnapshot || '历史未记录'
           }}</el-descriptions-item>
           <el-descriptions-item label="客资状态">{{
             leadStatusLabel(detail.status)
@@ -402,8 +402,6 @@ const reloadDetail = async () => {
     followUpLoading.value = false
   }
 }
-const dictLabel = (options: Array<{ label: string; value: string | number }>, value?: string) =>
-  !value ? '-' : options.find((item) => String(item.value) === String(value))?.label || '标签未配置'
 const optionLabel = (options: Array<{ label: string; value: string }>, value?: string) =>
   !value ? '-' : options.find((item) => item.value === value)?.label || '未知状态'
 const leadStatusLabel = (value?: string) => optionLabel(LeadApi.LEAD_STATUS_OPTIONS, value)

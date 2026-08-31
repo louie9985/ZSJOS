@@ -76,6 +76,9 @@
         >
           <Icon icon="ep:download" class="mr-5px" /> 导出
         </el-button>
+        <el-button v-hasPermi="['eam:asset:public-edit-code']" plain @click="showMyCode">我的公开编辑口令</el-button>
+        <el-button v-hasPermi="['eam:asset:public-edit-code']" plain @click="updateMyCode">修改口令</el-button>
+        <el-button v-hasPermi="['eam:asset:public-edit-code']" plain @click="resetMyCode">重新生成口令</el-button>
       </el-form-item>
     </el-form>
   </ContentWrap>
@@ -165,6 +168,7 @@ import AssetForm from './AssetForm.vue'
 import AssetImportForm from './AssetImportForm.vue'
 import AssetDetail from './AssetDetail.vue'
 import QrCodeDialog from './QrCodeDialog.vue'
+import { ElMessageBox } from 'element-plus'
 
 defineOptions({ name: 'EamAsset' })
 
@@ -199,6 +203,39 @@ const filterOptions = computed(() => {
     ? getStrDictOptions(field.dictType)
     : (field.options || []).map((value) => ({ label: value, value }))
 })
+
+const showMyCode = async () => {
+  try {
+    const data = await AssetApi.getMyPublicEditCode()
+    await message.alert(`您的公开编辑口令：${data.code}`)
+  } catch { /* request layer displays the reason */ }
+}
+
+const resetMyCode = async () => {
+  try {
+    await message.confirm('重新生成后，旧口令将立即失效，是否继续？')
+    const data = await AssetApi.generateMyPublicEditCode()
+    await message.alert(`新的公开编辑口令：${data.code}`)
+  } catch { /* cancel and request errors are intentionally silent */ }
+}
+
+const updateMyCode = async () => {
+  try {
+    const { value } = await ElMessageBox.prompt(
+      '请输入 6 位大写英数字，不支持 I、O、0、1',
+      '修改公开编辑口令',
+      {
+        inputPattern: /^[A-HJ-NP-Z2-9]{6}$/,
+        inputErrorMessage: '请输入有效的 6 位口令',
+        inputPlaceholder: '例如 A2BC3D',
+        confirmButtonText: '保存',
+        cancelButtonText: '取消'
+      }
+    )
+    const data = await AssetApi.updateMyPublicEditCode(value)
+    await message.alert(`公开编辑口令已修改为：${data.code}`)
+  } catch { /* cancel and request errors are intentionally silent */ }
+}
 
 const getList = async () => {
   loading.value = true
@@ -281,7 +318,7 @@ const handleExport = async () => {
 }
 
 onMounted(async () => {
-  await loadCategoryTree()
-  await getList()
+  // 分类树只用于筛选，和资产列表没有依赖关系；并行加载避免首屏被分类接口串行阻塞。
+  await Promise.all([loadCategoryTree(), getList()])
 })
 </script>

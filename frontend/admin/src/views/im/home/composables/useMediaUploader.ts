@@ -7,12 +7,6 @@ import { useMessageSender } from './useMessageSender'
 import { getDb, type DbClient } from '../../utils/db'
 import { ImMessageStatus, ImContentType } from '../../utils/constants'
 import {
-  MESSAGE_FILE_MAX_MB,
-  MESSAGE_IMAGE_MAX_MB,
-  MESSAGE_VIDEO_MAX_MB,
-  MESSAGE_VOICE_MAX_MB
-} from '../../utils/config'
-import {
   BLOB_URL_PREFIX,
   generateClientMessageId,
   parseMessage,
@@ -121,36 +115,6 @@ interface UploadAndSendMediaOptions {
  *
  * 任意失败把消息状态置 FAILED；MessageItem 上点重试再走一次本函数（_localFile 还在内存就行）
  */
-/** 按内容类型映射体积上限（MB）；未识别类型返回 0 表示不限 */
-function resolveMediaMaxMb(type: number): number {
-  switch (type) {
-    case ImContentType.IMAGE:
-      return MESSAGE_IMAGE_MAX_MB
-    case ImContentType.VIDEO:
-      return MESSAGE_VIDEO_MAX_MB
-    case ImContentType.VOICE:
-      return MESSAGE_VOICE_MAX_MB
-    case ImContentType.FILE:
-      return MESSAGE_FILE_MAX_MB
-    default:
-      return 0
-  }
-}
-
-/** 校验媒体文件大小是否超过内容类型上限；超限触发 warn 并返回 false，调用方不应进入占位 / 上传链路 */
-export function ensureMediaSizeWithinLimit(
-  file: File,
-  type: number,
-  warn: (text: string) => void
-): boolean {
-  const maxMb = resolveMediaMaxMb(type)
-  if (maxMb && file.size > maxMb * 1024 * 1024) {
-    warn(`文件大小超过上限 ${maxMb}MB，请压缩后再发`)
-    return false
-  }
-  return true
-}
-
 export const useMediaUploader = () => {
   const messageStore = useMessageStore()
   const message = useMessage()
@@ -326,10 +290,6 @@ export const useMediaUploader = () => {
     const handler = mediaTypeHandlers[opts.type]
     if (!handler) {
       console.warn('[IM] uploadAndSendMedia 收到未注册的媒体类型', { type: opts.type })
-      return ''
-    }
-    // 体积上限拦截：大文件浏览器内截帧 / 解码可致 OOM；超限直接 warning，不进入占位 / 上传链路
-    if (!ensureMediaSizeWithinLimit(opts.file, opts.type, message.warning)) {
       return ''
     }
     const context = opts.context ?? {}

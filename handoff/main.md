@@ -111,6 +111,64 @@
 
 # Main Workstream
 
+## Workstream Registration - 2026-08-31 16:10:00 +08:00
+
+- Workstream ID: `main-production-bootstrap-seed`
+- Goal: 按已确认的逐表生产口径完善 fresh production bootstrap，导入组织/权限/字典/EAM 分类/BPM 定义基线，并保持业务实例与运行历史为空。
+- Non-goals: 不导入真实员工、客资、合作方、订单、支付、资产实例、库存、日志或消息；不执行真实生产数据库写入；不切换分支、提交或推送；不清理其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `88313524d2d575fa22b72811245643ba33f7ff17`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/bootstrap.sql`; Core/EAM seed、verify 与数据库说明；BPM bootstrap 交付说明；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Core/EAM schema 与迁移链、System seed、EAM V006 分类基线、BPM manifest；无新增依赖。
+- Integration order: 登记表级口径 -> 修正 Core bootstrap 顺序 -> 接入 EAM schema/迁移 -> 补充生产预置说明与校验 -> 静态检查/受控 fresh 检查 -> 追加交付记录。
+- Verification plan: `python script/sql/mysql/tools/zsjos_db.py check`; SQL SOURCE/危险语句扫描；可用时运行 fresh bootstrap 与 `verify-bootstrap.sql`、`verify/core.sql`、`verify/eam.sql`；`git diff --check`。
+
+## Delivery Entry - 2026-08-31 16:25:00 +08:00
+
+- Workstream ID: `main-production-bootstrap-seed`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree)
+- User goal: 按逐表确认口径完善生产 fresh bootstrap，导入组织/权限/字典/EAM 分类等基线并保持业务实例为空。
+- Key decisions: 调整 Core V162 双文件执行顺序；将 EAM schema 与 V001-V011 接入 bootstrap 并登记 EAM 模块版本；补充生产 seed policy、EAM 基线和空业务表校验；BPM 定义仍按 manifest 资产单独部署，不在 SQL 导入运行实例。
+- Execution or analysis result: 完成 bootstrap 编排、EAM 模块接入、EAM 版本登记、生产说明与验证 SQL；未执行真实数据库写入。
+- Changed files: `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/README.md`; `script/sql/mysql/verify-bootstrap.sql`; `handoff/main.md`。
+- Verification evidence: 所有 bootstrap `SOURCE` 路径存在；bootstrap seed 入口无 DROP DATABASE/TRUNCATE/DELETE；`git diff --check` 无空白错误（仅 LF/CRLF 提示）。`zsjos_db.py check` 仍被仓库现有两个 `V162` 文件同号阻塞；BPM manifest 校验仍报告既有 `zsjos_feedback_requirement_approval/1.0.0/process.bpmn20.xml` checksum mismatch；未安装 mysql 客户端，未能运行 fresh 数据库实测。
+- Dependency or integration impact: EAM 生产执行需设置 `ZSJOS_DB_MODULES=core,eam`；BPM manifest checksum 需在部署前单独修复/确认；未新增依赖、未切换分支、未提交或推送。
+- Remaining work: 解决 Core V162 历史同号迁移的注册/工具兼容问题；修复或确认 BPM manifest checksum；在受控 MySQL 8 环境执行 fresh bootstrap、Core/EAM verify 和重复执行测试。
+
+## Workstream Registration - 2026-08-31 15:00:00 +08:00
+
+- Workstream ID: `main-workbench-menu-task-badges`
+- Goal: 在 React Workbench 全部导航布局中显示服务端待办摘要徽标，并提供稳定的待办菜单深链与实时刷新。
+- Non-goals: 不改 Vue Admin、Partner H5、BPM/业务任务状态机或数据库结构；不新增依赖；不切换分支、提交、推送或执行真实数据库/外部服务写操作。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `88313524d2d575fa22b72811245643ba33f7ff17`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: Workbench 菜单待办摘要服务、导航徽标与实时刷新；ZSJOS workbench 摘要 Controller/Service/VO；相关 API/前端测试和文档；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 BusinessTask、BPM 公共 API、System 权限/菜单、Workbench React/Ant Design/WebSocket；无新增依赖。
+- Integration order: 新增后端摘要契约 -> Workbench typed service/provider -> 所有导航模式徽标 -> WebSocket/轮询兜底 -> 聚焦测试与文档 -> typecheck/build/编译验证 -> 追加交付记录。
+- Verification plan: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile`; `cd frontend/workbench && npm test -- menuTaskBadge`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
+
+## Delivery Entry - 2026-08-31 14:30:00 +08:00
+
+- Workstream ID: `main-workbench-menu-task-badges`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree)
+- User goal: 在 React Workbench 全部导航布局中显示服务端待办摘要徽标，并提供待办菜单深链与刷新机制。
+- Key decisions: 新增 `/zsjos/business-task/menu-task-summary` 统一摘要契约；Workbench 使用单一 Provider、Ant Design Badge、父菜单后代聚合、WebSocket 失效事件与 60/15 秒轮询兜底；首批摘要覆盖现有 ZSJOS BusinessTask 来源，未改 Vue/H5、BPM 状态机和数据库。
+- Execution or analysis result: 后端可按当前用户 pending 业务任务映射 `/zsjos/leads/manage`、`/zsjos/leads/assignment`、`/zsjos/my-sales-orders`、`/zsjos/my-students`、`/zsjos/tasks/today`、`/zsjos/work-plans`；Workbench 所有菜单构建入口接入徽标解析，新增并通过摘要映射测试。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/task/BusinessTaskController.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/task/vo/MenuTaskSummaryRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/MenuTaskSummaryService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/task/MenuTaskSummaryServiceImpl.java`; `frontend/workbench/src/components/MenuTaskBadgeProvider.tsx`; `frontend/workbench/src/layouts/navItems.tsx`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/services/menuTaskBadge.ts`; `frontend/workbench/src/services/menuTaskBadge.test.ts`; `docs/api/zsjos-workbench-foundation.md`; `handoff/main.md`。
+- Verification evidence: Workbench `npm run typecheck` passed; focused Vitest `src/services/menuTaskBadge.test.ts` passed 1/1; Workbench production build passed with existing large-chunk warning; ZSJOS Maven compile passed; scoped `git diff --check` reported only existing LF-to-CRLF warnings。
+- Dependency or integration impact: No new dependency, no SQL/database mutation, no branch/commit/push, no external service change. Existing `notify-message-new` and `zsjos_lead_assignment` events are used as refresh hints; the new generic invalidation event is consumed when future providers publish it.
+- Remaining work: BPM 专用待办、生产工单/分配池等非 `zsjos_business_task` 来源尚未接入统一摘要；父级服务端菜单的多层聚合和点击后自动 deep-link 仍需按各业务页面逐项补齐；真实登录态桌面/移动浏览器验收未执行。
+
 ## Workstream Registration - 2026-08-31 00:55:00 +08:00
 
 - Workstream ID: `main-wecom-ticket-leadno-hardening`
@@ -18790,6 +18848,365 @@ equestAttachments。
 - Verification plan: 运行管理端 `pnpm ts:check`、目标文件 ESLint、`pnpm build:local`、scoped `git diff --check`；启动本地管理端并检查宽桌面抽屉、窄容器/嵌套条件组和移动宽度的输入框与浮层宽度，登录或后端状态阻断时记录未验证风险。
 - Status: `in-progress`
 
+### Delivery Entry - 2026-08-31 22:46:40 +08:00
+
+- Beijing time: 2026-08-31 22:46:40
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 允许“资产详情可见权限”读取分类字段定义，修复主管查看下属员工资产详情时报错。
+- Key decisions: 分类字段查询与生效字段查询保留 `eam:category-field:query`，并允许 `eam:asset:query`、`eam:asset:query-self`、`eam:asset:query-dept`、`eam:manage-all` 只读权限访问；未放开分类字段写操作。
+- Execution or analysis result: 资产详情并行请求的 `/eam/category-field/effective-list` 不再仅依赖分类字段管理权限，具备资产查看权限的主管可读取动态字段定义。
+- Changed files: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/category/EamCategoryFieldController.java`; `handoff/main.md`。
+- Verification evidence: EAM 依赖链编译成功；EAM 定向测试 5/5 通过（`EamAssetChangeLogServiceImplTest`、`EamAssetServiceImplTest`）；授权注解静态检查确认两查询接口均包含四类资产查看权限；本次文件 `git diff --check` 无错误。
+- Dependency or integration impact: 无新增依赖、数据库、菜单或角色配置变更；后端重启/重新部署后生效。资产对象数据范围与分类字段增删改权限不变。
+- Remaining work: 需在用户 233 的真实登录态重新打开一条下属员工资产详情，确认动态字段和变更记录均正常加载。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 23:08:30 +08:00
+
+- Workstream ID: `main-eam-loading-optimization`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将其他 Admin iframe 页面中的 EAM 串行首屏请求改为并行加载。
+- Key decisions: 统一 iframe 容器已是单 iframe、路由消息切换；仅并行互不依赖的 EAM 页面初始化请求，保留依赖请求和独立错误状态。
+- Execution or analysis result: 编码规则分类/列表、采购单/库存、盘点表单部门/分类树改为并行；采购页使用 `Promise.allSettled` 保留采购单与库存的独立失败提示。
+- Changed files: `frontend/admin/src/views/eam/codeRule/index.vue`; `frontend/admin/src/views/eam/purchase/index.vue`; `frontend/admin/src/views/eam/inventory/InventoryForm.vue`; `handoff/main.md`。
+- Verification evidence: 目标 EAM Vue 文件 ESLint 通过；`pnpm build:local` 通过（仅现有 legacy CSS 警告）；scoped `git diff --check` 无错误，仅有 LF/CRLF 提示。
+- Dependency or integration impact: 无新增依赖、后端/数据库/权限/菜单/iframe 协议变化；不影响有先后依赖的字段加载和表单提交流程。
+- Remaining work: 需要在有效登录态浏览器中逐个 iframe 页面用 Network 面板确认实际耗时；后端慢接口仍需按请求耗时继续优化。
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 23:04:00 +08:00
+
+- Workstream ID: `main-eam-loading-optimization`
+- Goal: 修复 Workbench/Admin 接入场景下 EAM 页面首次加载耗时过长，减少前端串行请求、后端 EAM 资产名称补齐的无效调用和员工资产任务逐条查询。
+- Non-goals: 不修改权限、菜单、iframe 协议、数据库结构、业务状态机或引入依赖；保留当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/eam/assetLedger/index.vue`; EAM 资产 Controller；员工资产任务项 Mapper/Service；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 EAM、HRM、System API 和 Vue Admin/Workbench 请求链路；无新增依赖。
+- Integration order: Admin 首屏并行加载 -> EAM 资产名称补齐空集合短路 -> 员工任务明细批量读取 -> 编译、Lint、构建和差异检查 -> 追加交付记录。
+- Verification plan: EAM 依赖链 compile；目标 Admin ESLint/build；EAM 聚焦测试（若 Maven 参数可用）；scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-08-31 23:06:48 +08:00
+
+- Workstream ID: `main-eam-loading-optimization`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复 EAM 页面加载耗时过长问题。
+- Key decisions: Admin 资产台账分类树与资产列表改为并行请求；资产 VO 补齐时对空员工/部门 ID 集合直接短路，避免无效远程调用；Workbench 员工资产摘要将任务明细从逐任务查询改为按任务 ID 批量查询并分组组装；不改权限、菜单、iframe、数据库和业务语义。
+- Execution or analysis result: 已完成上述三项性能优化，EAM 依赖链编译成功，Admin 目标页面 ESLint 和本地生产构建成功。
+- Changed files: `frontend/admin/src/views/eam/assetLedger/index.vue`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/admin/asset/EamAssetController.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/dal/mysql/employee/EamEmployeeAssetTaskItemMapper.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/employeeasset/EamEmployeeAssetServiceImpl.java`; `handoff/main.md`。
+- Verification evidence: `mvn -pl yudao-module-eam -am -DskipTests compile` passed; `frontend/admin pnpm exec eslint src/views/eam/assetLedger/index.vue` passed; `frontend/admin pnpm build:local` passed（仅现有 legacy CSS 警告）；scoped `git diff --check` 无错误，仅有 LF/CRLF 提示。EAM 聚焦测试命令受 PowerShell/Maven 参数解析及 reactor 未指定测试模块影响未执行成功，未声称通过。
+- Dependency or integration impact: 无新增依赖、数据库、权限、菜单、分支、提交、推送或外部服务变化；批量查询新增 Mapper 公共方法，其他调用方兼容。
+- Remaining work: 需在有效登录态浏览器中实测 EAM 首屏 Network 耗时；如仍慢，应基于 `/eam/asset/page`、`/eam/workbench/my-assets` 的服务端耗时继续优化 SQL/HRM API。
+- Status: `delivered`
+
+## Ordering Correction - 2026-08-31 22:47:00 +08:00
+
+- Workstream ID: `main-eam-asset-detail-field-permission`
+- Correction reason: 本工作流的登记与交付条目追加时命中了文件中较早的通用 `Status` 行，条目位置早于文件末尾；按 handoff 只追加规则保留原条目，不重写或删除。
+- Authoritative result: `main-eam-asset-detail-field-permission` 已完成；分类字段查询接口已允许资产详情只读权限，EAM 编译与定向测试均通过。
+- Status: `delivered`
+
+## Ordering Correction - 2026-08-31 20:41:30 +08:00
+
+- Workstream ID: `main-eam-public-save-operator-idle`
+- Correction reason: 本工作流的 `Delivery Entry - 2026-08-31 20:40:20 +08:00` 因追加补丁匹配到更早工作流的 `Status: in-progress`，被写入本次 `20:17:52` 登记之前；按 handoff 只追加规则保留原条目，不重写或删除。
+- Authoritative result: 上述 Delivery Entry 的决策、改动文件、验证证据、集成影响和剩余风险均有效；本更正位于当前文件末尾，确认 `main-eam-public-save-operator-idle` 状态为 `delivered`。
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 22:50:00 +08:00
+
+- Workstream ID: `main-eam-asset-detail-field-permission`
+- Goal: 允许拥有资产详情查看权限的主管读取分类动态字段定义，修复查看下属员工资产详情时的权限错误。
+- Non-goals: 不授予分类字段创建、编辑、删除权限；不改变资产对象数据范围、资产数据或菜单结构；不清理当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`（保留当前工作树全部既有未提交改动）
+- Target branch: 当前本地 `main`
+- Ownership scope: EAM 分类字段查询 Controller；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 EAM 资产查询权限与 Spring Security 方法授权；无新增依赖。
+- Integration order: 扩展分类字段只读授权 -> 编译/定向测试 -> 记录验证结果。
+- Verification plan: EAM Maven 定向测试、`git diff --check`，并检查授权注解覆盖四类资产查看权限。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-08-31 20:40:20 +08:00
+
+- Beijing time: 2026-08-31 20:40:20 +08:00
+- Workstream ID: `main-eam-public-save-operator-idle`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复 EAM 公开资产页显示保存成功但普通字段未实际提交的问题，按个人口令对应人员记录修改人，并提供受员工持有流程约束的一键清除使用归属并置闲功能。
+- Key decisions: H5 普通字段统一写入实际提交对象，扩展字段只通过 `extFields` 提交；公开更新使用独立 ReqVO，不能提交资产编号、状态或附件；口令匹配同时返回 HRM `employeeId` 和 System `userId`，前者写公开审计、后者写资产更新人与变更日志；普通公开保存和置闲均使用数据库版本条件原子更新；置闲只允许闲置/使用中，开放持有记录存在时明确拒绝，不自动结清员工资产流程。
+- Execution or analysis result: 文本、数字、日期、备注和扩展字段现会随保存请求提交并在版本未冲突时持久化；管理端资产变更时间线可通过口令对应的 System 用户显示真实操作人；公开页新增确认式“清除使用人和部门并置为闲置”，成功时清空员工、部门、员工姓名快照并递增版本，非法状态、开放持有或并发更新均不写入。
+- Changed files: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/pub/EamPublicAssetController.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/pub/vo/EamPublicAssetUpdateReqVO.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/controller/pub/vo/EamPublicAssetClearUsageReqVO.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/publicedit/EamPublicEditService.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetService.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetServiceImpl.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetChangeLogService.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetChangeLogServiceImpl.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/dal/mysql/asset/EamAssetMapper.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/enums/ErrorCodeConstants.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetServiceImplTest.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/asset/EamAssetChangeLogServiceImplTest.java`; `frontend/h5/src/api/eamPublic.ts`; `frontend/h5/src/pages/eam/asset.vue`; `docs/api/eam-office-procurement-assets.md`; `handoff/main.md`。
+- Verification evidence: 聚焦 Maven 测试 5/5 通过，覆盖公开更新显式操作人和原子版本、置闲成功、开放持有拒绝、非法状态拒绝及变更日志 System 操作人；`frontend/h5 npm run build` 通过；`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 通过；scoped `git diff --check` 通过（仅既有 LF/CRLF 提示）；浏览器在 390x844 和 1440x900 下检查无横向溢出，标题为“中世健资产管理”，无效资产状态正常展示。`mvn -f backend/pom.xml -pl yudao-module-eam -am test` 被上游既有 `CodegenEngineUniappTest.testExecute_treeSearch` 失败阻断，EAM 未进入该次全量运行；不带 `-am` 的 EAM 全量测试因本地已安装 HRM artifact 缺少当前工作树 DTO 而发现测试失败。
+- Dependency or integration impact: 无新增依赖、数据库、权限、菜单、二维码、口令规则、附件语义、分支、提交、推送或外部服务变更；新增公开 `PUT /public-api/eam/asset/clear-usage`，普通公开更新请求收窄为独立字段契约；ruoyi-vue-pro 技能促使实现保持 Controller -> Service -> DAL 分层、System/HRM 身份边界和 H5 现有请求模式。
+- Remaining work: 未重启当前后端，也未使用真实资产和个人口令执行端到端保存/置闲，以避免改动现有业务数据；部署或重启后需用一条可回滚测试资产验证后台字段、`updater`、变更时间线操作人和公开审计。有效资产的完整编辑态手机/桌面视觉验收仍待真实数据环境补做；上游 Infra 测试和本地 HRM artifact 同步问题不在本工作流范围。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 15:05:00 +08:00
+
+- Workstream ID: `main-employee-reminders`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (existing uncommitted worktree preserved)
+- User goal: Add employee contract-expiry and entry-anniversary reminders alongside birthday care.
+- Key decisions: Three independent HRM rules in one configuration payload; independent departments and trigger settings; 0-30 day advance window; active employees only; latest in-progress contract with `expireRemind`; entry-time natural anniversary with Feb 29 -> Mar 1 in non-leap years; in-app notification plus completable ZSJOS business tasks; old birthday paths remain compatible.
+- Execution or analysis result: Added HRM reminder API/config/controller/service and candidate queries; added unified contract/anniversary tenant job and notification provider; routed birthday scheduling through unified configuration; added generic reminder completion endpoint and Workbench actions; upgraded Admin page to three reminder cards; added V176 additive notification/job/menu metadata and API documentation.
+- Changed files: New HRM `api/employeereminder`, `service/employeereminder`, and controller/VO files; HRM employee and contract mappers/config enum; new ZSJOS reminder constants/job/providers; birthday job, business-task service/controller; Admin birthday-care API/page; Workbench API/task page; `script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql`; `docs/api/hrm-employee-reminders.md`; this handoff record.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-hrm,yudao-module-zsjos -am -DskipTests compile` passed; Workbench `npm run typecheck` passed for the earlier changed surface and `npm run build` passed; Admin scoped ESLint passed; Admin full `pnpm ts:check` remains blocked by pre-existing unrelated errors; scoped `git diff --check` passed apart from existing handoff whitespace warning.
+- Dependency or integration impact: No new dependency, no database business data changes, no service restart, no branch/commit/push. V176 must be applied through the documented bootstrap/migration process before production scheduling is expected.
+- Remaining work: Add focused automated tests for reminder date/filter/idempotency behavior, run controlled SQL execution and browser checks when an environment is available, and resolve unrelated pre-existing Admin type errors separately.
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 17:46:45 +08:00
+
+- Workstream ID: `main-eam-public-asset-edit`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修正 EAM 二维码扫码后只显示/搜索链接的问题，并确认个人口令入口。
+- Key decisions: 二维码内容已经使用公开 H5 绝对 URL；将 EAM H5 地址默认回退到 `ZSJOS_PUBLIC_H5_BASE_URL`，再回退到本地 `http://localhost:10086`，避免生成相对路径。
+- Execution or analysis result: 公开令牌、公开接口、H5 匿名资产页和口令管理代码已存在；管理端资产台账右上角“今日口令”调用 `/admin-api/eam/public-edit-code/me`，首次访问自动生成，具备独立权限的用户可查看。二维码扫码地址在手机上能否直接打开取决于 `EAM_PUBLIC_H5_BASE_URL` 是否配置为手机可访问地址。
+- Changed files: `backend/yudao-server/src/main/resources/application.yaml`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile` passed (`BUILD SUCCESS`); configuration and URL construction inspected.
+- Dependency or integration impact: No new dependency or database change; production deployment must set `EAM_PUBLIC_H5_BASE_URL` to a reachable HTTP/HTTPS host, not `localhost`.
+- Remaining work: 在有效部署地址和手机扫码器上验证真实跳转；如 H5 页面仍需“扫码后直接进入编辑/搜索”而非浏览器确认页，需另行调整扫码器或业务产品交互。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 17:52:30 +08:00
+
+- Workstream ID: `main-eam-public-asset-edit`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复 EAM 资产二维码生成时的重复键错误，并明确个人公开编辑口令的生成入口。
+- Key decisions: 公开令牌按资产复用数据库现有记录，替换 token_hash、恢复启用状态并递增版本，兼容已部署的资产唯一索引并立即使旧二维码失效；资产令牌查询按最新记录加行锁执行；管理端将“今日口令”改为长期有效口令的明确名称，并增加主动重新生成入口。
+- Execution or analysis result: `generatePublicToken` 不再在同一资产插入第二条记录，避免 `uk_eam_public_asset_token_asset` 重复键；拥有 `eam:asset:public-edit-code` 权限的当前员工可从资产台账查看或重新生成自己的口令，重生成后旧口令立即失效。
+- Changed files: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/dal/mysql/asset/EamPublicAssetTokenMapper.java`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/publicedit/EamPublicEditService.java`; `frontend/admin/src/views/eam/assetLedger/index.vue`; this handoff record.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile` passed (`BUILD SUCCESS`); targeted Admin ESLint passed; scoped `git diff --check` passed with only the existing LF/CRLF normalization warning.
+- Dependency or integration impact: No new dependency, migration, database execution, branch, commit, push, or external service change; existing H5 URL configuration remains responsible for producing a phone-reachable absolute URL in deployed environments.
+- Remaining work: Real database regeneration and phone QR scan remain unverified in this environment; production must configure `EAM_PUBLIC_H5_BASE_URL` to an accessible HTTP/HTTPS host.
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 17:55:00 +08:00
+
+- Workstream ID: `main-eam-unified-asset-qr`
+- Goal: 将 EAM 二维码改为统一匿名页面地址并携带资产编号，公开页按资产编号展示资料，保存仍需个人口令。
+- Non-goals: 不公开完整资产 JSON 于二维码，不取消匿名查看或口令授权，不修改既有后台资产编号规则、角色体系或数据库数据。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: EAM public edit service/controller, EAM asset QR controller/API, H5 EAM public page/API/router, this handoff record。
+- Owner: Codex `/root`
+- Dependencies: 现有 EAM 资产编号查询、匿名公开接口、H5 Vant 页面、既有个人口令接口；无新增依赖。
+- Integration order: 增加按资产编号查询 -> 改造公开 URL/接口 -> 更新 H5 查询参数与页面 -> 编译/类型检查 -> 追加交付记录。
+- Verification plan: EAM Maven compile、H5 build、Admin 目标 ESLint、scoped diff check；真实手机扫码待部署地址验证。
+
+## Delivery Entry - 2026-08-31 18:06:30 +08:00
+
+- Beijing time: 2026-08-31 18:06:30 +08:00
+- Workstream ID: `main-eam-unified-asset-qr`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将 EAM 二维码改为统一公开页面地址并只携带资产编号，页面匿名查看，修改继续校验个人口令。
+- Key decisions: 二维码地址采用 `/eam/asset?assetCode=...`；公开 GET/PUT 统一为 `/public-api/eam/asset?assetCode=...`；移除管理端已废弃的公开令牌生成/撤销接口；因资产编号仅租户内唯一，匿名入口忽略租户查找且仅在全库唯一命中时恢复资产所属租户执行，重复编号统一按不存在处理。
+- Execution or analysis result: 二维码不再创建或携带随机令牌；H5 路由改为固定 `/eam/asset` 并读取查询参数；匿名查看和口令保存均按资产编号定位；EAM 资产 DO 对齐 `TenantBaseDO` 以支持安全恢复租户上下文。
+- Changed files: EAM asset controller/public controller/public edit service/asset mapper/asset DO; Admin EAM asset API; H5 EAM API/page/router; this handoff record.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests clean compile` passed after compiling all 193 EAM sources; follow-up focused compile passed without the new unchecked warning; `frontend/h5 npm run build` passed; scoped `git diff --check` passed with existing LF/CRLF notices only.
+- Dependency or integration impact: No dependency, SQL migration, database execution, role assignment, branch, commit, push, or service restart; old random-token table remains unused for compatibility and may be retired separately after deployment review.
+- Remaining work: Real unauthenticated GET/PUT and phone QR scan require a running backend/H5 deployment; `EAM_PUBLIC_H5_BASE_URL` must be a phone-reachable absolute HTTP/HTTPS address. If different tenants reuse the same asset code, that code is deliberately unavailable through the assetCode-only public link to prevent cross-tenant ambiguity.
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 18:10:00 +08:00
+
+- Workstream ID: `main-eam-public-edit-menu-fix`
+- Goal: 修复 EAM 公开编辑口令按钮权限因菜单 ID 冲突未写入的问题，并同步本地开发数据库。
+- Non-goals: 不自动分配角色权限，不修改其他菜单、角色、用户、分支或提交，不清理当前工作树。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/migrations/eam/V009__eam_public_asset_access.sql`; local development DB single `system_menu` row; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing EAM asset menu `7102`, System menu/button permission contract, local Docker MySQL.
+- Integration order: Correct V009 menu ID -> insert missing local development menu row -> verify row and repeatability -> append delivery record.
+- Verification plan: Read-only checks for ID availability, permission uniqueness, parent menu, resulting row, role mappings, and repeat execution behavior; scoped `git diff --check`.
+
+## Delivery Entry - 2026-08-31 18:12:00 +08:00
+
+- Beijing time: 2026-08-31 18:12:00 +08:00
+- Workstream ID: `main-eam-public-edit-menu-fix`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 找回菜单管理中缺失的 EAM 资产公开编辑口令权限并修复其初始化来源。
+- Key decisions: 原 ID `7190` 已由 `eam:purchase:close` 占用，改用 EAM 范围内未占用的 `7198`；仅补插按钮权限，不自动绑定任何角色；保持权限挂在资产台账 `7102` 下。
+- Execution or analysis result: 修正 V009 权限菜单 ID，并在本地开发库新增一条 `system_menu` 记录：`7198 / 资产公开编辑口令 / eam:asset:public-edit-code / type 3 / parent 7102`；未修改 `system_role_menu`。
+- Changed files: `script/sql/mysql/migrations/eam/V009__eam_public_asset_access.sql`; this handoff record. External development state: local Docker MySQL `ruoyi-vue-pro.system_menu` inserted one row with ID 7198.
+- Verification evidence: Insertion reported 1 affected row; read-back matched ID/name/permission/type/sort/parent/status/deleted; role mapping count remained 0; executing the same guarded insertion again affected 0 rows; scoped `git diff --check` reported no whitespace errors.
+- Dependency or integration impact: Local development database menu metadata changed as explicitly confirmed; no role assignment, other menu/data mutation, dependency, branch, commit, push, or service restart.
+- Remaining work: Assign “资产公开编辑口令” to the intended role in role management, then re-login so the frontend receives `eam:asset:public-edit-code`; production or other databases must run the corrected V009 path or an equivalent controlled menu correction.
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 18:15:00 +08:00
+
+- Workstream ID: `main-eam-self-edit-passcode`
+- Goal: 允许具备 EAM 公开编辑口令权限的员工直接设置自己的 6 位口令，同时保留随机生成。
+- Non-goals: 不改变二维码、匿名查看、口令字符集、管理员重置或角色授权，不修改数据库结构或外部角色状态。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: EAM public-edit controller/service/VO/mapper, Admin EAM asset API/page or dialog, this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing `eam:asset:public-edit-code`, encrypted-code/HMAC storage, EAM Admin Axios and Element Plus.
+- Integration order: Add self-update request contract -> enforce format/permission/tenant uniqueness -> add Admin input UI -> focused verification -> append delivery record.
+- Verification plan: EAM clean/focused compile or tests, Admin target ESLint/type check where practical, scoped diff check; no real passcode mutation without a user-selected value.
+
+## Delivery Entry - 2026-08-31 18:39:00 +08:00
+
+- Beijing time: 2026-08-31 18:39:00 +08:00
+- Workstream ID: `main-eam-self-edit-passcode`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 允许员工直接输入并修改自己的 EAM 匿名编辑口令，而不只是查看或随机重置。
+- Key decisions: 新口令继续固定为 6 位 `A-HJ-NP-Z2-9`；本人修改复用现有 `eam:asset:public-edit-code` 权限和员工身份；同租户内按 HMAC 拒绝与其他员工重复；保留随机生成入口并对随机值查重；保存后直接覆盖原加密值和 HMAC，使旧口令立即失效。
+- Execution or analysis result: 新增 `PUT /admin-api/eam/public-edit-code/me`；管理端资产台账增加“修改口令”按钮和格式校验输入框；后端执行权限、格式、员工和重复口令校验，返回保存后的本人口令。
+- Changed files: EAM public-edit update ReqVO/controller/service/code mapper; Admin EAM asset API and asset ledger page; this handoff record.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile` passed after javac compiled 194 EAM source files; targeted Admin ESLint for the asset page and API passed; scoped `git diff --check` passed with only existing LF/CRLF notices.
+- Dependency or integration impact: No dependency, schema, database data, menu/role assignment, branch, commit, push, or service restart; API adds a backward-compatible authenticated operation.
+- Remaining work: Real endpoint mutation was not executed because no user-selected test code was authorized; application-layer duplicate checking does not provide a database-level guarantee against two truly simultaneous identical custom-code writes.
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 18:46:00 +08:00
+
+- Beijing time: 2026-08-31 18:46:00 +08:00
+- Workstream ID: `main-eam-unified-asset-qr`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复二维码打开后提示“链接无效或资产不存在”。
+- Key decisions: EAM H5 匿名 API 使用独立空基址，避免继承 Partner H5 的 `/part-api`；请求路径保持 `/public-api/eam/asset?assetCode=...`。
+- Execution or analysis result: 定位到 `frontend/h5/.env.development` 的全局 `VITE_APP_BASE_API=/part-api` 导致匿名 EAM 请求前缀错误；已在 `eamPublic.ts` 固定 `baseURL: ''`，由 `/public-api` 作为完整请求路径。开发库存在资产编号 `EAM-IT-COMPUTER-20260831-0001` 可用于联调。
+- Changed files: `frontend/h5/src/api/eamPublic.ts`; this handoff record.
+- Verification evidence: `frontend/h5 npm run build` passed；匿名接口路径和数据库资产编号已静态核对；scoped `git diff --check` passed with no errors.
+- Dependency or integration impact: No dependency, database, permission, branch, commit, push, or service restart; H5 must be rebuilt/restarted for the client base URL change to take effect.
+- Remaining work: Real browser/mobile request remains unverified until backend and rebuilt H5 are running through the same host; if reverse proxy uses a different public API prefix, proxy routing must forward `/public-api/**` to the backend.
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 19:42:00 +08:00
+
+- Beijing time: 2026-08-31 19:42:00 +08:00
+- Workstream ID: `main-eam-unified-asset-qr`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 公开资产页按系统中文展示字段，并在口令验证后真正允许编辑和保存。
+- Key decisions: 后端返回中文字段描述、显示值、编辑类型和权威选项，同时单独返回内部编辑值；不向页面展示 ID、extFields 等存储键；新增匿名口令验证接口，保存时仍再次校验口令和版本。
+- Execution or analysis result: 部门、分类、员工、资产来源和扩展字段均映射为中文标签；H5 页面改为“验证口令并编辑”后显示编辑表单，保存调用公开 PUT 接口；修复原页面仅提交原始数据、无法修改的缺陷。
+- Changed files: EAM public edit service/controller; H5 EAM API and asset page; this handoff record。
+- Verification evidence: EAM Maven compile passed; `frontend/h5 npm run build` passed; scoped `git diff --check` passed with no errors.
+- Dependency or integration impact: No new dependency, SQL migration, database mutation, menu/role change, branch, commit, push, or service restart. Anonymous endpoint continues through `/public-api` and existing tenant recovery.
+- Remaining work: Select-style controls currently render as editable text fields in H5; authoritative options are returned for subsequent picker enhancement. Real anonymous GET/verify/PUT and mobile browser checks remain unverified until services are restarted with rebuilt artifacts.
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 19:50:00 +08:00
+
+- Workstream ID: `main-eam-h5-editor-polish`
+- Goal: 将 EAM 匿名资产页的关联字段改为中文选择器，并只在资产页显示“中世健资产管理”标题。
+- Non-goals: 不改变兼职 H5 其他页面标题、后端资产字段契约、二维码格式、口令规则或数据库结构。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/h5/src/pages/eam/asset.vue`; H5 EAM API types if required; this handoff record.
+- Owner: Codex `/root`
+- Dependencies: Existing backend PublicField options, Vant Picker/Popup, Vue Router.
+- Integration order: Add scoped title -> add select picker UI and internal value mapping -> build H5 -> append delivery record.
+- Verification plan: `npm run build`, scoped diff check; real mobile interaction remains deployment-dependent.
+
+## Delivery Entry - 2026-08-31 19:54:00 +08:00
+
+- Beijing time: 2026-08-31 19:54:00 +08:00
+- Workstream ID: `main-eam-h5-editor-polish`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 资产公开页使用“中世健资产管理”标题，并按后台样式选择部门、员工、分类等关联数据。
+- Key decisions: 仅在 EAM 资产路由动态设置 `document.title`，保留兼职 H5 全局标题；H5 选择字段使用后端返回的中文 label/options，表单内部继续提交 categoryId/useDeptId/useEmployeeId/source 等权威值。
+- Execution or analysis result: 资产页关联字段已从普通文本输入改为 Vant Picker 弹层，选择后显示中文名称；扩展字段同步支持中文标签和扩展值转换；兼职页面未修改。
+- Changed files: `frontend/h5/src/pages/eam/asset.vue`; this handoff record.
+- Verification evidence: `cd frontend/h5 && npm run build` passed；scoped `git diff --check` passed without errors。
+- Dependency or integration impact: No new dependency, API/database/menu/role change, branch, commit, push, or service restart；依赖现有公开接口返回的字段选项。
+- Remaining work: 当前后端部门 options 受已返回员工部门集合限制，若需完整组织树需提供明确的公开部门目录 API；真实移动端 Picker 联动和保存仍待运行环境验收。
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 20:00:00 +08:00
+
+- Workstream ID: `main-eam-public-cascader`
+- Goal: 修复公开资产页分类、部门选项不完整且非分级的问题。
+- Non-goals: 不改变资产编号、二维码、口令、租户隔离或兼职 H5 页面。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: EAM public edit service projection and H5 asset page, this handoff record。
+- Owner: Codex `/root`
+- Dependencies: EAM category list, System DeptApi, HRM employee API, Vant Cascader/Popup。
+- Integration order: Return complete tree projections -> render cascading selectors and employee filtering -> build/compile -> append delivery record。
+- Verification plan: EAM Maven compile, H5 build, scoped diff check; live mobile selection pending runtime。
+
+## Delivery Entry - 2026-08-31 20:08:05 +08:00
+
+- Workstream ID: `main-eam-public-cascader`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复资产公开页分类和使用部门选项不完整、不能分级选择的问题，并保持部门与员工选择为后台权威数据。
+- Key decisions: 通过 EAM 分类服务返回完整分类树；通过 System `DeptApi.getChildDeptList(0L)` 在资产租户上下文中读取完整部门层级，不再从已有员工部门反推选项；公开响应额外返回员工所属部门，H5 按选中部门过滤员工并在部门变更造成不匹配时清空旧员工；级联确认提交路径最后一级的内部 ID，同时显示完整中文路径；资产路由标题在参数校验前设置，错误页也不回退为兼职标题。
+- Execution or analysis result: 资产分类和部门已使用 Vant 多列级联选择器并恢复当前值的完整路径；部门目录来自 System 权威 API；员工选项随部门联动；分类、部门和员工提交仍使用内部 ID，页面显示中文标签；公开资产路由的成功与失败状态均使用“中世健资产管理”标题。
+- Changed files: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/publicedit/EamPublicEditService.java`; `frontend/h5/src/api/eamPublic.ts`; `frontend/h5/src/pages/eam/asset.vue`; `handoff/main.md`.
+- Verification evidence: `cd frontend/h5 && npm run build` passed twice after final title correction；scoped `git diff --check` passed；in-app browser at mobile viewport `390x844` verified `http://127.0.0.1:5174/eam/asset` renders the invalid-link state with title `中世健资产管理`；`mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile` reached EAM compilation but failed on nine pre-existing unresolved transfer error-code symbols in `EamTransferServiceImpl`, while this task's public service reported no compilation error.
+- Dependency or integration impact: No new dependency, database, menu, permission, branch, commit, push, or external service mutation. The public asset response adds `categoryTree`, `departmentTree`, and department-aware `employeeOptions` projections consumed by H5.
+- Remaining work: A live successful asset response and passcode are required to exercise real cascader scrolling and a save request end to end; the configured `http://localhost/eam/asset` currently resolves to the employee workbench rather than this H5 dev route, so deployment/proxy routing remains an environment concern outside this scoped fix.
+- Status: `delivered`
+
+## Verification Addendum - 2026-08-31 17:01:00 +08:00
+
+- Workstream ID: `main-partner-invite-copy`
+- Browser result: `http://localhost/zsjos/partner` 成功加载到“兼职管理”页面，但当前会话提示“登录超时，请重新登录”，伙伴列表请求失败，且受服务端权限控制的“兼职邀请码”区域未渲染，因此无法完成真实复制点击和桌面/移动宽度验收。
+- Remaining risk: 复制按钮的运行时剪贴板行为仍需在有效登录态、具备 `zsjos:partner-invitation:query` 权限且列表有邀请码数据时验证；静态实现、目标文件 ESLint 和差异检查均已通过。
+
+## Delivery Entry - 2026-08-31 14:40:07 +08:00
+
+- Workstream ID: `main-employee-contract-upload-limit`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将员工合同附件的单文件上传上限调整为 16MB。
+- Key decisions: 仅在员工合同表单显式传入 16MB，沿用服务器现有 16MB multipart 限制；不修改通用上传组件和其他上传入口。
+- Execution or analysis result: 员工合同附件由通用默认 5MB 调整为 16MB，页面上传提示同步显示 16MB。
+- Changed files: `frontend/admin/src/views/hrm/employee/detail/EmployeeContractForm.vue`; `handoff/main.md`。
+- Verification evidence: 目标 Vue 文件 ESLint 通过；Admin `pnpm build:local` 成功（存在既有 Lightning CSS `*zoom` 警告）；Admin `pnpm ts:check` 已执行但被 17 处无关既有类型错误阻断，员工合同文件无报错；未启动服务进行登录态浏览器上传验证。
+- Dependency or integration impact: 无新增依赖，无后端、数据库、权限、菜单、分支、提交、推送或外部服务变化；上传仍受服务器现有 16MB 单文件上限约束。
+- Remaining work: 在已有可用登录环境中补充接近 16MB 和超过 16MB 文件的真实上传边界验证。
+- Status: `delivered`
+
 ## Workstream Registration - 2026-08-31 13:35:00 +08:00
 
 - Workstream ID: `main-lead-batch-transfer-route`
@@ -18819,6 +19236,51 @@ equestAttachments。
 - Verification evidence: Workbench 聚焦与样式守卫测试 33/33 通过；`npm run typecheck` 通过；`npm run build` 通过，仅有既有 Vite 大 chunk 警告；后端 `LeadMapperSqlTest,LeadManagementServiceImplTest` 44/44 通过并验证白名单排序、稳定 ID 次序、非法参数拒绝及首个游标请求回退；scoped `git diff --check` 通过，仅有既有 LF-to-CRLF 工作树提示。现有 `http://127.0.0.1:5174/` 可加载，但浏览器停在统一账号登录页，未输入或读取凭据。
 - Dependency or integration impact: 无新增 npm/Maven 依赖，无数据库、权限、菜单、分支、提交、推送或外部服务变化；分页 API 新增可选 `sortField`、`sortOrder`，现有调用不传时语义不变；游标 API 保留原语义。
 - Remaining work: 在有效 Workbench 登录态下补做真实客资表格的排序请求、排序图标、鼠标/触控拖宽、80px 边界、刷新后宽度恢复、列设置/密度/全屏以及桌面和移动宽度视觉验收。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 14:30:00 +08:00
+
+- Workstream ID: `main-zsjos-full-chain-test-sop`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree)
+- User goal: 在合并后的测试 SOP 中增加完整的可执行测试任务清单。
+- Key decisions: 新增第 8 章，按执行顺序拆分为 TASK-001 至 TASK-103，覆盖环境准入、平台基础、权限、客资、订单支付审批、报名履约、媒体、Partner/财务、管理外围、跨切面、兼容、自动化、复测和发布归档；原场景矩阵顺延为第 9 章，数据与证据规范顺延为第 10 章。
+- Execution or analysis result: 每项任务包含状态、编号、优先级、运行面、测试任务和完成标准，可直接逐项勾选并关联证据/缺陷。
+- Changed files: `docs/operations/zsjos-full-chain-test-sop.md`; `handoff/main.md`。
+- Verification evidence: TASK-001 至 TASK-103 连续性检查、章节编号检查和 `git diff --check` 通过；原测试矩阵和数据/证据模板仍完整保留。
+- Dependency or integration impact: 无新增依赖，无业务运行时、SQL、权限、菜单、分支、提交、推送或外部服务变化。
+- Remaining work: 需要在有效测试环境按任务清单逐项执行并回填状态、证据和缺陷结果。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 14:06:13 +08:00
+
+- Workstream ID: `main-dictionary-snapshot-hardening`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f`（工作期间外部工作流同步了 `main`；本工作流未执行提交或推送，仍有未提交改动）
+- User goal: 修复业务表单引用可配置字典但未固定选择时快照、历史展示重查当前字典、以及未改值编辑重写旧快照的缺口。
+- Key decisions: Lead 来源渠道新增服务端可信标签快照并贯穿重复复核、激活、通知、订单和三端展示；内容分类、媒体账号平台忽略客户端标签并由服务端解析；媒体账号和 EAM 动态字段在值未改变时复用原快照；Lead 分类未改变时不再校验当前字典；无权威字典类型的媒体账号遗留等级/健康/风险字段禁止客户端改值；旧记录不回填，前端显示“历史未记录”。
+- Execution or analysis result: 新提交会固化字典值和标签，重复复核延迟放行仍沿用提交时渠道/分类标签；字典改名、停用或删除不会改变未改值记录的历史标签，也不会阻断无关编辑；历史通知、派单、订单资料和 Lead 详情不再以当前字典冒充历史值。
+- Changed files: `backend/yudao-module-zsjos` 下 Lead DO/VO、提交/复核/编辑/通知/派单/订单、媒体账号、内容服务、错误码及相关测试；`backend/yudao-module-eam` 下分类字段快照接口/实现和资产编辑；Admin/Workbench/H5 Lead API 与展示；`script/sql/mysql/00-bootstrap-schema.sql`、`schema/core.sql`、`bootstrap.sql`、`migrations/V175__lead_source_channel_snapshots.sql`；`docs/architecture/data-and-permission-flow.md`；`handoff/main.md`。
+- Verification evidence: ZSJOS `-am -DskipTests compile` 通过；EAM `-am -DskipTests compile` 通过；Workbench `typecheck` 与生产构建通过；H5 生产构建通过；scoped `git diff --check` 无错误，仅现有 LF/CRLF 提示；V175 已加入 bootstrap 且使用 information_schema 防重复，不回填历史值。ZSJOS 聚焦测试在 testCompile 阶段被工作区既有缺失类型阻断（Feedback BPM definition DTO/API、WorkOrder `AdminUserCandidatePageReqDTO`）；Admin `ts:check` 仅剩既有跨模块类型/未使用变量错误，本次 Lead 页面错误已消除。
+- Dependency or integration impact: 无新增依赖；新增 `zsjos_lead.source_channel_label_snapshot` 与 `zsjos_lead_duplicate_review.source_channel_label_snapshot` 两个可空字段；未执行真实数据库、分支、提交、推送或外部服务操作。部署需按 V175 迁移顺序更新数据库。
+- Remaining work: 未在受控 MySQL 执行 V175 重复性和基线结果比对，未在有效登录态做 Admin/Workbench/H5 浏览器验收；需先修复仓库既有 testCompile/Admin 类型错误后补跑完整测试。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 14:22:00 +08:00
+
+- Workstream ID: `main-zsjos-full-chain-test-sop`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree)
+- User goal: 将全链路测试 SOP、测试矩阵、测试数据和证据规范合并为一个完整 Markdown 文档。
+- Key decisions: 以 `zsjos-full-chain-test-sop.md` 作为唯一入口，将原矩阵和数据/证据规范编入第 8、9 章；删除两个重复入口；保留架构、权限和生命周期参考资料链接。
+- Execution or analysis result: 单一文档已包含测试准入、P0-P3 执行阶段、业务矩阵、角色/权限和跨切面用例、数据准备、只读核验、证据包、执行模板和缺陷复测规范。
+- Changed files: `docs/operations/zsjos-full-chain-test-sop.md`; 删除 `docs/operations/zsjos-full-chain-test-matrix.md`; 删除 `docs/operations/zsjos-full-chain-test-data-and-evidence.md`; `handoff/main.md`。
+- Verification evidence: 合并文档存在；旧文件已删除；相关资料内部链接检查通过；旧文件名引用检查通过；新增文档和 handoff 的 `git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖，无业务运行时、SQL、权限、菜单、分支、提交、推送或外部服务变化。
+- Remaining work: 需要在有效测试环境中按合并后的矩阵执行实际测试并回填结果；真实支付、数据清理和共享服务变更仍需单独确认。
 - Status: `delivered`
 
 ## Workstream Scope Update - 2026-08-31 13:35:00 +08:00
@@ -19003,6 +19465,22 @@ equestAttachments。
 - Verification summary: Workbench 聚焦与样式测试 33/33、typecheck、生产构建、后端聚焦测试 44/44 和 scoped diff check 均通过；真实表格浏览器验收仅因现有会话无登录态而未完成。
 - Remaining work: 在有效登录态下补做排序、拖宽持久化、80px 边界、原生列设置/密度/全屏兼容及桌面和移动宽度视觉验收。
 
+## Workstream Scope Update - 2026-08-31 13:50:00 +08:00
+
+- Workstream ID: `main-inbox-table-visible-fields`
+- User confirmation: 将“表格默认展示全部可见业务字段”的规则从客资扩展到所有采用收件箱布局并支持表格模式的页面，重点修复订单页字段不全。
+- Goal: 盘点并补齐 Workbench 全部表格收件箱的默认列；缺少列表字段时同步扩展对应列表响应，继续复用原详情页和完整标签页。
+- Non-goals: 不修改非收件箱页面；不展示内部 ID、权限不可见字段或敏感字段；不改变详情页业务逻辑、权限语义、筛选分页语义、ProTable 原生工具按钮、既有列宽排序能力；不新增依赖、数据库结构、分支、提交或外部服务变化。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `88313524d2d575fa22b72811245643ba33f7ff17`，保留当前工作树全部既有未提交改动。
+- Ownership scope: 全部表格收件箱 Workbench 页面、其 typed API/列表 VO（确有字段缺口时）、相关聚焦守卫测试、受影响 API 文档与 `handoff/main.md`。
+- Owner: Codex
+- Dependencies: 现有 Ant Design 6、Pro Components、ZSJOS 列表接口；无新增依赖。
+- Integration order: 页面/接口字段盘点 -> 前端默认列补齐 -> 必要的列表响应补齐 -> 测试、typecheck/build、后端测试、diff 检查。
+- Verification plan: 全部受影响 Workbench guard tests、`npm run typecheck`、`npm run build`；必要的 ZSJOS Controller/Service/VO 测试；scoped `git diff --check`；可用登录态下桌面/移动真实表格验收。
+- Status: `in-progress`
+
 ## Workstream Registration - 2026-08-31 14:00:00 +08:00
 
 - Workstream ID: `main-dictionary-snapshot-hardening`
@@ -19046,3 +19524,396 @@ equestAttachments。
 - Verification evidence: mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile (BUILD SUCCESS).
 - Dependency or integration impact: No new dependency or schema change; frontend dialog remains compatible because it still receives PNG bytes.
 - Remaining work: Browser/device scan verification and confirmation that the selected public fields meet operational disclosure policy.
+
+## Workstream Registration - 2026-08-31 14:15:00 +08:00
+
+- Workstream ID: `main-zsjos-full-chain-test-sop`
+- Goal: 建立 ZSJOS 全平台业务功能链路测试 SOP、用例矩阵以及测试数据和证据规范。
+- Non-goals: 不修改业务代码、权限、菜单、数据库、依赖、分支、提交、推送或外部服务；不执行生产环境测试和未经确认的数据清理。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `88313524d2d575fa22b72811245643ba33f7ff17`，保留当前工作树未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `docs/operations/zsjos-full-chain-test-sop.md`; `docs/operations/zsjos-full-chain-test-matrix.md`; `docs/operations/zsjos-full-chain-test-data-and-evidence.md`; 本 handoff 记录。
+- Owner: Codex
+- Dependencies: 现有 ZSJOS 菜单覆盖矩阵、角色权限矩阵、生命周期/BPM/API/运维文档；无新增依赖。
+- Integration order: 测试 SOP -> 测试矩阵 -> 数据与证据规范 -> 文档链接和覆盖审阅 -> 静态检查。
+- Verification plan: Markdown 链接/路径检查、关键主题覆盖检查、`git diff --check`；不因文档任务运行会修改仓库状态的格式化命令。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-08-31 14:15:00 +08:00
+
+- Workstream ID: `main-zsjos-full-chain-test-sop`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `88313524d2d575fa22b72811245643ba33f7ff17` (uncommitted worktree)
+- User goal: 建立可持续执行的 ZSJOS 全平台业务功能链路测试 SOP，并支持后续在已有测试环境执行全链路验证。
+- Key decisions: 采用 ZSJOS 全链路范围；覆盖 Admin、Workbench、Partner H5 及其 System/Infra/BPM/通知/文件/支付契约；使用人工浏览器、API 和数据库只读核验；以 P0-P3、角色/租户/对象权限和业务状态机组织测试；不新增依赖和不固化敏感环境信息。
+- Execution or analysis result: 新增 SOP、测试矩阵、数据与证据规范，覆盖现有菜单、角色、客资到订单/支付/审批/报名/学员/媒体链路及外围管理能力。
+- Changed files: `docs/operations/zsjos-full-chain-test-sop.md`; `docs/operations/zsjos-full-chain-test-matrix.md`; `docs/operations/zsjos-full-chain-test-data-and-evidence.md`; `handoff/main.md`。
+- Verification evidence: 文档路径和内部链接检查通过；关键链路、角色、权限、租户、对象权限、BPM、支付、通知、异步任务、文件和证据字段覆盖审阅通过；针对新增文档和 handoff 的 `git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖，无业务运行时、SQL、权限、菜单、分支、提交、推送或外部服务变化。
+- Remaining work: 需要在有效测试环境中补充地址、测试账号映射和配置快照，并按矩阵逐条执行；真实支付、数据清理和共享服务变更仍需单独确认。
+- Status: `delivered`
+
+## Workstream Ordering Correction - 2026-08-31 14:07:00 +08:00
+
+- Workstream ID: `main-dictionary-snapshot-hardening`
+- Correction reason: 并行工作流在本任务执行期间持续追加 `handoff/main.md`，本工作流的 `Delivery Entry - 2026-08-31 14:06:13 +08:00` 因补丁定位落在后续 Registration 之前；既有条目按只追加规则不重写。本条确认该 Delivery Entry 是本 workstream 的最终交付记录。
+- Final status: `delivered`
+- Remaining work: 按该 Delivery Entry 所述，补做受控 MySQL 迁移验证、登录态浏览器验收，并在仓库既有 testCompile/Admin 类型错误修复后补跑完整测试。
+
+## Workstream Ordering Correction - 2026-08-31 14:16:00 +08:00
+
+- Workstream ID: `main-dictionary-snapshot-hardening`
+- Correction reason: 上一条 ordering correction 使用了工具采集的实际时间，但并行工作流已写入未来时间戳 `14:15:00`，造成文件表面顺序不单调；本条作为只追加的最终顺序校正，不改写任何既有记录。
+- Final status: `delivered`；交付内容以 `Delivery Entry - 2026-08-31 14:06:13 +08:00` 为准。
+- Remaining work: 受控 MySQL 迁移验证、登录态浏览器验收，以及既有 testCompile/Admin 类型错误修复后的完整回归。
+
+## Workstream Registration - 2026-08-31 14:35:32 +08:00
+
+- Workstream ID: `main-employee-contract-upload-limit`
+- Goal: 将 Vue Admin 员工合同单个附件上传上限从通用默认的 5MB 调整为 16MB，与后端现有单文件限制保持一致。
+- Non-goals: 不修改通用上传组件、附件数量或格式、后端上传接口、全局 multipart 配置、数据库、权限、依赖、分支、提交、推送或外部服务状态；不清理当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/hrm/employee/detail/EmployeeContractForm.vue`; `handoff/main.md`。
+- Owner: Codex
+- Dependencies: 现有 Vue Admin `UploadFile` 组件及服务器 16MB multipart 单文件限制；无新增依赖。
+- Integration order: 员工合同表单显式设置 16MB -> 运行 Admin 聚焦检查和生产构建 -> 追加交付记录。
+- Verification plan: `cd frontend/admin && pnpm exec eslint src/views/hrm/employee/detail/EmployeeContractForm.vue`; `pnpm ts:check`; `pnpm build:local`; scoped `git diff --check`。
+- Status: `in-progress`
+
+## 2026-08-31 EAM anonymous asset ledger
+- Workstream: main
+- Goal: Implement EAM anonymous asset token pages and employee passcodes
+- Branch/worktree: main / D:\ZSJ-OS
+- Base commit: f516733f4791abd714b7dfc1706732bcc56b502f
+- Scope: backend EAM public token/passcode/audit APIs, SQL migration, H5 public page, admin QR URL integration, config
+- Non-goals: no baseline migration rewrite, no new dependency, no anonymous attachment mutation
+- Verification: Maven EAM tests/build, H5 npm build, admin checks where feasible
+- Owner: root
+- Dependencies/integration order: SQL -> backend -> H5/admin -> verification
+
+## Workstream Registration - 2026-08-31 15:00:00 +08:00
+
+- Workstream ID: `main-employee-reminders`
+- Goal: Implement configurable employee birthday, contract-expiry, and entry-anniversary reminders with HRM configuration, tenant scheduling, ZSJOS tasks, in-app notifications, Admin UI, Workbench actions, SQL metadata, and documentation.
+- Non-goals: No new notification channel, BPM workflow, contract lifecycle mutation, destructive data cleanup, dependency addition, branch/worktree operation, commit, push, or service restart.
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`, preserving existing uncommitted changes.
+- Target branch: current local `main`
+- Ownership scope: HRM reminder APIs/config/query, ZSJOS scheduler/task/notification contracts, Admin reminder settings page, Workbench task actions, MySQL migration/bootstrap verification, affected API/architecture docs, and this handoff record.
+- Owner: Codex
+- Dependencies: Existing HRM employee/contract DAL, System department/user/permission/notification APIs, ZSJOS business-task APIs, Quartz tenant job runtime; no new dependency.
+- Integration order: register scope -> backend contracts and tests -> scheduler/tasks/notifications -> Admin and Workbench -> SQL/docs -> verification.
+- Verification plan: focused HRM/ZSJOS tests, Maven compile/package for touched modules, Admin/Workbench typecheck/build, scoped SQL/static checks, and `git diff --check`.
+- Status: `in-progress`
+
+## Workstream Ordering Correction - 2026-08-31 14:40:07 +08:00
+
+- Workstream ID: `main-employee-contract-upload-limit`
+- Correction reason: 并行工作流在本任务期间持续追加 `handoff/main.md`，本工作流的 `Delivery Entry - 2026-08-31 14:40:07 +08:00` 因补丁定位出现在 Registration 之前；遵循只追加规则，不移动或重写既有条目。
+- Final status: `delivered`；交付内容和验证证据以该 Delivery Entry 为准。
+- Remaining work: 在已有可用登录环境中补充接近 16MB 和超过 16MB 文件的真实上传边界验证。
+
+## Delivery 2026-08-31 14:45:00 +08:00
+- Beijing time: 2026-08-31 14:43:47 +08:00
+- Branch: main
+- Worktree: D:\ZSJ-OS
+- HEAD commit: f516733f4791abd714b7dfc1706732bcc56b502f
+- User goal: EAM 匿名资产台账查看与口令修改
+- Key decisions: Added forward-only V009 tables for public asset tokens, employee edit codes, audit records, and asset optimistic version; QR now encodes H5 URL; public controllers live under controller.pub and admin public-edit; H5 route is login-free; existing attachments remain read-only; no new dependency or baseline rewrite.
+- Execution result: Implemented token generation/revocation, SHA-256 token lookup, employee permission-gated 6-character code generation/reset, encrypted code storage with HMAC matching, public read/update endpoints, audit records, admin API/UI entry, and H5 mobile page.
+- Changed files: backend/yudao-module-eam public token/code/audit DOs, mappers, service and controllers; EamAssetController, EamAssetDO, EamAssetSaveReqVO, EamAssetServiceImpl; backend/yudao-server application.yaml; script/sql/mysql/migrations/eam/V009__eam_public_asset_access.sql; frontend/admin EAM asset API/index; frontend/h5 eamPublic API/page/router.
+- Verification evidence: mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile passed; rontend/h5 npm run build passed; rontend/admin pnpm ts:check remains failing on pre-existing unrelated type errors (including existing EAM tree option typing).
+- Dependency/integration impact: Uses existing Hutool, MyBatis, HRM/System APIs, public-api controller mapping, and existing QR utility; migration must run after EAM V008; configure EAM_PUBLIC_H5_BASE_URL and EAM_PUBLIC_PASSCODE_ENCRYPTION_KEY before enabling production edits.
+- Remaining work: Full Redis-backed failure lock/rate limiting, strict tenant restoration for anonymous requests, complete public field projection labels, admin QR dialog URL/revoke UX, and comprehensive automated/browser acceptance tests require follow-up hardening.
+
+## Workstream Registration - 2026-08-31 15:20:00 +08:00
+
+- Workstream ID: `main-partner-h5-lead-detail-visibility`
+- Goal: 修复兼职 H5 客资详情的催办、投诉、申诉按钮以及销售跟进、投诉、申诉记录不可见问题。
+- Non-goals: 不修改 ADMIN/Workbench 行为，不新增数据库表、迁移或第三方依赖，不切换分支、提交、推送或执行真实外部状态写操作。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: Partner LeadManagement/Portal service and tests, `frontend/h5/src/pages/lead/detail.vue`, H5 partner API documentation, and this handoff file.
+- Owner: Codex `/root`
+- Dependencies: 现有 Partner 身份、Lead/Complaint/Appeal/Follow-up 服务与 H5 Vue/Vant；无新增依赖。
+- Integration order: Partner 专用详情投影 -> 申诉动作协议 -> H5 独立记录状态渲染 -> 文档 -> 后端/H5 定向验证 -> 追加交付记录。
+- Verification plan: ZSJOS Maven 聚焦测试/编译；`frontend/h5` `npm run build`；scoped `git diff --check`。
+
+## Delivery Entry - 2026-08-31 15:03:00 +08:00
+
+- Workstream ID: `main-partner-h5-lead-detail-visibility`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复兼职 H5 客资详情的催办、投诉、申诉按钮以及销售跟进、投诉、申诉记录不可见问题。
+- Key decisions: Partner 详情使用已校验 `partnerId` 做独立对象可见性投影，不把 Partner Account ID 传入 ADMIN 权限计算；无效自有客资返回 `CREATE_APPEAL`；H5 将活动状态与无效说明解耦并提供失败重试；不修改数据库、ADMIN/Workbench 或依赖。
+- Execution or analysis result: Partner 详情返回完整业务标签与 Partner 动作；活动/申诉记录在无效客资上仍可渲染；接口文档补充了标签和动作契约；新增 Partner 动作单元覆盖。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `frontend/h5/src/pages/lead/detail.vue`; `frontend/h5/兼职端API接口.md`; `handoff/main.md`。
+- Verification evidence: `mvn -pl yudao-module-zsjos -am "-Dtest=LeadManagementServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test` passed, 40 tests; `mvn -pl yudao-module-zsjos -am -DskipTests compile` passed; `cd frontend/h5 && npm run build` passed; scoped `git diff --check` passed with existing LF-to-CRLF warnings.
+- Dependency or integration impact: No new dependency, schema/migration, branch, commit, push, or external state change. Existing Partner complaint/appeal/activity endpoints remain the data source and retain their own partner isolation checks.
+- Remaining work: Real Partner login/API and desktop/mobile browser acceptance were not run because no usable authenticated environment was available; production role grants should still be verified against existing V071/V086 data.
+
+## Workstream Registration - 2026-08-31 15:49:53 +08:00
+
+- Workstream ID: `main-yudao-profile-config-binding`
+- Goal: 修复 local/dev profile 覆盖基础 `yudao` 命名空间后导致短信验证码、代码生成和 WebSocket 配置无法绑定、后端无法启动的问题。
+- Non-goals: 不启用真实短信渠道，不修改短信接口、认证行为、数据库或外部服务，不处理现有开发数据库缺列问题。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-server/src/main/resources/application-local.yaml`、`backend/yudao-server/src/main/resources/application-dev.yaml` 和本交付记录。
+- Owner: Codex `/root`
+- Dependencies: Spring Boot 4.1 配置绑定、现有 System/Infra/WebSocket 配置；无新增依赖。
+- Integration order: profile 配置扁平化 -> 补齐启动期必需配置 -> Maven 构建 -> local 启动和健康检查。
+- Verification plan: `yudao-server` Maven package、local profile 实际启动、Actuator 健康检查、scoped `git diff --check`。
+- Registration timing note: 本记录因诊断过程中首次补丁后才确认问题扩展到整个 `yudao` 命名空间而延后追加；文件改动始终限制在上述 ownership scope。
+
+## Delivery Entry - 2026-08-31 15:49:53 +08:00
+
+- Beijing time: 2026-08-31 15:49:53 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复重新构建后仍因 `SmsCodeProperties` 全部为空而无法启动的问题。
+- Key decisions: 将 local/dev 的嵌套 `yudao` profile 覆盖改为扁平属性键；在 profile 中显式保留短信验证码、代码生成和本地 WebSocket 启动必需值；不配置或启用真实短信渠道。
+- Execution or analysis result: 短信、Codegen 与 WebSocket 配置均成功绑定，local profile 完整启动，Actuator 返回 `UP`；验证进程随后正常停止。
+- Changed files: `backend/yudao-server/src/main/resources/application-local.yaml`; `backend/yudao-server/src/main/resources/application-dev.yaml`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 返回 `BUILD SUCCESS`；`java -jar target/yudao-server.jar --spring.profiles.active=local` 成功启动；`GET http://127.0.0.1:48080/actuator/health` 返回 `status=UP`；scoped `git diff --check` 仅报告既有 LF/CRLF 提示。
+- Dependency or integration impact: 无新增依赖、数据库变更、分支、提交或推送；local/dev 原有覆盖值保持不变，基础 `yudao` 配置不再被 profile 整体遮蔽。
+- Remaining work: 启动后的后台任务报告开发数据库缺少 `source_channel_label_snapshot` 列，属于现有 schema/migration 同步问题，未在本次配置修复中处理。
+
+## Workstream Registration - 2026-08-31 16:17:42 +08:00
+
+- Workstream ID: `main-v176-anniversary-template-sql`
+- Goal: 修复 V176 员工入职周年通知模板初始化语句的 SQL 语法错误，并保持迁移可重复执行。
+- Non-goals: 不修改业务代码、其他迁移、现有数据库数据、菜单或通知业务契约，不直接执行数据库迁移。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql` 和本交付记录。
+- Owner: Codex `/root`
+- Dependencies: MySQL `INSERT ... SELECT` 与现有 System 通知模板表；无新增依赖。
+- Integration order: 修正周年模板 INSERT -> 静态语句计数、括号平衡与差异检查 -> 由用户在目标开发库重新执行 V176。
+- Verification plan: 核对 10 条 INSERT 的语句边界和括号平衡；确认周年模板具有 `NOT EXISTS` 幂等保护；scoped `git diff --check`。
+- Registration timing note: 用户确认修改后先完成了单行 SQL 修正，再补录本工作流；实际修改始终限制在上述 ownership scope。
+
+## Delivery Entry - 2026-08-31 16:17:42 +08:00
+
+- Beijing time: 2026-08-31 16:17:42 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复 V176 执行到员工入职周年提醒模板时出现的 MySQL 1064 语法错误。
+- Key decisions: 删除 SELECT 值列表末尾提前结束语句的分号和多余右括号；补充 `FROM DUAL WHERE NOT EXISTS`，按模板 code 和未删除状态实现幂等插入；保留前五条已执行数据并支持整份 V176 重跑。
+- Execution or analysis result: 周年模板语句现在与合同到期模板采用同一幂等初始化模式；V176 保持 10 条 INSERT，所有语句括号平衡且各有完整分号边界。
+- Changed files: `script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql`; `handoff/main.md`。
+- Verification evidence: 静态检查确认 `insert-statements=10`，10 条语句的 `paren-balance` 均为 0，周年模板存在 `ENTRY_ANNIVERSARY` 的 `NOT EXISTS` 守卫；scoped `git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖、业务代码、数据库直接变更、分支、提交或推送；目标开发库中前五条已写入数据可由幂等条件安全跳过，V176 仍需在该库重新执行以完成后续初始化和版本登记。
+- Remaining work: 在目标开发库重新运行 V176，并核对周年模板、定时任务、两条通知规则及 `zsjos_schema_version` 的 V176 记录；本次未直接连接或修改该数据库。
+
+## Workstream Registration - 2026-08-31 16:39:46 +08:00
+
+- Workstream ID: `main-employee-contract-attachment-preview-images`
+- Goal: 修复 Vue Admin 员工合同附件回显时将带签名参数的 URL 当作文件名的问题，并允许合同附件上传常用图片格式。
+- Non-goals: 不增加图片缩略图或看图器；不修改后端附件契约、URL 存储、全局 multipart 配置、数据库、权限、依赖、分支、提交、推送或外部服务；不清理当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/components/UploadFile/src/UploadFile.vue`; `frontend/admin/src/views/hrm/employee/detail/EmployeeContractForm.vue`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue Admin `UploadFile` 组件和 `getFileNameFromUrl` 工具；无新增依赖。
+- Integration order: 通用上传组件统一解析显示文件名 -> 合同附件显式配置文档与图片格式 -> Admin 类型、lint、构建和浏览器验证 -> 追加交付记录。
+- Verification plan: 使用带中文编码文件名和 `X-Amz-*` 查询参数的 URL 验证回显；检查合同图片/文档格式校验；运行 scoped ESLint/Prettier、`pnpm ts:check`、`pnpm build:local`、scoped `git diff --check`；可用时进行桌面和移动宽度浏览器检查。
+- Status: `in-progress`
+## Workstream Registration - 2026-08-31 17:00:00 +08:00
+
+- Workstream ID: `main-attachment-upload-size-limits`
+- Goal: 将全局 multipart 上传上限调整为单文件 1024MB、总请求 2048MB，并清除三端前端文件大小限制文案和前端大小校验。
+- Non-goals: 不修改后端业务服务级更严格附件限制、文件类型/数量/尺寸/时长规则、数据库、依赖、分支、提交或推送；保留现有工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-server/src/main/resources/application.yaml`；三端上传组件和业务上传页面中与文件大小限制相关的文案/前端校验；受影响文档；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Spring multipart、Vue Admin、React Workbench、Partner H5 上传实现；无新增依赖。
+- Integration order: 后端全局配置 -> Admin/Workbench/H5 大小文案与校验清理 -> 关联文档同步 -> 静态扫描与三端构建/类型检查 -> 追加交付记录。
+- Verification plan: YAML 静态检查；三端大小限制扫描；Admin `pnpm ts:check`/`pnpm lint`/`pnpm build:local`；Workbench `npm test`/`npm run typecheck`/`npm run build`；H5 `npm run build`；scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-08-31 16:54:52 +08:00
+
+- Workstream ID: `main-employee-contract-attachment-preview-images`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 修复员工合同附件上传/回显时的文件名预览错误，并支持图片附件。
+- Key decisions: 复用现有 `getFileNameFromUrl` 在新上传和历史回显两条路径中去除签名查询参数并解码文件名；合同附件保留文档格式并新增 JPG/JPEG/PNG/GIF/WebP；保留既有 16MB 合同附件设置，不增加图片缩略图。
+- Execution or analysis result: 带中文 URL 编码和 `X-Amz-*` 签名参数的附件现仅显示解码后文件名；合同上传提示和前端格式校验已包含常用图片。
+- Changed files: `frontend/admin/src/components/UploadFile/src/UploadFile.vue`; `frontend/admin/src/views/hrm/employee/detail/EmployeeContractForm.vue`; `handoff/main.md`。
+- Verification evidence: 目标两文件 scoped ESLint 通过；scoped Prettier check 通过；签名 URL 示例解析为 `有效合同.pdf`；`pnpm build:local` 成功（仅有现有 legacy CSS `*zoom` 警告）；scoped `git diff --check` 无错误，仅有既有 LF/CRLF 提示；`pnpm ts:check` 被 BPM/EAM/CRM/MES/System/ZSJOS 等既有无关类型错误阻断，本次两目标文件未报错；本地浏览器加载成功且无本次相关运行错误，但现有会话超时阻止进入合同弹窗。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限变更、分支操作、提交或推送。后续 `main-attachment-upload-size-limits` 工作流可调整大小限制，但必须保留本次 `getFileNameFromUrl` 解析和合同图片格式配置；本工作流现已释放目标文件所有权。
+- Remaining work: 需在有效登录会话中补做合同弹窗桌面/移动宽度及真实图片上传验收；Admin 全量类型检查需先解决上述既有无关错误。
+- Status: `delivered`
+- Ordering note: 并行工作流预先写入了 `17:00:00` 的登记；本条使用工具采集的实际北京时间并按只追加规则保留文件顺序。
+
+## Delivery Correction - 2026-08-31 16:59:20 +08:00
+
+- Workstream ID: `main-employee-contract-attachment-preview-images`
+- Correction reason: 本工作流释放文件所有权后，进行中的 `main-attachment-upload-size-limits` 已开始修改同一 `UploadFile.vue`，移除通用前端文件大小提示与校验。
+- Preserved result: 本次 `getFileNameFromUrl` 的新上传/历史回显修复以及合同 JPG/JPEG/PNG/GIF/WebP 格式配置仍保留在当前工作树。
+- Verification correction: 上一 Delivery Entry 的 Prettier 和 build 证据对本工作流交付时的状态有效；并行大小限制修改后的组合状态已重跑 scoped ESLint 且通过，但 `UploadFile.vue` Prettier check 当前未通过，应由当前文件所有者在其工作流中完成格式化与最终构建。
+- Integration impact: 上一条中“保留既有 16MB 设置”仅描述本工作流自身未主动改动该值；最终大小限制以 `main-attachment-upload-size-limits` 的用户目标和交付结果为准。
+
+## Workstream Registration - 2026-08-31 16:59:16 +08:00
+
+- Workstream ID: `main-partner-invite-copy`
+- Goal: 在 Vue Admin `/zsjos/partner` 邀请码列表为邀请码字段提供直接复制功能。
+- Non-goals: 不修改后端 API、权限、数据库、其他前端项目或邀请码生成流程；不新增依赖。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/zsjos/partner/index.vue` 和本交付记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 `@vueuse/core`、Element Plus `message` 和页面现有邀请码表格。
+- Integration order: 页面复制入口 -> Admin 类型检查/构建 -> 追加交付记录。
+- Verification plan: `pnpm ts:check`、目标文件 ESLint、scoped `git diff --check`。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 16:59:16 +08:00
+
+- Beijing time: 2026-08-31 16:59:16 +08:00
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 在 `/zsjos/partner` 邀请码字段提供直接复制功能。
+- Key decisions: 邀请码列增加带 tooltip 和无障碍标签的复制图标按钮；复用 `useClipboard({ legacy: true })`，成功提示“邀请码已复制”，不支持或异常时提示失败；不改变权限和后端契约。
+- Execution or analysis result: 每条邀请码都可在表格内直接复制到剪贴板，复制状态有明确反馈。
+- Changed files: `frontend/admin/src/views/zsjos/partner/index.vue`; `handoff/main.md`。
+- Verification evidence: 目标文件 `pnpm exec eslint src/views/zsjos/partner/index.vue` 通过；`pnpm ts:check` 执行但被仓库既有无关类型错误阻断，本次页面未报错；scoped `git diff --check` 通过（仅现有换行提示）。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限/分支/提交/推送或外部服务变化。
+- Remaining work: 未在有效登录态执行浏览器桌面/移动宽度验收；Admin 全量类型检查需另行修复既有错误。
+- Status: `delivered`
+## Delivery Entry - 2026-08-31 17:05:00 +08:00
+
+- Beijing time: 2026-08-31 17:05:00 +08:00
+- Workstream ID: `main-attachment-upload-size-limits`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将全局上传限制调整为单文件 1024MB、总请求 2048MB，并清除三端前端文件大小限制文案及前端大小校验。
+- Key decisions: 仅提升 Spring 全局 multipart 配置；保留后端业务服务级更严格上限、文件类型/数量/尺寸/时长等规则；移除 Admin、Workbench、H5 中大小提示和浏览器端文件大小拦截，但保留实际文件大小展示及其他校验。
+- Execution or analysis result: 已更新 `application.yaml` 为 1024MB/2048MB；清理共享上传组件、AI/财务/公众号/支付/公告/IM/ZSJOS 业务上传页面、Workbench 附件与 JSON 导入、H5 Lead 上传相关大小文案和前端 size 校验；同步移除定位卡 JSON 文档中的 1 MiB 前端限制描述。
+- Changed files: `backend/yudao-server/src/main/resources/application.yaml`; 受影响的 `frontend/admin/src`、`frontend/workbench/src`、`frontend/h5/src` 上传组件/页面；`docs/api/registration-fulfillment-api.md`；`handoff/main.md`。
+- Verification evidence: yudao-server Maven compile passed (`BUILD SUCCESS`); Workbench `npm run typecheck` passed and `npm run build` passed；H5 `npm run build` passed；Admin `pnpm build:local` passed；Admin `pnpm ts:check` 未通过，失败项均为现有其他页面类型错误；Admin `pnpm lint` 未通过，失败项为现有 `DocAlert/index.vue` 错误及既有警告；Workbench 全量测试 526/531 通过，5 个失败来自现有 message inbox/media-students guard 源码断言，与本次上传改动无关；静态扫描确认目标上传链路不再包含文件大小上限文案或 size 比较，剩余命中为文件实际大小展示、动态强制表单大小配置及非附件文本长度。
+- Dependency or integration impact: 无新增依赖、无数据库变更、无分支/提交/推送、未修改后端业务服务级限制；构建产生的 dist/cache 属于现有前端构建产物，不纳入本任务源码范围。
+- Remaining work: 真实大文件 HTTP 上传边界和浏览器桌面/移动交互未验证；如需消除动态强制表单配置中的“大小 MB”字段，需另行确认是否同时改变其业务可配置上限契约。
+
+## Ordering Correction - 2026-08-31 17:06:00 +08:00
+
+- Workstream ID: `main-partner-invite-copy`
+- Correction reason: 浏览器验收补充记录因并行工作流追加 `handoff/main.md` 时错误匹配到更早的 `Status: delivered`，现按只追加规则保留原记录并在文件末尾补充顺序说明。
+- Browser result: `http://localhost/zsjos/partner` 成功加载到“兼职管理”页面，但当前会话提示“登录超时，请重新登录”，伙伴列表请求失败，且受服务端权限控制的“兼职邀请码”区域未渲染，因此无法完成真实复制点击和桌面/移动宽度验收。
+- Remaining risk: 复制按钮运行时剪贴板行为仍需在有效登录态、具备 `zsjos:partner-invitation:query` 权限且列表有邀请码数据时验证；静态实现、目标文件 ESLint 和差异检查均已通过。
+
+## Delivery Entry - 2026-08-31 17:30:21 +08:00
+
+- Beijing time: 2026-08-31 17:30:21 +08:00
+- Workstream ID: `main-inbox-table-visible-fields`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将“表格模式默认展示全部可见业务字段”扩展到所有已支持表格布局的 Workbench 收件箱页面，重点补全订单表格字段。
+- Key decisions: 我的订单、团队订单和普通成交审批共用完整订单 ProTable 列定义；订单列表 API 直接返回详情中可用于列表的业务字段、历史字典标签快照、客资来源摘要和课程摘要，课程明细按当前页批量查询；申诉、BPM、公告、重复复核和主管确认表格补齐各自可见字段；内部关联 ID、用户 ID、流程实例/任务 ID、版本号和复核指纹不进入表格；继续复用既有详情内容和可调整宽度抽屉，并保留 ProTable 原生密度、列设置和全屏工具。
+- Execution or analysis result: 订单表格已覆盖订单状态与类型、审批上下文、学员与联系方式、地区、服务/来源、课程、付款、备注、客资业务编号及来源信息和全部相关时间；其他表格收件箱已补齐申诉理由/裁决、流程摘要/处理人/耗时、公告正文/高亮/附件、重复复核快照摘要及主管确认原因/意见。Message 和 Lead 管理现有完整列保持不变。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/order/vo/SalesOrderListItemRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderServiceImplTest.java`; `frontend/workbench/src/components/SalesOrderTableColumns.tsx`; `frontend/workbench/src/components/SalesOrderSupervisorInbox.tsx`; `frontend/workbench/src/pages/MySalesOrderPage.tsx`; `frontend/workbench/src/pages/SalesOrderApprovalPage.tsx`; `frontend/workbench/src/pages/LeadAppealPage.tsx`; `frontend/workbench/src/pages/BpmApprovalCenterPage.tsx`; `frontend/workbench/src/pages/AnnouncementCenterPage.tsx`; `frontend/workbench/src/pages/LeadDuplicateReviewPage.tsx`; `frontend/workbench/src/pages/inbox-table-visible-fields.guard.test.ts`; `frontend/workbench/src/pages/global-inbox-layout.guard.test.ts`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/services/salesOrder.ts`; `docs/api/zsjos-sales-order.md`; `handoff/main.md`。
+- Verification evidence: Workbench 聚焦测试 5 files / 30 tests 通过；`npm run typecheck` 通过；`npm run build` 通过（仅现有大 chunk 警告）；全量 `npm test` 为 528/533 通过，5 个失败来自现有 `messageinboxpage.guard.test.ts` 和 `media-students.guard.test.ts` 对并行工作树消息分类/定位卡 API 的旧源码断言，本次聚焦范围全部通过；`SalesOrderServiceImplTest` 34/34 通过并验证列表批量课程投影和历史快照；scoped `git diff --check` 通过，仅有现有 LF/CRLF 提示；本地 `http://127.0.0.1:5174/` 可访问且标题为“中世健员工工作台”。
+- Dependency or integration impact: 无新增依赖、数据库、权限、菜单、分支、提交、推送或外部服务变化；订单列表响应新增可选字段，现有调用方保持兼容；批量课程读取每个列表页只执行一次，不触发前端逐行详情请求。
+- Remaining work: 浏览器当前停在统一账号登录页，无法进入真实业务表格执行桌面/移动宽度、列设置、横向滚动和详情抽屉验收；需在有效登录态下补验。全量 Workbench 的 5 个既有无关守卫失败仍待对应并行工作流同步测试断言。
+- Status: `delivered`
+## Workstream Registration - 2026-08-31 17:20:00 +08:00
+
+- Workstream ID: `main-advanced-filter-pages`
+- Goal: 将现有高级筛选能力同步到订单及其他已具备后端筛选契约的管理端列表，并补齐场景人员选项范围。
+- Non-goals: 不新增依赖，不修改数据库，不改变既有菜单权限模型，不清理或覆盖工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f47`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/zsjos/components/WorkbenchListPage.vue`; 订单、申诉、重复复核、报名、学员及下属销售高级筛选页面接入文件；`backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AdvancedFilterVisibleUserService.java` 及对应测试；本 handoff 文件。
+- Owner: Codex `/root`
+- Dependencies: 现有高级筛选目录、场景查询接口、System AdminUserApi、ZSJOS 对象权限；无新增依赖。
+- Integration order: 扩展通用列表组件 -> 接入各场景页面 -> 补齐人员范围解析 -> 增加定向测试 -> 运行后端测试与 Admin 类型/构建检查 -> 追加交付记录。
+- Verification plan: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am test`; `cd frontend/admin && pnpm exec eslint` 目标文件、`pnpm ts:check`、`pnpm build:local`; scoped `git diff --check`。
+## Delivery Entry - 2026-08-31 18:49:35 +08:00
+
+- Beijing time: 2026-08-31 18:49:35
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f47` (uncommitted worktree)
+- User goal: 将高级筛选同步到订单等当前缺少高级筛选的管理端列表，并补齐人员选项覆盖。
+- Key decisions: 扩展 `WorkbenchListPage` 支持场景目录和既有 POST `search-page` 契约；订单、申诉、重复复核、报名池、我的学员、下属销售、主管确认接入对应场景；订单及相关场景人员选项沿用已授权的 Lead 可见/管理范围，不扩大到无范围系统用户列表。
+- Execution or analysis result: 订单我的/团队列表在有高级条件时分别调用 `/my-search-page`、`/team-search-page`；申诉、复核、报名、学员、主管确认支持现有后端搜索接口；人员目录解析从仅 3 个场景扩展到订单、申诉、复核、报名，并过滤禁用用户。
+- Changed files: `frontend/admin/src/views/zsjos/components/WorkbenchListPage.vue`; `frontend/admin/src/views/zsjos/components/ZsjosAdvancedFilter.vue`; `frontend/admin/src/views/zsjos/mySalesOrder/index.vue`; `frontend/admin/src/views/zsjos/leadAppeal/index.vue`; `frontend/admin/src/views/zsjos/leadDuplicateReview/index.vue`; `frontend/admin/src/views/zsjos/registration-pool.vue`; `frontend/admin/src/views/zsjos/my-students.vue`; `frontend/admin/src/views/zsjos/subordinateSales/index.vue`; `frontend/admin/src/views/zsjos/salesOrderSupervisorConfirmation/index.vue`; `frontend/admin/src/api/zsjos/registration/index.ts`; `frontend/admin/src/api/zsjos/salesOrderSupervisorConfirmation/index.ts`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AdvancedFilterVisibleUserService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/advancedfilter/AdvancedFilterVisibleUserServiceTest.java`; `handoff/main.md`。
+- Verification evidence: ZSJOS 定向 Maven 测试 26/26 通过；目标 Admin 文件 ESLint 通过；`pnpm build:local` 成功；`pnpm ts:check` 被既有 BPM/EAM/CRM/导出任务类型错误阻断，未出现本次改动文件错误；scoped `git diff --check` 无错误，仅有 LF/CRLF 提示；未执行真实登录态浏览器验收。
+- Dependency or integration impact: 无新增依赖、无数据库/菜单权限模型/分支/提交/推送或外部服务变更；复用现有目录、查询和权限契约。
+- Remaining work: 需要在有效登录态逐场景验证后端目录返回字段、人员范围和列表 POST 查询；管理员维护的硬编码枚举字典化仍是后续独立工作。
+- Status: `delivered`
+
+## Workstream Registration - 2026-08-31 20:17:52 +08:00
+
+- Workstream ID: `main-eam-public-save-operator-idle`
+- Goal: 修复 EAM 公开资产页显示保存成功但普通字段未实际提交的问题，按个人口令对应的 System 用户记录资产修改人，并提供受状态机与员工持有约束保护的一键置为闲置功能。
+- Non-goals: 不修改二维码、口令生成规则、菜单权限、数据库结构、调拨/退还流程语义、附件行为或其他前端；不强制关闭未完成员工持有记录；不清理当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: EAM public asset Controller/Service and focused public request VO/tests; EAM asset Service/Mapper/change-log explicit-operator extensions; H5 EAM public API/page; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/enums/ErrorCodeConstants.java` 的本功能错误码；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 EAM 资产状态机、`eam_stock_holding` 开放持有查询、HRM Employee API、System permission/user identity、Vant Dialog/Field/Button；无新增依赖。
+- Integration order: 修复 H5 实际表单绑定 -> 口令匹配保留 employeeId/userId -> 资产更新和变更日志支持显式操作人 -> 新增一键闲置公开命令及持有/状态/版本校验 -> 增加聚焦测试 -> 构建与浏览器检查 -> 追加交付记录。
+- Verification plan: EAM 聚焦单元测试；`mvn -f backend/pom.xml -pl yudao-module-eam -am test`（若被当前工作树其他 EAM 改动阻断则记录具体失败）；`cd frontend/h5 && npm run build`；手机/桌面浏览器检查；scoped `git diff --check`。
+- Status: `in-progress`
+
+## Ordering Correction - 2026-08-31 20:42:10 +08:00
+
+- Workstream ID: `main-eam-public-save-operator-idle`
+- Correction reason: 本工作流的 `Delivery Entry - 2026-08-31 20:40:20 +08:00` 和第一次顺序更正均因追加补丁匹配到更早工作流的通用状态行，被写入本次登记之前；按 handoff 只追加规则保留这些条目，不重写或删除。
+- Authoritative result: `Delivery Entry - 2026-08-31 20:40:20 +08:00` 中的目标、决策、执行结果、改动文件、验证证据、集成影响和剩余风险均有效；本末尾更正确认 `main-eam-public-save-operator-idle` 已完成交付。
+- Status: `delivered`
+
+## Ordering Correction - 2026-08-31 22:48:00 +08:00
+
+- Workstream ID: `main-eam-asset-detail-field-permission`
+- Correction reason: 本工作流条目追加时文件存在多个相同的 `Status` 行，首次补丁位置早于末尾；本更正追加在文件末尾，保留此前条目不变。
+- Authoritative result: 资产详情只读权限已覆盖分类字段查询；EAM 依赖链编译及 5 项定向测试通过。
+- Status: `delivered`
+
+## Delivery Entry - 2026-08-31 23:08:30 +08:00
+
+- Workstream ID: `main-eam-loading-optimization`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将其他 Admin iframe 页面中的 EAM 串行首屏请求改为并行加载。
+- Key decisions: 统一 iframe 容器已是单 iframe、路由消息切换；仅并行互不依赖的 EAM 页面初始化请求，保留依赖请求和独立错误状态。
+- Execution or analysis result: 编码规则分类/列表、采购单/库存、盘点表单部门/分类树改为并行；采购页使用 `Promise.allSettled` 保留采购单与库存的独立失败提示。
+- Changed files: `frontend/admin/src/views/eam/codeRule/index.vue`; `frontend/admin/src/views/eam/purchase/index.vue`; `frontend/admin/src/views/eam/inventory/InventoryForm.vue`; `handoff/main.md`。
+- Verification evidence: 目标 EAM Vue 文件 ESLint 通过；`pnpm build:local` 通过（仅现有 legacy CSS 警告）；scoped `git diff --check` 无错误，仅有 LF/CRLF 提示。
+- Dependency or integration impact: 无新增依赖、后端/数据库/权限/菜单/iframe 协议变化；不影响有先后依赖的字段加载和表单提交流程。
+- Remaining work: 需要在有效登录态浏览器中逐个 iframe 页面用 Network 面板确认实际耗时；后端慢接口仍需按请求耗时继续优化。
+- Status: `delivered`

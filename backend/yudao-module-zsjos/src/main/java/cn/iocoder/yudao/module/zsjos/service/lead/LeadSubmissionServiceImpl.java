@@ -8,7 +8,7 @@ import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
-import cn.iocoder.yudao.module.system.api.dict.dto.DictDataRespDTO;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
@@ -183,23 +183,26 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             return LeadCreateRespVO.reviewPending(review.getId());
         }
 
-        return createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category);
+        return createApproved(reqVO, actorUserId, sourceUserId, null, products, region, attachments, identity, category,
+                requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
     }
 
     @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO createApproved(LeadCreateReqVO reqVO, Long submitterUserId, Long reusePersonId) {
-        return createApprovedFromReview(reqVO, submitterUserId, reusePersonId, SOURCE_INTERNAL_NEW_MEDIA, null, null);
+        return createApprovedFromReview(reqVO, submitterUserId, reusePersonId, SOURCE_INTERNAL_NEW_MEDIA, null, null, null);
     }
 
     @Transactional(rollbackFor = Exception.class)
     public LeadCreateRespVO createApprovedFromReview(LeadCreateReqVO reqVO, Long submitterUserId, Long reusePersonId,
                                                       String sourceType, Long partnerId,
-                                                      String leadCategoryLabelSnapshot) {
+                                                      String leadCategoryLabelSnapshot,
+                                                      String sourceChannelLabelSnapshot) {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
         validateContact(mobile, wechatId);
         RegionSnapshot region = validateRegion(reqVO.getProvinceCode(), reqVO.getCityCode());
-        dictDataApi.validateDictDataList(DICT_SOURCE_CHANNEL, List.of(reqVO.getSourceChannel()));
+        String sourceChannelLabel = sourceChannelLabelSnapshot == null
+                ? requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()) : sourceChannelLabelSnapshot;
         LeadCategorySnapshotService.Selection category = leadCategoryLabelSnapshot == null
                 ? categorySnapshotService.requireEnabled(reqVO.getLeadCategory())
                 : new LeadCategorySnapshotService.Selection(StrUtil.trimToNull(reqVO.getLeadCategory()),
@@ -218,7 +221,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         Long sourceUserId = selfSourced
                 ? selfSourcedSourceUserId(reqVO.getNewMediaProviderUserId(), submitterUserId)
                 : submitterUserId;
-        return createApproved(reqVO, submitterUserId, sourceUserId, reusePersonId, products, region, attachments, identity, category);
+        return createApproved(reqVO, submitterUserId, sourceUserId, reusePersonId, products, region, attachments, identity,
+                category, sourceChannelLabel);
     }
 
     private LeadCreateRespVO duplicateReviewResponse(LeadDuplicateReviewDO review) {
@@ -289,7 +293,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
                                             List<LeadProductSnapshot> products, RegionSnapshot region,
                                             Map<Long, FileInfoRespDTO> attachments,
                                             LeadSubmissionIdentityService.Resolution identity,
-                                            LeadCategorySnapshotService.Selection category) {
+                                            LeadCategorySnapshotService.Selection category, String sourceChannelLabel) {
         String mobile = StrUtil.trimToNull(reqVO.getMobile());
         String wechatId = StrUtil.trimToNull(reqVO.getWechatId());
         PersonDO person = reusePersonId == null
@@ -300,7 +304,8 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             throw exception(LEAD_DUPLICATE_REVIEW_RESULT_INVALID);
         }
         LocalDateTime submittedAt = LocalDateTime.now(BEIJING);
-        LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, sourceUserId, identity, submittedAt, category);
+        LeadDO lead = createLead(person, reqVO, mobile, wechatId, region, sourceUserId, identity, submittedAt, category,
+                sourceChannelLabel);
         insertProducts(lead.getId(), reqVO.getEffectiveProducts(), products);
         insertAttachments(lead.getId(), reqVO.getAttachments(), attachments);
         notifyEventPublisher.publish(CREATED, lead.getId(), "lead-created:" + lead.getId(), actorUserId,
@@ -426,7 +431,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     private LeadDO createLead(PersonDO person, LeadCreateReqVO reqVO, String mobile, String wechatId,
                               RegionSnapshot region, Long sourceUserId,
                               LeadSubmissionIdentityService.Resolution identity, LocalDateTime submittedAt,
-                              LeadCategorySnapshotService.Selection category) {
+                              LeadCategorySnapshotService.Selection category, String sourceChannelLabel) {
         LeadDO lead = new LeadDO();
         lead.setLeadNo(leadNumberService.next(submittedAt));
         lead.setPersonId(person.getId()); lead.setSubmittedName(reqVO.getName().trim());
@@ -447,7 +452,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         AdminUserRespDTO submitter = sourceUserId == null ? null : adminUserApi.getUser(sourceUserId);
         lead.setSourceDeptId(submitter == null ? null : submitter.getDeptId());
         lead.setSourceChannelId(reqVO.getSourceChannel());
-        lead.setSourceChannelLabelSnapshot(requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
+        lead.setSourceChannelLabelSnapshot(sourceChannelLabel);
         applyRegion(lead, region); lead.setLeadCategory(category.value());
         lead.setLeadCategoryLabelSnapshot(category.labelSnapshot()); lead.setRemark(reqVO.getRemark());
         lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_UNASSIGNED);

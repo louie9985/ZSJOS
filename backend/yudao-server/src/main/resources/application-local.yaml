@@ -193,29 +193,29 @@ logging:
     name: ${user.home}/logs/${spring.application.name}.log # 日志文件名，全路径
   level:
     # 配置自己写的 MyBatis Mapper 打印日志
-    cn.iocoder.yudao.module.bpm.dal.mysql: debug
-    cn.iocoder.yudao.module.infra.dal.mysql: debug
+#    cn.iocoder.yudao.module.bpm.dal.mysql: debug
+#    cn.iocoder.yudao.module.infra.dal.mysql: debug
     cn.iocoder.yudao.module.infra.dal.mysql.logger.ApiErrorLogMapper: INFO # 配置 ApiErrorLogMapper 的日志级别为 info，避免和 GlobalExceptionHandler 重复打印
     cn.iocoder.yudao.module.infra.dal.mysql.job.JobLogMapper: INFO # 配置 JobLogMapper 的日志级别为 info
     cn.iocoder.yudao.module.infra.dal.mysql.file.FileConfigMapper: INFO # 配置 FileConfigMapper 的日志级别为 info
-    cn.iocoder.yudao.module.pay.dal.mysql: debug
+#    cn.iocoder.yudao.module.pay.dal.mysql: debug
     cn.iocoder.yudao.module.pay.dal.mysql.notify.PayNotifyTaskMapper: INFO # 配置 PayNotifyTaskMapper 的日志级别为 info
-    cn.iocoder.yudao.module.system.dal.mysql: debug
+#    cn.iocoder.yudao.module.system.dal.mysql: debug
     cn.iocoder.yudao.module.system.dal.mysql.sms.SmsChannelMapper: INFO # 配置 SmsChannelMapper 的日志级别为 info
-    cn.iocoder.yudao.module.tool.dal.mysql: debug
-    cn.iocoder.yudao.module.member.dal.mysql: debug
-    cn.iocoder.yudao.module.trade.dal.mysql: debug
-    cn.iocoder.yudao.module.promotion.dal.mysql: debug
-    cn.iocoder.yudao.module.statistics.dal.mysql: debug
-    cn.iocoder.yudao.module.crm.dal.mysql: debug
-    cn.iocoder.yudao.module.erp.dal.mysql: debug
-    cn.iocoder.yudao.module.mes.dal.mysql: debug
-    cn.iocoder.yudao.module.wms.dal.mysql: debug
-    cn.iocoder.yudao.module.iot.dal.mysql: debug
-    cn.iocoder.yudao.module.iot.dal.tdengine: DEBUG
-    cn.iocoder.yudao.module.iot.service.rule: debug
-    cn.iocoder.yudao.module.ai.dal.mysql: debug
-    cn.iocoder.yudao.module.im.dal.mysql: debug
+#    cn.iocoder.yudao.module.tool.dal.mysql: debug
+#    cn.iocoder.yudao.module.member.dal.mysql: debug
+#    cn.iocoder.yudao.module.trade.dal.mysql: debug
+#    cn.iocoder.yudao.module.promotion.dal.mysql: debug
+#    cn.iocoder.yudao.module.statistics.dal.mysql: debug
+#    cn.iocoder.yudao.module.crm.dal.mysql: debug
+#    cn.iocoder.yudao.module.erp.dal.mysql: debug
+#    cn.iocoder.yudao.module.mes.dal.mysql: debug
+#    cn.iocoder.yudao.module.wms.dal.mysql: debug
+#    cn.iocoder.yudao.module.iot.dal.mysql: debug
+#    cn.iocoder.yudao.module.iot.dal.tdengine: DEBUG
+#    cn.iocoder.yudao.module.iot.service.rule: debug
+#    cn.iocoder.yudao.module.ai.dal.mysql: debug
+#    cn.iocoder.yudao.module.im.dal.mysql: debug
     org.springframework.context.support.PostProcessorRegistrationDelegate: ERROR # TODO 芋艿：先禁用，Spring Boot 3.X 存在部分错误的 WARN 提示
 
 debug: false
@@ -250,33 +250,38 @@ wx:
 
 --- #################### 芋道相关配置 ####################
 
-# 芋道配置项，设置当前项目所有自定义的配置
-yudao:
-  captcha:
-    enable: false # 本地环境，暂时关闭图片验证码，方便登录等接口的测试；
-  security:
-    mock-enable: true
-  media-screen:
-    # Local development exception explicitly approved on 2026-08-25. Do not copy to shared environments.
-    enabled: true
-    clients:
-      - tenant-id: 1
-        cidrs:
-          - 0.0.0.0/0
-    new-media:
-      department-ids: [1011, 1012, 1013]
-  pay:
-    order-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/order # 支付渠道的【支付】回调地址
-    refund-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/refund # 支付渠道的【退款】回调地址
-    transfer-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/transfer # 支付渠道的【转账】回调地址
-  access-log: # 访问日志的配置项
-    enable: false
-  demo: false # 关闭演示模式
-  wxa-code:
-    env-version: develop # 小程序版本: 正式版为 "release"；体验版为 "trial"；开发版为 "develop"
-  wxa-subscribe-message:
-    miniprogram-state: developer # 跳转小程序类型：开发版为 “developer”；体验版为 “trial”为；正式版为 “formal”
-  tencent-lbs-key: TVDBZ-TDILD-4ON4B-PFDZA-RNLKH-VVF6E # QQ 地图的密钥 https://lbs.qq.com/service/staticV2/staticGuide/staticDoc
+# 本地环境覆盖项使用扁平键，避免替换基础 application.yaml 的整个 yudao 命名空间。
+yudao.captcha.enable: false
+yudao.security.mock-enable: true
+yudao.sms-code.expire-times: 10m
+yudao.sms-code.send-frequency: 1m
+yudao.sms-code.send-maximum-quantity-per-day: 10
+yudao.sms-code.begin-code: 9999
+yudao.sms-code.end-code: 9999
+yudao.codegen.base-package: cn.iocoder.yudao
+yudao.codegen.db-schemas: ${spring.datasource.dynamic.datasource.master.name}
+yudao.codegen.front-type: 20
+yudao.codegen.vo-type: 10
+yudao.codegen.delete-batch-enable: true
+yudao.codegen.unit-test-enable: false
+yudao.codegen.import-enable: false
+yudao.websocket.enable: true
+yudao.websocket.path: /infra/ws
+yudao.websocket.sender-type: local
+yudao.media-screen.enabled: true
+yudao.media-screen.clients[0].tenant-id: 1
+yudao.media-screen.clients[0].cidrs[0]: 0.0.0.0/0
+yudao.media-screen.new-media.department-ids[0]: 1011
+yudao.media-screen.new-media.department-ids[1]: 1012
+yudao.media-screen.new-media.department-ids[2]: 1013
+yudao.pay.order-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/order
+yudao.pay.refund-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/refund
+yudao.pay.transfer-notify-url: https://yutou.mynatapp.cc/admin-api/pay/notify/transfer
+yudao.access-log.enable: false
+yudao.demo: false
+yudao.wxa-code.env-version: develop
+yudao.wxa-subscribe-message.miniprogram-state: developer
+yudao.tencent-lbs-key: TVDBZ-TDILD-4ON4B-PFDZA-RNLKH-VVF6E
 
 justauth:
   enabled: true

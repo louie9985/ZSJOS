@@ -24,6 +24,14 @@
     </el-alert>
   </ContentWrap>
 
+  <ZsjosAdvancedFilter
+    scene="student"
+    placeholder="姓名 / 手机号 / 客资编号"
+    :keyword="query.keyword"
+    @search="(value) => { query.keyword = value; handleQuery() }"
+    @change="(value) => { query.advancedFilter = value; handleQuery() }"
+  />
+
   <ContentWrap>
     <el-table v-loading="loading" :data="list" row-key="personId" stripe>
       <el-table-column label="学员姓名" prop="name" min-width="130" fixed="left" />
@@ -116,6 +124,7 @@
 
 <script lang="ts" setup>
 import * as RegistrationApi from '@/api/zsjos/registration'
+import ZsjosAdvancedFilter from './components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosMyStudents' })
 
@@ -123,7 +132,7 @@ const loading = ref(false)
 const error = ref('')
 const list = ref<RegistrationApi.MyStudent[]>([])
 const total = ref(0)
-const query = reactive({ pageNo: 1, pageSize: 10, keyword: '' })
+const query = reactive({ pageNo: 1, pageSize: 10, keyword: '', advancedFilter: undefined as any })
 const detailOpen = ref(false)
 const detailLoading = ref(false)
 const detailError = ref('')
@@ -168,6 +177,7 @@ const handleQuery = () => {
 const resetQuery = () => {
   query.pageNo = 1
   query.keyword = ''
+  query.advancedFilter = undefined
   void load()
 }
 const openDetail = async (personId: number) => {

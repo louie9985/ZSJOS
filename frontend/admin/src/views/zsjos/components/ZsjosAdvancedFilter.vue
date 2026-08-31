@@ -26,7 +26,7 @@ import * as DictDataApi from '@/api/system/dict/dict.data'
 import * as UserApi from '@/api/system/user'
 import ZsjosAdvancedFilterGroup from './ZsjosAdvancedFilterGroup.vue'
 
-const props = defineProps<{ scene: 'lead' | 'order'; placeholder: string; keyword?: string }>()
+const props = defineProps<{ scene: Api.AdvancedFilterScene; placeholder: string; keyword?: string }>()
 const emit = defineEmits<{ change: [value?: Api.AdvancedFilterGroup]; search: [value: string] }>()
 const visible = ref(false), fields = ref<Api.AdvancedFilterField[]>([]), searchText = ref(props.keyword || '')
 const catalogLoading = ref(true), catalogError = ref(false)

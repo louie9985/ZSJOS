@@ -15,7 +15,7 @@ import { DICT_TYPE } from '../constants'
 import { hasPermission } from '../services/managementAccess'
 import { formatTimestamp } from '../services/time'
 import { DirectorAutoSaveCoordinator, type DirectorAutoSaveState } from '../services/directorAutoSave'
-import { mergePositioningJsonValues, parsePositioningJson, POSITIONING_JSON_MAX_BYTES, serializePositioningFormValues, type PositioningJsonImportPreview } from '../services/positioningJsonImport'
+import { mergePositioningJsonValues, parsePositioningJson, serializePositioningFormValues, type PositioningJsonImportPreview } from '../services/positioningJsonImport'
 import { workOrderApi, type WorkOrderDepartment, type WorkOrderFile, type WorkOrderTemplate } from '../services/workOrderApi'
 
 const PAGE_SIZE = 20
@@ -307,10 +307,6 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
     setPositioningJsonError(''); setPositioningJsonPreview(undefined)
     if (!file.name.toLowerCase().endsWith('.json')) {
       setPositioningJsonError('请选择 .json 文件')
-      return Upload.LIST_IGNORE
-    }
-    if (file.size > POSITIONING_JSON_MAX_BYTES) {
-      setPositioningJsonError('JSON 文件不能超过 1 MiB')
       return Upload.LIST_IGNORE
     }
     try {
@@ -677,7 +673,7 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
         <Alert type="info" showIcon message="仅按当前模板字段 key 匹配" description="字典字段请填写服务端稳定 value；null 表示清空该字段，未提供或校验失败的字段会保留原值。" />
         <Upload.Dragger accept=".json,application/json" maxCount={1} showUploadList={false} beforeUpload={readPositioningJsonFile} disabled={positioningJsonSaving}>
           <p className="ant-upload-drag-icon"><UploadOutlined /></p>
-          <p>点击或拖入不超过 1 MiB 的 UTF-8 .json 文件</p>
+          <p>点击或拖入 UTF-8 .json 文件</p>
           {positioningJsonFileName && <Tag>{positioningJsonFileName}</Tag>}
         </Upload.Dragger>
         <Input.TextArea rows={8} value={positioningJsonText} disabled={positioningJsonSaving} placeholder={'也可以直接粘贴 JSON，例如：\n{\n  "strongStoryHook": "十年一线实战经验",\n  "recommendedMatchRate": 85\n}'} onChange={event => { setPositioningJsonText(event.target.value); setPositioningJsonFileName(''); setPositioningJsonPreview(undefined); setPositioningJsonError('') }} />

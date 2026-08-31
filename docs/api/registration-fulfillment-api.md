@@ -239,7 +239,7 @@ an item. The V129 seed is repeatable and is not executed by application startup.
 
 Workbench 的“导入 JSON”是定位卡草稿表单的本地辅助能力，不新增后端导入接口，也不读取
 历史定位卡，因此只沿用填写定位卡所需的 `zsjos:positioning-card:create` 权限。浏览器接受
-不超过 1 MiB 的 UTF-8 `.json` 文件或粘贴文本，原始文件不会上传。JSON 顶层必须是普通对象，
+UTF-8 `.json` 文件或粘贴文本，原始文件不会上传。JSON 顶层必须是普通对象，
 仅按当前草稿冻结模板的稳定字段 `key` 匹配，例如：
 
 ```json

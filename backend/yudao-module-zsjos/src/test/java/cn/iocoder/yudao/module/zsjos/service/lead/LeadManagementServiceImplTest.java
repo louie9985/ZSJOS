@@ -35,6 +35,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -48,6 +49,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -92,6 +94,28 @@ class LeadManagementServiceImplTest {
     private PartnerMapper partnerMapper;
     @Mock
     private BusinessTaskMapper businessTaskMapper;
+
+    @Test
+    void resolvePartnerActions_shouldExposeSubmitterActionsForActiveOwnLead() {
+        LeadDO lead = new LeadDO().setProviderOwnerType("partner").setProviderOwnerId(10L)
+                .setStatus("valid").setOwnerUserId(20L);
+        @SuppressWarnings("unchecked")
+        List<LeadManagementRespVO.ActionVO> actions = (List<LeadManagementRespVO.ActionVO>)
+                ReflectionTestUtils.invokeMethod(service, "resolvePartnerActions", lead, 10L);
+        assertTrue(actions.stream().anyMatch(item -> "SUBMITTER_URGE".equals(item.getCode())));
+        assertTrue(actions.stream().anyMatch(item -> "SUBMITTER_COMPLAINT".equals(item.getCode())));
+    }
+
+    @Test
+    void resolvePartnerActions_shouldExposeAppealOnlyForOwnInvalidLead() {
+        LeadDO lead = new LeadDO().setProviderOwnerType("partner").setProviderOwnerId(10L)
+                .setStatus("invalid").setOwnerUserId(20L);
+        @SuppressWarnings("unchecked")
+        List<LeadManagementRespVO.ActionVO> actions = (List<LeadManagementRespVO.ActionVO>)
+                ReflectionTestUtils.invokeMethod(service, "resolvePartnerActions", lead, 10L);
+        assertEquals(1, actions.size());
+        assertEquals("CREATE_APPEAL", actions.get(0).getCode());
+    }
 
     @BeforeEach
     void setUp() {

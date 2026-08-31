@@ -225,8 +225,8 @@ export default function SalesOrderDetailCards({ order, approvalContext, mode, on
           <div className="lead-profile-row"><span className="lead-field-label">来源</span><span className="lead-field-value lead-source-value"><span className="lead-source-label">{leadProfile.sourceLabel || '来源未配置'}</span>{sourceDispatchTag && <Tag color={sourceDispatchTag.color}>{sourceDispatchTag.label}</Tag>}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">提交人</span><span className="lead-field-value">{leadProfile.sourceUserName || '-'}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">所属销售</span><span className="lead-field-value">{leadProfile.ownerUserName || '暂未分配'}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || label(DICT_TYPE.LEAD_CATEGORY, leadProfile.leadCategory)}</span></div>
-          <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || label(DICT_TYPE.LEAD_SOURCE_CHANNEL, leadProfile.sourceChannel)}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">分类</span><span className="lead-field-value">{leadProfile.leadCategoryLabelSnapshot || "历史未记录"}</span></div>
+          <div className="lead-profile-row"><span className="lead-field-label">渠道</span><span className="lead-field-value">{leadProfile.sourceChannelLabelSnapshot || "历史未记录"}</span></div>
           <div className="lead-profile-row"><span className="lead-field-label">地区</span><span className="lead-field-value">{[leadProfile.provinceName, leadProfile.cityName].filter(Boolean).join(' / ') || '-'}</span></div>
         </div>
       </section>}

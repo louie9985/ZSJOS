@@ -1,15 +1,7 @@
 import request from '@/config/axios'
-
-export interface BirthdayCareConfig {
-  enabled: boolean
-  advanceDays: number
-  triggerTime: string
-  deptIds: number[]
-  includeChildDepartments: boolean
-  recipientUserIds?: number[]
-  missingTaskPermissionUserIds?: number[]
-}
-
-export const getBirthdayCareConfig = () => request.get<BirthdayCareConfig>({ url: '/hrm/birthday-care/config' })
-export const saveBirthdayCareConfig = (data: BirthdayCareConfig) =>
-  request.put({ url: '/hrm/birthday-care/config', data })
+export interface ReminderRule { enabled: boolean; advanceDays: number; triggerTime: string; deptIds: number[]; includeChildDepartments: boolean; recipientUserIds?: number[]; missingTaskPermissionUserIds?: number[] }
+export interface EmployeeReminderConfig { birthday: ReminderRule; contractExpiry: ReminderRule; entryAnniversary: ReminderRule }
+export const getEmployeeReminderConfig = () => request.get<EmployeeReminderConfig>({ url: '/hrm/employee-reminder/config' })
+export const saveEmployeeReminderConfig = (data: EmployeeReminderConfig) => request.put({ url: '/hrm/employee-reminder/config', data })
+export const getBirthdayCareConfig = getEmployeeReminderConfig
+export const saveBirthdayCareConfig = saveEmployeeReminderConfig

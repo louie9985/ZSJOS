@@ -1,0 +1,164 @@
+{
+  "key": "eam_asset_transfer",
+  "name": "资产流转审批",
+  "category": "general-module",
+  "description": "领用、借用和调拨的统一资产流转审批与履行流程",
+  "type": 20,
+  "formType": 20,
+  "formCustomCreatePath": "/eam/transfer",
+  "formCustomViewPath": "/eam/transfer/ApprovalDetail",
+  "visible": false,
+  "startUserIds": [],
+  "startDeptIds": [],
+  "managerUserIds": [],
+  "allowCancelRunningProcess": true,
+  "allowWithdrawTask": false,
+  "autoApprovalType": 0,
+  "processIdRule": {
+    "enable": false,
+    "length": 5
+  },
+  "titleSetting": {
+    "enable": false
+  },
+  "summarySetting": {
+    "enable": false,
+    "summary": []
+  },
+  "printTemplateSetting": {
+    "enable": false
+  },
+  "simpleModel": {
+    "id": "StartUserNode",
+    "type": 10,
+    "name": "发起人",
+    "childNode": {
+      "id": "departmentLeaderReview",
+      "type": 11,
+      "name": "申请部门负责人审批",
+      "showText": "流程表达式：${departmentLeaderUsers}",
+      "candidateStrategy": 60,
+      "candidateParam": "${departmentLeaderUsers}",
+      "approveType": 1,
+      "approveMethod": 3,
+      "fieldsPermission": [],
+      "buttonsSetting": [
+        {"id": 1, "displayName": "通过", "enable": true},
+        {"id": 2, "displayName": "拒绝", "enable": true},
+        {"id": 3, "displayName": "转办", "enable": true},
+        {"id": 4, "displayName": "委派", "enable": true},
+        {"id": 5, "displayName": "加签", "enable": true},
+        {"id": 6, "displayName": "退回", "enable": false}
+      ],
+      "signEnable": false,
+      "reasonRequire": true,
+      "skipExpression": "${isAllocate == true}",
+      "rejectHandler": {"type": 1},
+      "assignEmptyHandler": {"type": 2},
+      "assignStartUserHandlerType": 1,
+      "childNode": {
+        "id": "sourceDepartmentReview",
+        "type": 11,
+        "name": "转出部门负责人审批",
+        "showText": "流程表达式：${sourceDepartmentUsers}",
+        "candidateStrategy": 60,
+        "candidateParam": "${sourceDepartmentUsers}",
+        "approveType": 1,
+        "approveMethod": 3,
+        "fieldsPermission": [],
+        "buttonsSetting": [
+          {"id": 1, "displayName": "通过", "enable": true},
+          {"id": 2, "displayName": "拒绝", "enable": true},
+          {"id": 3, "displayName": "转办", "enable": true},
+          {"id": 4, "displayName": "委派", "enable": true},
+          {"id": 5, "displayName": "加签", "enable": true},
+          {"id": 6, "displayName": "退回", "enable": false}
+        ],
+        "signEnable": false,
+        "reasonRequire": true,
+        "skipExpression": "${isAllocate != true}",
+        "rejectHandler": {"type": 1},
+        "assignEmptyHandler": {"type": 2},
+        "assignStartUserHandlerType": 1,
+        "childNode": {
+          "id": "targetDepartmentReview",
+          "type": 11,
+          "name": "接收部门负责人审批",
+          "showText": "流程表达式：${targetDepartmentUsers}",
+          "candidateStrategy": 60,
+          "candidateParam": "${targetDepartmentUsers}",
+          "approveType": 1,
+          "approveMethod": 3,
+          "fieldsPermission": [],
+          "buttonsSetting": [
+            {"id": 1, "displayName": "通过", "enable": true},
+            {"id": 2, "displayName": "拒绝", "enable": true},
+            {"id": 3, "displayName": "转办", "enable": true},
+            {"id": 4, "displayName": "委派", "enable": true},
+            {"id": 5, "displayName": "加签", "enable": true},
+            {"id": 6, "displayName": "退回", "enable": false}
+          ],
+          "signEnable": false,
+          "reasonRequire": true,
+          "skipExpression": "${isAllocate != true || sameDepartment == true}",
+          "rejectHandler": {"type": 1},
+          "assignEmptyHandler": {"type": 2},
+          "assignStartUserHandlerType": 1,
+          "childNode": {
+            "id": "assetAdministratorReview",
+            "type": 13,
+            "name": "资产管理员确认",
+            "showText": "流程表达式：${assetAdministratorUsers}",
+            "candidateStrategy": 60,
+            "candidateParam": "${assetAdministratorUsers}",
+            "approveType": 1,
+            "approveMethod": 3,
+            "fieldsPermission": [],
+            "buttonsSetting": [
+              {"id": 1, "displayName": "确认", "enable": true},
+              {"id": 2, "displayName": "拒绝", "enable": false},
+              {"id": 3, "displayName": "转办", "enable": false},
+              {"id": 4, "displayName": "委派", "enable": false},
+              {"id": 5, "displayName": "加签", "enable": false},
+              {"id": 6, "displayName": "退回", "enable": false}
+            ],
+            "signEnable": false,
+            "reasonRequire": true,
+            "rejectHandler": {"type": 1},
+            "assignEmptyHandler": {"type": 2},
+            "assignStartUserHandlerType": 1,
+            "childNode": {
+              "id": "receiverSign",
+              "type": 13,
+              "name": "接收人签收",
+              "showText": "流程表达式：${receiverUsers}",
+              "candidateStrategy": 60,
+              "candidateParam": "${receiverUsers}",
+              "approveType": 1,
+              "approveMethod": 3,
+              "fieldsPermission": [],
+              "buttonsSetting": [
+                {"id": 1, "displayName": "签收", "enable": true},
+                {"id": 2, "displayName": "拒绝", "enable": false},
+                {"id": 3, "displayName": "转办", "enable": false},
+                {"id": 4, "displayName": "委派", "enable": false},
+                {"id": 5, "displayName": "加签", "enable": false},
+                {"id": 6, "displayName": "退回", "enable": false}
+              ],
+              "signEnable": false,
+              "reasonRequire": false,
+              "rejectHandler": {"type": 1},
+              "assignEmptyHandler": {"type": 2},
+              "assignStartUserHandlerType": 1,
+              "childNode": {
+                "id": "EndEvent",
+                "type": 1,
+                "name": "结束"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

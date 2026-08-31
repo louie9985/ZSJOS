@@ -48,6 +48,7 @@ import LeadAssignmentHost from './components/LeadAssignmentHost'
 import { OverlayCoordinatorProvider } from './components/OverlayCoordinator'
 import { RealtimeProvider } from './components/RealtimeProvider'
 import { NotifyMessageProvider } from './components/NotifyMessageProvider'
+import MenuTaskBadgeProvider, { useMenuTaskBadges } from './components/MenuTaskBadgeProvider'
 import MessageCenter from './components/MessageCenter'
 import { AnnouncementProvider } from './components/AnnouncementProvider'
 import { ForcedFormProvider } from './components/ForcedFormProvider'
@@ -91,10 +92,10 @@ class RuntimeBoundary extends React.Component<React.PropsWithChildren, { error?:
   }
 }
 
-function toPrimaryItems(items: PrimaryNavigationItem[]): MenuItem[] {
+function toPrimaryItems(items: PrimaryNavigationItem[], badgeResolver?: (path: string) => { count: number } | undefined): MenuItem[] {
   return items.map(item => ({
     key: item.key,
-    label: item.label,
+    label: badgeResolver?.(item.menu.path)?.count ? <Badge count={badgeResolver(item.menu.path)?.count} overflowCount={99}><span>{item.label}</span></Badge> : item.label,
     title: item.label,
     icon: <BackendMenuIcon icon={item.icon}/>
   }))
@@ -124,6 +125,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   const location = useLocation()
   const { token } = theme.useToken()
   const { isDark, backgroundValue, layoutMode, watermark: watermarkEnabled, headerFixed, tabs: tabsEnabled, tabStyle } = useTheme()
+  const { resolve: resolveMenuTaskBadge } = useMenuTaskBadges()
   const [primaryCollapsed, setPrimaryCollapsed] = useState(false)
   const [secondaryCollapsed, setSecondaryCollapsed] = useState(false)
   const [singleSiderOpenKeys, setSingleSiderOpenKeys] = useState<string[]>([])
@@ -246,14 +248,14 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   const showTopSecondary = layoutMode === 'top-only'
 
   const singleSiderItems: MenuItem[] = useMemo(
-    () => showSingleSider ? buildNavMenuItems(navigation, { popupClassName: NAV_POPUP_CLASS_NAME }) : [],
-    [navigation, showSingleSider]
+    () => showSingleSider ? buildNavMenuItems(navigation, { popupClassName: NAV_POPUP_CLASS_NAME, badgeResolver: resolveMenuTaskBadge }) : [],
+    [navigation, resolveMenuTaskBadge, showSingleSider]
   )
   const miniSiderItems: MenuItem[] = useMemo(
     () => showMiniSider
-      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: `${NAV_POPUP_CLASS_NAME} mini-flyout` })
+      ? buildNavMenuItems(navigation, { groupChildren: true, popupClassName: `${NAV_POPUP_CLASS_NAME} mini-flyout`, badgeResolver: resolveMenuTaskBadge })
       : [],
-    [navigation, showMiniSider]
+    [navigation, resolveMenuTaskBadge, showMiniSider]
   )
   const topOnlyItems: MenuItem[] = useMemo(
     () => showTopSecondary
@@ -261,9 +263,10 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
           childIcons: false,
           expandSuffix: <DownOutlined style={{ fontSize: 10, marginLeft: 2 }}/>,
           popupClassName: NAV_POPUP_CLASS_NAME
+          , badgeResolver: resolveMenuTaskBadge
         })
       : [],
-    [navigation, showTopSecondary]
+    [navigation, resolveMenuTaskBadge, showTopSecondary]
   )
 
   const layoutClass = [
@@ -309,7 +312,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <span className="primary-nav-icon"><BackendMenuIcon icon={item.icon}/></span>
-                  {!primaryCollapsed && <span className="primary-nav-label">{item.label}</span>}
+                  {!primaryCollapsed && <span className="primary-nav-label">{item.label}{(resolveMenuTaskBadge(item.menu.path)?.count ?? 0) > 0 && <Badge count={resolveMenuTaskBadge(item.menu.path)?.count} overflowCount={99} />}</span>}
                 </button>
               )
               return primaryCollapsed
@@ -341,7 +344,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
             inlineIndent={NAV_INLINE_INDENT}
             inlineCollapsed={secondaryCollapsed}
             selectedKeys={currentMenu ? [currentMenu.path] : []}
-            items={buildHierarchicalSecondaryItems(activePrimary?.menu, { popupClassName: NAV_POPUP_CLASS_NAME })}
+            items={buildHierarchicalSecondaryItems(activePrimary?.menu, { popupClassName: NAV_POPUP_CLASS_NAME, badgeResolver: resolveMenuTaskBadge })}
             onClick={({ key }) => go(String(key))}
             className="transparent-menu"
           />
@@ -406,7 +409,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
           <Menu
             mode="horizontal"
             selectedKeys={activePrimary ? [activePrimary.key] : []}
-            items={toPrimaryItems(navigation)}
+            items={toPrimaryItems(navigation, resolveMenuTaskBadge)}
             onClick={({ key }) => selectPrimary(String(key))}
             className="top-primary-menu"
           />
@@ -480,12 +483,12 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   )
 
   return <>
-    <RealtimeProvider platform={authPlatform}><ForcedFormProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider>
+    <>
       {showWatermark
         ? <Watermark content={[watermarkText]} className="crm-watermark-wrapper">{shellContent}</Watermark>
         : <div className="crm-watermark-wrapper">{shellContent}</div>
       }
-    </NotifyMessageProvider></SalesDispatchStatusProvider></AnnouncementProvider></ForcedFormProvider></RealtimeProvider>
+    </>
   </>
 }
 
@@ -557,12 +560,13 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
     : <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLoginRedirectPending(true); setLogged(true) }}/>
   if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space></Card></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
-  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
+  return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider>
+    <Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)
       await api.logout(authPlatform)
     } finally { setInfo(undefined); setError(''); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }
-  }}/></OverlayCoordinatorProvider></DefaultEmployeeAvatarProvider>
+  }}/></MenuTaskBadgeProvider></NotifyMessageProvider></SalesDispatchStatusProvider></AnnouncementProvider></ForcedFormProvider></RealtimeProvider></OverlayCoordinatorProvider></DefaultEmployeeAvatarProvider>
 }
 
 const authPlatform = initializeAuthPlatform()

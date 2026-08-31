@@ -368,8 +368,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (matchedOrderIds != null) reqVO.setStatus(null);
         PageResult<SalesOrderDO> page = orderMapper.selectMyPage(userId, reqVO, matchedOrderIds);
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(page.getList());
         return new PageResult<>(page.getList().stream()
-                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList(), page.getTotal());
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null,
+                        items.getOrDefault(order.getId(), List.of()))).toList(), page.getTotal());
     }
 
     @Override
@@ -383,8 +385,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         boolean hasMore = rows.size() > limit;
         List<SalesOrderDO> list = hasMore ? rows.subList(0, limit) : rows;
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(list);
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(list);
         List<SalesOrderListItemRespVO> result = list.stream()
-                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList();
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null,
+                        items.getOrDefault(order.getId(), List.of()))).toList();
         String next = hasMore && !list.isEmpty()
                 ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getUpdateTime(), list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
         return new CursorPageResult<>(result, next, hasMore);
@@ -398,8 +402,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (matchedOrderIds != null) reqVO.setStatus(null);
         PageResult<SalesOrderDO> page = orderMapper.selectTeamPage(teamUserIds, reqVO, matchedOrderIds);
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(page.getList());
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(page.getList());
         return new PageResult<>(page.getList().stream()
-                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList(), page.getTotal());
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null,
+                        items.getOrDefault(order.getId(), List.of()))).toList(), page.getTotal());
     }
 
     @Override
@@ -415,8 +421,10 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         boolean hasMore = rows.size() > limit;
         List<SalesOrderDO> list = hasMore ? rows.subList(0, limit) : rows;
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(list);
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(list);
         List<SalesOrderListItemRespVO> result = list.stream()
-                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList();
+                .map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null,
+                        items.getOrDefault(order.getId(), List.of()))).toList();
         String next = hasMore && !list.isEmpty()
                 ? SalesOrderCursorCodec.encode(list.get(list.size() - 1).getUpdateTime(), list.get(list.size() - 1).getId(), userId, reqVO.getStatus(), keyword) : null;
         return new CursorPageResult<>(result, next, hasMore);
@@ -496,13 +504,18 @@ public class SalesOrderServiceImpl implements SalesOrderService {
                 : searchProcessIds(reqVO.getKeyword());
         if (processIds != null && processIds.isEmpty()) return PageResult.empty();
         List<BpmTaskRespDTO> tasks = loadApprovalTasks(userId, reqVO, filter, processIds);
-        List<SalesOrderListItemRespVO> result = new ArrayList<>();
+        List<OrderTaskContext> contexts = new ArrayList<>();
         for (BpmTaskRespDTO task : tasks) {
             Long orderId = parseOrderId(task.getBusinessKey());
             SalesOrderDO order = orderId == null ? null : orderMapper.selectById(orderId);
             if (order == null || !permissionService.canRead(order, userId)) continue;
-            result.add(convertListItem(order, roundMapper.selectByProcessInstanceId(task.getProcessInstanceId()), task));
+            contexts.add(new OrderTaskContext(order,
+                    roundMapper.selectByProcessInstanceId(task.getProcessInstanceId()), task));
         }
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(contexts.stream().map(OrderTaskContext::order).toList());
+        List<SalesOrderListItemRespVO> result = contexts.stream().map(context -> convertListItem(
+                context.order(), context.round(), context.task(),
+                items.getOrDefault(context.order().getId(), List.of()))).toList();
         long total = countApprovalTasks(userId, filter, processIds);
         return new PageResult<>(result, total);
     }
@@ -800,7 +813,9 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         List<SalesOrderDO> orders = orderMapper.selectByPersonId(lead.getPersonId());
         Map<Long, SalesOrderApprovalRoundDO> rounds = getCurrentRounds(orders);
-        return orders.stream().map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null)).toList();
+        Map<Long, List<SalesOrderItemDO>> items = getOrderItems(orders);
+        return orders.stream().map(order -> convertListItem(order, rounds.get(order.getCurrentApprovalRoundId()), null,
+                items.getOrDefault(order.getId(), List.of()))).toList();
     }
 
     @Override
@@ -1396,12 +1411,11 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             result.setSourceUserName(userName(users, lead.getSourceUserId()));
         }
         result.setSourceChannel(lead.getSourceChannelId());
-        result.setSourceChannelLabelSnapshot(dictLabel(DICT_SOURCE_CHANNEL, lead.getSourceChannelId()));
+        result.setSourceChannelLabelSnapshot(lead.getSourceChannelLabelSnapshot());
         result.setProvinceName(lead.getProvinceName());
         result.setCityName(lead.getCityName());
         result.setLeadCategory(lead.getLeadCategory());
-        result.setLeadCategoryLabelSnapshot(lead.getLeadCategoryLabelSnapshot() != null
-                ? lead.getLeadCategoryLabelSnapshot() : dictLabel(DICT_CATEGORY, lead.getLeadCategory()));
+        result.setLeadCategoryLabelSnapshot(lead.getLeadCategoryLabelSnapshot());
         result.setDispatchMode(lead.getDispatchMode());
         result.setOwnerUserName(userName(users, lead.getOwnerUserId()));
         return result;
@@ -1435,13 +1449,49 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         return result;
     }
 
-    private SalesOrderListItemRespVO convertListItem(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task) {
+    @SuppressWarnings("unchecked")
+    private SalesOrderListItemRespVO convertListItem(SalesOrderDO order, SalesOrderApprovalRoundDO round,
+                                                     BpmTaskRespDTO task, List<SalesOrderItemDO> items) {
         SalesOrderListItemRespVO result = new SalesOrderListItemRespVO();
         result.setId(order.getId()); result.setOrderNo(order.getOrderNo()); result.setLeadId(order.getLeadId());
         result.setStatus(order.getStatus()); result.setOrderType(order.getOrderType()); result.setPersonId(order.getPersonId());
-        result.setStudentName(order.getStudentName()); result.setStudentMobile(order.getStudentMobile());
+        result.setBuyerName(order.getBuyerName()); result.setStudentName(order.getStudentName());
+        result.setStudentMobile(order.getStudentMobile()); result.setStudentWechatId(order.getStudentWechatId());
+        result.setProvinceName(order.getProvinceName()); result.setCityName(order.getCityName());
+        result.setAgreedExamTime(order.getAgreedExamTime()); result.setClassType(order.getClassType());
         result.setTotalAmount(order.getTotalAmount()); result.setSubmittedAt(order.getSubmittedAt()); result.setEffectiveAt(order.getEffectiveAt());
+        result.setCustomerPaidAt(order.getCustomerPaidAt()); result.setRemark(order.getRemark());
+        result.setStudentSpecialRequirements(order.getStudentSpecialRequirements());
+        result.setMaterialDeliveryContact(order.getMaterialDeliveryContact());
+        result.setRepurchaseReason(order.getRepurchaseReason()); result.setTerminationReason(order.getTerminationReason());
+        result.setProductSummary(summarizeOrderItems(items));
         if (round != null) result.setApprovalRoundNo(round.getRoundNo());
+        if (round != null && JsonUtils.isJsonObject(round.getOrderSnapshot())) {
+            try {
+                Map<String, Object> snapshot = JsonUtils.parseObject(round.getOrderSnapshot(), Map.class);
+                Map<String, Object> labels = snapshot == null ? null : (Map<String, Object>) snapshot.get("orderLabels");
+                if (labels != null) {
+                    result.setStudentNatureLabelSnapshot(text(labels.get("studentNature")));
+                    result.setServicePeriodLabelSnapshot(text(labels.get("servicePeriod")));
+                    result.setStudentSourceLabelSnapshot(text(labels.get("studentSource")));
+                    result.setFeeModeLabelSnapshot(text(labels.get("feeMode")));
+                    result.setPaymentMethodLabelSnapshot(text(labels.get("paymentMethod")));
+                }
+                Map<String, Object> lead = snapshot == null ? null : (Map<String, Object>) snapshot.get("leadProfile");
+                if (lead != null) {
+                    result.setLeadNo(text(lead.get("leadNo")));
+                    result.setLeadSourceLabel(text(lead.get("sourceLabel")));
+                    result.setLeadSourceUserName(text(lead.get("sourceUserName")));
+                    result.setLeadOwnerUserName(text(lead.get("ownerUserName")));
+                    result.setLeadCategoryLabelSnapshot(text(lead.get("leadCategoryLabelSnapshot")));
+                    result.setLeadSourceChannelLabelSnapshot(text(lead.get("sourceChannelLabelSnapshot")));
+                    result.setLeadProvinceName(text(lead.get("provinceName")));
+                    result.setLeadCityName(text(lead.get("cityName")));
+                }
+            } catch (RuntimeException ignored) {
+                // Malformed historical snapshots must not prevent the list from loading.
+            }
+        }
         if (task != null) {
             result.setTaskId(task.getId()); result.setTaskDefinitionKey(task.getTaskDefinitionKey()); result.setTaskStatus(task.getStatus());
             result.setTaskReason(task.getReason()); result.setTaskCreateTime(task.getCreateTime()); result.setTaskEndTime(task.getEndTime());
@@ -1458,6 +1508,29 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             }
         }
         return result;
+    }
+
+    private Map<Long, List<SalesOrderItemDO>> getOrderItems(List<SalesOrderDO> orders) {
+        if (orders.isEmpty()) return Map.of();
+        return itemMapper.selectListByOrderIds(orders.stream().map(SalesOrderDO::getId).toList()).stream()
+                .collect(java.util.stream.Collectors.groupingBy(SalesOrderItemDO::getOrderId));
+    }
+
+    private String summarizeOrderItems(List<SalesOrderItemDO> items) {
+        return items.stream().map(item -> {
+            try {
+                if (!JsonUtils.isJsonObject(item.getProductSnapshot())) throw new IllegalArgumentException("invalid product snapshot");
+                LeadProductSnapshot snapshot = JsonUtils.parseObject(item.getProductSnapshot(), LeadProductSnapshot.class);
+                if (snapshot != null) {
+                    return StrUtil.blankToDefault(snapshot.name(), item.getProductRef())
+                            + (StrUtil.isBlank(snapshot.skuName()) ? "" : " / " + snapshot.skuName());
+                }
+            } catch (RuntimeException ignored) {
+                // Fall back to stable references for historical items with malformed snapshots.
+            }
+            return java.util.stream.Stream.of(item.getProductRef(), item.getSkuRef()).filter(StrUtil::isNotBlank)
+                    .collect(java.util.stream.Collectors.joining(" / "));
+        }).filter(StrUtil::isNotBlank).collect(java.util.stream.Collectors.joining("；"));
     }
 
     private SalesOrderRespVO.SupervisorApprovalVO convertSupervisorApproval(SalesOrderSupervisorConfirmationDO source) {
@@ -1567,6 +1640,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
 
     private record ValidatedItem(LeadProductSnapshot snapshot, BigDecimal actualAmount) {}
     private record ValidatedSubmission(List<ValidatedItem> items, List<VoucherRef> vouchers, BigDecimal total) {}
+    private record OrderTaskContext(SalesOrderDO order, SalesOrderApprovalRoundDO round, BpmTaskRespDTO task) {}
     private record RegionSnapshot(String provinceCode, String provinceName, String cityCode, String cityName) {}
     private record VoucherRef(Long infraFileId, String fileUrl, String originalName, String contentType, Long fileSize, Integer sort) {}
 }

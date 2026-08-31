@@ -3,18 +3,16 @@ import { Button, Image, Spin, Upload, message, type UploadProps } from 'antd'
 import { createDeferredUploadItem, type DeferredUploadItem } from '../services/deferredUpload'
 
 export default function DeferredAttachmentPicker<T>({ value, onChange, accept, maxCount = 9,
-  maxSize = 10 * 1024 * 1024, imageOnly = true, disabled = false }: {
+  imageOnly = true, disabled = false }: {
   value: DeferredUploadItem<T>[]
   onChange: (value: DeferredUploadItem<T>[]) => void
   accept: string
   maxCount?: number
-  maxSize?: number
   imageOnly?: boolean
   disabled?: boolean
 }) {
   const beforeUpload: UploadProps['beforeUpload'] = file => {
     if (value.length >= maxCount) { message.warning(`最多选择 ${maxCount} 个文件`); return Upload.LIST_IGNORE }
-    if (file.size > maxSize) { message.error(`单个文件不能超过 ${Math.round(maxSize / 1024 / 1024)}MB`); return Upload.LIST_IGNORE }
     if (imageOnly && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
       message.error('仅支持 JPG、PNG、WebP 图片'); return Upload.LIST_IGNORE
     }

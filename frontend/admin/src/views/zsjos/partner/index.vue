@@ -130,7 +130,22 @@
       </el-form-item>
     </el-form>
     <el-table v-loading="invitationLoading" :data="invitations">
-      <el-table-column prop="inviteCode" label="邀请码" width="120" />
+      <el-table-column label="邀请码" width="160">
+        <template #default="scope">
+          <span>{{ scope.row.inviteCode }}</span>
+          <el-tooltip content="复制邀请码" placement="top">
+            <el-button
+              link
+              type="primary"
+              class="ml-4px"
+              aria-label="复制邀请码"
+              @click="copyInvitationCode(scope.row.inviteCode)"
+            >
+              <Icon icon="ep:copy-document" />
+            </el-button>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column prop="name" label="姓名" />
       <el-table-column prop="mobile" label="手机号" />
       <el-table-column prop="assignedOperatorName" label="归属运营" />
@@ -310,6 +325,7 @@
 import * as PartnerApi from '@/api/zsjos/partner'
 import * as DeptApi from '@/api/system/dept'
 import { defaultProps, handleTree } from '@/utils/tree'
+import { useClipboard } from '@vueuse/core'
 
 defineOptions({ name: 'ZsjosPartner' })
 const message = useMessage()
@@ -458,6 +474,20 @@ const submitInvitation = async () => {
 const handleInvitationQuery = () => {
   invitationQuery.pageNo = 1
   loadInvitations()
+}
+const copyInvitationCode = async (inviteCode: string) => {
+  const { copy, copied, isSupported } = useClipboard({ legacy: true, source: inviteCode })
+  if (!isSupported.value) {
+    message.error('复制邀请码失败')
+    return
+  }
+  try {
+    await copy()
+    if (copied.value) message.success('邀请码已复制')
+    else message.error('复制邀请码失败')
+  } catch {
+    message.error('复制邀请码失败')
+  }
 }
 const resetInvitationQuery = () => {
   invitationQuery.pageNo = 1

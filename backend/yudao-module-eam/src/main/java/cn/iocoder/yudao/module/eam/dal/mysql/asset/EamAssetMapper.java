@@ -5,14 +5,17 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetPageReqVO;
 import cn.iocoder.yudao.module.eam.dal.dataobject.asset.EamAssetDO;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.Collection;
 import java.util.List;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum.RETURNED_TO_SUPPLIER;
 import static cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum.SCRAPPED;
+import static cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum.IDLE;
 import static cn.iocoder.yudao.module.eam.enums.procurement.EamProcurementConstants.EXPIRY_FIELD_KEY;
 
 @Mapper
@@ -37,6 +40,26 @@ public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
                 .eq(EamAssetDO::getAssetCode, assetCode));
     }
 
+    default PageResult<EamAssetDO> selectPage(EamAssetPageReqVO reqVO, cn.iocoder.yudao.module.eam.service.common.EamDataScopeService.Scope scope) {
+        var wrapper = new LambdaQueryWrapperX<EamAssetDO>()
+                .likeIfPresent(EamAssetDO::getName, reqVO.getName())
+                .likeIfPresent(EamAssetDO::getAssetCode, reqVO.getAssetCode())
+                .eqIfPresent(EamAssetDO::getCategoryId, reqVO.getCategoryId())
+                .eqIfPresent(EamAssetDO::getStatus, reqVO.getStatus())
+                .eqIfPresent(EamAssetDO::getUseDeptId, reqVO.getUseDeptId())
+                .eqIfPresent(EamAssetDO::getUseEmployeeId, reqVO.getUseEmployeeId());
+        if (!scope.all()) {
+            wrapper.and(w -> w.eq(scope.self() && scope.userId() != null, EamAssetDO::getUseEmployeeId, scope.userId())
+                    .or(scope.deptIds() != null && !scope.deptIds().isEmpty(), x -> x.in(EamAssetDO::getUseDeptId, scope.deptIds())));
+        }
+        return selectPage(reqVO, wrapper.orderByDesc(EamAssetDO::getId));
+    }
+
+    default List<EamAssetDO> selectListByAssetCode(String assetCode) {
+        return selectList(new LambdaQueryWrapperX<EamAssetDO>()
+                .eq(EamAssetDO::getAssetCode, assetCode));
+    }
+
     default Long selectCountByCategoryId(Long categoryId) {
         return selectCount(new LambdaQueryWrapperX<EamAssetDO>()
                 .eq(EamAssetDO::getCategoryId, categoryId));
@@ -53,6 +76,36 @@ public interface EamAssetMapper extends BaseMapperX<EamAssetDO> {
     default EamAssetDO selectByIdForUpdate(Long id) {
         return selectOne(new LambdaQueryWrapperX<EamAssetDO>()
                 .eq(EamAssetDO::getId, id).last("FOR UPDATE"));
+    }
+
+    default int clearUsageAndSetIdle(Long id, Integer persistedVersion, Integer nextVersion, String updater) {
+        LambdaUpdateWrapper<EamAssetDO> wrapper = new LambdaUpdateWrapper<EamAssetDO>()
+                .eq(EamAssetDO::getId, id)
+                .set(EamAssetDO::getUseEmployeeId, null)
+                .set(EamAssetDO::getUseDeptId, null)
+                .set(EamAssetDO::getUseEmployeeNameSnapshot, null)
+                .set(EamAssetDO::getStatus, IDLE.getStatus())
+                .set(EamAssetDO::getPreviousStatus, null)
+                .set(EamAssetDO::getVersion, nextVersion)
+                .set(EamAssetDO::getUpdater, updater)
+                .set(EamAssetDO::getUpdateTime, LocalDateTime.now());
+        if (persistedVersion == null) {
+            wrapper.isNull(EamAssetDO::getVersion);
+        } else {
+            wrapper.eq(EamAssetDO::getVersion, persistedVersion);
+        }
+        return update(null, wrapper);
+    }
+
+    default int updateByIdAndVersion(EamAssetDO updateObj, Integer persistedVersion) {
+        LambdaUpdateWrapper<EamAssetDO> wrapper = new LambdaUpdateWrapper<EamAssetDO>()
+                .eq(EamAssetDO::getId, updateObj.getId());
+        if (persistedVersion == null) {
+            wrapper.isNull(EamAssetDO::getVersion);
+        } else {
+            wrapper.eq(EamAssetDO::getVersion, persistedVersion);
+        }
+        return update(updateObj, wrapper);
     }
 
     default List<EamAssetDO> selectIdleListByCategoryId(Long categoryId) {

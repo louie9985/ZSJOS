@@ -1,4 +1,5 @@
 import request from '@/config/axios'
+import type { AdvancedFilterGroup } from '../advancedFilter'
 
 export interface SalesOrderSupervisorInboxVO {
   id: number
@@ -51,8 +52,11 @@ export const getInboxPage = (params: {
   pageSize: number
   handled: boolean
   keyword?: string
+  advancedFilter?: AdvancedFilterGroup
 }): Promise<{ list: SalesOrderSupervisorInboxVO[]; total: number }> =>
-  request.get({ url: '/zsjos/sales-order/supervisor-confirmation/inbox-page', params })
+  params.advancedFilter
+    ? request.post({ url: '/zsjos/sales-order/supervisor-confirmation/search-page', data: params })
+    : request.get({ url: '/zsjos/sales-order/supervisor-confirmation/inbox-page', params })
 
 export const getSalesOrder = (id: number): Promise<SalesOrderDetailVO> =>
   request.get({ url: `/zsjos/sales-order/${id}` })

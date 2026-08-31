@@ -14,6 +14,13 @@
       </el-form-item>
       <el-form-item><el-button type="primary" @click="search">查询</el-button></el-form-item>
     </el-form>
+    <ZsjosAdvancedFilter
+      scene="order"
+      placeholder="订单号 / 学员姓名 / 手机号"
+      :keyword="keyword"
+      @search="(value) => { keyword = value; search() }"
+      @change="(value) => { advancedFilter = value; search() }"
+    />
     <el-alert v-if="unauthorized" title="暂无主管确认权限" type="warning" show-icon :closable="false" />
     <el-alert v-else-if="error" :title="error" type="error" show-icon :closable="false">
       <template #default><el-button link type="primary" @click="load">重试</el-button></template>
@@ -69,11 +76,14 @@
 <script lang="ts" setup>
 import type { TabsPaneContext } from 'element-plus'
 import * as Api from '@/api/zsjos/salesOrderSupervisorConfirmation'
+import type { AdvancedFilterGroup } from '@/api/zsjos/advancedFilter'
+import ZsjosAdvancedFilter from '../components/ZsjosAdvancedFilter.vue'
 
 defineOptions({ name: 'ZsjosSalesOrderSupervisorConfirmation' })
 const message = useMessage()
 const tab = ref('todo')
 const keyword = ref('')
+const advancedFilter = ref<AdvancedFilterGroup>()
 const items = ref<Api.SalesOrderSupervisorInboxVO[]>([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -101,7 +111,7 @@ const load = async () => {
   error.value = ''
   unauthorized.value = false
   try {
-    const result = await Api.getInboxPage({ pageNo: pageNo.value, pageSize: pageSize.value, handled: tab.value === 'done', keyword: keyword.value.trim() || undefined })
+    const result = await Api.getInboxPage({ pageNo: pageNo.value, pageSize: pageSize.value, handled: tab.value === 'done', keyword: keyword.value.trim() || undefined, advancedFilter: advancedFilter.value })
     items.value = result.list
     total.value = result.total
   } catch (e: any) {

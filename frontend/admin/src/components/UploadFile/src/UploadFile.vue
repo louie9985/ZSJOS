@@ -26,9 +26,6 @@
       </el-button>
       <template v-if="isShowTip" #tip>
         <div style="font-size: 8px">
-          大小不超过 <b style="color: #f56c6c">{{ fileSize }}MB</b>
-        </div>
-        <div style="font-size: 8px">
           格式为 <b style="color: #f56c6c">{{ fileType.join('/') }}</b> 的文件
         </div>
       </template>
@@ -68,6 +65,7 @@
 </template>
 <script lang="ts" setup>
 import { propTypes } from '@/utils/propTypes'
+import { getFileNameFromUrl } from '@/utils/file'
 import type { UploadProps, UploadRawFile, UploadUserFile } from 'element-plus'
 import { isString } from '@/utils/is'
 import { useUpload } from '@/components/UploadFile/src/useUpload'
@@ -81,7 +79,6 @@ const emit = defineEmits(['update:modelValue'])
 const props = defineProps({
   modelValue: propTypes.oneOfType<string | string[]>([String, Array<String>]).isRequired,
   fileType: propTypes.array.def(['doc', 'xls', 'ppt', 'txt', 'pdf']), // 文件类型, 例如['png', 'jpg', 'jpeg']
-  fileSize: propTypes.number.def(5), // 大小限制(MB)
   limit: propTypes.number.def(5), // 数量限制
   autoUpload: propTypes.bool.def(true), // 自动上传
   drag: propTypes.bool.def(false), // 拖拽上传
@@ -120,14 +117,8 @@ const beforeUpload: UploadProps['beforeUpload'] = (file: UploadRawFile) => {
     if (file.type.indexOf(type) > -1) return true
     return !!(fileExtension && fileExtension.indexOf(type) > -1)
   })
-  const isLimit = file.size < props.fileSize * 1024 * 1024
   if (!isImg) {
     message.error(`文件格式不正确, 请上传${props.fileType.join('/')}格式!`)
-    removeRejectedFile(file)
-    return false
-  }
-  if (!isLimit) {
-    message.error(`上传文件大小不能超过${props.fileSize}MB!`)
     removeRejectedFile(file)
     return false
   }
@@ -149,7 +140,7 @@ const handleFileSuccess: UploadProps['onSuccess'] = (res: any): void => {
     (item) => (item.response as { data?: string } | undefined)?.data === response.data
   )
   fileList.value.splice(index, 1)
-  uploadList.value.push({ name: response.data, url: response.data })
+  uploadList.value.push({ name: getFileNameFromUrl(response.data), url: response.data })
   if (uploadList.value.length == uploadNumber.value) {
     fileList.value.push(...uploadList.value)
     uploadList.value = []
@@ -191,15 +182,11 @@ watch(
     fileList.value = [] // 保障数据为空
     // 情况1：字符串
     if (isString(val)) {
-      fileList.value.push(
-        ...val.split(',').map((url) => ({ name: url.substring(url.lastIndexOf('/') + 1), url }))
-      )
+      fileList.value.push(...val.split(',').map((url) => ({ name: getFileNameFromUrl(url), url })))
       return
     }
     // 情况2：数组
-    fileList.value.push(
-      ...(val as string[]).map((url) => ({ name: url.substring(url.lastIndexOf('/') + 1), url }))
-    )
+    fileList.value.push(...(val as string[]).map((url) => ({ name: getFileNameFromUrl(url), url })))
   },
   { immediate: true, deep: true }
 )

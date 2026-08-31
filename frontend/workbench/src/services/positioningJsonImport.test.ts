@@ -3,7 +3,6 @@ import type { StudentContactFormField } from './api'
 import {
   mergePositioningJsonValues,
   parsePositioningJson,
-  POSITIONING_JSON_MAX_BYTES,
   serializePositioningFormValues,
 } from './positioningJsonImport'
 
@@ -36,10 +35,6 @@ describe('positioning JSON import', () => {
 
   it.each(['{', '[]', 'null'])('rejects an invalid root: %s', raw => {
     expect(() => parsePositioningJson(raw, context)).toThrow()
-  })
-
-  it('rejects content over one MiB', () => {
-    expect(() => parsePositioningJson(`{"story":"${'a'.repeat(POSITIONING_JSON_MAX_BYTES)}"}`, context)).toThrow('1 MiB')
   })
 
   it('skips unknown keys, invalid types, labels and constraints independently', () => {

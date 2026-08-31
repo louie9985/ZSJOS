@@ -132,8 +132,11 @@ const handleDelete = async (id: number) => {
 }
 
 onMounted(async () => {
-  categories.value = await CategoryApi.getCategoryList()
+  const [categoryRows] = await Promise.all([
+    CategoryApi.getCategoryList(),
+    getList()
+  ])
+  categories.value = categoryRows
   categoryTree.value = handleTree(categories.value as any, 'id', 'parentId')
-  await getList()
 })
 </script>

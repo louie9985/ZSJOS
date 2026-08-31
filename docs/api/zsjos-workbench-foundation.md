@@ -17,6 +17,7 @@ Templates provide four dynamic-field sections: `plan`, `task`, `report`, and `su
 - `GET /zsjos/business-task/my-summary` retains pending bucket counts.
 - `GET /zsjos/business-task/my-page` retains the compatibility pending page.
 - `GET /zsjos/business-task/my-task-page` pages pending or completed/cancelled tasks in the database.
+- `GET /zsjos/business-task/menu-task-summary` returns the current user's pending-task counts projected onto authorized Workbench menu paths. Counts are server-computed; the response may include an urgent severity and a typed target query for deep linking. It excludes notification unread counts and completed tasks.
 - Domains create, complete, and cancel tasks through `BusinessTaskCommandService`.
 - Clients execute controlled `actionCode` values only; arbitrary backend URLs are never executed.
 

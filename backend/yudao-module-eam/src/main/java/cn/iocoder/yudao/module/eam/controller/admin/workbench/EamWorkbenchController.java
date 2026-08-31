@@ -4,6 +4,8 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategoryFieldRespVO;
+import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetPageReqVO;
+import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.category.vo.EamCategoryRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.employeeasset.vo.EamEmployeeAssetSummaryRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.procurement.vo.EamDemandCreateReqVO;
@@ -11,11 +13,18 @@ import cn.iocoder.yudao.module.eam.controller.admin.procurement.vo.EamDemandItem
 import cn.iocoder.yudao.module.eam.controller.admin.procurement.vo.EamDemandRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.procurement.vo.EamStockCandidateRespVO;
 import cn.iocoder.yudao.module.eam.controller.admin.repair.vo.EamRepairCreateReqVO;
+import cn.iocoder.yudao.module.eam.controller.admin.transfer.vo.EamTransferCreateReqVO;
+import cn.iocoder.yudao.module.eam.controller.admin.transfer.vo.EamTransferRespVO;
+import cn.iocoder.yudao.module.eam.enums.transfer.EamTransferTypeEnum;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryFieldService;
 import cn.iocoder.yudao.module.eam.service.category.EamCategoryService;
 import cn.iocoder.yudao.module.eam.service.employeeasset.EamEmployeeAssetService;
 import cn.iocoder.yudao.module.eam.service.procurement.EamDemandService;
 import cn.iocoder.yudao.module.eam.service.repair.EamRepairService;
+import cn.iocoder.yudao.module.eam.service.asset.EamAssetService;
+import cn.iocoder.yudao.module.eam.service.transfer.EamTransferService;
+import cn.iocoder.yudao.module.hrm.api.employee.HrmEmployeeApi;
+import cn.iocoder.yudao.module.hrm.api.employee.dto.HrmEmployeeRespDTO;
 import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -48,11 +57,50 @@ public class EamWorkbenchController {
     private EamCategoryService categoryService;
     @Resource
     private EamCategoryFieldService categoryFieldService;
+    @Resource private EamTransferService transferService;
+    @Resource private HrmEmployeeApi employeeApi;
+    @Resource private EamAssetService assetService;
 
     @GetMapping("/my-assets")
     @PreAuthorize("@ss.hasPermission('eam:workbench:asset:query')")
     public CommonResult<EamEmployeeAssetSummaryRespVO> myAssets() {
         return success(employeeAssetService.getByUserId(SecurityFrameworkUtils.getLoginUserId()));
+    }
+
+    @GetMapping("/my-transfers")
+    @PreAuthorize("@ss.hasPermission('eam:workbench:asset:query')")
+    public CommonResult<List<EamTransferRespVO>> myTransfers() {
+        return success(BeanUtils.toBean(transferService.getMyTransfers(SecurityFrameworkUtils.getLoginUserId()),
+                EamTransferRespVO.class));
+    }
+
+    @GetMapping("/transfer-assets")
+    @PreAuthorize("@ss.hasPermission('eam:workbench:asset:transfer')")
+    public CommonResult<List<EamAssetRespVO>> transferAssets(@RequestParam(required = false) String keyword) {
+        EamAssetPageReqVO query = new EamAssetPageReqVO();
+        query.setPageNo(1);
+        query.setPageSize(50);
+        query.setStatus(cn.iocoder.yudao.module.eam.enums.asset.EamAssetStatusEnum.IDLE.getStatus());
+        query.setName(keyword);
+        return success(BeanUtils.toBean(assetService.getAssetPage(query).getList(), EamAssetRespVO.class));
+    }
+
+    @PostMapping("/transfer")
+    @PreAuthorize("@ss.hasPermission('eam:workbench:asset:transfer')")
+    public CommonResult<Long> createTransfer(@Valid @RequestBody EamTransferCreateReqVO reqVO) {
+        if (EamTransferTypeEnum.ALLOCATE.getType().equals(reqVO.getType())) {
+            throw exception(cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.TRANSFER_TYPE_INVALID);
+        }
+        HrmEmployeeRespDTO employee = employeeApi.getEmployeeByUserId(SecurityFrameworkUtils.getLoginUserId());
+        if (employee == null) throw exception(cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.EMPLOYEE_NOT_BOUND);
+        if (EamTransferTypeEnum.RECEIVE.getType().equals(reqVO.getType())
+                || EamTransferTypeEnum.BORROW.getType().equals(reqVO.getType())) {
+            reqVO.setToEmployeeId(employee.getId());
+            reqVO.setToDeptId(employee.getDeptId());
+        } else if (!employee.getId().equals(assetService.validateAssetExists(reqVO.getAssetId()).getUseEmployeeId())) {
+            throw exception(ASSET_NOT_EXISTS);
+        }
+        return success(transferService.createTransfer(reqVO));
     }
 
     @GetMapping("/my-demands")

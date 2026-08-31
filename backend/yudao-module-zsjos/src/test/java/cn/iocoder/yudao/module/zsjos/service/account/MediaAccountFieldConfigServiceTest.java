@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.account;
 import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountFieldConfigRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountDetailSnapshotVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.account.vo.MediaAccountFieldConfigSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.account.MediaAccountFieldConfigDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.account.MediaAccountFieldConfigMapper;
@@ -19,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
@@ -56,6 +58,23 @@ class MediaAccountFieldConfigServiceTest {
 
         assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of("unknown", "value")));
         assertThrows(RuntimeException.class, () -> service.validateAndSnapshot(Map.of()));
+    }
+
+    @Test
+    void preservesUnchangedDictionarySnapshotWithoutCurrentDictionaryLookup() {
+        MediaAccountFieldConfigRespVO.FieldVO level = field("level", "账号等级", "select", "account_level", true);
+        when(mapper.selectPublished()).thenReturn(new MediaAccountFieldConfigDO().setId(9L)
+                .setStatus("published").setFieldsJson(cn.iocoder.yudao.framework.common.util.json.JsonUtils
+                        .toJsonString(List.of(level))));
+        MediaAccountDetailSnapshotVO previous = new MediaAccountDetailSnapshotVO();
+        previous.setKey("level"); previous.setLabel("账号等级"); previous.setType("select");
+        previous.setDictType("account_level"); previous.setValue("a"); previous.setDisplayValue("提交时A级");
+
+        MediaAccountFieldConfigService.DetailSnapshot snapshot = service.validateAndSnapshot(
+                Map.of("level", "a"), List.of(previous));
+
+        assertEquals("提交时A级", snapshot.snapshots().getFirst().getDisplayValue());
+        verifyNoInteractions(dictDataApi);
     }
 
     @Test

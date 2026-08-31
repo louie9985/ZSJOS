@@ -131,7 +131,7 @@
           >
             <el-button :disabled="vouchers.length >= 6">选择文件</el-button>
           </el-upload>
-          <span class="voucher-hint">1–6 份 JPG、PNG、WebP 或 PDF，单个不超过 10MB</span>
+          <span class="voucher-hint">1–6 份 JPG、PNG、WebP 或 PDF</span>
           <el-empty v-if="vouchers.length === 0" description="尚未上传缴费凭证" :image-size="56" />
           <div v-for="item in vouchers" :key="item.uid" class="voucher-row">
             <el-image
@@ -292,8 +292,6 @@ const handleVoucherSelect = (file: UploadFile) => {
   }
   if (file.raw.size === 0) {
     item.error = '文件不能为空'
-  } else if (file.raw.size > 10 * 1024 * 1024) {
-    item.error = '文件超过 10MB'
   } else if (!allowed.includes(file.raw.type)) {
     item.error = '文件类型不支持'
   } else {

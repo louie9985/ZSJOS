@@ -10,7 +10,6 @@ import {
   Alert,
   Avatar,
   Button,
-  Drawer,
   Empty,
   Input,
   Modal,
@@ -38,6 +37,9 @@ import SalesOrderDetailCards, {
 import { formatTimestamp } from "../services/time";
 import { useSubmissionGuard } from "../services/submissionGuard";
 import { AdvancedFilterToolbar } from "./AdvancedFilter";
+import { ProTable } from "@ant-design/pro-components";
+import { useInboxTableLayout } from "../services/inboxLayout";
+import ResizableDetailDrawer from "./ResizableDetailDrawer";
 
 const STATUS_LABELS = {
   pending: "待审批",
@@ -86,6 +88,7 @@ export default function SalesOrderSupervisorInbox({
   const [decision, setDecision] = useState<"confirm" | "reject">(),
     [reason, setReason] = useState("");
   const { submitting, run, resetIntent } = useSubmissionGuard();
+  const { useTableLayout } = useInboxTableLayout();
   const handled = scope === "all" ? undefined : scope === "done";
   const load = useCallback(
     async (append = false) => {
@@ -308,7 +311,7 @@ export default function SalesOrderSupervisorInbox({
     <Empty description="选择一条主管审批" />
   );
   return (
-    <section className="workspace-page business-inbox-page sales-order-supervisor-page">
+    <section className={`workspace-page business-inbox-page sales-order-supervisor-page${useTableLayout ? " business-inbox-table-page" : ""}`}>
       <header className="business-inbox-scope-bar">
         <div className="business-inbox-scope-row">
           {scopeControl}
@@ -326,7 +329,32 @@ export default function SalesOrderSupervisorInbox({
           </Button>
         </div>
       </header>
-      <div className="business-inbox-layout">
+      {useTableLayout ? (
+        <ProTable<SalesOrderSupervisorInboxItem>
+          className="business-inbox-table"
+          rowKey="id"
+          search={false}
+          options={{ density: true, fullScreen: true, setting: true }}
+          columnsState={{ persistenceKey: "crm-sales-order-supervisor-table-columns", persistenceType: "localStorage" }}
+          loading={loading}
+          dataSource={items}
+          pagination={false}
+          scroll={{ x: 1900 }}
+          locale={{ emptyText: <Empty description="暂无主管审批" /> }}
+          columns={[
+            { title: "订单号", dataIndex: "orderNo", width: 180, fixed: "left", ellipsis: true },
+            { title: "学员姓名", dataIndex: "studentName", width: 140 },
+            { title: "审批节点", dataIndex: "taskDefinitionKey", width: 150, render: value => SALES_ORDER_TASK_LABELS[String(value)] || "-" },
+            { title: "申请人", dataIndex: "requesterUserName", width: 140, render: value => value || "-" },
+            { title: "申请原因", dataIndex: "requestReason", width: 280, ellipsis: true },
+            { title: "状态", dataIndex: "status", width: 110, render: value => <Tag color={STATUS_COLORS[value as SalesOrderSupervisorInboxItem["status"]]}>{STATUS_LABELS[value as SalesOrderSupervisorInboxItem["status"]]}</Tag> },
+            { title: "主管意见", dataIndex: "decisionReason", width: 280, ellipsis: true, render: value => value || "-" },
+            { title: "申请时间", dataIndex: "requestedAt", width: 170, render: value => formatTimestamp(value as SalesOrderSupervisorInboxItem["requestedAt"]) },
+            { title: "处理时间", dataIndex: "decidedAt", width: 170, render: value => formatTimestamp(value as SalesOrderSupervisorInboxItem["decidedAt"]) },
+            { title: "操作", key: "action", width: 88, fixed: "right", hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelectedId(item.id); setDrawerOpen(true) }}>详细</Button> }
+          ]}
+        />
+      ) : <div className="business-inbox-layout">
         <aside className="business-inbox-list-pane">
           <div className="business-inbox-toolbar">
             <AdvancedFilterToolbar
@@ -425,8 +453,9 @@ export default function SalesOrderSupervisorInbox({
           </div>
         </aside>
         <main className="business-inbox-detail-pane">{detailContent}</main>
-      </div>
-      <Drawer
+      </div>}
+      <ResizableDetailDrawer
+        desktopResizable={useTableLayout}
         className="business-inbox-mobile-drawer sales-order-mobile-drawer"
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
@@ -434,7 +463,7 @@ export default function SalesOrderSupervisorInbox({
         width="100%"
       >
         {detailContent}
-      </Drawer>
+      </ResizableDetailDrawer>
       <Modal
         title={decision === "confirm" ? "通过主管审批" : "驳回并退回销售"}
         open={Boolean(decision)}

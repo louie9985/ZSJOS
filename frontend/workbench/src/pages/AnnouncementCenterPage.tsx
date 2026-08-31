@@ -39,6 +39,12 @@ const formatFileSize = (size: number) => size >= 1024 * 1024
   ? `${(size / 1024 / 1024).toFixed(1)} MB`
   : `${Math.max(1, Math.round(size / 1024))} KB`
 
+function announcementText(content?: string) {
+  if (!content) return '-'
+  if (typeof DOMParser === 'undefined') return content
+  return new DOMParser().parseFromString(content, 'text/html').body.textContent?.trim() || '-'
+}
+
 export default function AnnouncementCenterPage() {
   const screens = Grid.useBreakpoint()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -101,14 +107,20 @@ export default function AnnouncementCenterPage() {
       loading={loading}
       dataSource={items}
       pagination={false}
-      scroll={{ x: 760 }}
+      scroll={{ x: 1900 }}
       locale={{ emptyText: <Empty description="暂无公告" /> }}
       columns={[
         { title: '标题', dataIndex: 'title' },
         { title: '类型', render: (_, item) => item.type === 1 ? '通知' : '公告', width: 100 },
+        { title: '正文', dataIndex: 'content', width: 360, ellipsis: true, render: value => announcementText(value as string | undefined) },
+        { title: '高亮状态', dataIndex: 'highlighted', width: 110, render: value => value ? <Tag color="gold">高亮中</Tag> : '普通' },
+        { title: '高亮截止时间', dataIndex: 'highlightUntil', render: (_, item) => formatTimestamp(item.highlightUntil), width: 170 },
         { title: '发布时间', dataIndex: 'publishTime', render: (_, item) => formatTimestamp(item.publishTime), width: 170 },
         { title: '阅读状态', render: (_, item) => item.read ? '已读' : <Tag color="processing">未读</Tag>, width: 100 },
-        { title: '操作', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => void openDetail(item.id, true)}>详细</Button> }
+        { title: '阅读时间', dataIndex: 'readTime', render: (_, item) => formatTimestamp(item.readTime), width: 170 },
+        { title: '附件数量', width: 100, render: (_, item) => `${item.attachments.length} 个` },
+        { title: '附件', width: 280, ellipsis: true, render: (_, item) => item.attachments.map(file => file.fileName).join('；') || '-' },
+        { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => void openDetail(item.id, true)}>详细</Button> }
       ]}
     /> : <div className="announcement-layout">
       <aside className="announcement-list-pane">

@@ -1,4 +1,5 @@
 import copy
+import json
 import pathlib
 import subprocess
 import sys
@@ -40,6 +41,33 @@ class ValidateManifestTest(unittest.TestCase):
 
         with self.assertRaises(SystemExit):
             validate_manifest.validate_asset(asset, set(), set())
+
+    def test_simple_asset_requires_stable_tasks_and_expressions(self):
+        model = {
+            "key": "sample_process",
+            "type": 20,
+            "simpleModel": {
+                "id": "StartUserNode",
+                "type": 10,
+                "childNode": {
+                    "id": "review",
+                    "type": 11,
+                    "candidateStrategy": 60,
+                    "candidateParam": "${reviewUsers}",
+                    "childNode": {"id": "EndEvent", "type": 1},
+                },
+            },
+        }
+        asset = {
+            "processKey": "sample_process",
+            "path": "sample_process/1.0.0/process-model.json",
+            "taskKeys": ["review"],
+            "businessVariables": [],
+            "assigneeVariables": ["reviewUsers"],
+            "runtimeOnlyVariables": [],
+        }
+
+        validate_manifest.validate_simple_asset(asset, json.dumps(model).encode())
 
 
 if __name__ == "__main__":

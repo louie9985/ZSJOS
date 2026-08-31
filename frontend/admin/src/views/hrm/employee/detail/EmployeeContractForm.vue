@@ -84,7 +84,11 @@
         <el-switch v-model="formData.expireRemind" />
       </el-form-item>
       <el-form-item label="附件">
-        <UploadFile v-model="formData.fileUrls" />
+        <UploadFile
+          v-model="formData.fileUrls"
+          :file-size="16"
+          :file-type="contractAttachmentFileTypes"
+        />
       </el-form-item>
       <el-form-item label="备注">
         <el-input
@@ -120,6 +124,21 @@ import {
 defineOptions({ name: 'HrmEmployeeContractForm' })
 
 const message = useMessage() // 消息弹窗
+const contractAttachmentFileTypes = [
+  'doc',
+  'docx',
+  'xls',
+  'xlsx',
+  'ppt',
+  'pptx',
+  'txt',
+  'pdf',
+  'jpg',
+  'jpeg',
+  'png',
+  'gif',
+  'webp'
+] // 合同附件支持的文档和常用图片格式
 
 const dialogVisible = ref(false) // 弹窗的是否展示
 const formLoading = ref(false) // 表单的加载中

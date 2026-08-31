@@ -68,6 +68,8 @@
               clearable
               class="!w-full"
               placeholder="请选择使用部门"
+              @clear="handleDeptClear"
+              @update:model-value="handleDeptChange"
             />
           </el-form-item>
         </el-col>
@@ -181,6 +183,17 @@ const formRules = reactive({
   categoryId: [{ required: true, message: '分类不能为空', trigger: 'change' }]
 })
 
+// 员工归属必须落在其所属部门；清空部门时同步清空员工，避免后端按员工部门自动补回。
+const handleDeptClear = () => {
+  formData.value.useDeptId = undefined
+  formData.value.useEmployeeId = undefined
+}
+
+const handleDeptChange = (value: number | undefined | null) => {
+  formData.value.useDeptId = value ?? undefined
+  if (value == null) formData.value.useEmployeeId = undefined
+}
+
 function buildEmptyForm(): AssetApi.AssetVO {
   return {
     name: '',
@@ -226,12 +239,19 @@ defineExpose({ open })
 
 const submitForm = async () => {
   await formRef.value.validate()
+  // 清空部门后不允许残留员工 ID；后端会按员工所属部门自动补回部门。
+  if (formData.value.useDeptId == null) formData.value.useEmployeeId = undefined
   if (selectedCategory.value?.managementMode !== 2) {
     formData.value.quantity = 1
   }
   formLoading.value = true
   try {
-    const data = formData.value
+    // 显式组装保存请求，清空选择器时用 null 覆盖打开表单时的旧归属值。
+    const data = {
+      ...formData.value,
+      useDeptId: formData.value.useDeptId ?? null,
+      useEmployeeId: formData.value.useEmployeeId ?? null
+    } as AssetApi.AssetVO
     if (formType.value === 'create') {
       await AssetApi.createAsset(data)
       message.success(t('common.createSuccess'))

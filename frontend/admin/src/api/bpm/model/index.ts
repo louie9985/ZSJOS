@@ -66,7 +66,7 @@ export const createModel = async (data: ModelVO) => {
   return await request.post({ url: '/bpm/model/create', data: data })
 }
 
-export const importModel = async (file: File, key?: string, name?: string) => {
+export const importModel = async (file: File, key?: string, name?: string, category?: string) => {
   const data = new FormData()
   data.append('file', file)
   if (key) {
@@ -74,6 +74,9 @@ export const importModel = async (file: File, key?: string, name?: string) => {
   }
   if (name) {
     data.append('name', name)
+  }
+  if (category) {
+    data.append('category', category)
   }
   return await request.post({
     url: '/bpm/model/import',

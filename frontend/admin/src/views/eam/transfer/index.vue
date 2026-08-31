@@ -70,28 +70,16 @@
         min-width="170"
         :formatter="dateFormatter"
       />
-      <el-table-column label="操作" width="180" align="center" fixed="right">
+      <el-table-column label="流程实例" prop="processInstanceId" min-width="190" show-overflow-tooltip />
+      <el-table-column label="验收结果" min-width="100" align="center">
+        <template #default="{ row }">{{ inspectionLabels[row.inspectionResult] || '-' }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="210" align="center" fixed="right">
         <template #default="{ row }">
-          <!-- 仅审批中的单据可审批或取消，其余状态为终态 -->
           <template v-if="row.status === TransferStatus.APPROVING">
+            <el-button link type="primary" @click="openApprovalCenter">审批中心</el-button>
             <el-button
-              v-hasPermi="['eam:transfer:update']"
-              link
-              type="success"
-              @click="handleApprove(row.id)"
-            >
-              通过
-            </el-button>
-            <el-button
-              v-hasPermi="['eam:transfer:update']"
-              link
-              type="danger"
-              @click="handleReject(row.id)"
-            >
-              驳回
-            </el-button>
-            <el-button
-              v-hasPermi="['eam:transfer:update']"
+              v-hasPermi="['eam:transfer:cancel']"
               link
               type="info"
               @click="handleCancel(row.id)"
@@ -99,6 +87,11 @@
               取消
             </el-button>
           </template>
+          <el-button
+            v-else-if="row.status === TransferStatus.PENDING_INSPECTION"
+            v-hasPermi="['eam:transfer:inspect']"
+            link type="primary" @click="handleInspect(row.id)"
+          >验收</el-button>
           <span v-else class="text-gray-400">-</span>
         </template>
       </el-table-column>
@@ -124,6 +117,8 @@ import TransferForm from './TransferForm.vue'
 defineOptions({ name: 'EamTransfer' })
 
 const message = useMessage()
+const router = useRouter()
+const inspectionLabels: Record<number, string> = { 1: '完好', 2: '损坏', 3: '缺件/遗失', 4: '不符驳回' }
 
 const loading = ref(false)
 const total = ref(0)
@@ -164,20 +159,17 @@ const openForm = () => {
   formRef.value.open()
 }
 
-const handleApprove = async (id: number) => {
-  try {
-    await message.confirm('确认审批通过该流转单？通过后资产状态与归属将立即变更')
-    await TransferApi.approveTransfer(id)
-    message.success('审批通过')
-    await getList()
-  } catch {}
-}
+const openApprovalCenter = () => router.push('/bpm/task/todo')
 
-const handleReject = async (id: number) => {
+const handleInspect = async (id: number) => {
   try {
-    const { value } = await message.prompt('请输入驳回原因', '驳回流转单')
-    await TransferApi.rejectTransfer(id, value)
-    message.success('已驳回')
+    const result = await ElMessageBox.prompt('请输入验收结果：1 完好，2 损坏，3 缺件/遗失，4 不符驳回', '资产验收', {
+      inputPattern: /^[1-4]$/,
+      inputErrorMessage: '请输入 1 至 4'
+    })
+    const remark = await message.prompt('请输入验收备注（可选）', '验收备注')
+    await TransferApi.inspectTransfer(id, { result: Number(result.value), remark: remark.value })
+    message.success('验收结果已提交')
     await getList()
   } catch {}
 }

@@ -73,7 +73,6 @@ async function onFileChange(event: Event) {
   for (let i = 0; i < files.length; i++) {
     if (fileList.value.length >= 9) break
     const file = files[i]
-    if (file.size > 10 * 1024 * 1024) { showToast(`${file.name} 超过 10MB`); continue }
     const id = createIdempotencyKey()
     const url = URL.createObjectURL(file)
     fileList.value.push({ id, url, status: 'uploading' })

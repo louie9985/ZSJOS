@@ -13,6 +13,7 @@ import { APP_ROUTES } from '../constants'
 import { useInboxTableLayout } from '../services/inboxLayout'
 import { ProTable } from '@ant-design/pro-components'
 import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
+import { buildSalesOrderTableColumns } from '../components/SalesOrderTableColumns'
 
 const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
@@ -129,16 +130,9 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       loading={loading}
       dataSource={items}
       pagination={false}
-      scroll={{ x: 980 }}
+      scroll={{ x: 6200 }}
       locale={{ emptyText: <Empty description="暂无订单" /> }}
-      columns={[
-        { title: '订单号', dataIndex: 'orderNo', width: 170 },
-        { title: '学员', dataIndex: 'studentName', width: 140 },
-        { title: '金额', dataIndex: 'totalAmount', render: value => `¥${Number(value).toFixed(2)}` },
-        { title: '状态', dataIndex: 'status', render: value => <Tag color={SALES_ORDER_STATUS_COLORS[value as SalesOrder['status']]}>{SALES_ORDER_STATUS_LABELS[value as SalesOrder['status']] || value}</Tag> },
-        { title: '提交时间', dataIndex: 'submittedAt', render: (_, item) => formatTimestamp(item.submittedAt), width: 170 },
-        { title: '操作', key: 'action', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
-      ]}
+      columns={buildSalesOrderTableColumns(item => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) })}
     /> : <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">
         <AdvancedFilterToolbar scene="order" pageKey={team ? "sales_order_team" : "sales_order_my"} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>

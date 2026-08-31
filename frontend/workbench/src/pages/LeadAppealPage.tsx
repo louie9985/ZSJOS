@@ -281,15 +281,27 @@ export default function LeadAppealPage() {
       loading={loading}
       dataSource={items}
       pagination={false}
-      scroll={{ x: 980 }}
+      scroll={{ x: 2800 }}
       locale={{ emptyText: <Empty description="暂无申诉" /> }}
       columns={[
         { title: '客资编号', dataIndex: 'leadNo', width: 150 },
         { title: '姓名', dataIndex: 'leadName', width: 140 },
+        { title: '申诉轮次', dataIndex: 'roundNo', width: 100, render: value => `第 ${value} 次` },
         { title: '处理阶段', render: (_, item) => stageLabel[item.reviewStage] || item.reviewStage },
         { title: '状态', render: (_, item) => <Tag color={item.status === 'upheld' ? 'error' : 'processing'}>{statusLabel[item.status] || item.status}</Tag> },
+        { title: '申请人', dataIndex: 'applicantUserName', width: 130, render: value => value || '-' },
+        { title: '申诉理由', dataIndex: 'reason', width: 240, ellipsis: true },
+        { title: '申诉附件', width: 100, render: (_, item) => `${item.evidence.length} 个` },
+        { title: '原无效原因', width: 180, ellipsis: true, render: (_, item) => invalidReasonSnapshotLabel(item.invalidReasonSnapshot) || '-' },
+        { title: '原无效说明', dataIndex: 'invalidDescriptionSnapshot', width: 240, ellipsis: true, render: value => value || '-' },
+        { title: '原无效附件', width: 110, render: (_, item) => `${item.invalidEvidenceSnapshot.length} 个` },
+        { title: '处理人', dataIndex: 'reviewerUserName', width: 130, render: value => value || '-' },
+        { title: '裁决意见', dataIndex: 'decisionReason', width: 240, ellipsis: true, render: value => value || '-' },
+        { title: '裁决附件', width: 100, render: (_, item) => `${item.decisionEvidence.length} 个` },
+        { title: '可再次申诉', dataIndex: 'canSubmitNextRound', width: 110, render: value => value ? '是' : '否' },
         { title: '提交时间', dataIndex: 'submittedAt', render: (_, item) => formatTimestamp(item.submittedAt), width: 170 },
-        { title: '操作', key: 'action', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => { setSelected(item); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
+        { title: '处理时间', dataIndex: 'decidedAt', render: (_, item) => formatTimestamp(item.decidedAt), width: 170 },
+        { title: '操作', key: 'action', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelected(item); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
       ]}
     /> : <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">

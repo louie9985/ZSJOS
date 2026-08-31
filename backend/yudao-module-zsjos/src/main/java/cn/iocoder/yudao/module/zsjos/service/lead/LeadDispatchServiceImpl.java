@@ -467,19 +467,15 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         Map<Long, LeadAssignmentHistoryDO> dispatchHistories = Optional.ofNullable(
                 historyMapper.selectLatestDispatchByLeadIds(leadIds)).orElse(Map.of());
         Map<Long, String> attachmentUrls = resolveAttachmentUrls(attachmentList);
-        Map<String, String> channelLabels = dictLabels(DICT_SOURCE_CHANNEL);
-        Map<String, String> categoryLabels = dictLabels(DICT_CATEGORY);
         return leads.stream().map(lead -> toPendingResp(lead,
                 products.getOrDefault(lead.getId(), List.of()),
                 attachments.getOrDefault(lead.getId(), List.of()), attachmentUrls,
-                channelLabels, categoryLabels, dispatchHistories.get(lead.getId()))).toList();
+                dispatchHistories.get(lead.getId()))).toList();
     }
 
     private LeadPendingRespVO toPendingResp(LeadDO lead, List<LeadIntendedProductDO> products,
                                              List<LeadAttachmentDO> attachments,
                                              Map<Long, String> attachmentUrls,
-                                             Map<String, String> channelLabels,
-                                             Map<String, String> categoryLabels,
                                              LeadAssignmentHistoryDO dispatchHistory) {
         LeadPendingRespVO result = new LeadPendingRespVO();
         result.setId(lead.getId()); result.setLeadNo(lead.getLeadNo()); result.setDispatchMode(lead.getDispatchMode());
@@ -492,10 +488,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         result.setPrimaryIntendedProduct(products.stream().filter(item -> Boolean.TRUE.equals(item.getIsPrimary()))
                 .map(LeadIntendedProductDO::getProductNameSnapshot).findFirst().orElse(null));
         result.setSourceChannel(lead.getSourceChannelId());
-        result.setSourceChannelLabel(channelLabels.get(lead.getSourceChannelId()));
+        result.setSourceChannelLabel(lead.getSourceChannelLabelSnapshot());
         result.setLeadCategory(lead.getLeadCategory());
-        result.setLeadCategoryLabel(lead.getLeadCategoryLabelSnapshot() != null
-                ? lead.getLeadCategoryLabelSnapshot() : categoryLabels.get(lead.getLeadCategory()));
+        result.setLeadCategoryLabel(lead.getLeadCategoryLabelSnapshot());
         result.setRemark(lead.getRemark());
         result.setAttachmentUrls(attachments.stream()
                 .sorted(Comparator.comparing(LeadAttachmentDO::getSort))

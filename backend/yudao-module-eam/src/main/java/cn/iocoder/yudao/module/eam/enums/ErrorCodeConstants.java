@@ -35,11 +35,19 @@ public interface ErrorCodeConstants {
     ErrorCode ASSET_IMPORT_FILE_INVALID = new ErrorCode(1_070_003_004, "资产台账文件无效：{}");
     ErrorCode ASSET_IMPORT_CATEGORY_MISSING = new ErrorCode(1_070_003_005, "资产分类【{} / {}】不存在，请先导入分类配置");
     ErrorCode ASSET_IMPORT_HAS_ERRORS = new ErrorCode(1_070_003_006, "资产台账存在 {} 个错误，请先修正后再提交");
+    ErrorCode ASSET_PUBLIC_CLEAR_USAGE_HOLDING_ACTIVE = new ErrorCode(1_070_003_007,
+            "该资产存在未完成的员工领用或退还记录，请先完成员工资产退还流程");
 
     // ========== 流转 1-070-004-000 ==========
     ErrorCode TRANSFER_NOT_EXISTS = new ErrorCode(1_070_004_000, "流转单不存在");
     ErrorCode TRANSFER_STATUS_INVALID = new ErrorCode(1_070_004_001, "流转单当前状态不允许该操作");
     ErrorCode TRANSFER_TYPE_INVALID = new ErrorCode(1_070_004_002, "流转类型不合法");
+    ErrorCode TRANSFER_RECEIVER_INVALID = new ErrorCode(1_070_004_003, "接收员工或部门无效");
+    ErrorCode TRANSFER_CANDIDATE_EMPTY = new ErrorCode(1_070_004_004, "资产流转审批人配置不完整");
+    ErrorCode TRANSFER_CANCEL_FORBIDDEN = new ErrorCode(1_070_004_005, "仅申请人可以取消流转单");
+    ErrorCode TRANSFER_INSPECTION_RESULT_INVALID = new ErrorCode(1_070_004_006, "资产验收结果不合法");
+    ErrorCode TRANSFER_PROCESS_UNAVAILABLE = new ErrorCode(1_070_004_007, "资产流转审批流程未部署或未启用");
+    ErrorCode TRANSFER_INSPECTION_FORBIDDEN = new ErrorCode(1_070_004_008, "无权验收该资产流转单");
 
     // ========== 盘点 1-070-005-000 ==========
     ErrorCode INVENTORY_NOT_EXISTS = new ErrorCode(1_070_005_000, "盘点单不存在");

@@ -78,7 +78,7 @@ public class LeadDuplicateReviewServiceImpl implements LeadDuplicateReviewServic
             case DUPLICATE_REVIEW_ACTION_ALLOW_FLOW -> {
                 LeadCreateRespVO result = submissionService.createApprovedFromReview(submission,
                         review.getSubmitterUserId(), null, review.getSubmissionSourceType(), review.getSubmissionPartnerId(),
-                        review.getLeadCategoryLabelSnapshot());
+                        review.getLeadCategoryLabelSnapshot(), review.getSourceChannelLabelSnapshot());
                 after.put("personId", leadMapper.selectById(result.getLeadId()).getPersonId());
                 after.put("leadId", result.getLeadId());
             }

@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.BusinessTaskSummaryRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.task.vo.MenuTaskSummaryRespVO;
 import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -22,6 +23,14 @@ import java.time.LocalDateTime;
 @RequestMapping("/zsjos/business-task")
 public class BusinessTaskController {
     @Resource private BusinessTaskService taskService;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.task.MenuTaskSummaryService menuTaskSummaryService;
+
+    @GetMapping("/menu-task-summary")
+    @Operation(summary = "获得工作台菜单待办摘要")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:business-task:query','bpm:task:query')")
+    public CommonResult<MenuTaskSummaryRespVO> getMenuTaskSummary() {
+        return success(menuTaskSummaryService.getMySummary(getLoginUserId()));
+    }
 
     @GetMapping("/my-summary")
     @Operation(summary = "获得我的待办汇总")
@@ -51,7 +60,13 @@ public class BusinessTaskController {
     @Operation(summary = "完成员工生日关怀待办")
     @PreAuthorize("@ss.hasPermission('zsjos:business-task:query')")
     public CommonResult<Boolean> completeBirthdayCare(@PathVariable("id") Long id) {
-        return success(commandService.completeBirthdayCare(id, getLoginUserId(), LocalDateTime.now()));
+        return success(commandService.completeEmployeeReminder(id, getLoginUserId(), LocalDateTime.now()));
+    }
+
+    @PostMapping("/{id}/complete-employee-reminder")
+    @Operation(summary = "完成员工提醒待办")
+    public CommonResult<Boolean> completeEmployeeReminder(@PathVariable("id") Long id) {
+        return success(commandService.completeEmployeeReminder(id, getLoginUserId(), LocalDateTime.now()));
     }
 
     @Resource private cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService commandService;
