@@ -18878,6 +18878,21 @@ equestAttachments。
 - Remaining work: 需要在有效登录态浏览器中逐个 iframe 页面用 Network 面板确认实际耗时；后端慢接口仍需按请求耗时继续优化。
 - Status: `delivered`
 
+## Delivery Entry - 2026-09-01 00:04:00 +08:00
+
+- Workstream ID: `main-production-deploy-script`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 直接提供一套完整的生产部署和启动脚本，并使用统一环境变量入口。
+- Key decisions: 新增单一 Bash 入口 `deploy-production.sh`；默认环境文件为仓库根 `.env.production`，可通过 `ENV_FILE` 覆盖；数据库复用 `deploy/production/zsjos-db` 的 plan/migrate/verify；发布目录按版本保存并维护 `current`/`previous-release`；后端通过进程环境传递数据库、Redis 和企微回跳配置，避免把敏感值写入前端构建；数据库回滚明确保持不变。
+- Execution or analysis result: 脚本覆盖 `check`、`build`、`db-plan`、`db-migrate`、`db-verify`、`start`、`stop`、`restart`、`health`、`deploy`、`rollback`；构建阶段仅导出 VITE 前端变量；`deploy` 顺序为 build -> plan -> migrate -> verify -> install -> restart -> health。
+- Changed files: `script/shell/deploy-production.sh`; `handoff/main.md`。
+- Verification evidence: 已完成脚本内容静态审阅和 `git diff --check` 范围检查；当前 Windows 环境的 `bash` 调用被失效 WSL 拦截，未能执行 `bash -n` 或 ShellCheck；未执行真实构建、数据库迁移、服务停止/启动或生产发布。
+- Dependency or integration impact: 依赖目标服务器的 Bash、Java 25、Maven、Node.js、pnpm、npm、Docker Compose v2、curl、git、sha256sum；无新增项目依赖；不改变业务代码、数据库 schema/data、权限或企微数据库配置。
+- Remaining work: 将脚本和统一 `.env.production` 部署到 Linux 服务器后先执行 `chmod +x` 与 `./deploy-production.sh check`，再按需执行数据库迁移和发布；建议在目标机补跑 `bash -n`/ShellCheck，并填入真实企微社交客户端数据库配置。
+- Status: `delivered`
+
 ## Workstream Registration - 2026-08-31 23:04:00 +08:00
 
 - Workstream ID: `main-eam-loading-optimization`
@@ -19917,3 +19932,17 @@ equestAttachments。
 - Dependency or integration impact: 无新增依赖、后端/数据库/权限/菜单/iframe 协议变化；不影响有先后依赖的字段加载和表单提交流程。
 - Remaining work: 需要在有效登录态浏览器中逐个 iframe 页面用 Network 面板确认实际耗时；后端慢接口仍需按请求耗时继续优化。
 - Status: `delivered`
+## Workstream Registration - 2026-09-01 00:00:00 +08:00
+
+- Workstream ID: `main-production-deploy-script`
+- Goal: 新增一套使用单一生产环境文件的 Linux 部署与启动脚本，覆盖依赖检查、后端/三端前端构建、生产数据库 plan/migrate/verify、版本发布、后端进程管理、健康检查和应用回滚入口。
+- Non-goals: 不修改业务代码、数据库结构或数据；不执行删除/重置生产数据；不把企业微信 Secret 等敏感值写入前端构建产物；不切换分支、提交、推送或清理现有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `f516733f4791abd714b7dfc1706732bcc56b502f`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/shell/deploy-production.sh`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: Java 25/Maven、Node.js/pnpm/npm、Docker Compose、现有 `deploy/production/zsjos-db`、Nginx/systemd 由部署环境提供；无新增依赖。
+- Integration order: 新增单文件环境加载与校验 -> 构建/数据库/进程/发布命令 -> 健康检查与回滚入口 -> Shell 静态验证 -> 追加交付记录。
+- Verification plan: `bash -n script/shell/deploy-production.sh`; `shellcheck`（若可用）；命令帮助和只读 `check`；不执行真实生产迁移、停止服务或发布。
