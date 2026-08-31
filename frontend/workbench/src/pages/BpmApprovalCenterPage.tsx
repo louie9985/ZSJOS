@@ -5,7 +5,6 @@ import {
   Avatar,
   Badge,
   Button,
-  Drawer,
   Empty,
   Grid,
   Result,
@@ -28,6 +27,9 @@ import { APP_ROUTES } from '../constants'
 import DateTimeText from '../components/DateTimeText'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { api, ApiError, AuthenticationError, type BpmTask } from '../services/api'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable } from '@ant-design/pro-components'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 type BpmTaskView = 'todo' | 'done'
 
@@ -182,6 +184,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const [unauthorized, setUnauthorized] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [locatingTaskId, setLocatingTaskId] = useState<string>()
+  const { useTableLayout } = useInboxTableLayout()
   const requestSeq = useRef(0)
   const countSeq = useRef(0)
   const listRef = useRef<HTMLDivElement>(null)
@@ -315,7 +318,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
 
   const selectTask = (task: BpmTask) => {
     setSelectedId(task.id)
-    if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+    if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
 
   const openBusiness = async (task: BpmTask) => {
@@ -359,7 +362,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     onOpenBusiness={openBusiness}
   />
 
-  return <section className="workspace-page business-inbox-page bpm-approval-page">
+  return <section className={`workspace-page business-inbox-page bpm-approval-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar bpm-approval-header">
       <div className="bpm-approval-title">
         <Typography.Title level={4}>审批中心</Typography.Title>
@@ -398,7 +401,25 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
 
     {unauthorized
       ? <Result status="403" title="审批任务加载被拒绝" subTitle={error || '请确认当前账号是否具备 BPM 查询权限。'}/>
-      : <div className="business-inbox-layout bpm-approval-layout">
+      : useTableLayout ? <ProTable<BpmTask>
+        className="business-inbox-table"
+        rowKey="id"
+        search={false}
+        options={{ density: true, fullScreen: true, setting: true }}
+        columnsState={{ persistenceKey: 'crm-bpm-approval-table-columns', persistenceType: 'localStorage' }}
+        loading={loading}
+        dataSource={tasks}
+        pagination={false}
+        scroll={{ x: 1000 }}
+        locale={{ emptyText: <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'} /> }}
+        columns={[
+          { title: '任务', render: (_, task) => taskSubject(task), width: 220 },
+          { title: '流程节点', dataIndex: 'name', render: value => value || '流程节点' },
+          { title: '发起人', render: (_, task) => task.processInstance?.startUser?.nickname || '-' },
+          { title: view === 'todo' ? '到达时间' : '完成时间', render: (_, task) => <DateTimeText value={view === 'todo' ? task.createTime : task.endTime} /> },
+          { title: '操作', width: 88, fixed: 'right', render: (_, task) => <Button type="link" onClick={() => selectTask(task)}>详细</Button> }
+        ]}
+      /> : <div className="business-inbox-layout bpm-approval-layout">
         <aside className="business-inbox-list-pane">
           {error && <Alert
             className="business-inbox-error"
@@ -457,7 +478,8 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         <main className="business-inbox-detail-pane">{detail}</main>
       </div>}
 
-    <Drawer
+    <ResizableDetailDrawer
+      desktopResizable={useTableLayout}
       title="审批任务"
       open={drawerOpen}
       onClose={() => setDrawerOpen(false)}
@@ -465,6 +487,6 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       placement="right"
     >
       {detail}
-    </Drawer>
+    </ResizableDetailDrawer>
   </section>
 }

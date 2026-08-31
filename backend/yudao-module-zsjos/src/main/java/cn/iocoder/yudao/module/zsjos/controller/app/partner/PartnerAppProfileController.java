@@ -2,8 +2,10 @@ package cn.iocoder.yudao.module.zsjos.controller.app.partner;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerPasswordUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerNotifyChannelReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerProfileUpdateReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWecomBindReqVO;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerAccountService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerProfileService;
 import jakarta.annotation.Resource;
@@ -33,6 +35,18 @@ public class PartnerAppProfileController {
     @PutMapping("/update-password")
     public CommonResult<Boolean> updatePassword(@Valid @RequestBody PartnerPasswordUpdateReqVO reqVO) {
         accountService.updatePassword(getLoginUserId(), reqVO.getOldPassword(), reqVO.getNewPassword());
+        return success(true);
+    }
+
+    @PostMapping("/wecom-bind")
+    public CommonResult<Boolean> wecomBind(@Valid @RequestBody PartnerWecomBindReqVO reqVO) {
+        profileService.bindWecom(getLoginUserId(), reqVO);
+        return success(true);
+    }
+
+    @PutMapping("/notify-channel")
+    public CommonResult<Boolean> updateNotifyChannel(@Valid @RequestBody PartnerNotifyChannelReqVO reqVO) {
+        profileService.updateNotifyChannel(getLoginUserId(), Boolean.TRUE.equals(reqVO.getWecomEnabled()));
         return success(true);
     }
 }

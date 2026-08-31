@@ -21,6 +21,11 @@ public class LeadDuplicateReviewDO extends TenantBaseDO {
     private Long submissionPartnerId;
     private String submissionSnapshot;
     private String leadCategoryLabelSnapshot;
+    private String sourceChannelLabelSnapshot;
+    private String duplicateFlag;
+    private String duplicateResult;
+    private String primaryRuleCode;
+    private String reviewFingerprint;
     private String matchRules;
     private String candidateSnapshot;
     private Long matchedPersonId;

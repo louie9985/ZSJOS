@@ -180,7 +180,7 @@ export default function LeadClaimPoolPage({ canClaim }: { canClaim: boolean }) {
 
   return <section className="workspace-page claim-pool-page">
     <div className="claim-pool-toolbar">
-      <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+      <AdvancedFilterToolbar scene="lead" pageKey="lead_claim_pool" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
     </div>
     <div className="claim-pool-container">{content}</div>
   </section>

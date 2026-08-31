@@ -19,7 +19,7 @@
 | 接口 | 权限 |
 | --- | --- |
 | `GET /zsjos/lead/product/simple-list` | `zsjos:lead:submit` |
-| `POST /zsjos/lead/attachment/upload` | `zsjos:lead:submit` |
+| `POST /zsjos/lead/attachment/upload` | Lead 提交、自拓、投诉处理或 `zsjos:lead:request-submitter-assist` 任一对应操作权限 |
 | `POST /zsjos/lead/create` | `zsjos:lead:submit` |
 | `POST /zsjos/lead/self-sourced/create` | `zsjos:lead:self-sourced:create` |
 | `GET /zsjos/lead-duplicate-review/page` | `zsjos:lead-duplicate-review:query`；租户公共复核队列 |
@@ -52,7 +52,7 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 派单、接单、拒单和超时同时维护 `lead_assignment_accept` 业务任务。接单、抢单和管理员转派在归属事务内创建 `lead_first_follow_up` 任务，截止时间由接单时启用的独立跟进规则计算。
 
-提交接口先执行统一查重。自动判重关闭时，强弱规则的所有重复命中都创建审计记录并返回 `outcome=review_pending + reviewId`，此时不分配 `leadNo`。自动判重开启时，系统按历史 Lead 的 `submittedAt` 倒序、再按 ID 倒序选取最近候选：无效或关闭客资返回 `activated` 并重新激活历史 Lead；原负责人仍是启用销售时保留归属，否则进入抢单池；活动或已成交客资保持不变，关闭本次提交审计并返回 `duplicate_auto_closed`，存在有效负责人时发送重复客资提醒。只有 Person、没有历史 Lead 的命中仍进入人工复核。完全无命中返回 `created + leadId + leadNo`。
+提交接口先执行统一查重。同字段手机号或同字段微信号命中任何历史客资时为强重复，创建 `duplicate_flag=strong_duplicate`、`duplicate_result=strong_rejected` 的查重审计记录，并返回稳定业务错误 `LEAD_DUPLICATE_STRONG_CONFLICT`；本次不创建 `Person`、`Lead`、派单或指定销售任务。交叉联系方式、姓名+明确省市+明确主意向课程、姓名+手机号后四位命中时为疑似重复，保存提交快照、候选快照、命中规则和 `reviewFingerprint`，返回 `outcome=review_pending + reviewId`；相同 fingerprint 已有待处理任务时复用最早任务，不追加可见复核项。`duplicateAutoResolutionEnabled` 仅用于交叉联系方式疑似重复：开启时自动关闭本次复核并返回 `duplicate_auto_closed`，不创建 Lead、不改动历史客资。完全无命中返回 `created + leadId + leadNo`。
 
 自拓客资未选择新媒体提供方时，`sourceUserId` 固定回退为提交销售，确保来源人与直接归属一致。提供方候选列表中的手机号只返回脱敏值，部门名称通过 System 批量接口解析，不逐行查询。V080 将默认“客资新建”站内信拆成两条规则：实际提交销售继续收到通用提交成功消息；仅当销售自拓时明确选择了不同于提交人的新媒体提供方，该提供方才收到“`{{operator.name}}销售提交客资{{lead.no}}（客资编号），已关联你为客资来源。`”。未选择提供方以及普通新媒体提交均不产生这条关联提醒。管理员已有的启用、停用或已编辑规则保持不变，历史客资不补发消息。
 
@@ -62,13 +62,17 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 统一客资页的 `simpleStatus` 支持 `first_follow_pending`（待首跟）、`following`（待跟进）、`qualification_pending`（待判定）、`deal_pending_approval`（成交待审核）、`won`（已成交）、`invalid`（已判无效）、`closed`（已关闭）和 `suspended`（已挂起）；不传或传 `all` 表示全部。该参数只追加生命周期条件，不改变 `relationScope=all` 已计算的对象可见范围。待跟进固定表示已判有效且 Opportunity 尚未进入成交审批或成交；待分配、待接单和抢单池属于分配流程，不作为统一页简单状态标签。
 
-复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；这是租户级中央复核，不按复核人的组织范围裁剪候选销售。决定事务对任务加行锁，第一位提交者成功。结论固定为 `new_person`、`reuse_person`、`reactivate_lead`、`notify_owner`，意见必填、附件可选。重新激活覆盖当前 Person/Lead 资料，可选择租户内全部符合资格的启用销售并回到待首次跟进；旧 Opportunity 保持 `lost`，重新判有效时恢复。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
+统一客资分页接口支持成对提交 `sortField` 与 `sortOrder=ascend|descend`，排序作用于完整筛选结果后再分页。`sortField` 只接受 Lead 根表的持久化字段白名单：`leadNo`、`submittedName`、`submittedMobile`、`submittedWechatId`、`sourceType`、`leadCategory`、`sourceChannelId`、`assignmentStatus`、`dispatchMode`、`assignmentAttemptCount`、`publicPoolAt`、`countedAt`、`currentAssignmentFirstFollowUpAt`、`currentAssignmentFirstFollowUpDeadlineAt`、`qualificationStartedAt`、`qualificationDeadlineAt`、`suspendedAt`、`validDescription`、`invalidDescription`、`appealDeadlineAt`、`closedAt`、`closeReason`、`nextFollowUpAt`、`submittedAt`、`lastActivityAt`、`qualifiedAt`、`convertedAt`、`remark`、`updateTime`。每种显式排序均追加 `id DESC` 作为并列值的稳定次序；未提交完整排序参数时仍使用 `lastActivityAt DESC, id DESC`。提交人、所属销售、产品等关联投影名称不在排序白名单中，前端不得将当前页投影值伪装为全量排序。游标接口的令牌固定编码 `lastActivityAt + id`，即使请求携带排序参数也继续使用默认游标顺序；自定义排序只适用于普通分页接口。
+
+复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；这是租户级中央复核。决定事务对任务加行锁，第一位提交者成功。结论固定为 `allow_flow` 和 `close_duplicate`，意见必填、附件可选。`allow_flow` 按首次待复核提交的快照创建正式 Lead，后续进入普通自动分配、指定销售或销售自拓归属流程；`close_duplicate` 只关闭本次复核，永久不创建 Lead、不分配、不计入业绩。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
 
 ## 管理接口与权限
 
 高级筛选字段目录由 `GET /zsjos/advanced-filter/catalog?scene=` 返回，场景白名单为 `lead`、`order`、`lead_appeal`、`duplicate_review`、`registration`、`student` 和 `subordinate_sales`，目录本身按场景权限校验。目录中的提交人、负责人、审核人、学习规划师等人员选项只能来自当前场景已经建立的对象范围：Lead 使用客资层级范围，下属销售使用主管管理范围，学员使用当前用户的有效服务关系；场景范围存在但当前没有可见人员时返回空选项。尚未提供权威人员范围的订单、申诉、重复复核和报名场景不下发人员型筛选字段，前端不得回退到 Lead 范围或 System 全量用户列表。前端只展示“身份与联系、状态与进度、归属与人员、产品与服务、金额与付款、时间、补充信息、业务指标”等中性分组及业务字段名称；场景名和 `person.*`、`lead.*`、`order.*` 仅用于协议识别，不作为用户分类。
 
-请求只提交目录白名单中的 `fieldKey`、运算符和值，不接受数据库列名、内部 ID、原始 JSON 或 SQL。“客资编号”只映射 `lead.leadNo`，绝不回退到 `id/leadId/personId`。文本支持包含、不包含、等于、不等于和空值；枚举支持属于、不属于和空值；数字支持比较、区间和空值；日期支持比较、区间、空值及今天、昨天、近 7 天、近 30 天、本周、本月、本季度、本年。相对日期由服务端按北京时间自然日计算，近 7 天和近 30 天包含当天。
+请求只提交目录白名单中的 `fieldKey`、运算符和值，不接受数据库列名、内部 ID、原始 JSON 或 SQL。“客资编号”只映射 `lead.leadNo`，绝不回退到 `id/leadId/personId`。文本支持包含、不包含、等于、不等于和空值；枚举支持属于、不属于和空值；数字支持比较、区间和空值；日期支持比较、区间、空值及今天、昨天、近 7 天、近 30 天、本周、本月、本季度、本年。相对日期由服务端按北京时间自然日计算，近 7 天和近 30 天包含当天。场景下至少存在两个日期字段时，目录追加虚拟字段 `duration.diff`（时间作差），其 `options` 只列出当前场景可选日期字段；条件必须提交 `startFieldKey`、`endFieldKey`、`unit=minute/hour/day` 以及比较值，语义固定为“结束时间 - 开始时间”。服务端将分钟、小时、天统一折算为分钟并编译为受控 `TIMESTAMPDIFF(MINUTE, start, end)`，同时追加两个时间字段均不为空的条件；两个日期字段必须来自当前场景字段目录，根表字段可与一个关联字段组合，同一关联关系内两个字段可组合，两个不同关联关系字段组合返回 `ADVANCED_FILTER_INVALID`。
+
+高级筛选模板只保存上述结构化条件树，字段为 `filter`，持久化为 `filter_json`；任何用户、管理员和前端都不能保存或提交 SQL 片段。SQL 只在列表查询时由后端 `AdvancedFilterService` 根据场景字段目录即时校验和编译，并且始终叠加页面固定范围、租户、当前用户对象范围、数据范围和业务池约束。模板按 `scene + pageKey` 绑定到具体页面：个人模板 `scope=personal` 仅当前用户可见，系统预置 `scope=system` 由管理员维护并对当前租户该页面可见；同一页面、同一范围最多一个 `defaultTemplate=true`，默认标记只影响模板列表排序和标识，不自动绕过用户当前查询条件。
 
 根组和一级子组支持 `AND/OR`，最多 5 个子组和 20 个条件；根组可为空并表示不追加筛选，一级子组不得为空。`in/not_in` 必须提供 1–100 个非空且类型有效的值，标量运算值不得为空，`between` 两端必须类型有效且起点不晚于终点；SQL 与内存指标筛选使用同一校验并统一返回 `ADVANCED_FILTER_INVALID`。绝对日期使用 Unix epoch 毫秒。同一关联范围内的正向 `AND` 条件合并到同一个 `EXISTS`，保证商品与金额等条件由同一张订单、服务条件由同一条服务关系满足；关联字段的“不属于、不等于、不包含”编译为单层 `NOT EXISTS`，内部保持正向谓词。租户、当前用户对象范围、部门范围、待处理/已处理页签和业务池范围始终作为条件树之外的固定约束，不能被 `OR` 绕过。
 
@@ -88,6 +92,10 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 | `POST /zsjos/lead-duplicate-review/search-page` | 租户复核队列内按结构化提交快照和复核字段筛选；不提供原始 JSON 检索 |
 | `POST /zsjos/subordinate-sales/search-page` | 当前用户可见下属范围内先聚合业务指标、再筛选和分页 |
 | `POST /zsjos/subordinate-sales/{salesUserId}/leads/search-page` | 指定可见下属的名下客资固定范围内组合关键词与高级条件 |
+| `GET /zsjos/advanced-filter-template/visible-list?scene=&pageKey=` | 已登录用户需具备对应业务页面查询类权限；返回当前页面启用的系统预置和本人个人模板 |
+| `POST/PUT/DELETE /zsjos/advanced-filter-template/personal` | 已登录用户需具备对应业务页面查询类权限；创建、修改或删除本人个人模板 |
+| `GET /zsjos/advanced-filter-template/system-list?scene=&pageKey=` | `zsjos:advanced-filter-template:query` |
+| `POST/PUT/DELETE /zsjos/advanced-filter-template/system` | `zsjos:advanced-filter-template:update` |
 | `GET /zsjos/lead/{id}/transfer-candidates` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
 | `POST /zsjos/lead/{id}/restore` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
 | `POST /zsjos/lead/{id}/transfer` | `zsjos:lead:qualification:manage` + 异常客资对象权限 |
@@ -115,9 +123,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 客资提交、跟进、有效性判定和异常处置中的 `idempotencyKey` 表示一次用户操作意图。前端在打开或重置为新操作时生成一次键，同一操作的快速重复点击、上传失败、网络失败和超时重试必须复用该键，只有服务端确认成功后才能轮换。前端提交状态必须使用同步互斥保护，按钮 loading 仅作为交互反馈，不能作为唯一防重手段。
 
-跟进提交完成当前分配历史对应的 `lead_first_follow_up`，并按可选的下次跟进时间替换 `lead_follow_up_reminder`。`nextFollowUpAt` 必须使用 epoch 毫秒数且换算后的服务端时间晚于提交时刻。跟进结果来自 `zsjos_lead_follow_up_result` 字典；`unreachable` 表示“未联系上”，提交时备注必填并固化结果标签快照。`GET /zsjos/business-task/my-summary` 与 `GET /zsjos/business-task/my-page` 只返回当前用户的 ZSJOS 任务，使用 `unscheduled`、`overdue`、`today`、`future` 分组；任务没有通用完成接口，只能由接单或填写跟进等业务动作完成。
+跟进提交完成当前分配历史对应的 `lead_first_follow_up`，并按可选的下次跟进时间替换 `lead_follow_up_reminder`。`nextFollowUpAt` 必须使用 epoch 毫秒数且换算后的服务端时间晚于提交时刻。`GET /zsjos/business-task/my-summary` 与 `GET /zsjos/business-task/my-page` 只返回当前用户的 ZSJOS 任务，使用 `unscheduled`、`overdue`、`today`、`future` 分组；任务没有通用完成接口，只能由接单或填写跟进等业务动作完成。
 
-首次跟进成功后创建 `lead_qualification` 任务。若当前归属周期的首次跟进结果为 `unreachable`，首跟仍视为完成并进入待判定，同时向客资提交人发送 `zsjos.lead.submitter_assist_requested` 业务消息；内部员工提交人额外创建 `lead_submitter_assist` 待办，操作码为 `OPEN_LEAD_SUBMITTER_SUPPLEMENT`，从今日待办进入客资详情并打开提交人补充入口。兼职提交客资没有 ADMIN 待办，只通过绑定合作方账号接收消息提醒。提交人完成补充后，系统完成该客资下当前提交人的待处理协助任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
+首次跟进成功后创建 `lead_qualification` 任务。客资响应由服务端返回正交的 `qualificationStatus`、`followUpStatus`、`assignmentStatus`、`operationalStatus` 和 `availableActions`，并附带首跟截止、判定截止、挂起时间、判定结果、Opportunity 摘要与无效判定附件；附件 URL 在详情读取时重新签名。前端不组合 `status` 和 `assignmentStatus` 自行推断状态或写操作。历史有效客资通过 V019 补齐唯一 `initial_conversion` Opportunity。
 
 客资详情的生命周期时间字段按业务事实投影：`qualifiedAt` 表示判定有效/无效时间，`salesOrderSubmittedAt` 表示最近一次首购订单录入并提交审批的时间，`convertedAt` 仅在关联 Opportunity 进入 `won` 时返回其 `wonAt`，不再把创建 Opportunity 的历史兼容时间展示为成交转化。
 
@@ -130,6 +138,13 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 每分钟按租户扫描已到判定截止时间的 `submitted + owned` 客资，并在行锁下再次校验后改为 `suspended`。截止时间已到但扫描尚未提交时，当前销售仍可判定；扫描先提交后，跟进、判定、资料修改、转派和建单均由服务端拒绝。恢复与转派创建新判定轮次；回收进入 `recycle_pending` 并清除销售；释放进入抢单池，被抢后重新创建首跟任务。
 
 销售主管通过独立的 `zsjos:subordinate-sales:lead-*` 按钮权限处置管理范围内的未成交客资。
+
+销售本人可通过 `POST /zsjos/lead/owner/{leadId}/transfer`（权限
+`zsjos:lead:owner-transfer`）将本人负责的客资转派给启用销售；目标列表由
+`GET /zsjos/lead/owner/transfer-candidates` 返回，转派成功后沿用既有流转通知通知目标销售。`POST
+/zsjos/lead/owner/{leadId}/release-public-sea`（权限
+`zsjos:lead:owner-release-public-sea`）将本人符合公海前置条件的客资进入公海待分配，
+保留正式负责人快照并沿用公海通知与后续认领逻辑。
 判有效前释放进入抢单池并清除当前归属；判有效后释放创建公海周期，保留正式归属，
 可同步指定符合范围的实际跟进销售。挂起状态额外允许恢复，成交和关闭状态不允许这些操作。
 
@@ -147,3 +162,29 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 6. JVM、MySQL 连接会话和产品展示统一使用 `Asia/Shanghai`。MySQL Connector/J 8 连接必须配置 `connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true`，并通过 `script/sql/mysql/verify-zsjos-time-contract.sql` 只读核验 `@@session.time_zone` 和历史异常。
 主动抢单使用租户派单规则 `dailyClaimLimit`，默认每个销售每个北京时间自然日 5 条。服务端按
 租户、销售和日期原子保留额度；自动接单开关只影响自动轮询，不影响主动抢单。
+## 请求提交人协助
+
+- 员工端详情动作码：`REQUEST_SUBMITTER_ASSIST`。当用户可读该 Lead 且持有
+  `zsjos:lead:request-submitter-assist` 时投影，不受 Lead 状态或分配状态限制。
+- 命令：`POST /admin-api/zsjos/lead/{id}/submitter-assist-request`。
+- 请求字段：`problem`（必填，最多 1000 字）、`expectedAssistance`（必填，最多 1000 字）、
+  `remark`（选填，最多 2000 字）、`attachments`（选填，最多 9 个 Infra 文件引用）和
+  `idempotencyKey`（必填）。附件沿用 Lead 管理端上传契约，仅支持 JPG、PNG、WebP，单文件不超过 10 MB。
+- 命令使用 Lead 统一对象读取权限，并写入独立的 `zsjos_lead_submitter_assist_request` 快照和
+  `lead_submitter_assist_requested` 业务事件。用户可见标识始终为快照 `leadNo`。
+- 内部员工提交时，消息和 `lead_submitter_assist` 待办均落给提交人。兼职提交时，主消息发送给
+  Partner 账号；待办与补充提醒发送给当前 `PartnerOwnership` 员工，当前关系缺失时回落 Lead
+  的历史所属员工快照。补充提醒固定包含“请提醒兼职人员尽快协助处理”。
+
+## 客资表格批量处置
+
+Workbench 客资表格使用 ProTable 原生 `rowSelection`，通过 `preserveSelectedRowKeys` 支持跨分页选择，
+最多保留 100 条。普通刷新保留仍存在的选择，筛选或状态切换清空选择，批量完成后清空选择并刷新列表。
+
+批量接口为 `POST /admin-api/zsjos/lead/batch/{action}`，`action` 仅支持
+`transfer`、`restore`、`recycle`、`release-claim-pool` 和 `release-public-sea`。请求包含去重后的
+`leadIds`、必填 `reason`、可选目标销售/公海协作销售和 `idempotencyKey`。目标人员由既有销售资格接口
+提供，服务端再次校验资格、对象权限、当前状态和业务前置条件。
+
+接口逐条调用现有 Lead 命令并返回 `successCount`、`failureCount` 及逐条 `leadNo`、稳定错误码和用户可读消息；
+单条失败不回滚其他成功项，系统异常统一返回“操作失败，请刷新后重试”。

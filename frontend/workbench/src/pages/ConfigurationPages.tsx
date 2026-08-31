@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Button, Cascader, Drawer, Empty, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Spin, Switch, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Cascader, Empty, Form, Input, InputNumber, Modal, Popconfirm, Segmented, Select, Space, Spin, Switch, Table, Tag, Typography, message, type DrawerProps } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type LeadAssignmentRule, type LeadFilterAdmin, type LeadFilterAudience, type LeadFilterGroupConfig, type LeadFilterVersion, type LeadFollowUpRule, type ProductAttribute, type ProductCategory, type ProductCategorySaveRequest, type ProductConfig, type ProductSaveRequest, type ProductSku, type ProductSkuSaveRequest, type WorkPlanTemplate, type WorkPlanTemplateSaveRequest, type WorkPlanType } from '../services/api'
 import { formatTimestamp } from '../services/time'
+import ResizableDrawer from '../components/ResizableDrawer'
+import { CONFIGURATION_DRAWER_WIDTH_STORAGE_KEY_PREFIX } from '../constants'
+
+function Drawer({ title, width, ...props }: DrawerProps) {
+  const defaultSize = typeof width === 'number' ? width : 720
+  const titleKey = typeof title === 'string' ? title : 'panel'
+  return <ResizableDrawer {...props} title={title} width={typeof width === 'number' ? `min(${width}px, 100vw)` : width} defaultSize={defaultSize} minSize={Math.min(640, defaultSize)} storageKey={`${CONFIGURATION_DRAWER_WIDTH_STORAGE_KEY_PREFIX}${titleKey}`}/>
+}
 
 function PageState({ loading, error, retry, children }: { loading: boolean; error: string; retry: () => void; children: React.ReactNode }) {
   if (error) return <Alert type="error" showIcon message={error} action={<Button size="small" onClick={retry}>重试</Button>}/>

@@ -92,6 +92,11 @@ public class MediaAccountFieldConfigService {
     }
 
     public DetailSnapshot validateAndSnapshot(Map<String, Object> requestedValues) {
+        return validateAndSnapshot(requestedValues, List.of());
+    }
+
+    public DetailSnapshot validateAndSnapshot(Map<String, Object> requestedValues,
+                                               List<MediaAccountDetailSnapshotVO> previousSnapshots) {
         MediaAccountFieldConfigDO config = mapper.selectPublished();
         if (config == null) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_NOT_PUBLISHED);
         List<MediaAccountFieldConfigRespVO.FieldVO> fields = normalized(
@@ -109,11 +114,19 @@ public class MediaAccountFieldConfigService {
             Object value = values.get(field.getKey());
             if (field.getRequired() && empty(value)) throw exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID);
             if (empty(value)) continue;
-            MediaAccountDetailSnapshotVO snapshot = snapshot(field, value);
+            MediaAccountDetailSnapshotVO snapshot = previousSnapshots.stream()
+                    .filter(previous -> field.getKey().equals(previous.getKey())
+                            && java.util.Objects.equals(normalizeComparable(value), normalizeComparable(previous.getValue())))
+                    .findFirst().orElseGet(() -> snapshot(field, value));
             persisted.put(field.getKey(), snapshot.getValue());
             snapshots.add(snapshot);
         }
         return new DetailSnapshot(config.getId(), persisted, snapshots);
+    }
+
+    private Object normalizeComparable(Object value) {
+        if (value instanceof Collection<?> collection) return collection.stream().map(String::valueOf).toList();
+        return value == null ? null : String.valueOf(value);
     }
 
     private MediaAccountDetailSnapshotVO snapshot(MediaAccountFieldConfigRespVO.FieldVO field, Object rawValue) {

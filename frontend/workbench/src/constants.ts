@@ -61,6 +61,7 @@ export const STORAGE_KEYS = {
 
 export const APP_ROUTES = {
   USER_PROFILE: '/user/profile',
+  WECOM_CLICK: '/zsjos/wecom-click',
   LEAD_SUBMISSION: '/zsjos/leads/submit',
   LEAD_MANAGEMENT: '/zsjos/leads/manage',
   LEAD_SELF_SOURCED: '/zsjos/leads/self-sourced',
@@ -273,6 +274,11 @@ export const LEAD_HANDLING_STAGE_LABELS: Record<string, string> = {
   won: '已成交'
 }
 
+export const LEAD_OPERATIONAL_STATUS_LABELS: Record<string, string> = {
+  active: '正常',
+  suspended: '已挂起'
+}
+
 export const LEAD_QUALIFICATION_STATUS_LABELS: Record<string, string> = {
   pending: '待判定', valid: '已判有效', invalid: '已判无效'
 }
@@ -283,8 +289,19 @@ export const LEAD_FOLLOW_UP_STATUS_LABELS: Record<string, string> = {
 
 export const LEAD_DISPATCH_MODE_LABELS: Record<string, string> = {
   auto: '自动分配',
-  specified: '指定销售'
+  specified: '指定销售',
+  self: '自拓录'
 }
+
+export const DETAIL_DRAWER_WIDTH_STORAGE_KEY = 'crm-detail-drawer-width'
+export const ADVANCED_FILTER_DRAWER_WIDTH_STORAGE_KEY = 'crm-advanced-filter-drawer-width'
+export const SETTINGS_DRAWER_WIDTH_STORAGE_KEY = 'crm-settings-drawer-width'
+export const ASSIGNMENT_DRAWER_WIDTH_STORAGE_KEY = 'crm-assignment-drawer-width'
+export const FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY = 'crm-feedback-detail-drawer-width'
+export const PRODUCT_CATEGORY_DRAWER_WIDTH_STORAGE_KEY = 'crm-product-category-drawer-width'
+export const PRODUCT_SKU_DRAWER_WIDTH_STORAGE_KEY = 'crm-product-sku-drawer-width'
+export const WORK_PLAN_DRAWER_WIDTH_STORAGE_KEY = 'crm-work-plan-drawer-width'
+export const CONFIGURATION_DRAWER_WIDTH_STORAGE_KEY_PREFIX = 'crm-configuration-drawer-width:'
 
 export const PHONE_PATTERN = /^1\d{10}$/
 
@@ -321,7 +338,8 @@ export const DEFAULT_THEME = {
   animation: true,
   watermark: false,
   tabs: true,
-  tabStyle: 'card' as TabStyle
+  tabStyle: 'card' as TabStyle,
+  inboxLayoutMode: 'split' as InboxLayoutMode
 } as const
 
 // ========== Layout ==========
@@ -357,6 +375,13 @@ export const TAB_STYLE_OPTIONS: Array<{ label: string; value: TabStyle }> = [
   { label: '线条', value: 'line' },
   { label: '胶囊', value: 'pill' },
   { label: '平铺', value: 'flat' }
+]
+
+export type InboxLayoutMode = 'split' | 'table'
+
+export const INBOX_LAYOUT_OPTIONS: Array<{ label: string; value: InboxLayoutMode }> = [
+  { label: '主从', value: 'split' },
+  { label: '表格', value: 'table' }
 ]
 
 // ========== Density ==========

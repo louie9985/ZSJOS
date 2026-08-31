@@ -22,6 +22,7 @@ public class PartnerAccountDO extends TenantBaseDO {
     private String mobile;
     private String password;
     private Integer status;
+    private Boolean wecomEnabled;
     private String lastLoginIp;
     private LocalDateTime lastLoginTime;
     @Version

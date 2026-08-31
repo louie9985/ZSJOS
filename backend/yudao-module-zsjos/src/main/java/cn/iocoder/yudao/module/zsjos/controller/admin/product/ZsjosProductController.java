@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.product;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.*;
@@ -69,6 +71,7 @@ public class ZsjosProductController {
     public CommonResult<List<ZsjosProductSimpleRespVO>> simpleList() { return success(productService.getEnabledSimpleList()); }
 
     @PostMapping("/validate")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "批量校验启用产品")
     @PreAuthorize("@ss.hasPermission('zsjos:product:query')")
     public CommonResult<List<ZsjosProductValidateRespVO>> validate(@Valid @RequestBody ZsjosProductValidateReqVO reqVO) {

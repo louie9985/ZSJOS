@@ -32,6 +32,10 @@ public class AdvancedFilterService {
     private static final List<String> SELECT_OPS = List.of("in", "not_in", "is_empty", "is_not_empty");
     private static final List<String> RANGE_OPS = List.of("eq", "gt", "gte", "lt", "lte", "between", "is_empty", "is_not_empty");
     private static final List<String> DATE_OPS = List.of("eq", "gt", "gte", "lt", "lte", "between", "relative", "is_empty", "is_not_empty");
+    private static final String DURATION_FIELD_KEY = "duration.diff";
+    private static final List<String> DURATION_OPS = List.of("gt", "gte", "lt", "lte", "between");
+    private static final Map<String, BigDecimal> DURATION_UNIT_FACTORS = Map.of(
+            "minute", BigDecimal.ONE, "hour", BigDecimal.valueOf(60), "day", BigDecimal.valueOf(1440));
     private static final Set<String> SCENES = Set.of("lead", "order", "lead_appeal", "duplicate_review", "registration", "student", "subordinate_sales");
     private static final Map<String, Field> FIELDS = fields();
     private static final List<AdvancedFilterCatalogRespVO.OptionVO> RELATIVE_DATES = options(
@@ -42,10 +46,19 @@ public class AdvancedFilterService {
 
     public AdvancedFilterCatalogRespVO catalog(String scene) {
         if (!SCENES.contains(scene)) throw exception(ADVANCED_FILTER_INVALID);
-        return new AdvancedFilterCatalogRespVO(FIELDS.values().stream()
+        List<AdvancedFilterCatalogRespVO.FieldVO> fields = new ArrayList<>(FIELDS.values().stream()
                 .filter(field -> field.bindings.containsKey(scene))
                 .map(field -> new AdvancedFilterCatalogRespVO.FieldVO(field.key, field.group, field.label,
-                        field.type, field.operators, field.optionSource, field.options)).toList(), RELATIVE_DATES);
+                        field.type, field.operators, field.optionSource, field.options)).toList());
+        List<AdvancedFilterCatalogRespVO.OptionVO> dateOptions = fields.stream()
+                .filter(field -> "date".equals(field.valueType()))
+                .map(field -> new AdvancedFilterCatalogRespVO.OptionVO(field.fieldKey(), field.label()))
+                .toList();
+        if (dateOptions.size() >= 2) {
+            fields.add(new AdvancedFilterCatalogRespVO.FieldVO(DURATION_FIELD_KEY, TIME, "时间作差",
+                    "duration", DURATION_OPS, null, dateOptions));
+        }
+        return new AdvancedFilterCatalogRespVO(fields, RELATIVE_DATES);
     }
 
     public AdvancedFilterCatalogRespVO catalog(String scene,
@@ -69,6 +82,20 @@ public class AdvancedFilterService {
     public boolean hasConditions(AdvancedFilterGroupReqVO group) {
         return group != null && ((group.getConditions() != null && !group.getConditions().isEmpty())
                 || (group.getGroups() != null && group.getGroups().stream().anyMatch(this::hasConditions)));
+    }
+
+    public void validate(String scene, AdvancedFilterGroupReqVO group) {
+        if (group == null) throw exception(ADVANCED_FILTER_INVALID);
+        validateShape(group, 0, new int[]{0});
+        if (hasConditions(group)) {
+            groupSql(group, scene, new LinkedHashMap<>());
+        } else if (!SCENES.contains(scene)) {
+            throw exception(ADVANCED_FILTER_INVALID);
+        }
+    }
+
+    public boolean supportsScene(String scene) {
+        return SCENES.contains(scene);
     }
 
     public List<Long> matchLeadIds(AdvancedFilterGroupReqVO group) {
@@ -163,6 +190,7 @@ public class AdvancedFilterService {
     }
 
     private Compiled compile(AdvancedFilterConditionReqVO condition, String scene, Map<String, Object> params) {
+        if (DURATION_FIELD_KEY.equals(condition.getFieldKey())) return compileDuration(condition, scene, params);
         Field field = FIELDS.get(condition.getFieldKey());
         Binding binding = field == null ? null : field.bindings.get(scene);
         if (field == null || binding == null || !field.operators.contains(condition.getOperator())) throw exception(ADVANCED_FILTER_INVALID);
@@ -213,10 +241,57 @@ public class AdvancedFilterService {
         return new Compiled(binding.relation, predicate, negateRelation);
     }
 
+    private Compiled compileDuration(AdvancedFilterConditionReqVO condition, String scene, Map<String, Object> params) {
+        if (!SCENES.contains(scene) || !DURATION_OPS.contains(condition.getOperator())) throw exception(ADVANCED_FILTER_INVALID);
+        Field startField = FIELDS.get(condition.getStartFieldKey());
+        Field endField = FIELDS.get(condition.getEndFieldKey());
+        Binding startBinding = startField == null ? null : startField.bindings.get(scene);
+        Binding endBinding = endField == null ? null : endField.bindings.get(scene);
+        if (startBinding == null || endBinding == null
+                || !"date".equals(startField.type) || !"date".equals(endField.type)
+                || !DURATION_UNIT_FACTORS.containsKey(condition.getUnit())) {
+            throw exception(ADVANCED_FILTER_INVALID);
+        }
+        String relation = durationRelation(startBinding.relation, endBinding.relation);
+        String diffExpression = "TIMESTAMPDIFF(MINUTE, " + startBinding.expression + ", " + endBinding.expression + ")";
+        String durationPredicate = switch (condition.getOperator()) {
+            case "gt" -> diffExpression + " > " + ref(params, durationThreshold(condition.getValue(), condition.getUnit()));
+            case "gte" -> diffExpression + " >= " + ref(params, durationThreshold(condition.getValue(), condition.getUnit()));
+            case "lt" -> diffExpression + " < " + ref(params, durationThreshold(condition.getValue(), condition.getUnit()));
+            case "lte" -> diffExpression + " <= " + ref(params, durationThreshold(condition.getValue(), condition.getUnit()));
+            case "between" -> durationBetween(diffExpression, condition, params);
+            default -> throw exception(ADVANCED_FILTER_INVALID);
+        };
+        return new Compiled(relation, startBinding.expression + " IS NOT NULL AND "
+                + endBinding.expression + " IS NOT NULL AND " + durationPredicate, false);
+    }
+
+    private String durationRelation(String startRelation, String endRelation) {
+        if (startRelation == null) return endRelation;
+        if (endRelation == null || startRelation.equals(endRelation)) return startRelation;
+        throw exception(ADVANCED_FILTER_INVALID);
+    }
+
+    private String durationBetween(String diffExpression, AdvancedFilterConditionReqVO condition, Map<String, Object> params) {
+        BigDecimal from = durationThreshold(condition.getValueFrom(), condition.getUnit());
+        BigDecimal to = durationThreshold(condition.getValueTo(), condition.getUnit());
+        if (from.compareTo(to) > 0) throw exception(ADVANCED_FILTER_INVALID);
+        return diffExpression + " BETWEEN " + ref(params, from) + " AND " + ref(params, to);
+    }
+
+    private BigDecimal durationThreshold(Object value, String unit) {
+        Object typedValue = typed("number", value);
+        if (!(typedValue instanceof BigDecimal number)) throw exception(ADVANCED_FILTER_INVALID);
+        BigDecimal factor = DURATION_UNIT_FACTORS.get(unit);
+        if (factor == null) throw exception(ADVANCED_FILTER_INVALID);
+        return number.multiply(factor);
+    }
+
     private boolean matchesGroup(String scene, AdvancedFilterGroupReqVO group, Function<String, Object> values) {
         boolean and = "AND".equals(group.getLogic());
         List<Boolean> matches = new ArrayList<>();
         for (AdvancedFilterConditionReqVO condition : group.getConditions()) {
+            if (DURATION_FIELD_KEY.equals(condition.getFieldKey())) throw exception(ADVANCED_FILTER_INVALID);
             Field field = FIELDS.get(condition.getFieldKey());
             if (field == null || !field.bindings.containsKey(scene) || !field.operators.contains(condition.getOperator())) throw exception(ADVANCED_FILTER_INVALID);
             validateOperands(field, condition);
@@ -425,7 +500,9 @@ public class AdvancedFilterService {
         add(result, text("review.submittedMobile", IDENTITY, "提交手机号", bind("duplicate_review", json("mobile"), null)));
         add(result, text("review.submittedWechatId", IDENTITY, "提交微信号", bind("duplicate_review", json("wechatId"), null)));
         add(result, select("review.status", STATUS, "复核状态", options("pending", "待处理", "completed", "已处理"), bind("duplicate_review", "dr.status", null)));
-        add(result, select("review.resultType", STATUS, "复核结果", options("reuse_person", "复用已有客户", "reactivate_lead", "激活客资", "notify_owner", "提醒所属销售", "create_new", "创建新客资"), bind("duplicate_review", "dr.result_type", null)));
+        add(result, select("review.resultType", STATUS, "复核结果", options("allow_flow", "放行", "close_duplicate", "确认重复关闭", "strong_rejected", "强重复拦截", "auto_closed", "自动关闭"), bind("duplicate_review", "dr.result_type", null)));
+        add(result, select("review.duplicateFlag", STATUS, "重复类型", options("strong_duplicate", "强重复", "suspected_duplicate", "疑似重复", "none", "未重复"), bind("duplicate_review", "dr.duplicate_flag", null)));
+        add(result, select("review.duplicateResult", STATUS, "查重结果", options("strong_rejected", "强重复拦截", "suspected_created", "疑似重复待确认", "allowed", "已放行", "closed", "已关闭", "auto_closed", "自动关闭"), bind("duplicate_review", "dr.duplicate_result", null)));
         add(result, selectSource("review.submitterUserId", PEOPLE, "复核提交人", "visible-users", bind("duplicate_review", "dr.submitter_user_id", null)));
         add(result, selectSource("review.reviewerUserId", PEOPLE, "复核人", "visible-users", bind("duplicate_review", "dr.reviewer_user_id", null)));
         add(result, selectSource("review.selectedSalesUserId", PEOPLE, "选定销售", "visible-users", bind("duplicate_review", "dr.selected_sales_user_id", null)));

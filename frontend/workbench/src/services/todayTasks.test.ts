@@ -4,6 +4,7 @@ import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
 import { canOpenAllCalendar, canQueryBpmTasks, canReadAnnouncements } from '../pages/TodayTasksPage'
 
 const source = readFileSync(new URL('../pages/TodayTasksPage.tsx', import.meta.url), 'utf8')
+const styles = readFileSync(new URL('../styles/pages/today-tasks.css', import.meta.url), 'utf8')
 
 describe('today task permissions', () => {
   it('does not load BPM tasks for a business-task-only user', () => {
@@ -43,8 +44,48 @@ describe('today task permissions', () => {
     expect(source).toContain('home-stat-card placeholder')
   })
 
-  it('opens lead submitter assist tasks through the supplement flow', () => {
-    expect(source).toContain('OPEN_LEAD_SUBMITTER_SUPPLEMENT')
-    expect(source).toContain('openSubmitterSupplement: true')
+  it('opens submitter-assistance tasks in the Lead detail route', () => {
+    expect(source).toContain("task.actionCode === 'OPEN_LEAD_SUBMITTER_ASSIST'")
+    expect(source).toContain('state: { leadId: task.bizId }')
+  })
+
+  it('keeps the home calendar month and weekday labels in Chinese', () => {
+    const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
+    expect(source).toContain("import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'")
+    expect(source).toContain('const homeCalendarLocale = {')
+    expect(source).toContain("shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']")
+    expect(source).toContain("shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']")
+    expect(calendarPanel).toContain('locale={homeCalendarLocale}')
+  })
+
+  it('uses the home calendar only as a current-month preview', () => {
+    const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
+    expect(calendarPanel).toContain('headerRender={() => null}')
+    expect(calendarPanel).toContain('APP_ROUTES.MEDIA_ALL_CALENDAR')
+    expect(calendarPanel).toContain("if (info.source === 'date') openCalendar()")
+    expect(calendarPanel).not.toContain('onPanelChange')
+  })
+
+  it('keeps the compact home calendar spacing inside the fixed dashboard cell', () => {
+    expect(styles).toContain('--home-calendar-cell-h: var(--crm-sp-6)')
+    expect(styles).toContain('--home-calendar-weekday-h: var(--crm-sp-5)')
+    expect(styles).toContain('.home-calendar-panel .home-panel-header.compact')
+    expect(styles).toContain('.home-calendar-panel .ant-picker-calendar .ant-picker-panel')
+    expect(styles).toContain('.home-calendar-panel .ant-picker-calendar .ant-picker-date-panel')
+    expect(styles).toContain('.home-calendar-panel .ant-picker-calendar .ant-picker-body')
+    expect(styles).toContain('.home-calendar-panel .ant-picker-calendar-mini .ant-picker-content')
+    expect(styles).toContain('height: 100%')
+    expect(styles).toContain('table-layout: fixed')
+    expect(styles).toContain('height: var(--home-calendar-cell-h)')
+    expect(styles).toContain('line-height: var(--home-calendar-weekday-h)')
+    expect(styles).not.toContain('.home-calendar-panel .ant-picker-cell:not(.ant-picker-cell-in-view)')
+  })
+
+  it('labels highlighted home announcements as pinned entries', () => {
+    const announcementPanel = source.split('function AnnouncementPanel')[1] ?? ''
+    expect(announcementPanel).toContain("item.highlighted ? ' highlighted' : ''")
+    expect(announcementPanel).toContain('<Tag color="gold">置顶</Tag>')
+    expect(announcementPanel).toContain('home-announcement-title-text')
+    expect(announcementPanel).not.toContain('<Tag color="gold">高亮</Tag>')
   })
 })

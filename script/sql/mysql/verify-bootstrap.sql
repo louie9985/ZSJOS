@@ -1706,7 +1706,6 @@ SELECT 'V142 partial V139 V140 execution repair' AS check_name,
                        'zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool',
                        'zsjos:subordinate-sales:lead-release-public-sea'))<>5),
           'PASS','FAIL') AS result;
-
 SELECT 'V149 feedback version registration' AS check_name,
        IF(EXISTS (SELECT 1 FROM zsjos_schema_version
                   WHERE version='V149' AND checksum=SHA2('V149__feedback_management.sql',256))
@@ -2029,28 +2028,32 @@ SELECT 'V162 lead submit specify permission' AS check_name,
                  AND NOT JSON_CONTAINS(menu_ids,'6820','$')),
           'PASS','FAIL') AS result;
 
-SELECT 'V163 lead unreachable submitter assist' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V163')
-          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V163')
-          AND EXISTS (SELECT 1 FROM system_dict_data
-               WHERE dict_type='zsjos_lead_follow_up_result' AND value='unreachable'
-                 AND label='未联系上' AND deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_notify_template
-               WHERE code='ZSJOS_LEAD_SUBMITTER_ASSIST_REQUESTED'
-                 AND scene_code='zsjos.lead.submitter_assist_requested'
-                 AND JSON_CONTAINS(params, JSON_QUOTE('lead.no'))
-                 AND deleted=b'0')
-          AND NOT EXISTS (SELECT 1 FROM system_notify_template
-               WHERE code='ZSJOS_LEAD_SUBMITTER_ASSIST_REQUESTED' AND deleted=b'0'
-                 AND (scene_code<>'zsjos.lead.submitter_assist_requested'
-                      OR JSON_CONTAINS(params, JSON_QUOTE('lead.id'))))
-          AND NOT EXISTS (SELECT 1 FROM system_tenant tenant
-               WHERE tenant.deleted=b'0' AND NOT EXISTS (
-                 SELECT 1 FROM system_notify_rule rule_row
-                 WHERE rule_row.tenant_id=tenant.id
-                   AND rule_row.scene_code='zsjos.lead.submitter_assist_requested'
-                   AND rule_row.channel_code='in_app'
-                   AND JSON_CONTAINS(rule_row.recipient_roles, JSON_QUOTE('submitter'))
-                   AND rule_row.action_type='business_detail'
-                   AND rule_row.deleted=b'0')),
+SELECT 'V171 lead duplicate rule contract' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V171')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+               WHERE module_code='core' AND version='V171')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_lead_duplicate_review'
+                 AND column_name IN ('duplicate_flag','duplicate_result','primary_rule_code','review_fingerprint'))=4
+          AND EXISTS (SELECT 1 FROM information_schema.statistics
+               WHERE table_schema=DATABASE() AND table_name='zsjos_lead_duplicate_review'
+                 AND index_name='idx_tenant_duplicate_pending'),
+          'PASS','FAIL') AS result;
+SELECT 'V173 lead submitter assist request' AS check_name,
+       IF(EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V173')
+          AND EXISTS (SELECT 1 FROM `zsjos_module_schema_version` WHERE `module_code`='core' AND `version`='V173')
+          AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema=DATABASE()
+                      AND table_name='zsjos_lead_submitter_assist_request')
+          AND EXISTS (SELECT 1 FROM `system_menu` WHERE `permission`='zsjos:lead:request-submitter-assist' AND `deleted`=b'0')
+          AND EXISTS (SELECT 1 FROM `system_notify_template` WHERE `scene_code`='zsjos.lead.submitter_assist_requested' AND `deleted`=b'0')
+          AND EXISTS (SELECT 1 FROM `system_notify_template` WHERE `scene_code`='zsjos.lead.partner_assist_reminder' AND `deleted`=b'0'),
+          'PASS','FAIL') AS result;
+
+SELECT 'V174 complete ZSJOS business audit' AS check_name,
+       IF(EXISTS (SELECT 1 FROM `zsjos_schema_version` WHERE `version`='V174')
+          AND EXISTS (SELECT 1 FROM `zsjos_module_schema_version` WHERE `module_code`='core' AND `version`='V174')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_business_audit_log'
+                 AND column_name IN ('source_type','trace_id','request_method','request_path','result_status',
+                                     'result_code','result_message','finished_at','duration_ms'))=9,
           'PASS','FAIL') AS result;

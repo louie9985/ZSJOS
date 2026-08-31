@@ -28,7 +28,7 @@ public class NotifyBusinessEventProcessor {
     @Resource private NotifyRuleService notifyRuleService;
     @Resource private NotifyTemplateService notifyTemplateService;
     @Resource private NotifyBusinessMessageCreator messageCreator;
-    @Resource private List<NotifyChannelAdapter> channelAdapters;
+    @org.springframework.beans.factory.annotation.Autowired private List<NotifyChannelAdapter> channelAdapters;
 
     public void process(NotifyBusinessEvent event) {
         TenantUtils.execute(event.getTenantId(), () -> processInTenant(event));
@@ -103,7 +103,8 @@ public class NotifyBusinessEventProcessor {
             var variables = provider.resolveVariables(event, recipient);
             NotifySendResult result = adapter.send(NotifyDeliveryContext.builder()
                     .tenantId(event.getTenantId()).sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey())
-                    .ruleId(rule.getId()).userId(recipient.getUserId()).userType(recipient.getUserType()).templateCode(template.getCode())
+                    .ruleId(rule.getId()).actionType(rule.getActionType()).userId(recipient.getUserId())
+                    .userType(recipient.getUserType()).templateCode(template.getCode())
                     .smsTemplateId(template.getSmsTemplateId()).wecomMessageType(template.getWecomMessageType())
                     .title(notifyTemplateService.formatNotifyTemplateContent(template.getTitle(), variables))
                     .content(notifyTemplateService.formatNotifyTemplateContent(template.getContent(), variables))
@@ -195,7 +196,8 @@ public class NotifyBusinessEventProcessor {
             }
             NotifySendResult result = adapter.send(NotifyDeliveryContext.builder()
                     .tenantId(event.getTenantId()).sceneCode(event.getSceneCode()).sourceEventKey(event.getSourceEventKey())
-                    .ruleId(rule.getId()).userId(recipient.getUserId()).userType(recipient.getUserType()).templateCode(template.getCode())
+                    .ruleId(rule.getId()).actionType(rule.getActionType()).userId(recipient.getUserId())
+                    .userType(recipient.getUserType()).templateCode(template.getCode())
                     .smsTemplateId(template.getSmsTemplateId()).wecomMessageType(template.getWecomMessageType())
                     .title(notifyTemplateService.formatNotifyTemplateContent(template.getTitle(), variables))
                     .content(notifyTemplateService.formatNotifyTemplateContent(template.getContent(), variables))

@@ -11,6 +11,7 @@ import java.util.Objects;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_PERMISSION_DENIED;
+import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.SUBJECT_ADMIN;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.TYPE_PERMISSION;
 
 @Component
@@ -31,7 +32,8 @@ public class FeedbackObjectPermissionProvider implements ZsjosObjectPermissionPr
         FeedbackDO feedback = feedbackMapper.selectById(feedbackId);
         if (feedback == null) return false;
         if (action.endsWith("-own")) {
-            return Objects.equals(feedback.getSubmitterUserId(), userId);
+            return SUBJECT_ADMIN.equals(feedback.getSubmitterSubjectType())
+                    && Objects.equals(feedback.getSubmitterUserId(), userId);
         }
         if ("manage".equals(action) || "read-admin".equals(action)) {
             String permission = TYPE_PERMISSION.get(feedback.getFeedbackType());

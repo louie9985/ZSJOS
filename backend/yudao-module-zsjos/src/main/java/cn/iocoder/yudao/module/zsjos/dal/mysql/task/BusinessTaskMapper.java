@@ -86,18 +86,6 @@ public interface BusinessTaskMapper extends BaseMapperX<BusinessTaskDO> {
                 .last("LIMIT 1"));
     }
 
-    default int completePendingByTypeAndBizAndAssignee(String taskType, String bizType, Long bizId,
-                                                       Long assigneeId, LocalDateTime completedAt) {
-        return update(null, new LambdaUpdateWrapper<BusinessTaskDO>()
-                .eq(BusinessTaskDO::getTaskType, taskType)
-                .eq(BusinessTaskDO::getBizType, bizType)
-                .eq(BusinessTaskDO::getBizId, bizId)
-                .eq(BusinessTaskDO::getAssigneeId, assigneeId)
-                .eq(BusinessTaskDO::getStatus, TASK_STATUS_PENDING)
-                .set(BusinessTaskDO::getStatus, "completed")
-                .set(BusinessTaskDO::getCompletedAt, completedAt));
-    }
-
     default List<BusinessTaskDO> selectExpiredPending(String taskType, LocalDateTime now, int limit) {
         return selectList(new LambdaQueryWrapperX<BusinessTaskDO>()
                 .eq(BusinessTaskDO::getTaskType, taskType)

@@ -4,11 +4,13 @@ import cn.iocoder.yudao.framework.mybatis.core.mapper.BaseMapperX;
 import cn.iocoder.yudao.framework.mybatis.core.query.LambdaQueryWrapperX;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.toolkit.support.SFunction;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -28,6 +30,10 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    default LeadDO selectByLeadNo(String leadNo) {
+        return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getLeadNo, leadNo));
+    }
+
     @Select("""
             SELECT
               contribution_user_id_snapshot AS contributor_user_id,
@@ -249,7 +255,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                     .or(nested -> nested.eq(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
                             .lt(LeadDO::getId, reqVO.getCursorId())));
         }
-        query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+        applyManagementOrder(query, reqVO);
         return selectPage(reqVO, query);
     }
 
@@ -318,8 +324,53 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                     .or(nested -> nested.eq(LeadDO::getLastActivityAt, reqVO.getCursorActivityAt())
                             .lt(LeadDO::getId, reqVO.getCursorId())));
         }
-        query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+        applyManagementOrder(query, reqVO);
         return selectPage(reqVO, query);
+    }
+
+    private static void applyManagementOrder(LambdaQueryWrapperX<LeadDO> query,
+                                             LeadManagementPageReqVO reqVO) {
+        // Cursor tokens encode lastActivityAt + id, so cursor endpoints must retain that order.
+        if ((reqVO.getCursor() != null && !reqVO.getCursor().isBlank())
+                || reqVO.getCursorActivityAt() != null || reqVO.getCursorId() != null
+                || reqVO.getSortField() == null || reqVO.getSortOrder() == null) {
+            query.orderByDesc(LeadDO::getLastActivityAt).orderByDesc(LeadDO::getId);
+            return;
+        }
+        SFunction<LeadDO, ?> sortColumn = switch (reqVO.getSortField()) {
+            case "leadNo" -> LeadDO::getLeadNo;
+            case "submittedName" -> LeadDO::getSubmittedName;
+            case "submittedMobile" -> LeadDO::getSubmittedMobile;
+            case "submittedWechatId" -> LeadDO::getSubmittedWechatId;
+            case "sourceType" -> LeadDO::getSourceType;
+            case "leadCategory" -> LeadDO::getLeadCategory;
+            case "sourceChannelId" -> LeadDO::getSourceChannelId;
+            case "assignmentStatus" -> LeadDO::getAssignmentStatus;
+            case "dispatchMode" -> LeadDO::getDispatchMode;
+            case "assignmentAttemptCount" -> LeadDO::getAssignmentAttemptCount;
+            case "publicPoolAt" -> LeadDO::getPublicPoolAt;
+            case "countedAt" -> LeadDO::getCountedAt;
+            case "currentAssignmentFirstFollowUpAt" -> LeadDO::getCurrentAssignmentFirstFollowUpAt;
+            case "currentAssignmentFirstFollowUpDeadlineAt" -> LeadDO::getCurrentAssignmentFirstFollowUpDeadlineAt;
+            case "qualificationStartedAt" -> LeadDO::getQualificationStartedAt;
+            case "qualificationDeadlineAt" -> LeadDO::getQualificationDeadlineAt;
+            case "suspendedAt" -> LeadDO::getSuspendedAt;
+            case "validDescription" -> LeadDO::getValidDescription;
+            case "invalidDescription" -> LeadDO::getInvalidDescription;
+            case "appealDeadlineAt" -> LeadDO::getAppealDeadlineAt;
+            case "closedAt" -> LeadDO::getClosedAt;
+            case "closeReason" -> LeadDO::getCloseReason;
+            case "nextFollowUpAt" -> LeadDO::getNextFollowUpAt;
+            case "submittedAt" -> LeadDO::getSubmittedAt;
+            case "lastActivityAt" -> LeadDO::getLastActivityAt;
+            case "qualifiedAt" -> LeadDO::getQualifiedAt;
+            case "convertedAt" -> LeadDO::getConvertedAt;
+            case "remark" -> LeadDO::getRemark;
+            case "updateTime" -> LeadDO::getUpdateTime;
+            default -> throw new IllegalArgumentException("Unsupported lead sort field");
+        };
+        query.orderBy(true, "ascend".equals(reqVO.getSortOrder()), sortColumn)
+                .orderByDesc(LeadDO::getId);
     }
 
     private static void applySimpleStatus(LambdaQueryWrapperX<LeadDO> query, LeadSimpleStatusQuery filter) {
@@ -404,7 +455,7 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 "AND NOT EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record newer_opp " +
                 "WHERE newer_opp.lead_id=zsjos_lead.id AND newer_opp.tenant_id=zsjos_lead.tenant_id " +
                 "AND newer_opp.deleted=b'0' AND (newer_opp.occurred_at>current_opp.occurred_at " +
-                "OR (newer_opp.occurred_at=current_opp.occurred_at AND newer_opp.id>current_opp.id))))");
+                "OR (newer_opp.occurred_at=current_opp.occurred_at AND newer_opp.id>current_opp.id)))))";
     }
 
     @Select("SELECT COUNT(*) FROM zsjos_lead WHERE partner_id=#{partnerId} AND deleted=b'0' " +
@@ -431,12 +482,66 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
             "OR (newer_lead.occurred_at=current_opp.occurred_at AND newer_lead.id>current_opp.id))) " +
             "AND NOT EXISTS (SELECT 1 FROM zsjos_opportunity_follow_up_record newer_opp WHERE newer_opp.lead_id=zsjos_lead.id " +
             "AND newer_opp.tenant_id=zsjos_lead.tenant_id AND newer_opp.deleted=b'0' AND (newer_opp.occurred_at>current_opp.occurred_at " +
-            "OR (newer_opp.occurred_at=current_opp.occurred_at AND newer_opp.id>current_opp.id))))")
+            "OR (newer_opp.occurred_at=current_opp.occurred_at AND newer_opp.id>current_opp.id)))))")
     long countPartnerUnreachable(@Param("partnerId") Long partnerId);
 
     @Select("SELECT COUNT(*) FROM zsjos_lead WHERE partner_id=#{partnerId} " +
             "AND deleted=b'0' AND status='invalid'")
     long countPartnerInvalid(@Param("partnerId") Long partnerId);
+
+    default Long countPartnerLeads(Long partnerId, LocalDateTime from, LocalDateTime to) {
+        LambdaQueryWrapperX<LeadDO> query = partnerMetricQuery(partnerId, from, to);
+        return selectCount(query);
+    }
+
+    default Long countPartnerLeadsByStatuses(Long partnerId, Collection<String> statuses,
+                                             LocalDateTime from, LocalDateTime to) {
+        LambdaQueryWrapperX<LeadDO> query = partnerMetricQuery(partnerId, from, to);
+        if (statuses != null && !statuses.isEmpty()) query.in(LeadDO::getStatus, statuses);
+        return selectCount(query);
+    }
+
+    default PageResult<LeadDO> selectPartnerMetricPage(PageParam pageParam, Long partnerId,
+                                                       Collection<String> statuses,
+                                                       LocalDateTime from, LocalDateTime to) {
+        LambdaQueryWrapperX<LeadDO> query = partnerMetricQuery(partnerId, from, to);
+        if (statuses != null && !statuses.isEmpty()) query.in(LeadDO::getStatus, statuses);
+        return selectPage(pageParam, query.orderByDesc(LeadDO::getCountedAt)
+                .orderByDesc(LeadDO::getSubmittedAt).orderByDesc(LeadDO::getId));
+    }
+
+    @Select("SELECT partner_id AS partner_id, COUNT(*) AS value FROM zsjos_lead "
+            + "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id IS NOT NULL "
+            + "AND (#{from} IS NULL OR COALESCE(counted_at, submitted_at)>=#{from}) "
+            + "AND (#{to} IS NULL OR COALESCE(counted_at, submitted_at)<#{to}) "
+            + "GROUP BY partner_id")
+    List<PartnerLeaderboardMetricRow> selectPartnerLeadCountRanking(@Param("tenantId") Long tenantId,
+                                                                     @Param("from") LocalDateTime from,
+                                                                     @Param("to") LocalDateTime to);
+
+    @Select("SELECT partner_id AS partner_id, COUNT(*) AS value FROM zsjos_lead "
+            + "WHERE tenant_id=#{tenantId} AND deleted=b'0' AND partner_id IS NOT NULL "
+            + "AND status IN ('valid','converted','won') "
+            + "AND (#{from} IS NULL OR COALESCE(counted_at, submitted_at)>=#{from}) "
+            + "AND (#{to} IS NULL OR COALESCE(counted_at, submitted_at)<#{to}) "
+            + "GROUP BY partner_id")
+    List<PartnerLeaderboardMetricRow> selectPartnerValidLeadCountRanking(@Param("tenantId") Long tenantId,
+                                                                          @Param("from") LocalDateTime from,
+                                                                          @Param("to") LocalDateTime to);
+
+    private static LambdaQueryWrapperX<LeadDO> partnerMetricQuery(Long partnerId,
+                                                                  LocalDateTime from,
+                                                                  LocalDateTime to) {
+        LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
+                .eq(LeadDO::getPartnerId, partnerId);
+        if (from != null) {
+            query.apply("COALESCE(counted_at, submitted_at) >= {0}", from);
+        }
+        if (to != null) {
+            query.apply("COALESCE(counted_at, submitted_at) < {0}", to);
+        }
+        return query;
+    }
 
     default void touchActivity(Long leadId, java.time.LocalDateTime occurredAt) {
         update(new LeadDO().setLastActivityAt(occurredAt),
@@ -650,19 +755,8 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
 
     private static void applyLeadKeyword(LambdaQueryWrapperX<LeadDO> query, String rawKeyword) {
         String keyword = rawKeyword.trim();
-        if (keyword.regionMatches(true, 0, "KZ", 0, 2)) {
-            query.eq(LeadDO::getLeadNo, keyword.toUpperCase(java.util.Locale.ROOT));
-            return;
-        }
-        if (keyword.chars().allMatch(Character::isDigit)) {
-            try {
-                query.eq(LeadDO::getId, Long.valueOf(keyword));
-            } catch (NumberFormatException ex) {
-                query.eq(LeadDO::getId, -1L);
-            }
-            return;
-        }
-        query.and(wrapper -> wrapper.like(LeadDO::getSubmittedName, keyword)
+        query.and(wrapper -> wrapper.like(LeadDO::getLeadNo, keyword)
+                .or().like(LeadDO::getSubmittedName, keyword)
                 .or().like(LeadDO::getSubmittedMobile, keyword)
                 .or().like(LeadDO::getSubmittedWechatId, keyword));
     }

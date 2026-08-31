@@ -316,6 +316,7 @@ CREATE TABLE IF NOT EXISTS "system_users" (
     "email" varchar(50) default '',
     "mobile" varchar(11) default '',
     "wecom_user_id" varchar(64) default null,
+    "wecom_enabled" bit not null default false,
     "sex" tinyint default '0',
     "avatar" varchar(100) default '',
     "status" tinyint not null default '0',

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_ROUTES, DEFAULT_THEME, LAYOUT_MODE_OPTIONS, RENDERABLE_APP_ROUTES } from './constants'
+import { APP_ROUTES, DEFAULT_THEME, INBOX_LAYOUT_OPTIONS, LAYOUT_MODE_OPTIONS, RENDERABLE_APP_ROUTES } from './constants'
 
 describe('renderable Workbench routes', () => {
   it('registers configuration pages and existing pages that previously lacked renderability', () => {
@@ -26,5 +26,10 @@ describe('Workbench navigation layouts', () => {
 
   it('enables the shared page tabs by default', () => {
     expect(DEFAULT_THEME.tabs).toBe(true)
+  })
+
+  it('defaults the inbox layout to the existing split view', () => {
+    expect(DEFAULT_THEME.inboxLayoutMode).toBe('split')
+    expect(INBOX_LAYOUT_OPTIONS.map(option => option.value)).toEqual(['split', 'table'])
   })
 })

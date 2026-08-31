@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert, Badge, Button, Calendar, Card, Empty, Pagination, Segmented, Skeleton, Space, Statistic, Tag, Typography } from 'antd'
 import { CalendarOutlined, CheckCircleOutlined, ClockCircleOutlined, NotificationOutlined, ReloadOutlined, RightOutlined } from '@ant-design/icons'
+import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'
 import { useNavigate } from 'react-router-dom'
 import { ApiError, api, type Announcement, type BusinessTask, type BusinessTaskBucket, type BusinessTaskSummary, type PageResult } from '../services/api'
 import { APP_ROUTES } from '../constants'
@@ -26,6 +27,14 @@ const bucketLabels: Record<BusinessTaskBucket, string> = {
 
 const bucketOrder: BusinessTaskBucket[] = ['overdue', 'today', 'future', 'unscheduled']
 const workPlanActions = new Set(['OPEN_WORK_TASK', 'CONFIRM_WORK_TASK', 'SUMMARIZE_WORK_PLAN'])
+const homeCalendarLocale = {
+  ...zhCNCalendarLocale,
+  lang: {
+    ...zhCNCalendarLocale.lang,
+    shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
+    shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']
+  }
+}
 const emptySummary: BusinessTaskSummary = {
   overdue: 0,
   today: 0,
@@ -164,10 +173,8 @@ function BusinessTaskPanel({
       })
       return
     }
-    if (task.actionCode === 'OPEN_LEAD_SUBMITTER_SUPPLEMENT') {
-      navigate(APP_ROUTES.LEAD_MANAGEMENT, {
-        state: { leadId: task.bizId, openSubmitterSupplement: true }
-      })
+    if (task.actionCode === 'OPEN_LEAD_SUBMITTER_ASSIST') {
+      navigate(APP_ROUTES.LEAD_MANAGEMENT, { state: { leadId: task.bizId } })
       return
     }
     if (task.actionCode === 'OPEN_SALES_ORDER_REVISION') {
@@ -304,6 +311,8 @@ function HomeCalendarPanel({ enabled }: { enabled: boolean }) {
       </header>
       <Calendar
         fullscreen={false}
+        locale={homeCalendarLocale}
+        headerRender={() => null}
         onSelect={(_, info) => {
           if (info.source === 'date') openCalendar()
         }}
@@ -375,11 +384,11 @@ function AnnouncementPanel({ enabled }: { enabled: boolean }) {
           <Skeleton active paragraph={{ rows: 5 }} />
         ) : items.length ? (
           items.map((item) => (
-            <button type="button" className={`home-announcement-item${item.read ? '' : ' unread'}`} key={item.id} onClick={() => openAnnouncement(item.id)}>
+            <button type="button" className={`home-announcement-item${item.read ? '' : ' unread'}${item.highlighted ? ' highlighted' : ''}`} key={item.id} onClick={() => openAnnouncement(item.id)}>
               <span className="home-announcement-title">
                 <Badge status={item.read ? 'default' : 'processing'} />
-                {item.highlighted && <Tag color="gold">高亮</Tag>}
-                {item.title}
+                {item.highlighted && <Tag color="gold">置顶</Tag>}
+                <span className="home-announcement-title-text">{item.title}</span>
               </span>
               <time>{formatTimestamp(item.publishTime)}</time>
             </button>

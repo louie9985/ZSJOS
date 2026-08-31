@@ -29,6 +29,12 @@ public interface PartnerBankCardMapper extends BaseMapperX<PartnerBankCardDO> {
                 .eq(PartnerBankCardDO::getId, id).eq(PartnerBankCardDO::getPartnerId, partnerId));
     }
 
+    default PartnerBankCardDO selectByPartnerAndCardNumber(Long partnerId, String cardNumber) {
+        return selectOne(new LambdaQueryWrapperX<PartnerBankCardDO>()
+                .eq(PartnerBankCardDO::getPartnerId, partnerId)
+                .eq(PartnerBankCardDO::getCardNumber, cardNumber));
+    }
+
     default void clearDefaultByOwner(Long userId) {
         update(null, new LambdaUpdateWrapper<PartnerBankCardDO>()
                 .eq(PartnerBankCardDO::getOwnerUserId, userId)

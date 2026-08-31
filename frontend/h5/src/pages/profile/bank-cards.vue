@@ -2,7 +2,6 @@
 import { ref, onMounted } from 'vue'
 import { showConfirmDialog, showSuccessToast, showToast } from 'vant'
 import { getMyCards, addCard, deleteCard, setDefaultCard, type BankCard } from '@/api/withdrawal'
-import { applyDevBankCardOverrides } from '@/api/mock'
 import { maskCardNumber } from '@/utils/format'
 
 defineOptions({ name: 'BankCards' })
@@ -20,7 +19,7 @@ async function loadCards() {
   loading.value = true
   loadError.value = ''
   try {
-    cards.value = applyDevBankCardOverrides(await getMyCards())
+    cards.value = await getMyCards()
   } catch (cause) {
     loadError.value = cause instanceof Error ? cause.message : '银行卡加载失败'
   } finally {

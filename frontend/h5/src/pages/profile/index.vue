@@ -1,28 +1,31 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useTheme, THEMES } from '@/composables/useTheme'
-import { getPartnerMe, getProfile } from '@/api/profile'
+import { bindWecom, getPartnerMe, getProfile, updateNotifyChannel, type UserProfile } from '@/api/profile'
 import { getCashbackSummary, type CashbackSummary } from '@/api/cashback'
-import { logout } from '@/api/auth'
+import { logout, wecomAuthorizeUrl } from '@/api/auth'
 import { formatAmount, maskMobile } from '@/utils/format'
-import { showConfirmDialog, showToast } from 'vant'
+import { showConfirmDialog, showSuccessToast, showToast } from 'vant'
 
 defineOptions({ name: 'Profile' })
 
 const router = useRouter()
+const route = useRoute()
 const userStore = useUserStore()
 const { currentTheme } = useTheme()
 const currentThemeInfo = computed(() => THEMES.find(t => t.key === currentTheme()) || THEMES[0])
 
 const profileLoading = ref(true)
 const profileError = ref('')
-const profile = ref<{ nickname: string; mobile: string; avatar?: string }>()
+const profile = ref<UserProfile>()
 const partner = ref<{ name: string; mobile: string }>()
 const summary = ref<CashbackSummary>()
 const summaryLoading = ref(true)
 const summaryError = ref('')
+const wecomBinding = ref(false)
+const wecomSaving = ref(false)
 
 const accountEntries = computed(() => [
   { title: '个人信息', icon: 'contact', to: '/profile/edit' },
@@ -69,8 +72,66 @@ async function loadSummary() {
   }
 }
 
-onMounted(() => {
-  void loadProfile()
+async function handleWecomCallback() {
+  if (route.query.wecomBind !== '1') return false
+  const code = (route.query.code as string | undefined)?.trim()
+  const state = (route.query.state as string | undefined)?.trim()
+  if (!code || !state) {
+    showToast('企业微信授权信息不完整，请重新绑定')
+    await router.replace('/profile')
+    return true
+  }
+  wecomBinding.value = true
+  try {
+    await bindWecom({ code, state })
+    showSuccessToast('企业微信绑定成功')
+  } catch (cause) {
+    showToast(cause instanceof Error ? cause.message : '企业微信绑定失败')
+  } finally {
+    wecomBinding.value = false
+    await router.replace('/profile')
+    await loadProfile()
+  }
+  return true
+}
+
+function buildWecomBindRedirectUri() {
+  const url = new URL('/profile', window.location.origin)
+  url.searchParams.set('wecomBind', '1')
+  return url.toString()
+}
+
+async function handleWecomBind() {
+  if (wecomBinding.value) return
+  wecomBinding.value = true
+  try {
+    window.location.href = await wecomAuthorizeUrl(buildWecomBindRedirectUri())
+  } catch (cause) {
+    wecomBinding.value = false
+    showToast(cause instanceof Error ? cause.message : '企业微信授权失败')
+  }
+}
+
+async function handleWecomEnabled(enabled: boolean) {
+  if (!profile.value?.wecomBound) {
+    showToast('请先绑定企业微信')
+    return
+  }
+  wecomSaving.value = true
+  try {
+    await updateNotifyChannel({ wecomEnabled: enabled })
+    profile.value = { ...profile.value, wecomEnabled: enabled }
+    showSuccessToast(enabled ? '已开启企业微信推送' : '已关闭企业微信推送')
+  } catch (cause) {
+    showToast(cause instanceof Error ? cause.message : '设置失败')
+  } finally {
+    wecomSaving.value = false
+  }
+}
+
+onMounted(async () => {
+  const handledWecom = await handleWecomCallback()
+  if (!handledWecom) void loadProfile()
   void loadSummary()
 })
 
@@ -172,6 +233,31 @@ function goWithdraw() {
           is-link
           :to="item.to"
         />
+      </van-cell-group>
+    </section>
+
+    <section class="page-section">
+      <div class="page-section__head profile-section__head">
+        <div class="page-section__title">企业微信</div>
+      </div>
+      <van-cell-group class="card profile-group" :border="false">
+        <van-cell title="账号绑定" icon="wechat">
+          <template #value>
+            <span v-if="profile?.wecomBound" class="profile-meta">已绑定</span>
+            <van-button v-else size="mini" type="primary" round :loading="wecomBinding" @click="handleWecomBind">去绑定</van-button>
+          </template>
+        </van-cell>
+        <van-cell title="接收企业微信推送" icon="bell">
+          <template #value>
+            <van-switch
+              :model-value="Boolean(profile?.wecomBound && profile?.wecomEnabled)"
+              :disabled="!profile?.wecomBound"
+              :loading="wecomSaving"
+              size="22"
+              @update:model-value="handleWecomEnabled"
+            />
+          </template>
+        </van-cell>
       </van-cell-group>
     </section>
 

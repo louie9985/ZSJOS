@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Badge, Button, Descriptions, Drawer, Empty, Form, Input, Modal, Segmented,
+  Alert, Badge, Button, Descriptions, Empty, Form, Input, Modal, Segmented,
   Select, Skeleton, Space, Spin, Tag, Timeline, Typography, message
 } from 'antd'
 import {
@@ -24,6 +24,8 @@ import {
 } from '../services/feedbackApi'
 import { formatTimestamp } from '../services/time'
 import { useSearchParams } from 'react-router-dom'
+import ResizableDrawer from '../components/ResizableDrawer'
+import { FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 
 const PAGE_SIZE = 10
 const TYPE_META: Record<FeedbackType, { label: string; icon: React.ReactNode; permission: string }> = {
@@ -316,7 +318,7 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
       {editor && <FeedbackDynamicForm form={editorForm} fields={editor.form.fields}/>}
     </Modal>
 
-    <Drawer open={detailOpen} onClose={() => setDetailOpen(false)} width="min(720px, 100vw)" title={detail?.feedbackNo || '反馈详情'}>
+    <ResizableDrawer open={detailOpen} onClose={() => setDetailOpen(false)} width="min(720px, 100vw)" defaultSize={720} minSize={560} storageKey={FEEDBACK_DETAIL_DRAWER_WIDTH_STORAGE_KEY} title={detail?.feedbackNo || '反馈详情'}>
       {detailError && <Alert type="error" showIcon message={detailError} action={<Button onClick={() => detailId && void loadDetail(detailId)}>重试</Button>}/>}
       {detailLoading ? <Skeleton active paragraph={{ rows: 8 }}/> : detail && <div className="feedback-detail">
         <div className="feedback-detail-title"><div><Typography.Title level={4}>{detail.title}</Typography.Title><Typography.Text type="secondary">{formatTimestamp(detail.createTime)}</Typography.Text></div><Tag color={STATUS_META[detail.status].color}>{STATUS_META[detail.status].label}</Tag></div>
@@ -337,7 +339,7 @@ export default function FeedbackPage({ permissions }: { permissions: string[] })
           {detail.canSubmitSurvey && hasPermission(permissions, 'zsjos:feedback:survey:submit') && <Button type="primary" onClick={() => { surveyForm.resetFields(); setSurveyOpen(true) }}>满意度评价</Button>}
         </div>
       </div>}
-    </Drawer>
+    </ResizableDrawer>
 
     <Modal open={replyOpen} title="回复反馈" okText="发送" confirmLoading={saving} onCancel={() => setReplyOpen(false)} onOk={() => void submitReply()}>
       <Input.TextArea value={replyContent} onChange={event => setReplyContent(event.target.value)} rows={5} maxLength={5000} showCount placeholder="请输入回复内容"/>

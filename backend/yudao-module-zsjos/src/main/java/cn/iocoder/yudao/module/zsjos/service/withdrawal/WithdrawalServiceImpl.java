@@ -20,6 +20,7 @@ import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.*;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.BankCardUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.BankCardSaveReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.WithdrawalSummaryRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWithdrawalRespVO;
@@ -238,6 +239,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "withdrawal.process-result", targetType = "withdrawal")
     @Transactional(rollbackFor = Exception.class)
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
@@ -347,6 +349,25 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 .setDefaultCard(first).setVersion(0);
         cardMapper.insert(card);
         return card.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updatePartnerCard(Long partnerId, Long cardId, BankCardUpdateReqVO request) {
+        requireEnabledPartnerId(partnerId);
+        PartnerBankCardDO card = cardMapper.selectByIdAndPartner(cardId, partnerId);
+        if (card == null) throw exception(WITHDRAWAL_BANK_CARD_INVALID);
+        String cardNumber = StrUtil.isBlank(request.getCardNumber())
+                ? card.getCardNumber() : normalizeCard(request.getCardNumber());
+        PartnerBankCardDO duplicate = cardMapper.selectByPartnerAndCardNumber(partnerId, cardNumber);
+        if (duplicate != null && !Objects.equals(duplicate.getId(), cardId)) {
+            throw exception(WITHDRAWAL_BANK_CARD_INVALID);
+        }
+        card.setAccountName(request.getAccountName().trim())
+                .setCardNumber(cardNumber)
+                .setBankName(request.getBankName().trim())
+                .setBranchName(StrUtil.trimToNull(request.getBranchName()));
+        cardMapper.updateById(card);
     }
 
     @Override
@@ -517,6 +538,7 @@ public class WithdrawalServiceImpl implements WithdrawalService {
                 .sorted().toList();
     }
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "withdrawal.send-finance-reminder", targetType = "withdrawal")
     public void sendFinanceReminder() {
         int overdueDays = configuredInt(REMINDER_OVERDUE_DAYS_KEY, 7, 1, 365);
         List<WithdrawalDO> active = withdrawalMapper.selectPendingReminder(LocalDateTime.now().minusDays(overdueDays));

@@ -9,4 +9,6 @@ public class PartnerProfileRespVO {
     private String email;
     private String avatar;
     private Integer sex;
+    private Boolean wecomBound;
+    private Boolean wecomEnabled;
 }

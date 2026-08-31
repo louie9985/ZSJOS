@@ -61,6 +61,7 @@ public class BusinessTaskReminderService {
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private ServiceRelationMapper relationMapper;
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "business-task.emit-reminders", targetType = "business-task")
     @Transactional(rollbackFor = Exception.class)
     public int emitPending(LocalDateTime now) {
         reassignAssistanceTasks(now);

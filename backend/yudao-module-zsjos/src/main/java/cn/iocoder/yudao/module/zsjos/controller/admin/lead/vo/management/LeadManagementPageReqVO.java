@@ -20,6 +20,13 @@ import static cn.iocoder.yudao.module.zsjos.service.lead.LeadSimpleStatusQuery.V
 @EqualsAndHashCode(callSuper = true)
 public class LeadManagementPageReqVO extends PageParam {
 
+    public static final String SORT_FIELD_PATTERN = "leadNo|submittedName|submittedMobile|submittedWechatId|sourceType|"
+            + "leadCategory|sourceChannelId|assignmentStatus|dispatchMode|assignmentAttemptCount|publicPoolAt|"
+            + "countedAt|currentAssignmentFirstFollowUpAt|currentAssignmentFirstFollowUpDeadlineAt|"
+            + "qualificationStartedAt|qualificationDeadlineAt|suspendedAt|validDescription|invalidDescription|"
+            + "appealDeadlineAt|closedAt|closeReason|nextFollowUpAt|submittedAt|lastActivityAt|qualifiedAt|"
+            + "convertedAt|remark|updateTime";
+
     private String keyword;
     private String status;
     private String assignmentStatus;
@@ -32,6 +39,12 @@ public class LeadManagementPageReqVO extends PageParam {
 
     @Pattern(regexp = VALIDATION_PATTERN, message = "客资简单状态不正确")
     private String simpleStatus;
+
+    @Pattern(regexp = SORT_FIELD_PATTERN, message = "客资排序字段不正确")
+    private String sortField;
+
+    @Pattern(regexp = "ascend|descend", message = "客资排序方向不正确")
+    private String sortOrder;
 
     @Pattern(regexp = "all|follow_up_pending|unreachable|invalid", message = "客资提醒视图不正确")
     private String view;

@@ -277,6 +277,30 @@
   display: none;
 }
 
+.crm-resizable-detail-drawer .ant-drawer-content-wrapper {
+  min-width: min(var(--crm-detail-drawer-min-width), 92vw);
+}
+
+.crm-resizable-drawer .ant-drawer-content-wrapper {
+  max-width: 92vw;
+}
+
+.business-inbox-table-page > .business-inbox-table {
+  min-width: 0;
+  flex: 1;
+}
+
+.business-inbox-table .ant-table-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.business-inbox-table-page .business-inbox-mobile-drawer {
+  display: block;
+}
+
 @media (max-width: 768px) {
   .business-inbox-page {
     height: 100%;

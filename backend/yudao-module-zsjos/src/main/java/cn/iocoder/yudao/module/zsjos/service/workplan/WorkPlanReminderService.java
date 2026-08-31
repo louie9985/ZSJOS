@@ -42,6 +42,7 @@ public class WorkPlanReminderService {
         }
     }
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "work-plan.scan-reminders", targetType = "work-task")
     @Transactional
     public void scan() {
         LocalDateTime now = LocalDateTime.now();

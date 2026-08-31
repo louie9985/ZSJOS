@@ -1,7 +1,6 @@
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { getTenantId } from '@/utils/storage'
-import type { ApiResponse } from './request'
-import { isMissingImplementation, resolveReadMock } from './mock'
+import { isMissingImplementation, type ApiResponse } from './request'
 
 const referenceRequest = axios.create({
   // 字典、地区等公共参考数据仍由 MEMBER app-api 提供，不携带兼职 Token。
@@ -20,13 +19,12 @@ referenceRequest.interceptors.response.use(
     if (response.data.code === 0) {
       return response.data.data as unknown as AxiosResponse
     }
-    const mock = resolveReadMock(response.config, response.status, response.data.msg)
-    if (mock) return mock.data as AxiosResponse
+    if (isMissingImplementation(response.status, response.data.msg)) {
+      return Promise.reject(new Error('后端接口暂未提供'))
+    }
     return Promise.reject(new Error(response.data.msg || '参考数据加载失败'))
   },
   (error) => {
-    const mock = resolveReadMock(error.config || {}, error.response?.status, error.response?.data?.msg)
-    if (mock) return mock.data
     if (isMissingImplementation(error.response?.status, error.response?.data?.msg)) {
       return Promise.reject(new Error('后端接口暂未提供'))
     }

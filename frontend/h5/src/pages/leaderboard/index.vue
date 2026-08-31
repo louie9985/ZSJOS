@@ -10,7 +10,6 @@ import {
   type LeaderboardPeriod,
   type LeaderboardType
 } from '@/api/leaderboard'
-import { wasMockedEndpoint } from '@/api/mock'
 import {
   computeMaxStepGap,
   formatLeaderboardChase,
@@ -44,7 +43,6 @@ const configError = ref('')
 const listError = ref('')
 const configStatus = ref<number>()
 
-const usingMock = computed(() => wasMockedEndpoint('/zsjos/partner/leaderboard'))
 const configUnavailable = computed(() => /接口暂未提供|请求地址不存在|接口不存在|接口未实现|功能不存在/i.test(configError.value))
 const enabledTypeOptions = computed(() => {
   if (!config.value) return []
@@ -161,10 +159,6 @@ onMounted(loadConfig)
         <button v-if="data || configError" type="button" class="rule-button" @click="openRules">规则</button>
       </template>
     </van-nav-bar>
-
-    <van-notice-bar v-if="usingMock" color="#8a6100" background="#fff7df" left-icon="info-o">
-      当前榜单为开发环境演示数据
-    </van-notice-bar>
 
     <van-skeleton v-if="configLoading" :row="8" style="padding: 20px 16px;" />
 

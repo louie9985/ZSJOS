@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
 import cn.hutool.core.util.DesensitizedUtil;
+import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
@@ -153,6 +154,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
 
     @Override
     public CursorPageResult<LeadManagementRespVO> getLeadCursor(LeadManagementPageReqVO reqVO, Long userId) {
+        reqVO.setSortField(null);
+        reqVO.setSortOrder(null);
         LeadCursor cursor = decodeCursor(reqVO.getCursor(), reqVO, userId);
         reqVO.setCursorActivityAt(cursor == null ? null : cursor.time());
         reqVO.setCursorId(cursor == null ? null : cursor.id());
@@ -233,6 +236,14 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         List<LeadIntendedProductDO> products = intendedProductMapper.selectListByLeadId(id);
         List<LeadAttachmentDO> attachments = attachmentMapper.selectListByLeadId(id);
         return convert(lead, userId, users, products, attachments, resolveAttachmentUrls(attachments), true);
+    }
+
+    @Override
+    public LeadManagementRespVO getLeadByLeadNo(String leadNo, Long userId) {
+        if (StrUtil.isBlank(leadNo)) throw exception(LEAD_NOT_EXISTS);
+        LeadDO lead = leadMapper.selectByLeadNo(leadNo);
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        return getLead(lead.getId(), userId);
     }
 
     @Override
@@ -517,6 +528,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                                                 Long currentUserId) {
         LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
+        if (securityFrameworkService.hasPermission(PERMISSION_REQUEST_SUBMITTER_ASSIST)) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_REQUEST_SUBMITTER_ASSIST, true));
+        }
         boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus())
                 && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus());
         boolean recyclePending = ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus());
@@ -531,6 +545,17 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_QUALIFICATION_RELEASE, true));
         }
         addSupervisorActions(actions, lead, currentUserId);
+        if (Objects.equals(currentUserId, lead.getOwnerUserId())
+                && securityFrameworkService.hasPermission(PERMISSION_OWNER_TRANSFER)
+                && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                && !STATUS_SUSPENDED.equals(lead.getStatus())) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_OWNER_TRANSFER, true));
+        }
+        if (Objects.equals(currentUserId, lead.getOwnerUserId())
+                && securityFrameworkService.hasPermission(PERMISSION_OWNER_RELEASE_PUBLIC_SEA)
+                && agingPoolService.canEnterManually(lead.getId())) {
+            actions.add(new LeadManagementRespVO.ActionVO(ACTION_OWNER_RELEASE_PUBLIC_SEA, true));
+        }
         if (PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                 && Objects.equals(lead.getProviderOwnerId(), currentUserId)
                 && lead.getStatus() != null

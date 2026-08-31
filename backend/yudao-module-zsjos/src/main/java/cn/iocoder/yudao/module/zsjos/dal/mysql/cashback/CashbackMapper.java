@@ -11,6 +11,7 @@ import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageReqVO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerLeaderboardMetricRow;
 
 @Mapper
 public interface CashbackMapper extends BaseMapperX<CashbackDO> {
@@ -47,6 +48,23 @@ public interface CashbackMapper extends BaseMapperX<CashbackDO> {
                 .eqIfPresent(CashbackDO::getStatus, request.getStatus())
                 .orderByDesc(CashbackDO::getGeneratedAt).orderByDesc(CashbackDO::getId));
     }
+
+    default List<CashbackDO> selectListByLeadIdAndPartner(Long leadId, Long partnerId) {
+        return selectList(new LambdaQueryWrapperX<CashbackDO>()
+                .eq(CashbackDO::getLeadId, leadId)
+                .eq(CashbackDO::getPartnerId, partnerId)
+                .orderByDesc(CashbackDO::getGeneratedAt).orderByDesc(CashbackDO::getId));
+    }
+
+    @Select("SELECT partner_id AS partner_id, COALESCE(SUM(amount), 0) AS value "
+            + "FROM zsjos_cashback WHERE tenant_id=#{tenantId} AND deleted=0 "
+            + "AND partner_id IS NOT NULL AND status<>'cancelled' "
+            + "AND (#{from} IS NULL OR generated_at>=#{from}) "
+            + "AND (#{to} IS NULL OR generated_at<#{to}) "
+            + "GROUP BY partner_id")
+    List<PartnerLeaderboardMetricRow> selectPartnerEstimatedIncomeRanking(@Param("tenantId") Long tenantId,
+                                                                           @Param("from") LocalDateTime from,
+                                                                           @Param("to") LocalDateTime to);
 
     @Select("SELECT status, COALESCE(SUM(amount), 0) amount, COUNT(*) count "
             + "FROM zsjos_cashback WHERE beneficiary_user_id=#{userId} AND tenant_id=#{tenantId} "

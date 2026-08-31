@@ -43,7 +43,7 @@ queries to the assigned director/operator unless the independent all-account per
 | 4 | `new_media_operator` | `/zsjos/media-students`、第三方账号、内容生产、拍剪核对和账号定位复核；学员范围仅限本人负责账号、内容、定位或任务关联对象 |
 | 5 | `filming_editor` | 查询、接受/拒绝指定拍剪单、制作、提交、查看公共池和抢单；候选资格由用户关系与 `zsjos:production-ticket:accept` 权限交集决定 |
 | 6 | `sales_manager` | 通过 `query-owned` 查看本人及当前所管部门、子部门销售负责的客资，并具备跟进记录、流转记录只读能力及下属销售一键暂停接单能力；不得持有 `query-all` |
-| 7 | `sales_specialist` | 通过 `query-owned` 查看本人负责的客资，保留接单/抢单、跟进判定、自拓、建单、本人订单、公海申请和本人工作计划能力；不得持有 `query-all` |
+| 7 | `sales_specialist` | 通过 `query-owned` 查看本人负责的客资，保留接单/抢单、跟进判定、自拓、建单、本人订单、公海申请和本人工作计划能力；本人客资可按 `owner-transfer` 转派给启用销售，或按 `owner-release-public-sea` 释放至公海；不得持有 `query-all` |
 | 8 | `enrollment_manager` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 9 | `enrollment_specialist` | V071 精确 2 项订单查询/履约审批权限；无提现、返现或资金导出 |
 | 10 | `finance_manager` | V071 精确 11 项完整财务权限 |

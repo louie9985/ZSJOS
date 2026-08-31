@@ -180,6 +180,9 @@
 
   /* 主从页列表列宽，四个主从页统一（原 320/320/320/300） */
   --crm-list-pane-w: 320px;
+  /* 桌面详情抽屉与主从页右侧详情区保持同等可视宽度。 */
+  --crm-detail-drawer-width: calc(100vw - var(--crm-list-pane-w) - var(--crm-gap) - var(--crm-page-pad) - var(--crm-page-pad));
+  --crm-detail-drawer-min-width: 640px;
 
   /* 页面限宽。默认不限宽（多数页面是表格/主从页，越宽越好用），
      仅表单类与阅读类页面显式取用下列档位。 */

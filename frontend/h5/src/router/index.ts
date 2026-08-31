@@ -24,6 +24,12 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
+      path: '/wecom/click',
+      name: 'WecomClick',
+      component: () => import('@/pages/wecom/click.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/',
       redirect: '/home'
     },

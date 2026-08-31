@@ -113,31 +113,6 @@ class LeadFollowUpServiceImplTest {
     }
 
     @Test
-    void firstUnreachableFollowUpCreatesSubmitterAssistTaskAndNotification() {
-        LeadDO lead = validLead();
-        lead.setSourceUserId(30L);
-        stubSuccessfulCreate(lead);
-        when(dictDataApi.getDictDataList("zsjos_lead_follow_up_result"))
-                .thenReturn(List.of(dict("unreachable", "未联系上")));
-        when(lifecycleTaskService.completeFirstFollowUpTask(eq(88L), any(LocalDateTime.class))).thenReturn(true);
-        doAnswer(invocation -> {
-            invocation.<LeadFollowUpRecordDO>getArgument(0).setId(40L);
-            return 1;
-        }).when(recordMapper).insert(any(LeadFollowUpRecordDO.class));
-
-        LeadFollowUpCreateReqVO request = request(LocalDateTime.now().plusHours(1));
-        request.setResult("unreachable");
-        request.setRemark("电话多次未接，请协助确认联系方式");
-        withTenant(() -> service.create(1L, 20L, request));
-
-        verify(lifecycleTaskService).createQualificationTask(eq(lead), eq(20L), any(LocalDateTime.class));
-        verify(lifecycleTaskService).createSubmitterAssistTask(eq(lead), eq(40L), any(LocalDateTime.class),
-                eq("未联系上"), eq("电话多次未接，请协助确认联系方式"));
-        verify(notifyEventPublisher).publish(eq("zsjos.lead.submitter_assist_requested"), eq(1L),
-                eq("lead-submitter-assist-requested:40"), eq(20L), any(LocalDateTime.class), anyMap());
-    }
-
-    @Test
     void createDoesNotStoreCategoryKeyWhenDictionaryLabelIsMissing() {
         LeadDO lead = validLead();
         stubSuccessfulCreate(lead);
@@ -186,8 +161,7 @@ class LeadFollowUpServiceImplTest {
         when(dictDataApi.getDictDataList(anyString())).thenAnswer(invocation -> {
             String type = invocation.getArgument(0);
             if ("zsjos_lead_follow_up_method".equals(type)) return List.of(dict("phone", "电话"));
-            if ("zsjos_lead_follow_up_result".equals(type)) return List.of(dict("interested", "有意向"),
-                    dict("unreachable", "未联系上"));
+            if ("zsjos_lead_follow_up_result".equals(type)) return List.of(dict("interested", "有意向"));
             return List.of(dict("a", "A 类"));
         });
         when(adminUserApi.getUser(20L)).thenReturn(null);

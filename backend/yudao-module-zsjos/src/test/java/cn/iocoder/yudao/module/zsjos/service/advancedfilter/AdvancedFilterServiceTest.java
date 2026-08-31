@@ -115,6 +115,15 @@ class AdvancedFilterServiceTest {
         var catalog = service.catalog("lead");
         assertTrue(catalog.fields().stream().allMatch(field -> field.fieldKey().contains(".")));
         assertFalse(catalog.fields().stream().filter(field -> field.fieldKey().equals("lead.status")).findFirst().orElseThrow().options().isEmpty());
+        var duration = catalog.fields().stream().filter(field -> field.fieldKey().equals("duration.diff")).findFirst().orElseThrow();
+        assertEquals("时间作差", duration.label());
+        assertEquals("时间", duration.group());
+        assertEquals("duration", duration.valueType());
+        assertEquals(List.of("gt", "gte", "lt", "lte", "between"), duration.operators());
+        assertTrue(duration.options().size() >= 2);
+        assertTrue(duration.options().stream().anyMatch(option -> option.value().equals("lead.submittedAt")));
+        assertTrue(duration.options().stream().allMatch(option -> catalog.fields().stream()
+                .anyMatch(field -> field.fieldKey().equals(option.value()) && field.valueType().equals("date"))));
         assertTrue(catalog.fields().stream().anyMatch(field -> field.fieldKey().equals("lead.leadNo") && field.label().equals("客资编号")));
         assertTrue(catalog.fields().stream().noneMatch(field -> Set.of("lead.id", "lead.leadId", "person.id").contains(field.fieldKey())));
         assertTrue(catalog.fields().stream().allMatch(field -> Set.of("身份与联系", "状态与进度", "归属与人员", "产品与服务", "金额与付款", "时间", "补充信息", "业务指标").contains(field.group())));
@@ -139,6 +148,76 @@ class AdvancedFilterServiceTest {
                         || field.group().equals("归属与人员")));
         assertTrue(service.catalogWithoutVisibleUsers("registration").fields().stream()
                 .noneMatch(field -> "visible-users".equals(field.optionSource())));
+    }
+
+    @Test void compilesDurationDiffInMinutesWithNonNullGuards() {
+        when(mapper.selectOrderIds(any())).thenReturn(List.of());
+        service.matchOrderIds(group("AND", duration("order.submittedAt", "order.effectiveAt", "gte", "hour", 24)));
+        ArgumentCaptor<AdvancedFilterQuery> captor = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectOrderIds(captor.capture());
+        String sql = captor.getValue().getWhereSql();
+        assertTrue(sql.contains("o.submitted_at IS NOT NULL"));
+        assertTrue(sql.contains("o.effective_at IS NOT NULL"));
+        assertTrue(sql.contains("TIMESTAMPDIFF(MINUTE, o.submitted_at, o.effective_at) >="));
+        assertTrue(captor.getValue().getParameters().containsValue(new java.math.BigDecimal("1440")));
+    }
+
+    @Test void durationDiffAllowsRootAndOneRelatedRelation() {
+        when(mapper.selectLeadIds(any())).thenReturn(List.of());
+        service.matchLeadIds(group("AND", duration("lead.submittedAt", "order.effectiveAt", "lt", "day", 2)));
+        ArgumentCaptor<AdvancedFilterQuery> captor = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectLeadIds(captor.capture());
+        String sql = captor.getValue().getWhereSql();
+        assertTrue(sql.contains("EXISTS (SELECT 1 FROM zsjos_order ro"));
+        assertTrue(sql.contains("l.submitted_at IS NOT NULL"));
+        assertTrue(sql.contains("ro.effective_at IS NOT NULL"));
+        assertTrue(sql.contains("TIMESTAMPDIFF(MINUTE, l.submitted_at, ro.effective_at) <"));
+        assertTrue(captor.getValue().getParameters().containsValue(new java.math.BigDecimal("2880")));
+    }
+
+    @Test void durationDiffAllowsTwoFieldsFromTheSameRelation() {
+        when(mapper.selectLeadIds(any())).thenReturn(List.of());
+        service.matchLeadIds(group("AND", duration("order.submittedAt", "order.effectiveAt", "gte", "minute", 30)));
+        ArgumentCaptor<AdvancedFilterQuery> captor = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectLeadIds(captor.capture());
+        String sql = captor.getValue().getWhereSql();
+        String relation = "EXISTS (SELECT 1 FROM zsjos_order ro";
+        assertEquals(1, (sql.length() - sql.replace(relation, "").length()) / relation.length());
+        assertTrue(sql.contains("TIMESTAMPDIFF(MINUTE, ro.submitted_at, ro.effective_at) >="));
+    }
+
+    @Test void durationDiffRejectsFieldsFromTwoDifferentRelations() {
+        assertThrows(ServiceException.class, () -> service.matchRegistrationCaseIds(group("AND",
+                duration("lead.submittedAt", "order.submittedAt", "gte", "hour", 1))));
+    }
+
+    @Test void durationDiffBetweenValidatesThresholdOrderAndScalesUnits() {
+        when(mapper.selectOrderIds(any())).thenReturn(List.of());
+        AdvancedFilterConditionReqVO between = duration("order.submittedAt", "order.effectiveAt", "between", "hour", null);
+        between.setValueFrom("1.5");
+        between.setValueTo("2");
+        service.matchOrderIds(group("AND", between));
+        ArgumentCaptor<AdvancedFilterQuery> captor = ArgumentCaptor.forClass(AdvancedFilterQuery.class);
+        verify(mapper).selectOrderIds(captor.capture());
+        assertTrue(captor.getValue().getWhereSql().contains(" BETWEEN "));
+        assertTrue(captor.getValue().getParameters().containsValue(new java.math.BigDecimal("90.0")));
+        assertTrue(captor.getValue().getParameters().containsValue(new java.math.BigDecimal("120")));
+
+        AdvancedFilterConditionReqVO reversed = duration("order.submittedAt", "order.effectiveAt", "between", "minute", null);
+        reversed.setValueFrom("10");
+        reversed.setValueTo("1");
+        assertThrows(ServiceException.class, () -> service.matchOrderIds(group("AND", reversed)));
+    }
+
+    @Test void durationDiffRejectsUnknownOrNonDateOperands() {
+        assertThrows(ServiceException.class, () -> service.matchOrderIds(group("AND",
+                duration("order.totalAmount", "order.effectiveAt", "gte", "hour", 1))));
+        assertThrows(ServiceException.class, () -> service.matchOrderIds(group("AND",
+                duration("order.submittedAt", "order.effectiveAt", "gte", "week", 1))));
+        assertThrows(ServiceException.class, () -> service.matchOrderIds(group("AND",
+                duration("order.submittedAt", "order.unknownAt", "gte", "hour", 1))));
+        assertThrows(ServiceException.class, () -> service.matchOrderIds(group("AND",
+                duration("order.submittedAt", "order.effectiveAt", "eq", "hour", 1))));
     }
 
     @Test void mergesPositiveAndConditionsForTheSameOrderRelation() {
@@ -202,4 +281,11 @@ class AdvancedFilterServiceTest {
 
     private static AdvancedFilterGroupReqVO group(String logic, AdvancedFilterConditionReqVO... conditions) { AdvancedFilterGroupReqVO value = new AdvancedFilterGroupReqVO(); value.setLogic(logic); value.getConditions().addAll(List.of(conditions)); return value; }
     private static AdvancedFilterConditionReqVO condition(String field, String operator, Object value) { AdvancedFilterConditionReqVO result = new AdvancedFilterConditionReqVO(); result.setFieldKey(field); result.setOperator(operator); result.setValue(value); return result; }
+    private static AdvancedFilterConditionReqVO duration(String startField, String endField, String operator, String unit, Object value) {
+        AdvancedFilterConditionReqVO result = condition("duration.diff", operator, value);
+        result.setStartFieldKey(startField);
+        result.setEndFieldKey(endField);
+        result.setUnit(unit);
+        return result;
+    }
 }

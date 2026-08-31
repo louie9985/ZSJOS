@@ -58,7 +58,7 @@ public class IotDataRuleServiceImpl implements IotDataRuleService {
     @Resource
     private IotDataSinkService dataSinkService;
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<IotDataRuleAction> dataRuleActions;
 
     @Override

@@ -6,7 +6,7 @@
     <el-badge :value="count || ''"><el-button :icon="Filter" @click="visible = true">筛选</el-button></el-badge>
   </div>
   <div v-if="count" class="advanced-tags">
-    <el-tag v-for="item in flatConditions" :key="item.key" closable @close="removeTag(item)">{{ fieldMap[item.condition.fieldKey]?.group }} · {{ fieldMap[item.condition.fieldKey]?.label }} {{ operatorLabels[item.condition.operator] }}</el-tag>
+    <el-tag v-for="item in flatConditions" :key="item.key" closable @close="removeTag(item)">{{ summarize(item.condition) }}</el-tag>
     <el-button link type="primary" @click="clear">清空全部</el-button>
   </div>
   <el-drawer v-model="visible" class="advanced-filter-drawer" title="高级筛选 · 修改后自动生效" size="min(560px, 100%)">
@@ -33,7 +33,12 @@ const catalogLoading = ref(true), catalogError = ref(false)
 const blank = (): Api.AdvancedFilterGroup => ({ logic: 'AND', conditions: [], groups: [] })
 const draft = ref(blank())
 const hasValue = (value: unknown) => Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== ''
-const isComplete = (condition: Api.AdvancedFilterCondition) => condition.operator === 'is_empty' || condition.operator === 'is_not_empty' || (condition.operator === 'between' ? hasValue(condition.valueFrom) && hasValue(condition.valueTo) : hasValue(condition.value))
+const isComplete = (condition: Api.AdvancedFilterCondition) => {
+  if (condition.operator === 'is_empty' || condition.operator === 'is_not_empty') return true
+  if (condition.fieldKey === 'duration.diff') return hasValue(condition.startFieldKey) && hasValue(condition.endFieldKey) && hasValue(condition.unit)
+    && (condition.operator === 'between' ? hasValue(condition.valueFrom) && hasValue(condition.valueTo) : hasValue(condition.value))
+  return condition.operator === 'between' ? hasValue(condition.valueFrom) && hasValue(condition.valueTo) : hasValue(condition.value)
+}
 const countGroup = (group: Api.AdvancedFilterGroup): number => group.conditions.length + group.groups.reduce((sum, item) => sum + countGroup(item), 0)
 const effectiveGroup = (group: Api.AdvancedFilterGroup): Api.AdvancedFilterGroup => ({ logic: group.logic, conditions: group.conditions.filter(isComplete), groups: group.groups.map(effectiveGroup).filter((item) => item.conditions.length || item.groups.length) })
 const count = computed(() => countGroup(effectiveGroup(draft.value)))
@@ -43,7 +48,9 @@ const flatConditions = computed(() => [
   ...draft.value.groups.flatMap((group, groupIndex) => group.conditions.map((condition, index) => ({ key: `${groupIndex}-${index}`, condition, groupIndex, index })))
 ].filter((item) => isComplete(item.condition)))
 const fieldMap = computed(() => Object.fromEntries(fields.value.map((field) => [field.fieldKey, field])))
-const operatorLabels: Record<string, string> = { contains: '包含', eq: '等于', ne: '不等于', in: '属于', not_in: '不属于', gt: '大于', lt: '小于', between: '区间', is_empty: '为空', is_not_empty: '不为空' }
+const operatorLabels: Record<string, string> = { contains: '包含', not_contains: '不包含', eq: '等于', ne: '不等于', in: '属于', not_in: '不属于', gt: '大于', gte: '大于等于', lt: '小于', lte: '小于等于', between: '区间', relative: '相对时间', is_empty: '为空', is_not_empty: '不为空' }
+const durationOperatorLabels: Record<string, string> = { gt: '大于', gte: '大于等于', lt: '小于', lte: '小于等于', between: '介于' }
+const durationUnitLabels: Record<string, string> = { minute: '分钟', hour: '小时', day: '天' }
 let timer: number | undefined
 watch(() => props.keyword, (value) => { searchText.value = value || '' })
 const submitSearch = () => emit('search', searchText.value.trim())
@@ -53,6 +60,16 @@ const clear = () => updateDraft(blank(), true)
 const removeTag = (item: { groupIndex: number; index: number }) => {
   if (item.groupIndex < 0) updateDraft({ ...draft.value, conditions: draft.value.conditions.filter((_, index) => index !== item.index) }, true)
   else updateDraft({ ...draft.value, groups: draft.value.groups.map((group, index) => index === item.groupIndex ? { ...group, conditions: group.conditions.filter((_, conditionIndex) => conditionIndex !== item.index) } : group) }, true)
+}
+const summarize = (condition: Api.AdvancedFilterCondition) => {
+  const field = fieldMap.value[condition.fieldKey]
+  if (condition.fieldKey !== 'duration.diff') return `${field?.group || ''} · ${field?.label || '筛选字段'} ${operatorLabels[condition.operator] || condition.operator}`
+  const options = field?.options?.length ? field.options : fields.value.filter((item) => item.valueType === 'date').map((item) => ({ value: item.fieldKey, label: item.label }))
+  const start = options.find((option) => option.value === condition.startFieldKey)?.label || '开始时间'
+  const end = options.find((option) => option.value === condition.endFieldKey)?.label || '结束时间'
+  const unit = durationUnitLabels[condition.unit || 'hour'] || condition.unit || ''
+  if (condition.operator === 'between') return `${end} - ${start} ${durationOperatorLabels.between} ${condition.valueFrom ?? ''} - ${condition.valueTo ?? ''} ${unit}`
+  return `${end} - ${start} ${durationOperatorLabels[condition.operator] || condition.operator} ${condition.value ?? ''} ${unit}`
 }
 const sourceOptions = async (source?: string): Promise<Api.AdvancedFilterOption[]> => {
   if (!source) return []

@@ -12,7 +12,7 @@ import java.util.List;
 
 @Data
 public class LeadDuplicateReviewDecisionReqVO {
-    @NotBlank @Pattern(regexp = "new_person|reuse_person|reactivate_lead|notify_owner")
+    @NotBlank @Pattern(regexp = "allow_flow|close_duplicate")
     private String resultType;
     private Long matchedPersonId;
     private Long matchedLeadId;

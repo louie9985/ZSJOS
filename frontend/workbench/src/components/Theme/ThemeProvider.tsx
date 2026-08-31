@@ -1,6 +1,8 @@
 import type { ConfigProviderProps } from 'antd';
 import { ConfigProvider, theme as antdTheme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
+import dayjs from 'dayjs';
+import 'dayjs/locale/zh-cn';
 import type { ReactNode } from 'react';
 import { BORDER_RADIUS_VALUES, FONT_SCALE_SIZE, type Density, type FontScale, type ThemePreset } from '../../constants';
 import { withGlassSurface } from './glassSurface';
@@ -19,6 +21,8 @@ import useShadcnTheme from './presets/shadcnTheme';
 import useV4Theme from './presets/v4Theme';
 import { ThemeStateContext, useThemeState } from './ThemeContext';
 import ThemeVars from './ThemeVars';
+
+dayjs.locale('zh-cn');
 
 /**
  * 全局主题注入层：根据 preset 选择对应主题配置，用 ConfigProvider 包裹全站。

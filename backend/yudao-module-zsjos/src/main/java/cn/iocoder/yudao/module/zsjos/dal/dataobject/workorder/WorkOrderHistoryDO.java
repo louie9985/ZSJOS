@@ -17,6 +17,7 @@ public class WorkOrderHistoryDO extends TenantBaseDO {
     private Long workOrderId;
     private String fromStatus;
     private String toStatus;
+    private String operatorSubjectType;
     private Long operatorUserId;
     private String reason;
     private LocalDateTime operatedAt;

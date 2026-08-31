@@ -1,5 +1,5 @@
 /**
- * 企业微信环境检测和 SDK 工具
+ * 企业微信环境检测工具
  */
 
 /** 判断是否在企业微信环境中 */
@@ -15,18 +15,5 @@ export function isInWechat(): boolean {
 }
 
 /**
- * 企微 OAuth 登录
- * 拼接授权 URL 并跳转，授权后企微会回调到 redirectUri 带上 code
+ * 企微登录与绑定由后端返回授权地址，这里只保留环境识别。
  */
-export function redirectToWecomOAuth(corpId: string, agentId: string, redirectUri: string) {
-  const url = `https://open.weixin.qq.com/connect/oauth2/authorize?appid=${corpId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=snsapi_base&agentid=${agentId}#wechat_redirect`
-  window.location.href = url
-}
-
-/**
- * 从 URL 中提取 OAuth code
- */
-export function getWecomCodeFromUrl(): string | null {
-  const params = new URLSearchParams(window.location.search)
-  return params.get('code')
-}

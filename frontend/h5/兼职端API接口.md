@@ -51,18 +51,18 @@ POST /part-api/zsjos/auth/login
 
 ```
 {
-  "username": "partner001",
+  "mobile": "13800138000",
   "password": "Password123",
-  "platform": "PC"
+  "platform": "MOBILE"
 }
 ```
 
 字段：
 
 ```
-username: 账号，4-32 位，只允许字母、数字、下划线
+mobile: 手机号
 password: 密码
-platform: PC 或 MOBILE，默认 PC
+platform: PC 或 MOBILE，默认 MOBILE
 ```
 
 返回：
@@ -80,9 +80,70 @@ platform: PC 或 MOBILE，默认 PC
 }
 ```
 
-只有拥有 `part_time_partner` 角色的账号可以通过该接口登录。
+只有已完成邀请码激活并且账号与兼职主体均启用的 PARTNER 账号可以通过该接口登录。若手机号存在有效未激活邀请码但尚未激活，接口返回明确提示，H5 会引导用户进入首次登录激活。
 
-当前保留“企业微信登录”入口，但暂不打通。点击入口只提示暂未开放，不发起 OAuth，也不调用 `/part-api/zsjos/auth/wecom-login`。
+### 1.1 首次登录激活
+
+```
+POST /part-api/zsjos/auth/activate
+```
+
+请求：
+
+```
+{
+  "mobile": "13800138000",
+  "password": "Password123",
+  "confirmPassword": "Password123",
+  "inviteCode": "ABCD1234",
+  "platform": "MOBILE"
+}
+```
+
+规则：
+
+```
+inviteCode: 四位大写英文字母 + 四位数字；前端会自动转大写
+password/confirmPassword: 8-20 位且同时包含字母和数字，必须一致
+```
+
+服务端按手机号和邀请码匹配管理员生成的待激活记录。邀请码默认 7 天过期，使用后立即失效且不可复用；同一手机号被创建新邀请码时，旧待激活邀请码会直接失效。激活成功会创建兼职主体、独立 Partner 登录账号和归属运营记录，并直接返回登录 Token。
+
+### 1.2 企业微信授权地址
+
+```
+GET /part-api/zsjos/auth/wecom-authorize-url?redirectUri={redirectUri}
+```
+
+返回企业微信授权跳转地址。前端先跳转到该地址，企微授权后回调到 `redirectUri` 携带 `code` 和 `state`。
+
+### 1.3 企业微信登录
+
+```
+POST /part-api/zsjos/auth/wecom-login
+```
+
+请求：
+
+```
+{
+  "code": "CODE_FROM_WECOM",
+  "state": "STATE_FROM_WECOM",
+  "platform": "MOBILE"
+}
+```
+
+兼职端本地、开发和生产运行面均使用后端真实接口。接口缺失、权限失败、空列表、网络失败和业务错误都展示真实状态与重试入口，前端不再提供本地替代数据。
+
+`platform` 可选，默认 `MOBILE`。若当前企微账号未绑定兼职主体，接口返回明确的未绑定错误。
+
+### 1.4 企业微信消息回跳
+
+```
+GET /wecom/click?ticket={ticket}
+```
+
+`ticket` 为短期票据，不包含系统 token。页面会先解析票据，再按业务详情优先级跳转；若当前未登录，会先进入登录流程，登录成功后回到目标业务页。
 
 ### 2. 退出登录
 
@@ -198,6 +259,37 @@ enabled
 disabled
 converted
 ```
+
+### 5. 绑定企业微信
+
+```
+POST /part-api/zsjos/profile/wecom-bind
+```
+
+请求：
+
+```
+{
+  "code": "CODE_FROM_WECOM",
+  "state": "STATE_FROM_WECOM"
+}
+```
+
+### 6. 通知渠道偏好
+
+```
+PUT /part-api/zsjos/profile/notify-channel
+```
+
+请求：
+
+```
+{
+  "wecomEnabled": true
+}
+```
+
+`wecomEnabled` 仅控制是否接收企业微信推送，不影响账号密码登录和企业微信绑定状态。
 
 ## 三、字典接口
 
@@ -476,6 +568,22 @@ GET /part-api/zsjos/lead/get?id={leadId}
 只能查看本人有提交人历史权限的客资。
 
 所有页面只把非空 `leadNo` 展示为客资编号；缺失时显示“客资编号暂未生成”，不能回退展示 `id` 或 `leadId`。现有后端的催办/投诉动作编码为 `SUBMITTER_URGE`、`SUBMITTER_COMPLAINT`，H5 兼容这两个编码，同时支持后续统一契约 `URGE`、`CREATE_COMPLAINT`、`CREATE_APPEAL`；前端不根据状态自行补显示写操作按钮。
+
+### 获取 Partner 客资筛选项
+
+```
+GET /part-api/zsjos/lead/partner-filter-options
+```
+
+返回当前 Partner 可用的状态、主产品、申诉状态和订单审核状态筛选项。筛选项由后端生成，前端不维护静态生产选项。
+
+### 获取客资处理进度
+
+```
+GET /part-api/zsjos/lead/{leadId}/partner-activity
+```
+
+返回 Partner 本人可见的当前状态、时间线、跟进摘要、返现、投诉和订单投影。接口不得下发销售、主管、审核人、部门、派单规则或内部备注；收益详情只展示与返现 `orderId` 精确匹配的真实订单。
 
 ### 补充本人客资
 
@@ -782,6 +890,25 @@ DELETE /part-api/zsjos/withdrawal/my-cards/{id}
 PUT /part-api/zsjos/withdrawal/my-cards/{id}/default
 ```
 
+### 修改银行卡
+
+```
+PUT /part-api/zsjos/withdrawal/my-cards/{id}
+```
+
+请求：
+
+```
+{
+  "accountName": "张三",
+  "cardNumber": "6217000000001234",
+  "bankName": "中国银行",
+  "branchName": "某某支行"
+}
+```
+
+`cardNumber` 仅在换卡号时传完整值；不传时服务端保留原卡号。只能修改本人 Partner 名下银行卡。
+
 ### 提交提现申请
 
 ```
@@ -870,16 +997,117 @@ PUT /part-api/zsjos/withdrawal/{id}/cancel
 
 ```
 GET /part-api/zsjos/messages/page
+GET /part-api/zsjos/messages/groups
 GET /part-api/zsjos/messages/{id}
 PUT /part-api/zsjos/messages/read
 GET /part-api/zsjos/messages/unread-count
 ```
 
-已读请求体为 `{ "ids": [1, 2] }`。消息沿用 System 字段 `templateTitle`、`templateSummary`、`templateContent`、`templateType`、`readStatus`、`createTime`。四个接口要求 `part_time_partner` 角色，并按当前 ADMIN 用户校验消息所有权。
+`groups` 返回服务端维护的分组：全部、客资、反馈、提现。分页支持 `group=lead|feedback|withdrawal`，Controller 映射为服务端 `bizType` 查询。
+
+已读请求体为 `{ "ids": [1, 2] }`。消息沿用 System 字段 `templateTitle`、`templateSummary`、`templateContent`、`templateType`、`readStatus`、`createTime`。消息接口要求 PARTNER 身份，并按 `user_type=PARTNER` 与当前 Partner Account ID 校验所有权。
 
 普通业务请求的 HTTP 401 和业务 `code=401` 进入同一个单航班刷新流程。刷新请求不进入普通拦截器，原请求最多重放一次；刷新失败时全部等待请求结束、认证状态清空，并带原目标地址统一返回登录页。主动退出请求明确跳过刷新，清理后不保留回跳地址。
 
-## 十三、前端需要处理的状态
+## 十三、首页统计与排行榜
+
+### 首页统计
+
+```
+GET /part-api/zsjos/partner/home-statistics
+```
+
+查询参数：
+
+```
+period: today | week | month | year | total
+```
+
+返回：
+
+```
+period
+leadCount
+withdrawnAmount
+validLeadCount
+convertedLeadCount
+```
+
+### 首页统计明细
+
+```
+GET /part-api/zsjos/partner/home-statistics/details
+```
+
+查询参数：
+
+```
+period: today | week | month | year | total
+metric: lead_count | withdrawn_amount | valid_lead_count | converted_lead_count
+pageNo
+pageSize
+```
+
+返回真实客资或已打款提现分页。客资明细只展示 `leadNo`，内部 ID 仅用于详情路由。
+
+### 排行榜配置与数据
+
+```
+GET /part-api/zsjos/partner/leaderboard/config
+GET /part-api/zsjos/partner/leaderboard
+```
+
+排行榜查询参数：
+
+```
+period: today | week | month | total
+type: estimated_income | withdrawn_amount | lead_count | valid_lead_count
+pageNo
+pageSize
+```
+
+返回排名、Top3、本人名次、上一名差距和 Top10 差距。排行榜口径和脱敏策略由后端返回，前端不本地生成排名。
+
+## 十四、系统反馈
+
+```
+GET /part-api/zsjos/feedback/portal
+GET /part-api/zsjos/feedback/form?type={type}
+POST /part-api/zsjos/feedback/{type}/create
+GET /part-api/zsjos/feedback/my-page
+GET /part-api/zsjos/feedback/{id}
+PUT /part-api/zsjos/feedback/{id}/read
+POST /part-api/zsjos/feedback/{id}/reply
+POST /part-api/zsjos/feedback/file/upload
+```
+
+`type` 路径值为 `requirement`、`bug`、`support`，查询/响应中的反馈类型为 `REQUIREMENT`、`BUG`、`SUPPORT`。
+
+反馈状态：
+
+```
+APPROVING
+APPROVAL_REJECTED
+WAITING
+IN_PROGRESS
+COMPLETED
+```
+
+创建反馈请求：
+
+```
+{
+  "values": {
+    "title": "页面无法保存"
+  },
+  "configVersion": 0,
+  "idempotencyKey": "feedback-20260830-001"
+}
+```
+
+已读和回复都需要携带当前详情返回的 `version` 与幂等键。附件上传使用 `multipart/form-data` 的 `file` 字段，返回文件 ID、名称、类型、大小和访问 URL。Partner 反馈由后端保存 `submitter_subject_type=PARTNER_ACCOUNT` 与 `partner_id`，对象读取、已读和回复同时校验 Partner Account ID 与 Partner ID。需求反馈如启用 BPM 审批，兼职端提交会返回明确的暂不支持错误。
+
+## 十五、前端需要处理的状态
 
 ```
 401：未登录、Token 过期，需要刷新或重新登录
@@ -889,19 +1117,13 @@ GET /part-api/zsjos/messages/unread-count
 上传失败：保留重试入口，不要提交无效 infraFileId
 ```
 
-## 十四、字段适配与后端缺口说明
+## 十六、字段适配与真实接口说明
 
 ### 已有接口字段适配
 
-H5 按 ZSJOS Partner 响应 VO 使用真实字段：课程目录使用分类节点 `id/name`、分类路径对象数组、属性数组、SKU `attrValues` 和 `price`；客资详情使用处理时限、来源、微信号、关闭信息、商机及课程 SKU/属性/价格；申诉使用 `roundNo`、`reviewStage`、证据、处理人、裁决信息和 `canSubmitNextRound`；投诉使用双方证据、销售/处理人和处理时间；收益、提现、消息、个人资料和定位页使用后端已返回的完整字段。生产环境不使用这些字段的静态替代值。
-
-### 需要后端继续开发或修正
-
-- 修正客资列表和详情 Partner 投影：传入当前登录 Partner 身份，正确生成 `relationTypes`、`visibleTabs`、`identityMaskMode` 和 `availableActions`，并在权限允许时返回 `CREATE_APPEAL`。
-- 新增 `GET /part-api/zsjos/lead/{leadId}/partner-activity`，提供兼职可见的跟进、流转、客资收益、投诉和订单聚合。
-- 扩展 `/part-api/zsjos/lead/inbox/submitted/page` 支持 `mainProductRef`、`appealStatus`、`orderReviewStatus`，或提供等价独立接口。
-- 新增消息分组接口并支持服务端分组筛选；新增排行榜配置/数据、系统反馈全流程和银行卡编辑接口。
+H5 按 ZSJOS Partner 响应 VO 使用真实字段：课程目录使用分类节点 `id/name`、分类路径对象数组、属性数组、SKU `attrValues` 和 `price`；客资详情使用处理时限、来源、微信号、关闭信息、商机及课程 SKU/属性/价格；申诉使用 `roundNo`、`reviewStage`、证据、处理人、裁决信息和 `canSubmitNextRound`；投诉使用双方证据、销售/处理人和处理时间；首页、排行榜、反馈、收益、提现、消息、个人资料和定位页使用后端返回字段。生产环境不使用这些字段的静态替代值。
 
 详细请求参数、响应字段、权限、错误和数据范围要求见：
 
-`docs/api/partner-h5-feature-gap-api.md`
+`docs/api/partner-app-api.md`
+`frontend/h5/docs/real-data.md`

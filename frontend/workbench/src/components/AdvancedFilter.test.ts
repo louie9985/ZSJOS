@@ -28,6 +28,19 @@ describe('filterCount', () => {
       groups: []
     })).toBe(0)
   })
+
+  it('requires both date fields, unit, and thresholds for duration conditions', () => {
+    expect(filterCount({
+      logic: 'AND',
+      conditions: [
+        { fieldKey: 'duration.diff', operator: 'gte', startFieldKey: 'order.submittedAt', endFieldKey: 'order.effectiveAt', unit: 'hour', value: 24 },
+        { fieldKey: 'duration.diff', operator: 'gte', startFieldKey: 'order.submittedAt', unit: 'hour', value: 24 },
+        { fieldKey: 'duration.diff', operator: 'between', startFieldKey: 'order.submittedAt', endFieldKey: 'order.effectiveAt', unit: 'day', valueFrom: 1 },
+        { fieldKey: 'duration.diff', operator: 'between', startFieldKey: 'order.submittedAt', endFieldKey: 'order.effectiveAt', unit: 'day', valueFrom: 1, valueTo: 3 }
+      ],
+      groups: []
+    })).toBe(2)
+  })
 })
 
 describe('advanced filter draft helpers', () => {
@@ -45,6 +58,29 @@ describe('advanced filter draft helpers', () => {
     const draft = cloneFilterGroup(applied)
     draft.conditions[0].value = '李'
     expect(applied.conditions[0].value).toBe('张')
+  })
+
+  it('keeps duration draft fields as structured condition data', () => {
+    const draft = cloneFilterGroup({
+      logic: 'AND',
+      conditions: [{
+        fieldKey: 'duration.diff',
+        operator: 'gte',
+        startFieldKey: 'order.submittedAt',
+        endFieldKey: 'order.effectiveAt',
+        unit: 'hour',
+        value: 24
+      }],
+      groups: []
+    })
+    expect(draft.conditions[0]).toMatchObject({
+      fieldKey: 'duration.diff',
+      startFieldKey: 'order.submittedAt',
+      endFieldKey: 'order.effectiveAt',
+      unit: 'hour',
+      value: 24
+    })
+    expect(JSON.stringify(draft)).not.toContain('TIMESTAMPDIFF')
   })
 
   it('counts incomplete rows toward the 20-condition editor limit', () => {

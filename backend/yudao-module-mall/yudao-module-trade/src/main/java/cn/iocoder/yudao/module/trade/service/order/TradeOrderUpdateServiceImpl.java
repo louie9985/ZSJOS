@@ -100,7 +100,7 @@ public class TradeOrderUpdateServiceImpl implements TradeOrderUpdateService {
     @Resource
     private TradeNoRedisDAO tradeNoRedisDAO;
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<TradeOrderHandler> tradeOrderHandlers;
 
     @Resource

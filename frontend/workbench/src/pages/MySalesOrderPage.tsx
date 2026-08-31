@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Drawer, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Avatar, Button, Empty, Form, Input, Modal, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AdvancedFilterGroup, type SalesOrder, type SalesOrderListItem, type SalesOrderStatusCounts } from '../services/api'
 import { AdvancedFilterToolbar, filterCount } from '../components/AdvancedFilter'
@@ -10,6 +10,9 @@ import { mergeSalesOrderListItems, salesOrderDetailToListItem } from '../service
 import { useSubmissionGuard } from '../services/submissionGuard'
 import { useNavigate } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable } from '@ant-design/pro-components'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const PAGE_SIZE = 20
 type StatusTab = 'all' | SalesOrder['status']
@@ -36,6 +39,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
   const [revisionOpen, setRevisionOpen] = useState(false)
   const [terminateOpen, setTerminateOpen] = useState(false)
   const [terminationReason, setTerminationReason] = useState('')
+  const { useTableLayout } = useInboxTableLayout()
   const { submitting: terminating, run: runTermination, resetIntent: resetTerminationIntent } = useSubmissionGuard()
   const listVersion = useRef(0)
   const detailVersion = useRef(0)
@@ -105,7 +109,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
     primaryProduct: detail.items[0] ? { spuRef: detail.items[0].productRef, skuRef: detail.items[0].skuRef } : undefined
   } : undefined
 
-  return <section className="workspace-page sales-order-inbox-page">
+  return <section className={`workspace-page sales-order-inbox-page${useTableLayout ? ' sales-order-table-page' : ''}`}>
     <div className="sales-order-inbox-actions">
       {filterCount(advancedFilter) === 0 && <Tabs activeKey={status} onChange={key => setStatus(key as StatusTab)} items={[
         { key: 'all', label: `全部 ${counts.total}` }, { key: 'pending_approval', label: `待审核 ${counts.pendingApproval}` },
@@ -116,9 +120,28 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    <div className="sales-order-inbox-layout">
+    {useTableLayout ? <ProTable<SalesOrderListItem>
+      className="sales-order-inbox-table"
+      rowKey="id"
+      search={false}
+      options={{ density: true, fullScreen: true, setting: true }}
+      columnsState={{ persistenceKey: `crm-sales-order-${team ? 'team' : 'my'}-table-columns`, persistenceType: 'localStorage' }}
+      loading={loading}
+      dataSource={items}
+      pagination={false}
+      scroll={{ x: 980 }}
+      locale={{ emptyText: <Empty description="暂无订单" /> }}
+      columns={[
+        { title: '订单号', dataIndex: 'orderNo', width: 170 },
+        { title: '学员', dataIndex: 'studentName', width: 140 },
+        { title: '金额', dataIndex: 'totalAmount', render: value => `¥${Number(value).toFixed(2)}` },
+        { title: '状态', dataIndex: 'status', render: value => <Tag color={SALES_ORDER_STATUS_COLORS[value as SalesOrder['status']]}>{SALES_ORDER_STATUS_LABELS[value as SalesOrder['status']] || value}</Tag> },
+        { title: '提交时间', dataIndex: 'submittedAt', render: (_, item) => formatTimestamp(item.submittedAt), width: 170 },
+        { title: '操作', key: 'action', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
+      ]}
+    /> : <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">
-        <AdvancedFilterToolbar scene="order" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+        <AdvancedFilterToolbar scene="order" pageKey={team ? "sales_order_team" : "sales_order_my"} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
         {error && <Alert
           className="sales-order-inbox-error" type="error" showIcon message={error}
           action={<Button size="small" onClick={reload}>重试</Button>}/>
@@ -133,8 +156,8 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
         </div>
       </aside>
       <main className="sales-order-detail-pane">{detailContent}</main>
-    </div>
-    <Drawer className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="订单详情" width="100%">{detailContent}</Drawer>
+    </div>}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="订单详情" placement="right" width="100%">{detailContent}</ResizableDetailDrawer>
     {revisionLead && <SalesOrderEntryModal lead={revisionLead} orderId={detail?.id} open={revisionOpen} onClose={() => setRevisionOpen(false)}
       onSubmitted={id => { setRevisionOpen(false); reload(); setSelectedId(id) }}/>}<Modal title="终止订单审批" open={terminateOpen}
       onCancel={() => { setTerminateOpen(false); setTerminationReason(''); resetTerminationIntent() }} okText="确认终止"

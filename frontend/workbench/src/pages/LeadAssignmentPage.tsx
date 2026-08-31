@@ -9,7 +9,6 @@ import {
   App,
   Button,
   Checkbox,
-  Drawer,
   Empty,
   Input,
   Modal,
@@ -28,6 +27,8 @@ import { useBusinessOverlay } from '../components/OverlayCoordinator'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import { assignmentConfirmAction } from '../services/irreversibleConfirm'
 import EmployeeAvatar from '../components/EmployeeAvatar'
+import ResizableDrawer from '../components/ResizableDrawer'
+import { ASSIGNMENT_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 
 const { Text } = Typography
 type SaveMode = 'append' | 'replace' | 'remove'
@@ -203,7 +204,7 @@ export default function LeadAssignmentPage() {
     <Table<AssignmentRelation> rowKey="id" loading={loading} columns={columns} dataSource={rows} pagination={false} scroll={{ x: 980 }} rowSelection={{ selectedRowKeys, onChange: setSelectedRowKeys }}/>
     <div className="assignment-pagination"><Pagination current={pageNo} pageSize={pageSize} total={total} showSizeChanger onChange={(page, size) => { setPageNo(page); setPageSize(size) }}/></div>
 
-    <Drawer title={batchMode ? '批量配置派单关系' : '配置可派销售'} width={760} open={drawerOpen} onClose={() => setDrawerOpen(false)} extra={<IrreversiblePopconfirm action={assignmentConfirmAction(saveMode, batchMode ? { batchCount: selectedRowKeys.length } : { name: activeRow?.nickname || '当前员工' })} danger={saveMode === 'remove'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" danger={saveMode === 'remove'} loading={saving} onClick={prepareSubmit}>保存配置</Button></IrreversiblePopconfirm>}>
+    <ResizableDrawer title={batchMode ? '批量配置派单关系' : '配置可派销售'} width="min(760px, 100vw)" defaultSize={760} minSize={640} storageKey={ASSIGNMENT_DRAWER_WIDTH_STORAGE_KEY} open={drawerOpen} onClose={() => setDrawerOpen(false)} extra={<IrreversiblePopconfirm action={assignmentConfirmAction(saveMode, batchMode ? { batchCount: selectedRowKeys.length } : { name: activeRow?.nickname || '当前员工' })} danger={saveMode === 'remove'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" danger={saveMode === 'remove'} loading={saving} onClick={prepareSubmit}>保存配置</Button></IrreversiblePopconfirm>}>
       <div className="assignment-subject"><ApartmentOutlined/><Text type="secondary">配置对象</Text><Text strong>{batchMode ? `已选择 ${selectedRowKeys.length} 名员工` : activeRow ? userLabel(activeRow) : ''}</Text></div>
       {batchMode && <Segmented<SaveMode> block value={saveMode} onChange={setSaveMode} options={[{ label: '追加绑定', value: 'append' }, { label: '替换原绑定', value: 'replace' }, { label: '解除指定绑定', value: 'remove' }]}/>} 
       <div className="assignment-picker">
@@ -215,7 +216,7 @@ export default function LeadAssignmentPage() {
         </div>
         <div className="assignment-selected"><div className="assignment-pane-title"><Text strong>已选择</Text><Tag color="blue">{selectedSales.length} 人</Tag></div>{selectedSales.map(user => <div key={user.id} className="assignment-selected-row"><div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}><EmployeeAvatar avatar={user.avatar} name={user.nickname} size={28}/><span><Text strong>{user.nickname}</Text><Text type="secondary">{user.deptName || '未分配部门'}</Text></span></div><Button type="text" danger icon={<CloseOutlined/>} onClick={() => setSelectedSalesIds(ids => ids.filter(id => id !== user.id))}/></div>)}{selectedSales.length === 0 && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂未选择销售"/>}</div>
       </div>
-    </Drawer>
+    </ResizableDrawer>
 
     <Modal title="派单关系变更记录" width={900} open={logOpen} footer={null} onCancel={() => setLogOpen(false)}>
       <Table<AssignmentLog> rowKey="id" loading={logLoading} dataSource={logs} pagination={false} columns={[{ title: '操作时间', dataIndex: 'createTime', width: 180, render: value => value?.replace('T', ' ') }, { title: '操作人', dataIndex: 'operatorName', width: 110 }, { title: '操作', dataIndex: 'actionType', width: 100, render: value => actionLabels[value as AssignmentLog['actionType']] }, { title: '派单员工', dataIndex: 'sourceUsers', ellipsis: true }, { title: '销售人员', dataIndex: 'targetUsers', ellipsis: true }]}/>

@@ -817,15 +817,6 @@ receive the new button menu, but no role is auto-granted this permission. The mi
 repeatable, and forward-only; rollback should disable or retire the button in a later reviewed
 permission migration while preserving historical permissions already referenced by administrators.
 
-### V163 lead unreachable submitter assist
-
-V163 follows V162 and makes the `unreachable` value in `zsjos_lead_follow_up_result` explicit for
-sales first follow-up. It adds the default `zsjos.lead.submitter_assist_requested` in-app notification
-template and tenant rules for the source submitter, using `lead.no` as the user-visible Lead identifier.
-The migration creates no business tasks for historical records, changes no Lead state, grants no role,
-and does not extend business tasks to PARTNER accounts. Rollback is forward-only through a later reviewed
-notification migration that disables the seeded rule/template while retaining historical message snapshots.
-
 ### V149 Feedback management
 
 Adds the tenant-scoped requirement, BUG and technical-support feedback workspace. It extends
@@ -895,3 +886,72 @@ Fresh bootstrap sources V157 after V156. It does not create business templates, 
 departments, users, or work-order instances and does not delete historical rows. Verify tables, columns,
 indexes, empty category data, relative Workbench paths, tenant-package coverage, and both version markers with
 `verify-bootstrap.sql`. Rollback is forward-only once published versions or snapshots use the new schema.
+
+### V167 WeCom login and push preference closed loop
+
+V167 follows V166 and adds user-level `wecom_enabled` flags to `system_users` and
+`zsjos_partner_account`. The fields default to disabled, so Workbench and Partner H5 accounts must opt in
+before the WeCom external channel sends application messages. It relies on the existing V077 normalized
+`system_users.wecom_user_id` and V072 Partner account identity; no account, role, message, social binding or
+business row is deleted.
+
+Runtime code uses System social binding for ADMIN and PARTNER WeCom identities, System notification rules for
+channel selection, and a short-lived Redis ticket for click-back links. The migration is additive and guarded by
+`information_schema`; rollback should keep the columns while older application versions ignore them, or disable
+the UI/channel in a later forward migration.
+
+### V168 Partner H5 feedback subject fields
+
+V168 follows V167 and adds typed subject columns for Partner H5 feedback: `zsjos_feedback.submitter_subject_type`,
+`zsjos_feedback.partner_id`, `zsjos_work_order.source_subject_type`, `zsjos_work_order.command_subject_type`,
+and `zsjos_work_order_history.operator_subject_type`. Existing historical rows keep the `ADMIN` default so old
+employee/admin feedback remains readable without inventing Partner ownership. The migration also adds Partner
+feedback lookup indexes `idx_submitter_subject_activity` and `idx_feedback_partner`.
+
+The migration is additive and guarded by `information_schema`; it does not delete feedback, work orders,
+messages, accounts, roles, tenants, or business rows. Rollback should keep the columns while older application
+versions ignore them, or disable Partner H5 feedback creation in a later forward migration.
+
+### V169 Advanced filter templates
+
+V169 follows V168 and creates the empty tenant-scoped `zsjos_advanced_filter_template` table for saved
+advanced-filter condition trees. `scope=personal` rows belong to one ADMIN user through `owner_user_id`;
+`scope=system` rows are administrator-maintained page presets. Templates store structured condition JSON only;
+runtime SQL remains compiled by the existing controlled advanced-filter service.
+
+The migration also registers the admin-only `高级筛选预置` page and its update buttons as menu IDs
+`79990-79992`. It does not seed business templates, dictionaries, users, departments, leads, orders or role
+grants. Rollback should keep the additive table while older application versions ignore it, or hide the menu in
+a later forward migration.
+
+### V170 Partner H5 invitation activation
+
+V170 follows V169 and creates the empty tenant-scoped `zsjos_partner_invitation` table for Partner H5
+first-login activation. An invitation stores the generated code, intended mobile/name, assigned new-media
+operator snapshot, active/used/voided/expired state, seven-day expiry, optional used Partner ID and creator.
+It also registers Partner-page button permissions `79993-79995` for querying, creating and voiding invitations.
+
+The migration seeds no invitation codes, Partner accounts, users, departments, roles or business records. Reruns
+are guarded by table/menu/package/grant checks and both schema-version registries are recorded. Rollback is
+forward-only: preserve invitation history and hide the buttons or disable the runtime entry in a later migration.
+### V173 Lead submitter assistance request
+
+V173 follows V172 and creates the empty tenant-scoped `zsjos_lead_submitter_assist_request` snapshot table.
+It registers the `zsjos:lead:request-submitter-assist` button, grants it initially to enabled
+`sales_specialist` and `sales_manager` roles, and creates separate in-app defaults for the submitter message
+and Partner owning-employee reminder. It does not insert Lead, request, task, message, account or file rows.
+
+The migration is additive and guarded for reruns. Rollback is forward-only: retain request history and disable
+the permission or notification rules in a later migration. Attachments remain Infra file references with stored
+name/type/size snapshots; runtime ownership validation is still required.
+
+### V174 Complete ZSJOS business audit
+
+V174 follows V173 and extends the existing tenant-scoped `zsjos_business_audit_log` instead of introducing a
+parallel audit table. It adds operation source, trace ID, request method/path, attempt result, stable result code,
+sanitized result summary, completion time and duration. `target_id` becomes nullable because an internal database
+identifier must not be presented when no safe public business number is available. Existing rows retain the
+`EXPLICIT` and `SUCCESS` compatibility defaults; no historical operation is invented or rewritten.
+
+The migration changes metadata only, seeds no business rows, and guards additive columns and indexes for reruns.
+Rollback is forward-only: retain audit history and allow older application versions to ignore the added columns.

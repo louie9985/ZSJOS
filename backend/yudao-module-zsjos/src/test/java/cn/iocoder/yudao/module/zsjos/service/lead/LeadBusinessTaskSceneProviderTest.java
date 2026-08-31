@@ -12,6 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.util.List;
 
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_FIRST_FOLLOW_UP;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.TASK_TYPE_SUBMITTER_ASSIST;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.when;
 
@@ -35,5 +36,17 @@ class LeadBusinessTaskSceneProviderTest {
         var display = provider.getDisplayMap(List.of(task)).get(1L);
 
         assertEquals("首次跟进：KZ202608160000000008", display.title());
+    }
+
+    @Test
+    void mapsSubmitterAssistTaskToLeadDetail() {
+        BusinessTaskDO task = new BusinessTaskDO().setId(2L).setBizId(8L).setTaskType(TASK_TYPE_SUBMITTER_ASSIST);
+        when(leadMapper.selectBatchIds(List.of(8L))).thenReturn(List.of(
+                new LeadDO().setId(8L).setLeadNo("KZ202608160000000008")));
+
+        var display = provider.getDisplayMap(List.of(task)).get(2L);
+
+        assertEquals("提交人协助：KZ202608160000000008", display.title());
+        assertEquals("OPEN_LEAD_SUBMITTER_ASSIST", display.actionCode());
     }
 }

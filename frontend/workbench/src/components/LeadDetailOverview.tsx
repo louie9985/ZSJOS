@@ -593,7 +593,7 @@ export function studentProfileIdentity(lead?: ManagedLead, student?: MyStudent) 
   }
 }
 
-export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, slots }: {
+export default function LeadDetailOverview({ lead, student, categoryLabel, channelLabel, showFollowUp, toolbar, studentContext, studentService, hideProviderOwner, slots }: {
   lead?: ManagedLead
   student?: MyStudent
   categoryLabel: (value?: string) => string
@@ -603,6 +603,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
   toolbar?: React.ReactNode
   studentContext?: StudentOverviewContext
   studentService?: MyStudent['services'][number]
+  hideProviderOwner?: boolean
   slots?: LeadOverviewSlots
 }) {
   const sourceDispatchTag = lead ? leadSourceDispatchTag(lead) : undefined
@@ -659,10 +660,10 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     <span className="lead-field-label">提交人</span>
                     <span className="lead-field-value">{lead.sourceUserName || '-'}</span>
                   </div>
-                  <div className="lead-profile-row">
+                  {!hideProviderOwner && <div className="lead-profile-row">
                     <span className="lead-field-label">提供方</span>
                     <span className="lead-field-value">{lead.providerOwnerNameSnapshot || '-'}</span>
-                  </div>
+                  </div>}
                   <div className="lead-profile-row">
                     <span className="lead-field-label">所属销售</span>
                     <span className="lead-field-value">{lead.ownerUserName || '暂未分配'}</span>

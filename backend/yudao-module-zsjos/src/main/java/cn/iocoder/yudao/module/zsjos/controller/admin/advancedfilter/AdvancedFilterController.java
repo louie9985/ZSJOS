@@ -23,10 +23,11 @@ public class AdvancedFilterController {
     @GetMapping("/catalog")
     @Operation(summary = "获得高级筛选字段目录")
     @PreAuthorize("(#scene == 'lead' && @ss.hasAnyPermissions('zsjos:lead:query','zsjos:lead:query-submitted',"
-            + "'zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
+            + "'zsjos:lead:query-owned','zsjos:lead:claim','zsjos:lead:claim-pool:query',"
+            + "'zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query'))"
             + " || (#scene == 'order' && @ss.hasAnyPermissions('zsjos:sales-order:query-own',"
-            + "'zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm'))"
+            + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm'))"
             + " || (#scene == 'lead_appeal' && @ss.hasAnyPermissions('zsjos:lead:appeal:query',"
             + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
             + "'zsjos:lead:appeal:review-chairman'))"

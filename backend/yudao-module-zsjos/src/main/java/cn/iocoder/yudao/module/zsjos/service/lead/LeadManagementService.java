@@ -19,6 +19,7 @@ public interface LeadManagementService {
     CursorPageResult<LeadManagementRespVO> getLeadCursor(LeadManagementPageReqVO reqVO, Long userId);
 
     LeadManagementRespVO getLead(Long id, Long userId);
+    LeadManagementRespVO getLeadByLeadNo(String leadNo, Long userId);
     LeadManagementRespVO getPartnerLead(Long id, Long partnerId);
 
     void updateBasicInfo(Long id, Long userId, LeadBasicInfoUpdateReqVO reqVO);

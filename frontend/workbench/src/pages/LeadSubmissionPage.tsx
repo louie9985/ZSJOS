@@ -183,21 +183,21 @@ export default function LeadSubmissionPage({
     }
     if (result.outcome === 'review_pending') {
       return modal.info({
-        title: '疑似重复，已转入复核',
-        content: `本次提交与既有客资疑似重复，已生成复核任务 #${result.reviewId}，请等待复核结果。`,
+        title: '疑似重复，等待管理员审核',
+        content: `本次提交与既有客资疑似重复，已生成复核任务 #${result.reviewId}。审核前不会创建正式客资、不会自动分配，也不会计入业绩。`,
         okText: '知道了'
       })
     }
     if (result.outcome === 'duplicate_rejected') {
       return modal.warning({
-        title: '未创建客资',
-        content: `已存在活动客资${result.leadNo ? ` ${result.leadNo}` : ''}，本次提交未创建客资，也未生成复核任务。`,
+        title: '联系方式已存在',
+        content: '本次提交命中强重复，未创建客资，也不会进入分配。请联系管理员处理。',
         okText: '知道了'
       })
     }
-    return modal.success({
-      title: '历史重复提交已记录',
-      content: `本次提交命中历史客资${result.leadNo ? ` ${result.leadNo}` : ''}，已记录提交行为。`,
+    return modal.info({
+      title: '疑似重复，已自动关闭',
+      content: '本次提交命中交叉联系方式疑似重复并已自动关闭，未创建客资。',
       okText: '知道了'
     })
   }

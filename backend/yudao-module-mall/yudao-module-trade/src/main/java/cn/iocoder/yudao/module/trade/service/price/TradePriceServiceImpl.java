@@ -51,7 +51,7 @@ public class TradePriceServiceImpl implements TradePriceService {
     @Resource
     private RewardActivityApi rewardActivityApi;
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<TradePriceCalculator> priceCalculators;
 
     @Resource

@@ -59,6 +59,9 @@ public class WithdrawalController {
         return success(service.getDetail(id, WebFrameworkUtils.getLoginUserId(), false));
     }
     @GetMapping("/{id}/finance-detail")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(
+            mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.SENSITIVE_READ,
+            action = "withdrawal.card.view", targetType = "withdrawal")
     @PreAuthorize("@ss.hasPermission('zsjos:withdrawal:finance-query')")
     public CommonResult<WithdrawalRespVO> financeDetail(@PathVariable Long id) {
         return success(service.getDetail(id, WebFrameworkUtils.getLoginUserId(), true));

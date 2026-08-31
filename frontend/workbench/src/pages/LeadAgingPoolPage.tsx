@@ -243,7 +243,7 @@ export default function LeadAgingPoolPage() {
             })}
         </Space>}
         <Space>
-          <AdvancedFilterToolbar scene="lead" placeholder="姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
+          <AdvancedFilterToolbar scene="lead" pageKey="lead_aging_pool" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={(value) => { setKeyword(value); setPageNo(1) }} onChange={setAdvancedFilter}/>
         </Space>
       </div>
       {error && (

@@ -44,6 +44,9 @@ public class ExportTaskController {
     }
 
     @GetMapping("/{id}/download-url")
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(
+            mode = cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit.Mode.SENSITIVE_READ,
+            action = "export.download", targetType = "export-task")
     @PreAuthorize("@ss.hasPermission('zsjos:export:query')")
     public CommonResult<String> downloadUrl(@PathVariable Long id) {
         return success(service.getDownloadUrl(WebFrameworkUtils.getLoginUserId(), id));

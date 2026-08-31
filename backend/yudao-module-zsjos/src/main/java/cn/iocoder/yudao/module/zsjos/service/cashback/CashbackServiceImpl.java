@@ -116,6 +116,7 @@ public class CashbackServiceImpl implements CashbackService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "cashback.settle-matured", targetType = "cashback")
     @Transactional(rollbackFor = Exception.class)
     public int settleMatured() {
         LocalDateTime now = LocalDateTime.now();

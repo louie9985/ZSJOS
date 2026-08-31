@@ -70,6 +70,8 @@ public class AdminUserDO extends TenantBaseDO {
     private String mobile;
     /** 企业微信应用消息接收人 userid。 */
     private String wecomUserId;
+    /** 是否接收企业微信推送。 */
+    private Boolean wecomEnabled;
     /**
      * 用户性别
      *

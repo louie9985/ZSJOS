@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.controller.pub.payment;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
 import cn.iocoder.yudao.module.zsjos.controller.pub.payment.vo.PublicPaymentDetailRespVO;
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
 import cn.iocoder.yudao.module.zsjos.service.payment.PurchaseIntentService;
 import jakarta.annotation.Resource;
 import jakarta.annotation.security.PermitAll;
@@ -25,6 +26,7 @@ public class PublicPaymentController {
     @Resource private PurchaseIntentService service;
 
     @GetMapping("/{no}")
+    @ZsjosAudit(action = "payment.public-detail", targetType = "payment")
     public CommonResult<PublicPaymentDetailRespVO> detail(@PathVariable String no, @RequestParam @NotBlank String token) {
         return success(service.publicDetail(no, token));
     }

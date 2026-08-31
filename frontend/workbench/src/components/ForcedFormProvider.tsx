@@ -242,7 +242,7 @@ function ForcedFormGate({
   onSubmit: (answers: ForcedFormAnswers) => Promise<void>
 }) {
   const mobile = useIsMobileViewport()
-  const open = Boolean(current) || loading || Boolean(error)
+  const open = Boolean(current)
   const body = (
     <ForcedFormModalContent
       current={current}

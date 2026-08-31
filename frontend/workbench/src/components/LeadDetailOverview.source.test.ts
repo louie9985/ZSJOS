@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { leadSourceDispatchTag } from './LeadDetailOverview'
 
@@ -13,5 +14,14 @@ describe('Lead detail source dispatch tag', () => {
     expect(leadSourceDispatchTag({ sourceType: 'partner', dispatchMode: 'auto' })).toBeUndefined()
     expect(leadSourceDispatchTag({ sourceType: 'sales_self_sourced', dispatchMode: 'self' })).toBeUndefined()
     expect(leadSourceDispatchTag({ sourceType: 'internal_new_media' })).toBeUndefined()
+  })
+
+  it('hides the provider row from lead detail overview output', () => {
+    const source = readFileSync('src/components/LeadDetailOverview.tsx', 'utf8')
+    expect(source).toContain('hideProviderOwner?: boolean')
+    expect(source).toContain('!hideProviderOwner && <div className="lead-profile-row">')
+    expect(source).toContain('providerOwnerNameSnapshot || \'-\'')
+    const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
+    expect(page).toContain('hideProviderOwner/>')
   })
 })

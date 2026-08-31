@@ -40,6 +40,7 @@ public class LeadDO extends TenantBaseDO {
     private String contributionDeptNameSnapshot;
     private LocalDateTime countedAt;
     private String sourceChannelId;
+    private String sourceChannelLabelSnapshot;
     private String provinceCode;
     private String provinceName;
     private String cityCode;

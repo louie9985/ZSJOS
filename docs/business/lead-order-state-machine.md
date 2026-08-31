@@ -11,7 +11,7 @@
 支付一期只保留一个实现来源：[ZSJOS 通联支付一期开发实施文档](./payment-module-development.md)。购买意向、通联报文、支付确认、手工补录订单、成交链路八态投影及整单全额退款均以该文档为准；本文只描述它们与客资、订单、BPM、报名和服务生命周期的关系。
 
 提交人补充、每日催促和销售投诉是客资主状态之外的审计动作。它们不改变客资、商机或订单状态；无效、关闭和已成交客资不接受新的提交人动作。投诉成立仅产生销售及直属主管通知，不触发自动处罚、回收、停派或绩效变更。
-提交人补充、提交人协助、每日催促和销售投诉是客资主状态之外的审计动作。它们不改变客资、商机或订单状态；无效、关闭和已成交客资不接受新的提交人动作。投诉成立仅产生销售及直属主管通知，不触发自动处罚、回收、停派或绩效变更。
+提交人补充、每日催促和销售投诉是客资主状态之外的审计动作。它们不改变客资、商机或订单状态；无效、关闭和已成交客资不接受新的提交人动作。投诉成立仅产生销售及直属主管通知，不触发自动处罚、回收、停派或绩效变更。
 
 ## 1. 文档结论
 
@@ -249,17 +249,17 @@ ServiceRelation 1:N ServiceRecord
 | `converted_at` | datetime | 否 | 首次销售转化机会创建成功时间，不是订单创建或首次付款时间 |
 | `closed_at`、`close_reason` | datetime/varchar | 条件必填 | 关闭时间和原因 |
 
-提交人身份必须满足二选一：内部来源填写 `source_user_id`，兼职来源填写 `partner_id`。提交先执行统一查重：活动客资手机号或微信号同字段强命中时直接拒绝并展示已有业务阶段；交叉联系方式、姓名+省市+主意向、姓名+手机号后四位，以及历史无效、关闭、已成交或只有 Person 的命中进入独立重复客资复核；完全无命中才在同一事务创建 Person 与 Lead。
+提交人身份必须满足二选一：内部来源填写 `source_user_id`，兼职来源填写 `partner_id`。提交先执行统一查重：手机号或微信号同字段命中任何历史客资均为强重复，直接拒绝并保存强重复审计；历史状态不参与强重复过滤，已关闭、已判无效、已成交、公海、挂起、回收、待跟进和跟进中客资都会拦截。交叉联系方式、姓名+明确省市+明确主意向课程、姓名+手机号后四位命中时进入疑似重复复核；完全无命中才在同一事务创建 Person 与 Lead。
 
-`lead_no` 在实际创建 Lead 的事务内分配。每个租户按北京时间自然日独立计数，从 `0001` 开始，递增到 `9999` 后重新从 `0001` 开始。幂等重试和活动客资强命中返回既有编号，复核任务本身不预占编号，重新激活保留原编号。所有持久化关联继续使用 `id`。同一租户同一秒内若循环到已使用的四位序号，租户唯一索引会拒绝重复编号。
+`lead_no` 在实际创建 Lead 的事务内分配。每个租户按北京时间自然日独立计数，从 `0001` 开始，递增到 `9999` 后重新从 `0001` 开始。幂等重试返回已创建 Lead 的既有编号；强重复和疑似重复复核任务本身不预占编号。所有持久化关联继续使用 `id`。同一租户同一秒内若循环到已使用的四位序号，租户唯一索引会拒绝重复编号。
 
-新提交必须至少选择一个启用课程、同一课程不可重复且恰好一个主意向。稳定产品引用与提交时名称保存在 `zsjos_lead_intended_product`；最多九张图片的 Infra 文件编号和提交时元数据快照保存在 `zsjos_lead_attachment`。附件保持私有读，只有在对象读取权限校验通过后才通过 Infra 公共 API 生成短期访问地址。疑似重复提交的完整资料、命中规则和候选对象保存在 `zsjos_lead_duplicate_review`，强命中活动客资不落复核任务。
+新提交必须至少选择一个启用课程、同一课程不可重复且恰好一个主意向。稳定产品引用与提交时名称保存在 `zsjos_lead_intended_product`；最多九张图片的 Infra 文件编号和提交时元数据快照保存在 `zsjos_lead_attachment`。附件保持私有读，只有在对象读取权限校验通过后才通过 Infra 公共 API 生成短期访问地址。强重复与疑似重复均在 `zsjos_lead_duplicate_review` 保存查重记录；疑似重复保存完整提交资料、命中规则、候选对象和复核 fingerprint，强重复保存拦截审计。
 
-### 7.4 重复客资复核与历史激活
+### 7.4 重复客资复核
 
-`LeadActivation` 仅保留阶段二上线前的历史兼容数据，新提交不再写入。新复核任务永久保存提交快照、命中规则、候选快照、处理人、处理时间、结构化结论、意见、附件、选择销售及资料前后值。公共队列提交结论时锁定任务，第一位处理人成功。
+`LeadActivation` 仅保留阶段二上线前的历史兼容数据，新提交不再写入。新复核任务永久保存提交快照、命中规则、候选快照、`duplicate_flag`、`duplicate_result`、首要规则、fingerprint、处理人、处理时间、结构化结论、意见、附件及处理前后值。公共队列提交结论时锁定任务，第一位处理人成功。
 
-非重复创建新 Person/Lead；重复 Person 且无主客资时复用 Person 创建首条主客资；无效或关闭 Lead 可覆盖当前资料、选择范围内销售并回到待首次跟进；活动、商机或已成交客户只通知所属销售而不修改资料。重新激活时旧 Opportunity 保持关闭，重新判有效后恢复原 Opportunity。联系方式修改只在完全无命中时成功，任何疑似命中都取消修改且不进入复核。
+管理员只支持 `allow_flow` 与 `close_duplicate`。放行后清空本次重复待处理含义，按首次待复核提交快照创建正式 Lead，再进入自动分配、指定销售或销售自拓归属流程；关闭后仅完成复核记录，不创建 Lead、不分配、不计入业绩。相同疑似重复 fingerprint 的后续提交复用最早待处理复核任务，不覆盖首次提交人、来源、快照或派单依据。联系方式修改只在完全无命中时成功，任何疑似命中都取消修改且不进入复核。
 
 ### 7.5 客资分配历史 `LeadAssignmentHistory`
 
@@ -368,13 +368,13 @@ ServiceRelation 1:N ServiceRecord
 
 ### 7.12 统一业务任务 `BusinessTask`
 
-至少包含 `task_type`、`biz_type`、`biz_id`、`status`、`assignee_type`、`assignee_id`、`due_at`、`completed_at`、`cancelled_at`、`cancel_reason`、`payload`。典型任务：接单、补正订单、处理报名服务、提交人协助、业务提醒。
+至少包含 `task_type`、`biz_type`、`biz_id`、`status`、`assignee_type`、`assignee_id`、`due_at`、`completed_at`、`cancelled_at`、`cancel_reason`、`payload`。典型任务：接单、补正订单、处理报名服务、业务提醒。
 
 BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；待办、处理人、意见、逾期和任务历史从 BPM 查询。`BusinessTask` 只保存补正订单、接单、报名处理和业务提醒等非工作流任务。
 
 派单时为当前候选销售创建 `lead_assignment_accept` 任务；接受时完成，拒绝、超时、转派或进入抢单池时取消。销售通过接单、抢单或管理员转派取得归属时，在同一事务内创建 `lead_first_follow_up` 任务。首次跟进任务按对应分配历史编号幂等，payload 固化跟进规则版本和归属开始时间；本阶段逾期只形成任务逾期事实，不自动回收客资。
 
-客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；当前归属周期首次记录完成 `lead_first_follow_up`，并以该首次跟进成功时间为起点创建 `lead_qualification` 任务，截止时间为起点加当时启用规则的 `qualification_timeout_minutes`。若首次记录结果为 `unreachable`（未联系上），备注必填，首跟仍完成并进入待判定，同时向提交人发送协助处理消息；内部员工提交人创建 `lead_submitter_assist` 待办，兼职提交人只通过合作方消息提醒。提交人完成补充后关闭本人待处理协助任务，Lead 主状态、判定任务和后续跟进任务不因此回退。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。首次跟进完成前只有首次跟进截止时间，不能展示有效性判定截止时间。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
+客资仍为 `submitted` 且已经归属时，销售可以追加 `LeadFollowUpRecord`。新增记录不改变 Lead 主状态；当前归属周期首次记录完成 `lead_first_follow_up`，并以该首次跟进成功时间为起点创建 `lead_qualification` 任务，截止时间为起点加当时启用规则的 `qualification_timeout_minutes`。判定任务按客资和轮次幂等，固化创建时启用规则的编号、版本、时限及截止时间；后续规则修改不追溯已有轮次。首次跟进完成前只有首次跟进截止时间，不能展示有效性判定截止时间。可选的下次跟进时间创建或替换 `lead_follow_up_reminder`。记录只追加，方式、结果和分类标签均固化快照。
 
 判定有效在同一事务内完成判定任务、保存必填有效备注、创建或恢复唯一 `initial_conversion` Opportunity，并让 Lead 保持 `valid + owned`。之后的跟进写入 Opportunity 跟进记录，并维护机会状态和提醒；判无效会同时取消待处理的首跟、判定和跟进提醒任务，并把未结束 Opportunity 改为 `lost`。`V034` 负责取消规则上线前的历史遗留记录。无效 Lead 仍允许当前负责人追加证据型跟进，但不创建首跟、判定或提醒任务。
 
@@ -515,7 +515,7 @@ BPM 审批任务不写入 `BusinessTask`，也不在 ZSJOS 建立任务副本；
 | 提交全新客资 | 无 | `lead.status.submitted` | 手机号和微信号均未命中；原子创建 Person、Lead、来源归因和事件 |
 | 提交已有客资 | 无 | 不创建新 Lead | 任一标识命中同一 Person；创建 LeadActivation 并按当前关系发送激活通知 |
 | 提交身份冲突 | 无 | 校验失败 | 手机号和微信号指向不同 Person；不创建任何 Person、Lead 或 LeadActivation |
-| 首次跟进 | `submitted + owned` | 主状态不变 | 完成首跟任务并创建判定任务；迟到首跟仍允许提交；结果为 `unreachable` 时额外通知提交人协助处理，内部提交人创建 `lead_submitter_assist` 待办 |
+| 首次跟进 | `submitted + owned` | 主状态不变 | 完成首跟任务并创建判定任务；迟到首跟仍允许提交 |
 | 判定有效 | `submitted + owned + 待判定` | `valid + owned` | 完成判定任务，保存有效备注并原子创建唯一 `initial_conversion` Opportunity；不创建订单，`converted_at` 仅为历史兼容字段，不作为成交时间 |
 | 判定无效 | `submitted + owned + 待判定` / `converted` | `invalid` | 原因字典值与说明均必填；有效后判无效还会把 Opportunity 改为 `lost`，并保留销售归属和证据跟进入口 |
 | 判定超时扫描 | `submitted + owned + 判定截止已到` | `suspended + owned` | 行锁下重新校验；扫描提交前仍允许人工判定 |
@@ -650,7 +650,7 @@ BPM 审批任务状态遵循 BPM 合同。ZSJOS 不复制这些任务状态；�
 1. 一次全新客资提交必须原子创建 `Person + Lead`；命中已有 Person 时只创建 LeadActivation；交叉身份冲突不得写入三者中的任何一个。
 2. 同一 Lead 最多一条 `Opportunity.type.initial_conversion`；复购 PurchaseIntent 不得重新打开历史客资，一期不强制创建复购 Opportunity。
 3. 每次首购或复购必须有独立 PurchaseIntent。首购绑定既有 Lead 且 Person 必须一致；复购绑定 Person 和适用来源，创建后不得改绑业务主体。
-4. 同一 PurchaseIntent 一期最多一个 PaymentIntent；失效后不复活，重新收款必须新建 PurchaseIntent。一个 PaymentIntent 最多一笔成功 PaymentTransaction 和一笔整单全额 PaymentRefund。
+4. 同一 PurchaseIntent 一期最多一个活动 PaymentIntent；旧单失效或关闭后不复活，但同一 PurchaseIntent 可以重新生成新的 PaymentIntent。一个 PaymentIntent 最多一笔成功 PaymentTransaction 和一笔整单全额 PaymentRefund。
 5. 在线支付到账不自动建单。责任人补录的 Order 必须关联 PurchaseIntent；在线路径同时唯一关联 PaymentIntent，支付回调事件、渠道流水号和补录命令都必须幂等。
 6. `Order.lead_id` 必须与首购 PurchaseIntent 和 PaymentIntent 一致；存在 Opportunity 时，`Opportunity.person_id = Order.person_id`，且一个首次转化机会最多一条当前订单链。无机会订单不得驱动任何机会为 `won`。
 7. 产品、SKU 和产品规则快照在 PurchaseIntent、PaymentIntent、订单项或审批快照固化后不可修改。状态机只执行固化规则，不按名称、价格或展示标签推断规则。

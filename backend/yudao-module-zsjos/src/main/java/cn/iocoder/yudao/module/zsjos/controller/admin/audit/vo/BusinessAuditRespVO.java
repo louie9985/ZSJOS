@@ -15,5 +15,14 @@ public class BusinessAuditRespVO {
     private String targetId;
     private String detailJson;
     private String sourceIp;
+    private String sourceType;
+    private String traceId;
+    private String requestMethod;
+    private String requestPath;
+    private String resultStatus;
+    private Integer resultCode;
+    private String resultMessage;
     private LocalDateTime occurredAt;
+    private LocalDateTime finishedAt;
+    private Long durationMs;
 }

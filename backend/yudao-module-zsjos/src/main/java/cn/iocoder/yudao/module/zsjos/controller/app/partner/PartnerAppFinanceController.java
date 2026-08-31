@@ -8,6 +8,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.*;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentUploadRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.withdrawal.vo.*;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.BankCardSaveReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.BankCardUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWithdrawalRespVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadComplaintService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadAppealService;
@@ -47,6 +48,13 @@ public class PartnerAppFinanceController {
     @PostMapping("/withdrawal/my-cards")
     public CommonResult<Long> saveCard(@Valid @RequestBody BankCardSaveReqVO request) {
         return success(withdrawalService.savePartnerCard(partnerId(), request));
+    }
+
+    @PutMapping("/withdrawal/my-cards/{id}")
+    public CommonResult<Boolean> updateCard(@PathVariable Long id,
+                                            @Valid @RequestBody BankCardUpdateReqVO request) {
+        withdrawalService.updatePartnerCard(partnerId(), id, request);
+        return success(true);
     }
 
     @DeleteMapping("/withdrawal/my-cards/{id}")

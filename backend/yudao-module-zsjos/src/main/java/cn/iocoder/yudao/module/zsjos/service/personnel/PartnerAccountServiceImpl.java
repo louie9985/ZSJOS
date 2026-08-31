@@ -45,9 +45,15 @@ public class PartnerAccountServiceImpl implements PartnerAccountService {
             throw exception(PARTNER_LOGIN_BAD_CREDENTIALS);
         }
         requireContext(account.getId());
+        return account;
+    }
+
+    @Override
+    public void recordLogin(Long accountId, String loginIp) {
+        PartnerAccountDO account = accountMapper.selectById(accountId);
+        if (account == null) throw exception(PARTNER_ACCOUNT_NOT_EXISTS);
         updateVersioned(new PartnerAccountDO().setId(account.getId())
                 .setLastLoginIp(loginIp).setLastLoginTime(LocalDateTime.now()).setVersion(account.getVersion()));
-        return account;
     }
 
     @Override
@@ -70,6 +76,11 @@ public class PartnerAccountServiceImpl implements PartnerAccountService {
     @Override
     public PartnerAccountDO getById(Long accountId) {
         return accountMapper.selectById(accountId);
+    }
+
+    @Override
+    public PartnerAccountDO getByMobile(String mobile) {
+        return accountMapper.selectByMobile(StrUtil.trim(mobile));
     }
 
     @Override
@@ -115,6 +126,15 @@ public class PartnerAccountServiceImpl implements PartnerAccountService {
         if (!passwordEncoder.matches(oldPassword, account.getPassword())) throw exception(PARTNER_PASSWORD_MISMATCH);
         updateEncodedPassword(account, newPassword);
         revoke(account.getId());
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateWecomEnabled(Long accountId, boolean enabled) {
+        requireContext(accountId);
+        PartnerAccountDO account = accountMapper.selectById(accountId);
+        updateVersioned(new PartnerAccountDO().setId(account.getId()).setWecomEnabled(enabled)
+                .setVersion(account.getVersion()));
     }
 
     private void updateEncodedPassword(PartnerAccountDO account, String rawPassword) {

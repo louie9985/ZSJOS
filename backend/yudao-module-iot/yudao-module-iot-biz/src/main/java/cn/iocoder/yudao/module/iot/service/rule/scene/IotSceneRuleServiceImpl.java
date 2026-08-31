@@ -59,7 +59,7 @@ public class IotSceneRuleServiceImpl implements IotSceneRuleService {
 
     @Resource
     private IotSceneRuleMatcherManager sceneRuleMatcherManager;
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<IotSceneRuleAction> sceneRuleActions;
     @Resource
     private IotSceneRuleTimerHandler timerHandler;

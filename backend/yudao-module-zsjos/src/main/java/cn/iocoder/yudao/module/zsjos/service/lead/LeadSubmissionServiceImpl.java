@@ -8,6 +8,7 @@ import cn.iocoder.yudao.framework.common.util.validation.ValidationUtils;
 import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
+import cn.iocoder.yudao.module.system.api.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
@@ -162,24 +163,22 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         }
         LeadDuplicateMatcher.MatchResult match = duplicateMatcher.match(reqVO, null);
         if (match.hasMatches()) {
-            LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
-            review.setStatus("pending");
-            review.setSubmitterUserId(actorUserId);
-            review.setSubmissionSourceType(sourceType(identity));
-            review.setSubmissionPartnerId(identity.partnerId());
-            review.setSubmissionSnapshot(JsonUtils.toJsonString(reqVO));
-            review.setLeadCategoryLabelSnapshot(category.labelSnapshot());
-            review.setMatchRules(JsonUtils.toJsonString(match.candidates().stream()
-                    .flatMap(candidate -> candidate.rules().stream()).distinct().toList()));
-            review.setCandidateSnapshot(JsonUtils.toJsonString(match.candidates()));
-            review.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey());
-            review.setVersion(0);
+            if (match.strongDuplicate()) {
+                duplicateReviewMapper.insert(duplicateReview(reqVO, actorUserId, identity, category, match,
+                        DUPLICATE_REVIEW_STATUS_COMPLETED, match.strongActiveMatch(),
+                        DUPLICATE_RESULT_STRONG_REJECTED, "系统强重复拦截"));
+                throw exception(LEAD_DUPLICATE_STRONG_CONFLICT);
+            }
+            LeadDuplicateReviewDO existingPending = duplicateReviewMapper.selectPendingByFingerprint(match.reviewFingerprint());
+            if (existingPending != null) return LeadCreateRespVO.reviewPending(existingPending.getId());
+            LeadDuplicateReviewDO review = duplicateReview(reqVO, actorUserId, identity, category, match,
+                    DUPLICATE_REVIEW_STATUS_PENDING, firstCandidate(match.candidates()),
+                    DUPLICATE_RESULT_SUSPECTED_CREATED, null);
             duplicateReviewMapper.insert(review);
-            if (Boolean.TRUE.equals(followUpRuleService.requireEnabledRule().getDuplicateAutoResolutionEnabled())) {
+            if (match.crossContactOnly()
+                    && Boolean.TRUE.equals(followUpRuleService.requireEnabledRule().getDuplicateAutoResolutionEnabled())) {
                 Long matchedLeadId = newestMatchedLeadId(match.candidates());
-                if (matchedLeadId != null) {
-                    return duplicateReviewService.resolveAutomatically(review.getId(), matchedLeadId, actorUserId);
-                }
+                return duplicateReviewService.resolveAutomatically(review.getId(), matchedLeadId, actorUserId);
             }
             return LeadCreateRespVO.reviewPending(review.getId());
         }
@@ -223,7 +222,11 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
     }
 
     private LeadCreateRespVO duplicateReviewResponse(LeadDuplicateReviewDO review) {
-        if (!"completed".equals(review.getStatus()) || review.getMatchedLeadId() == null) {
+        if (DUPLICATE_RESULT_STRONG_REJECTED.equals(review.getDuplicateResult())
+                || DUPLICATE_FLAG_STRONG.equals(review.getDuplicateFlag())) {
+            throw exception(LEAD_DUPLICATE_STRONG_CONFLICT);
+        }
+        if (!DUPLICATE_REVIEW_STATUS_COMPLETED.equals(review.getStatus()) || review.getMatchedLeadId() == null) {
             return LeadCreateRespVO.reviewPending(review.getId());
         }
         LeadDO lead = leadMapper.selectById(review.getMatchedLeadId());
@@ -231,6 +234,45 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         return "reactivate_lead".equals(review.getResultType())
                 ? LeadCreateRespVO.activated(lead.getId(), lead.getLeadNo(), lead.getAssignmentStatus())
                 : LeadCreateRespVO.duplicateAutoClosed(lead.getId(), lead.getLeadNo(), lead.getStatus());
+    }
+
+    private LeadDuplicateReviewDO duplicateReview(LeadCreateReqVO reqVO, Long actorUserId,
+                                                  LeadSubmissionIdentityService.Resolution identity,
+                                                  LeadCategorySnapshotService.Selection category,
+                                                  LeadDuplicateMatcher.MatchResult match, String status,
+                                                  LeadDuplicateMatcher.Candidate primaryCandidate,
+                                                  String duplicateResult, String opinion) {
+        LeadDuplicateReviewDO review = new LeadDuplicateReviewDO();
+        review.setStatus(status);
+        review.setSubmitterUserId(actorUserId);
+        review.setSubmissionSourceType(sourceType(identity));
+        review.setSubmissionPartnerId(identity.partnerId());
+        review.setSubmissionSnapshot(JsonUtils.toJsonString(reqVO));
+        review.setLeadCategoryLabelSnapshot(category.labelSnapshot());
+        review.setSourceChannelLabelSnapshot(requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
+        review.setDuplicateFlag(match.duplicateFlag());
+        review.setDuplicateResult(duplicateResult);
+        review.setPrimaryRuleCode(match.primaryRuleCode());
+        review.setReviewFingerprint(match.reviewFingerprint());
+        review.setMatchRules(JsonUtils.toJsonString(match.candidates().stream()
+                .flatMap(candidate -> candidate.rules().stream()).distinct().toList()));
+        review.setCandidateSnapshot(JsonUtils.toJsonString(match.candidates()));
+        if (primaryCandidate != null) {
+            review.setMatchedPersonId(primaryCandidate.personId());
+            review.setMatchedLeadId(primaryCandidate.leadId());
+        }
+        review.setResultType(duplicateResult);
+        review.setReviewOpinion(opinion);
+        if (DUPLICATE_REVIEW_STATUS_COMPLETED.equals(status)) {
+            review.setReviewedAt(LocalDateTime.now(BEIJING));
+        }
+        review.setSubmissionIdempotencyKey(reqVO.getIdempotencyKey());
+        review.setVersion(0);
+        return review;
+    }
+
+    private LeadDuplicateMatcher.Candidate firstCandidate(List<LeadDuplicateMatcher.Candidate> candidates) {
+        return candidates.isEmpty() ? null : candidates.getFirst();
     }
 
     private Long newestMatchedLeadId(List<LeadDuplicateMatcher.Candidate> candidates) {
@@ -405,6 +447,7 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         AdminUserRespDTO submitter = sourceUserId == null ? null : adminUserApi.getUser(sourceUserId);
         lead.setSourceDeptId(submitter == null ? null : submitter.getDeptId());
         lead.setSourceChannelId(reqVO.getSourceChannel());
+        lead.setSourceChannelLabelSnapshot(requireDictLabel(DICT_SOURCE_CHANNEL, reqVO.getSourceChannel()));
         applyRegion(lead, region); lead.setLeadCategory(category.value());
         lead.setLeadCategoryLabelSnapshot(category.labelSnapshot()); lead.setRemark(reqVO.getRemark());
         lead.setStatus(STATUS_SUBMITTED); lead.setAssignmentStatus(ASSIGNMENT_UNASSIGNED);
@@ -446,7 +489,9 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
             productMap.put("primary", item.getPrimary()); productSnapshots.add(productMap);
         }
         snapshot.put("products", productSnapshots);
-        snapshot.put("sourceChannel", reqVO.getSourceChannel()); snapshot.put("leadCategory", reqVO.getLeadCategory());
+        snapshot.put("sourceChannel", reqVO.getSourceChannel());
+        snapshot.put("sourceChannelLabelSnapshot", lead.getSourceChannelLabelSnapshot());
+        snapshot.put("leadCategory", reqVO.getLeadCategory());
         snapshot.put("remark", reqVO.getRemark()); snapshot.put("attachments", reqVO.getAttachments());
         snapshot.put("dispatchMode", reqVO.getDispatchMode());
         LeadActivationDO activation = new LeadActivationDO();
@@ -458,6 +503,14 @@ public class LeadSubmissionServiceImpl implements LeadSubmissionService {
         activation.setActivatedAt(LocalDateTime.now()); activation.setIdempotencyKey(reqVO.getIdempotencyKey());
         activationMapper.insert(activation);
         return activation;
+    }
+
+    private String requireDictLabel(String type, String value) {
+        dictDataApi.validateDictDataList(type, List.of(value));
+        return dictDataApi.getDictDataList(type).stream()
+                .filter(item -> Objects.equals(item.getValue(), value))
+                .map(DictDataRespDTO::getLabel).findFirst()
+                .orElseThrow(() -> exception(LEAD_SOURCE_CHANNEL_INVALID));
     }
 
     private Map<String, Object> eventContext(LeadDO lead, Long actorUserId) {

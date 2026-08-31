@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Alert, Button, Empty, Form, Input, Modal, Select, Space, Spin, Tabs, Typography, message } from 'antd'
-import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, EditOutlined, ExportOutlined, FileAddOutlined, PlusOutlined, RollbackOutlined, SwapOutlined, WarningOutlined } from '@ant-design/icons'
-import { api, type AssignmentUser, type DictData, type LeadAppealEvidence, type ManagedLead, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
+import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, DeleteOutlined, EditOutlined, ExportOutlined, FileAddOutlined, MessageOutlined, PlusOutlined, RollbackOutlined, SwapOutlined, WarningOutlined } from '@ant-design/icons'
+import { api, type AssignmentUser, type DictData, type LeadAppealEvidence, type LeadAttachment, type ManagedLead, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
 import { applyInvalidRemarkTemplate } from '../services/leadManagement'
 import { DICT_TYPE } from '../constants'
 import { defaultLeadDetailTab, detailTabsFromProjection, resolveLeadDetailTab, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
@@ -21,6 +21,7 @@ import IrreversiblePopconfirm from './IrreversiblePopconfirm'
 import FollowUpModal from './FollowUpModal'
 import { formatTimestamp } from '../services/time'
 import EmployeeSelect from './EmployeeSelect'
+import DeferredAttachmentPicker from './DeferredAttachmentPicker'
 
 type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release' | 'releasePublicSea'
 
@@ -28,14 +29,13 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, autoOpenSubmitterSupplement, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, studentContext, studentService, studentToolbarActions = [], overviewContent }: {
+export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner }: {
   lead: ManagedLead
   categories: DictData[]
   categoryLabel: (value?: string) => string
   channelLabel: (value?: string) => string
   mode: LeadDetailMode
   autoExpandFollowUp: boolean
-  autoOpenSubmitterSupplement?: boolean
   initialTab?: LeadDetailTab
   activeTab?: string
   onTabChange?: (key: string) => void
@@ -48,6 +48,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   studentService?: MyStudent['services'][number]
   studentToolbarActions?: ToolbarAction[]
   overviewContent?: ReactNode
+  hideProviderOwner?: boolean
 }) {
   const readOnly = mode === 'student-readonly'
   const managerMode = mode === 'manager-readonly'
@@ -83,6 +84,12 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [submitterSupplementOpen, setSubmitterSupplementOpen] = useState(false)
   const [urgeOpen, setUrgeOpen] = useState(false)
   const [complaintOpen, setComplaintOpen] = useState(false)
+  const [assistOpen, setAssistOpen] = useState(false)
+  const [assistProblem, setAssistProblem] = useState('')
+  const [assistExpected, setAssistExpected] = useState('')
+  const [assistRemark, setAssistRemark] = useState('')
+  const [assistAttachments, setAssistAttachments] = useState<DeferredUploadItem<LeadAttachment>[]>([])
+  const { submitting: assistSaving, run: runAssist, resetIntent: resetAssistIntent } = useSubmissionGuard()
   const [urgeReason, setUrgeReason] = useState('')
   const [complaintReason, setComplaintReason] = useState('')
   const [submitterActionSaving, setSubmitterActionSaving] = useState(false)
@@ -101,7 +108,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const closeValid = () => { setValidConfirmOpen(false); setValidOpen(false) }
   const projectedActions = lead.availableActions || []
   const actions = readOnly ? new Map<string, NonNullable<ManagedLead['availableActions']>[number]>()
-    : new Map(projectedActions.filter(item => !managerMode || item.code.startsWith('SUPERVISOR_'))
+    : new Map(projectedActions.filter(item => !managerMode
+      || item.code.startsWith('SUPERVISOR_') || item.code === 'REQUEST_SUBMITTER_ASSIST')
       .map(item => [item.code, item]))
 
   useEffect(() => { onDirtyChange(readOnly ? false : followUpFormDirty || basicInfoDirty) },
@@ -159,10 +167,6 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lead.id, readOnly, requestedInitialTab, visibleTabKey])
 
-  useEffect(() => {
-    if (autoOpenSubmitterSupplement && actions.has('SUBMITTER_SUPPLEMENT')) setSubmitterSupplementOpen(true)
-  }, [actions, autoOpenSubmitterSupplement, lead.id])
-
   const handleStandaloneFollowUpSuccess = () => {
     setFollowUpRefreshVersion(current => current + 1)
     onChanged()
@@ -180,10 +184,12 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     setQualificationReason('')
     setQualificationSalesUserId(undefined)
     setQualificationCandidates([])
-    if (action !== 'transfer' && action !== 'releasePublicSea') return
+    const loadsCandidates = action === 'transfer' || supervisorAction && action === 'releasePublicSea'
+    if (!loadsCandidates) return
     setQualificationCandidatesLoading(true)
     try { setQualificationCandidates(managerMode || supervisorAction
-      ? await api.subordinateTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
+      ? await api.subordinateTransferCandidates()
+      : actions.has('OWNER_TRANSFER') ? await api.ownerTransferCandidates() : await api.leadTransferCandidates(lead.id)) }
     catch (error) { message.error(error instanceof Error ? error.message : '转派销售加载失败') }
     finally { setQualificationCandidatesLoading(false) }
   }
@@ -208,9 +214,13 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
           lead.id, qualificationSalesUserId, command.reason, idempotencyKey)
       } else {
         if (action === 'restore') await api.restoreLead(lead.id, command)
-        if (action === 'transfer') await api.transferLead(lead.id, { ...command, salesUserId: qualificationSalesUserId! })
+        if (action === 'transfer') {
+          if (actions.has('OWNER_TRANSFER')) await api.ownerTransferLead(lead.id, { ...command, salesUserId: qualificationSalesUserId! })
+          else await api.transferLead(lead.id, { ...command, salesUserId: qualificationSalesUserId! })
+        }
         if (action === 'recycle') await api.recycleLead(lead.id, command)
         if (action === 'release') await api.releaseLeadToClaimPool(lead.id, command)
+        if (action === 'releasePublicSea') await api.ownerReleasePublicSeaLead(lead.id, command)
       }
       complete()
       message.success('客资已处理')
@@ -219,11 +229,37 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     }).catch(error => message.error(error instanceof Error ? error.message : '客资处理失败'))
   }
 
+  const closeAssist = () => {
+    if (!assistSaving) setAssistOpen(false)
+  }
+  const submitAssist = async () => {
+    if (!assistProblem.trim() || !assistExpected.trim()) {
+      message.warning('请填写遇到的问题和希望协助方式')
+      return
+    }
+    await runAssist(async ({ idempotencyKey, complete }) => {
+      const uploadResult = await uploadDeferredFiles(assistAttachments, api.uploadLeadAttachment, setAssistAttachments)
+      if (uploadResult.failed) { message.error('有附件上传失败，请重试失败项'); return }
+      await api.requestLeadSubmitterAssist(lead.id, {
+        problem: assistProblem.trim(), expectedAssistance: assistExpected.trim(),
+        remark: assistRemark.trim() || undefined,
+        attachments: uploadResult.items.filter(item => item.uploaded)
+          .map(item => ({ infraFileId: item.uploaded!.infraFileId })),
+        idempotencyKey,
+      })
+      complete(); message.success('协助请求已发送')
+      setAssistProblem(''); setAssistExpected(''); setAssistRemark(''); setAssistAttachments([])
+      setAssistOpen(false); onChanged()
+    }).catch(error => message.error(error instanceof Error ? error.message : '协助请求发送失败'))
+  }
+
   const qualificationAlertActions: ToolbarAction[] = [
     actions.has('QUALIFICATION_RESTORE') && { key: 'qualification-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('QUALIFICATION_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore') },
     actions.has('QUALIFICATION_TRANSFER') && { key: 'qualification-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('QUALIFICATION_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
     actions.has('QUALIFICATION_RECYCLE') && { key: 'qualification-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('QUALIFICATION_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle') },
     actions.has('QUALIFICATION_RELEASE') && { key: 'qualification-release', icon: <ExportOutlined/>, label: '释放', danger: true, disabled: !actions.get('QUALIFICATION_RELEASE')?.enabled, onClick: () => void openQualificationAction('release') },
+    actions.has('OWNER_TRANSFER') && { key: 'owner-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('OWNER_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer') },
+    actions.has('OWNER_RELEASE_PUBLIC_SEA') && { key: 'owner-release-public-sea', icon: <ExportOutlined/>, label: '释放至公海', danger: true, disabled: !actions.get('OWNER_RELEASE_PUBLIC_SEA')?.enabled, onClick: () => void openQualificationAction('releasePublicSea') },
     actions.has('SUPERVISOR_RESTORE') && { key: 'supervisor-restore', icon: <RollbackOutlined/>, label: '恢复', disabled: !actions.get('SUPERVISOR_RESTORE')?.enabled, onClick: () => void openQualificationAction('restore', true) },
     actions.has('SUPERVISOR_TRANSFER') && { key: 'supervisor-transfer', icon: <SwapOutlined/>, label: '转派', disabled: !actions.get('SUPERVISOR_TRANSFER')?.enabled, onClick: () => void openQualificationAction('transfer', true) },
     actions.has('SUPERVISOR_RECYCLE') && { key: 'supervisor-recycle', icon: <DeleteOutlined/>, label: '回收', danger: true, disabled: !actions.get('SUPERVISOR_RECYCLE')?.enabled, onClick: () => void openQualificationAction('recycle', true) },
@@ -238,6 +274,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     actions.has('ENTER_DEAL') && { key: 'enter-deal', icon: <FileAddOutlined/>, label: '录入成交', disabled: !actions.get('ENTER_DEAL')?.enabled, onClick: () => setSalesOrderOpen(true) },
     actions.has('REVISE_DEAL') && { key: 'revise-deal', icon: <FileAddOutlined/>, label: '补正成交', disabled: !actions.get('REVISE_DEAL')?.enabled, onClick: () => setSalesOrderOpen(true) },
     actions.has('EDIT_BASIC_INFO') && { key: 'edit-info', icon: <EditOutlined/>, label: '修改信息', onClick: () => setBasicInfoOpen(true) },
+    actions.has('REQUEST_SUBMITTER_ASSIST') && { key: 'request-submitter-assist', icon: <MessageOutlined/>, label: '请求提交人协助', disabled: !actions.get('REQUEST_SUBMITTER_ASSIST')?.enabled, onClick: () => { resetAssistIntent(); setAssistOpen(true) } },
     actions.has('SUBMITTER_SUPPLEMENT') && { key: 'submitter-supplement', icon: <EditOutlined/>, label: '补充资料', onClick: () => setSubmitterSupplementOpen(true) },
     actions.has('SUBMITTER_URGE') && { key: 'submitter-urge', icon: <BellOutlined/>, label: '催促', onClick: () => setUrgeOpen(true) },
     actions.has('SUBMITTER_COMPLAINT') && { key: 'submitter-complaint', icon: <WarningOutlined/>, label: '投诉', danger: true, onClick: () => setComplaintOpen(true) },
@@ -247,7 +284,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   ].filter(Boolean) as ToolbarAction[]
 
   const tabItems: LeadDetailExtraTab[] = visibleTabs.map<LeadDetailExtraTab>(tab => {
-    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService}/>}</div> }
+    if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner}/>}</div> }
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
     if (tab === 'complaints') return { key: tab, label: '投诉记录', children: <div className="lead-detail-tab-content"><LeadComplaintPanel leadId={lead.id}/></div> }
@@ -293,13 +330,21 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       <LeadBasicInfoModal lead={lead} open={submitterSupplementOpen} submitterOnly onClose={() => setSubmitterSupplementOpen(false)} onChanged={onChanged}/>
       <Modal title="催促当前责任销售" open={urgeOpen} confirmLoading={submitterActionSaving} onCancel={() => setUrgeOpen(false)} onOk={async () => { if (!urgeReason.trim()) { message.warning('请填写催促原因'); return } setSubmitterActionSaving(true); try { await api.urgeLead(lead.id, urgeReason.trim()); message.success('催促已发送'); setUrgeReason(''); setUrgeOpen(false) } catch (error) { message.error(error instanceof Error ? error.message : '催促失败') } finally { setSubmitterActionSaving(false) } }}><Form.Item label="催促原因" required><Input.TextArea value={urgeReason} onChange={event => setUrgeReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次催促原因"/></Form.Item></Modal>
       <Modal title="发起销售投诉" open={complaintOpen} confirmLoading={submitterActionSaving} onCancel={() => setComplaintOpen(false)} onOk={async () => { if (!complaintReason.trim()) { message.warning('请填写投诉原因'); return } setSubmitterActionSaving(true); try { await api.createLeadComplaint(lead.id, complaintReason.trim(), []); message.success('投诉已提交'); setComplaintReason(''); setComplaintOpen(false) } catch (error) { message.error(error instanceof Error ? error.message : '投诉提交失败') } finally { setSubmitterActionSaving(false) } }}><Form.Item label="投诉原因" required><Input.TextArea value={complaintReason} onChange={event => setComplaintReason(event.target.value)} rows={5} maxLength={1000} showCount placeholder="填写投诉事实与诉求"/></Form.Item></Modal>
+      <Modal title="请求提交人协助" open={assistOpen} confirmLoading={assistSaving} onCancel={closeAssist} onOk={() => void submitAssist()} okText="发送请求" destroyOnHidden>
+        <Form layout="vertical">
+          <Form.Item label="遇到的问题" required><Input.TextArea value={assistProblem} onChange={event => setAssistProblem(event.target.value)} rows={4} maxLength={1000} showCount placeholder="说明当前遇到的问题"/></Form.Item>
+          <Form.Item label="希望协助方式" required><Input.TextArea value={assistExpected} onChange={event => setAssistExpected(event.target.value)} rows={4} maxLength={1000} showCount placeholder="说明希望提交人如何协助"/></Form.Item>
+          <Form.Item label="备注"><Input.TextArea value={assistRemark} onChange={event => setAssistRemark(event.target.value)} rows={3} maxLength={2000} showCount placeholder="补充说明（选填）"/></Form.Item>
+          <Form.Item label="附件"><DeferredAttachmentPicker value={assistAttachments} onChange={setAssistAttachments} accept="image/jpeg,image/png,image/webp" maxCount={9} maxSize={10 * 1024 * 1024} disabled={assistSaving}/></Form.Item>
+        </Form>
+      </Modal>
       <SalesOrderEntryModal lead={lead} orderId={actions.has('REVISE_DEAL') ? lead.activeSalesOrderId : undefined} open={salesOrderOpen} onClose={() => setSalesOrderOpen(false)} onSubmitted={() => { setSalesOrderOpen(false); onChanged() }}/>
       <SalesOrderEntryModal lead={lead} repurchase open={repurchaseOpen} onClose={() => setRepurchaseOpen(false)} onSubmitted={() => { setRepurchaseOpen(false); onChanged() }}/>
       <FollowUpModal lead={lead} open={followUpModalOpen} onClose={() => setFollowUpModalOpen(false)} onSuccess={handleStandaloneFollowUpSuccess}/>
       <Modal open={Boolean(qualificationAction)} title={{ restore: '恢复原销售', transfer: '转派客资', recycle: '回收客资', release: '释放至抢单池', releasePublicSea: '释放至公海池' }[qualificationAction || 'restore']} onCancel={closeQualificationAction} footer={<Space><Button onClick={closeQualificationAction}>取消</Button><IrreversiblePopconfirm action={`处理客资「${lead.submittedName}」`} danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} open={qualificationConfirmOpen} onOpenChange={setQualificationConfirmOpen} onConfirm={submitQualificationAction}><Button type="primary" danger={qualificationAction === 'recycle' || qualificationAction === 'release' || qualificationAction === 'releasePublicSea'} loading={dispositionSaving} onClick={prepareQualificationAction}>确认处理</Button></IrreversiblePopconfirm></Space>}>
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {qualificationAction === 'transfer' && <Form.Item label="目标销售" required><EmployeeSelect users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder={qualificationCandidatesLoading ? '正在加载可转派销售' : qualificationCandidates.length ? '选择目标销售' : '暂无可转派销售'} style={{ width: '100%' }}/></Form.Item>}
-          {qualificationAction === 'releasePublicSea' && <Form.Item label="实际跟进销售（可不填）"><EmployeeSelect allowClear users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder="不指定则进入待分配" style={{ width: '100%' }}/></Form.Item>}
+          {qualificationAction === 'releasePublicSea' && qualificationSupervisorAction && <Form.Item label="实际跟进销售（可不填）"><EmployeeSelect allowClear users={qualificationCandidates} loading={qualificationCandidatesLoading} showSearch optionFilterProp="label" value={qualificationSalesUserId} onChange={setQualificationSalesUserId} placeholder="不指定则进入待分配" style={{ width: '100%' }}/></Form.Item>}
           <Form.Item label="处置理由" required><Input.TextArea value={qualificationReason} onChange={event => setQualificationReason(event.target.value)} rows={4} maxLength={500} showCount placeholder="填写本次处置理由"/></Form.Item>
         </Space>
       </Modal>

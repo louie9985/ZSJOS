@@ -74,7 +74,7 @@ public class YudaoWebSecurityConfigurerAdapter {
      *
      * @see #filterChain(HttpSecurity)
      */
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<AuthorizeRequestsCustomizer> authorizeRequestsCustomizers;
 
     @Resource

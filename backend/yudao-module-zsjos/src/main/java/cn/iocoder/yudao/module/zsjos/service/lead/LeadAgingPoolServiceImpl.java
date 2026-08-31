@@ -172,6 +172,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-aging.scan-due", targetType = "lead")
     public int scanDue(LocalDateTime now) {
         LeadFollowUpRuleDO rule = ruleService.requireEnabledRule();
         LocalDateTime cutoff = now.minusDays(rule.getAgingPoolTimeoutDays());
@@ -184,12 +185,14 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-aging.clear-invalid-collaborators", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
     public boolean tryEnterDueLead(Long leadId, LocalDateTime now) {
         return enterDueLead(leadId, now);
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-aging.emit-advance-reminders", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
     public void enterManually(Long leadId, Long collaboratorUserId, Long operatorUserId, String reason,
                               String idempotencyKey) {
@@ -271,6 +274,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-aging.process-no-progress", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
     public int clearInvalidCollaborators(LocalDateTime now) {
         int changed = 0;

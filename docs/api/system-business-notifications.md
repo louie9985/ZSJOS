@@ -7,20 +7,12 @@ typed `NotifyBusinessEvent` values through `NotifyBusinessEventApi`. Administrat
 tenant rules against that catalog; arbitrary request interception and executable expressions are
 not supported.
 
-The ZSJOS catalog contains 41 lead scenes covering creation, dispatch and ownership, follow-up,
+The ZSJOS catalog contains 42 lead scenes covering creation, dispatch and ownership, follow-up,
 qualification, appeal, complaint, public-pool, duplicate, and transfer workflows. Complaint
 decisions use distinct `zsjos.lead.complaint_founded` and `zsjos.lead.complaint_unfounded` scenes.
 Both resolve the complaint record's actual employee or partner complainant; the founded scene also
 retains the snapshotted owner and current direct-leader recipients. The scene response is the source
 of truth for available variables, recipient roles, sensitive markers, and actions.
-
-`zsjos.lead.submitter_assist_requested` is published when the current owner records the first
-follow-up as `unreachable` for a `submitted + owned` Lead. Its `submitter` recipient resolves to the
-original internal `lead.sourceUserId`; for partner-submitted Leads it resolves through the bound
-partner account. The template uses `{{lead.no}}` for the user-visible Lead number and may include the
-follow-up result, remark, and occurrence time. Internal submitters also receive a ZSJOS
-`lead_submitter_assist` business task with action `OPEN_LEAD_SUBMITTER_SUPPLEMENT`; partner
-submitters receive only the configured message because partner IDs are not ADMIN user IDs.
 
 Fresh environments and migration V016 provide one enabled global template for every registered
 scene. Templates do not send messages by themselves. Notification rules remain tenant-owned. V075
@@ -75,9 +67,7 @@ and internal business ID. Appeal scenes target `tab=appeals`, complaint result s
 `tab=overview`. The resulting route is
 `/zsjos/leads/manage?leadId={internalLeadId}&tab={overview|follow-ups|orders|appeals|complaints}`.
 `zsjos.lead.appeal_submitted` keeps its reviewer-inbox action when that task is available and uses
-the Lead appeal tab only as its authorized fallback. Submitter-assist message clicks use the same
-authorized Lead overview fallback; the dedicated Workbench todo action opens the submitter
-supplement panel directly.
+the Lead appeal tab only as its authorized fallback.
 
 The backend persists the rendered title, summary, full content, rule, scene, business identity,
 action, and source event key. After commit it emits:
@@ -121,3 +111,12 @@ Business notification templates for ZSJOS Lead, sales-order and registration sce
 Sales-order supervisor confirmation adds two tenant-scoped scenes: `zsjos.sales_order.supervisor_requested` (recipient role `supervisor`) and `zsjos.sales_order.supervisor_decided` (recipient role `requester`). Their payload includes `order.no`, request center, requester/supervisor names, separate request and decision reasons, decision, confirmation ID and controlled task identifiers. Message clicks resolve those identifiers through the ZSJOS notification-target API, which rechecks the persisted recipient relationship and order object permission before returning a relative approval target. The first scene links the designated supervisor to the supervisor-confirmation view; the second links only the requester to the ordinary approval view. V093 creates a default only when the tenant has no rule for that scene, preserving administrator rules and avoiding duplicate delivery by confirmation event key.
 
 Applied V085 databases are repaired only by forward migration V087; V085 is not rewritten. V087 also covers logically deleted message snapshots, restores the missing registration business-number parameter, and fails closed when the stored JSON or tenant-scoped business relation cannot be resolved safely. It does not infer a removed name or expose an internal Lead ID.
+### Lead 提交人协助
+
+| Scene | 默认收件人 | 说明 |
+| --- | --- | --- |
+| `zsjos.lead.submitter_assist_requested` | `submitter` | 向冻结的内部提交人或 Partner 提交账号发送协助请求主消息 |
+| `zsjos.lead.partner_assist_reminder` | `partner_owner` | 仅兼职提交时发送给当前所属员工或 Lead 历史归属员工，提醒其转告兼职人员 |
+
+两个 scene 提供 `assist.requestId`、`assist.problem`、`assist.expectedAssistance`、
+`assist.remark`、`assist.attachmentNames` 变量，并继续使用 `lead.no` 作为用户可见客资编号。

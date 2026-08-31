@@ -104,6 +104,7 @@ public class MediaScreenQueryService {
         return value;
     }
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "media-screen.freeze-snapshot", targetType = "media-screen-snapshot")
     @Transactional
     public void freeze(Long tenantId, LocalDate date) {
         if (!snapshotMapper.selectByDate(tenantId, date).isEmpty()) return;

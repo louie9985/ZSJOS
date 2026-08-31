@@ -18,6 +18,8 @@ import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
+import cn.iocoder.yudao.module.system.api.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.zsjos.service.common.MediaDataScopeService;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PersonMapper;
 import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
@@ -56,6 +58,7 @@ public class MediaAccountService {
     @Resource private BpmProcessInstanceApi processInstanceApi;
     @Resource private MediaWorkflowEventService workflowEventService;
     @Resource private MediaAccountFieldConfigService fieldConfigService;
+    @Resource private DictDataApi dictDataApi;
 
     @Transactional(rollbackFor = Exception.class)
     public Long create(MediaAccountSaveReqVO req, Long userId) {
@@ -74,7 +77,7 @@ public class MediaAccountService {
         account.setAccountNo(numberService.next()).setStudentPersonId(req.getStudentPersonId())
                 .setOwnershipType(req.getStudentPersonId() == null ? OWNERSHIP_COMPANY : OWNERSHIP_STUDENT)
                 .setOwnerOperatorUserId(assignedOperator == null ? userId : assignedOperator).setDirectorUserId(directorUserId)
-                .setPlatformValue(req.getPlatformValue()).setPlatformLabelSnapshot(req.getPlatformLabelSnapshot())
+                .setPlatformValue(req.getPlatformValue()).setPlatformLabelSnapshot(requirePlatformLabel(req.getPlatformValue()))
                 .setPlatformAccountId(uid).setNickname(nickname)
                 .setDetailConfigVersionId(details.configVersionId())
                 .setDetailValuesJson(JsonUtils.toJsonString(details.values()))
@@ -163,8 +166,11 @@ public class MediaAccountService {
             directorUserId = req.getDirectorUserId();
         }
         if (req.getDetailValues() != null) {
+            List<MediaAccountDetailSnapshotVO> previousSnapshots = account.getDetailSnapshotJson() == null ? List.of()
+                    : JsonUtils.parseArray(account.getDetailSnapshotJson(), MediaAccountDetailSnapshotVO.class);
             MediaAccountFieldConfigService.DetailSnapshot details = fieldConfigService.validateAndSnapshot(
-                    mergeCompatibilityValues(req.getDetailValues(), req.getPlatformAccountId(), req.getNickname()));
+                    mergeCompatibilityValues(req.getDetailValues(), req.getPlatformAccountId(), req.getNickname()),
+                    previousSnapshots);
             account.setDetailConfigVersionId(details.configVersionId())
                     .setDetailValuesJson(JsonUtils.toJsonString(details.values()))
                     .setDetailSnapshotJson(JsonUtils.toJsonString(details.snapshots()))
@@ -177,6 +183,14 @@ public class MediaAccountService {
                 .setRiskLevelValue(req.getRiskLevelValue()).setRiskLevelLabelSnapshot(req.getRiskLevelLabelSnapshot())
                 .setHealthJson(req.getHealthJson());
         if (mapper.updateProfile(account, req.getVersion()) == 0) throw exception(MEDIA_ACCOUNT_VERSION_CONFLICT);
+    }
+
+    private String requirePlatformLabel(String value) {
+        dictDataApi.validateDictDataList("zsjos_account_platform", List.of(value));
+        return dictDataApi.getDictDataList("zsjos_account_platform").stream()
+                .filter(item -> java.util.Objects.equals(item.getValue(), value))
+                .map(DictDataRespDTO::getLabel).findFirst()
+                .orElseThrow(() -> exception(MEDIA_ACCOUNT_FIELD_CONFIG_INVALID));
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_MEDIA_ACCOUNT, bizId = "#id", action = "rescue")
@@ -212,6 +226,7 @@ public class MediaAccountService {
         return processId;
     }
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "media-account.rebind-process-result", targetType = "media-account")
     @Transactional(rollbackFor = Exception.class)
     public void handleRebindProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;

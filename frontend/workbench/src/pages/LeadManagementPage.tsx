@@ -3,19 +3,26 @@ import {
   Alert,
   Badge,
   Button,
-  Drawer,
+  Dropdown,
+  Form,
   Empty,
   Grid,
+  Input,
+  List,
+  message,
+  Modal,
+  Select,
   Skeleton,
   Space,
   Spin,
   Tag,
   Typography
 } from 'antd'
-import { ArrowLeftOutlined, ReloadOutlined } from '@ant-design/icons'
+import { ArrowLeftOutlined, DeleteOutlined, DownOutlined, ExportOutlined, EyeOutlined, ReloadOutlined, RollbackOutlined, SwapOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { api, type AdvancedFilterGroup, type DictData, type LeadSimpleStatus, type ManagedLead } from '../services/api'
+import { api, type AdvancedFilterGroup, type AssignmentUser, type DictData, type LeadBatchAction, type LeadSimpleStatus, type LeadSortField, type ManagedLead, type ManagedLeadPageParams, type SubordinateBatchResult } from '../services/api'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 import { NameAvatar } from '../components/LeadDetailOverview'
 import LeadDetail from '../components/LeadDetail'
 import {
@@ -32,12 +39,20 @@ import {
 } from '../services/leadManagement'
 import {
   DICT_TYPE,
+  LEAD_ASSIGNMENT_STATUS_LABELS,
+  LEAD_DISPATCH_MODE_LABELS,
+  LEAD_HANDLING_STAGE_LABELS,
+  LEAD_OPERATIONAL_STATUS_LABELS,
   LEAD_QUALIFICATION_STATUS_LABELS,
   LEAD_FOLLOW_UP_STATUS_LABELS
 } from '../constants'
 import { parseLeadDetailTab, shouldBlockLeadSwitch } from '../services/leadFollowUp'
 import { formatTimestamp } from '../services/time'
 import { useRealtimeEvent } from '../components/RealtimeProvider'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable, type ProColumns } from '@ant-design/pro-components'
+import type { TableProps } from 'antd'
+import type { TableRowSelection } from 'antd/es/table/interface'
 import {
   LEAD_INBOX_REFRESH_RETRY_DELAYS_MS,
   LEAD_INBOX_UNSEEN_EVENT,
@@ -47,9 +62,113 @@ import {
 } from '../services/leadInboxUnseen'
 
 const PAGE_SIZE = 20
+const LEAD_TABLE_COLUMN_MIN_WIDTH = 80
+const LEAD_TABLE_COLUMN_WIDTHS_KEY = 'crm-lead-management-table-column-widths'
 type LeadAudience = 'all'
 type LeadSimpleStatusSelection = 'all' | LeadSimpleStatus
-type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean }
+type LeadPageLoadOptions = { preferredSelectedId?: number; silent?: boolean; pageSize?: number }
+type LeadBatchFormAction = LeadBatchAction
+
+const LEAD_SORT_FIELD_BY_COLUMN_KEY: Partial<Record<string, LeadSortField>> = {
+  leadNo: 'leadNo',
+  submittedName: 'submittedName',
+  submittedMobile: 'submittedMobile',
+  submittedWechatId: 'submittedWechatId',
+  source: 'sourceType',
+  category: 'leadCategory',
+  channel: 'sourceChannelId',
+  assignmentStatus: 'assignmentStatus',
+  dispatchMode: 'dispatchMode',
+  assignmentAttemptCount: 'assignmentAttemptCount',
+  publicPoolAt: 'publicPoolAt',
+  countedAt: 'countedAt',
+  firstFollowUpAt: 'currentAssignmentFirstFollowUpAt',
+  firstFollowUpDeadlineAt: 'currentAssignmentFirstFollowUpDeadlineAt',
+  qualificationStartedAt: 'qualificationStartedAt',
+  qualificationDeadlineAt: 'qualificationDeadlineAt',
+  suspendedAt: 'suspendedAt',
+  validDescription: 'validDescription',
+  invalidDescription: 'invalidDescription',
+  appealDeadlineAt: 'appealDeadlineAt',
+  closedAt: 'closedAt',
+  closeReason: 'closeReason',
+  nextFollowUpAt: 'nextFollowUpAt',
+  submittedAt: 'submittedAt',
+  lastActivityAt: 'lastActivityAt',
+  qualifiedAt: 'qualifiedAt',
+  convertedAt: 'convertedAt',
+  remark: 'remark',
+  updateTime: 'updateTime',
+}
+
+function clampLeadTableColumnWidth(width: number) {
+  return Math.max(LEAD_TABLE_COLUMN_MIN_WIDTH, Math.round(width))
+}
+
+function readLeadTableColumnWidths(): Record<string, number> {
+  try {
+    const stored = window.localStorage.getItem(LEAD_TABLE_COLUMN_WIDTHS_KEY)
+    if (!stored) return {}
+    const parsed = JSON.parse(stored) as Record<string, unknown>
+    return Object.fromEntries(Object.entries(parsed)
+      .filter((entry): entry is [string, number] => Number.isFinite(entry[1]))
+      .map(([key, width]) => [key, clampLeadTableColumnWidth(width)]))
+  } catch {
+    return {}
+  }
+}
+
+function isLeadTableResizeEdge(element: HTMLElement, clientX: number) {
+  return element.getBoundingClientRect().right - clientX <= 12
+}
+
+function startLeadTableColumnResize(event: React.PointerEvent<HTMLElement>, width: number,
+                                    onResize: (width: number) => void) {
+  if (!isLeadTableResizeEdge(event.currentTarget, event.clientX)) return
+  event.preventDefault()
+  event.stopPropagation()
+  const startX = event.clientX
+  const startWidth = width
+  const handlePointerMove = (moveEvent: PointerEvent) => {
+    onResize(clampLeadTableColumnWidth(startWidth + moveEvent.clientX - startX))
+  }
+  const finishResize = () => {
+    window.removeEventListener('pointermove', handlePointerMove)
+    window.removeEventListener('pointerup', finishResize)
+    window.removeEventListener('pointercancel', finishResize)
+  }
+  window.addEventListener('pointermove', handlePointerMove)
+  window.addEventListener('pointerup', finishResize)
+  window.addEventListener('pointercancel', finishResize)
+}
+
+const LEAD_BATCH_ACTIONS: Array<{ type: LeadBatchFormAction; label: string; permissions: string[]; icon: React.ReactNode; danger?: boolean }> = [
+  { type: 'transfer', label: '批量转派', permissions: ['zsjos:lead:owner-transfer', 'zsjos:subordinate-sales:lead-transfer', 'zsjos:lead:qualification:manage'], icon: <SwapOutlined /> },
+  { type: 'restore', label: '批量恢复', permissions: ['zsjos:subordinate-sales:lead-restore', 'zsjos:lead:qualification:manage'], icon: <RollbackOutlined /> },
+  { type: 'recycle', label: '批量回收', permissions: ['zsjos:subordinate-sales:lead-recycle', 'zsjos:lead:qualification:manage'], icon: <DeleteOutlined />, danger: true },
+  { type: 'release-claim-pool', label: '释放至抢单池', permissions: ['zsjos:subordinate-sales:lead-release-claim-pool', 'zsjos:lead:qualification:manage'], icon: <ExportOutlined />, danger: true },
+  { type: 'release-public-sea', label: '释放至公海池', permissions: ['zsjos:lead:owner-release-public-sea', 'zsjos:subordinate-sales:lead-release-public-sea', 'zsjos:lead:qualification:manage'], icon: <ExportOutlined />, danger: true },
+]
+
+const LEAD_BATCH_ACTION_LABELS: Record<LeadBatchFormAction, string> = Object.fromEntries(
+  LEAD_BATCH_ACTIONS.map(action => [action.type, action.label.replace('批量', '')])
+) as Record<LeadBatchFormAction, string>
+
+function LeadBatchResultModal({ result, open, onClose }: { result?: SubordinateBatchResult; open: boolean; onClose: () => void }) {
+  const resultType = result?.failureCount === 0 ? 'success' : result?.successCount === 0 ? 'error' : 'warning'
+  return <Modal open={open} title="批量操作完成" onCancel={onClose} footer={<Button onClick={onClose}>关闭</Button>}>
+    {result && <>
+      <Alert type={resultType} showIcon message={`成功 ${result.successCount} 条，失败 ${result.failureCount} 条`} />
+      <List className="lead-batch-result-list" size="small" dataSource={result.items} renderItem={item => <List.Item>
+        <Space>
+          <Tag color={item.success ? 'success' : 'error'}>{item.success ? '成功' : '失败'}</Tag>
+          <Typography.Text>{item.leadNo || '客资编号不可用'}</Typography.Text>
+          <Typography.Text type={item.success ? undefined : 'danger'}>{item.message}</Typography.Text>
+        </Space>
+      </List.Item>} />
+    </>}
+  </Modal>
+}
 
 const SIMPLE_STATUS_OPTIONS: Array<{ key: LeadSimpleStatusSelection; label: string }> = [
   { key: 'all', label: '全部' },
@@ -82,10 +201,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const navigate = useNavigate()
   const location = useLocation()
   const [searchParams] = useSearchParams()
-  const routeState = location.state as { leadId?: number; openFollowUp?: boolean; openSubmitterSupplement?: boolean; relationScope?: 'submitted' | 'owned' } | null
+  const routeState = location.state as { leadId?: number; leadNo?: string; openFollowUp?: boolean; relationScope?: 'submitted' | 'owned' } | null
   const queryLeadId = Number(searchParams.get('leadId')) || undefined
+  const requestedLeadNo = routeState?.leadNo || searchParams.get('leadNo') || undefined
   const screens = Grid.useBreakpoint()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { useTableLayout } = useInboxTableLayout()
   const requestedLeadId = routeState?.leadId || queryLeadId
   const requestedTab = parseLeadDetailTab(searchParams.get('tab'))
     || (routeState?.openFollowUp ? 'follow-ups' : undefined)
@@ -95,6 +216,10 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const [items, setItems] = useState<ManagedLead[]>([])
   const [total, setTotal] = useState(0)
   const [pageNo, setPageNo] = useState(1)
+  const [leadPageSize, setLeadPageSize] = useState(PAGE_SIZE)
+  const [sortField, setSortField] = useState<LeadSortField>()
+  const [sortOrder, setSortOrder] = useState<'ascend' | 'descend'>()
+  const [columnWidths, setColumnWidths] = useState<Record<string, number>>(readLeadTableColumnWidths)
   const [initialLoading, setInitialLoading] = useState(false)
   const [loadingMore, setLoadingMore] = useState(false)
   const [initialError, setInitialError] = useState('')
@@ -112,6 +237,15 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const [detailError, setDetailError] = useState('')
   const [followUpDirty, setFollowUpDirty] = useState(false)
   const [unseenIds, setUnseenIds] = useState<number[]>(() => unseenLeadIds())
+  const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
+  const [selectedLeadMap, setSelectedLeadMap] = useState<Map<number, ManagedLead>>(new Map())
+  const [batchAction, setBatchAction] = useState<LeadBatchFormAction>()
+  const [batchCandidates, setBatchCandidates] = useState<AssignmentUser[]>([])
+  const [batchResult, setBatchResult] = useState<SubordinateBatchResult>()
+  const [batchResultOpen, setBatchResultOpen] = useState(false)
+  const [batchSaving, setBatchSaving] = useState(false)
+  const batchIdempotencyKey = useRef<string | undefined>(undefined)
+  const [batchForm] = Form.useForm<{ targetUserId?: number; collaboratorUserId?: number; reason: string }>()
   const requestVersion = useRef(0)
   const metadataVersion = useRef(0)
   const activePageRequests = useRef(new Set<string>())
@@ -120,6 +254,20 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
   const listScrollRef = useRef<HTMLDivElement>(null)
   const listSentinelRef = useRef<HTMLDivElement>(null)
   const itemIdsRef = useRef<number[]>([])
+
+  const clearLeadSelection = useCallback(() => {
+    setSelectedRowKeys([])
+    setSelectedLeadMap(new Map())
+  }, [])
+
+  useEffect(() => { clearLeadSelection() }, [advancedFilter, clearLeadSelection, keyword, simpleStatus])
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LEAD_TABLE_COLUMN_WIDTHS_KEY, JSON.stringify(columnWidths))
+    } catch {
+      // Table resizing remains usable when browser storage is unavailable.
+    }
+  }, [columnWidths])
 
   const loadMetadata = useCallback(async () => {
     const version = ++metadataVersion.current
@@ -152,12 +300,14 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       setLoadMoreError('')
     }
     try {
-      const params = {
+      const params: ManagedLeadPageParams = {
         pageNo: targetPage,
-        pageSize: PAGE_SIZE,
+        pageSize: options.pageSize ?? leadPageSize,
         keyword: keyword || undefined, advancedFilter,
         relationScope: routeState?.relationScope,
         simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus,
+        sortField,
+        sortOrder,
       }
       const result = audience === 'all'
         ? await api.allLeadPage(params)
@@ -176,6 +326,12 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
           : next
       })
       setTotal(result.total)
+      setSelectedLeadMap(current => {
+        if (!current.size) return current
+        const next = new Map(current)
+        result.list.forEach(item => { if (next.has(item.id)) next.set(item.id, item) })
+        return next
+      })
       setPageNo(targetPage)
       if (replace) setSelectedId(current => resolveLeadSelection(result.list, {
         preferredId: options.preferredSelectedId,
@@ -203,7 +359,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         }
       }
     }
-  }, [advancedFilter, audience, keyword, requestedLeadId, routeState?.relationScope, simpleStatus])
+  }, [advancedFilter, audience, keyword, leadPageSize, requestedLeadId, routeState?.relationScope, simpleStatus, sortField, sortOrder])
 
   useEffect(() => { void loadMetadata() }, [loadMetadata])
   useEffect(() => {
@@ -239,10 +395,29 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     }
   }, [])
 
+  const loadDetailByNo = useCallback(async (leadNo: string) => {
+    setDetailLoading(true)
+    setDetailError('')
+    try {
+      const loaded = await api.managedLeadByNo(leadNo)
+      setSelectedId(loaded.id)
+      setDetail(loaded)
+      setItems(current => current.some(item => item.id === loaded.id) ? current : pinLeadFirst(current, loaded))
+    } catch (loadError) {
+      setDetail(undefined)
+      setDetailError(loadError instanceof Error ? loadError.message : '客资详情加载失败')
+    } finally {
+      setDetailLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
     if (selectedId) void loadDetail(selectedId)
     else setDetail(undefined)
   }, [loadDetail, selectedId])
+  useEffect(() => {
+    if (!selectedId && requestedLeadNo) void loadDetailByNo(requestedLeadNo)
+  }, [loadDetailByNo, requestedLeadNo, selectedId])
 
   // 详情已经渲染出来即算看过，自动选中与手工点击一视同仁
   useEffect(() => {
@@ -307,7 +482,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     (value?: string) => dictionaryDisplayLabel(channels, value, channelError),
     [channelError, channels]
   )
-  const hasMore = hasNextLeadInboxPage(pageNo, PAGE_SIZE, total)
+  const hasMore = hasNextLeadInboxPage(pageNo, leadPageSize, total)
 
   useEffect(() => {
     const root = listScrollRef.current
@@ -327,7 +502,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     setFollowUpDirty(false)
     routeSelectionRef.current = undefined
     setSelectedId(id)
-    if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+    if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
   const detailContent = detailLoading
     ? <Skeleton active paragraph={{ rows: 10 }}/>
@@ -336,10 +511,158 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       : detail
         ? <LeadDetail lead={detail} categories={categories} categoryLabel={categoryLabel} channelLabel={channelLabel}
           mode={audience} autoExpandFollowUp={Boolean(routeState?.openFollowUp && requestedLeadId === detail.id)}
-          autoOpenSubmitterSupplement={Boolean(routeState?.openSubmitterSupplement && requestedLeadId === detail.id)}
           initialTab={requestedLeadId === detail.id ? requestedTab : undefined}
-          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)}/>
+          onDirtyChange={setFollowUpDirty} onChanged={() => void refreshAfterLeadChange(detail.id)} hideProviderOwner/>
         : <Empty description="从左侧选择一条客资"/>
+
+  const allLeadTableColumns: ProColumns<ManagedLead>[] = [
+      { key: 'leadNo', title: '客资编号', dataIndex: 'leadNo', width: 170 },
+      { key: 'submittedName', title: '姓名', dataIndex: 'submittedName', width: 130 },
+      { key: 'submittedMobile', title: '手机号', dataIndex: 'submittedMobile', width: 130, render: (_, item) => item.submittedMobile || '-' },
+      { key: 'submittedWechatId', title: '微信号', dataIndex: 'submittedWechatId', width: 140, render: (_, item) => item.submittedWechatId || '-' },
+      { key: 'source', title: '来源', render: (_: unknown, item: ManagedLead) => item.sourceLabel || item.sourceType || '-' },
+      { key: 'sourceUser', title: '提交人', render: (_: unknown, item: ManagedLead) => item.sourceUserName || '-' },
+      { key: 'owner', title: '所属销售', render: (_: unknown, item: ManagedLead) => item.ownerUserName || '-' },
+      { key: 'category', title: '分类', render: (_: unknown, item: ManagedLead) => snapshotOrDictionaryDisplayLabel(item.leadCategoryLabelSnapshot, categories, item.leadCategory, categoryError) },
+      { key: 'channel', title: '渠道', render: (_: unknown, item: ManagedLead) => channelLabel(item.sourceChannel) },
+      { key: 'region', title: '地区', render: (_: unknown, item: ManagedLead) => [item.provinceName, item.cityName].filter(Boolean).join(' / ') || '-' },
+      { key: 'product', title: '意向产品', render: (_: unknown, item: ManagedLead) => productText(item) },
+      { key: 'qualificationStatus', title: '有效性状态', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_QUALIFICATION_STATUS_LABELS, item.qualificationStatus, '未知') },
+      { key: 'followUpStatus', title: '跟进状态', render: (_: unknown, item: ManagedLead) => item.followUpStatus ? protocolDisplayLabel(LEAD_FOLLOW_UP_STATUS_LABELS, item.followUpStatus, '未知') : '-' },
+      { key: 'operationalStatus', title: '运营状态', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_OPERATIONAL_STATUS_LABELS, item.operationalStatus, item.operationalStatus || '-') },
+      { key: 'handlingStage', title: '处理阶段', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_HANDLING_STAGE_LABELS, item.handlingStage, item.handlingStage || '-') },
+      { key: 'assignmentStatus', title: '分配状态', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_ASSIGNMENT_STATUS_LABELS, item.assignmentStatus, item.assignmentStatus || '-') },
+      { key: 'dispatchMode', title: '分配方式', render: (_: unknown, item: ManagedLead) => protocolDisplayLabel(LEAD_DISPATCH_MODE_LABELS, item.dispatchMode, item.dispatchMode || '-') },
+      { key: 'assignmentAttemptCount', title: '分配尝试次数', dataIndex: 'assignmentAttemptCount', render: (_, item) => item.assignmentAttemptCount ?? '-' },
+      { key: 'publicPoolAt', title: '进入公海时间', dataIndex: 'publicPoolAt', width: 170, render: (_, item) => formatTimestamp(item.publicPoolAt) },
+      { key: 'countedAt', title: '计入业绩时间', dataIndex: 'countedAt', width: 170, render: (_, item) => formatTimestamp(item.countedAt) },
+      { key: 'firstFollowUpAt', title: '首次跟进时间', dataIndex: 'currentAssignmentFirstFollowUpAt', width: 170, render: (_, item) => formatTimestamp(item.currentAssignmentFirstFollowUpAt) },
+      { key: 'firstFollowUpDeadlineAt', title: '首跟截止时间', dataIndex: 'currentAssignmentFirstFollowUpDeadlineAt', width: 170, render: (_, item) => formatTimestamp(item.currentAssignmentFirstFollowUpDeadlineAt) },
+      { key: 'qualificationStartedAt', title: '判定开始时间', dataIndex: 'qualificationStartedAt', width: 170, render: (_, item) => formatTimestamp(item.qualificationStartedAt) },
+      { key: 'qualificationDeadlineAt', title: '判定截止时间', dataIndex: 'qualificationDeadlineAt', width: 170, render: (_, item) => formatTimestamp(item.qualificationDeadlineAt) },
+      { key: 'suspendedAt', title: '挂起时间', dataIndex: 'suspendedAt', width: 170, render: (_, item) => formatTimestamp(item.suspendedAt) },
+      { key: 'qualifiedBy', title: '判定人', render: (_: unknown, item: ManagedLead) => item.qualifiedByUserName || '-' },
+      { key: 'validDescription', title: '有效说明', dataIndex: 'validDescription', width: 220, ellipsis: true, render: (_, item) => item.validDescription || '-' },
+      { key: 'salesOrderSubmittedAt', title: '订单提交时间', dataIndex: 'salesOrderSubmittedAt', width: 170, render: (_, item) => formatTimestamp(item.salesOrderSubmittedAt) },
+      { key: 'invalidReason', title: '无效原因', render: (_: unknown, item: ManagedLead) => item.invalidReasonLabelSnapshot || item.invalidReason || '-' },
+      { key: 'invalidDescription', title: '无效说明', dataIndex: 'invalidDescription', width: 220, ellipsis: true, render: (_, item) => item.invalidDescription || '-' },
+      { key: 'appealDeadlineAt', title: '申诉截止时间', dataIndex: 'appealDeadlineAt', width: 170, render: (_, item) => formatTimestamp(item.appealDeadlineAt) },
+      { key: 'closedAt', title: '关闭时间', dataIndex: 'closedAt', width: 170, render: (_, item) => formatTimestamp(item.closedAt) },
+      { key: 'closeReason', title: '关闭原因', dataIndex: 'closeReason', width: 220, ellipsis: true, render: (_, item) => item.closeReason || '-' },
+      { key: 'relationTypes', title: '当前关系', dataIndex: 'relationTypes', render: (_, item) => item.relationTypes?.join(' / ') || '-' },
+      { key: 'nextFollowUpAt', title: '下次跟进时间', dataIndex: 'nextFollowUpAt', width: 170, render: (_, item) => formatTimestamp(item.nextFollowUpAt) },
+      { key: 'submittedAt', title: '提交时间', dataIndex: 'submittedAt', width: 170, render: (_, item) => formatTimestamp(item.submittedAt) },
+      { key: 'lastActivityAt', title: '最近活动时间', dataIndex: 'lastActivityAt', width: 170, render: (_, item) => formatTimestamp(item.lastActivityAt) },
+      { key: 'qualifiedAt', title: '判定时间', dataIndex: 'qualifiedAt', width: 170, render: (_, item) => formatTimestamp(item.qualifiedAt) },
+      { key: 'convertedAt', title: '成交转化时间', dataIndex: 'convertedAt', width: 170, render: (_, item) => formatTimestamp(item.convertedAt) },
+      { key: 'remark', title: '备注', dataIndex: 'remark', width: 220, ellipsis: true, render: (_, item) => item.remark || '-' },
+      { key: 'updateTime', title: '更新时间', dataIndex: 'updateTime', width: 170, render: (_, item) => formatTimestamp(item.updateTime) }
+  ]
+  const leadTableColumnSource: ProColumns<ManagedLead>[] = [...allLeadTableColumns, {
+    key: 'action', title: '操作', width: 88, fixed: 'right' as const, hideInSetting: true,
+    render: (_: unknown, item: ManagedLead) => <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => selectLead(item.id)}>详细</Button>
+  }]
+  const leadTableColumns: ProColumns<ManagedLead>[] = leadTableColumnSource.map(column => {
+    const columnKey = String(column.key)
+    const backendSortField = LEAD_SORT_FIELD_BY_COLUMN_KEY[columnKey]
+    const width = columnWidths[columnKey] ?? Number(column.width ?? 140)
+    return {
+      ...column,
+      width,
+      ellipsis: column.ellipsis ?? true,
+      sorter: backendSortField ? true : undefined,
+      sortOrder: backendSortField === sortField ? sortOrder : null,
+      onHeaderCell: columnKey === 'action' ? column.onHeaderCell : () => ({
+        className: 'lead-table-resizable-header',
+        onPointerMove: event => {
+          event.currentTarget.style.cursor = isLeadTableResizeEdge(event.currentTarget, event.clientX)
+            ? 'col-resize'
+            : ''
+        },
+        onPointerLeave: event => { event.currentTarget.style.cursor = '' },
+        onPointerDownCapture: event => startLeadTableColumnResize(event, width, nextWidth => {
+          setColumnWidths(current => ({ ...current, [columnKey]: nextWidth }))
+        }),
+        onClickCapture: event => {
+          if (!isLeadTableResizeEdge(event.currentTarget, event.clientX)) return
+          event.preventDefault()
+          event.stopPropagation()
+        },
+      }),
+    }
+  })
+  const leadTableScrollWidth = leadTableColumns.reduce((totalWidth, column) => totalWidth + Number(column.width ?? 140), 0)
+
+  const handleLeadTableChange: TableProps<ManagedLead>['onChange'] = (_pagination, _filters, sorter, extra) => {
+    if (extra.action !== 'sort') return
+    const activeSorter = Array.isArray(sorter) ? sorter[0] : sorter
+    const nextOrder = activeSorter?.order || undefined
+    const nextSortField = nextOrder
+      ? LEAD_SORT_FIELD_BY_COLUMN_KEY[String(activeSorter.columnKey)]
+      : undefined
+    clearLeadSelection()
+    setSortField(nextSortField)
+    setSortOrder(nextSortField ? nextOrder : undefined)
+  }
+
+  const openBatchAction = async (action: LeadBatchFormAction) => {
+    if (!selectedRowKeys.length) return
+    setBatchAction(action)
+    batchIdempotencyKey.current = crypto.randomUUID()
+    batchForm.resetFields()
+    if (action === 'transfer' || action === 'release-public-sea') {
+      try {
+        try { setBatchCandidates(await api.ownerTransferCandidates()) }
+        catch { setBatchCandidates(await api.subordinateTransferCandidates()) }
+      }
+      catch (error) { setBatchCandidates([]); message.error(error instanceof Error ? error.message : '销售候选加载失败') }
+    }
+  }
+
+  const submitBatchAction = async () => {
+    if (!batchAction) return
+    const values = await batchForm.validateFields()
+    setBatchSaving(true)
+    try {
+      const result = await api.batchLeadAction(batchAction, selectedRowKeys.map(Number), {
+        reason: values.reason?.trim() || '', targetUserId: values.targetUserId, collaboratorUserId: values.collaboratorUserId,
+        idempotencyKey: batchIdempotencyKey.current || crypto.randomUUID(),
+      })
+      setBatchResult(result); setBatchResultOpen(true); setBatchAction(undefined); clearLeadSelection(); batchIdempotencyKey.current = undefined
+      const version = ++requestVersion.current
+      await loadPage(1, true, version, { silent: true })
+      if (selectedId) await loadDetail(selectedId, true)
+    } catch (error) { message.error(error instanceof Error ? error.message : '批量操作失败') }
+    finally { setBatchSaving(false) }
+  }
+
+  const updateLeadSelection = useCallback((keys: React.Key[], rows: ManagedLead[]) => {
+    const limitedKeys = keys.slice(0, 100)
+    if (keys.length > 100) message.warning('最多选择 100 条客资')
+    const ids = new Set(limitedKeys.map(Number))
+    setSelectedRowKeys(limitedKeys)
+    setSelectedLeadMap(current => {
+      const next = new Map([...current].filter(([id]) => ids.has(id)))
+      rows.filter(row => ids.has(row.id)).forEach(row => next.set(row.id, row))
+      return next
+    })
+  }, [])
+
+  const leadRowSelection: TableRowSelection<ManagedLead> = {
+    selectedRowKeys,
+    preserveSelectedRowKeys: true,
+    onChange: updateLeadSelection,
+  }
+
+  const batchMenuItems = LEAD_BATCH_ACTIONS
+    .filter(action => action.permissions.some(permission => permissions.includes(permission)))
+    .map(action => ({
+      key: action.type,
+      icon: action.icon,
+      label: action.label.replace('批量', ''),
+      danger: action.danger,
+      onClick: () => void openBatchAction(action.type),
+    }))
 
   if (detailOnly) {
     return <section className="workspace-page lead-management-page lead-management-detail-only">
@@ -347,7 +670,7 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
     </section>
   }
 
-  return <><section className="workspace-page lead-management-page">
+  return <><section className={`workspace-page lead-management-page${useTableLayout ? ' lead-management-table-page' : ''}`}>
     <header className="lead-simple-status-shell" role="group" aria-label="客资状态筛选">
       {returnTo && <Button icon={<ArrowLeftOutlined/>} onClick={() => navigate(returnTo)}>返回订单审批</Button>}
       {SIMPLE_STATUS_OPTIONS.map(option => <button
@@ -359,9 +682,53 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
       >{option.label}</button>)}
       <Button icon={<ReloadOutlined/>} onClick={() => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current); if (selectedId) void loadDetail(selectedId, true) }}>刷新</Button>
     </header>
-    <div className="lead-inbox-layout">
+    <div className={useTableLayout ? 'lead-management-table-shell' : 'lead-inbox-layout'}>
+      {useTableLayout ? <>
+        <ProTable<ManagedLead>
+          className="lead-management-table"
+          rowKey="id"
+          search={false}
+          toolBarRender={() => [
+            <div key="lead-table-toolbar-left" className="lead-management-table-toolbar-left">
+              <Space className="lead-management-batch-toolbar" wrap>
+                <Typography.Text type="secondary">已选 {selectedRowKeys.length} 条</Typography.Text>
+                <Dropdown menu={{ items: batchMenuItems }} disabled={!selectedRowKeys.length || !batchMenuItems.length}>
+                  <Button icon={<DownOutlined />} disabled={!selectedRowKeys.length || !batchMenuItems.length}>批量操作</Button>
+                </Dropdown>
+              </Space>
+              <div className="lead-management-table-filter-toolbar">
+                <AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
+              </div>
+            </div>
+          ]}
+          options={{ density: true, fullScreen: true, setting: true, reload: () => { void loadMetadata(); void loadPage(1, true, ++requestVersion.current) } }}
+          columnsState={{ persistenceKey: 'crm-lead-management-table-columns', persistenceType: 'localStorage' }}
+          loading={initialLoading}
+          dataSource={items}
+          pagination={{
+            current: pageNo,
+            pageSize: leadPageSize,
+            total,
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100],
+            onChange: (nextPage, nextPageSize) => {
+              const sizeChanged = nextPageSize !== leadPageSize
+              if (sizeChanged) setLeadPageSize(nextPageSize)
+              void loadPage(sizeChanged ? 1 : nextPage, true, ++requestVersion.current,
+                sizeChanged ? { pageSize: nextPageSize } : undefined)
+            },
+          }}
+          scroll={{ x: leadTableScrollWidth }}
+          locale={{ emptyText: initialError ? '客资列表加载失败' : '当前筛选下暂无客资' }}
+          columns={leadTableColumns}
+          onChange={handleLeadTableChange}
+          rowSelection={leadRowSelection}
+          tableAlertRender={false}
+          tableAlertOptionRender={false}
+        />
+      </> : <>
       <aside className="lead-inbox-list-pane">
-        <div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
+        <div className="lead-inbox-toolbar"><AdvancedFilterToolbar scene="lead" pageKey="lead_management" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
         {initialError && <Alert className="lead-list-error" type={isLeadInboxUnauthorized(initialError) ? 'warning' : 'error'} showIcon
           message={isLeadInboxUnauthorized(initialError) ? '无权查看客资收件箱' : '客资列表加载失败'} description={initialError}
           action={!isLeadInboxUnauthorized(initialError) ? <Button size="small" onClick={() => void loadPage(1, true, requestVersion.current)}>重试</Button> : undefined}/>}
@@ -406,18 +773,31 @@ export default function LeadManagementPage({ permissions, detailOnly = false }: 
         </div>
       </aside>
       <main className="lead-inbox-detail-pane">{detailContent}</main>
+      </>}
     </div>
   </section>
-  <Drawer
+  <Modal open={Boolean(batchAction)} title={batchAction ? `批量${LEAD_BATCH_ACTION_LABELS[batchAction]}客资` : undefined} confirmLoading={batchSaving} onOk={() => void submitBatchAction()} onCancel={() => setBatchAction(undefined)}>
+    {batchAction && <>
+      <Alert type="info" showIcon message={`已选择 ${selectedRowKeys.length} 条客资，后端将逐条校验并返回成功或失败结果。`} style={{ marginBottom: 16 }} />
+      <Form form={batchForm} layout="vertical">
+        {batchAction === 'transfer' && <Form.Item name="targetUserId" label="目标销售" rules={[{ required: true, message: '请选择目标销售' }]}><Select showSearch optionFilterProp="label" options={batchCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>}
+        {batchAction === 'release-public-sea' && <Form.Item name="collaboratorUserId" label="公海跟进销售（可不填）"><Select allowClear showSearch optionFilterProp="label" options={batchCandidates.map(user => ({ value: user.id, label: user.nickname }))} /></Form.Item>}
+        <Form.Item name="reason" label="操作原因" rules={[{ required: true, whitespace: true, message: '请填写操作原因' }, { max: 500, message: '最多 500 个字符' }]}><Input.TextArea rows={4} maxLength={500} showCount /></Form.Item>
+      </Form>
+    </>}
+  </Modal>
+  <LeadBatchResultModal result={batchResult} open={batchResultOpen} onClose={() => setBatchResultOpen(false)} />
+  <ResizableDetailDrawer
+    desktopResizable={useTableLayout}
     className="lead-inbox-mobile-drawer"
     title={detail?.submittedName || '客资详情'}
-    placement="bottom"
-    height="82vh"
+    placement={useTableLayout ? 'right' : 'bottom'}
+    height={useTableLayout ? undefined : '82vh'}
     open={drawerOpen}
     onClose={() => setDrawerOpen(false)}
     destroyOnClose={false}
   >
     {detailContent}
-  </Drawer>
+  </ResizableDetailDrawer>
   </>
 }

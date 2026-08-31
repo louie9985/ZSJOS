@@ -42,7 +42,7 @@ public class MesMdAutoCodeRecordServiceImpl implements MesMdAutoCodeRecordServic
     @Resource
     private MesMdAutoCodePartService partService;
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<MesMdAutoCodePartStrategy> strategyList;
     private Map<Integer, MesMdAutoCodePartStrategy> strategyMap;
 

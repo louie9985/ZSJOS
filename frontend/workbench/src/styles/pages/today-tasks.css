@@ -100,6 +100,9 @@
 }
 
 .home-calendar-panel {
+  --home-calendar-cell-h: var(--crm-sp-6);
+  --home-calendar-weekday-h: var(--crm-sp-5);
+
   grid-column: 13 / span 4;
   grid-row: 1 / span 3;
 }
@@ -126,6 +129,10 @@
 .home-panel-header.compact {
   align-items: center;
   margin-bottom: var(--crm-sp-2);
+}
+
+.home-calendar-panel .home-panel-header.compact {
+  margin-bottom: var(--crm-sp-1);
 }
 
 .home-panel-header h4 {
@@ -196,17 +203,36 @@
 }
 
 .home-calendar-panel .ant-picker-calendar {
+  display: flex;
   min-height: 0;
   flex: 1;
+  flex-direction: column;
   overflow: hidden;
 }
 
-.home-calendar-panel .ant-picker-calendar-header {
-  padding: 0 0 var(--crm-sp-1);
+.home-calendar-panel .ant-picker-calendar .ant-picker-panel,
+.home-calendar-panel .ant-picker-calendar .ant-picker-date-panel,
+.home-calendar-panel .ant-picker-calendar .ant-picker-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
 }
 
-.home-calendar-panel .ant-picker-calendar-header .ant-select {
-  min-width: 72px;
+.home-calendar-panel .ant-picker-calendar .ant-picker-body {
+  padding: 0;
+}
+
+.home-calendar-panel .ant-picker-calendar-mini .ant-picker-content {
+  height: 100%;
+  table-layout: fixed;
+}
+
+/* The six-week month view must fit inside the fixed 16:9 top region. */
+.home-calendar-panel .ant-picker-calendar .ant-picker-content tbody tr,
+.home-calendar-panel .ant-picker-calendar .ant-picker-content tbody td,
+.home-calendar-panel .ant-picker-calendar .ant-picker-cell {
+  height: var(--home-calendar-cell-h);
 }
 
 .home-calendar-panel .ant-picker-content th,
@@ -214,10 +240,15 @@
   padding: 0;
 }
 
+.home-calendar-panel .ant-picker-content th {
+  height: var(--home-calendar-weekday-h);
+  line-height: var(--home-calendar-weekday-h);
+}
+
 .home-calendar-panel .ant-picker-cell-inner {
-  min-width: 24px;
-  height: 24px;
-  line-height: 24px;
+  min-width: var(--home-calendar-cell-h);
+  height: var(--home-calendar-cell-h);
+  line-height: var(--home-calendar-cell-h);
 }
 
 .home-announcement-list {
@@ -239,9 +270,9 @@
   min-width: 0;
   min-height: 58px;
   flex: 0 0 auto;
-  flex-direction: column;
-  justify-content: center;
-  gap: var(--crm-sp-1);
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
   padding: var(--crm-sp-2);
   color: var(--crm-text);
   text-align: left;
@@ -251,9 +282,19 @@
   cursor: pointer;
 }
 
+.home-announcement-item.highlighted {
+  border-bottom-color: var(--crm-color-primary-border);
+  background: var(--crm-color-primary-bg);
+}
+
 .home-announcement-item:hover,
 .home-announcement-item:focus-visible {
   background: var(--crm-bg-sunken);
+}
+
+.home-announcement-item.highlighted:hover,
+.home-announcement-item.highlighted:focus-visible {
+  background: color-mix(in srgb, var(--crm-color-primary-bg) 78%, var(--crm-bg-sunken));
 }
 
 .home-announcement-item.unread .home-announcement-title {
@@ -262,6 +303,7 @@
 
 .home-announcement-title {
   display: flex;
+  flex: 1 1 auto;
   min-width: 0;
   align-items: center;
   gap: var(--crm-sp-2);
@@ -270,9 +312,22 @@
   white-space: nowrap;
 }
 
+.home-announcement-title .ant-tag {
+  flex: 0 0 auto;
+}
+
+.home-announcement-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .home-announcement-item time {
+  flex: 0 0 auto;
   color: var(--crm-text-secondary);
   font-size: var(--crm-font-sm);
+  white-space: nowrap;
 }
 
 .home-announcement-all {

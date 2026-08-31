@@ -26,6 +26,9 @@ public class UserProfileUpdateReqVO {
     @Mobile
     private String mobile;
 
+    @Schema(description = "是否接收企业微信推送")
+    private Boolean wecomEnabled;
+
     @Schema(description = "用户性别，参见 SexEnum 枚举类", example = "1")
     private Integer sex;
 

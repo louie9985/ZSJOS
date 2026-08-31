@@ -12,6 +12,7 @@ public class NotifyDeliveryContext {
     String sceneCode;
     String sourceEventKey;
     Long ruleId;
+    String actionType;
     Long userId;
     Integer userType;
     String templateCode;

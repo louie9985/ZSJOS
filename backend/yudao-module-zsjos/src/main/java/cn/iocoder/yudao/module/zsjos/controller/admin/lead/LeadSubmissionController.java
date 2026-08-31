@@ -46,7 +46,7 @@ public class LeadSubmissionController {
 
     @PostMapping("/attachment/upload")
     @Operation(summary = "上传客资图片")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:submit', 'zsjos:lead:self-sourced:create', 'zsjos:lead-complaint:create', 'zsjos:lead-complaint:handle', 'zsjos:lead:request-submitter-assist')")
     public CommonResult<LeadAttachmentUploadRespVO> uploadAttachment(@RequestParam("file") MultipartFile file)
             throws IOException {
         return success(attachmentService.upload(file));

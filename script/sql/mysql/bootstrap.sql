@@ -143,10 +143,17 @@ SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
 SOURCE script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql;
 SOURCE script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql;
 SOURCE script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql;
-SOURCE script/sql/mysql/migrations/V163__lead_unreachable_submitter_assist.sql;
 SOURCE script/sql/mysql/migrations/V164__notice_highlight_until.sql;
 SOURCE script/sql/mysql/migrations/V165__zsjos_forced_form.sql;
 SOURCE script/sql/mysql/migrations/V166__zsjos_forced_form_formal_model.sql;
+SOURCE script/sql/mysql/migrations/V167__wecom_login_push_closed_loop.sql;
+SOURCE script/sql/mysql/migrations/V168__partner_h5_real_data_feedback_subject.sql;
+SOURCE script/sql/mysql/migrations/V169__advanced_filter_templates.sql;
+SOURCE script/sql/mysql/migrations/V170__partner_invitation_activation.sql;
+SOURCE script/sql/mysql/migrations/V171__lead_duplicate_rule_contract.sql;
+SOURCE script/sql/mysql/migrations/V172__lead_owner_self_actions.sql;
+SOURCE script/sql/mysql/migrations/V173__lead_submitter_assist_request.sql;
+SOURCE script/sql/mysql/migrations/V174__complete_zsjos_business_audit.sql;
 
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)

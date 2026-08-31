@@ -11,9 +11,16 @@ import '@/styles/vant-overrides.css'
 
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import { Locale } from 'vant/es/locale'
+import zhCN from 'vant/es/locale/lang/zh-CN'
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'
 import App from './App.vue'
 import router from './router'
 import { useAppStore } from './stores/app'
+
+dayjs.locale('zh-cn')
+Locale.use('zh-CN', zhCN)
 
 const MAX_ROOT_FONT_SIZE = 54
 

@@ -16,6 +16,14 @@ public interface LeadDuplicateReviewMapper extends BaseMapperX<LeadDuplicateRevi
                 .eq(LeadDuplicateReviewDO::getSubmissionIdempotencyKey, key));
     }
 
+    default LeadDuplicateReviewDO selectPendingByFingerprint(String fingerprint) {
+        return selectOne(new LambdaQueryWrapperX<LeadDuplicateReviewDO>()
+                .eq(LeadDuplicateReviewDO::getStatus, "pending")
+                .eq(LeadDuplicateReviewDO::getReviewFingerprint, fingerprint)
+                .orderByAsc(LeadDuplicateReviewDO::getId)
+                .last("LIMIT 1"));
+    }
+
     default PageResult<LeadDuplicateReviewDO> selectPage(PageParam page, String status, java.util.List<Long> matchedIds) {
         LambdaQueryWrapperX<LeadDuplicateReviewDO> query = new LambdaQueryWrapperX<LeadDuplicateReviewDO>()
                 .eqIfPresent(LeadDuplicateReviewDO::getStatus, status);

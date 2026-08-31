@@ -3,7 +3,6 @@ import { showToast } from 'vant'
 import { useUserStore } from '@/stores/user'
 import { getToken, getTenantId, getRefreshToken, getClientId } from '@/utils/storage'
 import router from '@/router'
-import { isMissingImplementation, resolveFeatureMock } from './mock'
 
 declare module 'axios' {
   interface AxiosRequestConfig {
@@ -16,6 +15,12 @@ export interface ApiResponse<T = unknown> {
   code: number
   data: T
   msg: string
+}
+
+export function isMissingImplementation(status?: number, message?: unknown): boolean {
+  if ([404, 405, 501].includes(status || 0)) return true
+  const normalizedMessage = typeof message === 'string' ? message.toLowerCase() : ''
+  return /接口暂未提供|请求地址不存在|接口不存在|接口未实现|功能不存在|not found|not implemented/.test(normalizedMessage)
 }
 
 const request = axios.create({
@@ -111,9 +116,6 @@ request.interceptors.response.use(
       return recoverAndReplay(config)
     }
 
-    const mock = resolveFeatureMock(response.config, response.status, msg)
-    if (mock) return mock.data as AxiosResponse
-
     if (isMissingImplementation(response.status, msg)) {
       showToast({ message: '后端接口暂未提供', type: 'fail' })
       return Promise.reject(new Error('后端接口暂未提供'))
@@ -125,9 +127,6 @@ request.interceptors.response.use(
   },
   async (error) => {
     const { response, config } = error
-
-    const mock = resolveFeatureMock(config || {}, response?.status, response?.data?.msg)
-    if (mock) return mock.data
 
     if (isMissingImplementation(response?.status, response?.data?.msg)) {
       showToast({ message: '后端接口暂未提供', type: 'fail' })

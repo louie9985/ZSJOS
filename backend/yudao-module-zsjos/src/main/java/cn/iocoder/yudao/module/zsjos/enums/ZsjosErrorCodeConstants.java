@@ -46,7 +46,19 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PARTNER_OWNERSHIP_TARGET_INVALID = new ErrorCode(1_900_000_015, "归属员工必须是启用且拥有下属兼职权限的员工");
     ErrorCode PARTNER_OWNERSHIP_VERSION_CONFLICT = new ErrorCode(1_900_000_016, "兼职归属已被其他人修改，请刷新后重试");
     ErrorCode PARTNER_OWNERSHIP_PERMISSION_DENIED = new ErrorCode(1_900_000_017, "无权查看该下属兼职");
+    ErrorCode PARTNER_WECOM_NOT_BOUND = new ErrorCode(1_900_000_018, "当前企业微信尚未绑定兼职账号，请先使用账号密码登录后绑定");
+    ErrorCode WECOM_CLICK_TICKET_INVALID = new ErrorCode(1_900_000_019, "企业微信消息链接无效或已失效");
+    ErrorCode WECOM_CLICK_BASE_URL_INVALID = new ErrorCode(1_900_000_020, "企业微信点击回跳地址未配置或无效");
     ErrorCode PARTNER_ACCOUNT_CONCURRENT_MODIFICATION = new ErrorCode(1_900_000_015, "兼职账号已被并发修改，请重试");
+    ErrorCode PARTNER_INVITATION_NOT_ACTIVATED = new ErrorCode(1_900_000_021, "该手机号尚未激活，请先使用邀请码激活");
+    ErrorCode PARTNER_INVITATION_NOT_EXISTS = new ErrorCode(1_900_000_022, "邀请码或手机号不匹配");
+    ErrorCode PARTNER_INVITATION_EXPIRED = new ErrorCode(1_900_000_023, "邀请码已过期，请联系管理员重新生成");
+    ErrorCode PARTNER_INVITATION_USED = new ErrorCode(1_900_000_024, "邀请码已使用");
+    ErrorCode PARTNER_INVITATION_VOIDED = new ErrorCode(1_900_000_025, "邀请码已失效，请使用最新邀请码");
+    ErrorCode PARTNER_INVITATION_OPERATOR_INVALID = new ErrorCode(1_900_000_026, "归属运营必须是启用的新媒体运营");
+    ErrorCode PARTNER_INVITATION_VERSION_CONFLICT = new ErrorCode(1_900_000_027, "邀请码状态已变化，请刷新后重试");
+    ErrorCode PARTNER_INVITATION_CODE_CONFLICT = new ErrorCode(1_900_000_028, "邀请码生成冲突，请重试");
+    ErrorCode PARTNER_INVITATION_PASSWORD_CONFIRM_MISMATCH = new ErrorCode(1_900_000_029, "两次输入的密码不一致");
 
     ErrorCode LEAD_ASSIGNMENT_SOURCE_INVALID = new ErrorCode(1_900_001_001, "派单员工不存在、已停用或不属于新媒体运营岗位");
     ErrorCode LEAD_ASSIGNMENT_TARGET_INVALID = new ErrorCode(1_900_001_002, "所选销售不存在、已停用或不属于销售专员岗位");
@@ -88,6 +100,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_DUPLICATE_REVIEW_RESULT_INVALID = new ErrorCode(1_900_003_062, "复核结论与当前候选业务状态不匹配");
     ErrorCode LEAD_DUPLICATE_REVIEW_SALES_INVALID = new ErrorCode(1_900_003_063, "所选销售不在复核人的可选范围内");
     ErrorCode LEAD_DUPLICATE_REVIEW_PERMISSION_DENIED = new ErrorCode(1_900_003_064, "无权访问或处理该重复客资复核任务");
+    ErrorCode LEAD_DUPLICATE_STRONG_CONFLICT = new ErrorCode(1_900_003_065, "联系方式已存在，请联系管理员");
     ErrorCode LEAD_INBOX_FILTER_NOT_EXISTS = new ErrorCode(1_900_003_019, "客资筛选方案不存在或尚未发布");
     ErrorCode LEAD_INBOX_FILTER_INVALID = new ErrorCode(1_900_003_020, "客资筛选方案配置无效");
     ErrorCode ADVANCED_FILTER_INVALID = new ErrorCode(1_900_003_021, "高级筛选条件无效");
@@ -103,6 +116,9 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode BUSINESS_TASK_NOT_EXISTS = new ErrorCode(1_900_003_080, "业务待办不存在");
     ErrorCode BUSINESS_TASK_COMPLETE_FORBIDDEN = new ErrorCode(1_900_003_081, "无权完成该业务待办");
     ErrorCode LEAD_CATEGORY_INVALID = new ErrorCode(1_900_003_083, "客资分类不存在或已停用");
+    ErrorCode LEAD_SOURCE_CHANNEL_INVALID = new ErrorCode(1_900_003_086, "来源渠道不存在或已停用");
+    ErrorCode ADVANCED_FILTER_TEMPLATE_NOT_EXISTS = new ErrorCode(1_900_003_084, "高级筛选模板不存在");
+    ErrorCode ADVANCED_FILTER_TEMPLATE_INVALID = new ErrorCode(1_900_003_085, "高级筛选模板配置无效");
     ErrorCode WORK_ORDER_SCENE_NOT_EXISTS = new ErrorCode(1_900_003_100, "工单场景不存在");
     ErrorCode WORK_ORDER_SCENE_CODE_DUPLICATE = new ErrorCode(1_900_003_101, "工单场景编码已存在");
     ErrorCode WORK_ORDER_SCENE_INVALID = new ErrorCode(1_900_003_102, "工单场景配置无效");
@@ -156,6 +172,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_COMPLAINT_ALREADY_HANDLED = new ErrorCode(1_900_003_076, "该销售投诉已由其他人员处理");
     ErrorCode LEAD_COMPLAINT_RESULT_INVALID = new ErrorCode(1_900_003_077, "销售投诉处理结论无效");
     ErrorCode LEAD_SUBMITTER_ACTION_STATE_INVALID = new ErrorCode(1_900_003_078, "当前客资状态不允许提交人补充、催促或投诉");
+    ErrorCode LEAD_SUBMITTER_ASSIST_RECIPIENT_MISSING = new ErrorCode(1_900_003_079, "当前客资缺少可通知的提交人");
+    ErrorCode LEAD_SUBMITTER_ASSIST_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_080, "幂等键已用于其他提交人协助请求");
 
     ErrorCode PRODUCT_NOT_EXISTS = new ErrorCode(1_900_004_001, "产品不存在");
     ErrorCode PRODUCT_REF_DUPLICATE = new ErrorCode(1_900_004_002, "产品稳定编号已存在");
@@ -310,6 +328,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode CONTENT_VERSION_STAGE_INVALID = new ErrorCode(1_900_012_007, "内容版本阶段不允许该操作");
     ErrorCode CONTENT_VERSION_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_012_008, "内容版本提交幂等键已被使用");
     ErrorCode CONTENT_REJECT_REASON_REQUIRED = new ErrorCode(1_900_012_009, "内容验收退回原因不能为空且不能超过 500 个字符");
+    ErrorCode CONTENT_CLASS_INVALID = new ErrorCode(1_900_012_010, "内容分类不存在或已停用");
 
     ErrorCode PRODUCTION_TICKET_NOT_EXISTS = new ErrorCode(1_900_013_001, "拍剪工单不存在");
     ErrorCode PRODUCTION_TICKET_STATE_INVALID = new ErrorCode(1_900_013_002, "当前拍剪工单状态不允许该操作");

@@ -30,8 +30,10 @@ public class FeedbackDO extends TenantBaseDO {
     private String supportTypeValue;
     private String supportTypeLabelSnapshot;
     private String status;
+    private String submitterSubjectType;
     private Long submitterUserId;
     private String submitterNameSnapshot;
+    private Long partnerId;
     private Long assigneeUserId;
     private String assigneeNameSnapshot;
     private String lastReplySummary;

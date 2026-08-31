@@ -74,6 +74,7 @@ public class PaymentRefundService {
 
     public PaymentRefundRespVO get(Long id) { PaymentRefundDO refund = refundMapper.selectById(id); if (refund == null) throw exception(PAYMENT_REFUND_NOT_EXISTS); return toVO(refund); }
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "payment-refund.process-result", targetType = "payment-refund")
     @Transactional(rollbackFor = Exception.class)
     public void handleProcessResult(String processInstanceId, Integer processStatus) {
         PaymentRefundDO refund = refundMapper.selectOne(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<PaymentRefundDO>().eq(PaymentRefundDO::getProcessInstanceId, processInstanceId).last("LIMIT 1"));

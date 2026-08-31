@@ -26,6 +26,13 @@
         >
           <Icon icon="ep:plus" />新增兼职
         </el-button>
+        <el-button
+          v-hasPermi="['zsjos:partner-invitation:create']"
+          type="success"
+          @click="openInvitationCreate"
+        >
+          <Icon icon="ep:key" />生成邀请码
+        </el-button>
       </el-form-item>
     </el-form>
     <el-table v-loading="loading" :data="partners" class="table">
@@ -92,6 +99,71 @@
       @pagination="load"
     />
   </ContentWrap>
+  <ContentWrap v-hasPermi="['zsjos:partner-invitation:query']" class="mt-16px">
+    <template #header>
+      <span>兼职邀请码</span>
+    </template>
+    <el-form :model="invitationQuery" inline class="mb-16px" @submit.prevent="handleInvitationQuery">
+      <el-form-item label="关键词">
+        <el-input
+          v-model="invitationQuery.keyword"
+          clearable
+          placeholder="姓名、手机号或邀请码"
+          @keyup.enter="handleInvitationQuery"
+        />
+      </el-form-item>
+      <el-form-item label="状态">
+        <el-select v-model="invitationQuery.status" clearable class="!w-160px" placeholder="全部状态">
+          <el-option label="待激活" value="active" />
+          <el-option label="已使用" value="used" />
+          <el-option label="已失效" value="voided" />
+          <el-option label="已过期" value="expired" />
+        </el-select>
+      </el-form-item>
+      <el-form-item>
+        <el-button type="primary" @click="handleInvitationQuery">
+          <Icon icon="ep:search" />查询
+        </el-button>
+        <el-button @click="resetInvitationQuery">
+          <Icon icon="ep:refresh" />重置
+        </el-button>
+      </el-form-item>
+    </el-form>
+    <el-table v-loading="invitationLoading" :data="invitations">
+      <el-table-column prop="inviteCode" label="邀请码" width="120" />
+      <el-table-column prop="name" label="姓名" />
+      <el-table-column prop="mobile" label="手机号" />
+      <el-table-column prop="assignedOperatorName" label="归属运营" />
+      <el-table-column label="状态" width="100">
+        <template #default="scope">{{ invitationStatusLabels[scope.row.status] }}</template>
+      </el-table-column>
+      <el-table-column prop="expiresAt" label="过期时间" min-width="170" />
+      <el-table-column prop="createdByName" label="创建人" />
+      <el-table-column label="操作" width="100">
+        <template #default="scope">
+          <el-button
+            v-if="scope.row.status === 'active'"
+            v-hasPermi="['zsjos:partner-invitation:void']"
+            link
+            type="warning"
+            @click="handleVoidInvitation(scope.row)"
+            >作废</el-button
+          >
+        </template>
+      </el-table-column>
+    </el-table>
+    <el-alert v-if="invitationLoadError" :title="invitationLoadError" type="error" show-icon>
+      <template #default><el-button link @click="loadInvitations">重试</el-button></template>
+    </el-alert>
+    <el-empty v-else-if="!invitationLoading && !invitations.length" description="暂无邀请码" />
+    <Pagination
+      v-if="invitationTotal > 0"
+      v-model:page="invitationQuery.pageNo"
+      v-model:limit="invitationQuery.pageSize"
+      :total="invitationTotal"
+      @pagination="loadInvitations"
+    />
+  </ContentWrap>
   <Dialog v-model="createVisible" title="新增兼职账号">
     <el-form :model="createForm" label-width="100px">
       <el-form-item label="兼职编号"><el-input v-model="createForm.partnerNo" /></el-form-item>
@@ -110,6 +182,40 @@
       ><el-button @click="createVisible = false">取消</el-button
       ><el-button type="primary" @click="submitCreate">确认</el-button></template
     >
+  </Dialog>
+  <Dialog v-model="invitationCreateVisible" title="生成兼职邀请码" width="520px">
+    <el-form :model="invitationForm" label-width="100px">
+      <el-form-item label="姓名" required>
+        <el-input v-model="invitationForm.name" maxlength="100" />
+      </el-form-item>
+      <el-form-item label="手机号" required>
+        <el-input v-model="invitationForm.mobile" maxlength="11" />
+      </el-form-item>
+      <el-form-item label="归属运营" required>
+        <el-select
+          v-model="invitationForm.assignedOperatorUserId"
+          filterable
+          remote
+          reserve-keyword
+          :remote-method="searchInvitationOperators"
+          :loading="operatorLoading"
+          placeholder="选择新媒体运营"
+        >
+          <el-option
+            v-for="user in invitationOperators"
+            :key="user.id"
+            :label="user.nickname"
+            :value="user.id"
+          />
+        </el-select>
+      </el-form-item>
+    </el-form>
+    <template #footer>
+      <el-button @click="invitationCreateVisible = false">取消</el-button>
+      <el-button type="primary" :loading="invitationSubmitting" @click="submitInvitation">
+        生成
+      </el-button>
+    </template>
   </Dialog>
   <Dialog v-model="convertVisible" title="兼职转为新媒体员工">
     <el-form :model="convertForm" label-width="120px">
@@ -213,7 +319,27 @@ const total = ref(0)
 const loadError = ref('')
 const queryParams = reactive({ pageNo: 1, pageSize: 20, keyword: '', status: '' })
 const statusLabels = { enabled: '启用', disabled: '停用', converted: '已转员工' }
+const invitationStatusLabels = {
+  active: '待激活',
+  used: '已使用',
+  voided: '已失效',
+  expired: '已过期'
+}
 const createVisible = ref(false)
+const invitationCreateVisible = ref(false)
+const invitationSubmitting = ref(false)
+const invitationLoading = ref(false)
+const invitationLoadError = ref('')
+const invitationTotal = ref(0)
+const invitations = ref<PartnerApi.PartnerInvitationVO[]>([])
+const invitationQuery = reactive({ pageNo: 1, pageSize: 10, keyword: '', status: '' })
+const invitationForm = reactive<PartnerApi.PartnerInvitationCreateVO>({
+  name: '',
+  mobile: '',
+  assignedOperatorUserId: undefined
+})
+const operatorLoading = ref(false)
+const invitationOperators = ref<PartnerApi.AssignmentCandidateVO[]>([])
 const convertVisible = ref(false)
 const assignmentVisible = ref(false)
 const assignmentLoading = ref(false)
@@ -260,6 +386,25 @@ const load = async () => {
     loading.value = false
   }
 }
+const loadInvitations = async () => {
+  invitationLoading.value = true
+  invitationLoadError.value = ''
+  try {
+    const page = await PartnerApi.getInvitationPage({
+      ...invitationQuery,
+      keyword: invitationQuery.keyword.trim() || undefined,
+      status: invitationQuery.status || undefined
+    })
+    invitations.value = page.list
+    invitationTotal.value = page.total
+  } catch (cause: any) {
+    invitations.value = []
+    invitationTotal.value = 0
+    invitationLoadError.value = cause?.code === 403 ? '无权查看兼职邀请码' : '邀请码列表加载失败'
+  } finally {
+    invitationLoading.value = false
+  }
+}
 const submitCreate = async () => {
   if (
     !/^1\d{10}$/.test(createForm.mobile) ||
@@ -270,6 +415,61 @@ const submitCreate = async () => {
   createVisible.value = false
   message.success('兼职账号已创建')
   await load()
+}
+const openInvitationCreate = async () => {
+  invitationForm.name = ''
+  invitationForm.mobile = ''
+  invitationForm.assignedOperatorUserId = undefined
+  invitationCreateVisible.value = true
+  await searchInvitationOperators('')
+}
+const searchInvitationOperators = async (keyword: string) => {
+  operatorLoading.value = true
+  try {
+    invitationOperators.value = (await PartnerApi.getInvitationOperatorCandidates({ keyword })).list
+  } catch {
+    invitationOperators.value = []
+    message.error('归属运营加载失败')
+  } finally {
+    operatorLoading.value = false
+  }
+}
+const submitInvitation = async () => {
+  if (
+    !invitationForm.name.trim() ||
+    !/^1\d{10}$/.test(invitationForm.mobile) ||
+    !invitationForm.assignedOperatorUserId
+  )
+    return message.warning('请完整填写姓名、手机号和归属运营')
+  invitationSubmitting.value = true
+  try {
+    const result = await PartnerApi.createInvitation({
+      name: invitationForm.name.trim(),
+      mobile: invitationForm.mobile.trim(),
+      assignedOperatorUserId: invitationForm.assignedOperatorUserId
+    })
+    invitationCreateVisible.value = false
+    message.success(`邀请码已生成：${result.inviteCode}`)
+    await Promise.all([loadInvitations(), load()])
+  } finally {
+    invitationSubmitting.value = false
+  }
+}
+const handleInvitationQuery = () => {
+  invitationQuery.pageNo = 1
+  loadInvitations()
+}
+const resetInvitationQuery = () => {
+  invitationQuery.pageNo = 1
+  invitationQuery.keyword = ''
+  invitationQuery.status = ''
+  loadInvitations()
+}
+const handleVoidInvitation = async (row: PartnerApi.PartnerInvitationVO) => {
+  await message.confirm(`确认作废邀请码 ${row.inviteCode}？`)
+  await PartnerApi.voidInvitation(row.id)
+  message.success('邀请码已作废')
+  await loadInvitations()
 }
 const changeState = async (row: PartnerApi.PartnerVO, enable: boolean) => {
   const result = await message.prompt('请输入变更原因', enable ? '启用兼职' : '停用兼职')
@@ -368,7 +568,10 @@ const resetPassword = async (row: PartnerApi.PartnerVO) => {
   await PartnerApi.resetPartnerPassword(row.id, result.value)
   message.success('密码已重置，原 Partner Token 已撤销')
 }
-onMounted(load)
+onMounted(() => {
+  load()
+  loadInvitations()
+})
 </script>
 <style scoped>
 .table {

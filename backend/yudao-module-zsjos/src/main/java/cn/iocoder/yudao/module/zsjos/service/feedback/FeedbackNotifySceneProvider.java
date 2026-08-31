@@ -37,7 +37,7 @@ public class FeedbackNotifySceneProvider implements NotifySceneProvider {
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> roles) {
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
         Set<NotifyRecipientDTO> recipients = new LinkedHashSet<>();
-        if (roles.contains(ROLE_SUBMITTER)) addUser(recipients, payload.get("submitterUserId"));
+        if (roles.contains(ROLE_SUBMITTER)) addSubmitter(recipients, payload);
         if (roles.contains(ROLE_DISPATCHER)
                 && payload.get("dispatcherUserIds") instanceof Collection<?> dispatcherIds) {
             dispatcherIds.forEach(id -> addUser(recipients, id));
@@ -94,5 +94,22 @@ public class FeedbackNotifySceneProvider implements NotifySceneProvider {
             long id = Long.parseLong(String.valueOf(value));
             if (id > 0) recipients.add(NotifyRecipientDTO.admin(id));
         }
+    }
+
+    private void addSubmitter(Set<NotifyRecipientDTO> recipients, Map<String, Object> payload) {
+        Long id = parseId(payload.get("submitterUserId"));
+        if (id == null) return;
+        if (FeedbackConstants.SUBJECT_PARTNER_ACCOUNT.equals(payload.get("submitterSubjectType"))) {
+            recipients.add(NotifyRecipientDTO.partner(id));
+        } else {
+            recipients.add(NotifyRecipientDTO.admin(id));
+        }
+    }
+
+    private Long parseId(Object value) {
+        if (value instanceof Number number && number.longValue() > 0) return number.longValue();
+        if (value == null) return null;
+        long id = Long.parseLong(String.valueOf(value));
+        return id > 0 ? id : null;
     }
 }

@@ -3,14 +3,17 @@ package cn.iocoder.yudao.module.system.service.social;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.Assert;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserBindReqDTO;
 import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
 import cn.iocoder.yudao.module.system.controller.admin.socail.vo.user.SocialUserPageReqVO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialUserBindDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.social.SocialUserDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.mysql.social.SocialUserBindMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.social.SocialUserMapper;
+import cn.iocoder.yudao.module.system.dal.mysql.user.AdminUserMapper;
 import cn.iocoder.yudao.module.system.enums.social.SocialTypeEnum;
 import jakarta.annotation.Resource;
 import jakarta.validation.constraints.NotNull;
@@ -42,6 +45,8 @@ public class SocialUserServiceImpl implements SocialUserService {
     private SocialUserBindMapper socialUserBindMapper;
     @Resource
     private SocialUserMapper socialUserMapper;
+    @Resource
+    private AdminUserMapper adminUserMapper;
 
     @Resource
     private SocialClientService socialClientService;
@@ -77,6 +82,7 @@ public class SocialUserServiceImpl implements SocialUserService {
                 .userId(reqDTO.getUserId()).userType(reqDTO.getUserType())
                 .socialUserId(socialUser.getId()).socialType(socialUser.getType()).build();
         socialUserBindMapper.insert(socialUserBind);
+        syncAdminWecomUserId(reqDTO.getUserId(), reqDTO.getUserType(), socialUser.getType(), socialUser.getOpenid());
         return socialUser.getOpenid();
     }
 
@@ -90,6 +96,26 @@ public class SocialUserServiceImpl implements SocialUserService {
 
         // 获得对应的社交绑定关系
         socialUserBindMapper.deleteByUserTypeAndUserIdAndSocialType(userType, userId, socialUser.getType());
+        clearAdminWecomUserId(userId, userType, socialUser.getType(), openid);
+    }
+
+    private void syncAdminWecomUserId(Long userId, Integer userType, Integer socialType, String openid) {
+        if (!UserTypeEnum.ADMIN.getValue().equals(userType)
+                || !SocialTypeEnum.WECHAT_ENTERPRISE.getType().equals(socialType)) {
+            return;
+        }
+        adminUserMapper.updateById(new AdminUserDO().setId(userId).setWecomUserId(openid));
+    }
+
+    private void clearAdminWecomUserId(Long userId, Integer userType, Integer socialType, String openid) {
+        if (!UserTypeEnum.ADMIN.getValue().equals(userType)
+                || !SocialTypeEnum.WECHAT_ENTERPRISE.getType().equals(socialType)) {
+            return;
+        }
+        AdminUserDO user = adminUserMapper.selectById(userId);
+        if (user != null && java.util.Objects.equals(user.getWecomUserId(), openid)) {
+            adminUserMapper.updateById(new AdminUserDO().setId(userId).setWecomUserId(null).setWecomEnabled(false));
+        }
     }
 
     @Override

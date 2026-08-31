@@ -11,6 +11,7 @@ public class PaymentReconciliationService {
     @Resource private PaymentRefundMapper refundMapper;
     @Resource private PaymentRefundService refundService;
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "payment-refund.reconcile", targetType = "payment-refund")
     public int reconcile(int limit) {
         List<PaymentRefundDO> rows = refundMapper.selectDueForReconcile(Math.max(1, Math.min(limit, 500)));
         int count = 0;

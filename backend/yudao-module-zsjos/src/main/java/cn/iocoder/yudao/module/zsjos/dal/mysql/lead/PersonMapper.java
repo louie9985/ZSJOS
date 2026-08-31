@@ -19,9 +19,9 @@ public interface PersonMapper extends BaseMapperX<PersonDO> {
     PersonDO selectByIdForUpdate(@Param("id") Long id, @Param("tenantId") Long tenantId);
     @Select("<script>SELECT * FROM zsjos_person WHERE deleted=b'0' AND ("
             + "<if test='mobile != null'>(CAST(mobile AS BINARY)=CAST(#{mobile} AS BINARY) "
-            + "OR CAST(wechat_id AS BINARY)=CAST(#{mobile} AS BINARY))</if>"
+            + "OR LOWER(wechat_id)=LOWER(#{mobile}))</if>"
             + "<if test='mobile != null and wechatId != null'> OR </if>"
-            + "<if test='wechatId != null'>(CAST(wechat_id AS BINARY)=CAST(#{wechatId} AS BINARY) "
+            + "<if test='wechatId != null'>(LOWER(wechat_id)=LOWER(#{wechatId}) "
             + "OR CAST(mobile AS BINARY)=CAST(#{wechatId} AS BINARY))</if>"
             + ")</script>")
     List<PersonDO> selectDuplicateCandidates(@Param("mobile") String mobile, @Param("wechatId") String wechatId);

@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
@@ -8,10 +10,14 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadMan
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadInboxFilterProfileRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBasicInfoUpdateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistRequestReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadUrgeReqVO;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadSubmitterActionService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadManagementService;
 import cn.iocoder.yudao.module.zsjos.service.lead.LeadFlowHistoryService;
+import cn.iocoder.yudao.module.zsjos.service.lead.LeadBatchActionService;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.subordinate.SubordinateBatchResultVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadBatchActionReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.flow.LeadFlowHistoryRespVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -46,6 +52,7 @@ public class LeadManagementController {
     private LeadManagementService leadManagementService;
     @Resource private LeadSubmitterActionService submitterActionService;
     @Resource private LeadFlowHistoryService leadFlowHistoryService;
+    @Resource private LeadBatchActionService leadBatchActionService;
 
     @GetMapping("/page")
     @Operation(summary = "获得客资分页")
@@ -56,6 +63,7 @@ public class LeadManagementController {
     }
 
     @PostMapping("/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "高级筛选客资分页")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchLeadPage(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
@@ -67,18 +75,21 @@ public class LeadManagementController {
         return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
     @PostMapping("/search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> searchLeadCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         return success(leadManagementService.getLeadCursor(reqVO, getLoginUserId()));
     }
 
     @PostMapping("/inbox/submitted/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchSubmitted(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); reqVO.setRelationScope("submitted");
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/inbox/submitted/search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-submitted')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> searchSubmittedCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_SUBMITTER); reqVO.setRelationScope("submitted");
@@ -86,12 +97,14 @@ public class LeadManagementController {
     }
 
     @PostMapping("/inbox/owned/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchOwned(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_OWNER); reqVO.setRelationScope("owned");
         return success(leadManagementService.getLeadPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/inbox/owned/search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:query') && @ss.hasPermission('zsjos:lead:query-owned')")
     public CommonResult<CursorPageResult<LeadManagementRespVO>> searchOwnedCursor(@Valid @RequestBody LeadManagementPageReqVO reqVO) {
         reqVO.setAudience(INBOX_AUDIENCE_OWNER); reqVO.setRelationScope("owned");
@@ -138,6 +151,13 @@ public class LeadManagementController {
         return success(leadManagementService.getLead(id, getLoginUserId()));
     }
 
+    @GetMapping("/get-by-no")
+    @Operation(summary = "按客资编号获得客资详情")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query','zsjos:partner:query','zsjos:partner:manage','zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query','zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read','zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
+    public CommonResult<LeadManagementRespVO> getLeadByLeadNo(@RequestParam("leadNo") String leadNo) {
+        return success(leadManagementService.getLeadByLeadNo(leadNo, getLoginUserId()));
+    }
+
     @GetMapping("/{id}/flow-history")
     @Operation(summary = "获得客资流转记录")
     @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage')")
@@ -167,6 +187,22 @@ public class LeadManagementController {
     @PreAuthorize("@ss.hasPermission('zsjos:lead:urge')")
     public CommonResult<Boolean> urge(@PathVariable("id") Long id, @Valid @RequestBody LeadUrgeReqVO reqVO) {
         submitterActionService.urge(id, getLoginUserId(), reqVO); return success(true);
+    }
+
+    @PostMapping("/batch/{action}")
+    @Operation(summary = "批量处置客资")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:qualification:manage','zsjos:lead:owner-transfer','zsjos:lead:owner-release-public-sea','zsjos:subordinate-sales:lead-transfer','zsjos:subordinate-sales:lead-restore','zsjos:subordinate-sales:lead-recycle','zsjos:subordinate-sales:lead-release-claim-pool','zsjos:subordinate-sales:lead-release-public-sea')")
+    public CommonResult<SubordinateBatchResultVO> batchAction(@PathVariable String action,
+                                                               @Valid @RequestBody LeadBatchActionReqVO reqVO) {
+        return success(leadBatchActionService.execute(action, reqVO, getLoginUserId()));
+    }
+
+    @PostMapping("/{id}/submitter-assist-request")
+    @Operation(summary = "请求客资提交人协助")
+    @PreAuthorize("@ss.hasPermission('zsjos:lead:request-submitter-assist')")
+    public CommonResult<Long> requestSubmitterAssist(@PathVariable("id") Long id,
+            @Valid @RequestBody LeadSubmitterAssistRequestReqVO reqVO) {
+        return success(submitterActionService.requestAssist(id, getLoginUserId(), reqVO));
     }
 
     @GetMapping("/status-counts")

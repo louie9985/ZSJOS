@@ -66,6 +66,7 @@ import AdminEmbedFrame, { type AdminEmbedFrameHandle } from './layouts/AdminEmbe
 import MobileNavDrawer from './layouts/MobileNavDrawer'
 import { buildHierarchicalSecondaryItems, buildNavMenuItems } from './layouts/navItems'
 import UserProfilePage from './pages/UserProfilePage'
+import WecomClickPage from './pages/WecomClickPage'
 import LeadManagementPage from './pages/LeadManagementPage'
 import { ProductionTicketAssignmentHost } from './pages/MediaFeaturePage'
 import { getStoredImpersonation, IMPERSONATION_CHANGE_EVENT } from './services/impersonation'
@@ -461,6 +462,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
             ? <Result status="info" title="请使用电脑端访问此页面" subTitle="该页面由管理端承载，手机端会话不会复用电脑端登录状态。"/>
             : !activeAdminEmbedPath && <Routes>
             <Route path={APP_ROUTES.USER_PROFILE} element={<UserProfilePage onUserChange={onUserChange}/>}/>
+            <Route path={APP_ROUTES.WECOM_CLICK} element={<WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => navigate(targetPath, { replace: true })}/>}/>
             <Route path={APP_ROUTES.LEAD_MANAGEMENT} element={currentMenu
               ? <RouteHost menu={currentMenu} permissions={info.permissions || []} roles={info.roles || []} onOpenAssignment={() => setOpenAssignmentRequest(value => value + 1)}/>
               : leadDetailDeepLink
@@ -489,7 +491,10 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
 
 function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const navigateRef = useRef(navigate)
+  const [publicLoginRedirect, setPublicLoginRedirect] = useState('')
+  const [loginRedirectPending, setLoginRedirectPending] = useState(false)
   const [logged, setLogged] = useState(() => {
     migrateLegacyAuthStorage()
     return Boolean(getAuthAccessToken(authPlatform))
@@ -505,14 +510,16 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
       setInfo(undefined)
       setError('')
       setLogged(false)
+      setPublicLoginRedirect('')
+      setLoginRedirectPending(false)
     }
     window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired)
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired)
   }, [authPlatform])
 
   useEffect(() => {
-    // useNavigate() 在这个路由器里会随着当前位置变化而变；这里只想在登录态建立时做一次首页落点，
-    // 不能让每次路由切换都把页面重新拉回首页。
+    // useNavigate() 在这个路由器里会随着当前位置变化而变；这里只给显式重新登录和回跳目标做一次落点，
+    // 不能让普通刷新把当前页面重新拉回首页。
     navigateRef.current = navigate
   }, [navigate])
 
@@ -525,7 +532,11 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
         const fallbackTarget = getInitialTarget(buildTwoLevelNavigation(
           filterRenderableMenus(authorizedMenus, RENDERABLE_APP_ROUTES)
         ))
-        navigateRef.current(homeTarget || fallbackTarget || '/', { replace: true })
+        if (publicLoginRedirect || loginRedirectPending) {
+          navigateRef.current(publicLoginRedirect || homeTarget || fallbackTarget || '/', { replace: true })
+        }
+        setPublicLoginRedirect('')
+        setLoginRedirectPending(false)
         setInfo(permissionInfo)
       })
       .catch(permissionError => {
@@ -533,6 +544,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
         if (permissionError instanceof AuthenticationError) {
           clearAuthStorage(authPlatform)
           setError('登录状态已失效，请重新登录')
+          setLoginRedirectPending(false)
           setLogged(false)
           return
         }
@@ -540,14 +552,16 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
       })
   }, [authPlatform, logged, permissionAttempt])
 
-  if (!logged) return <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLogged(true) }}/>
-  if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setLogged(false) }}>返回登录</Button></Space></Card></div>
+  if (!logged) return location.pathname === APP_ROUTES.WECOM_CLICK && !publicLoginRedirect
+    ? <WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => setPublicLoginRedirect(targetPath)} />
+    : <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLoginRedirectPending(true); setLogged(true) }}/>
+  if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space></Card></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
   return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {
     try {
       if ((info.permissions || []).includes('zsjos:lead:accept')) await api.dispatchOffline().catch(() => undefined)
       await api.logout(authPlatform)
-    } finally { setInfo(undefined); setError(''); setLogged(false) }
+    } finally { setInfo(undefined); setError(''); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }
   }}/></OverlayCoordinatorProvider></DefaultEmployeeAvatarProvider>
 }
 

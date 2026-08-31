@@ -11,6 +11,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.*;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.*;
 import cn.iocoder.yudao.module.zsjos.service.cashback.CashbackService;
 import cn.iocoder.yudao.module.zsjos.service.lead.*;
+import cn.iocoder.yudao.module.zsjos.service.partner.PartnerPortalService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerManagementService;
 import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerAccountService;
 import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
@@ -42,6 +43,7 @@ public class PartnerAppPortalController {
     @Resource private LeadAppealService appealService;
     @Resource private CashbackService cashbackService;
     @Resource private WithdrawalService withdrawalService;
+    @Resource private PartnerPortalService partnerPortalService;
 
     @GetMapping("/partner/me")
     public CommonResult<PartnerMeRespVO> me() { return success(partnerService.getMe(getLoginUserId())); }
@@ -75,6 +77,39 @@ public class PartnerAppPortalController {
     @GetMapping("/lead/get")
     public CommonResult<LeadManagementRespVO> lead(@RequestParam Long id) {
         return success(leadManagementService.getPartnerLead(id, partnerId()));
+    }
+
+    @GetMapping("/partner/home-statistics")
+    public CommonResult<PartnerHomeStatisticsRespVO> homeStatistics(@RequestParam(defaultValue = "total") String period) {
+        return success(partnerPortalService.getHomeStatistics(partnerId(), period));
+    }
+
+    @GetMapping("/partner/home-statistics/details")
+    public CommonResult<PartnerHomeStatisticsDetailRespVO> homeStatisticsDetails(
+            @Valid PartnerHomeStatisticsDetailPageReqVO request) {
+        return success(partnerPortalService.getHomeStatisticsDetails(partnerId(), request));
+    }
+
+    @GetMapping("/partner/leaderboard/config")
+    public CommonResult<PartnerLeaderboardConfigRespVO> leaderboardConfig() {
+        partnerId();
+        return success(partnerPortalService.getLeaderboardConfig());
+    }
+
+    @GetMapping("/partner/leaderboard")
+    public CommonResult<PartnerLeaderboardRespVO> leaderboard(@Valid PartnerLeaderboardPageReqVO request) {
+        return success(partnerPortalService.getLeaderboard(partnerId(), request));
+    }
+
+    @GetMapping("/lead/{id}/partner-activity")
+    public CommonResult<PartnerLeadActivityRespVO> leadActivity(@PathVariable Long id) {
+        return success(partnerPortalService.getLeadActivity(partnerId(), id));
+    }
+
+    @GetMapping("/lead/partner-filter-options")
+    public CommonResult<PartnerLeadFilterOptionsRespVO> leadFilterOptions() {
+        partnerId();
+        return success(partnerPortalService.getLeadFilterOptions());
     }
 
     @PutMapping("/lead/{id}/submitter-supplement")

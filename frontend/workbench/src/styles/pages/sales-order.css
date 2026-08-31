@@ -67,6 +67,15 @@
   gap: var(--crm-gap);
 }
 
+.sales-order-table-page .sales-order-inbox-table {
+  min-width: 0;
+  flex: 1;
+}
+
+.sales-order-table-page .sales-order-mobile-drawer {
+  display: block;
+}
+
 .sales-order-list-pane {
   display: flex;
   min-width: 0;

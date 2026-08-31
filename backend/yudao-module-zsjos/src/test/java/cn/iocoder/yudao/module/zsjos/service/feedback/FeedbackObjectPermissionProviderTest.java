@@ -31,6 +31,16 @@ class FeedbackObjectPermissionProviderTest {
     }
 
     @Test
+    void partnerSubjectDoesNotPassEmployeeOwnPermission() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, 11L);
+        row.setSubmitterSubjectType(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT);
+        when(feedbackMapper.selectById(1L)).thenReturn(row);
+
+        assertFalse(provider.hasPermission(1L, "read-own", 11L));
+        assertFalse(provider.hasPermission(1L, "reply-own", 11L));
+    }
+
+    @Test
     void adminAccessUsesPermissionForTheRecordsActualType() {
         when(feedbackMapper.selectById(1L)).thenReturn(feedback(FeedbackConstants.TYPE_SUPPORT, 11L));
         when(permissionApi.hasAnyPermissions(21L, FeedbackConstants.PERMISSION_SUPPORT_MANAGE))
@@ -45,6 +55,7 @@ class FeedbackObjectPermissionProviderTest {
         FeedbackDO row = new FeedbackDO();
         row.setId(1L);
         row.setFeedbackType(type);
+        row.setSubmitterSubjectType(FeedbackConstants.SUBJECT_ADMIN);
         row.setSubmitterUserId(submitterId);
         return row;
     }

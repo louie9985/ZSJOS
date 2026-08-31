@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
@@ -62,6 +64,7 @@ public class LeadQualificationController {
         return success(qualificationService.getExceptionPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/qualification-exception/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:qualification:query')")
     public CommonResult<PageResult<LeadQualificationExceptionRespVO>> searchExceptionPage(
             @Valid @RequestBody LeadQualificationExceptionPageReqVO reqVO) {
@@ -84,7 +87,8 @@ public class LeadQualificationController {
         return success(true);
     }
 
-    @PostMapping("/{id}/transfer")
+    // Keep the literal /batch prefix reserved for the batch action controller.
+    @PostMapping("/{id:\\d+}/transfer")
     @Operation(summary = "转派挂起或回收待处理客资")
     @PreAuthorize("@ss.hasPermission('zsjos:lead:qualification:manage')")
     public CommonResult<Boolean> transfer(@PathVariable("id") Long id,

@@ -83,6 +83,7 @@ public class ImpersonationServiceImpl implements ImpersonationService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "impersonation.expire-idle", targetType = "impersonation-session")
     @Transactional(rollbackFor = Exception.class)
     public int expireIdleSessions() {
         int count = 0;

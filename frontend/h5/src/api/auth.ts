@@ -6,6 +6,20 @@ export interface LoginParams {
   platform?: 'PC' | 'MOBILE'
 }
 
+export interface WecomLoginParams {
+  code: string
+  state: string
+  platform?: 'PC' | 'MOBILE'
+}
+
+export interface ActivateParams {
+  mobile: string
+  password: string
+  confirmPassword: string
+  inviteCode: string
+  platform?: 'PC' | 'MOBILE'
+}
+
 export interface LoginResult {
   userId: number
   accessToken: string
@@ -27,6 +41,29 @@ export interface PermissionInfo {
 /** 手机号密码登录 */
 export function login(data: LoginParams) {
   return request.post<never, LoginResult>('/zsjos/auth/login', {
+    ...data,
+    platform: data.platform || 'MOBILE'
+  })
+}
+
+/** 首次登录邀请码激活 */
+export function activate(data: ActivateParams) {
+  return request.post<never, LoginResult>('/zsjos/auth/activate', {
+    ...data,
+    platform: data.platform || 'MOBILE'
+  })
+}
+
+/** 企业微信授权地址 */
+export function wecomAuthorizeUrl(redirectUri: string) {
+  return request.get<never, string>('/zsjos/auth/wecom-authorize-url', {
+    params: { redirectUri }
+  })
+}
+
+/** 企业微信登录 */
+export function wecomLogin(data: WecomLoginParams) {
+  return request.post<never, LoginResult>('/zsjos/auth/wecom-login', {
     ...data,
     platform: data.platform || 'MOBILE'
   })

@@ -60,7 +60,8 @@ public class LeadBasicInfoService {
         checkIdentityConflict(lead, req, mobile, wechat);
         Region region = validateRegion(req.getProvinceCode(), req.getCityCode());
         String category = StrUtil.trimToNull(req.getLeadCategory());
-        LeadCategorySnapshotService.Selection categorySelection = categorySnapshotService.requireEnabled(category);
+        LeadCategorySnapshotService.Selection categorySelection = Objects.equals(lead.getLeadCategory(), category)
+                ? null : categorySnapshotService.requireEnabled(category);
         List<LeadProductSnapshot> snapshots = validateProducts(req.getIntendedProducts());
 
         PersonDO person = personMapper.selectById(lead.getPersonId());
@@ -76,7 +77,7 @@ public class LeadBasicInfoService {
         lead.setSubmittedName(req.getName().trim()); lead.setSubmittedMobile(mobile); lead.setSubmittedWechatId(wechat);
         lead.setProvinceCode(region.provinceCode()); lead.setProvinceName(region.provinceName());
         lead.setCityCode(region.cityCode()); lead.setCityName(region.cityName());
-        if (!Objects.equals(lead.getLeadCategory(), categorySelection.value())) {
+        if (categorySelection != null) {
             lead.setLeadCategory(categorySelection.value());
             lead.setLeadCategoryLabelSnapshot(categorySelection.labelSnapshot());
         }

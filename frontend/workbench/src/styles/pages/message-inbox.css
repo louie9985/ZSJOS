@@ -171,6 +171,36 @@
   padding-top: var(--crm-sp-3);
 }
 
+.message-inbox-table-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.message-inbox-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--crm-gap-sm);
+}
+
+.message-inbox-table-shell .ant-table-wrapper {
+  min-width: 0;
+}
+
+.message-inbox-table .ant-table-tbody > tr.unread > td {
+  background: color-mix(in srgb, var(--crm-bg-container) 92%, var(--crm-color-primary) 8%);
+}
+
+.message-inbox-table .ant-table-tbody > tr.active > td {
+  background: var(--crm-color-primary-bg);
+}
+
+.message-inbox-table .ant-table-tbody > tr.active.unread > td {
+  background: color-mix(in srgb, var(--crm-color-primary-bg) 78%, var(--crm-color-primary) 22%);
+}
+
 .message-inbox-detail-pane {
   min-width: 0;
   min-height: 0;

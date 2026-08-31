@@ -557,6 +557,7 @@ public class PositioningCardService {
         return toResp(require(id), userId);
     }
 
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "positioning-card.process-result", targetType = "positioning-card")
     @Transactional(rollbackFor = Exception.class)
     public void handleIpProcessResult(String processId, Integer status, String reason) {
         PositioningCardDO card = mapper.selectByIpProcessId(processId);

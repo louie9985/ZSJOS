@@ -7,9 +7,17 @@ import { LocaleDropdownType } from '@/types/localeDropdown'
 
 const { wsCache } = useCache()
 
+const enWithChineseCalendar = {
+  ...en,
+  el: {
+    ...en.el,
+    datepicker: zhCn.el.datepicker
+  }
+}
+
 const elLocaleMap = {
   'zh-CN': zhCn,
-  en: en
+  en: enWithChineseCalendar
 }
 interface LocaleState {
   currentLocale: LocaleDropdownType

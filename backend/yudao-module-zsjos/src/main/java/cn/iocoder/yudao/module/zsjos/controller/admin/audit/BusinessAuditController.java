@@ -1,8 +1,9 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.audit;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
-import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.PageParam;
+import cn.iocoder.yudao.module.zsjos.controller.admin.audit.vo.BusinessAuditPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.audit.vo.BusinessAuditRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.audit.vo.ImpersonationAuditRespVO;
 import cn.iocoder.yudao.module.zsjos.service.audit.BusinessAuditService;
@@ -20,10 +21,8 @@ public class BusinessAuditController {
 
     @GetMapping("/page")
     @PreAuthorize("@ss.hasPermission('zsjos:audit:query')")
-    public CommonResult<PageResult<BusinessAuditRespVO>> page(@Valid PageParam page,
-            @RequestParam(required = false) String actionCode,
-            @RequestParam(required = false) String targetType) {
-        return success(service.getPage(page, actionCode, targetType));
+    public CommonResult<PageResult<BusinessAuditRespVO>> page(@Valid BusinessAuditPageReqVO reqVO) {
+        return success(service.getPage(reqVO));
     }
 
     @GetMapping("/impersonation-page")

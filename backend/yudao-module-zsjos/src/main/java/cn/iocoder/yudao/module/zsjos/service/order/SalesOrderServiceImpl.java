@@ -827,6 +827,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "sales-order.process-result", targetType = "sales-order")
     @Transactional(rollbackFor = Exception.class)
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;

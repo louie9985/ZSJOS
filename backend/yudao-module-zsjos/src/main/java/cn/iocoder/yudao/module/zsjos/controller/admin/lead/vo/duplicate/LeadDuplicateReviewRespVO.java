@@ -10,6 +10,10 @@ public class LeadDuplicateReviewRespVO {
     private String status;
     private Long submitterUserId;
     private String submissionSnapshot;
+    private String duplicateFlag;
+    private String duplicateResult;
+    private String primaryRuleCode;
+    private String reviewFingerprint;
     private String matchRules;
     private String candidateSnapshot;
     private String resultType;

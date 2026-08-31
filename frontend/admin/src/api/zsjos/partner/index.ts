@@ -78,3 +78,55 @@ export const getAssignmentLogPage = (id: number) =>
     url: `/zsjos/partner/${id}/assignment-log/page`,
     params: { pageNo: 1, pageSize: 100 }
   })
+
+export interface PartnerInvitationVO {
+  id: number
+  inviteCode: string
+  name: string
+  mobile: string
+  assignedOperatorUserId: number
+  assignedOperatorName?: string
+  status: 'active' | 'used' | 'voided' | 'expired'
+  expiresAt: string
+  usedAt?: string
+  voidedAt?: string
+  partnerId?: number
+  createdByUserId?: number
+  createdByName?: string
+  createTime: string
+  version: number
+}
+
+export interface PartnerInvitationCreateVO {
+  name: string
+  mobile: string
+  assignedOperatorUserId?: number
+}
+
+export const getInvitationPage = (params: {
+  pageNo: number
+  pageSize: number
+  keyword?: string
+  status?: string
+  assignedOperatorUserId?: number
+}) =>
+  request.get<{ list: PartnerInvitationVO[]; total: number }>({
+    url: '/zsjos/partner-invitation/page',
+    params
+  })
+
+export const createInvitation = (data: PartnerInvitationCreateVO) =>
+  request.post<PartnerInvitationVO>({ url: '/zsjos/partner-invitation/create', data })
+
+export const voidInvitation = (id: number) =>
+  request.put({ url: `/zsjos/partner-invitation/${id}/void` })
+
+export const getInvitationOperatorCandidates = (params?: {
+  keyword?: string
+  pageNo?: number
+  pageSize?: number
+}) =>
+  request.get<{ list: AssignmentCandidateVO[]; total: number }>({
+    url: '/zsjos/partner-invitation/operator-candidates',
+    params: { pageNo: 1, pageSize: 100, ...params }
+  })

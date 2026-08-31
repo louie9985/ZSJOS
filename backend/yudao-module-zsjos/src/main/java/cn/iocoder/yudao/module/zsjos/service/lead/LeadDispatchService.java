@@ -28,6 +28,8 @@ public interface LeadDispatchService {
     void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId);
     void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason);
     void adminTransfer(Long leadId, Long salesUserId, Long operatorUserId, String reason, String idempotencyKey);
+    void transferOwned(Long leadId, Long expectedOwnerUserId, Long salesUserId,
+                       Long operatorUserId, String reason, String idempotencyKey);
     TransferAttemptResult tryAdminTransfer(Long leadId, Long expectedOwnerUserId, Long salesUserId,
                                            Long operatorUserId, String reason);
     int processExpired();

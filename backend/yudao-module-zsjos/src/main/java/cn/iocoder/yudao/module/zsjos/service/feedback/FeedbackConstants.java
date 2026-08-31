@@ -21,6 +21,9 @@ public interface FeedbackConstants {
 
     String AUTHOR_EMPLOYEE = "EMPLOYEE";
     String AUTHOR_ADMIN = "ADMIN";
+    String AUTHOR_PARTNER_ACCOUNT = "PARTNER_ACCOUNT";
+    String SUBJECT_ADMIN = "ADMIN";
+    String SUBJECT_PARTNER_ACCOUNT = "PARTNER_ACCOUNT";
     String SURVEY_PENDING = "PENDING";
     String SURVEY_SUBMITTED = "SUBMITTED";
 

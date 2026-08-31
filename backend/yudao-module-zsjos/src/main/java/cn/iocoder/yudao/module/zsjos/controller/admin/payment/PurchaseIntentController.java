@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.payment;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.web.core.util.WebFrameworkUtils;
 import cn.iocoder.yudao.module.zsjos.controller.admin.payment.vo.PurchaseIntentRespVO;
@@ -23,6 +25,7 @@ public class PurchaseIntentController {
     @Resource private PurchaseIntentService service;
 
     @PostMapping("/current")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "查询当前购买草稿")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:create')")
     public CommonResult<PurchaseIntentRespVO> current(@RequestBody PurchaseIntentSaveDraftReqVO request) {

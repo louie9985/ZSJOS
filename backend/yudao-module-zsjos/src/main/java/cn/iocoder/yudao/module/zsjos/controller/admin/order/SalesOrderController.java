@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.order;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
@@ -114,6 +116,7 @@ public class SalesOrderController {
     }
 
     @PostMapping("/team-search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "高级筛选团队成交订单")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> searchTeamPage(@Valid @RequestBody SalesOrderTeamPageReqVO reqVO) {
@@ -128,6 +131,7 @@ public class SalesOrderController {
     }
 
     @PostMapping("/team-search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "高级筛选团队成交订单游标列表")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-team')")
     public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchTeamCursorPage(@Valid @RequestBody SalesOrderTeamCursorReqVO reqVO) {
@@ -141,6 +145,7 @@ public class SalesOrderController {
         return success(orderService.getTeamStatusCounts(WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/my-search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "高级筛选本人订单游标列表")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
     public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchMyCursorPage(
@@ -148,6 +153,7 @@ public class SalesOrderController {
         return success(orderService.getMyCursorPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/my-search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:query-own')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> searchMyPage(@Valid @RequestBody SalesOrderMyPageReqVO reqVO) {
         return success(orderService.getMyPage(reqVO, WebFrameworkUtils.getLoginUserId()));
@@ -179,11 +185,13 @@ public class SalesOrderController {
         return success(orderService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/approval/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<PageResult<SalesOrderListItemRespVO>> searchInboxPage(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
     @PostMapping("/approval/search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:review')")
     public CommonResult<CursorPageResult<SalesOrderListItemRespVO>> searchInboxCursor(@Valid @RequestBody SalesOrderPageReqVO reqVO) {
         return success(orderService.getInboxCursor(reqVO, WebFrameworkUtils.getLoginUserId()));
@@ -260,6 +268,7 @@ public class SalesOrderController {
     }
 
     @PostMapping("/supervisor-confirmation/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "搜索主管确认待办或已办")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
     public CommonResult<PageResult<SalesOrderSupervisorConfirmationRespVO>> searchSupervisorConfirmationInbox(
@@ -268,6 +277,7 @@ public class SalesOrderController {
     }
 
     @PostMapping("/supervisor-confirmation/search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "游标搜索主管确认待办或已办")
     @PreAuthorize("@ss.hasPermission('zsjos:sales-order:supervisor-confirm')")
     public CommonResult<CursorPageResult<SalesOrderSupervisorConfirmationRespVO>> searchSupervisorConfirmationCursor(

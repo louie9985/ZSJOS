@@ -36,6 +36,7 @@ export type UserProfile = {
   mobile?: string;
   sex: number;
   avatar?: string;
+  wecomEnabled?: boolean;
   createTime: Timestamp;
   dept?: { id: number; name: string };
   posts?: Array<{ id: number; name: string }>;
@@ -46,6 +47,7 @@ export type UserProfileUpdate = {
   mobile?: string;
   sex?: number;
   avatar?: string;
+  wecomEnabled?: boolean;
 };
 export type SocialUser = {
   id: number;
@@ -53,6 +55,12 @@ export type SocialUser = {
   openid: string;
   nickname?: string;
   avatar?: string;
+};
+export type WecomClickTarget = {
+  audience: "ADMIN" | "PARTNER";
+  actionType?: "none" | "message_detail" | "business_detail";
+  targetPath?: string;
+  fallbackPath?: string;
 };
 export type MenuRenderMode = "native" | "admin_embed" | "admin_only";
 export type RawMenu = {
@@ -924,6 +932,9 @@ export type StudentContactExtension = {
 export type AdvancedFilterCondition = {
   fieldKey: string;
   operator: string;
+  startFieldKey?: string;
+  endFieldKey?: string;
+  unit?: "minute" | "hour" | "day";
   value?: unknown;
   valueFrom?: unknown;
   valueTo?: unknown;
@@ -945,7 +956,7 @@ export type AdvancedFilterField = {
   fieldKey: string;
   group: string;
   label: string;
-  valueType: "text" | "select" | "number" | "date";
+  valueType: "text" | "select" | "number" | "date" | "duration";
   operators: string[];
   optionSource?: string;
   options: Array<{ value: string | number; label: string }>;
@@ -956,6 +967,31 @@ export type AdvancedFilterField = {
 export type AdvancedFilterCatalog = {
   fields: AdvancedFilterField[];
   relativeDateOptions: Array<{ value: string; label: string }>;
+};
+export type AdvancedFilterTemplate = {
+  id: number;
+  scene: AdvancedFilterScene;
+  pageKey: string;
+  scope: "personal" | "system";
+  name: string;
+  filter: AdvancedFilterGroup;
+  sort: number;
+  enabled: boolean;
+  defaultTemplate: boolean;
+  version?: number;
+  createTime?: Timestamp;
+  updateTime?: Timestamp;
+};
+export type AdvancedFilterTemplateSaveRequest = {
+  id?: number;
+  scene: AdvancedFilterScene;
+  pageKey: string;
+  name: string;
+  filter: AdvancedFilterGroup;
+  sort: number;
+  enabled: boolean;
+  defaultTemplate: boolean;
+  version?: number;
 };
 export type AreaNode = {
   id: number;
@@ -1048,6 +1084,15 @@ export type LeadDuplicateReview = {
   status: "pending" | "completed";
   submitterUserId?: number;
   submissionSnapshot: string;
+  duplicateFlag?: "none" | "strong_duplicate" | "suspected_duplicate";
+  duplicateResult?:
+    | "strong_rejected"
+    | "suspected_created"
+    | "allowed"
+    | "closed"
+    | "auto_closed";
+  primaryRuleCode?: string;
+  reviewFingerprint?: string;
   matchRules: string;
   candidateSnapshot: string;
   resultType?: string;
@@ -1058,8 +1103,7 @@ export type LeadDuplicateReview = {
   createTime: Timestamp;
 };
 export type LeadDuplicateReviewDecision = {
-  resultType:
-    "new_person" | "reuse_person" | "reactivate_lead" | "notify_owner";
+  resultType: "allow_flow" | "close_duplicate";
   matchedPersonId?: number;
   matchedLeadId?: number;
   selectedSalesUserId?: number;
@@ -1212,6 +1256,7 @@ export type ManagedLead = {
       | "SUBMITTER_SUPPLEMENT"
       | "SUBMITTER_URGE"
       | "SUBMITTER_COMPLAINT"
+      | "REQUEST_SUBMITTER_ASSIST"
       | "QUALIFICATION_RESTORE"
       | "QUALIFICATION_TRANSFER"
       | "QUALIFICATION_RECYCLE"
@@ -1220,7 +1265,9 @@ export type ManagedLead = {
       | "SUPERVISOR_TRANSFER"
       | "SUPERVISOR_RECYCLE"
       | "SUPERVISOR_RELEASE_CLAIM_POOL"
-      | "SUPERVISOR_RELEASE_PUBLIC_SEA";
+      | "SUPERVISOR_RELEASE_PUBLIC_SEA"
+      | "OWNER_TRANSFER"
+      | "OWNER_RELEASE_PUBLIC_SEA";
     enabled: boolean;
   }>;
 };
@@ -1230,6 +1277,13 @@ export type LeadComplaintEvidence = {
   originalName?: string;
   contentType?: string;
   fileSize?: number;
+};
+export type LeadSubmitterAssistRequest = {
+  problem: string;
+  expectedAssistance: string;
+  remark?: string;
+  attachments: Array<{ infraFileId: number }>;
+  idempotencyKey: string;
 };
 export type LeadComplaint = {
   id: number;
@@ -1288,6 +1342,36 @@ export type LeadSimpleStatus =
   | "invalid"
   | "closed"
   | "suspended";
+export type LeadSortField =
+  | "leadNo"
+  | "submittedName"
+  | "submittedMobile"
+  | "submittedWechatId"
+  | "sourceType"
+  | "leadCategory"
+  | "sourceChannelId"
+  | "assignmentStatus"
+  | "dispatchMode"
+  | "assignmentAttemptCount"
+  | "publicPoolAt"
+  | "countedAt"
+  | "currentAssignmentFirstFollowUpAt"
+  | "currentAssignmentFirstFollowUpDeadlineAt"
+  | "qualificationStartedAt"
+  | "qualificationDeadlineAt"
+  | "suspendedAt"
+  | "validDescription"
+  | "invalidDescription"
+  | "appealDeadlineAt"
+  | "closedAt"
+  | "closeReason"
+  | "nextFollowUpAt"
+  | "submittedAt"
+  | "lastActivityAt"
+  | "qualifiedAt"
+  | "convertedAt"
+  | "remark"
+  | "updateTime";
 export type ManagedLeadPageParams = {
   pageNo: number;
   pageSize: number;
@@ -1297,6 +1381,8 @@ export type ManagedLeadPageParams = {
   inboxStage?: string;
   relationScope?: "all" | "submitted" | "owned";
   simpleStatus?: LeadSimpleStatus;
+  sortField?: LeadSortField;
+  sortOrder?: "ascend" | "descend";
   advancedFilter?: AdvancedFilterGroup;
 };
 export type LeadDetailTab =
@@ -1798,7 +1884,7 @@ export type BusinessTask = {
   actionCode?:
     | "OPEN_LEAD_ASSIGNMENT"
     | "OPEN_LEAD_FOLLOW_UP"
-    | "OPEN_LEAD_SUBMITTER_SUPPLEMENT"
+    | "OPEN_LEAD_SUBMITTER_ASSIST"
     | "OPEN_WORK_TASK"
     | "CONFIRM_WORK_TASK"
     | "SUMMARIZE_WORK_PLAN"
@@ -2433,6 +2519,15 @@ export const writeSharedTenantId = (
   storage.setItem(STORAGE_KEYS.TENANT_ID, JSON.stringify(cacheItem));
   return normalized;
 };
+export type LeadBatchAction =
+  | "transfer"
+  | "restore"
+  | "recycle"
+  | "release-claim-pool"
+  | "release-public-sea";
+
+const publicApiBaseUrl = () =>
+  APP_CONFIG.API_BASE_URL.replace(/\/admin-api\/?$/, "/public-api");
 
 const authenticatedTenantId = (platform: AuthPlatform) => {
   const tenantId = readSharedTenantId();
@@ -2750,6 +2845,10 @@ export const api = {
     unwrap<UserProfile>(await http.get("/system/user/profile/get")),
   updateUserProfile: async (data: UserProfileUpdate) =>
     unwrap<boolean>(await http.put("/system/user/profile/update", data)),
+  updateUserWecomEnabled: async (wecomEnabled: boolean) =>
+    unwrap<boolean>(
+      await http.put("/system/user/profile/update", { wecomEnabled }),
+    ),
   updateUserPassword: async (oldPassword: string, newPassword: string) =>
     unwrap<boolean>(
       await http.put("/system/user/profile/update-password", {
@@ -2779,6 +2878,16 @@ export const api = {
     unwrap<boolean>(
       await http.delete("/system/social-user/unbind", {
         data: { type, openid },
+      }),
+    ),
+  resolveWecomClickTicket: async (ticket: string) =>
+    unwrap<WecomClickTarget>(
+      await axios.get(`${publicApiBaseUrl()}/zsjos/wecom-click/resolve`, {
+        params: { ticket },
+        headers: {
+          "tenant-id": readSharedTenantId() || APP_CONFIG.DEFAULT_TENANT_ID,
+        },
+        timeout: 15000,
       }),
     ),
   dictDataByType: async (dictType: string) => {
@@ -3449,6 +3558,8 @@ export const api = {
         ),
   managedLead: async (id: number) =>
     unwrap<ManagedLead>(await http.get("/zsjos/lead/get", { params: { id } })),
+  managedLeadByNo: async (leadNo: string) =>
+    unwrap<ManagedLead>(await http.get("/zsjos/lead/get-by-no", { params: { leadNo } })),
   leadFlowHistory: async (id: number) =>
     unwrap<LeadFlowHistory[]>(await http.get(`/zsjos/lead/${id}/flow-history`)),
   allLeadPage: async (params: ManagedLeadPageParams) =>
@@ -3457,8 +3568,21 @@ export const api = {
           await http.post("/zsjos/lead/search-page", params),
         )
       : unwrap<PageResult<ManagedLead>>(
-          await http.get("/zsjos/lead/page", { params }),
-        ),
+        await http.get("/zsjos/lead/page", { params }),
+      ),
+  batchLeadAction: async (
+    action: LeadBatchAction,
+    leadIds: number[],
+    data: {
+      reason: string;
+      targetUserId?: number;
+      collaboratorUserId?: number;
+      idempotencyKey: string;
+    },
+  ) =>
+    unwrap<SubordinateBatchResult>(
+      await http.post(`/zsjos/lead/batch/${action}`, { leadIds, ...data }),
+    ),
   allLeadCursor: async (
     params: Omit<ManagedLeadPageParams, "pageNo" | "pageSize"> & {
       cursor?: string;
@@ -3625,6 +3749,20 @@ export const api = {
     unwrap<AssignmentUser[]>(
       await http.get(`/zsjos/lead/${id}/transfer-candidates`),
     ),
+  ownerTransferCandidates: async () =>
+    unwrap<AssignmentUser[]>(await http.get("/zsjos/lead/owner/transfer-candidates")),
+  ownerTransferLead: async (
+    id: number,
+    data: { salesUserId: number; reason: string; idempotencyKey: string },
+  ) => unwrap<boolean>(await http.post(`/zsjos/lead/owner/${id}/transfer`, data)),
+  ownerReleasePublicSeaLead: async (
+    id: number,
+    data: { reason: string; idempotencyKey: string },
+  ) => unwrap<boolean>(await http.post(`/zsjos/lead/owner/${id}/release-public-sea`, data)),
+  requestLeadSubmitterAssist: async (
+    id: number,
+    data: LeadSubmitterAssistRequest,
+  ) => unwrap<number>(await http.post(`/zsjos/lead/${id}/submitter-assist-request`, data)),
   restoreLead: async (
     id: number,
     data: { reason: string; idempotencyKey: string },
@@ -3951,6 +4089,33 @@ export const api = {
   advancedFilterCatalog: async (scene: AdvancedFilterScene) =>
     unwrap<AdvancedFilterCatalog>(
       await http.get("/zsjos/advanced-filter/catalog", { params: { scene } }),
+    ),
+  advancedFilterTemplates: async (
+    scene: AdvancedFilterScene,
+    pageKey: string,
+  ) =>
+    unwrap<AdvancedFilterTemplate[]>(
+      await http.get("/zsjos/advanced-filter-template/visible-list", {
+        params: { scene, pageKey },
+      }),
+    ),
+  createPersonalAdvancedFilterTemplate: async (
+    data: AdvancedFilterTemplateSaveRequest,
+  ) =>
+    unwrap<number>(
+      await http.post("/zsjos/advanced-filter-template/personal", data),
+    ),
+  updatePersonalAdvancedFilterTemplate: async (
+    data: AdvancedFilterTemplateSaveRequest,
+  ) =>
+    unwrap<boolean>(
+      await http.put("/zsjos/advanced-filter-template/personal", data),
+    ),
+  deletePersonalAdvancedFilterTemplate: async (id: number) =>
+    unwrap<boolean>(
+      await http.delete("/zsjos/advanced-filter-template/personal", {
+        params: { id },
+      }),
     ),
   decideSalesOrder: async (
     orderId: number,

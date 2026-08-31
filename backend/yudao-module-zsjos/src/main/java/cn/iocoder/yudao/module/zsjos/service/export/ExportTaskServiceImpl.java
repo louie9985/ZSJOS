@@ -46,7 +46,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     @Resource private AdminUserApi adminUserApi;
     @Resource private SecurityFrameworkService securityService;
     @Resource private FileApi fileApi;
-    @Resource private List<ExportTypeProvider> providers;
+    @org.springframework.beans.factory.annotation.Autowired private List<ExportTypeProvider> providers;
     @Resource private BusinessAuditService auditService;
 
     @Override
@@ -116,6 +116,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "export.process-available", targetType = "export-task")
     public int processAvailable() {
         // Tenant-scoped invocation is owned by the scheduler.
         LocalDateTime now = LocalDateTime.now();
@@ -130,6 +131,7 @@ public class ExportTaskServiceImpl implements ExportTaskService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "export.expire-files", targetType = "export-task")
     public int expireFiles() {
         int count = 0;
         LocalDateTime now = LocalDateTime.now();

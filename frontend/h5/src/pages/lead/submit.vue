@@ -195,9 +195,10 @@ const outcomeInfo = computed(() => {
   const result = submitResult.value
   const map: Record<string, { icon: string; color: string; title: string; desc: string }> = {
     activated: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: formatLeadNo(submitResult.value.leadNo) },
-    review_pending: { icon: 'info-o', color: 'var(--h5-warning)', title: '疑似重复，已进入复核', desc: `复核单号：#${submitResult.value.reviewId}` },
-    duplicate_rejected: { icon: 'close', color: 'var(--h5-danger)', title: '提交被拒绝', desc: `已有相同活动客资：${result.existingLeadStatus || '本次提交未创建'}` },
-    duplicate_auto_closed: { icon: 'info-o', color: 'var(--h5-info)', title: '历史重复', desc: formatLeadNo(submitResult.value.leadNo) }
+    created: { icon: 'checked', color: 'var(--h5-success)', title: '提交成功', desc: formatLeadNo(submitResult.value.leadNo) },
+    review_pending: { icon: 'info-o', color: 'var(--h5-warning)', title: '疑似重复，等待管理员审核', desc: `复核单号：#${submitResult.value.reviewId}，请勿重复提交` },
+    duplicate_rejected: { icon: 'close', color: 'var(--h5-danger)', title: '联系方式已存在', desc: '本次提交未创建客资，请联系管理员' },
+    duplicate_auto_closed: { icon: 'info-o', color: 'var(--h5-info)', title: '疑似重复，已自动关闭', desc: '本次提交未创建客资' }
   }
   return map[submitResult.value.outcome] || map.activated
 })

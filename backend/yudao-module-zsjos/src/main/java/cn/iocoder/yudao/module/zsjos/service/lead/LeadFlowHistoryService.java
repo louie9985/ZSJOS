@@ -46,6 +46,10 @@ public class LeadFlowHistoryService {
         if (lead == null) throw exception(LEAD_NOT_EXISTS);
         List<BusinessEventDO> events = eventMapper.selectByLeadId(leadId);
         List<LeadAssignmentHistoryDO> assignments = assignmentMapper.selectByLeadId(leadId);
+        Map<Long, LeadAssignmentHistoryDO> assignmentsById = assignments.stream()
+                .filter(item -> item.getId() != null)
+                .collect(java.util.stream.Collectors.toMap(LeadAssignmentHistoryDO::getId, item -> item,
+                        (first, ignored) -> first));
         Map<Long, LeadFollowUpRecordDO> followUps = followUpMapper.selectListByLeadId(leadId).stream()
                 .collect(java.util.stream.Collectors.toMap(LeadFollowUpRecordDO::getId, item -> item));
         List<LeadAgingPoolEventDO> agingEvents = agingEventMapper.selectByLeadId(leadId);
@@ -69,30 +73,16 @@ public class LeadFlowHistoryService {
         List<LeadFlowHistoryRespVO> result = new ArrayList<>();
         PartnerDO partner = lead.getPartnerId() == null ? null : partnerMapper.selectById(lead.getPartnerId());
         result.add(submission(lead, users, partner));
-        events.forEach(event -> result.add(fromEvent(event, users, followUps)));
+        events.forEach(event -> result.add(fromEvent(event, users, followUps, assignmentsById)));
         assignments.stream().filter(item -> !referencedAssignments.contains(item.getId()))
                 .forEach(item -> result.add(fromAssignment(item, users)));
         agingEvents.forEach(item -> result.add(fromAging(item, users)));
         result.sort(Comparator.comparing(LeadFlowHistoryRespVO::getOccurredAt,
                         Comparator.nullsLast(Comparator.reverseOrder()))
+                .thenComparingInt(LeadFlowHistoryService::sameTimeOrder)
                 .thenComparing(LeadFlowHistoryService::rawId, Comparator.reverseOrder())
                 .thenComparing(LeadFlowHistoryRespVO::getId, Comparator.reverseOrder()));
-        moveSubmissionBeforeFirstAssignment(result);
         return result;
-    }
-
-    private static void moveSubmissionBeforeFirstAssignment(List<LeadFlowHistoryRespVO> items) {
-        int submissionIndex = -1;
-        int firstAssignmentIndex = -1;
-        for (int index = 0; index < items.size(); index++) {
-            LeadFlowHistoryRespVO item = items.get(index);
-            if (item.getId() != null && item.getId().startsWith("lead:")) submissionIndex = index;
-            if (firstAssignmentIndex < 0 && "客资分配".equals(item.getBusinessObject())) firstAssignmentIndex = index;
-        }
-        if (submissionIndex > firstAssignmentIndex && firstAssignmentIndex >= 0) {
-            LeadFlowHistoryRespVO submission = items.remove(submissionIndex);
-            items.add(firstAssignmentIndex, submission);
-        }
     }
 
     private LeadFlowHistoryRespVO submission(LeadDO lead, Map<Long, AdminUserRespDTO> users, PartnerDO partner) {
@@ -107,16 +97,25 @@ public class LeadFlowHistoryService {
     }
 
     private LeadFlowHistoryRespVO fromEvent(BusinessEventDO event, Map<Long, AdminUserRespDTO> users,
-                                             Map<Long, LeadFollowUpRecordDO> followUps) {
+                                             Map<Long, LeadFollowUpRecordDO> followUps,
+                                             Map<Long, LeadAssignmentHistoryDO> assignmentsById) {
         String node = eventLabel(event.getEventType());
         boolean system = event.getOperatorUserId() == null || event.getOperatorUserId() == 0;
+        LeadAssignmentHistoryDO assignment = optionalLong(event.getRelatedObjectRefs(), "assignmentHistoryId")
+                .map(assignmentsById::get).orElse(null);
         LeadFlowHistoryRespVO vo = base("event:" + event.getId(), event.getOccurredAt(), businessObject(event.getEventType()),
-                node, system ? "系统任务" : "员工工作台",
-                system ? "系统" : name(users, event.getOperatorUserId()), eventReason(event));
+                node, eventSource(event, assignment, system),
+                system ? "系统" : name(users, event.getOperatorUserId()), eventReason(event, assignment));
         vo.setRemark(eventRemark(event, followUps));
         applyEventTransitions(vo, event);
-        vo.setFromOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "fromOwnerUserId").orElse(null)));
-        vo.setToOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "toOwnerUserId").orElse(null)));
+        vo.setFromOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "fromOwnerUserId")
+                .orElse(assignment == null ? null : assignment.getFromOwnerUserId())));
+        vo.setToOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "toOwnerUserId")
+                .orElse(assignment == null ? null : firstNonNull(assignment.getToOwnerUserId(), assignment.getCandidateUserId()))));
+        if (vo.getAssignmentStatusAfter() == null && assignment != null) {
+            vo.setAssignmentStatusBefore(assignmentBefore(assignment.getActionType()));
+            vo.setAssignmentStatusAfter(assignmentAfter(assignment.getActionType()));
+        }
         vo.setAttachments(attachments(event.getEvidenceRefs()));
         return vo;
     }
@@ -197,6 +196,12 @@ public class LeadFlowHistoryService {
         try { return Long.parseLong(item.getId().substring(separator + 1)); }
         catch (RuntimeException ignored) { return Long.MIN_VALUE; }
     }
+    private static int sameTimeOrder(LeadFlowHistoryRespVO item) {
+        return item.getId() != null && item.getId().startsWith("lead:") ? 0 : 1;
+    }
+    private static Long firstNonNull(Long first, Long second) {
+        return first != null ? first : second;
+    }
     private static void applyEventTransitions(LeadFlowHistoryRespVO vo, BusinessEventDO event) {
         String type = event.getEventType();
         if ("lead_appeal_overturned".equals(type)) {
@@ -247,11 +252,14 @@ public class LeadFlowHistoryService {
             Map.entry("valid", "有效"), Map.entry("converted", "有效"), Map.entry("invalid", "无效"),
             Map.entry("won", "已成交"), Map.entry("closed", "已关闭")
     ).get(status); }
-    private static String eventReason(BusinessEventDO event) {
+    private static String eventSource(BusinessEventDO event, LeadAssignmentHistoryDO assignment, boolean system) {
+        return assignment == null ? (system ? "系统任务" : "员工工作台") : assignmentSource(assignment);
+    }
+    private static String eventReason(BusinessEventDO event, LeadAssignmentHistoryDO assignment) {
         return switch (Objects.toString(event.getEventType(), "")) {
             case "lead_qualified_invalid" -> optionalText(event.getRelatedObjectRefs(), "reasonLabel").orElse(null);
             case "lead_qualified_valid", "lead_follow_up_recorded" -> null;
-            default -> event.getReason();
+            default -> firstText(event.getReason(), assignment == null ? null : assignment.getReason());
         };
     }
     private static String eventRemark(BusinessEventDO event, Map<Long, LeadFollowUpRecordDO> followUps) {
@@ -285,6 +293,7 @@ public class LeadFlowHistoryService {
             Map.entry("lead_restored", "恢复客资"), Map.entry("lead_basic_info_updated", "修改基础信息"),
             Map.entry("lead_qualification_started", "开始有效性判定"),
             Map.entry("lead_submitter_supplemented", "提交人补充资料"),
+            Map.entry("lead_submitter_assist_requested", "请求提交人协助"),
             Map.entry("lead_category_changed", "变更客资类别"),
             Map.entry("lead_duplicate_reviewed", "重复客资复核")
     ).getOrDefault(type, type); }

@@ -137,6 +137,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-transfer.process-result", targetType = "lead-transfer")
     @Transactional(rollbackFor = Exception.class)
     public void handleProcessResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;

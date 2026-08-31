@@ -563,7 +563,7 @@ function SalesDetail({
             label: "名下客资",
             children: (
               <>
-                <AdvancedFilterToolbar scene="lead" placeholder="搜索姓名 / 手机号 / 微信号" keyword={leadKeyword} value={advancedFilter} onKeyword={setLeadKeyword} onChange={setAdvancedFilter}/>
+                <AdvancedFilterToolbar scene="lead" pageKey="subordinate_sales_leads" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={leadKeyword} value={advancedFilter} onKeyword={setLeadKeyword} onChange={setAdvancedFilter}/>
                 <div className="subordinate-batch-bar">
                   <Typography.Text>已选 {selected.length} 条</Typography.Text>
                   <Space wrap>
@@ -879,6 +879,7 @@ export default function SubordinateSalesPage({
         <Space wrap>
           <AdvancedFilterToolbar
             scene="subordinate_sales"
+            pageKey="subordinate_sales"
             placeholder="搜索姓名、账号或手机号"
             keyword={keyword}
             value={advancedFilter}

@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { flowAttachmentState, flowPanelState } from './LeadFlowHistoryPanel'
 import flowHistorySource from './LeadFlowHistoryPanel.tsx?raw'
 
-const flowHistoryStyles = readFileSync(new URL('../styles/components/lead-detail-v2.css', import.meta.url), 'utf8')
+const flowHistoryStyles = readFileSync(new URL('../styles/components/flow-history.css', import.meta.url), 'utf8')
 
 describe('Lead flow-history attachment presentation', () => {
   it('distinguishes unsupported, unavailable, image, and PDF attachments', () => {
@@ -24,27 +24,25 @@ describe('Lead flow-history attachment presentation', () => {
     expect(flowPanelState(false, '', 2)).toBe('ready')
   })
 
-  it('uses the compact custom timeline and keeps all requested flow fields', () => {
+  it('uses the follow-up-style custom timeline and keeps flow details readable', () => {
     expect(flowHistorySource).not.toContain('<Timeline')
-    expect(flowHistorySource).toContain('className="lead-flow-history-node"')
-    expect(flowHistorySource).toContain('原归属销售')
-    expect(flowHistorySource).toContain('新归属销售')
-    expect(flowHistorySource).toContain("{value || '-'}")
-    expect(flowHistorySource).not.toContain('不变')
-    expect(flowHistorySource).toContain('客资状态变化')
-    expect(flowHistorySource).toContain('分配状态变化')
-    expect(flowHistorySource).toContain('<span>原因</span>')
-    expect(flowHistorySource).toContain('<span>备注</span>')
-    expect(flowHistorySource).not.toContain('原因 / 备注')
+    expect(flowHistorySource).toContain('className="flow-history-node"')
+    expect(flowHistorySource).toContain('className="flow-history-card"')
+    expect(flowHistorySource).toContain('归属销售')
+    expect(flowHistorySource).toContain('客资状态')
+    expect(flowHistorySource).toContain('分配状态')
+    expect(flowHistorySource).toContain('原因：')
+    expect(flowHistorySource).toContain('备注：')
     expect(flowHistorySource).toContain('附件')
     expect(flowHistorySource).toContain('{items.map(item => <FlowItem')
     expect(flowHistorySource).not.toContain('items.sort(')
+    expect(flowHistorySource).not.toContain('lead-flow-history-node')
   })
 
-  it('keeps compact fields on one row with labels left and values right', () => {
-    expect(flowHistoryStyles).toMatch(/\.lead-flow-history-field\s*\{[^}]*display:\s*flex;/s)
-    expect(flowHistoryStyles).toMatch(/\.lead-flow-history-field\s*\{[^}]*justify-content:\s*space-between;/s)
-    expect(flowHistoryStyles).toMatch(/\.lead-flow-history-value[\s\S]*text-align:\s*right;/)
-    expect(flowHistoryStyles).toMatch(/\.lead-flow-history-transition\s*\{[^}]*justify-content:\s*flex-end;/s)
+  it('keeps the flow timeline aligned with follow-up card rhythm', () => {
+    expect(flowHistoryStyles).toMatch(/\.flow-history-node\s*\{[^}]*grid-template-columns: 24px minmax\(0, 1fr\)/s)
+    expect(flowHistoryStyles).toMatch(/\.flow-history-marker::after\s*\{[^}]*background: var\(--crm-border-strong\)/s)
+    expect(flowHistoryStyles).toMatch(/\.flow-history-card\s*\{[^}]*box-shadow: var\(--crm-shadow-card\)/s)
+    expect(flowHistoryStyles).toMatch(/\.flow-history-change\s*\{[^}]*background: var\(--crm-bg-sunken\)/s)
   })
 })

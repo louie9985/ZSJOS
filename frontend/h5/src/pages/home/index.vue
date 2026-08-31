@@ -18,7 +18,6 @@ import { getLeadFollowUpSummary, getMyLeadPage, type LeadFollowUpSummary, type L
 import { getPartnerMe, type PartnerInfo } from '@/api/profile'
 import { getLeaderboard, getLeaderboardConfig, type LeaderboardConfig, type LeaderboardData } from '@/api/leaderboard'
 import { getUnreadCount } from '@/api/message'
-import { clearMockedEndpoint, wasMockedEndpoint, wasMockedExactEndpoint } from '@/api/mock'
 import { formatAmount, formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
 import { formatLeaderboardValue, leaderboardMemberInitial, leaderboardRowGapText } from '@/utils/leaderboard'
 import LiquidSegmentedControl from '@/components/LiquidSegmentedControl.vue'
@@ -89,10 +88,6 @@ const statisticsMetrics: Record<HomeStatisticsMetric, { label: string; permissio
 }
 
 const leaderboardVisible = computed(() => leaderboardConfigLoading.value || leaderboardConfig.value?.enabled !== false || !!leaderboardConfigError.value)
-const leaderboardUsingMock = computed(() => wasMockedEndpoint('/zsjos/partner/leaderboard'))
-const statisticsUsingMock = computed(() => wasMockedExactEndpoint('/zsjos/partner/home-statistics'))
-const statisticsDetailsUsingMock = computed(() => wasMockedExactEndpoint('/zsjos/partner/home-statistics/details'))
-const statisticsMockLabel = import.meta.env.DEV ? '演示数据' : ''
 const canViewLeads = computed(() => userStore.hasPermission('zsjos:lead:query-submitted'))
 const canViewEarnings = computed(() => userStore.hasPermission('zsjos:cashback:my-query'))
 const canWithdraw = computed(() => userStore.hasPermission('zsjos:withdrawal:apply'))
@@ -232,7 +227,6 @@ async function loadStatistics(period = statisticsPeriod.value) {
   const requestVersion = ++statisticsRequestVersion
   statisticsLoading.value = true
   statisticsError.value = ''
-  clearMockedEndpoint('/zsjos/partner/home-statistics')
   try {
     const data = await getHomeStatistics(period)
     if (requestVersion !== statisticsRequestVersion || period !== statisticsPeriod.value) return
@@ -278,7 +272,6 @@ async function loadStatisticsDetails(reset = false) {
     statisticsDetailTotalAmount.value = 0
     statisticsDetailFinished.value = false
     statisticsDetailError.value = ''
-    clearMockedEndpoint('/zsjos/partner/home-statistics/details')
   } else if (statisticsDetailRequestInFlight || statisticsDetailFinished.value) {
     return
   }
@@ -358,12 +351,8 @@ function isWithdrawalStatisticsDetail(item: HomeStatisticsDetailItem): item is H
 }
 
 function openStatisticsItem(item: HomeStatisticsDetailItem) {
-  if (!item.mock) {
-    statisticsDetailVisible.value = false
-    void router.push(item.kind === 'lead' ? `/lead/${item.id}` : `/withdrawal/${item.id}`)
-    return
-  }
-  statisticsDetailSelected.value = item
+  statisticsDetailVisible.value = false
+  void router.push(item.kind === 'lead' ? `/lead/${item.id}` : `/withdrawal/${item.id}`)
 }
 
 function statisticsDetailInitial(item: HomeStatisticsDetailItem) {
@@ -548,7 +537,6 @@ function statusClass(status: string) {
       <div class="home-section-title statistics-header">
         <div class="statistics-title-wrap">
           <h2>我的战绩</h2>
-          <span v-if="statisticsMockLabel && statisticsUsingMock" class="mock-badge">{{ statisticsMockLabel }}</span>
         </div>
         <LiquidSegmentedControl
           class="period-tabs"
@@ -642,9 +630,6 @@ function statusClass(status: string) {
     </section>
 
     <section v-if="leaderboardVisible" class="home-card home-leaderboard" aria-label="排行榜">
-      <van-notice-bar v-if="leaderboardUsingMock" class="leaderboard-notice" color="#8a6100" background="#fff7df" left-icon="info-o">
-        开发环境演示数据
-      </van-notice-bar>
       <div class="home-section-title home-section-title--tight">
         <h2>排行榜</h2>
         <button type="button" @click="goLeaderboard">
@@ -709,8 +694,7 @@ function statusClass(status: string) {
             <strong>{{ statisticsDetailSelected ? '记录详情' : statisticsDetailTitle }}</strong>
             <span v-if="!statisticsDetailSelected">{{ statisticsDetailSubtitle }}</span>
           </div>
-          <span v-if="statisticsMockLabel && statisticsDetailsUsingMock" class="mock-badge">演示数据</span>
-          <span v-else class="statistics-detail-header__spacer" />
+          <span class="statistics-detail-header__spacer" />
         </header>
 
         <div v-if="statisticsDetailSelected?.kind === 'lead'" class="statistics-record-detail">
@@ -1378,16 +1362,6 @@ function statusClass(status: string) {
   flex: 0 0 auto;
   align-items: center;
   gap: 6px;
-}
-
-.mock-badge {
-  flex: 0 0 auto;
-  padding: 2px 6px;
-  border-radius: 999px;
-  background: #fff8e6;
-  color: var(--h5-warning);
-  font-size: 10px;
-  font-weight: 600;
 }
 
 .period-tabs {

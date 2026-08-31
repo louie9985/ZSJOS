@@ -314,6 +314,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-qualification.process-expired", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "qualification-manage")
     public void supervisorRecycleOwned(Long leadId, Long userId, LeadDispositionReqVO reqVO) {

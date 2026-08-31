@@ -3,7 +3,6 @@ import {
   Button,
   ColorPicker,
   Divider,
-  Drawer,
   Flex,
   Segmented,
   Slider,
@@ -21,6 +20,7 @@ import {
   FONT_SCALE_OPTIONS,
   GLASS_BLUR_MAX,
   GLASS_BLUR_MIN,
+  INBOX_LAYOUT_OPTIONS,
   LAYOUT_MODE_OPTIONS,
   PRESET_COLORS,
   TAB_STYLE_OPTIONS,
@@ -28,9 +28,12 @@ import {
   type BorderRadiusPreset,
   type Density,
   type FontScale,
+  type InboxLayoutMode,
   type LayoutMode,
   type TabStyle,
 } from '../constants'
+import ResizableDrawer from './ResizableDrawer'
+import { SETTINGS_DRAWER_WIDTH_STORAGE_KEY } from '../constants'
 import { useTheme } from './Theme/ThemeContext'
 import { BgColorsOutlined, CheckOutlined } from '@ant-design/icons'
 
@@ -51,6 +54,7 @@ const SettingsDrawer: React.FC = () => {
     density,
     fontScale,
     layoutMode,
+    inboxLayoutMode,
     borderRadius,
     headerFixed,
     animation,
@@ -67,6 +71,7 @@ const SettingsDrawer: React.FC = () => {
     setDensity,
     setFontScale,
     setLayoutMode,
+    setInboxLayoutMode,
     setBorderRadius,
     setHeaderFixed,
     setAnimation,
@@ -86,10 +91,13 @@ const SettingsDrawer: React.FC = () => {
           onClick={() => setOpen(true)}
         />
       </Tooltip>
-      <Drawer
+      <ResizableDrawer
         title="系统设置"
         placement="right"
-        size={320}
+        defaultSize={320}
+        minSize={300}
+        storageKey={SETTINGS_DRAWER_WIDTH_STORAGE_KEY}
+        width="min(320px, 100vw)"
         open={open}
         onClose={() => setOpen(false)}
         styles={{ body: { paddingTop: 12 } }}
@@ -309,6 +317,15 @@ const SettingsDrawer: React.FC = () => {
           options={BORDER_RADIUS_OPTIONS}
         />
 
+        <SectionTitle style={{ marginTop: 16 }}>收件箱布局</SectionTitle>
+        <Segmented
+          block
+          style={{ marginTop: 6 }}
+          value={inboxLayoutMode}
+          onChange={(value) => setInboxLayoutMode(value as InboxLayoutMode)}
+          options={INBOX_LAYOUT_OPTIONS}
+        />
+
         <Divider style={{ margin: '20px 0 12px' }} />
 
         {/* ===== 开关设置 ===== */}
@@ -331,7 +348,7 @@ const SettingsDrawer: React.FC = () => {
 
         <Divider style={{ margin: '20px 0 12px' }} />
         <Button block onClick={reset}>恢复默认</Button>
-      </Drawer>
+      </ResizableDrawer>
     </>
   )
 }

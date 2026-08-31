@@ -4,7 +4,6 @@ import { useRouter } from 'vue-router'
 import { isAxiosError } from 'axios'
 import { getCashbackSummary, getCashbackPage, type CashbackSummary, type CashbackItem } from '@/api/cashback'
 import { getPartnerLeadActivity, type PartnerLeadActivity } from '@/api/lead'
-import { clearMockedEndpoint, wasMockedEndpoint } from '@/api/mock'
 import { usePageList } from '@/composables/usePageList'
 import { useUserStore } from '@/stores/user'
 import { formatAmount, formatDate, formatDateTime, formatLeadNo } from '@/utils/format'
@@ -26,15 +25,11 @@ const orderLoading = ref(false)
 const orderError = ref('')
 let orderRequestVersion = 0
 
-const detailActivityEndpoint = computed(() => selectedCashback.value
-  ? `/zsjos/lead/${selectedCashback.value.leadId}/partner-activity`
-  : '')
-const detailUsingMock = computed(() => !!detailActivityEndpoint.value && wasMockedEndpoint(detailActivityEndpoint.value))
 const selectedOrder = computed(() => {
   const item = selectedCashback.value
   if (!item?.orderId) return undefined
   const orders = detailActivity.value?.orders || []
-  return orders.find(order => order.id === item.orderId) || (detailUsingMock.value ? orders[0] : undefined)
+  return orders.find(order => order.id === item.orderId)
 })
 
 const tabs = [
@@ -105,11 +100,9 @@ async function loadOrderInfo() {
   const item = selectedCashback.value
   if (!item || item.type !== 'deal' || !item.orderId) return
   const requestVersion = ++orderRequestVersion
-  const endpoint = `/zsjos/lead/${item.leadId}/partner-activity`
   orderLoading.value = true
   orderError.value = ''
   detailActivity.value = undefined
-  clearMockedEndpoint(endpoint)
   try {
     const activity = await getPartnerLeadActivity(item.leadId)
     if (requestVersion !== orderRequestVersion || selectedCashback.value?.id !== item.id) return
@@ -310,7 +303,6 @@ const statusColor: Record<string, string> = {
         <section class="earnings-detail__section">
           <div class="earnings-detail__section-title">
             <h3>订单信息</h3>
-            <span v-if="detailUsingMock" class="detail-mock-chip">开发环境演示数据</span>
           </div>
           <p v-if="selectedCashback.type !== 'deal'" class="earnings-detail__hint">本笔为有效返现，无需关联订单。</p>
           <p v-else-if="!selectedCashback.orderId" class="earnings-detail__hint">该成交返现暂未关联订单。</p>
@@ -602,14 +594,6 @@ const statusColor: Record<string, string> = {
 
 .earnings-detail__section-title h3 {
   margin-bottom: 8px;
-}
-
-.detail-mock-chip {
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: #fff8e6;
-  color: var(--h5-warning);
-  font-size: 10px;
 }
 
 .earnings-detail__row {

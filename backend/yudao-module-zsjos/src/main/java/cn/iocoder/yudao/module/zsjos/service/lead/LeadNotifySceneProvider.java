@@ -63,7 +63,6 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(CLAIMED, "抢单成功", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(TRANSFERRED, "管理员转派", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(FOLLOW_UP_RECORDED, "新增跟进", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
-                scene(SUBMITTER_ASSIST_REQUESTED, "提交人协助处理", ROLE_SUBMITTER),
                 scene(CATEGORY_CHANGED, "客资分类变化", ROLE_OWNER, ROLE_SUBMITTER, ROLE_OPERATOR),
                 scene(QUALIFICATION_SUSPENDED, "客资判定超时挂起", ROLE_OWNER, ROLE_QUALIFICATION_MANAGERS),
                 scene(QUALIFIED_VALID, "客资判定有效", ROLE_SUBMITTER),
@@ -78,6 +77,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
+                scene(SUBMITTER_ASSIST_REQUESTED, "请求提交人协助", ROLE_SUBMITTER),
+                scene(PARTNER_ASSIST_REMINDER, "提醒兼职提交人协助", ROLE_PARTNER_OWNER),
                 scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_COMPLAINANT, ROLE_OWNER, ROLE_DIRECT_LEADER),
                 scene(COMPLAINT_UNFOUNDED, "销售投诉不成立", ROLE_COMPLAINANT),
                 scene(DUPLICATE_REACTIVATED, "重复客资重新激活", ROLE_PREVIOUS_OWNER, ROLE_NEW_OWNER),
@@ -132,12 +133,13 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 if (dept != null && dept.getLeaderUserId() != null) users.add(dept.getLeaderUserId());
                 continue;
             }
+            if (ROLE_PARTNER_OWNER.equals(role)) {
+                Long partnerOwnerUserId = longValue(payload.get("partnerOwnerUserId"));
+                if (partnerOwnerUserId != null) users.add(partnerOwnerUserId);
+                continue;
+            }
             Long id = switch (role) {
-                case ROLE_SUBMITTER -> SUBMITTER_ASSIST_REQUESTED.equals(event.getSceneCode()) && lead != null
-                        ? lead.getSourceUserId() : lead != null
-                        && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
-                        ? lead.getProviderOwnerId() : null;
-                case ROLE_NEW_MEDIA_PROVIDER -> lead != null
+                case ROLE_SUBMITTER, ROLE_NEW_MEDIA_PROVIDER -> lead != null
                         && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                         ? lead.getProviderOwnerId() : null;
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
@@ -232,6 +234,8 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
             copyContext(values, event.getPayload(), "urge.reason", "complaint.result",
                     "complaint.handlerUserId", "complaint.handlerOpinion");
+            copyContext(values, event.getPayload(), "assist.requestId", "assist.problem",
+                    "assist.expectedAssistance", "assist.remark", "assist.attachmentNames");
             copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
         }
         return values;
@@ -286,7 +290,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         } else if (CATEGORY_CHANGED.equals(sceneCode)) {
             variables.add(variable("category.before", "变更前分类"));
             variables.add(variable("category.after", "变更后分类"));
-        } else if (Set.of(FOLLOW_UP_RECORDED, SUBMITTER_ASSIST_REQUESTED).contains(sceneCode)) {
+        } else if (FOLLOW_UP_RECORDED.equals(sceneCode)) {
             variables.add(variable("followUp.method", "跟进方式"));
             variables.add(variable("followUp.result", "跟进结果"));
             variables.add(variable("followUp.remark", "跟进内容"));
@@ -302,6 +306,12 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("appeal.decisionReason", "裁决理由"));
         } else if (SUBMITTER_URGED.equals(sceneCode)) {
             variables.add(variable("urge.reason", "催促原因"));
+        } else if (Set.of(SUBMITTER_ASSIST_REQUESTED, PARTNER_ASSIST_REMINDER).contains(sceneCode)) {
+            variables.add(variable("assist.requestId", "协助请求编号"));
+            variables.add(variable("assist.problem", "遇到的问题"));
+            variables.add(variable("assist.expectedAssistance", "希望协助方式"));
+            variables.add(variable("assist.remark", "备注"));
+            variables.add(variable("assist.attachmentNames", "附件名称"));
         } else if (Set.of(COMPLAINT_FOUNDED, COMPLAINT_UNFOUNDED).contains(sceneCode)) {
             variables.add(variable("complaint.result", "投诉处理结果"));
             variables.add(variable("complaint.handlerUserId", "投诉处理人编号"));
@@ -332,6 +342,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             case ROLE_PREVIOUS_COLLABORATOR -> "原协同销售";
             case ROLE_FROZEN_DEPT_LEADER -> "冻结部门主管";
             case ROLE_COMPLAINANT -> "投诉提交人";
+            case ROLE_PARTNER_OWNER -> "兼职所属员工";
             default -> role;
         };
     }

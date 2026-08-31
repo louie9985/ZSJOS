@@ -22,6 +22,8 @@
 .announcement-bar time { margin-left: auto; color: var(--crm-text-secondary); white-space: nowrap; }
 .announcement-page { height: 100%; }
 .announcement-layout { display: grid; height: calc(100% - 44px); min-height: 0; grid-template-columns: var(--crm-list-pane-w) minmax(0, 1fr); gap: var(--crm-gap); }
+.announcement-table-page .announcement-table { width: 100%; }
+.announcement-table-page .announcement-mobile-drawer { display: block; }
 .announcement-list-pane,.announcement-detail-pane { min-width: 0; overflow-y: auto; background: var(--crm-bg-container); border-radius: var(--crm-radius-md); }
 .announcement-list-pane { padding: var(--crm-card-pad); }
 .announcement-list-pane .ant-pagination { margin-top: var(--crm-sp-3); text-align: center; }

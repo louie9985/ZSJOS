@@ -331,6 +331,7 @@ export default function SalesOrderSupervisorInbox({
           <div className="business-inbox-toolbar">
             <AdvancedFilterToolbar
               scene="order"
+              pageKey="sales_order_supervisor_confirm"
               placeholder="搜索订单号 / 学员姓名 / 手机号"
               keyword={keyword}
               value={advancedFilter}

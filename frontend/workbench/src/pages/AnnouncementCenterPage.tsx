@@ -1,4 +1,4 @@
-import { Alert, Badge, Button, Drawer, Empty, Grid, List, Pagination, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, Badge, Button, Empty, Grid, List, Pagination, Skeleton, Space, Tag, Typography } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -7,6 +7,9 @@ import { formatTimestamp } from '../services/time'
 import { useAnnouncements } from '../components/AnnouncementProvider'
 import AnnouncementAttachmentIcon from '../components/AnnouncementAttachmentIcon'
 import SafeRichText from '../components/SafeRichText'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable } from '@ant-design/pro-components'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const PAGE_SIZE = 20
 
@@ -48,8 +51,9 @@ export default function AnnouncementCenterPage() {
   const [detailLoading, setDetailLoading] = useState(false)
   const [error, setError] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const { useTableLayout } = useInboxTableLayout()
 
-  const openDetail = useCallback(async (id: number, mobile = !screens.md) => {
+  const openDetail = useCallback(async (id: number, mobile = useTableLayout || !screens.md) => {
     setDetailLoading(true)
     try {
       const detail = await api.announcement(id)
@@ -62,7 +66,7 @@ export default function AnnouncementCenterPage() {
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '公告详情加载失败')
     } finally { setDetailLoading(false) }
-  }, [refreshSummary, screens.md, setSearchParams])
+  }, [refreshSummary, screens.md, setSearchParams, useTableLayout])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -82,13 +86,31 @@ export default function AnnouncementCenterPage() {
 
   useEffect(() => { void load() }, [pageNo])
 
-  return <section className="workspace-page announcement-page">
+  return <section className={`workspace-page announcement-page${useTableLayout ? ' announcement-table-page' : ''}`}>
     <div className="page-heading">
       <Typography.Title level={4}>通知公告</Typography.Title>
       <Button icon={<ReloadOutlined/>} onClick={() => void load()}>刷新</Button>
     </div>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>}
-    <div className="announcement-layout">
+    {useTableLayout ? <ProTable<Announcement>
+      className="announcement-table"
+      rowKey="id"
+      search={false}
+      options={{ density: true, fullScreen: true, setting: true }}
+      columnsState={{ persistenceKey: 'crm-announcement-table-columns', persistenceType: 'localStorage' }}
+      loading={loading}
+      dataSource={items}
+      pagination={false}
+      scroll={{ x: 760 }}
+      locale={{ emptyText: <Empty description="暂无公告" /> }}
+      columns={[
+        { title: '标题', dataIndex: 'title' },
+        { title: '类型', render: (_, item) => item.type === 1 ? '通知' : '公告', width: 100 },
+        { title: '发布时间', dataIndex: 'publishTime', render: (_, item) => formatTimestamp(item.publishTime), width: 170 },
+        { title: '阅读状态', render: (_, item) => item.read ? '已读' : <Tag color="processing">未读</Tag>, width: 100 },
+        { title: '操作', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => void openDetail(item.id, true)}>详细</Button> }
+      ]}
+    /> : <div className="announcement-layout">
       <aside className="announcement-list-pane">
         {loading ? <Skeleton active paragraph={{ rows: 8 }}/> : items.length === 0 ? <Empty description="暂无公告"/> : <>
           <List dataSource={items} renderItem={item => <button type="button" className={`announcement-list-item${selected?.id === item.id ? ' active' : ''}${item.read ? '' : ' unread'}`} onClick={() => void openDetail(item.id)}>
@@ -99,9 +121,9 @@ export default function AnnouncementCenterPage() {
         </>}
       </aside>
       <main className="announcement-detail-pane">{detailLoading ? <Skeleton active/> : <AnnouncementDetail item={selected}/>}</main>
-    </div>
-    <Drawer className="announcement-mobile-drawer" title="公告详情" placement="bottom" height="82vh" open={drawerOpen} onClose={() => setDrawerOpen(false)}>
+    </div>}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="announcement-mobile-drawer" title="公告详情" placement={useTableLayout ? 'right' : 'bottom'} height={useTableLayout ? undefined : '82vh'} open={drawerOpen} onClose={() => setDrawerOpen(false)}>
       {detailLoading ? <Skeleton active/> : <AnnouncementDetail item={selected}/>}
-    </Drawer>
+    </ResizableDetailDrawer>
   </section>
 }

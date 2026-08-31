@@ -53,8 +53,7 @@ class PartnerAccountServiceImplTest {
         PartnerAccountDO result = service.authenticate(" 13800138000 ", "pass1234", "127.0.0.1");
 
         assertEquals(20L, result.getId());
-        verify(accountMapper).updateById(org.mockito.ArgumentMatchers.<PartnerAccountDO>argThat(value -> "127.0.0.1".equals(value.getLastLoginIp())
-                && value.getLastLoginTime() != null));
+        verify(accountMapper, never()).updateById(any(PartnerAccountDO.class));
     }
 
     @Test
@@ -71,15 +70,12 @@ class PartnerAccountServiceImplTest {
     }
 
     @Test
-    void authenticateConflictDoesNotReturnAuthenticatedAccount() {
+    void recordLoginConflictDoesNotUpdateAccount() {
         PartnerAccountDO account = account();
-        when(accountMapper.selectByMobile("13800138000")).thenReturn(account);
         when(accountMapper.selectById(20L)).thenReturn(account);
-        when(passwordEncoder.matches("pass1234", "encoded")).thenReturn(true);
-        when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L).setStatus(PARTNER_STATUS_ENABLED));
         when(accountMapper.updateById(any(PartnerAccountDO.class))).thenReturn(0);
 
-        assertServiceException(() -> service.authenticate("13800138000", "pass1234", "127.0.0.1"),
+        assertServiceException(() -> service.recordLogin(20L, "127.0.0.1"),
                 PARTNER_ACCOUNT_CONCURRENT_MODIFICATION);
     }
 

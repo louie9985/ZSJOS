@@ -5,15 +5,22 @@ import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.framework.common.util.servlet.ServletUtils;
+import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
+import cn.iocoder.yudao.framework.tenant.core.aop.TenantIgnore;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.audit.BusinessAuditLogDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.audit.BusinessAuditLogMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.impersonation.ImpersonationRequestLogMapper;
 import cn.iocoder.yudao.module.zsjos.controller.admin.audit.vo.BusinessAuditRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.audit.vo.BusinessAuditPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.audit.vo.ImpersonationAuditRespVO;
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAuditOperation;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -34,6 +41,42 @@ public class BusinessAuditServiceImpl implements BusinessAuditService {
     @Resource private ImpersonationRequestLogMapper impersonationLogMapper;
 
     @Override
+    @TenantIgnore
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public Long begin(ZsjosAuditOperation operation) {
+        HttpServletRequest request = currentRequest();
+        Long operatorId = SecurityFrameworkUtils.getLoginUserId();
+        String operatorName = operatorId == null ? "系统" : SecurityFrameworkUtils.getLoginUserNickname();
+        Long tenantId = TenantContextHolder.getTenantId();
+        BusinessAuditLogDO log = new BusinessAuditLogDO();
+        log.setTenantId(tenantId == null ? 0L : tenantId);
+        log.setOperatorUserId(operatorId)
+                .setOperatorNameSnapshot(operatorName == null ? "未知账号" : operatorName)
+                .setOperatorRoleSnapshot(operation.sourceType())
+                .setCategoryCode(operation.category()).setActionCode(operation.action())
+                .setTargetType(operation.targetType()).setTargetId(operation.targetId())
+                .setDetailJson("{}").setSourceIp(request == null ? null : ServletUtils.getClientIP(request))
+                .setSourceType(operation.sourceType()).setTraceId(TracerUtils.getTraceId())
+                .setRequestMethod(operation.requestMethod()).setRequestPath(operation.requestPath())
+                .setResultStatus("STARTED").setOccurredAt(LocalDateTime.now());
+        mapper.insert(log);
+        return log.getId();
+    }
+
+    @Override
+    @TenantIgnore
+    @Transactional(propagation = Propagation.REQUIRES_NEW, rollbackFor = Exception.class)
+    public void complete(Long auditId, boolean success, Integer resultCode, String resultMessage, long durationMs) {
+        BusinessAuditLogDO update = new BusinessAuditLogDO().setId(auditId)
+                .setResultStatus(success ? "SUCCESS" : "FAILURE")
+                .setResultCode(resultCode).setResultMessage(sanitizeResultMessage(resultMessage))
+                .setFinishedAt(LocalDateTime.now()).setDurationMs(durationMs);
+        if (mapper.updateById(update) != 1) {
+            throw exception(AUDIT_ACTION_INVALID);
+        }
+    }
+
+    @Override
     public void record(String category, String action, String targetType, String targetId,
                        String operatorRoleSnapshot, Map<String, ?> safeDetails) {
         if (!AuditActionCatalog.contains(category, action) || hasSensitiveDetail(safeDetails)) {
@@ -49,12 +92,13 @@ public class BusinessAuditServiceImpl implements BusinessAuditService {
                 .setTargetType(targetType).setTargetId(targetId)
                 .setDetailJson(JsonUtils.toJsonString(safeDetails == null ? Map.of() : safeDetails))
                 .setSourceIp(request == null ? null : ServletUtils.getClientIP(request))
-                .setOccurredAt(LocalDateTime.now()));
+                .setSourceType("EXPLICIT").setResultStatus("SUCCESS")
+                .setResultCode(0).setOccurredAt(LocalDateTime.now()).setFinishedAt(LocalDateTime.now()));
     }
 
     @Override
-    public PageResult<BusinessAuditRespVO> getPage(PageParam page, String actionCode, String targetType) {
-        return BeanUtils.toBean(mapper.selectPage(page, actionCode, targetType), BusinessAuditRespVO.class);
+    public PageResult<BusinessAuditRespVO> getPage(BusinessAuditPageReqVO reqVO) {
+        return BeanUtils.toBean(mapper.selectPage(reqVO), BusinessAuditRespVO.class);
     }
 
     @Override
@@ -66,6 +110,12 @@ public class BusinessAuditServiceImpl implements BusinessAuditService {
         if (details == null) return false;
         return details.keySet().stream().map(key -> key.replace("-", "_").toLowerCase(Locale.ROOT))
                 .anyMatch(key -> SENSITIVE_KEYS.stream().anyMatch(key::contains));
+    }
+
+    private static String sanitizeResultMessage(String message) {
+        if (message == null) return null;
+        String value = message.replaceAll("(?i)(password|token|mobile|phone|bank.?card)\\s*[=:]\\s*[^,;\\s]+", "$1=[REDACTED]");
+        return value.length() <= 500 ? value : value.substring(0, 500);
     }
 
     private static HttpServletRequest currentRequest() {

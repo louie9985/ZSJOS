@@ -64,11 +64,6 @@ public class BusinessTaskCommandService {
         return taskMapper.completePendingByKey(idempotencyKey, completedAt) > 0;
     }
 
-    public int completePendingByTypeAndBizAndAssignee(String taskType, String bizType, Long bizId,
-                                                      Long assigneeId, LocalDateTime completedAt) {
-        return taskMapper.completePendingByTypeAndBizAndAssignee(taskType, bizType, bizId, assigneeId, completedAt);
-    }
-
     public int cancel(String taskType, Long bizId, Long assigneeId, LocalDateTime cancelledAt, String reason) {
         return taskMapper.cancelPending(taskType, bizId, assigneeId, cancelledAt, reason);
     }

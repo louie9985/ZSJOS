@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.dispatch.*;
@@ -50,6 +52,7 @@ public class LeadDispatchController {
         return success(dispatchService.getClaimPoolPage(reqVO, getLoginUserId()));
     }
     @PostMapping("/claim-pool/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:claim-pool:query')")
     public CommonResult<PageResult<LeadPendingRespVO>> searchClaimPool(@Valid @RequestBody LeadClaimPoolPageReqVO reqVO) {
         return success(dispatchService.getClaimPoolPage(reqVO, getLoginUserId()));

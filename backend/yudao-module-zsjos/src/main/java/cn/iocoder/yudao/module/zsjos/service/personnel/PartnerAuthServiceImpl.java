@@ -12,9 +12,15 @@ import cn.iocoder.yudao.module.system.api.logger.dto.LoginLogCreateReqDTO;
 import cn.iocoder.yudao.module.system.enums.oauth2.OAuth2ClientConstants;
 import cn.iocoder.yudao.module.system.enums.logger.LoginLogTypeEnum;
 import cn.iocoder.yudao.module.system.enums.logger.LoginResultEnum;
+import cn.iocoder.yudao.module.system.api.social.SocialClientApi;
+import cn.iocoder.yudao.module.system.api.social.SocialUserApi;
+import cn.iocoder.yudao.module.system.api.social.dto.SocialUserRespDTO;
+import cn.iocoder.yudao.module.system.enums.social.SocialTypeEnum;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerActivateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerLoginReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerLoginRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerPermissionInfoRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.PartnerWecomLoginReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
@@ -26,6 +32,9 @@ import java.util.Set;
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.monitor.TracerUtils.getTraceId;
 import static cn.iocoder.yudao.framework.common.util.servlet.ServletUtils.getUserAgent;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_LOGIN_BAD_CREDENTIALS;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_INVITATION_NOT_ACTIVATED;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_WECOM_NOT_BOUND;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_TOKEN_TYPE_INVALID;
 
 @Service
@@ -42,6 +51,9 @@ public class PartnerAuthServiceImpl implements PartnerAuthService {
     @Resource private OAuth2TokenCommonApi oauth2TokenApi;
     @Resource private LoginLogApi loginLogApi;
     @Resource private ConfigApi configApi;
+    @Resource private SocialClientApi socialClientApi;
+    @Resource private SocialUserApi socialUserApi;
+    @Resource private PartnerInvitationService invitationService;
 
     @Override
     public PartnerLoginRespVO login(PartnerLoginReqVO reqVO, String loginIp) {
@@ -51,9 +63,48 @@ public class PartnerAuthServiceImpl implements PartnerAuthService {
         } catch (RuntimeException ex) {
             writeLog(null, reqVO.getMobile(), LoginResultEnum.BAD_CREDENTIALS, loginIp,
                     LoginLogTypeEnum.LOGIN_MOBILE);
+            if (PARTNER_LOGIN_BAD_CREDENTIALS.getCode().equals(exceptionCode(ex))
+                    && accountService.getByMobile(reqVO.getMobile()) == null
+                    && invitationService.hasActiveInvitation(reqVO.getMobile())) {
+                throw exception(PARTNER_INVITATION_NOT_ACTIVATED);
+            }
             throw ex;
         }
-        String clientId = resolveClientId(reqVO.getPlatform());
+        accountService.recordLogin(account.getId(), loginIp);
+        PartnerLoginRespVO response = issueToken(account, reqVO.getPlatform(), loginIp, LoginLogTypeEnum.LOGIN_MOBILE);
+        return response;
+    }
+
+    @Override
+    public PartnerLoginRespVO activate(PartnerActivateReqVO reqVO, String loginIp) {
+        PartnerAccountDO account = invitationService.activate(reqVO);
+        accountService.recordLogin(account.getId(), loginIp);
+        return issueToken(account, reqVO.getPlatform(), loginIp, LoginLogTypeEnum.LOGIN_MOBILE);
+    }
+
+    @Override
+    public String getWecomAuthorizeUrl(String redirectUri) {
+        return socialClientApi.getAuthorizeUrl(SocialTypeEnum.WECHAT_ENTERPRISE.getType(),
+                UserTypeEnum.PARTNER.getValue(), redirectUri);
+    }
+
+    @Override
+    public PartnerLoginRespVO wecomLogin(PartnerWecomLoginReqVO reqVO, String loginIp) {
+        SocialUserRespDTO socialUser = socialUserApi.getSocialUserByCode(UserTypeEnum.PARTNER.getValue(),
+                SocialTypeEnum.WECHAT_ENTERPRISE.getType(), reqVO.getCode(), reqVO.getState());
+        if (socialUser == null || socialUser.getUserId() == null) {
+            writeLog(null, null, LoginResultEnum.BAD_CREDENTIALS, loginIp, LoginLogTypeEnum.LOGIN_SOCIAL);
+            throw exception(PARTNER_WECOM_NOT_BOUND);
+        }
+        PartnerContext context = accountService.requireContext(socialUser.getUserId());
+        PartnerAccountDO account = accountService.getById(context.accountId());
+        accountService.recordLogin(account.getId(), loginIp);
+        return issueToken(account, reqVO.getPlatform(), loginIp, LoginLogTypeEnum.LOGIN_SOCIAL);
+    }
+
+    private PartnerLoginRespVO issueToken(PartnerAccountDO account, String platform, String loginIp,
+                                          LoginLogTypeEnum logType) {
+        String clientId = resolveClientId(platform);
         OAuth2AccessTokenCreateReqDTO create = new OAuth2AccessTokenCreateReqDTO().setUserId(account.getId())
                 .setUserType(UserTypeEnum.PARTNER.getValue()).setClientId(clientId)
                 .setMaxDevices(readPositive(OAuth2ClientConstants.CONFIG_MOBILE_MAX_DEVICES,
@@ -62,8 +113,7 @@ public class PartnerAuthServiceImpl implements PartnerAuthService {
                         OAuth2ClientConstants.DEFAULT_REMEMBER_DAYS, OAuth2ClientConstants.MAX_REMEMBER_DAYS)
                         * 24 * 60 * 60);
         OAuth2AccessTokenRespDTO token = oauth2TokenApi.createAccessToken(create);
-        writeLog(account.getId(), account.getMobile(), LoginResultEnum.SUCCESS, loginIp,
-                LoginLogTypeEnum.LOGIN_MOBILE);
+        writeLog(account.getId(), account.getMobile(), LoginResultEnum.SUCCESS, loginIp, logType);
         return BeanUtils.toBean(token, PartnerLoginRespVO.class).setClientId(clientId);
     }
 
@@ -127,5 +177,12 @@ public class PartnerAuthServiceImpl implements PartnerAuthService {
         loginLogApi.createLoginLog(new LoginLogCreateReqDTO().setLogType(type.getType()).setTraceId(getTraceId())
                 .setUserId(userId).setUserType(UserTypeEnum.PARTNER.getValue()).setUsername(mobile)
                 .setResult(result.getResult()).setUserIp(ip == null ? "0.0.0.0" : ip).setUserAgent(getUserAgent()));
+    }
+
+    private Integer exceptionCode(RuntimeException ex) {
+        if (ex instanceof cn.iocoder.yudao.framework.common.exception.ServiceException serviceException) {
+            return serviceException.getCode();
+        }
+        return null;
     }
 }

@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.registration;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils;
@@ -31,6 +33,7 @@ public class RegistrationController {
     }
 
     @PostMapping("/pool/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:registration:query-pool')")
     public CommonResult<PageResult<RegistrationCaseRespVO>> searchPoolPage(
             @Valid @RequestBody RegistrationPoolPageReqVO reqVO) {

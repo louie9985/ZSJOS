@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Modal, Radio, Skeleton, Space, Tabs, Upload, message } from 'antd'
+import { Alert, Avatar, Button, Card, Descriptions, Form, Input, Modal, Radio, Skeleton, Space, Switch, Tabs, Upload, message } from 'antd'
 import { UploadOutlined, WechatOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate } from 'react-router-dom'
 import EmployeeAvatar from '../components/EmployeeAvatar'
@@ -30,6 +30,7 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
   const [social, setSocial] = useState<SocialUser>()
   const [socialLoading, setSocialLoading] = useState(false)
   const [binding, setBinding] = useState(false)
+  const [wecomSaving, setWecomSaving] = useState(false)
   const avatarUploadRequest = useRef(0)
   const [form] = Form.useForm()
   const [passwordForm] = Form.useForm()
@@ -80,7 +81,23 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
   }
   const unbind = () => {
     if (!social || socialLoading) return
-    Modal.confirm({ title: '解绑企业微信？', content: '解绑后将取消当前账号与企业微信的关联。', okText: '确认解绑', cancelText: '取消', onOk: async () => { await api.unbindSocialUser(WECOM_TYPE, social.openid); setSocial(undefined); message.success('企业微信已解绑') } })
+    Modal.confirm({ title: '解绑企业微信？', content: '解绑后将取消当前账号与企业微信的关联，并停止企业微信推送。', okText: '确认解绑', cancelText: '取消', onOk: async () => { await api.unbindSocialUser(WECOM_TYPE, social.openid); setSocial(undefined); setProfile(current => current ? { ...current, wecomEnabled: false } : current); message.success('企业微信已解绑') } })
+  }
+  const updateWecomEnabled = async (enabled: boolean) => {
+    if (!social) {
+      message.warning('请先绑定企业微信')
+      return
+    }
+    setWecomSaving(true)
+    try {
+      await api.updateUserWecomEnabled(enabled)
+      setProfile(current => current ? { ...current, wecomEnabled: enabled } : current)
+      message.success(enabled ? '已开启企业微信推送' : '已关闭企业微信推送')
+    } catch (e) {
+      message.error(errorText(e))
+    } finally {
+      setWecomSaving(false)
+    }
   }
   const infoItems = useMemo(() => [{ key: 'username', label: '用户名', children: profile?.username || '—' }, { key: 'dept', label: '部门', children: profile?.dept?.name || '—' }, { key: 'posts', label: '岗位', children: profile?.posts?.map(post => post.name).join('、') || '—' }, { key: 'createTime', label: '创建日期', children: <DateTimeText value={profile?.createTime} emptyText="—" precision="second"/> }], [profile])
   if (loading) return <section className="workspace-page user-profile-page"><Card><Skeleton active /></Card></section>
@@ -88,6 +105,6 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
   return <section className="workspace-page user-profile-page"><Card title="个人中心"><Tabs items={[
     { key: 'profile', label: '个人资料', children: <div className="user-profile-grid"><Card bordered><div className="profile-avatar-editor"><EmployeeAvatar avatar={profile?.avatar} name={profile?.nickname} size={96} /><Upload showUploadList={false} beforeUpload={upload}><Button icon={<UploadOutlined />}>更换头像</Button></Upload></div><Form form={form} layout="vertical" onFinish={saveProfile}><Form.Item name="avatar" hidden><Input /></Form.Item><Form.Item label="昵称" name="nickname" rules={[{ required: true, max: 30, message: '请输入 1-30 个字符的昵称' }]}><Input /></Form.Item><Form.Item label="手机号" name="mobile" rules={[{ pattern: /^1[3-9]\d{9}$/, message: '请输入有效的 11 位手机号' }]}><Input /></Form.Item><Form.Item label="邮箱" name="email" rules={[{ type: 'email', message: '请输入有效邮箱' }]}><Input /></Form.Item><Form.Item label="性别" name="sex"><Radio.Group options={[{ value: 0, label: '未知' }, { value: 1, label: '男' }, { value: 2, label: '女' }]} optionType="button" /></Form.Item><Button type="primary" htmlType="submit">保存资料</Button></Form></Card><Card title="账户信息" bordered><Descriptions column={1} items={infoItems} /></Card></div> },
     { key: 'password', label: '修改密码', children: <Card bordered><Form form={passwordForm} layout="vertical" onFinish={async values => { try { await api.updateUserPassword(values.oldPassword, values.newPassword); passwordForm.resetFields(); message.success('密码修改成功') } catch (e) { message.error(errorText(e)) } }}><Form.Item label="旧密码" name="oldPassword" rules={[{ required: true, min: 4, max: 100 }]}><Input.Password /></Form.Item><Form.Item label="新密码" name="newPassword" rules={[{ required: true, min: 8, max: 20, message: '新密码为 8-20 位' }, { pattern: /^(?=.*[A-Za-z])(?=.*\d).+$/, message: '新密码必须同时包含字母和数字' }]}><Input.Password /></Form.Item><Form.Item label="确认新密码" name="confirmPassword" dependencies={['newPassword']} rules={[{ required: true }, ({ getFieldValue }) => ({ validator: (_, value) => !value || value === getFieldValue('newPassword') ? Promise.resolve() : Promise.reject(new Error('两次输入的密码不一致')) })]}><Input.Password /></Form.Item><Button type="primary" htmlType="submit">修改密码</Button></Form></Card> },
-    { key: 'social', label: '第三方账号', children: <Card bordered loading={socialLoading}><Space><WechatOutlined style={{ color: '#07c160' }} /><strong>企业微信</strong>{social ? <><Avatar src={social.avatar} size="small" /><span>{social.nickname || social.openid}</span><Button danger onClick={unbind}>解绑</Button></> : <><span>未绑定</span><Button type="primary" loading={binding} onClick={bind}>绑定企业微信</Button></>}</Space></Card> }
+    { key: 'social', label: '第三方账号', children: <Card bordered loading={socialLoading}><Space direction="vertical" size={12}><Space><WechatOutlined style={{ color: '#07c160' }} /><strong>企业微信</strong>{social ? <><Avatar src={social.avatar} size="small" /><span>{social.nickname || social.openid}</span><Button danger onClick={unbind}>解绑</Button></> : <><span>未绑定</span><Button type="primary" loading={binding} onClick={bind}>绑定企业微信</Button></>}</Space><Space><span>接收企业微信推送</span><Switch disabled={!social} loading={wecomSaving} checked={Boolean(social && profile?.wecomEnabled)} onChange={updateWecomEnabled} /></Space></Space></Card> }
   ]} /></Card></section>
 }

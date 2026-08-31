@@ -34,6 +34,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackReplyDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackRoundDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackSurveyDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackConfigMapper;
@@ -42,6 +43,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackNoDailyCounterMa
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackReplyMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackRoundMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackSurveyMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
@@ -68,14 +70,18 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBA
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_IDEMPOTENCY_CONFLICT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_NOT_EXISTS;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_NOT_OPEN;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_PERMISSION_DENIED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_PROCESS_UNAVAILABLE;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_SURVEY_ALREADY_REQUESTED;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_SURVEY_STATE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_TYPE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_VERSION_CONFLICT;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_NOT_EXISTS;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.PARTNER_ACCOUNT_DISABLED;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.AUTHOR_ADMIN;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.AUTHOR_EMPLOYEE;
+import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.AUTHOR_PARTNER_ACCOUNT;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.BUSINESS_TYPE_FEEDBACK;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.NOTIFY_SCENE_READY_FOR_HANDLING;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.PROCESS_DEFINITION_KEY;
@@ -85,6 +91,8 @@ import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.S
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.STATUS_COMPLETED;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.STATUS_IN_PROGRESS;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.STATUS_WAITING;
+import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.SUBJECT_ADMIN;
+import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.SUBJECT_PARTNER_ACCOUNT;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.SUBMISSION_TYPES;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.SURVEY_PENDING;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.SURVEY_SUBMITTED;
@@ -97,6 +105,7 @@ import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.T
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.TYPE_REQUIREMENT;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.TYPE_SUPPORT;
 import static cn.iocoder.yudao.module.zsjos.service.feedback.FeedbackConstants.TYPE_SURVEY;
+import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_ENABLED;
 
 @Service
 public class FeedbackServiceImpl implements FeedbackService {
@@ -141,6 +150,8 @@ public class FeedbackServiceImpl implements FeedbackService {
     private FileApi fileApi;
     @Resource
     private NotifyBusinessEventApi notifyBusinessEventApi;
+    @Resource
+    private PartnerMapper partnerMapper;
 
     @Override
     public FeedbackRespVO.Portal getPortal(Long userId) {
@@ -151,6 +162,20 @@ public class FeedbackServiceImpl implements FeedbackService {
                 portalEntry(TYPE_SUPPORT, "技术支持", "申请账号、软件、设备或网络支持")));
         portal.setRecent(feedbackMapper.selectRecentBySubmitter(userId, 5).stream()
                 .map(row -> toCard(row, userId, false)).toList());
+        return portal;
+    }
+
+    @Override
+    public FeedbackRespVO.Portal getPartnerPortal(Long accountId, Long partnerId) {
+        PartnerDO partner = requireEnabledPartner(partnerId);
+        FeedbackRespVO.Portal portal = new FeedbackRespVO.Portal();
+        portal.setEntries(List.of(
+                partnerPortalEntry(TYPE_REQUIREMENT, "提交需求", "提交软件系统和网站建设需求"),
+                partnerPortalEntry(TYPE_BUG, "BUG 反馈", "反馈系统使用中遇到的问题"),
+                partnerPortalEntry(TYPE_SUPPORT, "技术支持", "申请账号、软件、设备或网络支持")));
+        portal.setRecent(feedbackMapper.selectRecentBySubmitter(SUBJECT_PARTNER_ACCOUNT, accountId, 5).stream()
+                .filter(row -> Objects.equals(row.getPartnerId(), partner.getId()))
+                .map(row -> toCard(row, accountId, false)).toList());
         return portal;
     }
 
@@ -196,6 +221,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         workOrder.setSceneCode(type);
         workOrder.setSceneNameSnapshot(TYPE_LABEL.get(type));
         workOrder.setAssignmentMode("DIRECT");
+        workOrder.setSourceSubjectType(SUBJECT_ADMIN);
         workOrder.setSourceUserId(userId);
         workOrder.setSourceNameSnapshot(submitter.getNickname());
         workOrder.setStatus(initialStatus);
@@ -203,6 +229,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         workOrder.setValueJson(valueSnapshotJson);
         workOrder.setAttachmentIdsJson(JsonUtils.toJsonString(normalized.attachmentIds()));
         workOrder.setIdempotencyKey(request.getIdempotencyKey());
+        workOrder.setCommandSubjectType(SUBJECT_ADMIN);
         workOrder.setCommandUserId(userId);
         workOrder.setRequestFingerprint(fingerprint);
         workOrder.setVersion(0);
@@ -219,6 +246,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedback.setValueSnapshotJson(valueSnapshotJson);
         applySupportSnapshot(feedback, normalized.values());
         feedback.setStatus(initialStatus);
+        feedback.setSubmitterSubjectType(SUBJECT_ADMIN);
         feedback.setSubmitterUserId(userId);
         feedback.setSubmitterNameSnapshot(submitter.getNickname());
         feedback.setLastActivityAt(now);
@@ -239,6 +267,89 @@ public class FeedbackServiceImpl implements FeedbackService {
         if (STATUS_WAITING.equals(initialStatus)) {
             publishReadyForHandling(feedback, userId, config);
         }
+        return feedback.getId();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long createForPartner(String type, FeedbackCreateReqVO request, Long accountId, Long partnerId) {
+        requireSubmissionType(type);
+        PartnerDO partner = requireEnabledPartner(partnerId);
+        FeedbackConfigDO config = requireConfig(type);
+        validateConfigVersion(config, request.getConfigVersion());
+        if (effectiveDispatchers(config).isEmpty()) throw exception(FEEDBACK_NOT_OPEN);
+        if (TYPE_REQUIREMENT.equals(type) && Boolean.TRUE.equals(config.getApprovalEnabled())) {
+            throw exception(FEEDBACK_PROCESS_UNAVAILABLE);
+        }
+
+        FeedbackDynamicFormService.ParsedForm form = dynamicFormService.requireCompatibleForm(
+                config.getFormId(), type, config.getTitleFieldKey());
+        FeedbackDynamicFormService.NormalizedValues normalized = dynamicFormService.normalizeValues(
+                form, request.getValues(), accountId);
+        String fingerprint = fingerprint("create", SUBJECT_PARTNER_ACCOUNT, type, accountId, partnerId,
+                request.getConfigVersion(), normalized.values());
+        WorkOrderDO existing = workOrderMapper.selectAnyByIdempotencyKey(request.getIdempotencyKey());
+        if (existing != null) {
+            return requireCreateReplay(existing, fingerprint, SUBJECT_PARTNER_ACCOUNT, accountId);
+        }
+
+        String feedbackNo = nextFeedbackNo(type);
+        String initialStatus = STATUS_WAITING;
+        LocalDateTime now = LocalDateTime.now();
+        String fieldSnapshotJson = JsonUtils.toJsonString(form.fields());
+        String valueSnapshotJson = JsonUtils.toJsonString(normalized.values());
+        String submitterName = partner.getName();
+
+        WorkOrderDO workOrder = new WorkOrderDO();
+        workOrder.setBusinessType(BUSINESS_TYPE_FEEDBACK);
+        workOrder.setOrderNo(feedbackNo);
+        workOrder.setSceneCode(type);
+        workOrder.setSceneNameSnapshot(TYPE_LABEL.get(type));
+        workOrder.setAssignmentMode("DIRECT");
+        workOrder.setSourceSubjectType(SUBJECT_PARTNER_ACCOUNT);
+        workOrder.setSourceUserId(accountId);
+        workOrder.setSourceNameSnapshot(submitterName);
+        workOrder.setStatus(initialStatus);
+        workOrder.setFieldSnapshotJson(fieldSnapshotJson);
+        workOrder.setValueJson(valueSnapshotJson);
+        workOrder.setAttachmentIdsJson(JsonUtils.toJsonString(normalized.attachmentIds()));
+        workOrder.setIdempotencyKey(request.getIdempotencyKey());
+        workOrder.setCommandSubjectType(SUBJECT_PARTNER_ACCOUNT);
+        workOrder.setCommandUserId(accountId);
+        workOrder.setRequestFingerprint(fingerprint);
+        workOrder.setVersion(0);
+        workOrderMapper.insert(workOrder);
+
+        FeedbackDO feedback = new FeedbackDO();
+        feedback.setWorkOrderId(workOrder.getId());
+        feedback.setFeedbackType(type);
+        feedback.setFeedbackNo(feedbackNo);
+        feedback.setTitle(String.valueOf(normalized.values().get(config.getTitleFieldKey())));
+        feedback.setTitleFieldKey(config.getTitleFieldKey());
+        feedback.setFormId(config.getFormId());
+        feedback.setFormSnapshotJson(fieldSnapshotJson);
+        feedback.setValueSnapshotJson(valueSnapshotJson);
+        applySupportSnapshot(feedback, normalized.values());
+        feedback.setStatus(initialStatus);
+        feedback.setSubmitterSubjectType(SUBJECT_PARTNER_ACCOUNT);
+        feedback.setSubmitterUserId(accountId);
+        feedback.setSubmitterNameSnapshot(submitterName);
+        feedback.setPartnerId(partnerId);
+        feedback.setLastActivityAt(now);
+        feedback.setUnreadForSubmitter(false);
+        feedback.setUnreadForAssignee(false);
+        feedback.setApprovalEnabled(false);
+        feedback.setApprovalRoundNo(TYPE_REQUIREMENT.equals(type) ? 1 : 0);
+        feedback.setConfigVersion(config.getVersion());
+        feedback.setVersion(0);
+        feedbackMapper.insert(feedback);
+        addHistory(workOrder, null, initialStatus, SUBJECT_PARTNER_ACCOUNT, accountId,
+                "创建反馈", request.getIdempotencyKey(), "CREATE", fingerprint);
+
+        if (TYPE_REQUIREMENT.equals(type)) {
+            createRequirementRound(feedback, config, form, normalized.values(), accountId, null, now);
+        }
+        publishReadyForHandling(feedback, accountId, config);
         return feedback.getId();
     }
 
@@ -300,9 +411,26 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     @Override
+    public PageResult<FeedbackRespVO> getPartnerPage(FeedbackPageReqVO request, Long accountId, Long partnerId) {
+        requireEnabledPartner(partnerId);
+        validateOptionalSubmissionType(request.getFeedbackType());
+        PageResult<FeedbackDO> page = feedbackMapper.selectPartnerPage(request, accountId, partnerId);
+        return new PageResult<>(page.getList().stream().map(row -> toCard(row, accountId, false)).toList(),
+                page.getTotal());
+    }
+
+    @Override
     @ZsjosPermission(bizType = "feedback", bizId = "#id", action = "read-own")
     public FeedbackRespVO getOwn(Long id, Long userId) {
         return toDetail(require(id), userId, false);
+    }
+
+    @Override
+    public FeedbackRespVO getPartnerOwn(Long id, Long accountId, Long partnerId) {
+        requireEnabledPartner(partnerId);
+        FeedbackDO row = require(id);
+        requirePartnerFeedback(row, accountId, partnerId);
+        return toDetail(row, accountId, false);
     }
 
     @Override
@@ -320,10 +448,35 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void markReadForPartner(Long id, FeedbackActionVO.VersionedCommand request,
+                                   Long accountId, Long partnerId) {
+        requireEnabledPartner(partnerId);
+        FeedbackDO row = requireLocked(id);
+        requirePartnerFeedback(row, accountId, partnerId);
+        String fingerprint = fingerprint("read", SUBJECT_PARTNER_ACCOUNT, id, accountId, request.getVersion());
+        if (exactReplay(row, request.getIdempotencyKey(), "READ",
+                SUBJECT_PARTNER_ACCOUNT, accountId, fingerprint)) return;
+        validateVersion(row, request.getVersion());
+        row.setUnreadForSubmitter(false);
+        if (feedbackMapper.updateById(row) != 1) throw exception(FEEDBACK_VERSION_CONFLICT);
+        addHistory(requireWorkOrder(row.getWorkOrderId()), row.getStatus(), row.getStatus(),
+                SUBJECT_PARTNER_ACCOUNT, accountId, "兼职已读", request.getIdempotencyKey(),
+                "READ", fingerprint);
+    }
+
+    @Override
     @ZsjosPermission(bizType = "feedback", bizId = "#id", action = "reply-own")
     @Transactional(rollbackFor = Exception.class)
     public void replyOwn(Long id, FeedbackActionVO.ReplyReq request, Long userId) {
         reply(id, request, userId, AUTHOR_EMPLOYEE);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void replyForPartner(Long id, FeedbackActionVO.ReplyReq request, Long accountId, Long partnerId) {
+        requireEnabledPartner(partnerId);
+        reply(id, request, accountId, AUTHOR_PARTNER_ACCOUNT, partnerId);
     }
 
     @Override
@@ -551,6 +704,12 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     @Override
+    public FileInfoRespDTO uploadForPartner(byte[] content, String name, String contentType, Long accountId) {
+        return fileApi.createFileInfo(content, name, "zsjos/feedback/partner/" + accountId, contentType);
+    }
+
+    @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "feedback.process-result", targetType = "feedback")
     @Transactional(rollbackFor = Exception.class)
     public void handleProcessResult(BpmProcessInstanceStatusEvent event) {
         FeedbackDO row = feedbackMapper.selectByProcessInstanceId(event.getId());
@@ -583,7 +742,22 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     private void reply(Long id, FeedbackActionVO.ReplyReq request, Long userId, String authorType) {
+        reply(id, request, userId, authorType, null);
+    }
+
+    private void reply(Long id, FeedbackActionVO.ReplyReq request, Long userId, String authorType,
+                       Long partnerId) {
         FeedbackDO row = requireLocked(id);
+        boolean partnerAuthor = AUTHOR_PARTNER_ACCOUNT.equals(authorType);
+        String subjectType = partnerAuthor ? SUBJECT_PARTNER_ACCOUNT : SUBJECT_ADMIN;
+        String authorName;
+        if (partnerAuthor) {
+            requirePartnerFeedback(row, userId, partnerId);
+            PartnerDO partner = requireEnabledPartner(partnerId);
+            authorName = partner.getName();
+        } else {
+            authorName = requireEnabledUser(userId).getNickname();
+        }
         List<Long> attachmentIds = validateCommandAttachments(request.getAttachmentIds(), userId);
         String fingerprint = fingerprint("reply", authorType, id, userId, request.getVersion(),
                 request.getContent().trim(), attachmentIds);
@@ -592,6 +766,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             WorkOrderHistoryDO history = historyMapper.selectByOrderAndKey(row.getWorkOrderId(),
                     request.getIdempotencyKey());
             if (history == null || !Objects.equals(history.getRequestFingerprint(), fingerprint)
+                    || !Objects.equals(history.getOperatorSubjectType(), subjectType)
                     || !Objects.equals(history.getOperatorUserId(), userId)) {
                 throw exception(FEEDBACK_IDEMPOTENCY_CONFLICT);
             }
@@ -606,11 +781,10 @@ public class FeedbackServiceImpl implements FeedbackService {
         } else if (!Set.of(STATUS_WAITING, STATUS_IN_PROGRESS, STATUS_COMPLETED).contains(row.getStatus())) {
             throw exception(FEEDBACK_STATE_INVALID);
         }
-        AdminUserRespDTO author = requireEnabledUser(userId);
         FeedbackReplyDO reply = new FeedbackReplyDO();
         reply.setFeedbackId(id);
         reply.setAuthorUserId(userId);
-        reply.setAuthorNameSnapshot(author.getNickname());
+        reply.setAuthorNameSnapshot(authorName);
         reply.setAuthorType(authorType);
         reply.setContent(request.getContent().trim());
         reply.setAttachmentIdsJson(JsonUtils.toJsonString(attachmentIds));
@@ -624,7 +798,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             row.setUnreadForAssignee(true);
         }
         if (feedbackMapper.updateById(row) != 1) throw exception(FEEDBACK_VERSION_CONFLICT);
-        addHistory(requireWorkOrder(row.getWorkOrderId()), row.getStatus(), row.getStatus(), userId,
+        addHistory(requireWorkOrder(row.getWorkOrderId()), row.getStatus(), row.getStatus(), subjectType, userId,
                 abbreviate(request.getContent()), request.getIdempotencyKey(), "REPLY", fingerprint);
         if (AUTHOR_ADMIN.equals(authorType)) {
             publish(SCENE_ADMIN_REPLIED, row, "admin-reply:" + request.getIdempotencyKey(), userId, Map.of());
@@ -734,6 +908,16 @@ public class FeedbackServiceImpl implements FeedbackService {
         return entry;
     }
 
+    private FeedbackRespVO.Entry partnerPortalEntry(String type, String title, String description) {
+        FeedbackRespVO.Entry entry = portalEntry(type, title, description);
+        FeedbackConfigDO config = feedbackConfigMapper.selectByType(type);
+        if (TYPE_REQUIREMENT.equals(type) && config != null && Boolean.TRUE.equals(config.getApprovalEnabled())) {
+            entry.setOpen(false);
+            entry.setUnavailableReason("需求反馈暂不支持兼职端发起审批");
+        }
+        return entry;
+    }
+
     private FeedbackRespVO toCard(FeedbackDO row, Long userId, boolean admin) {
         FeedbackRespVO result = new FeedbackRespVO();
         result.setId(row.getId());
@@ -817,7 +1001,8 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     private void applyActions(FeedbackRespVO result, FeedbackDO row, Long userId, boolean admin) {
         boolean completed = STATUS_COMPLETED.equals(row.getStatus());
-        result.setCanResubmit(!admin && TYPE_REQUIREMENT.equals(row.getFeedbackType())
+        result.setCanResubmit(!admin && SUBJECT_ADMIN.equals(row.getSubmitterSubjectType())
+                && TYPE_REQUIREMENT.equals(row.getFeedbackType())
                 && STATUS_APPROVAL_REJECTED.equals(row.getStatus()));
         result.setCanReply(admin
                 ? row.getAssigneeUserId() != null
@@ -854,6 +1039,21 @@ public class FeedbackServiceImpl implements FeedbackService {
     private AdminUserRespDTO requireEligibleHandler(String type, Long userId) {
         if (!eligibleHandlerIds(type).contains(userId)) throw exception(FEEDBACK_ASSIGNEE_INVALID);
         return requireEnabledUser(userId);
+    }
+
+    private void requirePartnerFeedback(FeedbackDO row, Long accountId, Long partnerId) {
+        if (!SUBJECT_PARTNER_ACCOUNT.equals(row.getSubmitterSubjectType())
+                || !Objects.equals(row.getSubmitterUserId(), accountId)
+                || !Objects.equals(row.getPartnerId(), partnerId)) {
+            throw exception(FEEDBACK_PERMISSION_DENIED);
+        }
+    }
+
+    private PartnerDO requireEnabledPartner(Long partnerId) {
+        PartnerDO partner = partnerMapper.selectById(partnerId);
+        if (partner == null) throw exception(PARTNER_NOT_EXISTS);
+        if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())) throw exception(PARTNER_ACCOUNT_DISABLED);
+        return partner;
     }
 
     private AdminUserRespDTO requireEnabledUser(Long userId) {
@@ -929,7 +1129,9 @@ public class FeedbackServiceImpl implements FeedbackService {
         Map<String, Object> payload = new LinkedHashMap<>(extraPayload);
         payload.put("feedbackNo", row.getFeedbackNo());
         payload.put("feedbackTitle", row.getTitle());
+        payload.put("submitterSubjectType", row.getSubmitterSubjectType());
         payload.put("submitterUserId", row.getSubmitterUserId());
+        payload.put("partnerId", row.getPartnerId());
         payload.put("assigneeUserId", row.getAssigneeUserId());
         payload.put("deepLink", "/zsjos/feedback?feedbackId=" + row.getId());
         notifyBusinessEventApi.publish(NotifyBusinessEvent.builder()
@@ -953,9 +1155,15 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     private boolean exactReplay(FeedbackDO feedback, String key, String operation,
                                 Long userId, String fingerprint) {
+        return exactReplay(feedback, key, operation, SUBJECT_ADMIN, userId, fingerprint);
+    }
+
+    private boolean exactReplay(FeedbackDO feedback, String key, String operation,
+                                String subjectType, Long userId, String fingerprint) {
         WorkOrderHistoryDO replay = historyMapper.selectByOrderAndKey(feedback.getWorkOrderId(), key);
         if (replay == null) return false;
         if (!Objects.equals(replay.getOperation(), operation)
+                || !Objects.equals(replay.getOperatorSubjectType(), subjectType)
                 || !Objects.equals(replay.getOperatorUserId(), userId)
                 || !Objects.equals(replay.getRequestFingerprint(), fingerprint)) {
             throw exception(FEEDBACK_IDEMPOTENCY_CONFLICT);
@@ -965,10 +1173,16 @@ public class FeedbackServiceImpl implements FeedbackService {
 
     private void addHistory(WorkOrderDO workOrder, String from, String to, Long userId, String reason,
                             String key, String operation, String fingerprint) {
+        addHistory(workOrder, from, to, SUBJECT_ADMIN, userId, reason, key, operation, fingerprint);
+    }
+
+    private void addHistory(WorkOrderDO workOrder, String from, String to, String subjectType,
+                            Long userId, String reason, String key, String operation, String fingerprint) {
         WorkOrderHistoryDO history = new WorkOrderHistoryDO();
         history.setWorkOrderId(workOrder.getId());
         history.setFromStatus(from);
         history.setToStatus(to);
+        history.setOperatorSubjectType(subjectType);
         history.setOperatorUserId(userId);
         history.setReason(reason);
         history.setOperatedAt(LocalDateTime.now());
@@ -979,7 +1193,12 @@ public class FeedbackServiceImpl implements FeedbackService {
     }
 
     private Long requireCreateReplay(WorkOrderDO existing, String fingerprint, Long userId) {
+        return requireCreateReplay(existing, fingerprint, SUBJECT_ADMIN, userId);
+    }
+
+    private Long requireCreateReplay(WorkOrderDO existing, String fingerprint, String subjectType, Long userId) {
         if (!BUSINESS_TYPE_FEEDBACK.equals(existing.getBusinessType())
+                || !Objects.equals(existing.getCommandSubjectType(), subjectType)
                 || !Objects.equals(existing.getCommandUserId(), userId)
                 || !Objects.equals(existing.getRequestFingerprint(), fingerprint)) {
             throw exception(FEEDBACK_IDEMPOTENCY_CONFLICT);

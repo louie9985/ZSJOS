@@ -30,7 +30,7 @@ public class BpmTriggerTaskDelegate implements JavaDelegate {
 
     public static final String BEAN_NAME = "bpmTriggerTaskDelegate";
 
-    @Resource
+    @org.springframework.beans.factory.annotation.Autowired
     private List<BpmTrigger> triggers;
 
     private final EnumMap<BpmTriggerTypeEnum, BpmTrigger> triggerMap = new EnumMap<>(BpmTriggerTypeEnum.class);

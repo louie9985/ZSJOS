@@ -46,6 +46,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_SUBMITTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.any;
@@ -442,6 +443,30 @@ class LeadManagementServiceImplTest {
         when(attachmentMapper.selectListByLeadId(1L)).thenReturn(List.of());
 
         assertEquals(List.of(), service.getLead(1L, 99L).getAvailableActions());
+    }
+
+    @Test
+    void cursorIgnoresCustomPageSortingFromItsFirstPage() {
+        LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
+        reqVO.setSortField("submittedName");
+        reqVO.setSortOrder("ascend");
+        when(leadObjectPermissionService.hasQueryAll()).thenReturn(true);
+        when(leadMapper.selectManagementPageByScope(reqVO, List.of(), List.of(), true,
+                List.of(), List.of(), List.of(), false, null)).thenReturn(PageResult.empty());
+
+        service.getLeadCursor(reqVO, 99L);
+
+        assertNull(reqVO.getSortField());
+        assertNull(reqVO.getSortOrder());
+        verify(leadMapper).selectManagementPageByScope(reqVO, List.of(), List.of(), true,
+                List.of(), List.of(), List.of(), false, null);
+    }
+
+    @Test
+    void detailAlwaysProjectsSubmitterAssistWhenReadableAndPermitted() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:request-submitter-assist")).thenReturn(true);
+
+        assertActions(actionLead("closed", "owned", false), null, "REQUEST_SUBMITTER_ASSIST");
     }
 
     @Test

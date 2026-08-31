@@ -577,7 +577,9 @@ public class StudentContactServiceImpl implements StudentContactService {
         });
     }
 
-    @Override @Transactional(rollbackFor = Exception.class)
+    @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "student-contact.extension-process-result", targetType = "student-contact")
+    @Transactional(rollbackFor = Exception.class)
     public void handleExtensionResult(String processInstanceId, Integer processStatus, String reason) {
         if (!BpmProcessInstanceStatusEnum.isProcessEndStatus(processStatus)) return;
         StudentContactExtensionDO extension = extensionMapper.selectByProcessIdForUpdate(

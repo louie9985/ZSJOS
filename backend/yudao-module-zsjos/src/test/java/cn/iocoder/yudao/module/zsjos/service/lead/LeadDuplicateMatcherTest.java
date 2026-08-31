@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.lead;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
@@ -38,10 +39,11 @@ class LeadDuplicateMatcherTest {
 
         assertNotNull(result.strongActiveMatch());
         assertTrue(result.strongActiveMatch().rules().contains(LeadDuplicateMatcher.SAME_MOBILE));
+        assertTrue(result.strongDuplicate());
     }
 
     @Test
-    void sameMobileOnInvalidLeadRequiresReview() {
+    void sameMobileOnInvalidLeadIsStrongMatch() {
         LeadCreateReqVO request = request();
         PersonDO person = person(1L, "13800000000", null);
         LeadDO lead = lead(10L, 1L, "invalid");
@@ -51,8 +53,8 @@ class LeadDuplicateMatcherTest {
 
         LeadDuplicateMatcher.MatchResult result = matcher.match(request, null);
 
-        assertNull(result.strongActiveMatch());
-        assertTrue(result.hasMatches());
+        assertNotNull(result.strongActiveMatch());
+        assertTrue(result.strongDuplicate());
     }
 
     @Test
@@ -67,7 +69,59 @@ class LeadDuplicateMatcherTest {
         LeadDuplicateMatcher.MatchResult result = matcher.match(request, null);
 
         assertNull(result.strongActiveMatch());
-        assertTrue(result.candidates().getFirst().rules().contains(LeadDuplicateMatcher.CROSS_CONTACT));
+        assertTrue(result.suspectedDuplicate());
+        assertTrue(result.crossContactOnly());
+        assertTrue(result.candidates().getFirst().rules().contains(LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT));
+    }
+
+    @Test
+    void placeholderNameSkipsOrdinaryWeakRules() {
+        LeadCreateReqVO request = request();
+        request.setName("微信用户");
+        when(personMapper.selectDuplicateCandidates("13800000000", null)).thenReturn(List.of());
+
+        LeadDuplicateMatcher.MatchResult result = matcher.match(request, null);
+
+        assertFalse(result.hasMatches());
+    }
+
+    @Test
+    void otherRegionSkipsNameCityProductWeakRule() {
+        LeadCreateReqVO request = request();
+        request.setProvinceCode("OTHER");
+        request.setCityCode("OTHER");
+        LeadDO lead = lead(10L, 1L, "valid");
+        lead.setSubmittedMobile("13900000000");
+        lead.setProvinceCode("OTHER");
+        lead.setCityCode("OTHER");
+        when(personMapper.selectDuplicateCandidates("13800000000", null)).thenReturn(List.of());
+        when(leadMapper.selectByName("张三")).thenReturn(List.of(lead));
+
+        LeadDuplicateMatcher.MatchResult result = matcher.match(request, null);
+
+        assertFalse(result.hasMatches());
+    }
+
+    @Test
+    void explicitNameCityProductIsWeakRule() {
+        LeadCreateReqVO request = request();
+        LeadDO lead = lead(10L, 1L, "valid");
+        lead.setSubmittedMobile("13900000000");
+        lead.setProvinceCode("110000");
+        lead.setCityCode("110100");
+        LeadIntendedProductDO product = new LeadIntendedProductDO();
+        product.setSpuRef("SPU-1");
+        product.setSpuUnknown(false);
+        product.setSpuNameSnapshot("课程A");
+        when(personMapper.selectDuplicateCandidates("13800000000", null)).thenReturn(List.of());
+        when(leadMapper.selectByName("张三")).thenReturn(List.of(lead));
+        when(productMapper.selectPrimaryByLeadId(10L)).thenReturn(product);
+        when(personMapper.selectById(1L)).thenReturn(person(1L, "13900000000", null));
+
+        LeadDuplicateMatcher.MatchResult result = matcher.match(request, null);
+
+        assertTrue(result.suspectedDuplicate());
+        assertTrue(result.candidates().getFirst().rules().contains(LeadDuplicateMatcher.NAME_REGION_PRIMARY_PRODUCT));
     }
 
     private static LeadCreateReqVO request() {

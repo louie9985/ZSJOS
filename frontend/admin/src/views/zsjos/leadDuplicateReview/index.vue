@@ -5,40 +5,16 @@ const message = useMessage()
 const open = ref(false)
 const current = ref<any>()
 const form = reactive({
-  resultType: 'new_person',
-  matchedPersonId: undefined as number | undefined,
-  matchedLeadId: undefined as number | undefined,
-  selectedSalesUserId: undefined as number | undefined,
+  resultType: 'allow_flow',
   opinion: ''
 })
 const saving = ref(false)
-const leadCandidates = computed(() => {
-  try {
-    const candidates = JSON.parse(current.value?.candidateSnapshot || '[]') as Array<{
-      leadId?: number
-      leadNo?: string
-      personName: string
-      leadStatus?: string
-    }>
-    return candidates
-      .filter((item) => item.leadId)
-      .map((item) => ({
-        value: item.leadId!,
-        label: `${item.leadNo || '编号不可用'} · ${item.personName} · ${item.leadStatus || '未知状态'}`
-      }))
-  } catch {
-    return []
-  }
-})
 let reloadList = () => {}
 const show = (row: any, fn: () => void) => {
   current.value = row
   reloadList = fn
   Object.assign(form, {
-    resultType: 'new_person',
-    matchedPersonId: undefined,
-    matchedLeadId: undefined,
-    selectedSalesUserId: undefined,
+    resultType: 'allow_flow',
     opinion: ''
   })
   open.value = true
@@ -80,28 +56,22 @@ const submit = async () => {
     ><el-form :model="form" label-width="110px"
       ><el-form-item label="结论" required
         ><el-select v-model="form.resultType" class="w-100%"
-          ><el-option label="新建客户" value="new_person" /><el-option
-            label="复用客户"
-            value="reuse_person" /><el-option
-            label="重新激活客资"
-            value="reactivate_lead" /><el-option
-            label="通知原负责人"
-            value="notify_owner" /></el-select></el-form-item
-      ><el-form-item v-if="form.resultType === 'reuse_person'" label="客户编号" required
-        ><el-input-number v-model="form.matchedPersonId" :min="1" /></el-form-item
-      ><el-form-item
-        v-if="['reactivate_lead', 'notify_owner'].includes(form.resultType)"
-        label="客资编号"
-        required
-        ><el-select v-model="form.matchedLeadId" filterable class="w-100%"
-          ><el-option
-            v-for="item in leadCandidates"
-            :key="item.value"
-            :label="item.label"
-            :value="item.value" /></el-select></el-form-item
-      ><el-form-item v-if="form.resultType === 'reactivate_lead'" label="销售编号" required
-        ><el-input-number v-model="form.selectedSalesUserId" :min="1" /></el-form-item
-      ><el-form-item label="复核意见" required
+          ><el-option label="放行，进入正式客资流程" value="allow_flow" /><el-option
+            label="确认重复，关闭本次提交"
+            value="close_duplicate" /></el-select></el-form-item
+      ><el-alert
+        v-if="form.resultType === 'allow_flow'"
+        title="放行后将按原提交快照创建正式客资，并继续进入分配或销售跟进流程"
+        type="info"
+        :closable="false"
+        class="mb-12px" />
+      <el-alert
+        v-if="form.resultType === 'close_duplicate'"
+        title="确认关闭后不会创建客资，也不会进入分配或业绩统计"
+        type="warning"
+        :closable="false"
+        class="mb-12px" />
+      <el-form-item label="复核意见" required
         ><el-input
           v-model="form.opinion"
           type="textarea"

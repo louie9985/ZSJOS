@@ -40,12 +40,14 @@ public class LeadBusinessTaskSceneProvider implements BusinessTaskSceneProvider 
                 case TASK_TYPE_FIRST_FOLLOW_UP -> "首次跟进：" + name;
                 case TASK_TYPE_FOLLOW_UP_REMINDER -> "跟进提醒：" + name;
                 case TASK_TYPE_QUALIFICATION -> "有效性判定：" + name;
+                case TASK_TYPE_SUBMITTER_ASSIST -> "提交人协助：" + name;
                 default -> name;
             };
             String actionCode = switch (task.getTaskType()) {
                 case TASK_TYPE_ASSIGNMENT_ACCEPT -> "OPEN_LEAD_ASSIGNMENT";
                 case TASK_TYPE_FIRST_FOLLOW_UP, TASK_TYPE_FOLLOW_UP_REMINDER, TASK_TYPE_QUALIFICATION ->
                         "OPEN_LEAD_FOLLOW_UP";
+                case TASK_TYPE_SUBMITTER_ASSIST -> "OPEN_LEAD_SUBMITTER_ASSIST";
                 default -> null;
             };
             result.put(task.getId(), new BusinessTaskDisplay(title,

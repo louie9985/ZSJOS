@@ -1,5 +1,4 @@
 import request from './request'
-import { resolveHomeStatisticsDetailMock } from './mock'
 
 export type HomeStatisticsPeriod = 'today' | 'week' | 'month' | 'year' | 'total'
 
@@ -23,7 +22,6 @@ export interface HomeStatisticsTimelineItem {
 export interface HomeStatisticsLeadDetail {
   kind: 'lead'
   id: number
-  mock?: boolean
   leadNo: string
   submittedName: string
   status: string
@@ -38,7 +36,6 @@ export interface HomeStatisticsLeadDetail {
 export interface HomeStatisticsWithdrawalDetail {
   kind: 'withdrawal'
   id: number
-  mock?: boolean
   withdrawalNo: string
   status: 'paid'
   applicationAmount: number
@@ -70,9 +67,5 @@ export function getHomeStatisticsDetails(params: {
   pageNo: number
   pageSize: number
 }) {
-  if (import.meta.env.DEV) {
-    const mock = resolveHomeStatisticsDetailMock({ method: 'get', url: '/zsjos/partner/home-statistics/details', params })
-    if (mock) return Promise.resolve(mock.data as HomeStatisticsDetailPage)
-  }
   return request.get<never, HomeStatisticsDetailPage>('/zsjos/partner/home-statistics/details', { params })
 }

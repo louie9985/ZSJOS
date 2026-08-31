@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Alert, Avatar, Badge, Button, Drawer, Empty, Form, Input, Modal, Result, Segmented, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
+import { Alert, Avatar, Badge, Button, Empty, Form, Input, Modal, Result, Segmented, Skeleton, Spin, Tabs, Tag, Typography, message } from 'antd'
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { APP_ROUTES } from '../constants'
@@ -12,6 +12,9 @@ import { useSubmissionGuard } from '../services/submissionGuard'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import SalesOrderSupervisorInbox from '../components/SalesOrderSupervisorInbox'
 import { resolveSalesOrderApprovalAccess, type SalesOrderApprovalWorkType } from '../services/salesOrderApprovalAccess'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable } from '@ant-design/pro-components'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const PAGE_SIZE = 20
 
@@ -55,6 +58,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const inflightPages = useRef(new Set<string>())
   const profileRequest = useRef<Promise<void> | undefined>(undefined)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const { useTableLayout } = useInboxTableLayout()
   const closeDecision = () => { setConfirmOpen(false); setDecision(undefined); resetIntent() }
 
   const loadProfile = useCallback(() => {
@@ -196,7 +200,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   if (!canReview && !canConfirmSupervisor) return <Result status="403" title="无权访问成交订单审批"/>
   if (workType === 'supervisor') return <SalesOrderSupervisorInbox scopeControl={workTypeSwitch}
     requestedConfirmationId={requestedConfirmationId} requestedOrderId={requestedOrderId}/>
-  return <section className="workspace-page business-inbox-page sales-order-approval-page">
+  return <section className={`workspace-page business-inbox-page sales-order-approval-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar">
       <div className="business-inbox-scope-row">{workTypeSwitch}<Button icon={<ReloadOutlined/>} onClick={reload}>刷新</Button></div>
       <div className="business-inbox-scope-tabs">
@@ -207,7 +211,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用审批筛选配置"/>}
       </div>
     </header>
-    <div className="business-inbox-layout"><aside className="business-inbox-list-pane"><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>{center === 'finance' && permissions.includes('zsjos:export:finance-order') && <Button icon={<DownloadOutlined/>} onClick={exportFinanceOrders}>导出</Button>}</div>
+    {useTableLayout ? <ProTable<SalesOrderListItem> className="business-inbox-table" rowKey={salesOrderTaskKey} search={false} options={{ density: true, fullScreen: true, setting: true }} columnsState={{ persistenceKey: 'crm-sales-order-approval-table-columns', persistenceType: 'localStorage' }} loading={loading} dataSource={items} pagination={false} scroll={{ x: 980 }} columns={[{ title: '订单号', dataIndex: 'orderNo' }, { title: '学员', dataIndex: 'studentName' }, { title: '审批任务', render: (_, item) => SALES_ORDER_TASK_LABELS[item.taskDefinitionKey || ''] || '成交审批' }, { title: '金额', dataIndex: 'totalAmount', render: (_, item) => `¥${Number(item.totalAmount).toFixed(2)}` }, { title: '时间', render: (_, item) => formatTimestamp(groupKey === 'done' ? item.taskEndTime : item.taskCreateTime || item.submittedAt) }, { title: '操作', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }]} /> : <div className="business-inbox-layout"><aside className="business-inbox-list-pane"><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" pageKey={center ? `sales_order_approval:${center}` : undefined} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>{center === 'finance' && permissions.includes('zsjos:export:finance-order') && <Button icon={<DownloadOutlined/>} onClick={exportFinanceOrders}>导出</Button>}</div>
       {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(undefined, true)}>重试</Button>}/>}
       <div className="business-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false) }}>
         {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'business-inbox-item active' : 'business-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>
@@ -217,8 +221,8 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         {loading && <div className="lead-list-loading"><Spin size="small"/> 加载中</div>}
         {!loading && items.length > 0 && !hasMore && <Typography.Text type="secondary" className="lead-list-end">已加载全部审批</Typography.Text>}
       </div>
-    </aside><main className="business-inbox-detail-pane">{detailContent}</main></div>
-    <Drawer className="business-inbox-mobile-drawer sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" width="100%">{detailContent}</Drawer>
+    </aside><main className="business-inbox-detail-pane">{detailContent}</main></div>}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer sales-order-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="成交订单详情" placement="right" width="100%">{detailContent}</ResizableDetailDrawer>
     <Modal title={decision === 'approve' ? '通过成交订单' : '驳回成交订单'} open={Boolean(decision)} onCancel={closeDecision} footer={<><Button onClick={closeDecision}>取消</Button><IrreversiblePopconfirm action={`${decision === 'approve' ? '通过' : '驳回'}成交订单「${selectedItem?.orderNo || ''}」`} danger={decision === 'reject'} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submitDecision}><Button type="primary" danger={decision === 'reject'} loading={saving} onClick={prepareDecision}>提交审批</Button></IrreversiblePopconfirm></>}><Form.Item label="审批意见" required><Input.TextArea rows={5} maxLength={1000} showCount value={reason} onChange={event => setReason(event.target.value)} placeholder="填写审批意见"/></Form.Item></Modal>
     <Modal title="申请主管确认" open={supervisorOpen} onCancel={() => { setSupervisorOpen(false); setReason(''); resetIntent() }}
       onOk={() => void submitSupervisorRequest()} confirmLoading={saving} okText="提交申请">

@@ -19,7 +19,7 @@ import java.util.List;
 public class SmsNotifyChannelAdapter implements NotifyChannelAdapter {
 
     @Resource private SmsSendApi smsSendApi;
-    @Resource private List<NotifyRecipientMobileProvider> mobileProviders;
+    @org.springframework.beans.factory.annotation.Autowired private List<NotifyRecipientMobileProvider> mobileProviders;
 
     @Override
     public String getChannelCode() {

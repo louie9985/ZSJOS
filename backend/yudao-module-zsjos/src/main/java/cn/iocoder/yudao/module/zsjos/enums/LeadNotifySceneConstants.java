@@ -13,7 +13,6 @@ public interface LeadNotifySceneConstants {
     String CLAIMED = "zsjos.lead.claimed";
     String TRANSFERRED = "zsjos.lead.transferred";
     String FOLLOW_UP_RECORDED = "zsjos.lead.follow_up_recorded";
-    String SUBMITTER_ASSIST_REQUESTED = "zsjos.lead.submitter_assist_requested";
     String CATEGORY_CHANGED = "zsjos.lead.category_changed";
     String QUALIFICATION_SUSPENDED = "zsjos.lead.qualification_suspended";
     String QUALIFIED_VALID = "zsjos.lead.qualified_valid";
@@ -35,6 +34,8 @@ public interface LeadNotifySceneConstants {
     String AGING_POOL_REASSIGN_REQUIRED_NOTICE = "zsjos.lead.aging_pool_reassign_required";
     String AGING_POOL_EXITED_NOTICE = "zsjos.lead.aging_pool_exited";
     String SUBMITTER_URGED = "zsjos.lead.submitter_urged";
+    String SUBMITTER_ASSIST_REQUESTED = "zsjos.lead.submitter_assist_requested";
+    String PARTNER_ASSIST_REMINDER = "zsjos.lead.partner_assist_reminder";
     String COMPLAINT_FOUNDED = "zsjos.lead.complaint_founded";
     String COMPLAINT_UNFOUNDED = "zsjos.lead.complaint_unfounded";
     String DUPLICATE_REACTIVATED = "zsjos.lead.duplicate_reactivated";
@@ -61,4 +62,5 @@ public interface LeadNotifySceneConstants {
     String ROLE_TRANSFER_REVIEWER = "transfer_reviewer";
     String ROLE_REQUESTER = "requester";
     String ROLE_COMPLAINANT = "complainant";
+    String ROLE_PARTNER_OWNER = "partner_owner";
 }

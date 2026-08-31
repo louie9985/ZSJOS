@@ -259,6 +259,10 @@ yudao:
 --- #################### 芋道相关配置 ####################
 
 zsjos:
+  wecom:
+    workbench-base-url: ${ZSJOS_WECOM_WORKBENCH_BASE_URL:}
+    partner-h5-base-url: ${ZSJOS_WECOM_PARTNER_H5_BASE_URL:${ZSJOS_PUBLIC_H5_BASE_URL:}}
+    ticket-ttl-minutes: ${ZSJOS_WECOM_TICKET_TTL_MINUTES:30}
   positioning:
     public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
     confirmation-link-ttl-hours: ${ZSJOS_POSITIONING_CONFIRMATION_LINK_TTL_HOURS:168}

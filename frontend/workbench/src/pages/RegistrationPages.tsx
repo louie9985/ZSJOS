@@ -531,6 +531,7 @@ export function RegistrationPoolPage({ permissions = [] }: { permissions?: strin
           <div className="lead-inbox-toolbar">
             <AdvancedFilterToolbar
               scene="registration"
+              pageKey="registration_pool"
               placeholder="搜索订单号、客资编号、姓名或手机号"
               keyword={keyword}
               value={advancedFilter}
@@ -932,6 +933,7 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
               options={[{ value: 'active', label: '服务中' }, { value: 'paused', label: '已暂停' }, { value: 'completed', label: '已结业' }]}/>
             <AdvancedFilterToolbar
               scene="student"
+              pageKey="student_my"
               placeholder="搜索姓名、手机号或客资编号"
               keyword={keyword}
               value={advancedFilter}

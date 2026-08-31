@@ -14,6 +14,7 @@ import {
   FONT_SCALES,
   GLASS_BLUR_MAX,
   GLASS_BLUR_MIN,
+  INBOX_LAYOUT_OPTIONS,
   LAYOUT_MODES,
   STORAGE_KEYS,
   TAB_STYLE_OPTIONS,
@@ -22,6 +23,7 @@ import {
   type BorderRadiusPreset,
   type Density,
   type FontScale,
+  type InboxLayoutMode,
   type LayoutMode,
   type TabStyle,
   type ThemePreset,
@@ -55,6 +57,7 @@ export interface ThemeState {
   watermark: boolean;
   tabs: boolean;
   tabStyle: TabStyle;
+  inboxLayoutMode: InboxLayoutMode;
 }
 
 export interface ThemeContextValue extends ThemeState {
@@ -79,6 +82,7 @@ export interface ThemeContextValue extends ThemeState {
   setWatermark: (enabled: boolean) => void;
   setTabs: (enabled: boolean) => void;
   setTabStyle: (style: TabStyle) => void;
+  setInboxLayoutMode: (mode: InboxLayoutMode) => void;
   reset: () => void;
 }
 
@@ -126,6 +130,9 @@ function readStorage(): ThemeState {
     if (typeof merged.tabs !== 'boolean') merged.tabs = DEFAULT_THEME.tabs;
     if (!TAB_STYLE_OPTIONS.some((o) => o.value === merged.tabStyle)) {
       merged.tabStyle = DEFAULT_THEME.tabStyle;
+    }
+    if (!INBOX_LAYOUT_OPTIONS.some((o) => o.value === merged.inboxLayoutMode)) {
+      merged.inboxLayoutMode = DEFAULT_THEME.inboxLayoutMode;
     }
     return merged;
   } catch {
@@ -211,6 +218,10 @@ export function useThemeState(): ThemeContextValue {
     (tabStyle: TabStyle) => setState((s) => ({ ...s, tabStyle })),
     [],
   );
+  const setInboxLayoutMode = useCallback(
+    (inboxLayoutMode: InboxLayoutMode) => setState((s) => ({ ...s, inboxLayoutMode })),
+    [],
+  );
   const reset = useCallback(() => setState(DEFAULT_THEME), []);
 
   const meta = THEME_METAS.find((m) => m.key === state.preset);
@@ -245,6 +256,7 @@ export function useThemeState(): ThemeContextValue {
       setWatermark,
       setTabs,
       setTabStyle,
+      setInboxLayoutMode,
       reset,
     }),
     [
@@ -267,6 +279,7 @@ export function useThemeState(): ThemeContextValue {
       setWatermark,
       setTabs,
       setTabStyle,
+      setInboxLayoutMode,
       reset,
     ],
   );

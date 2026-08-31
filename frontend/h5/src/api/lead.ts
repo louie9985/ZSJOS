@@ -67,7 +67,7 @@ export interface LeadCreateResult {
   leadId: number | null
   leadNo?: string | null
   reviewId?: number | null
-  outcome: 'activated' | 'review_pending' | 'duplicate_rejected' | 'duplicate_auto_closed'
+  outcome: 'created' | 'activated' | 'review_pending' | 'duplicate_rejected' | 'duplicate_auto_closed'
   assignmentStatus: string
   pendingAssigneeUserId?: number | null
   existingLeadStatus?: string | null

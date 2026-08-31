@@ -3,6 +3,8 @@ package cn.iocoder.yudao.module.zsjos.service.content;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
+import cn.iocoder.yudao.module.system.api.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentPageReqVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.content.vo.ContentSaveReqVO;
@@ -31,6 +33,7 @@ public class ContentService {
     @Resource private MediaDataScopeService dataScopeService;
     @Resource private MediaAccountMapper accountMapper;
     @Resource private MediaWorkflowEventService workflowEventService;
+    @Resource private DictDataApi dictDataApi;
 
     public PageResult<ContentRespVO> page(ContentPageReqVO req, Long userId) {
         MediaDataScopeService.Scope scope = dataScopeService.resolve(userId, "zsjos:content:query-all");
@@ -47,7 +50,7 @@ public class ContentService {
         content.setTitle(req.getTitle());
         content.setTopic(req.getTopic());
         content.setContentClassValue(req.getContentClassValue());
-        content.setContentClassLabelSnapshot(req.getContentClassLabelSnapshot());
+        content.setContentClassLabelSnapshot(requireContentClassLabel(req.getContentClassValue()));
         content.setStatus(CONTENT_TOPIC);
         content.setCurrentVersionNo(1);
         content.setOwnerOperatorUserId(userId);
@@ -55,6 +58,14 @@ public class ContentService {
         content.setVersion(0);
         mapper.insert(content);
         return content.getId();
+    }
+
+    private String requireContentClassLabel(String value) {
+        dictDataApi.validateDictDataList("zsjos_content_class", List.of(value));
+        return dictDataApi.getDictDataList("zsjos_content_class").stream()
+                .filter(item -> java.util.Objects.equals(item.getValue(), value))
+                .map(DictDataRespDTO::getLabel).findFirst()
+                .orElseThrow(() -> exception(CONTENT_CLASS_INVALID));
     }
 
     @ZsjosPermission(bizType = BIZ_TYPE_CONTENT, bizId = "#id", action = "read")

@@ -11,6 +11,24 @@ public interface LeadConstants {
     String DICT_INVALID_REMARK_TEMPLATE = "zsjos_lead_invalid_remark_template";
     String DICT_VALID_REMARK_TEMPLATE = "zsjos_lead_valid_remark_template";
     String REGION_OTHER = "OTHER";
+    String DUPLICATE_FLAG_NONE = "none";
+    String DUPLICATE_FLAG_STRONG = "strong_duplicate";
+    String DUPLICATE_FLAG_SUSPECTED = "suspected_duplicate";
+    String DUPLICATE_RESULT_STRONG_REJECTED = "strong_rejected";
+    String DUPLICATE_RESULT_SUSPECTED_CREATED = "suspected_created";
+    String DUPLICATE_RESULT_ALLOWED = "allowed";
+    String DUPLICATE_RESULT_CLOSED = "closed";
+    String DUPLICATE_RESULT_AUTO_CLOSED = "auto_closed";
+    String DUPLICATE_REVIEW_STATUS_PENDING = "pending";
+    String DUPLICATE_REVIEW_STATUS_COMPLETED = "completed";
+    String DUPLICATE_REVIEW_ACTION_ALLOW_FLOW = "allow_flow";
+    String DUPLICATE_REVIEW_ACTION_CLOSE_DUPLICATE = "close_duplicate";
+    String DUPLICATE_RULE_STRONG_MOBILE = "strong_mobile";
+    String DUPLICATE_RULE_STRONG_WECHAT = "strong_wechat";
+    String DUPLICATE_RULE_WEAK_MOBILE_TO_WECHAT = "weak_mobile_to_wechat";
+    String DUPLICATE_RULE_WEAK_WECHAT_TO_MOBILE = "weak_wechat_to_mobile";
+    String DUPLICATE_RULE_WEAK_NAME_CITY_PRODUCT = "weak_name_city_product";
+    String DUPLICATE_RULE_WEAK_NAME_MOBILE_SUFFIX = "weak_name_mobile_suffix";
 
     String SOURCE_INTERNAL_NEW_MEDIA = "internal_new_media";
     String SOURCE_PARTNER = "partner";
@@ -53,9 +71,9 @@ public interface LeadConstants {
     String ACTION_REVISE_DEAL = "REVISE_DEAL";
     String ACTION_ENTER_REPURCHASE = "ENTER_REPURCHASE";
     String ACTION_SUBMITTER_SUPPLEMENT = "SUBMITTER_SUPPLEMENT";
-    String ACTION_OPEN_SUBMITTER_SUPPLEMENT = "OPEN_LEAD_SUBMITTER_SUPPLEMENT";
     String ACTION_SUBMITTER_URGE = "SUBMITTER_URGE";
     String ACTION_SUBMITTER_COMPLAINT = "SUBMITTER_COMPLAINT";
+    String ACTION_REQUEST_SUBMITTER_ASSIST = "REQUEST_SUBMITTER_ASSIST";
     String ACTION_QUALIFICATION_RESTORE = "QUALIFICATION_RESTORE";
     String ACTION_QUALIFICATION_TRANSFER = "QUALIFICATION_TRANSFER";
     String ACTION_QUALIFICATION_RECYCLE = "QUALIFICATION_RECYCLE";
@@ -65,6 +83,11 @@ public interface LeadConstants {
     String ACTION_SUPERVISOR_RECYCLE = "SUPERVISOR_RECYCLE";
     String ACTION_SUPERVISOR_RELEASE_CLAIM_POOL = "SUPERVISOR_RELEASE_CLAIM_POOL";
     String ACTION_SUPERVISOR_RELEASE_PUBLIC_SEA = "SUPERVISOR_RELEASE_PUBLIC_SEA";
+    String ACTION_OWNER_TRANSFER = "OWNER_TRANSFER";
+    String ACTION_OWNER_RELEASE_PUBLIC_SEA = "OWNER_RELEASE_PUBLIC_SEA";
+    String PERMISSION_OWNER_TRANSFER = "zsjos:lead:owner-transfer";
+    String PERMISSION_OWNER_RELEASE_PUBLIC_SEA = "zsjos:lead:owner-release-public-sea";
+    String PERMISSION_REQUEST_SUBMITTER_ASSIST = "zsjos:lead:request-submitter-assist";
     String PERMISSION_SUPERVISOR_RESTORE = "zsjos:subordinate-sales:lead-restore";
     String PERMISSION_SUPERVISOR_TRANSFER = "zsjos:subordinate-sales:lead-transfer";
     String PERMISSION_SUPERVISOR_RECYCLE = "zsjos:subordinate-sales:lead-recycle";
@@ -133,8 +156,8 @@ public interface LeadConstants {
     String WS_MESSAGE_TYPE = "zsjos_lead_assignment";
     String TASK_TYPE_ASSIGNMENT_ACCEPT = "lead_assignment_accept";
     String TASK_TYPE_FIRST_FOLLOW_UP = "lead_first_follow_up";
-    String TASK_TYPE_SUBMITTER_ASSIST = "lead_submitter_assist";
     String TASK_TYPE_FOLLOW_UP_REMINDER = "lead_follow_up_reminder";
+    String TASK_TYPE_SUBMITTER_ASSIST = "lead_submitter_assist";
     String TASK_TYPE_QUALIFICATION = "lead_qualification";
     String TASK_STATUS_PENDING = "pending";
     String FOLLOW_UP_RECORD_SCOPE_LEAD = "lead";

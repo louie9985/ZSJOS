@@ -1,11 +1,13 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
-import { login as loginApi, getPermissionInfo } from '@/api/auth'
+import {
+  activate as activateApi,
+  login as loginApi,
+  wecomLogin as wecomLoginApi,
+  getPermissionInfo
+} from '@/api/auth'
 
-/**
- * 兼职端本期仅支持账号密码登录。
- */
 export function useAuth() {
   const router = useRouter()
   const userStore = useUserStore()
@@ -52,6 +54,57 @@ export function useAuth() {
   }
 
   /**
+   * 首次登录邀请码激活
+   */
+  async function activateWithInvite(
+    mobile: string,
+    password: string,
+    confirmPassword: string,
+    inviteCode: string
+  ): Promise<boolean> {
+    loading.value = true
+    error.value = ''
+    try {
+      const result = await activateApi({
+        mobile,
+        password,
+        confirmPassword,
+        inviteCode,
+        platform: 'MOBILE'
+      })
+      userStore.setTokens(result.accessToken, result.refreshToken, result.clientId)
+      userStore.setUserInfo({ userId: result.userId, nickname: mobile })
+      await fetchUserInfo()
+      return true
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '激活失败'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
+   * 企业微信登录
+   */
+  async function loginWithWecom(code: string, state: string): Promise<boolean> {
+    loading.value = true
+    error.value = ''
+    try {
+      const result = await wecomLoginApi({ code, state, platform: 'MOBILE' })
+      userStore.setTokens(result.accessToken, result.refreshToken, result.clientId)
+      userStore.setUserInfo({ userId: result.userId, nickname: '兼职伙伴' })
+      await fetchUserInfo()
+      return true
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : '企业微信登录失败'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * 获取用户信息和权限
    */
   async function fetchUserInfo() {
@@ -77,6 +130,8 @@ export function useAuth() {
     error,
     initAuth,
     loginWithPassword,
+    activateWithInvite,
+    loginWithWecom,
     fetchUserInfo,
     doLogout
   }

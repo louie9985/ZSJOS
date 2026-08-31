@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { isAxiosError } from 'axios'
 import { showToast, showConfirmDialog, showImagePreview } from 'vant'
 import { getDictByType, getLeadAppeals, getLeadDetail, getPartnerLeadActivity, urgeLead, type LeadAppealItem, type LeadListItem, type LeadTimelineItem, type PartnerLeadActivity, type PartnerLeadActivityTone } from '@/api/lead'
-import { clearMockedEndpoint, wasMockedEndpoint } from '@/api/mock'
 import { formatAmount, formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
 import type { DictItem } from '@/stores/app'
 import type { ApiDateValue } from '@/utils/format'
@@ -28,8 +27,6 @@ const appealsError = ref('')
 const sourceChannelOptions = ref<DictItem[]>([])
 const sourceChannelLoading = ref(false)
 const sourceChannelError = ref('')
-const activityEndpoint = `/zsjos/lead/${leadId}/partner-activity`
-const activityUsingMock = ref(false)
 
 async function loadLead() {
   loading.value = true
@@ -78,8 +75,6 @@ const sourceChannelLabel = computed(() => {
   if (!value) return '来源渠道未配置'
   return sourceChannelOptions.value.find(item => item.value === value)?.label || '来源渠道未配置'
 })
-const trustedActivity = computed(() => activityUsingMock.value ? undefined : activity.value)
-
 function timelineTimestamp(value: ApiDateValue): number {
   if (Array.isArray(value)) {
     return new Date(
@@ -132,22 +127,22 @@ function buildSnapshotTimeline(value?: LeadListItem): LeadTimelineItem[] {
 }
 
 const snapshotTimeline = computed(() => buildSnapshotTimeline(lead.value))
-const displayTimeline = computed(() => trustedActivity.value?.timeline?.length
-  ? trustedActivity.value.timeline
+const displayTimeline = computed(() => activity.value?.timeline?.length
+  ? activity.value.timeline
   : snapshotTimeline.value)
 const latestTimelineItem = computed(() => displayTimeline.value[displayTimeline.value.length - 1])
 const statusTone = computed<PartnerLeadActivityTone>(() => {
-  if (trustedActivity.value?.currentStatus?.tone) return trustedActivity.value.currentStatus.tone
+  if (activity.value?.currentStatus?.tone) return activity.value.currentStatus.tone
   if (lead.value?.status === 'invalid') return 'danger'
   if (lead.value?.status === 'suspended') return 'warning'
   if (lead.value?.status === 'valid' || lead.value?.status === 'won') return 'success'
   if (lead.value?.status === 'submitted' || lead.value?.status === 'converted') return 'primary'
   return 'default'
 })
-const currentStatusText = computed(() => trustedActivity.value?.currentStatus?.text || formatLeadStatus(lead.value?.status || ''))
-const currentStatusDescription = computed(() => trustedActivity.value?.currentStatus?.description
+const currentStatusText = computed(() => activity.value?.currentStatus?.text || formatLeadStatus(lead.value?.status || ''))
+const currentStatusDescription = computed(() => activity.value?.currentStatus?.description
   || latestTimelineItem.value?.description || '请关注后续处理进度')
-const currentStatusUpdatedAt = computed(() => trustedActivity.value?.currentStatus?.updatedAt
+const currentStatusUpdatedAt = computed(() => activity.value?.currentStatus?.updatedAt
   || latestTimelineItem.value?.occurredAt || lead.value?.submittedAt)
 
 function previewAttachment(index: number) {
@@ -162,11 +157,8 @@ async function loadActivity() {
   activityLoading.value = true
   activityError.value = ''
   activity.value = undefined
-  activityUsingMock.value = false
-  clearMockedEndpoint(activityEndpoint)
   try {
     activity.value = await getPartnerLeadActivity(leadId)
-    activityUsingMock.value = wasMockedEndpoint(activityEndpoint)
   } catch (cause) {
     if (isAxiosError(cause) && cause.response?.status === 403) {
       activityError.value = '没有权限查看处理进度'

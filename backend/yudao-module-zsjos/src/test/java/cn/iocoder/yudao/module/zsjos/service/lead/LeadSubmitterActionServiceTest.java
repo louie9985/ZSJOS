@@ -1,107 +1,179 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
-import cn.iocoder.yudao.framework.ip.core.Area;
 import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
-import cn.iocoder.yudao.module.system.api.ip.AreaApi;
-import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterSupplementReqVO;
-import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadProductReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadSubmitterAssistRequestReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadAttachmentReqVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.event.BusinessEventDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadSubmitterAssistRequestDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerOwnershipDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.event.BusinessEventMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
-import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadUrgeMapper;
-import cn.iocoder.yudao.module.zsjos.service.lead.product.LeadProductSnapshot;
-import cn.iocoder.yudao.module.zsjos.service.product.ZsjosProductSkuService;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadSubmitterAssistRequestMapper;
+import cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCommandService;
+import cn.iocoder.yudao.module.zsjos.service.task.BusinessTaskCreateCommand;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import jakarta.validation.Validation;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class LeadSubmitterActionServiceTest {
+
     @InjectMocks private LeadSubmitterActionService service;
     @Mock private LeadMapper leadMapper;
-    @Mock private LeadIntendedProductMapper productMapper;
-    @Mock private AreaApi areaApi;
-    @Mock private ZsjosProductSkuService productSkuService;
+    @Mock private LeadSubmitterAssistRequestMapper assistRequestMapper;
+    @Mock private LeadAttachmentService attachmentService;
+    @Mock private LeadObjectPermissionService objectPermissionService;
+    @Mock private PartnerOwnershipService partnerOwnershipService;
+    @Mock private BusinessTaskCommandService businessTaskCommandService;
     @Mock private BusinessEventMapper eventMapper;
-    @Mock private LeadUrgeMapper urgeMapper;
     @Mock private LeadNotifyEventPublisher notifyPublisher;
-    @Mock private LeadSubmissionIdentityService identityService;
-    @Mock private LeadCategorySnapshotService categorySnapshotService;
-    @Mock private LeadLifecycleTaskService lifecycleTaskService;
 
-    @Test
-    void internalSubmitterSupplementCompletesSubmitterAssistTask() {
-        stubSupplement(new LeadDO().setId(1L).setStatus("submitted").setProviderOwnerType("system_user")
-                .setProviderOwnerId(30L).setSourceUserId(30L));
+    @BeforeEach
+    void setUp() {
+        TenantContextHolder.setTenantId(1L);
+        lenient().when(attachmentService.validateReferences(anyList(), anyLong())).thenReturn(Map.of());
+    }
 
-        withTenant(() -> service.supplement(1L, 30L, request()));
-
-        verify(lifecycleTaskService).completeSubmitterAssistTasks(eq(1L), eq(30L), any(LocalDateTime.class));
+    @AfterEach
+    void tearDown() {
+        TenantContextHolder.clear();
     }
 
     @Test
-    void partnerSupplementDoesNotCompleteAdminBusinessTask() {
-        stubSupplement(new LeadDO().setId(1L).setStatus("submitted").setProviderOwnerType("partner")
-                .setProviderOwnerId(70L).setPartnerId(70L));
+    void requestsInternalSubmitterAndCreatesTaskForSubmitter() {
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(internalLead());
+        assignInsertedId();
 
-        withTenant(() -> service.supplementForPartner(1L, 70L, request()));
+        assertEquals(81L, service.requestAssist(1L, 20L, request("key-1")));
 
-        verify(lifecycleTaskService, never()).completeSubmitterAssistTasks(anyLong(), anyLong(), any());
+        ArgumentCaptor<BusinessTaskCreateCommand> task = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(businessTaskCommandService).create(task.capture());
+        assertEquals(10L, task.getValue().assigneeId());
+        assertEquals(TASK_TYPE_SUBMITTER_ASSIST, task.getValue().taskType());
+        verify(notifyPublisher).publish(eq(SUBMITTER_ASSIST_REQUESTED), eq(1L), anyString(), eq(20L), any(), anyMap());
+        verify(notifyPublisher, never()).publish(eq(PARTNER_ASSIST_REMINDER), anyLong(), anyString(), anyLong(), any(), anyMap());
     }
 
-    private void stubSupplement(LeadDO lead) {
-        when(eventMapper.selectByIdempotencyKey("supplement-1")).thenReturn(null);
-        when(leadMapper.selectByIdForUpdate(1L, 9L)).thenReturn(lead);
-        AreaRespDTO province = area(110000, Area.ID_CHINA, 2, "北京市");
-        AreaRespDTO city = area(110100, 110000, 3, "北京市");
-        when(areaApi.getArea(110000)).thenReturn(province);
-        when(areaApi.getArea(110100)).thenReturn(city);
-        when(categorySnapshotService.requireEnabled("a"))
-                .thenReturn(new LeadCategorySnapshotService.Selection("a", "A 类"));
-        when(productSkuService.validateLeadProduct(eq("spu-1"), eq(false), eq("sku-1"), eq(false)))
-                .thenReturn(new LeadProductSnapshot("spu-1", "课程", null, null, List.of(), null, null,
-                        null, null, "sku-1", "规格", "{}", BigDecimal.TEN, false, false));
+    @Test
+    void partnerSubmissionUsesCurrentOwnerForTaskAndReminder() {
+        LeadDO lead = partnerLead();
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(partnerOwnershipService.getByPartnerId(70L)).thenReturn(new PartnerOwnershipDO()
+                .setPartnerId(70L).setEmployeeUserId(30L).setEmployeeNameSnapshot("当前员工"));
+        assignInsertedId();
+
+        service.requestAssist(1L, 20L, request("key-2"));
+
+        ArgumentCaptor<BusinessTaskCreateCommand> task = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(businessTaskCommandService).create(task.capture());
+        assertEquals(30L, task.getValue().assigneeId());
+        verify(notifyPublisher).publish(eq(PARTNER_ASSIST_REMINDER), eq(1L), anyString(), eq(20L), any(),
+                argThat(payload -> Long.valueOf(30L).equals(payload.get("partnerOwnerUserId"))));
+    }
+
+    @Test
+    void partnerSubmissionFallsBackToHistoricalOwnerWhenCurrentOwnershipHasNoEmployee() {
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(partnerLead());
+        when(partnerOwnershipService.getByPartnerId(70L)).thenReturn(new PartnerOwnershipDO().setPartnerId(70L));
+        assignInsertedId();
+
+        service.requestAssist(1L, 20L, request("key-partner-fallback"));
+
+        ArgumentCaptor<BusinessTaskCreateCommand> task = ArgumentCaptor.forClass(BusinessTaskCreateCommand.class);
+        verify(businessTaskCommandService).create(task.capture());
+        assertEquals(31L, task.getValue().assigneeId());
+        verify(notifyPublisher).publish(eq(PARTNER_ASSIST_REMINDER), eq(1L), anyString(), eq(20L), any(),
+                argThat(payload -> Long.valueOf(31L).equals(payload.get("partnerOwnerUserId"))));
+    }
+
+    @Test
+    void partnerSubmissionRejectsWhenNoCurrentOrHistoricalOwnerExists() {
+        LeadDO lead = partnerLead().setPartnerOwnerUserIdSnapshot(null).setPartnerOwnerNameSnapshot(null);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(partnerOwnershipService.getByPartnerId(70L)).thenReturn(null);
+
+        assertThrows(RuntimeException.class,
+                () -> service.requestAssist(1L, 20L, request("key-partner-owner-missing")));
+
+        verify(assistRequestMapper, never()).insert(any(LeadSubmitterAssistRequestDO.class));
+        verify(businessTaskCommandService, never()).create(any());
+        verify(notifyPublisher, never()).publish(anyString(), anyLong(), anyString(), anyLong(), any(), anyMap());
+    }
+
+    @Test
+    void exactIdempotencyReplayReturnsExistingRequest() {
+        LeadSubmitterAssistRequestDO replay = new LeadSubmitterAssistRequestDO().setId(99L);
+        LeadSubmitterAssistRequestReqVO request = request("key-replay");
+        when(assistRequestMapper.selectByIdempotencyKey("key-replay")).thenReturn(null, replay);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(internalLead());
         doAnswer(invocation -> {
-            invocation.<BusinessEventDO>getArgument(0).setOccurredAt(LocalDateTime.of(2026, 8, 29, 10, 0));
+            LeadSubmitterAssistRequestDO row = invocation.getArgument(0);
+            replay.setRequestFingerprint(row.getRequestFingerprint());
+            row.setId(99L);
             return 1;
-        }).when(eventMapper).insert(any(BusinessEventDO.class));
+        }).when(assistRequestMapper).insert(any(LeadSubmitterAssistRequestDO.class));
+
+        assertEquals(99L, service.requestAssist(1L, 20L, request));
+        assertEquals(99L, service.requestAssist(1L, 20L, request));
+        verify(assistRequestMapper, times(1)).insert(any(LeadSubmitterAssistRequestDO.class));
+        verify(businessTaskCommandService, times(1)).create(any());
     }
 
-    private LeadSubmitterSupplementReqVO request() {
-        LeadProductReqVO product = new LeadProductReqVO();
-        product.setSpuRef("spu-1"); product.setSkuRef("sku-1"); product.setPrimary(true);
-        LeadSubmitterSupplementReqVO request = new LeadSubmitterSupplementReqVO();
-        request.setProvinceCode("110000"); request.setCityCode("110100"); request.setLeadCategory("a");
-        request.setRemark("已补充联系方式"); request.setIntendedProducts(List.of(product));
-        request.setIdempotencyKey("supplement-1");
-        return request;
-    }
-
-    private AreaRespDTO area(Integer id, Integer parentId, Integer type, String name) {
-        AreaRespDTO area = new AreaRespDTO();
-        area.setId(id); area.setParentId(parentId); area.setType(type); area.setName(name);
-        area.setStatus(CommonStatusEnum.ENABLE.getStatus());
-        return area;
-    }
-
-    private void withTenant(Runnable runnable) {
-        try (MockedStatic<TenantContextHolder> tenant = mockStatic(TenantContextHolder.class)) {
-            tenant.when(TenantContextHolder::getRequiredTenantId).thenReturn(9L);
-            runnable.run();
+    @Test
+    void validatesRequiredPlainTextAndAttachmentLimit() {
+        LeadSubmitterAssistRequestReqVO invalid = request("key-validation");
+        invalid.setProblem("   "); invalid.setExpectedAssistance("");
+        invalid.setAttachments(java.util.stream.LongStream.rangeClosed(1, 10).mapToObj(id -> {
+            LeadAttachmentReqVO attachment = new LeadAttachmentReqVO(); attachment.setInfraFileId(id); return attachment;
+        }).toList());
+        try (var factory = Validation.buildDefaultValidatorFactory()) {
+            var paths = factory.getValidator().validate(invalid).stream()
+                    .map(violation -> violation.getPropertyPath().toString()).collect(java.util.stream.Collectors.toSet());
+            assertTrue(paths.containsAll(List.of("problem", "expectedAssistance", "attachments")));
         }
+    }
+
+    private void assignInsertedId() {
+        doAnswer(invocation -> { invocation.<LeadSubmitterAssistRequestDO>getArgument(0).setId(81L); return 1; })
+                .when(assistRequestMapper).insert(any(LeadSubmitterAssistRequestDO.class));
+    }
+
+    private LeadDO internalLead() {
+        return new LeadDO().setId(1L).setLeadNo("KZ202608300001")
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(10L)
+                .setProviderOwnerNameSnapshot("内部提交人");
+    }
+
+    private LeadDO partnerLead() {
+        return new LeadDO().setId(1L).setLeadNo("KZ202608300001")
+                .setProviderOwnerType(PROVIDER_OWNER_PARTNER).setProviderOwnerId(70L)
+                .setProviderOwnerNameSnapshot("兼职提交人").setPartnerOwnerUserIdSnapshot(31L)
+                .setPartnerOwnerNameSnapshot("历史员工");
+    }
+
+    private LeadSubmitterAssistRequestReqVO request(String key) {
+        LeadSubmitterAssistRequestReqVO request = new LeadSubmitterAssistRequestReqVO();
+        request.setProblem("无法确认报考信息"); request.setExpectedAssistance("请联系客户确认");
+        request.setRemark("今天处理"); request.setAttachments(List.of()); request.setIdempotencyKey(key);
+        return request;
     }
 }

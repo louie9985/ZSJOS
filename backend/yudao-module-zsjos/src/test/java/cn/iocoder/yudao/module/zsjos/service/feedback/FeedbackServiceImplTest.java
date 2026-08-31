@@ -25,6 +25,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackReplyDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackRoundDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.feedback.FeedbackSurveyDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.workorder.WorkOrderHistoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackConfigMapper;
@@ -33,6 +34,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackNoDailyCounterMa
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackReplyMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackRoundMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackSurveyMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderMapper;
 import org.junit.jupiter.api.AfterEach;
@@ -53,6 +55,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_CHAIRMAN_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_CONFIG_VERSION_CONFLICT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_SURVEY_ALREADY_REQUESTED;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_PERMISSION_DENIED;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.FEEDBACK_PROCESS_UNAVAILABLE;
+import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_ENABLED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -85,6 +90,7 @@ class FeedbackServiceImplTest {
     @Mock private RoleApi roleApi;
     @Mock private PermissionApi permissionApi;
     @Mock private FileApi fileApi;
+    @Mock private PartnerMapper partnerMapper;
     @Mock private NotifyBusinessEventApi notifyBusinessEventApi;
     @InjectMocks private FeedbackServiceImpl service;
 
@@ -185,6 +191,83 @@ class FeedbackServiceImplTest {
         assertEquals(List.of(21L), event.getValue().getPayload().get("dispatcherUserIds"));
         assertTrue(inserted.get().getFeedbackNo().matches("BUG-\\d{8}-0003"));
         verify(counterMapper).reserve(anyLong(), any(LocalDate.class), eq(FeedbackConstants.TYPE_BUG), eq(3L));
+    }
+
+    @Test
+    void partnerBugCreatePersistsPartnerSubjectAndNotifiesDispatchers() {
+        FeedbackConfigDO config = config(FeedbackConstants.TYPE_BUG, false);
+        stubOpenConfig(config);
+        FeedbackDynamicFormService.ParsedForm form = parsedForm();
+        when(partnerMapper.selectById(99L)).thenReturn(partner(99L, "合作方甲"));
+        when(dynamicFormService.requireCompatibleForm(1L, FeedbackConstants.TYPE_BUG, "title"))
+                .thenReturn(form);
+        when(dynamicFormService.normalizeValues(eq(form), any(), eq(11L))).thenReturn(
+                new FeedbackDynamicFormService.NormalizedValues(Map.of("title", "兼职端页面异常"), List.of()));
+        when(counterMapper.selectReservedValue(anyLong(), any(LocalDate.class), eq(FeedbackConstants.TYPE_BUG)))
+                .thenReturn(4L);
+        stubInsertedRows();
+
+        Long id = service.createForPartner(FeedbackConstants.TYPE_BUG, createRequest(0), 11L, 99L);
+
+        assertEquals(200L, id);
+        ArgumentCaptor<WorkOrderDO> workOrder = ArgumentCaptor.forClass(WorkOrderDO.class);
+        verify(workOrderMapper).insert(workOrder.capture());
+        assertEquals(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT, workOrder.getValue().getSourceSubjectType());
+        assertEquals(11L, workOrder.getValue().getSourceUserId());
+        assertEquals(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT, workOrder.getValue().getCommandSubjectType());
+        assertEquals(11L, workOrder.getValue().getCommandUserId());
+        assertEquals("合作方甲", workOrder.getValue().getSourceNameSnapshot());
+
+        ArgumentCaptor<FeedbackDO> feedback = ArgumentCaptor.forClass(FeedbackDO.class);
+        verify(feedbackMapper).insert(feedback.capture());
+        assertEquals(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT, feedback.getValue().getSubmitterSubjectType());
+        assertEquals(11L, feedback.getValue().getSubmitterUserId());
+        assertEquals(99L, feedback.getValue().getPartnerId());
+        assertEquals("合作方甲", feedback.getValue().getSubmitterNameSnapshot());
+
+        ArgumentCaptor<WorkOrderHistoryDO> history = ArgumentCaptor.forClass(WorkOrderHistoryDO.class);
+        verify(historyMapper).insert(history.capture());
+        assertEquals(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT, history.getValue().getOperatorSubjectType());
+        assertEquals(11L, history.getValue().getOperatorUserId());
+
+        ArgumentCaptor<NotifyBusinessEvent> event = ArgumentCaptor.forClass(NotifyBusinessEvent.class);
+        verify(notifyBusinessEventApi).publish(event.capture());
+        assertEquals(FeedbackConstants.NOTIFY_SCENE_READY_FOR_HANDLING, event.getValue().getSceneCode());
+        assertEquals(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT,
+                event.getValue().getPayload().get("submitterSubjectType"));
+        assertEquals(99L, event.getValue().getPayload().get("partnerId"));
+        assertEquals(List.of(21L), event.getValue().getPayload().get("dispatcherUserIds"));
+    }
+
+    @Test
+    void partnerRequirementWithApprovalRejectsBeforeCreatingProcess() {
+        FeedbackConfigDO config = config(FeedbackConstants.TYPE_REQUIREMENT, true);
+        stubOpenConfig(config);
+        when(partnerMapper.selectById(99L)).thenReturn(partner(99L, "合作方甲"));
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.createForPartner(FeedbackConstants.TYPE_REQUIREMENT, createRequest(0), 11L, 99L));
+
+        assertEquals(FEEDBACK_PROCESS_UNAVAILABLE.getCode(), error.getCode());
+        verify(dynamicFormService, never()).requireCompatibleForm(anyLong(), any(), any());
+        verify(processInstanceApi, never()).createProcessInstance(anyLong(), any());
+        verify(workOrderMapper, never()).insert(any(WorkOrderDO.class));
+        verify(feedbackMapper, never()).insert(any(FeedbackDO.class));
+    }
+
+    @Test
+    void partnerCannotReadAnotherPartnerFeedback() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_WAITING);
+        row.setSubmitterSubjectType(FeedbackConstants.SUBJECT_PARTNER_ACCOUNT);
+        row.setPartnerId(100L);
+        when(partnerMapper.selectById(99L)).thenReturn(partner(99L, "合作方甲"));
+        when(feedbackMapper.selectById(200L)).thenReturn(row);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.getPartnerOwn(200L, 11L, 99L));
+
+        assertEquals(FEEDBACK_PERMISSION_DENIED.getCode(), error.getCode());
+        verify(replyMapper, never()).selectByFeedbackId(anyLong());
     }
 
     @Test
@@ -501,9 +584,18 @@ class FeedbackServiceImplTest {
         row.setFeedbackNo("BUG-20260826-0001");
         row.setTitle("测试反馈");
         row.setStatus(status);
+        row.setSubmitterSubjectType(FeedbackConstants.SUBJECT_ADMIN);
         row.setSubmitterUserId(11L);
         row.setVersion(0);
         return row;
+    }
+
+    private PartnerDO partner(Long id, String name) {
+        PartnerDO partner = new PartnerDO();
+        partner.setId(id);
+        partner.setName(name);
+        partner.setStatus(PARTNER_STATUS_ENABLED);
+        return partner;
     }
 
     private WorkOrderDO workOrder() {

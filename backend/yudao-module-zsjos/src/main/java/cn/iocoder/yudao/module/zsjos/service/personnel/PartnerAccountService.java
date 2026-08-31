@@ -8,11 +8,15 @@ public interface PartnerAccountService {
 
     PartnerAccountDO authenticate(String mobile, String rawPassword, String loginIp);
 
+    void recordLogin(Long accountId, String loginIp);
+
     PartnerContext requireContext(Long accountId);
 
     PartnerAccountDO getByPartnerId(Long partnerId);
 
     PartnerAccountDO getById(Long accountId);
+
+    PartnerAccountDO getByMobile(String mobile);
 
     String getEnabledMobile(Long accountId);
 
@@ -23,4 +27,6 @@ public interface PartnerAccountService {
     void resetPassword(Long partnerId, String newPassword);
 
     void updatePassword(Long accountId, String oldPassword, String newPassword);
+
+    void updateWecomEnabled(Long accountId, boolean enabled);
 }

@@ -27,6 +27,7 @@ public class WorkOrderDO extends TenantBaseDO {
     private String candidateRoleScopesJson;
     private String candidateDeptScopesJson;
     private String assignmentMode;
+    private String sourceSubjectType;
     private Long sourceUserId;
     private Long targetUserId;
     private Long targetDeptId;
@@ -41,6 +42,7 @@ public class WorkOrderDO extends TenantBaseDO {
     private String completionRemark;
     private String completionAttachmentIdsJson;
     private String idempotencyKey;
+    private String commandSubjectType;
     private Long commandUserId;
     private String requestFingerprint;
     private String returnReason;

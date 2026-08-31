@@ -17,7 +17,7 @@ Lead / Person 跟进 -> PurchaseIntent 草稿
 
 `zsjos_purchase_intent` 是一次首购或复购链路的稳定锚点，保存业务编号、购买类型、收款路径、Lead/Person/Opportunity、发起人、责任人、当前订单、表单草稿 JSON、后端解析后的 SKU/金额快照、总额、币种、版本和幂等键。草稿最低要求是可确定 Person、至少一个有效 SKU、明细金额合法且合计大于零。
 
-`zsjos_payment_order` 作为 PaymentIntent，状态固定为 `created/waiting/paid/expired/closed`。一个 PurchaseIntent 可有历史支付单，但最多一条活动或已支付记录。`zsjos_payment_gateway_event` 保存脱敏下单、查询、回调和关单事实；`zsjos_payment_transaction` 只保存验签并核对成功的到账事实。
+`zsjos_payment_order` 作为 PaymentIntent，状态固定为 `created/waiting/paid/expired/closed`。一个 PurchaseIntent 可有历史支付单，但最多一条活动或已支付记录；旧单失效或关闭后可以在同一 PurchaseIntent 上重新生成新的 PaymentIntent，旧单不复活。`zsjos_payment_gateway_event` 保存脱敏下单、查询、回调和关单事实；`zsjos_payment_transaction` 只保存验签并核对成功的到账事实。
 
 `zsjos_order.purchase_intent_id` 关联草稿，线上订单同时写 `source_payment_order_id`，并向 `zsjos_order_payment_allocation` 写入可信流水分配。successor Order 继承 PurchaseIntent 和 PaymentIntent，不重复收款。
 
@@ -84,13 +84,13 @@ paytype=A01, notify_url, signtype=RSA, randomstr, sign
 
 通联 JSON 可能返回 `retcode`、`errmsg`、`trxstatus`、`reqsn`、`trxid`、`chnltrxid`、`trxamt`、`payinfo`、`sign`。只有响应验签成功、`retcode=SUCCESS`，且 `payinfo` 是命中白名单的绝对 HTTPS URL 时才能返回前端跳转。
 
-查单发送 `cusid,appid,reqsn,version=11,signtype=RSA,randomstr,sign`；关单发送 `cusid,appid,oldreqsn,version=11,signtype=RSA,randomstr,sign`。`waiting` 支付单切换路径或重新生成前必须先查单；未到账且通联确认关单成功后才能关闭。结果未知、验签失败或关单失败时保留原状态并阻止第二条有效链接。
+查单发送 `cusid,appid,reqsn,version=11,signtype=RSA,randomstr,sign`；关单发送 `cusid,appid,oldreqsn,version=11,signtype=RSA,randomstr,sign`。`waiting` 支付单切换路径或重新生成前必须先查单；未到账且通联确认关单成功后才能关闭。结果未知、验签失败或关单失败时保留原状态并阻止第二条有效链接。`expired` 或 `closed` 的旧单不复活，但同一 PurchaseIntent 可以重新生成新的 PaymentIntent。
 
 回调或查单只有同时满足签名有效、商户和 APPID 匹配、`reqsn` 匹配、金额分完全一致、`retcode=SUCCESS`、`trxstatus=0000` 才创建 PaymentTransaction。事件编号和渠道流水唯一约束保证回调与查单并发只确认一次。
 
 ## 6. 前端流程
 
-Workbench `SalesOrderEntryModal` 使用分段控件选择线上链接或线下已支付，共用原表单。提供保存草稿、生成支付链接、刷新状态、复制链接和提交审批。线上链接生成后禁用主体、SKU、金额；未到账禁止提交；到账后仍需补齐正式字段并上传凭证。successor 只补正订单。
+Workbench `SalesOrderEntryModal` 使用分段控件选择线上链接或线下已支付，共用原表单。提供保存草稿、生成支付链接、失效后重新生成支付链接、刷新状态、复制链接和提交审批。线上链接生成后禁用主体、SKU、金额；未到账禁止提交；到账后仍需补齐正式字段并上传凭证。successor 只补正订单。
 
 H5 提供 `/pay/:paymentIntentNo` 和 `/payment-result`。微信支付只在微信内展示并以 FORM 发起；支付宝在微信内提示外部浏览器打开。结果页使用 sessionStorage 的短期会话轮询后端；超时或查询异常只显示“结果待确认”，不显示支付失败。
 
@@ -127,4 +127,4 @@ zsjos:
 
 数据库使用 `V162__zsjos_purchase_intent_payment_draft.sql` 升级，基线同步在 `schema/core.sql` 与 `00-bootstrap-schema.sql`。发布前须由通联确认正式接口域名、APPID 产品授权、通知白名单、证书格式、回调应答和关单状态语义，再启用配置。
 
-验收至少覆盖四种来源、草稿恢复、乐观锁、重复生成、两种路径切换、微信/支付宝报文、金额转分、签名/验签、回调与查单并发、金额/SKU 不一致、未支付提交、凭证校验、successor 继承，以及 H5 轮询超时。测试环境可在测试代码中使用假网关，但生产运行时不提供 Mock。
+验收至少覆盖四种来源、草稿恢复、乐观锁、重复生成、失效后重新生成、两种路径切换、微信/支付宝报文、金额转分、签名/验签、回调与查单并发、金额/SKU 不一致、未支付提交、凭证校验、successor 继承，以及 H5 轮询超时。测试环境可在测试代码中使用假网关，但生产运行时不提供 Mock。

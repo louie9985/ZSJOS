@@ -5,6 +5,7 @@ import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.excel.core.util.ExcelUtils;
 import cn.iocoder.yudao.framework.common.util.http.HttpUtils;
 import cn.iocoder.yudao.module.eam.controller.admin.asset.vo.EamAssetChangeLogRespVO;
@@ -50,11 +51,14 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.convertSet;
+import static cn.iocoder.yudao.module.eam.enums.ErrorCodeConstants.ASSET_NOT_EXISTS;
 
 @Tag(name = "管理后台 - EAM 资产")
 @RestController
@@ -152,12 +156,42 @@ public class EamAssetController {
     }
 
     @GetMapping("/qrcode")
-    @Operation(summary = "生成资产二维码", description = "返回 PNG 图片流，内容为资产业务编号")
+    @Operation(summary = "生成资产二维码", description = "返回 PNG 图片流，内容为资产公开业务快照")
     @Parameter(name = "id", description = "资产编号", required = true, example = "1024")
     @PreAuthorize("@ss.hasPermission('eam:asset:qrcode')")
     public ResponseEntity<byte[]> getAssetQrCode(@RequestParam("id") Long id,
                                                  @RequestParam(value = "size", required = false) Integer size) {
-        byte[] png = EamQrCodeUtil.generatePng(assetService.buildQrContent(id), size);
+        EamAssetDO asset = assetService.getAsset(id);
+        if (asset == null) {
+            throw exception(ASSET_NOT_EXISTS);
+        }
+        EamAssetRespVO vo = buildAssetVOList(List.of(asset)).get(0);
+        // 二维码直接携带公开业务快照，排除内部主键、部门/员工 ID 等技术字段。
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("资产编号", vo.getAssetCode());
+        snapshot.put("资产名称", vo.getName());
+        snapshot.put("分类", vo.getCategoryName());
+        snapshot.put("管理模式", vo.getManagementMode());
+        snapshot.put("数量", vo.getQuantity());
+        snapshot.put("单位", vo.getUnit());
+        snapshot.put("状态", vo.getStatus());
+        snapshot.put("品牌", vo.getBrand());
+        snapshot.put("规格", vo.getSpecification());
+        snapshot.put("序列号", vo.getSn());
+        snapshot.put("条码", vo.getBarcode());
+        snapshot.put("原值", vo.getOriginalValue());
+        snapshot.put("净值", vo.getNetValue());
+        snapshot.put("购入日期", vo.getPurchaseDate());
+        snapshot.put("资产来源", vo.getSourceLabelSnapshot());
+        snapshot.put("保修到期日", vo.getWarrantyDate());
+        snapshot.put("使用部门", vo.getUseDeptName());
+        snapshot.put("使用人", vo.getUseEmployeeName());
+        snapshot.put("存放地点", vo.getLocation());
+        snapshot.put("预计使用年限(月)", vo.getExpectedLife());
+        snapshot.put("备注", vo.getRemark());
+        snapshot.put("扩展字段", vo.getExtFieldLabels() == null || vo.getExtFieldLabels().isEmpty()
+                ? vo.getExtFields() : vo.getExtFieldLabels());
+        byte[] png = EamQrCodeUtil.generatePng(JsonUtils.toJsonString(snapshot), size);
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_PNG)
                 .header(HttpHeaders.CACHE_CONTROL, "no-store")

@@ -129,7 +129,7 @@ export function getAuthenticatedHomeTarget(menus: WorkbenchMenu[]) {
 }
 
 export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path: string, authorizedMenus?: WorkbenchMenu[]) {
-  if (path === '/' || path === APP_ROUTES.USER_PROFILE || findPageByPath(items, path)
+  if (path === '/' || path === APP_ROUTES.USER_PROFILE || path === APP_ROUTES.WECOM_CLICK || findPageByPath(items, path)
     || (authorizedMenus && findMenuByPath(authorizedMenus, path))) return
   return getInitialTarget(items)
 }

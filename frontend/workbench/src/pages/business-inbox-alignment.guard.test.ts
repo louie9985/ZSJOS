@@ -13,7 +13,7 @@ describe('business inbox alignment', () => {
     for (const [file, source] of inboxSources) {
       expect(source, file).toContain('workspace-page business-inbox-page')
       expect(source, file).toContain('business-inbox-layout')
-      expect(source, file).toContain('<main className="business-inbox-detail-pane">')
+      expect(source, file).toContain('business-inbox-detail-pane')
     }
 
     const personnel = readFileSync('src/pages/ManagementPages.tsx', 'utf8')
@@ -21,7 +21,7 @@ describe('business inbox alignment', () => {
       .split('export function PartnerPage')[0]
     expect(personnel).toContain('workspace-page business-inbox-page personnel-page')
     expect(personnel).toContain('business-inbox-layout')
-    expect(personnel).toContain('<main className="business-inbox-detail-pane">')
+    expect(personnel).toContain('business-inbox-detail-pane')
   })
 
   it('keeps list-and-detail pages out of table mode', () => {
@@ -80,12 +80,19 @@ describe('business inbox alignment', () => {
 
     expect(messageInbox).toContain('IntersectionObserver')
     expect(messageInbox).toContain('buildNotifyMessageCursorParams(view, append ? cursor : undefined, CURSOR_LIMIT)')
+    expect(messageInbox).toContain('buildNotifyMessagePageParams(view, nextPage, PAGE_SIZE)')
+    expect(messageInbox).toContain('api.myNotifyMessagePage')
+    expect(messageInbox).toContain('message-inbox-table-shell')
+    expect(messageInbox).toContain('message-inbox-table-drawer')
     expect(messageInbox).toContain('message-inbox-load-more')
-    expect(messageInbox).not.toContain('Pagination')
+    expect(messageInbox).toContain('ProTable')
+    expect(messageInbox).toContain('columnsState')
 
     expect(styles).toMatch(/\.message-center-item \{[^}]*flex: none;/)
     expect(styles).toMatch(/\.message-center-item-copy > \.message-center-item-summary \{[^}]*overflow-wrap: anywhere;[^}]*word-break: break-word;[^}]*-webkit-line-clamp: 2;/)
     expect(styles).toMatch(/\.message-inbox-detail \.message-detail-section \.ant-typography \{[^}]*word-break: break-word;/)
+    expect(styles).toMatch(/\.message-inbox-table-shell \{/)
+    expect(styles).toMatch(/\.message-inbox-table \.ant-table-tbody > tr\.active > td \{/)
 
     // 「标签左、值右」与长值换行已提升为 DetailFieldGrid 的基础样式，
     // 此处的页面级覆盖随之删除（见 styles.guard.test.ts 的组件断言）。

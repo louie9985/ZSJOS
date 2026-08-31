@@ -109,7 +109,7 @@ public class BpmProcessInstanceServiceImpl implements BpmProcessInstanceService 
     @Resource
     private BpmProcessDefinitionService processDefinitionService;
     @Resource private BpmModelService modelService;
-    @Resource private List<BpmExternalStartUserProvider> externalStartUserProviders;
+    @org.springframework.beans.factory.annotation.Autowired private List<BpmExternalStartUserProvider> externalStartUserProviders;
     @Resource
     @Lazy // 避免循环依赖
     private BpmTaskService taskService;

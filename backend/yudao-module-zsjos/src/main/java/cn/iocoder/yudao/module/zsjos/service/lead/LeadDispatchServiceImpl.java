@@ -321,6 +321,24 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-dispatch.process-expired", targetType = "lead")
+    @Transactional(rollbackFor = Exception.class)
+    public void transferOwned(Long leadId, Long expectedOwnerUserId, Long salesUserId,
+                              Long operatorUserId, String reason, String idempotencyKey) {
+        requireSalesUser(salesUserId);
+        LeadDO lead = leadMapper.selectByIdForUpdate(leadId, TenantContextHolder.getRequiredTenantId());
+        if (lead == null) throw exception(LEAD_NOT_EXISTS);
+        if (!Objects.equals(expectedOwnerUserId, lead.getOwnerUserId())
+                || !ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
+                || STATUS_SUSPENDED.equals(lead.getStatus())
+                || ASSIGNMENT_RECYCLE_PENDING.equals(lead.getAssignmentStatus())) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
+        doAdminTransfer(lead, salesUserId, operatorUserId, reason, idempotencyKey);
+    }
+
+    @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "lead-dispatch.process-unassigned-retries", targetType = "lead")
     @Transactional(rollbackFor = Exception.class)
     public TransferAttemptResult tryAdminTransfer(Long leadId, Long expectedOwnerUserId, Long salesUserId,
                                                   Long operatorUserId, String reason) {

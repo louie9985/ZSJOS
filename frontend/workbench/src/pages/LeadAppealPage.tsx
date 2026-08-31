@@ -3,7 +3,6 @@ import {
   Alert,
   Avatar,
   Button,
-  Drawer,
   Empty,
   Form,
   Image,
@@ -27,6 +26,9 @@ import { invalidReasonSnapshotLabel } from '../services/leadManagement'
 import IrreversiblePopconfirm from '../components/IrreversiblePopconfirm'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable } from '@ant-design/pro-components'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 const statusLabel: Record<string, string> = {
   sales_manager_reviewing: '销售主管复核中',
@@ -129,6 +131,7 @@ export default function LeadAppealPage() {
   const sentinelRef = useRef<HTMLDivElement>(null)
   const { submitting: saving, run: runDecision, resetIntent } = useSubmissionGuard()
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const { useTableLayout } = useInboxTableLayout()
 
   useEffect(() => {
     if (targetHandled !== undefined) setHandled(targetHandled)
@@ -154,7 +157,7 @@ export default function LeadAppealPage() {
       if (target) {
         setItems(current => [target, ...current.filter(item => item.id !== target.id)])
         setSelected(target)
-        if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+        if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
         return true
       }
       nextCursor = result.nextCursor
@@ -259,7 +262,7 @@ export default function LeadAppealPage() {
 
   const detail = selected ? <Detail item={selected} onDecision={setDecision}/> : <Empty description="从左侧选择一条申诉"/>
 
-  return <section className="workspace-page business-inbox-page lead-appeal-inbox-page">
+  return <section className={`workspace-page business-inbox-page lead-appeal-inbox-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="business-inbox-scope-bar">
       <div className="business-inbox-scope-row">
         <Segmented
@@ -269,11 +272,31 @@ export default function LeadAppealPage() {
         />
       </div>
     </header>
-    <div className="business-inbox-layout">
+    {useTableLayout ? <ProTable<LeadAppeal>
+      className="business-inbox-table"
+      rowKey="id"
+      search={false}
+      options={{ density: true, fullScreen: true, setting: true }}
+      columnsState={{ persistenceKey: 'crm-lead-appeal-table-columns', persistenceType: 'localStorage' }}
+      loading={loading}
+      dataSource={items}
+      pagination={false}
+      scroll={{ x: 980 }}
+      locale={{ emptyText: <Empty description="暂无申诉" /> }}
+      columns={[
+        { title: '客资编号', dataIndex: 'leadNo', width: 150 },
+        { title: '姓名', dataIndex: 'leadName', width: 140 },
+        { title: '处理阶段', render: (_, item) => stageLabel[item.reviewStage] || item.reviewStage },
+        { title: '状态', render: (_, item) => <Tag color={item.status === 'upheld' ? 'error' : 'processing'}>{statusLabel[item.status] || item.status}</Tag> },
+        { title: '提交时间', dataIndex: 'submittedAt', render: (_, item) => formatTimestamp(item.submittedAt), width: 170 },
+        { title: '操作', key: 'action', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => { setSelected(item); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
+      ]}
+    /> : <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">
         <div className="business-inbox-toolbar">
           <AdvancedFilterToolbar
             scene="lead_appeal"
+            pageKey="lead_appeal"
             placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号"
             keyword={keyword}
             value={advancedFilter}
@@ -292,7 +315,7 @@ export default function LeadAppealPage() {
                 className={`business-inbox-item${selected?.id === item.id ? ' active' : ''}`}
                 onClick={() => {
                   setSelected(item)
-                  if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+                  if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
                 }}
               >
                 <div className="business-inbox-item-main">
@@ -320,10 +343,10 @@ export default function LeadAppealPage() {
         </div>
       </aside>
       <main className="business-inbox-detail-pane">{detail}</main>
-    </div>
-    <Drawer className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="申诉详情" placement="right" width="100%">
+    </div>}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="business-inbox-mobile-drawer" open={drawerOpen} onClose={() => setDrawerOpen(false)} title="申诉详情" placement="right" width="100%">
       {detail}
-    </Drawer>
+    </ResizableDetailDrawer>
     <Modal
       title={decision === 'overturn' ? '改判有效' : '维持无效'}
       open={Boolean(decision)}

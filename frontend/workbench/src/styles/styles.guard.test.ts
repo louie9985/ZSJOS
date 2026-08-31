@@ -204,6 +204,17 @@ describe('spacing and sizing anchors', () => {
     expect(detailFields).toMatch(/@media \(max-width: 768px\)[\s\S]*\.detail-field-grid\.columns-3[\s\S]*grid-template-columns: minmax\(0, 1fr\)/)
   })
 
+  it('keeps home announcements single-line with pinned highlight styling', () => {
+    const todayTasks = readFileSync(join(ROOT, 'pages/today-tasks.css'), 'utf8')
+
+    expect(todayTasks).toMatch(/\.home-announcement-item \{[^}]*display: flex[^}]*align-items: center[^}]*justify-content: space-between/)
+    expect(todayTasks).toMatch(/\.home-announcement-title \{[^}]*flex: 1 1 auto[^}]*min-width: 0/)
+    expect(todayTasks).toMatch(/\.home-announcement-title-text \{[^}]*overflow: hidden[^}]*text-overflow: ellipsis[^}]*white-space: nowrap/)
+    expect(todayTasks).toMatch(/\.home-announcement-item time \{[^}]*flex: 0 0 auto[^}]*white-space: nowrap/)
+    expect(todayTasks).toMatch(/\.home-announcement-item\.highlighted \{[^}]*background: var\(--crm-color-primary-bg\)/)
+    expect(todayTasks).toMatch(/\.home-announcement-item\.highlighted:hover,[\s\S]*\.home-announcement-item\.highlighted:focus-visible \{[^}]*background: color-mix\(in srgb, var\(--crm-color-primary-bg\)/)
+  })
+
   it('aligns detail field labels left and values right in the component itself', () => {
     // 曾由 message-inbox 与 sales-order 各自覆盖，其余 10 处调用方是左左对齐。
     // 现统一到组件基础样式，页面不该再打补丁。

@@ -1,22 +1,35 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Alert, Avatar, Button, Drawer, Empty, Form, Input, InputNumber, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
-import { api, type AdvancedFilterGroup, type AssignmentUser, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
+import { Alert, Avatar, Button, Empty, Form, Input, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
+import { api, type AdvancedFilterGroup, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import DeferredAttachmentPicker from '../components/DeferredAttachmentPicker'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import type { LeadAttachment } from '../services/api'
-import EmployeeSelect from '../components/EmployeeSelect'
 import { createIdempotencyKey } from '../services/idempotency'
 import DetailFieldGrid from '../components/DetailFieldGrid'
 import { AdvancedFilterToolbar } from '../components/AdvancedFilter'
+import { useInboxTableLayout } from '../services/inboxLayout'
+import { ProTable } from '@ant-design/pro-components'
+import ResizableDetailDrawer from '../components/ResizableDetailDrawer'
 
 type ResultType = LeadDuplicateReviewDecision['resultType']
 type DuplicateCandidate = { personId: number; leadId?: number; leadNo?: string; personName: string; leadStatus?: string }
 const labels: Record<ResultType, string> = {
-  new_person: '非重复，创建新客户', reuse_person: '复用客户并创建主客资',
-  reactivate_lead: '激活无效或关闭客资', notify_owner: '提醒所属销售'
+  allow_flow: '放行，进入正式客资流程',
+  close_duplicate: '确认重复，关闭本次提交'
 }
-const resultLabel = (value?: string) => value && value in labels ? labels[value as ResultType] : value
+const legacyResultLabels: Record<string, string> = {
+  strong_rejected: '强重复拦截',
+  suspected_created: '疑似重复待确认',
+  allowed: '已放行',
+  closed: '已关闭',
+  auto_closed: '自动关闭',
+  new_person: '旧记录：新建客户',
+  reuse_person: '旧记录：复用客户',
+  reactivate_lead: '旧记录：激活客资',
+  notify_owner: '旧记录：提醒所属销售'
+}
+const resultLabel = (value?: string) => value ? (labels[value as ResultType] ?? legacyResultLabels[value] ?? value) : value
 
 export default function LeadDuplicateReviewPage({ permissions }: { permissions: string[] }) {
   const [status, setStatus] = useState<'pending' | 'completed'>('pending')
@@ -29,10 +42,10 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [processing, setProcessing] = useState<LeadDuplicateReview>()
   const [saving, setSaving] = useState(false)
-  const [sales, setSales] = useState<AssignmentUser[]>([])
   const [form] = Form.useForm<LeadDuplicateReviewDecision>()
   const [files, setFiles] = useState<DeferredUploadItem<LeadAttachment>[]>([])
   const canProcess = permissions.includes('zsjos:lead-duplicate-review:process')
+  const { useTableLayout } = useInboxTableLayout()
 
   const load = useCallback(async () => {
     setLoading(true); setError('')
@@ -48,8 +61,6 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
 
   const openProcess = async (row: LeadDuplicateReview) => {
     setProcessing(row); form.resetFields(); setFiles([])
-    try { setSales(await api.duplicateReviewSalesCandidates()) }
-    catch (cause) { setSales([]); message.error(cause instanceof Error ? cause.message : '销售候选加载失败') }
   }
   const resultType = Form.useWatch('resultType', form)
   const parsed = useMemo(() => {
@@ -79,7 +90,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
 
   const selectReview = (item: LeadDuplicateReview) => {
     setSelected(item)
-    if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
+    if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true)
   }
 
   const detail = !selected ? <Empty description="从左侧选择一条复核任务"/>
@@ -92,6 +103,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
             <Space wrap>
               <Tag color={selected.status === 'pending' ? 'processing' : 'success'}>{selected.status === 'pending' ? '待处理' : '已处理'}</Tag>
               {selected.resultType && <Tag>{resultLabel(selected.resultType)}</Tag>}
+              {selected.duplicateResult && <Tag>{resultLabel(selected.duplicateResult)}</Tag>}
             </Space>
           </div>
           {selected.status === 'pending' && canProcess && <Button type="primary" onClick={() => void openProcess(selected)}>处理</Button>}
@@ -110,15 +122,33 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
         </section>
       </article>
 
-  return <section className="workspace-page message-inbox-page duplicate-review-page">
+  return <section className={`workspace-page message-inbox-page duplicate-review-page${useTableLayout ? ' business-inbox-table-page' : ''}`}>
     <header className="message-inbox-header">
       <div><Typography.Title level={4}>重复客资复核</Typography.Title><Typography.Text type="secondary">公共队列按提交时间处理，结论提交后不可覆盖</Typography.Text></div>
       <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
     </header>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
-    <div className="message-inbox-layout">
+    {useTableLayout ? <ProTable<LeadDuplicateReview>
+      className="business-inbox-table"
+      rowKey="id"
+      search={false}
+      options={{ density: true, fullScreen: true, setting: true }}
+      columnsState={{ persistenceKey: 'crm-lead-duplicate-review-table-columns', persistenceType: 'localStorage' }}
+      loading={loading}
+      dataSource={items}
+      pagination={false}
+      scroll={{ x: 920 }}
+      locale={{ emptyText: <Empty description="暂无复核任务" /> }}
+      columns={[
+        { title: '复核任务', render: (_, item) => `复核任务 #${item.id}`, width: 180 },
+        { title: '状态', render: (_, item) => <Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag>, width: 110 },
+        { title: '结论', render: (_, item) => resultLabel(item.duplicateResult || item.resultType) || '-' },
+        { title: '创建时间', dataIndex: 'createTime', render: (_, item) => formatTimestamp(item.createTime), width: 170 },
+        { title: '操作', width: 88, fixed: 'right', render: (_, item) => <Button type="link" onClick={() => selectReview(item)}>详细</Button> }
+      ]}
+    /> : <div className="message-inbox-layout">
       <aside className="message-inbox-list-pane">
-        <div className="message-inbox-toolbar"><AdvancedFilterToolbar scene="duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
+        <div className="message-inbox-toolbar"><AdvancedFilterToolbar scene="duplicate_review" pageKey="lead_duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
         <div className="message-inbox-list" aria-label="重复客资复核列表">
           {loading ? <div className="message-inbox-skeleton"><Skeleton active paragraph={{ rows: 8 }}/></div>
             : items.length ? items.map(item => {
@@ -130,7 +160,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
                   <div className="message-inbox-item-copy">
                     <div className="message-inbox-item-title"><strong>复核任务 #{item.id}</strong><Tag color={item.status === 'pending' ? 'processing' : 'success'}>{item.status === 'pending' ? '待处理' : '已处理'}</Tag></div>
                     <span>{rules.join('、')}</span>
-                    {item.resultType && <span>{resultLabel(item.resultType)}</span>}
+                    {(item.duplicateResult || item.resultType) && <span>{resultLabel(item.duplicateResult || item.resultType)}</span>}
                   </div>
                 </div>
                 <div className="message-inbox-item-meta"><span>{formatTimestamp(item.createTime)}</span></div>
@@ -139,14 +169,13 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
         </div>
       </aside>
       <main className="message-inbox-detail-pane">{detail}</main>
-    </div>
-    <Drawer className="message-inbox-mobile-drawer" open={drawerOpen} title="复核任务详情" placement="right" width="100%" onClose={() => setDrawerOpen(false)}>{detail}</Drawer>
+    </div>}
+    <ResizableDetailDrawer desktopResizable={useTableLayout} className="message-inbox-mobile-drawer" open={drawerOpen} title="复核任务详情" placement="right" width="100%" onClose={() => setDrawerOpen(false)}>{detail}</ResizableDetailDrawer>
     <Modal open={Boolean(processing)} title={`处理复核任务 #${processing?.id}`} okText="提交结论" confirmLoading={saving} onOk={() => void submit()} onCancel={() => setProcessing(undefined)} destroyOnHidden>
       <Form form={form} layout="vertical">
         <Form.Item name="resultType" label="复核结论" rules={[{ required: true }]}><Select options={Object.entries(labels).map(([value, label]) => ({ value, label }))}/></Form.Item>
-        {resultType === 'reuse_person' && <Form.Item name="matchedPersonId" label="客户编号" rules={[{ required: true }]}><InputNumber min={1} style={{ width: '100%' }}/></Form.Item>}
-        {(resultType === 'reactivate_lead' || resultType === 'notify_owner') && <Form.Item name="matchedLeadId" label="客资编号" rules={[{ required: true }]}><Select showSearch optionFilterProp="label" options={processingCandidates.filter(item => item.leadId).map(item => ({ value: item.leadId!, label: `${item.leadNo || '编号不可用'} · ${item.personName} · ${item.leadStatus || '未知状态'}` }))}/></Form.Item>}
-        {resultType === 'reactivate_lead' && <Form.Item name="selectedSalesUserId" label="归属销售" rules={[{ required: true }]}><EmployeeSelect users={sales} showSearch optionFilterProp="label" /></Form.Item>}
+        {resultType === 'close_duplicate' && processingCandidates.length > 0 && <Alert type="warning" showIcon message="确认关闭后不会创建客资，也不会进入分配或业绩统计" />}
+        {resultType === 'allow_flow' && <Alert type="info" showIcon message="放行后将按原提交快照创建正式客资，并继续进入分配或销售跟进流程" />}
         <Form.Item name="opinion" label="复核意见" rules={[{ required: true, whitespace: true }, { max: 2000 }]}><Input.TextArea rows={4} maxLength={2000} showCount/></Form.Item>
         <Form.Item label="复核附件"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" disabled={saving}/></Form.Item>
       </Form>

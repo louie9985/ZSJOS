@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { showConfirmDialog, showSuccessToast, showToast } from 'vant'
 import { getMyCards, updateCard, type BankCard } from '@/api/withdrawal'
-import { applyDevBankCardOverrides, wasMockedEndpoint } from '@/api/mock'
 
 defineOptions({ name: 'BankCardEdit' })
 const route = useRoute()
@@ -15,12 +14,11 @@ const loadError = ref('')
 const submitting = ref(false)
 const changeNumber = ref(false)
 const form = reactive({ accountName: '', bankName: '', branchName: '', cardNumber: '' })
-const usingMock = computed(() => wasMockedEndpoint('/zsjos/withdrawal/my-cards'))
 
 async function loadCard() {
   loading.value = true; loadError.value = ''
   try {
-    const cards = applyDevBankCardOverrides(await getMyCards())
+    const cards = await getMyCards()
     const current = cards.find(item => item.id === id)
     if (!current) throw new Error('未找到该银行卡')
     card.value = current
@@ -39,7 +37,7 @@ async function submit() {
   submitting.value = true
   try {
     await updateCard(id, { accountName: form.accountName.trim(), bankName: form.bankName.trim(), branchName: form.branchName.trim(), ...(changeNumber.value ? { cardNumber: form.cardNumber } : {}) })
-    showSuccessToast(wasMockedEndpoint('/zsjos/withdrawal/my-cards') ? '演示保存成功' : '保存成功')
+    showSuccessToast('保存成功')
     router.back()
   } finally { submitting.value = false }
 }
@@ -50,7 +48,6 @@ onMounted(loadCard)
 <template>
   <div class="page-container">
     <van-nav-bar title="编辑银行卡" left-arrow @click-left="$router.back()" />
-    <van-notice-bar v-if="usingMock" color="#8a6100" background="#fff7df" left-icon="info-o">修改只保存在开发环境演示数据中</van-notice-bar>
     <van-skeleton :loading="loading" :row="6" style="padding:16px">
       <van-empty v-if="loadError" :description="loadError" image="error"><van-button size="small" type="primary" @click="loadCard">重新加载</van-button></van-empty>
       <van-form v-else-if="card" @submit="submit">

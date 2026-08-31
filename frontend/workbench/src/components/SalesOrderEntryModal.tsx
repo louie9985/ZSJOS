@@ -24,6 +24,16 @@ type Values = {
 
 const emptyCatalog: LeadCatalog = { categoryTree: [], spus: [], skus: [] }
 const errorText = (error: unknown) => error instanceof Error ? error.message : '加载失败'
+export function getPaymentLinkActionLabel(
+  collectionMode: CollectionMode,
+  orderId: number | undefined,
+  purchaseIntent?: Pick<PurchaseIntent, 'paymentStatus' | 'paymentUrl'>,
+) {
+  if (orderId || collectionMode !== 'online_link') return null
+  if (purchaseIntent?.paymentStatus === 'expired' || purchaseIntent?.paymentStatus === 'closed') return '重新生成支付链接'
+  if (purchaseIntent?.paymentStatus) return null
+  return purchaseIntent?.paymentUrl ? null : '生成支付链接'
+}
 
 function findRegion(areas: AreaNode[], path: string[]) {
   const province = areas.find(item => item.selectionCode === path[0])
@@ -63,6 +73,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
   const items = Form.useWatch('items', form) || []
   const total = items.reduce((sum, item) => sum + Number(item?.actualAmount || 0), 0)
   const areaOptions = useMemo(() => buildLeadAreaOptions(areas), [areas])
+  const paymentLinkActionLabel = getPaymentLinkActionLabel(collectionMode, orderId, purchaseIntent)
   const purchaseType: PurchaseIntentDraftRequest['purchaseType'] = externalCustomer ? 'external_repurchase'
     : studentRepurchase ? 'student_repurchase' : repurchase ? 'lead_repurchase' : 'lead_first_purchase'
   const purchaseSource = { purchaseType, leadId: externalCustomer || studentRepurchase ? undefined : lead.id,
@@ -224,8 +235,8 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           <Segmented block value={collectionMode} disabled={Boolean(purchaseIntent?.paymentLocked)} onChange={value => setCollectionMode(value as CollectionMode)}
             options={[{ label: '线上支付链接', value: 'online_link' }, { label: '线下已支付', value: 'offline_paid' }]}/>
           {collectionMode === 'online_link' && purchaseIntent?.paymentUrl && <Alert style={{ marginTop: 12 }} showIcon
-            type={purchaseIntent.paymentStatus === 'paid' ? 'success' : purchaseIntent.displayStatus === 'invalid' ? 'warning' : 'info'}
-            message={purchaseIntent.paymentStatus === 'paid' ? '通联已确认到账' : '支付链接已生成'}
+            type={purchaseIntent.paymentStatus === 'paid' ? 'success' : purchaseIntent.paymentStatus === 'expired' || purchaseIntent.paymentStatus === 'closed' ? 'warning' : 'info'}
+            message={purchaseIntent.paymentStatus === 'paid' ? '通联已确认到账' : purchaseIntent.paymentStatus === 'expired' || purchaseIntent.paymentStatus === 'closed' ? '支付链接已失效，可重新生成' : '支付链接已生成'}
             description={<Space direction="vertical" style={{ width: '100%' }}><Typography.Text copyable>{purchaseIntent.paymentUrl}</Typography.Text>
               <Typography.Text type="secondary">状态：{purchaseIntent.paymentStatus}，有效期至 {purchaseIntent.paymentExpiresAt ? dayjs(purchaseIntent.paymentExpiresAt).format('YYYY-MM-DD HH:mm:ss') : '-'}</Typography.Text>
               <Space><Button size="small" icon={<CopyOutlined/>} onClick={() => void navigator.clipboard.writeText(purchaseIntent.paymentUrl!)}>复制链接</Button>
@@ -276,7 +287,7 @@ export default function SalesOrderEntryModal({ lead, orderId, repurchase, extern
           </Form.Item></Col>
         </Row>
         <Space wrap>{!orderId && <Button icon={<SaveOutlined/>} loading={draftSaving} onClick={() => void saveDraft(false)}>保存草稿</Button>}
-          {!orderId && collectionMode === 'online_link' && !purchaseIntent?.paymentLocked && <Button type="primary" icon={<LinkOutlined/>} loading={draftSaving} onClick={() => void saveDraft(true)}>生成支付链接</Button>}
+          {paymentLinkActionLabel && <Button type="primary" icon={<LinkOutlined/>} loading={draftSaving} onClick={() => void saveDraft(true)}>{paymentLinkActionLabel}</Button>}
           <IrreversiblePopconfirm action={orderId ? `重新提交成交订单「${orderNo || orderId}」审批` : `提交「${lead.submittedName}」的成交订单审批`} open={confirmOpen} onOpenChange={setConfirmOpen} onConfirm={submit}><Button type="primary" loading={saving} onClick={() => void prepareSubmit()}>{orderId ? '重新提交审批' : '提交审批'}</Button></IrreversiblePopconfirm><Button onClick={close}>取消</Button></Space>
       </Form>
     </Spin>

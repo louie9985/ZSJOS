@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
@@ -55,12 +57,14 @@ public class LeadAppealController {
     }
 
     @PostMapping("/inbox/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
     public CommonResult<PageResult<LeadAppealRespVO>> searchInboxPage(@Valid @RequestBody LeadAppealPageReqVO reqVO) {
         return success(appealService.getInboxPage(reqVO, WebFrameworkUtils.getLoginUserId()));
     }
 
     @PostMapping("/inbox/search-cursor")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:lead:appeal:query')")
     public CommonResult<CursorPageResult<LeadAppealRespVO>> searchInboxCursor(
             @Valid @RequestBody LeadAppealPageReqVO reqVO) {

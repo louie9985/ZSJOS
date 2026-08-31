@@ -27,6 +27,7 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 10 | 公海 | `/zsjos/lead-aging-pool` | `LeadAgingPoolPage` | `zsjos/leadAgingPool/index` |
 | 11 | 客资派单规则 | `/zsjos/lead-rule` | `LeadRuleConfigPage` | `zsjos/leadRule/index` |
 | 12 | 客资筛选方案 | `/zsjos/lead-filter` | `LeadFilterConfigPage` | `zsjos/leadFilter/index` |
+| 12.1 | 高级筛选预置 | `/zsjos/advanced-filter-template` | 不注册（Admin 配置页） | `zsjos/advancedFilterTemplate/index`（`workbenchRenderMode=admin_only`） |
 | 13 | 客资跟进规则 | `/zsjos/lead-follow-up-rule` | `LeadFollowUpRuleConfigPage` | `zsjos/leadFollowUpRule/index` |
 | 14 | 产品配置 | `/zsjos/product` | `ProductConfigPage` | `zsjos/product/index` |
 | 15 | 计划配置 | `/zsjos/work-plan-config` | `WorkPlanConfigPage` | `zsjos/workPlanConfig/index` |

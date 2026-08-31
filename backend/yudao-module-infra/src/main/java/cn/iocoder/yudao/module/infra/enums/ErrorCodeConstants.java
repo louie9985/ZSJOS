@@ -66,6 +66,17 @@ public interface ErrorCodeConstants {
     ErrorCode DATA_SOURCE_CONFIG_NOT_EXISTS = new ErrorCode(1_001_007_000, "数据源配置不存在");
     ErrorCode DATA_SOURCE_CONFIG_NOT_OK = new ErrorCode(1_001_007_001, "数据源配置不正确，无法进行连接");
 
+    // ========== 数据库管理 1-001-008-000 ==========
+    ErrorCode DATABASE_ADMIN_CONNECTION_FAIL = new ErrorCode(1_001_008_000, "数据库连接失败");
+    ErrorCode DATABASE_ADMIN_TABLE_NOT_EXISTS = new ErrorCode(1_001_008_001, "数据库表不存在");
+    ErrorCode DATABASE_ADMIN_COLUMN_NOT_EXISTS = new ErrorCode(1_001_008_002, "数据库字段不存在");
+    ErrorCode DATABASE_ADMIN_TABLE_READONLY = new ErrorCode(1_001_008_003, "该表没有单列主键，仅允许查看");
+    ErrorCode DATABASE_ADMIN_COLUMN_READONLY = new ErrorCode(1_001_008_004, "字段({})不允许编辑");
+    ErrorCode DATABASE_ADMIN_SENSITIVE_COLUMN = new ErrorCode(1_001_008_005, "字段({})为敏感字段，不允许通过数据库管理修改");
+    ErrorCode DATABASE_ADMIN_ROW_AFFECTED_INVALID = new ErrorCode(1_001_008_006, "数据库操作影响行数不正确");
+    ErrorCode DATABASE_ADMIN_UNSUPPORTED_DATABASE = new ErrorCode(1_001_008_007, "暂不支持当前数据库类型");
+    ErrorCode DATABASE_ADMIN_EXECUTE_FAIL = new ErrorCode(1_001_008_008, "数据库操作执行失败");
+
     // ========== 学生 1-001-201-000 ==========
     ErrorCode DEMO01_CONTACT_NOT_EXISTS = new ErrorCode(1_001_201_000, "示例联系人不存在");
     ErrorCode DEMO02_CATEGORY_NOT_EXISTS = new ErrorCode(1_001_201_001, "示例分类不存在");

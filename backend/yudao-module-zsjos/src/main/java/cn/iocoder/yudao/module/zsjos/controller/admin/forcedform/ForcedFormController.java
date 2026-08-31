@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.forcedform;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.forcedform.vo.*;
 import cn.iocoder.yudao.module.zsjos.service.forcedform.ForcedFormService;
@@ -78,6 +80,7 @@ public class ForcedFormController {
     }
 
     @PostMapping("/{id}/recipient-preview")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:forced-form:send')")
     public CommonResult<ForcedFormRecipientPreviewRespVO> recipientPreview(@PathVariable Long id,
                                                                            @Valid @RequestBody ForcedFormSendReqVO req) {

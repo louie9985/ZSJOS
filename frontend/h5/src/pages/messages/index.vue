@@ -3,7 +3,6 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { showConfirmDialog, showSuccessToast } from 'vant'
 import { getMessageGroups, getMessagePage, getUnreadCount, markAllRead, markRead, type MessageGroup, type MessageItem } from '@/api/message'
-import { wasMockedEndpoint } from '@/api/mock'
 import { usePageList } from '@/composables/usePageList'
 import { formatDateTime } from '@/utils/format'
 
@@ -19,7 +18,6 @@ const unreadCount = ref<number>()
 const unreadCountLoading = ref(true)
 const params = computed(() => ({ ...(activeGroup.value !== 'all' ? { group: activeGroup.value } : {}), ...(unreadOnly.value ? { unreadOnly: true } : {}) }))
 const { list, loading, refreshing, finished, error, loadMore, refresh } = usePageList<MessageItem>(page => getMessagePage(page), params)
-const usingMock = computed(() => wasMockedEndpoint('/zsjos/messages/groups'))
 
 async function loadGroups() {
   groupLoading.value = true; groupError.value = ''
@@ -81,9 +79,6 @@ onMounted(() => {
           </span>
           <span class="messages-chip messages-chip--muted">{{ unreadOnly ? '仅未读' : '全部消息' }}</span>
         </div>
-      </div>
-      <div v-if="usingMock" class="messages-hero__hint">
-        开发环境消息分组为演示能力
       </div>
     </section>
 
@@ -201,16 +196,6 @@ onMounted(() => {
 
 .messages-chip--loading {
   opacity: 0.75;
-}
-
-.messages-hero__hint {
-  margin-top: 10px;
-  padding: 8px 10px;
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--h5-primary) 6%, var(--h5-card-bg));
-  color: var(--h5-text-secondary);
-  font-size: 12px;
-  line-height: 1.4;
 }
 
 .messages-section__head {

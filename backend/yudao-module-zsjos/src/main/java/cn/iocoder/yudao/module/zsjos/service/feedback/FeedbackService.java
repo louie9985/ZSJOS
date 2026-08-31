@@ -16,19 +16,31 @@ public interface FeedbackService {
 
     FeedbackRespVO.Portal getPortal(Long userId);
 
+    FeedbackRespVO.Portal getPartnerPortal(Long accountId, Long partnerId);
+
     FeedbackFormRespVO getCurrentForm(String type);
 
     Long create(String type, FeedbackCreateReqVO request, Long userId);
+
+    Long createForPartner(String type, FeedbackCreateReqVO request, Long accountId, Long partnerId);
 
     void resubmit(Long id, FeedbackActionVO.ResubmitReq request, Long userId);
 
     PageResult<FeedbackRespVO> getMyPage(FeedbackPageReqVO request, Long userId);
 
+    PageResult<FeedbackRespVO> getPartnerPage(FeedbackPageReqVO request, Long accountId, Long partnerId);
+
     FeedbackRespVO getOwn(Long id, Long userId);
+
+    FeedbackRespVO getPartnerOwn(Long id, Long accountId, Long partnerId);
 
     void markRead(Long id, FeedbackActionVO.VersionedCommand request, Long userId);
 
+    void markReadForPartner(Long id, FeedbackActionVO.VersionedCommand request, Long accountId, Long partnerId);
+
     void replyOwn(Long id, FeedbackActionVO.ReplyReq request, Long userId);
+
+    void replyForPartner(Long id, FeedbackActionVO.ReplyReq request, Long accountId, Long partnerId);
 
     void submitSurvey(Long id, FeedbackActionVO.SurveySubmitReq request, Long userId);
 
@@ -55,6 +67,8 @@ public interface FeedbackService {
     List<FeedbackConfigVO.ProcessOption> getProcessOptions();
 
     FileInfoRespDTO upload(byte[] content, String name, String contentType, Long userId);
+
+    FileInfoRespDTO uploadForPartner(byte[] content, String name, String contentType, Long accountId);
 
     void handleProcessResult(BpmProcessInstanceStatusEvent event);
 }

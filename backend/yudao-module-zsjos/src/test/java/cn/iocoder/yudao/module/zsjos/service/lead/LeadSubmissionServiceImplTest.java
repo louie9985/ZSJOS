@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_CONTACT_REQUIRED;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_DUPLICATE_STRONG_CONFLICT;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_MOBILE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_REGION_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
@@ -256,9 +257,10 @@ class LeadSubmissionServiceImplTest {
     @Test
     void duplicateMatchEntersManualReviewWhenAutoResolutionIsDisabled() {
         LeadCreateReqVO req = validDuplicateRequest();
-        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid");
+        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
         when(duplicateMatcher.match(req, null)).thenReturn(
-                new LeadDuplicateMatcher.MatchResult(candidate, List.of(candidate)));
+                match(null, List.of(candidate), "suspected_duplicate", "suspected_created",
+                        LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT, "fp-weak"));
         when(followUpRuleService.requireEnabledRule()).thenReturn(rule(false));
         prepareDuplicateValidation(req);
         assignReviewId();
@@ -268,18 +270,62 @@ class LeadSubmissionServiceImplTest {
         assertEquals("review_pending", result.getOutcome());
         assertEquals(99L, result.getReviewId());
         verify(duplicateReviewMapper).insert(org.mockito.ArgumentMatchers.argThat(
-                (LeadDuplicateReviewDO review) -> "提交时分类".equals(review.getLeadCategoryLabelSnapshot())));
+                (LeadDuplicateReviewDO review) -> "提交时分类".equals(review.getLeadCategoryLabelSnapshot())
+                        && "suspected_duplicate".equals(review.getDuplicateFlag())
+                        && "suspected_created".equals(review.getDuplicateResult())
+                        && "fp-weak".equals(review.getReviewFingerprint())));
         verify(duplicateReviewService, never()).resolveAutomatically(any(), any(), any());
     }
 
     @Test
-    void autoResolutionSelectsNewestMatchedLeadThenHighestId() {
+    void strongDuplicatePersistsAuditAndThrowsStableConflict() {
         LeadCreateReqVO req = validDuplicateRequest();
-        LeadDuplicateMatcher.Candidate first = candidate(10L, "invalid");
-        LeadDuplicateMatcher.Candidate second = candidate(20L, "won");
-        LeadDuplicateMatcher.Candidate third = candidate(19L, "closed");
+        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "closed", LeadDuplicateMatcher.SAME_MOBILE);
         when(duplicateMatcher.match(req, null)).thenReturn(
-                new LeadDuplicateMatcher.MatchResult(null, List.of(first, second, third)));
+                match(candidate, List.of(candidate), "strong_duplicate", "strong_rejected",
+                        LeadDuplicateMatcher.SAME_MOBILE, "fp-strong"));
+        prepareDuplicateValidation(req);
+
+        ServiceException error = assertThrows(ServiceException.class, () -> service.create(req, 1L));
+
+        assertEquals(LEAD_DUPLICATE_STRONG_CONFLICT.getCode(), error.getCode());
+        verify(duplicateReviewMapper).insert(org.mockito.ArgumentMatchers.argThat(
+                (LeadDuplicateReviewDO review) -> "completed".equals(review.getStatus())
+                        && "strong_duplicate".equals(review.getDuplicateFlag())
+                        && "strong_rejected".equals(review.getDuplicateResult())
+                        && Long.valueOf(10L).equals(review.getMatchedLeadId())));
+        verify(dispatchService, never()).start(any(), any(), any());
+    }
+
+    @Test
+    void weakDuplicateReusesExistingPendingReviewByFingerprint() {
+        LeadCreateReqVO req = validDuplicateRequest();
+        LeadDuplicateMatcher.Candidate candidate = candidate(10L, "valid", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
+        when(duplicateMatcher.match(req, null)).thenReturn(
+                match(null, List.of(candidate), "suspected_duplicate", "suspected_created",
+                        LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT, "fp-weak"));
+        LeadDuplicateReviewDO existing = new LeadDuplicateReviewDO();
+        existing.setId(77L);
+        existing.setStatus("pending");
+        when(duplicateReviewMapper.selectPendingByFingerprint("fp-weak")).thenReturn(existing);
+        prepareDuplicateValidation(req);
+
+        LeadCreateRespVO result = service.create(req, 1L);
+
+        assertEquals("review_pending", result.getOutcome());
+        assertEquals(77L, result.getReviewId());
+        verify(duplicateReviewMapper, never()).insert(any(LeadDuplicateReviewDO.class));
+    }
+
+    @Test
+    void crossContactAutoResolutionSelectsNewestMatchedLeadThenHighestId() {
+        LeadCreateReqVO req = validDuplicateRequest();
+        LeadDuplicateMatcher.Candidate first = candidate(10L, "invalid", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
+        LeadDuplicateMatcher.Candidate second = candidate(20L, "won", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
+        LeadDuplicateMatcher.Candidate third = candidate(19L, "closed", LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT);
+        when(duplicateMatcher.match(req, null)).thenReturn(
+                match(null, List.of(first, second, third), "suspected_duplicate", "suspected_created",
+                        LeadDuplicateMatcher.WEAK_MOBILE_TO_WECHAT, "fp-cross"));
         when(followUpRuleService.requireEnabledRule()).thenReturn(rule(true));
         LeadDO older = lead(10L, LocalDateTime.of(2026, 8, 1, 10, 0));
         LeadDO newerLowerId = lead(19L, LocalDateTime.of(2026, 8, 2, 10, 0));
@@ -388,9 +434,15 @@ class LeadSubmissionServiceImplTest {
         }).when(duplicateReviewMapper).insert(any(LeadDuplicateReviewDO.class));
     }
 
-    private static LeadDuplicateMatcher.Candidate candidate(Long leadId, String status) {
+    private static LeadDuplicateMatcher.Candidate candidate(Long leadId, String status, String rule) {
         return new LeadDuplicateMatcher.Candidate(leadId + 100L, leadId, "L" + leadId, "客户",
-                status, "owned", new HashSet<>(List.of(LeadDuplicateMatcher.SAME_MOBILE)));
+                status, "owned", new HashSet<>(List.of(rule)));
+    }
+
+    private static LeadDuplicateMatcher.MatchResult match(LeadDuplicateMatcher.Candidate strong,
+                                                          List<LeadDuplicateMatcher.Candidate> candidates,
+                                                          String flag, String result, String rule, String fingerprint) {
+        return new LeadDuplicateMatcher.MatchResult(strong, candidates, flag, result, rule, fingerprint);
     }
 
     private static LeadFollowUpRuleDO rule(boolean auto) {

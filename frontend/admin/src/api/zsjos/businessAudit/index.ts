@@ -8,10 +8,19 @@ export interface BusinessAuditVO {
   categoryCode: string
   actionCode: string
   targetType: string
-  targetId: string
+  targetId?: string
   detailJson: string
   sourceIp?: string
+  sourceType: 'ADMIN' | 'PARTNER' | 'PUBLIC_CALLBACK' | 'SYSTEM' | 'EXPLICIT'
+  traceId?: string
+  requestMethod?: string
+  requestPath?: string
+  resultStatus: 'STARTED' | 'SUCCESS' | 'FAILURE'
+  resultCode?: number
+  resultMessage?: string
   occurredAt: string
+  finishedAt?: string
+  durationMs?: number
 }
 
 export interface ImpersonationAuditVO {
@@ -25,7 +34,15 @@ export interface ImpersonationAuditVO {
 }
 
 export const getBusinessAuditPage = (
-  params: PageParam & { actionCode?: string; targetType?: string }
+  params: PageParam & {
+    categoryCode?: string
+    actionCode?: string
+    targetType?: string
+    sourceType?: string
+    resultStatus?: string
+    operatorUserId?: number
+    occurredAt?: string[]
+  }
 ) => request.get<PageResult<BusinessAuditVO[]>>({ url: '/zsjos/business-audit/page', params })
 
 export const getImpersonationAuditPage = (params: PageParam & { sessionId?: number }) =>

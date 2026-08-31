@@ -1,5 +1,13 @@
 # Data and Permission Flow
 
+## WeCom click tickets
+
+WeCom notification click tickets are short-lived, one-time Redis capabilities. The anonymous
+resolve endpoint returns only `audience`, `actionType`, `targetPath`, and `fallbackPath`; it never
+returns tenant IDs, event keys, or internal business IDs. After login, the destination page performs
+normal authenticated tenant and object authorization. Lead deep links use the user-visible `leadNo`;
+`leadId` remains an internal API and persistence identifier.
+
 ## Global maintenance mode
 
 System owns the database-authoritative `zsjos.system.maintenance-enabled` configuration and its public read API. Only the stable `super_admin` role may toggle it. The request filter blocks ordinary writes with HTTP 503 without role or IP bypass; fixed authentication/callback recovery routes and the toggle itself are the only write exemptions. ZSJOS schedulers query the System public API before tenant enumeration, and business deadlines are not shifted by maintenance windows.
@@ -8,14 +16,23 @@ System owns the database-authoritative `zsjos.system.maintenance-enabled` config
 
 ZSJOS owns temporary impersonation sessions and their dedicated per-request audit. System remains authoritative for both administrator and target accounts. An active session replaces the request user ID before ZSJOS method and object permission checks, so permissions are resolved from System for the target user; the original administrator and session ID remain in request context and the dedicated audit. Non-read methods and cross-tenant visit contexts are rejected before identity replacement. Query strings, request bodies, filter values, and response content are never persisted in impersonation audit.
 
+## Complete ZSJOS business audit
+
+Every ZSJOS operation that can change business state is audited at the server boundary. Non-GET HTTP endpoints are audited by default; a POST endpoint that is genuinely read-only must declare `@ZsjosAudit(READ_ONLY)`. Ordinary GET, HEAD, OPTIONS, list, search, detail and preview traffic is excluded. Sensitive reads such as export download URL generation, full bank-card access and impersonation access declare `SENSITIVE_READ` or use the dedicated impersonation audit.
+
+The audit protocol inserts a `STARTED` row in an independent transaction before the business operation. If this insert fails, the business operation does not run. Completion updates the same row to `SUCCESS` or `FAILURE` with result code, a bounded sanitized error summary, finish time and duration. A remaining `STARTED` row means the process ended before completion could be persisted and is itself operational evidence that requires investigation. HTTP sources distinguish `ADMIN`, `PARTNER` and `PUBLIC_CALLBACK`; scheduled jobs, BPM callbacks and other annotated system handlers use `SYSTEM` even when a callback is synchronously triggered on an HTTP thread. Existing explicit domain audit entries use `EXPLICIT` and may coexist with the request-level attempt record when they carry additional business-safe detail. Public callbacks and payment links that legitimately have no tenant header are retained as platform audit rows under reserved tenant `0`; tenant-scoped requests always persist their actual tenant ID.
+
+Audit rows store the tenant, operator ID and name snapshot, source IP, category, stable action and target type, public target identifier when safely available, request method/path and trace ID. They never store query strings, request or response bodies, file content, passwords, tokens, mobile numbers, full bank cards or other sensitive payloads. Internal Lead IDs must not be presented as customer-facing identifiers; when `leadNo` is unavailable at the generic boundary, the audit target identifier remains empty.
+
 ## Authentication and tenant flow
 
 The employee workbench exposes the authenticated user's fixed `/user/profile` route from
 the avatar menu. This route is not derived from permission menus. It reads and updates the
 current System user through `/system/user/profile/*`, uploads avatar images through Infra
 file storage, and uses `/system/social-user/*` plus the System social-auth redirect for the
-current user's WeCom binding. The client accepts only the WeCom social type and clears OAuth
-callback parameters after binding; it does not infer organization or permission data locally.
+current user's WeCom binding. The client accepts only the WeCom social type, does not expose
+a WeCom login entry, and clears OAuth callback parameters after binding; it does not infer
+organization or permission data locally.
 
 The employee workbench currently uses the administration API prefix and the system
 authentication contract:
@@ -128,12 +145,13 @@ Mobile slot already exists; a complete PC or unclassified session remains compat
 Fields from different families are never combined. Partial sessions, unknown client IDs, and
 conflicting legacy data are cleared and require account-password login again. Login, request
 authorization, token refresh, 401 recovery, WebSocket authentication, permission-info failure
-cleanup, and logout all use the startup platform captured by that page or request. A refresh
-failure or ordinary logout clears only that platform. When one PC context receives a 401, it first
-checks whether the shared PC access token has changed before starting a refresh, which prevents an
-embedded Admin page from replacing a token refreshed by the PC Workbench context. Mobile never reads
-or writes the PC/Admin slot and does not render `admin_embed` pages; those pages direct the user to
-the computer entry.
+cleanup, and logout all use the startup platform captured by that page or request. A restored
+session keeps its current route on ordinary refresh, while a fresh successful login may redirect to
+the authenticated home or explicit return target. A refresh failure or ordinary logout clears only
+that platform. When one PC context receives a 401, it first checks whether the shared PC access
+token has changed before starting a refresh, which prevents an embedded Admin page from replacing a
+token refreshed by the PC Workbench context. Mobile never reads or writes the PC/Admin slot and
+does not render `admin_embed` pages; those pages direct the user to the computer entry.
 
 The Today Tasks page may show the ZSJOS business-task panel to users with
 `zsjos:business-task:query`. It requests and renders the separate BPM task panel only when the
@@ -161,11 +179,13 @@ license to hard-code tenant assumptions into business components.
 
 The partner frontend uses `/part-api/zsjos/**` with the independent `PARTNER(3)` identity. The dedicated `partner-api` mapping targets `controller.app.partner` and the URL prefix itself enforces PARTNER token matching, while every other `/app-api/**` route retains MEMBER and `/admin-api/**` retains ADMIN. API prefixes are validated at startup and request filters include the dedicated partner prefix. OAuth token `userId` is the tenant-scoped `zsjos_partner_account.id`; each business request resolves it to `partnerId`, verifies both account and Partner state, and authorizes the target object by `partnerId`. PARTNER does not depend on System roles, departments, posts, menus, or `member_user`.
 
+Partner H5 first-login activation is controlled by tenant-scoped `zsjos_partner_invitation` records. Vue Admin creates invitations from the Partner management surface with server-owned permissions, collecting the intended name, mobile and assigned operator. The assigned operator is resolved through System public APIs from the enabled `new_media_operator` role; ZSJOS stores the operator user ID and nickname snapshot on the invitation. Invite codes are generated only on the server as four uppercase letters followed by four digits, expire after seven days by default, become `used` immediately after successful activation, and become `voided` when a newer invite is created for the same mobile. H5 activation matches both mobile and invite code before creating the Partner subject, independent Partner account and current ownership relationship. Account-password login returns a distinct unactivated failure only when no Partner account exists but the mobile still has an active non-expired invitation.
+
 Partner account updates use the shared MyBatis-Plus optimistic-lock interceptor and the `zsjos_partner_account.version` column. Login audit, enable/disable, mobile, and password updates must affect exactly one row; a stale version returns the stable concurrent-modification error before token issuance, token revocation, or success reporting. This closes the race where a login could issue a token after the account was concurrently disabled.
 
 Partner logout is type-safe and idempotent. System reads the persisted access-token record without requiring it to remain unexpired and deletes the access token, linked refresh token, and their caches only when `user_type=PARTNER`; a missing token or a token of another subject type is left untouched. Login-log enrichment is best effort and cannot roll back logout. The H5 likewise treats confirmed local logout as authoritative: its logout request never starts refresh, and any server, network, or audit failure still clears all local authentication state and navigates directly to login without a return target. Other protected requests retain one refresh-and-replay attempt and preserve their return target only when recovery fails.
 
-The H5 System reference-data client is deliberately separate from the authenticated business client. It calls `GET /app-api/system/dict-data/type` and `GET /app-api/system/area/tree` with `tenant-id` only and removes `Authorization`; those public System endpoints therefore cannot misinterpret an ADMIN token as a MEMBER token. Reference-data failures are visible and retryable. The retained WeCom login entry is an unavailable product path only: it starts no OAuth flow and calls no backend login endpoint until a later approved integration.
+The H5 System reference-data client is deliberately separate from the authenticated business client. It calls `GET /app-api/system/dict-data/type` and `GET /app-api/system/area/tree` with `tenant-id` only and removes `Authorization`; those public System endpoints therefore cannot misinterpret an ADMIN token as a MEMBER token. Reference-data failures are visible and retryable. Partner H5 now supports WeCom login through the dedicated social OAuth flow, while business-profile binding and the receive-push toggle remain separate user preferences.
 
 Partner role grants are resolved by stable permission code. Numeric menu IDs are not authorization identities and must not be reused to infer or assign partner permissions. The partner role must not inherit work-plan permissions through menu-ID collisions, and finance review remains an explicitly assigned administrator capability rather than a default partner grant.
 
@@ -593,7 +613,9 @@ System department data-permission projection, including configured child departm
 name is interpreted as a supervisor. Unassigned Partners remain invisible to query-only users.
 `zsjos:partner:manage` grants the
 same page with tenant-wide Partner scope and the create, enable/disable, mobile, password and ownership
-commands. Every Partner and Partner-Lead detail request independently checks that scope. Reassignment
+commands. `zsjos:partner-invitation:*` grants the invitation list, generation and voiding controls on the
+same Vue Admin Partner page; these permissions do not create Partner accounts until H5 activation succeeds.
+Every Partner and Partner-Lead detail request independently checks that scope. Reassignment
 moves all historical and future Partner Lead visibility to the new employee, while each new Partner Lead
 continues to snapshot the configured employee ID and name at submission time. Historical null snapshots
 remain `未记录` and are never inferred from the current relationship. The former subordinate-Partner

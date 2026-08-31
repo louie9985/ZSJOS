@@ -74,6 +74,8 @@ public class LeadObjectPermissionService {
                     && Objects.equals(userId, lead.getOwnerUserId());
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.
+            case "owner-transfer", "owner-release-public-sea" -> Objects.equals(userId, lead.getOwnerUserId());
+            case "request-submitter-assist" -> canReadDetail(lead, userId);
             case "qualification-manage" -> canManageQualificationException(lead, userId);
             default -> false;
         };

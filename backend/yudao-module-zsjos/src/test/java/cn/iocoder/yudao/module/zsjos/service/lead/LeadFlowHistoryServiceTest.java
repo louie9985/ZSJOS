@@ -78,10 +78,10 @@ class LeadFlowHistoryServiceTest {
 
         List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
 
-        assertEquals(List.of("aging:11", "lead:7", "assignment:10", "event:9"),
+        assertEquals(List.of("aging:11", "assignment:10", "event:9", "lead:7"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
-        assertEquals("待接单", result.get(3).getAssignmentStatusBefore());
-        assertEquals("已归属", result.get(3).getAssignmentStatusAfter());
+        assertEquals("待接单", result.get(2).getAssignmentStatusBefore());
+        assertEquals("已归属", result.get(2).getAssignmentStatusAfter());
     }
 
     @Test
@@ -117,9 +117,9 @@ class LeadFlowHistoryServiceTest {
 
         List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
 
-        assertEquals("客资提交", result.get(0).getFlowNode());
-        assertEquals("自动分配", result.get(1).getSource());
-        assertEquals("指定派单", result.get(2).getSource());
+        assertEquals("自动分配", result.get(0).getSource());
+        assertEquals("指定派单", result.get(1).getSource());
+        assertEquals("客资提交", result.get(2).getFlowNode());
     }
 
     @Test
@@ -132,6 +132,44 @@ class LeadFlowHistoryServiceTest {
 
         assertEquals(List.of("lead:7", "assignment:2", "assignment:1"),
                 result.stream().map(LeadFlowHistoryRespVO::getId).toList());
+    }
+
+    @Test
+    void doesNotMoveSubmissionAheadOfLaterAssignments() {
+        LeadAssignmentHistoryDO later = assignment(3L, "transfer", submittedAt.plusDays(1));
+        LeadAssignmentHistoryDO sameTime = assignment(2L, "dispatch", submittedAt);
+        when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(later, sameTime));
+
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+
+        assertEquals(List.of("assignment:3", "lead:7", "assignment:2"),
+                result.stream().map(LeadFlowHistoryRespVO::getId).toList());
+    }
+
+    @Test
+    void mergesReferencedAssignmentDetailsIntoBusinessEvent() {
+        BusinessEventDO event = event(4L, "lead_transferred", submittedAt.plusMinutes(4),
+                "owned", "owned");
+        event.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("assignmentHistoryId", 30L)));
+        LeadAssignmentHistoryDO assignment = assignment(30L, "transfer", submittedAt.plusMinutes(4));
+        assignment.setFromOwnerUserId(20L); assignment.setToOwnerUserId(30L);
+        assignment.setOperatorUserId(10L); assignment.setReason("主管调整");
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(event));
+        when(assignmentMapper.selectByLeadId(7L)).thenReturn(List.of(assignment));
+        when(adminUserApi.getUserMap(anyCollection())).thenReturn(Map.of(
+                10L, user(10L, "主管"),
+                20L, user(20L, "原销售"),
+                30L, user(30L, "新销售")));
+
+        List<LeadFlowHistoryRespVO> result = service.getHistory(7L);
+
+        assertEquals(List.of("event:4", "lead:7"),
+                result.stream().map(LeadFlowHistoryRespVO::getId).toList());
+        LeadFlowHistoryRespVO merged = result.get(0);
+        assertEquals("原销售", merged.getFromOwner());
+        assertEquals("新销售", merged.getToOwner());
+        assertEquals("主管调整", merged.getReason());
+        assertEquals("已归属", merged.getAssignmentStatusAfter());
     }
 
     @Test

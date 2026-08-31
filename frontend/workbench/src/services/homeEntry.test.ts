@@ -4,11 +4,13 @@ import { readFileSync } from 'node:fs'
 const mainSource = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
 
 describe('authenticated workbench entry', () => {
-  it('redirects a restored or newly authenticated session after permission loading', () => {
+  it('keeps a restored session on the current route but redirects after a fresh login', () => {
+    expect(mainSource).toContain('const [loginRedirectPending, setLoginRedirectPending] = useState(false)')
     expect(mainSource).toContain('getAuthenticatedHomeTarget(authorizedMenus)')
-    expect(mainSource).toContain('navigateRef.current(homeTarget || fallbackTarget || \'/\', { replace: true })')
-    expect(mainSource).toContain('navigateRef.current = navigate')
-    expect(mainSource).toContain('}, [authPlatform, logged, permissionAttempt])')
-    expect(mainSource.indexOf('navigateRef.current(homeTarget || fallbackTarget')).toBeLessThan(mainSource.indexOf('setInfo(permissionInfo)'))
+    expect(mainSource).toContain('if (publicLoginRedirect || loginRedirectPending) {')
+    expect(mainSource).toContain('navigateRef.current(publicLoginRedirect || homeTarget || fallbackTarget || \'/\', { replace: true })')
+    expect(mainSource).toContain('setLoginRedirectPending(true)')
+    expect(mainSource).toContain('setLoginRedirectPending(false)')
+    expect(mainSource).not.toContain('publicLoginRedirect || !standalonePath')
   })
 })

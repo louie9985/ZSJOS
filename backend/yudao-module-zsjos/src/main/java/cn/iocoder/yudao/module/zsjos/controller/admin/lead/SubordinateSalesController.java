@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
@@ -33,6 +35,7 @@ public class SubordinateSalesController {
     }
 
     @PostMapping("/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @Operation(summary = "筛选下属销售分页")
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
     public CommonResult<PageResult<SubordinateSalesRespVO>> searchPage(
@@ -54,6 +57,7 @@ public class SubordinateSalesController {
     }
 
     @PostMapping("/{salesUserId}/leads/search-page")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:subordinate-sales:query')")
     public CommonResult<PageResult<LeadManagementRespVO>> searchLeads(@PathVariable Long salesUserId,
             @Valid @RequestBody LeadManagementPageReqVO reqVO) {

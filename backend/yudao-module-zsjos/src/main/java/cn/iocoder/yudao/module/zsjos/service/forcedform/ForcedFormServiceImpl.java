@@ -438,6 +438,7 @@ public class ForcedFormServiceImpl implements ForcedFormService {
     }
 
     @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "forced-form.cleanup-temporary-files", targetType = "forced-form-file")
     public int cleanupTemporaryFiles() {
         LocalDateTime expiredAt = LocalDateTime.now().minusHours(24);
         List<ForcedFormSubmissionFileDO> files = submissionFileMapper.selectExpiredTemporaryFiles(expiredAt);

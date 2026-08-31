@@ -1,5 +1,7 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.workplan;
 
+import cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit;
+
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
@@ -43,6 +45,7 @@ public class WorkPlanController {
     }
 
     @PostMapping("/search-page") @Operation(summary = "按固定条件和计划目标字段筛选工作计划")
+    @ZsjosAudit(mode = ZsjosAudit.Mode.READ_ONLY)
     @PreAuthorize("@ss.hasPermission('zsjos:work-plan:query')")
     public CommonResult<PageResult<WorkPlanRespVO>> searchPage(@Valid @RequestBody WorkPlanSearchReqVO reqVO) {
         return success(workPlanService.searchPage(reqVO, getLoginUserId()));

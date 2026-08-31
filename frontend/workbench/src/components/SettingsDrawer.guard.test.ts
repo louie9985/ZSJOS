@@ -9,4 +9,9 @@ describe('SettingsDrawer layout previews', () => {
       expect(source).toContain(`case '${mode}':`)
     }
   })
+
+  it('exposes the inbox layout toggle beside the global layout controls', () => {
+    expect(source).toContain('INBOX_LAYOUT_OPTIONS')
+    expect(source).toContain('setInboxLayoutMode')
+  })
 })

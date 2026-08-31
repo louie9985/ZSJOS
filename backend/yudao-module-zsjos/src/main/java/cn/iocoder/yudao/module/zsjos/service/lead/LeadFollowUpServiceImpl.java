@@ -43,8 +43,6 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class LeadFollowUpServiceImpl implements LeadFollowUpService {
-    private static final String FOLLOW_UP_RESULT_UNREACHABLE = "unreachable";
-
     @Resource private LeadMapper leadMapper;
     @Resource private LeadFollowUpRecordMapper recordMapper;
     @Resource private LeadFollowUpImageMapper imageMapper;
@@ -155,10 +153,6 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
             recordMapper.updateById(record);
             lead.setCurrentAssignmentFirstFollowUpAt(occurredAt);
             lifecycleTaskService.createQualificationTask(lead, operatorUserId, occurredAt);
-            if (FOLLOW_UP_RESULT_UNREACHABLE.equals(result.getValue())) {
-                lifecycleTaskService.createSubmitterAssistTask(lead, record.getId(), occurredAt,
-                        record.getResultLabelSnapshot(), record.getRemark());
-            }
         }
         lifecycleTaskService.replaceFollowUpReminder(leadId, operatorUserId,
                 FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),
@@ -178,10 +172,6 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         followUpContext.put("followUp.nextAt", record.getNextFollowUpAt());
         notifyEventPublisher.publish(FOLLOW_UP_RECORDED, leadId, followUpEvent.getIdempotencyKey(), operatorUserId,
                 occurredAt, followUpContext);
-        if (first && FOLLOW_UP_RESULT_UNREACHABLE.equals(result.getValue())) {
-            notifyEventPublisher.publish(SUBMITTER_ASSIST_REQUESTED, leadId,
-                    "lead-submitter-assist-requested:" + record.getId(), operatorUserId, occurredAt, followUpContext);
-        }
         return convert(record, imageMapper.selectListByRecordIds(List.of(record.getId())),
                 operator == null ? Map.of() : Map.of(operatorUserId, operator), null);
     }
