@@ -1,0 +1,343 @@
+package cn.iocoder.yudao.module.zsjos.service.cashback;
+
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.module.infra.api.config.ConfigApi;
+import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackPageReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.cashback.vo.CashbackRespVO;
+import cn.iocoder.yudao.module.zsjos.controller.app.partner.vo.CashbackSummaryRespVO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.cashback.CashbackStatusSummaryRow;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.cashback.CashbackDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadIntendedProductDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PartnerDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.cashback.CashbackMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadIntendedProductMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductCategoryMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.product.ZsjosProductMapper;
+import jakarta.annotation.Resource;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.Set;
+import java.util.HashMap;
+import java.util.HashSet;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.module.zsjos.enums.CashbackConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_PARTNER;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PROVIDER_OWNER_PARTNER;
+import static cn.iocoder.yudao.module.zsjos.enums.PersonnelConstants.PARTNER_STATUS_ENABLED;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
+
+@Service
+@Slf4j
+public class CashbackServiceImpl implements CashbackService {
+    static final String OBSERVATION_DAYS_KEY = "zsjos.cashback.observation-days";
+    static final int DEFAULT_OBSERVATION_DAYS = 7;
+    static final BigDecimal DEFAULT_VALID_CASHBACK_AMOUNT = new BigDecimal("10.00");
+    static final BigDecimal DEFAULT_DEAL_CASHBACK_RATE = new BigDecimal("0.1000");
+    @Resource private CashbackMapper mapper;
+    @Resource private LeadMapper leadMapper;
+    @Resource private LeadIntendedProductMapper intendedProductMapper;
+    @Resource private PartnerMapper partnerMapper;
+    @Resource private PartnerAccountMapper partnerAccountMapper;
+    @Resource private ZsjosProductMapper productMapper;
+    @Resource private ZsjosProductCategoryMapper categoryMapper;
+    @Resource private SalesOrderMapper orderMapper;
+    @Resource private ConfigApi configApi;
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long ensureValidCashback(Long leadId) {
+        String businessKey = "valid:" + leadId;
+        CashbackDO existing = mapper.selectByBusinessKey(businessKey);
+        if (existing != null) return reuseOrRestore(existing);
+        EligibleLead eligible = eligibleLead(leadId);
+        if (eligible == null) return null;
+        LeadDO lead = eligible.lead();
+        LeadIntendedProductDO primary = intendedProductMapper.selectPrimaryByLeadId(leadId);
+        if (primary == null || primary.getProductRef() == null) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
+        Rule rule = resolveRule(primary.getProductRef());
+        log.info("valid cashback rule resolved leadId={}, leadNo={}, sourceType={}, sourceUserId={}, partnerId={}, productRef={}, ruleSource={}",
+                lead.getId(), lead.getLeadNo(), lead.getSourceType(), lead.getSourceUserId(), lead.getPartnerId(),
+                primary.getProductRef(), rule.snapshot().get("validAmountSource") + "/" + rule.snapshot().get("dealRateSource"));
+        LocalDateTime now = LocalDateTime.now();
+        int observationDays = observationDays();
+        CashbackDO cashback = base(businessKey, TYPE_VALID, eligible, primary.getProductRef(),
+                primary.getProductNameSnapshot(), now, observationDays)
+                .setBaseAmount(null).setRateSnapshot(null).setAmount(rule.validAmount())
+                .setRuleSnapshotJson(JsonUtils.toJsonString(rule.snapshot()));
+        return insertOrReuse(cashback);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public Long ensureDealCashback(DealCashbackCommand command) {
+        if (command == null || command.orderId() == null || command.orderItemId() == null
+                || command.actualAmount() == null || command.actualAmount().signum() < 0
+                || command.rateSnapshot() == null || command.rateSnapshot().signum() < 0
+                || command.rateSnapshot().compareTo(BigDecimal.ONE) > 0) throw exception(CASHBACK_SOURCE_INVALID);
+        String key = "deal:" + command.orderItemId();
+        CashbackDO existing = mapper.selectByBusinessKey(key);
+        if (existing != null) return existing.getId();
+        EligibleLead eligible = eligibleLead(command.leadId());
+        if (eligible == null) return null;
+        LeadDO lead = eligible.lead();
+        LocalDateTime now = LocalDateTime.now();
+        int observationDays = observationDays();
+        BigDecimal amount = command.actualAmount().multiply(command.rateSnapshot())
+                .setScale(2, RoundingMode.HALF_UP);
+        CashbackDO cashback = base(key, TYPE_DEAL, eligible, command.productRef(), command.productName(),
+                now, observationDays).setOrderId(command.orderId()).setOrderItemId(command.orderItemId())
+                .setBaseAmount(command.actualAmount().setScale(2, RoundingMode.HALF_UP))
+                .setRateSnapshot(command.rateSnapshot()).setAmount(amount)
+                .setRuleSnapshotJson(JsonUtils.toJsonString(Map.of("source", "order_item_snapshot")));
+        return insertOrReuse(cashback);
+    }
+
+    @Override
+    @cn.iocoder.yudao.module.zsjos.framework.audit.ZsjosAudit(action = "cashback.settle-matured", targetType = "cashback")
+    @Transactional(rollbackFor = Exception.class)
+    public int settleMatured() {
+        LocalDateTime now = LocalDateTime.now();
+        int count = 0;
+        for (CashbackDO cashback : mapper.selectMatured(now)) {
+            if (TYPE_DEAL.equals(cashback.getType())) {
+                var order = cashback.getOrderId() == null ? null : orderMapper.selectById(cashback.getOrderId());
+                if (order == null || !"effective".equals(order.getStatus())) continue;
+            }
+            count += mapper.transition(cashback.getId(), cashback.getVersion(), STATUS_PENDING, STATUS_AVAILABLE, now);
+        }
+        return count;
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void assertOrderRejectable(Long orderId) {
+        if (orderId == null) throw exception(CASHBACK_SOURCE_INVALID);
+        boolean locked = mapper.selectByOrderIdForUpdate(orderId,
+                        cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())
+                .stream().anyMatch(item -> STATUS_WITHDRAWING.equals(item.getStatus())
+                        || STATUS_WITHDRAWN.equals(item.getStatus()));
+        if (locked) throw exception(CASHBACK_ORDER_REJECTION_LOCKED);
+    }
+
+    @Override
+    public PageResult<CashbackRespVO> getPage(CashbackPageReqVO request, Long beneficiaryUserId) {
+        PageResult<CashbackRespVO> result = BeanUtils.toBean(
+                mapper.selectPage(request, beneficiaryUserId), CashbackRespVO.class);
+        Set<Long> leadIds = new HashSet<>();
+        result.getList().stream().map(CashbackRespVO::getLeadId).filter(Objects::nonNull).forEach(leadIds::add);
+        Map<Long, String> leadNumbers = new HashMap<>();
+        if (!leadIds.isEmpty()) {
+            for (LeadDO lead : leadMapper.selectBatchIds(leadIds)) {
+                leadNumbers.put(lead.getId(), lead.getLeadNo());
+            }
+        }
+        result.getList().forEach(item -> item.setLeadNo(leadNumbers.get(item.getLeadId())));
+        return result;
+    }
+
+    @Override
+    public PageResult<CashbackRespVO> getPartnerPage(CashbackPageReqVO request, Long partnerId) {
+        PageResult<CashbackRespVO> result = BeanUtils.toBean(mapper.selectPartnerPage(request, partnerId), CashbackRespVO.class);
+        Set<Long> leadIds = result.getList().stream().map(CashbackRespVO::getLeadId)
+                .filter(Objects::nonNull).collect(java.util.stream.Collectors.toSet());
+        Map<Long, String> leadNumbers = leadIds.isEmpty() ? Map.of() : leadMapper.selectBatchIds(leadIds).stream()
+                .collect(java.util.stream.Collectors.toMap(LeadDO::getId, LeadDO::getLeadNo));
+        result.getList().forEach(item -> item.setLeadNo(leadNumbers.get(item.getLeadId())));
+        return result;
+    }
+
+    @Override
+    public CashbackSummaryRespVO getMySummary(Long userId) {
+        return buildSummary(mapper.selectStatusSummary(userId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+    }
+
+    @Override
+    public CashbackSummaryRespVO getPartnerSummary(Long partnerId) {
+        return buildSummary(mapper.selectPartnerStatusSummary(partnerId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId()));
+    }
+
+    private CashbackSummaryRespVO buildSummary(List<CashbackStatusSummaryRow> rows) {
+        CashbackSummaryRespVO result = new CashbackSummaryRespVO();
+        Map<String, Long> counts = new HashMap<>();
+        BigDecimal total = BigDecimal.ZERO;
+        for (CashbackStatusSummaryRow row : rows) {
+            BigDecimal amount = row.getAmount() == null ? BigDecimal.ZERO : row.getAmount();
+            counts.put(row.getStatus(), row.getCount()); total = total.add(amount);
+            switch (row.getStatus()) {
+                case STATUS_PENDING -> result.setPendingAmount(amount);
+                case STATUS_AVAILABLE -> result.setAvailableAmount(amount);
+                case STATUS_WITHDRAWING -> result.setWithdrawingAmount(amount);
+                case STATUS_WITHDRAWN -> result.setWithdrawnAmount(amount);
+                default -> { }
+            }
+        }
+        result.setTotalAmount(total.setScale(2, RoundingMode.HALF_UP));
+        result.setCounts(counts);
+        return result;
+    }
+
+    @Override
+    public boolean isEligibleDealLead(Long leadId) {
+        return eligibleLead(leadId) != null;
+    }
+
+    @Override
+    public BigDecimal resolveDealRate(String productRef) {
+        return resolveRule(productRef).dealRate();
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelDealCashbacks(Long orderId, String reason) {
+        if (orderId == null) throw exception(CASHBACK_SOURCE_INVALID);
+        LocalDateTime now = LocalDateTime.now();
+        for (CashbackDO cashback : mapper.selectByOrderIdForUpdate(orderId,
+                cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())) {
+            if (!TYPE_DEAL.equals(cashback.getType()) || STATUS_CANCELLED.equals(cashback.getStatus())) continue;
+            if (STATUS_WITHDRAWING.equals(cashback.getStatus()) || STATUS_WITHDRAWN.equals(cashback.getStatus())) {
+                throw exception(CASHBACK_ORDER_REJECTION_LOCKED);
+            }
+            if (Set.of(STATUS_PENDING, STATUS_AVAILABLE).contains(cashback.getStatus())) {
+                mapper.cancel(cashback.getId(), cashback.getVersion(), cashback.getStatus(), now, reason);
+            }
+        }
+    }
+
+    @Override
+    public BigDecimal getOrderCashbackTotal(Long orderId, Long beneficiaryUserId) {
+        if (orderId == null || beneficiaryUserId == null) return BigDecimal.ZERO.setScale(2);
+        return mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CashbackDO>()
+                        .eq(CashbackDO::getOrderId, orderId).eq(CashbackDO::getType, TYPE_DEAL)
+                        .eq(CashbackDO::getBeneficiaryUserId, beneficiaryUserId)
+                        .ne(CashbackDO::getStatus, STATUS_CANCELLED))
+                .stream().map(CashbackDO::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    @Override
+    public BigDecimal getPartnerOrderCashbackTotal(Long orderId, Long partnerId) {
+        if (orderId == null || partnerId == null) return BigDecimal.ZERO.setScale(2);
+        return mapper.selectList(new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<CashbackDO>()
+                        .eq(CashbackDO::getOrderId, orderId).eq(CashbackDO::getType, TYPE_DEAL)
+                        .eq(CashbackDO::getPartnerId, partnerId)
+                        .ne(CashbackDO::getStatus, STATUS_CANCELLED))
+                .stream().map(CashbackDO::getAmount).filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add).setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private Long reuseOrRestore(CashbackDO existing) {
+        if (!STATUS_CANCELLED.equals(existing.getStatus())) return existing.getId();
+        if (mapper.restoreValid(existing.getId(), existing.getVersion(), existing.getGeneratedAt(),
+                existing.getAvailableAt()) != 1) throw exception(CASHBACK_STATE_INVALID);
+        return existing.getId();
+    }
+
+    private CashbackDO base(String businessKey, String type, EligibleLead eligible, String productRef,
+                            String productName, LocalDateTime now, int observationDays) {
+        LeadDO lead = eligible.lead();
+        return new CashbackDO().setCashbackNo("CB" + UUID.randomUUID().toString().replace("-", "")
+                .substring(0, 20).toUpperCase()).setBusinessKey(businessKey).setType(type).setStatus(STATUS_PENDING)
+                .setBeneficiaryUserId(eligible.legacyBeneficiaryUserId()).setPartnerId(lead.getPartnerId()).setLeadId(lead.getId())
+                .setProductRefSnapshot(productRef).setProductNameSnapshot(productName)
+                .setObservationDaysSnapshot(observationDays).setGeneratedAt(now)
+                .setAvailableAt(now.plusDays(observationDays)).setVersion(0);
+    }
+
+    private Long insertOrReuse(CashbackDO cashback) {
+        try {
+            mapper.insert(cashback);
+            return cashback.getId();
+        } catch (DuplicateKeyException duplicate) {
+            CashbackDO existing = mapper.selectByBusinessKey(cashback.getBusinessKey());
+            if (existing == null) throw duplicate;
+            return existing.getId();
+        }
+    }
+
+    private EligibleLead eligibleLead(Long leadId) {
+        LeadDO lead = leadId == null ? null : leadMapper.selectById(leadId);
+        if (lead == null) throw exception(CASHBACK_SOURCE_INVALID);
+        if (!PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) return null;
+        if (lead.getProviderOwnerId() == null) throw exception(CASHBACK_SOURCE_INVALID);
+        PartnerDO partner = partnerMapper.selectById(lead.getProviderOwnerId());
+        if (partner == null) throw exception(CASHBACK_SOURCE_INVALID);
+        if (!PARTNER_STATUS_ENABLED.equals(partner.getStatus())
+                || partner.getEnabledAt() == null || partner.getDisabledAt() != null) return null;
+        PartnerAccountDO account = partnerAccountMapper.selectById(lead.getSourceUserId());
+        if (account != null && Objects.equals(account.getPartnerId(), lead.getProviderOwnerId())) {
+            if (!CommonStatusEnum.ENABLE.getStatus().equals(account.getStatus())) return null;
+            return new EligibleLead(lead, null);
+        }
+        // Leads submitted before V072 retain the former System-user source identifier.
+        if (Objects.equals(partner.getBoundSystemUserId(), lead.getSourceUserId())) {
+            return new EligibleLead(lead, lead.getSourceUserId());
+        }
+        throw exception(CASHBACK_SOURCE_INVALID);
+    }
+
+    private Rule resolveRule(String productRef) {
+        ZsjosProductDO product = productMapper.selectByProductRef(productRef);
+        if (product == null) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
+        ZsjosProductCategoryDO category = categoryMapper.selectById(product.getCategoryId());
+        while (category != null && category.getParentId() != null && category.getParentId() != 0) {
+            category = categoryMapper.selectById(category.getParentId());
+        }
+        BigDecimal amount = product.getValidCashbackAmount() != null ? product.getValidCashbackAmount()
+                : category != null && category.getDefaultValidCashbackAmount() != null
+                ? category.getDefaultValidCashbackAmount() : DEFAULT_VALID_CASHBACK_AMOUNT;
+        BigDecimal rate = product.getDealCashbackRate() != null ? product.getDealCashbackRate()
+                : category != null && category.getDefaultDealCashbackRate() != null
+                ? category.getDefaultDealCashbackRate() : DEFAULT_DEAL_CASHBACK_RATE;
+        if (amount == null || amount.signum() < 0 || rate == null || rate.signum() < 0
+                || rate.compareTo(BigDecimal.ONE) > 0) throw exception(CASHBACK_RULE_NOT_CONFIGURED);
+        Map<String, Object> snapshot = new LinkedHashMap<>();
+        snapshot.put("productId", product.getId()); snapshot.put("productRef", productRef);
+        snapshot.put("level1CategoryId", category == null ? null : category.getId());
+        snapshot.put("validCashbackAmount", amount); snapshot.put("dealCashbackRate", rate);
+        snapshot.put("validAmountSource", product.getValidCashbackAmount() != null ? "product"
+                : category != null && category.getDefaultValidCashbackAmount() != null ? "level1_category" : "system_default");
+        snapshot.put("dealRateSource", product.getDealCashbackRate() != null ? "product"
+                : category != null && category.getDefaultDealCashbackRate() != null ? "level1_category" : "system_default");
+        return new Rule(amount.setScale(2, RoundingMode.HALF_UP), rate, snapshot);
+    }
+
+    private int observationDays() {
+        String configured = configApi.getConfigValueByKey(OBSERVATION_DAYS_KEY);
+        if (configured == null || configured.isBlank()) return DEFAULT_OBSERVATION_DAYS;
+        try {
+            int value = Integer.parseInt(configured);
+            return value >= 0 && value <= 365 ? value : DEFAULT_OBSERVATION_DAYS;
+        } catch (NumberFormatException ignored) {
+            return DEFAULT_OBSERVATION_DAYS;
+        }
+    }
+
+    private record Rule(BigDecimal validAmount, BigDecimal dealRate, Map<String, Object> snapshot) {}
+
+    private record EligibleLead(LeadDO lead, Long legacyBeneficiaryUserId) {}
+}

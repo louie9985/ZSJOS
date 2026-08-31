@@ -1,0 +1,66 @@
+package cn.iocoder.yudao.module.zsjos.enums;
+
+public interface LeadNotifySceneConstants {
+
+    String CREATED = "zsjos.lead.created";
+    String ACTIVATED = "zsjos.lead.activated";
+    String ASSIGNED = "zsjos.lead.assigned";
+    String REASSIGNED = "zsjos.lead.reassigned";
+    String ACCEPTED = "zsjos.lead.accepted";
+    String REJECTED = "zsjos.lead.rejected";
+    String EXPIRED = "zsjos.lead.expired";
+    String PUBLIC_POOL = "zsjos.lead.public_pool";
+    String CLAIMED = "zsjos.lead.claimed";
+    String TRANSFERRED = "zsjos.lead.transferred";
+    String FOLLOW_UP_RECORDED = "zsjos.lead.follow_up_recorded";
+    String CATEGORY_CHANGED = "zsjos.lead.category_changed";
+    String QUALIFICATION_SUSPENDED = "zsjos.lead.qualification_suspended";
+    String QUALIFIED_VALID = "zsjos.lead.qualified_valid";
+    String QUALIFIED_INVALID = "zsjos.lead.qualified_invalid";
+    String QUALIFICATION_RESTORED = "zsjos.lead.qualification_restored";
+    String QUALIFICATION_TRANSFERRED = "zsjos.lead.qualification_transferred";
+    String QUALIFICATION_RECYCLED = "zsjos.lead.qualification_recycled";
+    String QUALIFICATION_RELEASED = "zsjos.lead.qualification_released";
+    String APPEAL_SUBMITTED = "zsjos.lead.appeal_submitted";
+    String APPEAL_OVERTURNED = "zsjos.lead.appeal_overturned";
+    String APPEAL_UPHELD = "zsjos.lead.appeal_upheld";
+    String FIRST_FOLLOW_UP_REMINDER = "zsjos.lead.first_follow_up_reminder";
+    String NEXT_FOLLOW_UP_REMINDER = "zsjos.lead.next_follow_up_reminder";
+    String QUALIFICATION_REMINDER = "zsjos.lead.qualification_reminder";
+    String AGING_POOL_REMINDER = "zsjos.lead.aging_pool_reminder";
+    String AGING_POOL_DUE = "zsjos.lead.aging_pool_due";
+    String AGING_POOL_ASSIGNED_NOTICE = "zsjos.lead.aging_pool_assigned";
+    String AGING_POOL_REASSIGNED_NOTICE = "zsjos.lead.aging_pool_reassigned";
+    String AGING_POOL_REASSIGN_REQUIRED_NOTICE = "zsjos.lead.aging_pool_reassign_required";
+    String AGING_POOL_EXITED_NOTICE = "zsjos.lead.aging_pool_exited";
+    String SUBMITTER_URGED = "zsjos.lead.submitter_urged";
+    String SUBMITTER_ASSIST_REQUESTED = "zsjos.lead.submitter_assist_requested";
+    String PARTNER_ASSIST_REMINDER = "zsjos.lead.partner_assist_reminder";
+    String COMPLAINT_FOUNDED = "zsjos.lead.complaint_founded";
+    String COMPLAINT_UNFOUNDED = "zsjos.lead.complaint_unfounded";
+    String DUPLICATE_REACTIVATED = "zsjos.lead.duplicate_reactivated";
+    String DUPLICATE_OWNER_REMINDER = "zsjos.lead.duplicate_owner_reminder";
+    String TRANSFER_REQUESTED = "zsjos.lead.transfer_requested";
+    String TRANSFER_REQUEST_APPROVED = "zsjos.lead.transfer_approved";
+    String TRANSFER_REQUEST_REJECTED = "zsjos.lead.transfer_rejected";
+    String TRANSFER_REQUEST_INVALIDATED = "zsjos.lead.transfer_invalidated";
+
+    String ROLE_SUBMITTER = "submitter";
+    String ROLE_NEW_MEDIA_PROVIDER = "new_media_provider";
+    String ROLE_PENDING_SALES = "pending_sales";
+    String ROLE_OWNER = "owner";
+    String ROLE_OPERATOR = "operator";
+    String ROLE_PREVIOUS_OWNER = "previous_owner";
+    String ROLE_NEW_OWNER = "new_owner";
+    String ROLE_QUALIFICATION_MANAGERS = "qualification_managers";
+    String ROLE_APPEAL_REVIEWERS = "appeal_reviewers";
+    String ROLE_DIRECT_LEADER = "direct_leader";
+    String ROLE_ALL_ELIGIBLE_SALES = "all_eligible_sales";
+    String ROLE_COLLABORATOR = "collaborator";
+    String ROLE_PREVIOUS_COLLABORATOR = "previous_collaborator";
+    String ROLE_FROZEN_DEPT_LEADER = "frozen_dept_leader";
+    String ROLE_TRANSFER_REVIEWER = "transfer_reviewer";
+    String ROLE_REQUESTER = "requester";
+    String ROLE_COMPLAINANT = "complainant";
+    String ROLE_PARTNER_OWNER = "partner_owner";
+}

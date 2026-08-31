@@ -1,0 +1,169 @@
+/* Intended-product editor. */
+
+.lead-product-editor {
+  display: grid;
+  min-width: 0;
+  gap: var(--crm-sp-4);
+}
+
+.lead-product-primary-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2,minmax(0,1fr)) 180px;
+  align-items: end;
+  gap: var(--crm-sp-4);
+}
+
+.lead-product-secondary-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  align-items: end;
+  gap: var(--crm-sp-4);
+}
+
+.lead-product-field {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.lead-product-control,.lead-product-field .ant-cascader,.lead-product-field .ant-select {
+  width: 100%;
+  min-width: 0;
+}
+
+.lead-product-control .ant-select-selector,.lead-product-control .ant-select-selection-item,.lead-product-control .ant-select-selection-placeholder {
+  min-width: 0;
+}
+
+.lead-product-control .ant-select-selection-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-add {
+  width: 180px;
+}
+
+/* 已选好待加入：常驻描边把视觉权重拉到按钮上，替代易被错过的浮现提示 */
+.lead-product-add.ready {
+  box-shadow: 0 0 0 3px var(--crm-color-primary-border);
+}
+
+/* 模式切换：勾选框太弱，用 Segmented 把两条录入路径摆成对等选项 */
+.lead-product-mode {
+  width: fit-content;
+  justify-self: start;
+}
+
+/* 未明确课程时两个选择器整块让位，虚线框读作「此处无需填写」而非「填不了」 */
+.lead-product-primary-grid.unknown {
+  grid-template-columns: minmax(0,1fr) 180px;
+}
+
+.lead-product-unknown-hint {
+  display: flex;
+  min-height: var(--crm-control-h);
+  min-width: 0;
+  align-items: center;
+  padding: 0 var(--crm-sp-4);
+  border: 1px dashed var(--crm-border-strong);
+  border-radius: var(--crm-radius-md);
+}
+
+/* 与同行表单控件垂直对齐，故跟随 antd controlHeight */
+.lead-product-checkbox {
+  display: flex;
+  min-height: var(--crm-control-h);
+  align-items: center;
+}
+
+.lead-product-checkbox-control {
+  width: fit-content;
+  justify-self: start;
+}
+
+.lead-product-list,.lead-product-list>.ant-card,.lead-product-list>.ant-space-item,.lead-product-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.lead-product-list {
+  display: grid;
+  gap: var(--crm-sp-4);
+}
+
+.lead-product-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-sp-5);
+}
+
+.lead-product-row>.ant-btn {
+  flex: none;
+}
+
+.lead-product-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.lead-product-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-3);
+}
+
+.lead-product-title .ant-radio-wrapper {
+  flex: none;
+}
+
+.lead-product-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-path {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-dropdown .ant-select-item-option-content,.lead-product-dropdown .ant-cascader-menu-item-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-product-dropdown .ant-cascader-menus {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+@media(max-width:768px) {
+  .lead-product-primary-grid,.lead-product-primary-grid.unknown,.lead-product-secondary-grid {
+    grid-template-columns: minmax(0,1fr);
+  }
+
+  .lead-product-add {
+    width: 100%;
+  }
+
+  .lead-product-path {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}

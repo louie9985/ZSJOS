@@ -1,0 +1,60 @@
+/* Sales dispatch status control in the header. */
+
+/* 高度跟随 antd controlHeight，使 Tag 与相邻 Button 始终同高；
+   密度切档时 antd 会改该 token，无需在此重复定义断点。 */
+.sales-dispatch-control {
+  height: var(--crm-control-h);
+  flex: none;
+}
+
+.dispatch-status-tag {
+  min-width: 72px;
+  height: var(--crm-control-h);
+  margin-inline-end: 0;
+  padding-inline: var(--crm-sp-3);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.dispatch-mode-button {
+  width: 96px;
+  height: var(--crm-control-h);
+  padding-inline: var(--crm-sp-4);
+}
+
+.sales-dispatch-status-alert {
+  margin: 0;
+  border-color: color-mix(in srgb, var(--crm-color-error) 55%, var(--crm-border));
+  background: var(--crm-color-error-bg);
+}
+
+.sales-dispatch-status-alert .ant-alert-message {
+  font-weight: var(--crm-weight-semibold);
+}
+
+.sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {
+  font-size: var(--crm-font-base);
+  white-space: nowrap;
+}
+
+@media(max-width:768px) {
+  .sales-dispatch-control {
+    gap: 2px!important;
+  }
+
+  .dispatch-status-tag {
+    min-width: 56px;
+    padding-inline: var(--crm-sp-1);
+  }
+
+  .dispatch-mode-button {
+    width: 72px;
+    padding-inline: var(--crm-sp-1);
+  }
+
+  .sales-dispatch-control .ant-tag,.sales-dispatch-control .ant-btn {
+    font-size: var(--crm-font-sm);
+  }
+}

@@ -1,0 +1,1 @@
+package cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo; import jakarta.validation.constraints.*; import lombok.Data; @Data public class PositioningVersionCreateReqVO { @NotNull private Long positioningCardId; private String beforeJson; @NotBlank private String afterJson; @NotBlank private String changeReason; }

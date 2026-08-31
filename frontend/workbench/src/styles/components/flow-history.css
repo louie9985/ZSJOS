@@ -1,0 +1,257 @@
+/* Lead flow history: follows the same vertical card rhythm as follow-up records. */
+
+.flow-history-panel {
+  min-width: 0;
+}
+
+.flow-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-3);
+}
+
+.flow-history-heading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--crm-sp-2);
+  color: var(--crm-text);
+  font-size: var(--crm-font-lg);
+  font-weight: var(--crm-weight-semibold);
+}
+
+.flow-history-heading span {
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+  font-weight: var(--crm-weight-normal);
+}
+
+.flow-history-loading {
+  min-height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--crm-sp-2);
+  color: var(--crm-text-secondary);
+}
+
+.flow-history-timeline {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+}
+
+.flow-history-node {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 0 var(--crm-sp-3);
+  min-width: 0;
+}
+
+.flow-history-marker {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+.flow-history-marker::after {
+  content: '';
+  position: absolute;
+  top: 14px;
+  bottom: 0;
+  width: 2px;
+  background: var(--crm-border-strong);
+}
+
+.flow-history-node:last-child .flow-history-marker::after {
+  display: none;
+}
+
+.flow-history-marker > span {
+  position: relative;
+  z-index: var(--crm-z-base);
+  width: 10px;
+  height: 10px;
+  flex: none;
+  margin-top: var(--crm-sp-1);
+  border: 2px solid var(--crm-bg-container);
+  border-radius: 50%;
+  background: var(--crm-color-primary);
+  box-shadow: 0 0 0 2px var(--crm-color-primary-border);
+}
+
+.flow-history-content {
+  min-width: 0;
+  padding-bottom: var(--crm-sp-5);
+}
+
+.flow-history-node:last-child .flow-history-content {
+  padding-bottom: 0;
+}
+
+.flow-history-time {
+  display: block;
+  margin-bottom: var(--crm-sp-2);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  font-weight: var(--crm-weight-medium);
+  line-height: 18px;
+}
+
+.flow-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  min-width: 0;
+  overflow: hidden;
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-left: 3px solid var(--crm-color-primary-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+  transition: box-shadow var(--crm-duration-base) ease;
+}
+
+.flow-history-card:hover {
+  box-shadow: var(--crm-shadow-raised);
+}
+
+.flow-history-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+}
+
+.flow-history-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-1);
+  min-width: 0;
+}
+
+.flow-history-title .ant-tag {
+  margin: 0;
+}
+
+.flow-history-operator {
+  flex: none;
+  font-size: var(--crm-font-sm);
+  white-space: nowrap;
+}
+
+.flow-history-changes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-2);
+}
+
+.flow-history-change {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  min-width: 0;
+  max-width: 100%;
+  padding: var(--crm-sp-1) var(--crm-sp-2);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.flow-history-change-label {
+  flex: none;
+  color: var(--crm-text-tertiary);
+}
+
+.flow-history-change-value,
+.flow-history-change strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.flow-history-change .anticon {
+  flex: none;
+  color: var(--crm-text-tertiary);
+}
+
+.flow-history-change strong {
+  color: var(--crm-color-primary);
+  font-weight: var(--crm-weight-semibold);
+}
+
+.flow-history-notes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.flow-history-note.ant-typography {
+  margin-bottom: 0;
+  color: var(--crm-text);
+  font-size: var(--crm-font-base);
+}
+
+.flow-history-attachments {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: center;
+  gap: var(--crm-sp-2);
+  padding-top: var(--crm-sp-2);
+  border-top: 1px solid var(--crm-border);
+}
+
+.flow-history-attachment-label {
+  font-size: var(--crm-font-sm);
+}
+
+.flow-history-attachment-list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  min-width: 0;
+}
+
+.flow-history-attachment-list .ant-tag {
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.flow-history-attachment-image {
+  width: 56px !important;
+  height: 56px !important;
+  object-fit: cover;
+  border-radius: var(--crm-radius-sm);
+}
+
+.flow-history-pdf-preview {
+  width: 100%;
+  height: min(72vh, 760px);
+  border: 0;
+}
+
+@container (max-width: 520px) {
+  .flow-history-card-header {
+    flex-direction: column;
+    gap: var(--crm-sp-1);
+  }
+
+  .flow-history-operator {
+    white-space: normal;
+  }
+
+  .flow-history-change {
+    width: 100%;
+  }
+
+  .flow-history-attachments {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

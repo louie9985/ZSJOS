@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL"
+             xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+             xmlns:flowable="http://flowable.org/bpmn"
+             xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+             xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC"
+             xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI"
+             targetNamespace="https://zsjos.com/bpm">
+  <process id="zsjos_sales_order_dual_approval" name="成交订单双中心会签" isExecutable="true">
+    <startEvent id="StartEvent" name="销售提交成交订单"/>
+    <sequenceFlow id="flow_start_split" sourceRef="StartEvent" targetRef="ParallelSplit"/>
+    <parallelGateway id="ParallelSplit" name="并行会签"/>
+    <sequenceFlow id="flow_split_registration" sourceRef="ParallelSplit" targetRef="registrationReview"/>
+    <sequenceFlow id="flow_split_finance" sourceRef="ParallelSplit" targetRef="financeReview"/>
+
+    <userTask id="registrationReview" name="报名履约中心审批" flowable:assignee="${registrationAssignee}">
+      <extensionElements>
+        <flowable:candidateStrategy>35</flowable:candidateStrategy>
+        <flowable:approveType>1</flowable:approveType>
+        <flowable:approveMethod>3</flowable:approveMethod>
+        <flowable:reasonRequire>true</flowable:reasonRequire>
+        <flowable:signEnable>false</flowable:signEnable>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${registrationUsers}" flowable:elementVariable="registrationAssignee">
+        <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+
+    <userTask id="financeReview" name="财务结算中心审批" flowable:assignee="${financeAssignee}">
+      <extensionElements>
+        <flowable:candidateStrategy>35</flowable:candidateStrategy>
+        <flowable:approveType>1</flowable:approveType>
+        <flowable:approveMethod>3</flowable:approveMethod>
+        <flowable:reasonRequire>true</flowable:reasonRequire>
+        <flowable:signEnable>false</flowable:signEnable>
+      </extensionElements>
+      <multiInstanceLoopCharacteristics isSequential="false" flowable:collection="${financeUsers}" flowable:elementVariable="financeAssignee">
+        <completionCondition xsi:type="tFormalExpression"><![CDATA[${nrOfCompletedInstances > 0}]]></completionCondition>
+      </multiInstanceLoopCharacteristics>
+    </userTask>
+
+    <sequenceFlow id="flow_registration_join" sourceRef="registrationReview" targetRef="ParallelJoin"/>
+    <sequenceFlow id="flow_finance_join" sourceRef="financeReview" targetRef="ParallelJoin"/>
+    <parallelGateway id="ParallelJoin" name="双中心均通过"/>
+    <sequenceFlow id="flow_join_end" sourceRef="ParallelJoin" targetRef="EndEvent"/>
+    <endEvent id="EndEvent" name="订单审批通过"/>
+  </process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_zsjos_sales_order_dual_approval">
+    <bpmndi:BPMNPlane id="BPMNPlane_zsjos_sales_order_dual_approval" bpmnElement="zsjos_sales_order_dual_approval">
+      <bpmndi:BPMNShape id="Shape_StartEvent" bpmnElement="StartEvent">
+        <omgdc:Bounds x="90" y="250" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="64" y="293" width="88" height="34"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_ParallelSplit" bpmnElement="ParallelSplit" isMarkerVisible="true">
+        <omgdc:Bounds x="200" y="243" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="194" y="300" width="62" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_registrationReview" bpmnElement="registrationReview">
+        <omgdc:Bounds x="330" y="110" width="180" height="100"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_financeReview" bpmnElement="financeReview">
+        <omgdc:Bounds x="330" y="360" width="180" height="100"/>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_ParallelJoin" bpmnElement="ParallelJoin" isMarkerVisible="true">
+        <omgdc:Bounds x="600" y="243" width="50" height="50"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="576" y="300" width="98" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Shape_EndEvent" bpmnElement="EndEvent">
+        <omgdc:Bounds x="730" y="250" width="36" height="36"/>
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="704" y="293" width="88" height="20"/>
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Edge_flow_start_split" bpmnElement="flow_start_split">
+        <omgdi:waypoint x="126" y="268"/>
+        <omgdi:waypoint x="200" y="268"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_split_registration" bpmnElement="flow_split_registration">
+        <omgdi:waypoint x="250" y="268"/>
+        <omgdi:waypoint x="290" y="268"/>
+        <omgdi:waypoint x="290" y="160"/>
+        <omgdi:waypoint x="330" y="160"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_split_finance" bpmnElement="flow_split_finance">
+        <omgdi:waypoint x="250" y="268"/>
+        <omgdi:waypoint x="290" y="268"/>
+        <omgdi:waypoint x="290" y="410"/>
+        <omgdi:waypoint x="330" y="410"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_registration_join" bpmnElement="flow_registration_join">
+        <omgdi:waypoint x="510" y="160"/>
+        <omgdi:waypoint x="555" y="160"/>
+        <omgdi:waypoint x="555" y="268"/>
+        <omgdi:waypoint x="600" y="268"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_finance_join" bpmnElement="flow_finance_join">
+        <omgdi:waypoint x="510" y="410"/>
+        <omgdi:waypoint x="555" y="410"/>
+        <omgdi:waypoint x="555" y="268"/>
+        <omgdi:waypoint x="600" y="268"/>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Edge_flow_join_end" bpmnElement="flow_join_end">
+        <omgdi:waypoint x="650" y="268"/>
+        <omgdi:waypoint x="730" y="268"/>
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</definitions>

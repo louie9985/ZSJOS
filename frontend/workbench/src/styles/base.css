@@ -1,0 +1,88 @@
+/* Reset, document defaults, font face, and the pre-shell pages (login / centered states). */
+
+@font-face {font-family:AlibabaSans;font-style:normal;font-weight: var(--crm-weight-normal);font-display:swap;src:url("//mdn.alipayobjects.com/huamei_iwk9zp/afts/file/A*2zEUQqnPNesAAAAAQtAAAAgAegCCAQ/AlibabaSans-Regular.woff2") format("woff2")}
+
+* {
+  box-sizing: border-box;
+}
+
+html,body,#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: AlibabaSans,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  color: var(--crm-text);
+}
+
+.login-page,.center-page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+}
+
+.login-page {
+  background: var(--crm-bg-layout);
+}
+
+.login-card {
+  padding: var(--crm-sp-5);
+  box-shadow: var(--crm-shadow-raised);
+}
+
+.login-mark {
+  color: var(--crm-color-primary);
+  font-weight: var(--crm-weight-bold);
+  letter-spacing: 1px;
+  margin-bottom: var(--crm-sp-5);
+}
+
+.login-input {
+  margin-bottom: var(--crm-sp-5);
+}
+
+.form-alert {
+  margin-bottom: var(--crm-sp-5);
+}
+
+.login-card {
+  width: min(380px,calc(100vw - 24px));
+}
+
+/* ==================== 滚动条 ====================
+   用 * 而非具体容器：滚动区散落在 layout.css / 四个主从页 / antd portal 里，
+   逐个挂类会漏，且 .ant-drawer-body、.ant-table-body 是 antd 内部结构。
+
+   仅在 any-pointer: fine 下生效：声明 ::-webkit-scrollbar 宽度会让 macOS/iOS
+   从 overlay 覆盖式切成 classic 占位式，触屏上白占 8px 且滚动条本就不该常驻。 */
+@media (any-pointer: fine) {
+  * {
+    scrollbar-width: thin;                                    /* Firefox */
+    scrollbar-color: var(--crm-scrollbar-thumb) transparent;  /* Firefox: thumb / track */
+  }
+
+  *::-webkit-scrollbar {
+    width: var(--crm-scrollbar-size);
+    height: var(--crm-scrollbar-size);
+  }
+
+  /* 轨道透明：自定义背景 + 磨砂玻璃下要让渐变透上来，实色轨道会开一道死板的沟 */
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--crm-scrollbar-thumb);
+    border-radius: var(--crm-radius-lg);
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--crm-scrollbar-thumb-hover);
+  }
+
+  *::-webkit-scrollbar-thumb:active {
+    background: var(--crm-scrollbar-thumb-active);
+  }
+}

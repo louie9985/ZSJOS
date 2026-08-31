@@ -1,0 +1,390 @@
+/* Workbench home dashboard. Desktop geometry follows a 16-column by 9-row grid. */
+
+.home-dashboard-grid {
+  display: grid;
+  width: 100%;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  grid-template-columns: repeat(16, minmax(0, 1fr));
+  grid-template-rows: repeat(9, minmax(0, 1fr));
+  gap: var(--crm-gap);
+}
+
+.home-summary-region {
+  display: grid;
+  min-width: 0;
+  min-height: 0;
+  grid-column: 1 / span 12;
+  grid-row: 1 / span 3;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: var(--crm-gap);
+}
+
+.home-stat-card,
+.home-panel {
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.home-stat-card {
+  height: 100%;
+  overflow: hidden;
+}
+
+.home-stat-card.placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--crm-card-pad);
+  background: var(--crm-bg-sunken);
+}
+
+.home-stat-card.placeholder .ant-statistic {
+  margin: var(--crm-sp-2) 0;
+}
+
+.home-stat-card .ant-card-body {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--crm-card-pad);
+}
+
+.home-stat-card.approval {
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+
+.home-stat-card.approval:hover,
+.home-stat-card.approval:focus-visible {
+  box-shadow: var(--crm-shadow-raised);
+  transform: translateY(-1px);
+}
+
+.home-stat-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+}
+
+.home-stat-breakdown {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--crm-sp-2);
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.home-stat-breakdown span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-panel {
+  display: flex;
+  overflow: hidden;
+  flex-direction: column;
+  padding: var(--crm-card-pad);
+}
+
+.home-calendar-panel {
+  --home-calendar-cell-h: var(--crm-sp-6);
+  --home-calendar-weekday-h: var(--crm-sp-5);
+
+  grid-column: 13 / span 4;
+  grid-row: 1 / span 3;
+}
+
+.home-business-panel {
+  grid-column: 1 / span 12;
+  grid-row: 4 / span 6;
+}
+
+.home-announcement-panel {
+  grid-column: 13 / span 4;
+  grid-row: 4 / span 6;
+}
+
+.home-panel-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-3);
+}
+
+.home-panel-header.compact {
+  align-items: center;
+  margin-bottom: var(--crm-sp-2);
+}
+
+.home-calendar-panel .home-panel-header.compact {
+  margin-bottom: var(--crm-sp-1);
+}
+
+.home-panel-header h4 {
+  margin: 0 !important;
+}
+
+.home-task-controls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+}
+
+.home-task-controls .task-bucket-control {
+  min-width: 420px;
+}
+
+.task-panel-alert {
+  margin-top: var(--crm-sp-3);
+}
+
+.task-panel-list {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  flex-direction: column;
+  margin-top: var(--crm-sp-2);
+  padding-right: var(--crm-sp-1);
+}
+
+.task-panel-item {
+  display: flex;
+  min-height: 62px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--crm-gap);
+  padding: var(--crm-sp-2) 0;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.task-panel-item:last-child {
+  border-bottom: 0;
+}
+
+.task-panel-item-icon {
+  color: var(--crm-color-primary);
+}
+
+.task-panel-item-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.task-panel-item-copy > * {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.home-business-panel > .ant-pagination {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-top: var(--crm-sp-2);
+}
+
+.home-calendar-panel .ant-picker-calendar {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.home-calendar-panel .ant-picker-calendar .ant-picker-panel,
+.home-calendar-panel .ant-picker-calendar .ant-picker-date-panel,
+.home-calendar-panel .ant-picker-calendar .ant-picker-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.home-calendar-panel .ant-picker-calendar .ant-picker-body {
+  padding: 0;
+}
+
+.home-calendar-panel .ant-picker-calendar-mini .ant-picker-content {
+  height: 100%;
+  table-layout: fixed;
+}
+
+/* The six-week month view must fit inside the fixed 16:9 top region. */
+.home-calendar-panel .ant-picker-calendar .ant-picker-content tbody tr,
+.home-calendar-panel .ant-picker-calendar .ant-picker-content tbody td,
+.home-calendar-panel .ant-picker-calendar .ant-picker-cell {
+  height: var(--home-calendar-cell-h);
+}
+
+.home-calendar-panel .ant-picker-content th,
+.home-calendar-panel .ant-picker-cell {
+  padding: 0;
+}
+
+.home-calendar-panel .ant-picker-content th {
+  height: var(--home-calendar-weekday-h);
+  line-height: var(--home-calendar-weekday-h);
+}
+
+.home-calendar-panel .ant-picker-cell-inner {
+  min-width: var(--home-calendar-cell-h);
+  height: var(--home-calendar-cell-h);
+  line-height: var(--home-calendar-cell-h);
+}
+
+.home-announcement-list {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  flex-direction: column;
+}
+
+.home-announcement-list > .ant-empty,
+.home-announcement-list > .ant-skeleton {
+  margin: auto;
+}
+
+.home-announcement-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  min-height: 58px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+  padding: var(--crm-sp-2);
+  color: var(--crm-text);
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--crm-border);
+  background: transparent;
+  cursor: pointer;
+}
+
+.home-announcement-item.highlighted {
+  border-bottom-color: var(--crm-color-primary-border);
+  background: var(--crm-color-primary-bg);
+}
+
+.home-announcement-item:hover,
+.home-announcement-item:focus-visible {
+  background: var(--crm-bg-sunken);
+}
+
+.home-announcement-item.highlighted:hover,
+.home-announcement-item.highlighted:focus-visible {
+  background: color-mix(in srgb, var(--crm-color-primary-bg) 78%, var(--crm-bg-sunken));
+}
+
+.home-announcement-item.unread .home-announcement-title {
+  font-weight: 600;
+}
+
+.home-announcement-title {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-announcement-title .ant-tag {
+  flex: 0 0 auto;
+}
+
+.home-announcement-title-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-announcement-item time {
+  flex: 0 0 auto;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  white-space: nowrap;
+}
+
+.home-announcement-all {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  margin-top: var(--crm-sp-2);
+}
+
+@media (max-width: 900px) {
+  .home-dashboard-grid {
+    display: flex;
+    aspect-ratio: auto;
+    flex-direction: column;
+  }
+
+  .home-summary-region {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+  }
+
+  .home-calendar-panel {
+    min-height: 360px;
+  }
+
+  .home-business-panel {
+    min-height: 560px;
+  }
+
+  .home-announcement-panel {
+    min-height: 420px;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-summary-region {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .home-stat-card {
+    min-height: 170px;
+  }
+
+  .home-stat-breakdown {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-task-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .home-task-controls .task-bucket-control {
+    min-width: 0;
+    overflow-x: auto;
+  }
+
+  .task-panel-item {
+    align-items: flex-start;
+  }
+}

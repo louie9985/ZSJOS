@@ -1,0 +1,30 @@
+.user-profile-page {
+  max-width: var(--crm-page-max-form);
+}
+
+.user-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, .8fr);
+  gap: var(--crm-sp-5);
+}
+
+.profile-avatar-editor {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-5);
+  margin-bottom: var(--crm-sp-6);
+}
+
+@media(max-width:768px) {
+  .user-profile-page {
+    padding: var(--crm-sp-3);
+  }
+
+  .user-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-profile-page .ant-tabs-nav-wrap {
+    overflow-x: auto;
+  }
+}

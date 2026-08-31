@@ -1,0 +1,87 @@
+/* Lead submission form page. */
+
+.lead-submission-page {
+  max-width: var(--crm-page-max-form);
+}
+
+.lead-form-card {
+  box-shadow: var(--crm-shadow);
+}
+
+.lead-form-steps {
+  margin-bottom: var(--crm-sp-6);
+  cursor: pointer;
+}
+
+.lead-form-step[hidden] {
+  display: none;
+}
+
+.lead-form-summary {
+  margin-bottom: var(--crm-sp-4);
+}
+
+/* 派单/提供方式的选项卡片：Radio 是真正的控件，整卡 onClick 放大鼠标命中区。 */
+.lead-dispatch-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--crm-sp-4);
+  width: 100%;
+}
+
+.lead-dispatch-option {
+  border: 1px solid var(--crm-border-strong);
+  border-radius: var(--crm-radius-md);
+  padding: var(--crm-sp-4);
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+}
+
+.lead-dispatch-option:hover {
+  border-color: var(--crm-color-primary-hover);
+}
+
+.lead-dispatch-option.selected {
+  border-color: var(--crm-color-primary);
+  background: var(--crm-color-primary-bg);
+  box-shadow: 0 0 0 2px var(--crm-color-primary-border);
+}
+
+.lead-dispatch-option .ant-radio-wrapper {
+  font-weight: 500;
+}
+
+.lead-dispatch-hint {
+  display: block;
+  margin-top: var(--crm-sp-1);
+  font-size: var(--crm-font-sm);
+  line-height: 1.4;
+}
+
+.lead-dispatch-nested {
+  margin: var(--crm-sp-3) 0 0;
+}
+
+.lead-dispatch-nested .ant-form-item-label {
+  display: none;
+}
+
+.lead-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--crm-sp-3);
+}
+
+@media(max-width:768px) {
+  .lead-form-steps .ant-steps-item-description {
+    display: none;
+  }
+
+  .lead-form-actions .ant-space {
+    width: 100%;
+  }
+
+  .lead-form-actions .ant-btn {
+    flex: 1;
+  }
+}

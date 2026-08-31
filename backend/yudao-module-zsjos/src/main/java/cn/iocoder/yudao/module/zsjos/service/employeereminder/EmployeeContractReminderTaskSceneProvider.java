@@ -1,0 +1,3 @@
+package cn.iocoder.yudao.module.zsjos.service.employeereminder;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.task.BusinessTaskDO; import cn.iocoder.yudao.module.zsjos.service.task.*; import org.springframework.stereotype.Component; import java.util.*;
+@Component public class EmployeeContractReminderTaskSceneProvider implements BusinessTaskSceneProvider { public String getBizType(){return EmployeeReminderConstants.CONTRACT_BIZ_TYPE;} public Map<Long,BusinessTaskDisplay> getDisplayMap(List<BusinessTaskDO> tasks){Map<Long,BusinessTaskDisplay> m=new HashMap<>(); tasks.forEach(t->m.put(t.getId(),new BusinessTaskDisplay(t.getTitleSnapshot(),t.getSummarySnapshot(),EmployeeReminderConstants.CONTRACT_ACTION))); return m;} }

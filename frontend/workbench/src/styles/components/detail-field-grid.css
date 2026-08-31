@@ -1,0 +1,92 @@
+.detail-field-grid {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--crm-sp-2);
+  margin: 0;
+}
+
+.detail-field-grid.columns-1 {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.detail-field-grid.columns-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/**
+ * 详情字段块。
+ *
+ * 视觉方向：**微凸**，不是凹陷。这些字段几乎总是嵌在大卡片内部
+ * （.lead-card / .media-students-card / .registration-summary-card），
+ * 在已经是容器的卡片里再挖凹槽会读成「洞中洞」，层次反了 ——
+ * 字段是承载信息的实体，应该从卡片底色上浮起一点点。
+ */
+.detail-field {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(88px, 32%) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-2) var(--crm-sp-3);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-container);
+  border: 1px solid var(--crm-border);
+  box-shadow: var(--crm-shadow);
+}
+
+/* span-2 是给长文本（备注、地址、目标）用的整行字段：整块也靠左，
+   不做右侧收拢 —— 整行宽度下靠右会让文字块远离标签。 */
+.detail-field.span-2 {
+  grid-column: span 2;
+}
+
+.detail-field.span-2 dd {
+  justify-items: start;
+}
+
+/* 标签左、值右：右边界对齐后金额与日期一列可直接比对。
+   两处页面（message-inbox / sales-order）原本各自覆盖成这个样式，
+   现提升为组件基础样式，页面级覆盖已删（有守卫）。 */
+.detail-field dt {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-align: left;
+}
+
+/* 值靠右：金额、日期、编号在同一列上右边界对齐，便于纵向比对。
+   实现用 grid + justify-items 而非 text-align —— text-align 会把
+   回行后的尾巴也甩到右边（"…6217 0012 / 3456 7890"），很难读。
+   这里让 dd 本身作为一个盒子靠右，盒内文字仍左排：
+   单行时看起来就是右对齐，多行时整块靠右而每行从左起。 */
+.detail-field dd {
+  min-width: 0;
+  margin: 0;
+  display: grid;
+  justify-items: end;
+  color: var(--crm-text);
+  /* 显式声明字号：此前继承父级，导致同一组件在不同页面里字号不一致 */
+  font-size: var(--crm-font-base);
+  font-weight: var(--crm-weight-medium);
+  text-align: left;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 768px) {
+  .detail-field-grid,
+  .detail-field-grid.columns-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detail-field.span-2 {
+    grid-column: auto;
+  }
+}
+
+/* illustration preset 有自己的粗描边 + 硬投影风格，覆盖上面的微凸做法 */
+[data-crm-preset="illustration"] .detail-field {
+  border: 3px solid var(--crm-border);
+  box-shadow: 2px 2px 0 var(--crm-border);
+}

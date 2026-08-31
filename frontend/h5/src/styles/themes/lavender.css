@@ -1,0 +1,29 @@
+/* 薰衣草紫主题 */
+:root[data-theme="lavender"] {
+  --h5-primary: #9B7DFF;
+  --h5-primary-light: #F5F0FF;
+  --h5-primary-dark: #7C5CE0;
+  --h5-primary-opacity: rgba(155, 125, 255, 0.1);
+  --h5-gradient: linear-gradient(135deg, #9B7DFF 0%, #B8A4FF 100%);
+  --h5-bg: #FAFAFE;
+  --h5-card-bg: #FFFFFF;
+  --h5-text-primary: #1A1A1A;
+  --h5-text-secondary: #666666;
+  --h5-text-placeholder: #BFBFBF;
+  --h5-border: #F0F0F0;
+  --h5-divider: #F5F5F5;
+  --h5-success: #52C41A;
+  --h5-warning: #FAAD14;
+  --h5-danger: #FF4D4F;
+  --h5-info: #1890FF;
+
+  --van-primary-color: #9B7DFF;
+  --van-background: #FAFAFE;
+  --van-background-2: #FFFFFF;
+  --van-text-color: #1A1A1A;
+  --van-text-color-2: #666666;
+  --van-text-color-3: #BFBFBF;
+  --van-border-color: #F0F0F0;
+  --van-active-color: #F5F0FF;
+  --van-tabbar-item-active-color: #9B7DFF;
+}

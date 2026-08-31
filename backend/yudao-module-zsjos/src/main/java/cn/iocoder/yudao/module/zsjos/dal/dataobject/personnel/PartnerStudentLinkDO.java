@@ -1,0 +1,3 @@
+package cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel;
+import cn.iocoder.yudao.framework.tenant.core.db.TenantBaseDO; import com.baomidou.mybatisplus.annotation.*; import lombok.*; import java.time.LocalDateTime;
+@TableName("zsjos_partner_student_link") @KeySequence("zsjos_partner_student_link_seq") @Data @EqualsAndHashCode(callSuper=true) public class PartnerStudentLinkDO extends TenantBaseDO { @TableId private Long id; private Long partnerId; private Long studentPersonId; private String status; private LocalDateTime startedAt; private LocalDateTime endedAt; private Long operatedByUserId; private String reason; }

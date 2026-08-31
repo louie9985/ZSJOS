@@ -1,0 +1,9 @@
+package cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class LeadAttachmentReqVO {
+    @NotNull private Long infraFileId;
+}

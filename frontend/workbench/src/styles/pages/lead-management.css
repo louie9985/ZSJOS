@@ -1,0 +1,593 @@
+/* Lead inbox: filter shell, master list, detail pane, attachments. */
+
+.lead-management-page {
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.lead-inbox-filter-shell {
+  flex: none;
+  border: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--crm-border);
+  background: transparent;
+}
+
+.lead-simple-status-shell {
+  display: flex;
+  flex: none;
+  min-width: 0;
+  gap: var(--crm-sp-1);
+  margin-bottom: var(--crm-sp-3);
+  padding-bottom: var(--crm-sp-2);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.lead-simple-status-shell button {
+  min-height: 30px;
+  flex: none;
+  padding: var(--crm-sp-1) var(--crm-sp-4);
+  border: 0;
+  border-radius: var(--crm-radius-sm);
+  background: transparent;
+  color: var(--crm-text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.lead-simple-status-shell button:hover,
+.lead-simple-status-shell button.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.lead-simple-status-shell button:focus-visible {
+  outline: 2px solid var(--crm-color-primary);
+  outline-offset: 1px;
+}
+
+.lead-inbox-group-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.lead-inbox-group-tabs .ant-tabs-tab {
+  padding: var(--crm-sp-3) 0;
+}
+
+.lead-inbox-group-tabs .ant-tabs-tab-btn>span {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-3);
+}
+
+.lead-inbox-group-tabs small,.lead-inbox-filter-options small {
+  font-size: var(--crm-font-xs);
+  font-weight: var(--crm-weight-normal);
+  color: var(--crm-text-secondary);
+}
+
+.lead-inbox-filter-sections {
+  border-top: none;
+  padding: var(--crm-sp-1) 0 var(--crm-sp-3);
+}
+
+.lead-inbox-filter-row {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--crm-sp-5);
+}
+
+.lead-inbox-filter-row+.lead-inbox-filter-row {
+  margin-top: var(--crm-sp-3);
+}
+
+.lead-inbox-filter-label {
+  flex: none;
+  width: 68px;
+  padding: var(--crm-sp-2) 0;
+  color: var(--crm-text-secondary);
+}
+
+.lead-inbox-filter-options {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-1);
+}
+
+.lead-inbox-filter-options button {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-1) var(--crm-sp-3);
+  border: 0;
+  border-radius: var(--crm-radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.lead-inbox-filter-options button:hover,.lead-inbox-filter-options button.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+}
+
+.lead-inbox-layout {
+  display: grid;
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0,1fr);
+}
+
+.lead-management-table-shell {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+  flex: 1;
+}
+
+.lead-management-table-toolbar-left {
+  display: flex;
+  min-width: 1040px;
+  align-items: center;
+  gap: var(--crm-sp-4);
+  flex-wrap: nowrap;
+}
+
+.lead-management-table-filter-toolbar {
+  min-width: 0;
+  flex: 1 1 520px;
+}
+
+.lead-management-table-filter-toolbar .advanced-filter-toolbar {
+  width: 100%;
+}
+
+.lead-management-batch-toolbar {
+  flex: none;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .lead-management-table-toolbar-left {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .lead-management-table-filter-toolbar {
+    flex-basis: 100%;
+  }
+}
+
+.lead-management-table-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-gap);
+  margin-bottom: var(--crm-gap-sm);
+}
+
+.lead-management-table-page .lead-management-table {
+  min-height: 0;
+  flex: 1;
+  width: 100%;
+}
+
+.lead-management-table .ant-table-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: keep-all;
+}
+
+.lead-table-resizable-header {
+  touch-action: pan-y;
+}
+
+.lead-inbox-list-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.lead-inbox-toolbar {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  margin-bottom: var(--crm-sp-3);
+}
+
+.lead-list-error {
+  margin-bottom: var(--crm-sp-3);
+}
+
+.lead-inbox-scroll {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  flex-direction: column;
+  /* 内容与常驻滚动条之间的呼吸位；滚动条本身已实际占宽，见 base.css */
+  padding-right: var(--crm-sp-1);
+}
+
+.lead-inbox-item {
+  position: relative;
+  width: 100%;
+  padding: var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-lg);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--crm-duration-base) ease, border-color var(--crm-duration-base) ease, box-shadow var(--crm-duration-base) ease;
+}
+
+.lead-inbox-item:hover {
+  border-color: var(--crm-color-primary-hover);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.lead-inbox-item.active {
+  border-color: var(--crm-color-primary-border);
+  background: var(--crm-color-primary-bg);
+}
+
+.lead-inbox-item.active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--crm-color-primary);
+}
+
+/**
+ * 刚接下、还没看过的客资。
+ * 底色 + 起始边一条竖条，在整列白底卡片里可以扫视识别；点进去后类名撤掉。
+ */
+.lead-inbox-item.unseen {
+  border-color: color-mix(in srgb, var(--crm-color-error) 35%, var(--crm-border));
+  background: var(--crm-color-error-bg);
+}
+
+.lead-inbox-item.unseen::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  inset-inline-start: 0;
+  width: 3px;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
+  background: var(--crm-color-error);
+}
+
+.lead-inbox-item.unseen:hover {
+  border-color: color-mix(in srgb, var(--crm-color-error) 55%, var(--crm-border));
+}
+
+.lead-inbox-new-tag {
+  flex: none;
+  margin-inline: 0;
+  font-size: var(--crm-font-sm);
+}
+
+.lead-inbox-item-main {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--crm-sp-4);
+}
+
+.lead-inbox-item-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.lead-inbox-item-copy>span,.lead-inbox-item-meta>span {
+  overflow: hidden;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-inbox-item-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+}
+
+.lead-inbox-item-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+.lead-inbox-item-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-inbox-item-title .ant-tag {
+  flex: none;
+  margin: 0;
+}
+
+.lead-inbox-item-title .ant-space {
+  flex: none;
+}
+
+.lead-inbox-item-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  padding-top: var(--crm-sp-2);
+  margin-top: var(--crm-sp-2);
+  border-top: 1px dashed color-mix(in srgb, var(--crm-border) 60%, transparent);
+}
+
+.lead-inbox-detail-pane {
+  min-width: 0;
+  overflow-y: auto;
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: color-mix(in srgb, var(--crm-bg-sunken) 50%, var(--crm-bg-container));
+}
+
+.lead-inbox-detail>h5 {
+  margin-top: var(--crm-sp-6);
+  margin-bottom: var(--crm-sp-4);
+}
+
+.lead-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill,minmax(120px,1fr));
+  gap: var(--crm-sp-4);
+}
+
+.lead-attachment-grid a {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  color: inherit;
+}
+
+.lead-attachment-grid .ant-image,.lead-attachment-grid img {
+  width: 100%;
+  aspect-ratio: 4/3;
+  object-fit: cover;
+  border-radius: var(--crm-radius-sm);
+}
+
+.lead-attachment-grid span {
+  overflow: hidden;
+  font-size: var(--crm-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lead-list-loading,.lead-list-end {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: var(--crm-sp-3);
+  padding: var(--crm-sp-4);
+}
+
+@media(max-width:768px) {
+  .lead-inbox-group-tabs .ant-tabs-nav-wrap {
+    overflow-x: auto;
+  }
+
+  .lead-inbox-group-tabs .ant-tabs-nav-list {
+    min-width: max-content;
+  }
+
+  .lead-inbox-filter-row {
+    gap: var(--crm-sp-3);
+  }
+
+  .lead-inbox-filter-label {
+    width: 60px;
+  }
+
+  .lead-inbox-filter-options {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: var(--crm-sp-1);
+  }
+
+  .lead-inbox-filter-options button {
+    flex: none;
+  }
+}
+
+.lead-inbox-detail-pane {
+  display: block;
+}
+
+@media(max-width:768px) {
+  .lead-management-page {
+    height: 100%;
+    min-height: 0;
+  }
+
+  .lead-inbox-layout {
+    display: block;
+    height: 0;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .lead-inbox-list-pane {
+    height: 100%;
+    min-height: 0;
+  }
+
+  /* 移动端详情移到抽屉，列表占满可用高度 */
+  .lead-inbox-detail-pane {
+    display: none;
+  }
+}
+
+.lead-attachment-item {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+  color: inherit;
+}
+
+.lead-attachment-grid .ant-image {
+  cursor: zoom-in;
+}
+
+.lead-inbox-filter-shell {
+  padding: 0;
+  margin-bottom: var(--crm-gap-sm);
+}
+
+.lead-inbox-metadata-error {
+  margin-top: var(--crm-sp-4);
+}
+
+.lead-inbox-group-tabs {
+  margin-top: 0;
+}
+
+.lead-inbox-filter-sections {
+  padding: var(--crm-sp-1) 0 var(--crm-sp-2);
+}
+
+.lead-inbox-layout {
+  gap: var(--crm-gap);
+}
+
+.lead-inbox-scroll {
+  gap: var(--crm-gap-sm);
+}
+
+.lead-list-skeletons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.lead-list-sentinel {
+  display: flex;
+  min-height: 48px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: var(--crm-sp-1) 0;
+}
+
+.lead-list-sentinel>.ant-alert {
+  width: 100%;
+}
+
+.lead-inbox-detail-pane {
+  padding: var(--crm-pane-pad);
+}
+
+/* 移动端详情抽屉：桌面端隐藏，仅在窄屏下显示 */
+.lead-inbox-mobile-drawer {
+  display: none;
+}
+
+.lead-management-table-page .lead-inbox-mobile-drawer {
+  display: block;
+}
+
+@media(max-width:768px) {
+  .lead-inbox-filter-shell {
+    padding: 0;
+  }
+
+  .lead-inbox-layout {
+    gap: var(--crm-sp-3);
+  }
+
+  .lead-inbox-mobile-drawer {
+    display: block;
+  }
+
+  .lead-inbox-mobile-drawer .ant-drawer-body {
+    padding: var(--crm-card-pad);
+  }
+
+  .lead-inbox-scroll {
+    padding-right: 0;
+  }
+}
+
+/* ==================== 插画风格适配 ==================== */
+
+[data-crm-preset="illustration"] .lead-inbox-item {
+  border-width: 3px;
+  border-radius: var(--crm-radius-lg);
+  box-shadow: 4px 4px 0 var(--crm-border);
+  transition: box-shadow var(--crm-duration-fast) ease, transform var(--crm-duration-fast) ease, background var(--crm-duration-fast) ease;
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item:hover {
+  box-shadow: 5px 5px 0 var(--crm-color-primary-hover);
+  transform: translate(-1px, -1px);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item.active {
+  border-width: 3px;
+  border-color: var(--crm-color-primary);
+  padding: var(--crm-sp-4);
+  background: var(--crm-color-primary-bg);
+  box-shadow: 4px 4px 0 var(--crm-color-primary);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item.unseen {
+  box-shadow: 4px 4px 0 color-mix(in srgb, var(--crm-color-error) 50%, var(--crm-border));
+}
+
+[data-crm-preset="illustration"] .lead-inbox-item.unseen:hover {
+  box-shadow: 5px 5px 0 var(--crm-color-error);
+  transform: translate(-1px, -1px);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-detail-pane {
+  border-width: 3px;
+  border-radius: var(--crm-radius-lg);
+  box-shadow: 4px 4px 0 var(--crm-border);
+}
+
+[data-crm-preset="illustration"] .lead-inbox-filter-shell {
+  border-bottom-width: 3px;
+}
+.lead-management-detail-only .lead-inbox-detail-pane {
+  min-width: 0;
+  width: 100%;
+}

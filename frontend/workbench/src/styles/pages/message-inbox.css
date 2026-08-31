@@ -1,0 +1,601 @@
+/* Personal message centre: inbox list and detail pane. */
+
+.message-inbox-page {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.message-inbox-header {
+  flex: none;
+  padding: 2px var(--crm-sp-1) var(--crm-sp-4);
+}
+
+/* 标题下方还有状态行时留出 3px；申诉页标题直接置于 flex 行内，不加边距以免与
+   Tabs 错位（该页 h4 不被 div 包裹，故用 > div > h4 区分两种结构）。 */
+.message-inbox-header > div h4 {
+  margin: 0 0 var(--crm-sp-1)!important;
+}
+
+.message-inbox-header > h4 {
+  margin: 0!important;
+}
+
+.message-inbox-error {
+  flex: none;
+  margin-bottom: var(--crm-sp-4);
+}
+
+.message-inbox-category-bar {
+  flex: none;
+  margin-bottom: var(--crm-sp-4);
+}
+
+.message-inbox-category-bar .ant-segmented {
+  width: 100%;
+}
+
+.message-inbox-layout {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  grid-template-columns: var(--crm-list-pane-w) minmax(0,1fr);
+  gap: var(--crm-gap);
+}
+
+.message-inbox-list-pane {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.message-inbox-list {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  /* 内容与常驻滚动条之间的呼吸位；滚动条本身已实际占宽，见 base.css */
+  padding-right: var(--crm-sp-1);
+}
+
+.message-inbox-list>.ant-empty {
+  margin: auto;
+}
+
+.message-inbox-skeleton {
+  padding: var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+}
+
+.message-inbox-item {
+  width: 100%;
+  min-height: 96px;
+  padding: var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--crm-duration-fast) ease,background-color var(--crm-duration-fast) ease;
+}
+
+.message-inbox-item:hover {
+  border-color: var(--crm-color-primary-hover);
+}
+
+.message-inbox-item.active {
+  padding: var(--crm-sp-4);
+  border: 2px solid var(--crm-color-primary);
+}
+
+.message-inbox-item.unread {
+  background: color-mix(in srgb,var(--crm-bg-container) 92%,var(--crm-color-primary) 8%);
+}
+
+.message-inbox-item-main {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--crm-sp-4);
+}
+
+.message-inbox-item-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.message-inbox-item-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-3);
+}
+
+.message-inbox-item-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-inbox-item-title .ant-tag {
+  flex: none;
+  margin: 0;
+}
+
+.message-inbox-item-copy>span {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  line-height: var(--crm-lh-base);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.message-inbox-item-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--crm-sp-3);
+  padding-top: var(--crm-sp-3);
+  margin-top: var(--crm-sp-3);
+  border-top: 1px solid var(--crm-border);
+}
+
+.message-inbox-item-meta>span {
+  overflow: hidden;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-inbox-pagination {
+  display: flex;
+  min-height: 42px;
+  flex: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding-top: var(--crm-sp-3);
+}
+
+.message-inbox-table-shell {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.message-inbox-table-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--crm-gap-sm);
+}
+
+.message-inbox-table-shell .ant-table-wrapper {
+  min-width: 0;
+}
+
+.message-inbox-table .ant-table-tbody > tr.unread > td {
+  background: color-mix(in srgb, var(--crm-bg-container) 92%, var(--crm-color-primary) 8%);
+}
+
+.message-inbox-table .ant-table-tbody > tr.active > td {
+  background: var(--crm-color-primary-bg);
+}
+
+.message-inbox-table .ant-table-tbody > tr.active.unread > td {
+  background: color-mix(in srgb, var(--crm-color-primary-bg) 78%, var(--crm-color-primary) 22%);
+}
+
+.message-inbox-detail-pane {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--crm-pane-pad);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+}
+
+.message-inbox-detail-pane>.ant-empty {
+  display: grid;
+  height: 100%;
+  place-content: center;
+}
+
+.message-inbox-detail {
+  max-width: var(--crm-read-max);
+}
+
+.message-detail-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--crm-sp-4);
+  padding-bottom: var(--crm-sp-5);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.message-detail-heading {
+  min-width: 0;
+}
+
+.message-detail-heading h4 {
+  margin: 0!important;
+  overflow-wrap: anywhere;
+}
+
+.message-detail-section {
+  padding: var(--crm-sp-6) 0;
+}
+
+.message-detail-section>.ant-typography-secondary {
+  display: block;
+  margin-bottom: var(--crm-sp-3);
+}
+
+.message-detail-section .ant-typography {
+  font-size: var(--crm-font-lg);
+  line-height: var(--crm-lh-loose);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.message-detail-meta {
+  margin-top: var(--crm-sp-4);
+}
+
+@media(max-width:768px) {
+  .message-inbox-page {
+    height: 100%;
+    padding: var(--crm-sp-3);
+  }
+
+  .message-inbox-header {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 2px 0 var(--crm-sp-3);
+  }
+
+  .message-inbox-header>.ant-space {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .message-inbox-header>.ant-space .ant-btn {
+    width: 100%;
+  }
+
+  .message-inbox-layout {
+    display: block;
+    min-height: 0;
+  }
+
+  .message-inbox-category-bar {
+    margin-bottom: var(--crm-sp-3);
+  }
+
+  .message-inbox-list-pane {
+    height: 100%;
+  }
+
+  .message-inbox-list {
+    padding-right: 0;
+  }
+
+  .message-inbox-item {
+    min-height: 92px;
+  }
+
+  .message-inbox-detail-pane {
+    display: none;
+  }
+
+  .message-inbox-pagination {
+    align-items: center;
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .message-inbox-mobile-drawer .ant-drawer-body {
+    padding: var(--crm-sp-5);
+  }
+
+  .message-detail-hero {
+    align-items: flex-start;
+  }
+
+}
+
+.message-inbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-5);
+}
+
+.message-inbox-header .ant-tabs {
+  margin: 0;
+  flex: 1;
+}
+
+.message-inbox-header .ant-tabs-nav {
+  margin: 0;
+}
+
+.message-inbox-page .message-inbox-layout {
+  min-height: 0;
+  flex: 1;
+}
+
+.message-inbox-page .message-inbox-list-pane {
+  overflow-y: auto;
+}
+
+.message-inbox-page .message-inbox-detail-pane {
+  min-height: 0;
+}
+
+.message-inbox-page .message-inbox-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+}
+
+.message-inbox-page .message-inbox-item {
+  width: 100%;
+  min-height: 96px;
+  padding: var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.message-inbox-page .message-inbox-item.active {
+  padding: var(--crm-sp-4);
+  border: 2px solid var(--crm-color-primary);
+}
+
+.message-inbox-load-more {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-base);
+}
+
+/* The header popup keeps a stable footprint; only the unread list scrolls. */
+.message-center-popover .ant-popover-inner {
+  padding: 0;
+  overflow: hidden;
+}
+
+.message-center-popover .ant-popover-title {
+  min-height: 44px;
+  padding: var(--crm-sp-4) var(--crm-sp-5);
+  margin: 0;
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.message-center-popup-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-4);
+}
+
+.message-center-popup {
+  display: grid;
+  width: min(400px, calc(100vw - 24px));
+  height: min(440px, calc(100vh - 96px));
+  min-height: 280px;
+  grid-template-rows: minmax(0, 1fr) 44px;
+}
+
+.message-center-popup-list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.message-center-popup-skeleton {
+  padding: var(--crm-sp-5);
+}
+
+.message-center-popup-state {
+  display: grid;
+  height: 100%;
+  padding: var(--crm-sp-5);
+  place-items: center;
+}
+
+.message-center-popup-state .ant-alert {
+  width: 100%;
+}
+
+.message-center-popup-item {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-sp-5);
+  border: 0;
+  border-bottom: 1px solid var(--crm-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.message-center-popup-item:hover,
+.message-center-popup-item:focus-visible {
+  background: var(--crm-bg-sunken);
+}
+
+.message-center-popup-item:focus-visible {
+  outline: 2px solid var(--crm-color-primary);
+  outline-offset: -2px;
+}
+
+.message-center-popup-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--crm-sp-1);
+}
+
+.message-center-popup-copy strong,
+.message-center-popup-copy > span,
+.message-center-popup-copy time {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.message-center-popup-copy > span,
+.message-center-popup-copy time {
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+.message-center-popup-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--crm-sp-1) var(--crm-sp-4);
+  border-top: 1px solid var(--crm-border);
+}
+
+.message-center-popup-load-more {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  color: var(--crm-text-secondary);
+  font-size: var(--crm-font-sm);
+}
+
+/* Message center uses the shared business inbox geometry; duplicate review keeps
+   the legacy message-inbox selectors above until its own migration. */
+.message-center-scope-bar {
+  justify-content: space-between;
+}
+
+.message-center-heading {
+  min-width: 0;
+}
+
+.message-center-heading h4 {
+  margin: 0 !important;
+}
+
+.message-center-item {
+  overflow: hidden;
+  flex: none;
+}
+
+.message-center-item-copy {
+  overflow: hidden;
+}
+
+.message-center-item .business-inbox-item-title strong {
+  min-width: 0;
+  flex: 1;
+}
+
+.message-center-item-copy > .message-center-item-summary {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: var(--crm-lh-base);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.message-inbox-detail {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.message-inbox-detail .message-detail-heading {
+  overflow: hidden;
+  flex: 1;
+}
+
+.message-inbox-detail .message-detail-section .ant-typography {
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.message-detail-meta-card {
+  min-width: 0;
+}
+
+@media (max-width: 768px) {
+  .message-center-scope-bar {
+    align-items: stretch;
+  }
+
+  .message-center-scope-bar > .ant-btn {
+    width: 100%;
+  }
+}
+
+.duplicate-review-detail .message-detail-hero > .ant-btn {
+  margin-left: auto;
+}
+
+.duplicate-review-snapshot {
+  margin: 0;
+  padding: var(--crm-sp-3);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-bg-sunken);
+  box-shadow: var(--crm-shadow-inset);
+}
+
+.duplicate-review-detail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+.duplicate-review-section {
+  padding: var(--crm-card-pad);
+}
+
+.duplicate-review-section h5 {
+  margin-top: 0;
+}
+
+@media (max-width: 768px) {
+  .duplicate-review-detail .message-detail-hero > .ant-btn {
+    width: 100%;
+    margin-left: 0;
+  }
+}

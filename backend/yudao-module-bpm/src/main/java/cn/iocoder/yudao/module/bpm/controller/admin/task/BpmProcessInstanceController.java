@@ -1,0 +1,300 @@
+package cn.iocoder.yudao.module.bpm.controller.admin.task;
+
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
+import cn.iocoder.yudao.framework.common.util.number.NumberUtils;
+import cn.iocoder.yudao.module.bpm.controller.admin.base.user.UserSimpleBaseVO;
+import cn.iocoder.yudao.module.bpm.api.task.dto.BpmStartSubjectDTO;
+import cn.iocoder.yudao.module.bpm.controller.admin.task.vo.instance.*;
+import cn.iocoder.yudao.module.bpm.convert.task.BpmProcessInstanceConvert;
+import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmCategoryDO;
+import cn.iocoder.yudao.module.bpm.dal.dataobject.definition.BpmProcessDefinitionInfoDO;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmCategoryService;
+import cn.iocoder.yudao.module.bpm.service.definition.BpmProcessDefinitionService;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceService;
+import cn.iocoder.yudao.module.bpm.service.task.BpmProcessInstanceRelationService;
+import cn.iocoder.yudao.module.bpm.service.task.BpmTaskService;
+import cn.iocoder.yudao.module.system.api.dept.DeptApi;
+import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
+import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.annotation.Resource;
+import jakarta.validation.Valid;
+import org.flowable.engine.history.HistoricProcessInstance;
+import org.flowable.engine.repository.ProcessDefinition;
+import org.flowable.task.api.Task;
+import org.flowable.task.api.history.HistoricTaskInstance;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
+import static cn.iocoder.yudao.framework.common.pojo.CommonResult.success;
+import static cn.iocoder.yudao.framework.common.util.collection.CollectionUtils.*;
+import static cn.iocoder.yudao.framework.security.core.util.SecurityFrameworkUtils.getLoginUserId;
+import static cn.iocoder.yudao.module.bpm.enums.ErrorCodeConstants.PROCESS_INSTANCE_NOT_EXISTS;
+
+@Tag(name = "管理后台 - 流程实例") // 流程实例，通过流程定义创建的一次“申请”
+@RestController
+@RequestMapping("/bpm/process-instance")
+@Validated
+public class BpmProcessInstanceController {
+
+    @Resource
+    private BpmProcessInstanceService processInstanceService;
+    @Resource
+    private BpmProcessInstanceRelationService processInstanceRelationService;
+    @Resource
+    private BpmTaskService taskService;
+    @Resource
+    private BpmProcessDefinitionService processDefinitionService;
+    @Resource
+    private BpmCategoryService categoryService;
+
+    @Resource
+    private AdminUserApi adminUserApi;
+    @Resource
+    private DeptApi deptApi;
+
+    @GetMapping("/my-page")
+    @Operation(summary = "获得我的实例分页列表", description = "在【我的流程】菜单中，进行调用")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<PageResult<BpmProcessInstanceRespVO>> getProcessInstanceMyPage(
+            @Valid BpmProcessInstancePageReqVO pageReqVO) {
+        PageResult<HistoricProcessInstance> pageResult = processInstanceService.getProcessInstancePage(
+                getLoginUserId(), pageReqVO);
+        if (CollUtil.isEmpty(pageResult.getList())) {
+            return success(PageResult.empty(pageResult.getTotal()));
+        }
+
+        // 拼接返回
+        Map<String, List<Task>> taskMap = taskService.getTaskMapByProcessInstanceIds(
+                convertList(pageResult.getList(), HistoricProcessInstance::getId));
+        Map<String, ProcessDefinition> processDefinitionMap = processDefinitionService.getProcessDefinitionMap(
+                convertSet(pageResult.getList(), HistoricProcessInstance::getProcessDefinitionId));
+        Map<String, BpmCategoryDO> categoryMap = categoryService.getCategoryMap(
+                convertSet(processDefinitionMap.values(), ProcessDefinition::getCategory));
+        Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
+                convertSet(pageResult.getList(), HistoricProcessInstance::getProcessDefinitionId));
+        Set<Long> userIds = pageResult.getList().stream().map(HistoricProcessInstance::getStartUserId)
+                .map(BpmStartSubjectDTO::getAdminUserId).filter(java.util.Objects::nonNull)
+                .collect(java.util.stream.Collectors.toSet());
+        userIds.addAll(convertSetByFlatMap(taskMap.values(),
+                tasks -> tasks.stream().map(Task::getAssignee).filter(StrUtil::isNotBlank).map(Long::parseLong)));
+        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(userIds);
+        Map<Long, DeptRespDTO> deptMap = deptApi.getDeptMap(
+                convertSet(userMap.values(), AdminUserRespDTO::getDeptId));
+        return success(BpmProcessInstanceConvert.INSTANCE.buildProcessInstancePage(pageResult,
+                processDefinitionMap, categoryMap, taskMap, userMap, deptMap, processDefinitionInfoMap));
+    }
+
+    @GetMapping("/relation-candidate-page")
+    @Operation(summary = "获得当前用户发起的关联审批候选")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:create')")
+    public CommonResult<PageResult<BpmProcessInstanceRelationRespVO>> getRelationCandidatePage(
+            @Valid BpmProcessInstanceRelationCandidatePageReqVO pageReqVO) {
+        return success(processInstanceRelationService.getCandidatePage(getLoginUserId(), pageReqVO));
+    }
+
+    @GetMapping("/relation-list")
+    @Operation(summary = "获得流程实例冻结的关联审批")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<Map<String, List<BpmProcessInstanceRelationRespVO>>> getRelationList(
+            @RequestParam("processInstanceId") String processInstanceId) {
+        Map<String, List<BpmProcessInstanceRelationRespVO>> result = new LinkedHashMap<>();
+        processInstanceRelationService.getRelationList(getLoginUserId(), processInstanceId)
+                .forEach(item -> result.computeIfAbsent(item.getFormField(), key -> new java.util.ArrayList<>()).add(item));
+        return success(result);
+    }
+
+    @GetMapping("/relation-detail")
+    @Operation(summary = "获得关联审批的只读详情")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<BpmProcessInstanceRelationDetailRespVO> getRelationDetail(
+            @RequestParam("relationId") Long relationId) {
+        var relation = processInstanceRelationService.getRelationAndCheckRead(getLoginUserId(), relationId);
+        BpmProcessInstanceRelationRespVO summary = processInstanceRelationService
+                .getRelationList(getLoginUserId(), relation.getSourceProcessInstanceId()).stream()
+                .filter(item -> Objects.equals(item.getId(), relationId)).findFirst()
+                .orElseThrow(() -> exception(PROCESS_INSTANCE_NOT_EXISTS));
+        BpmProcessInstanceRelationDetailRespVO result = new BpmProcessInstanceRelationDetailRespVO()
+                .setRelation(summary);
+        if (Boolean.TRUE.equals(summary.getDetailAvailable())) {
+            result.setApprovalDetail(processInstanceService.getApprovalDetail(getLoginUserId(),
+                    new BpmApprovalDetailReqVO().setProcessInstanceId(relation.getTargetProcessInstanceId())));
+            result.setModelView(processInstanceService
+                    .getProcessInstanceBpmnModelView(relation.getTargetProcessInstanceId()));
+        }
+        return success(result);
+    }
+
+    @GetMapping("/relation-print-data")
+    @Operation(summary = "获得关联审批的只读打印数据")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<BpmProcessInstanceRelationPrintRespVO> getRelationPrintData(
+            @RequestParam("relationId") Long relationId) {
+        var relation = processInstanceRelationService.getRelationAndCheckRead(getLoginUserId(), relationId);
+        BpmProcessInstanceRelationRespVO summary = processInstanceRelationService
+                .getRelationList(getLoginUserId(), relation.getSourceProcessInstanceId()).stream()
+                .filter(item -> Objects.equals(item.getId(), relationId)).findFirst()
+                .orElseThrow(() -> exception(PROCESS_INSTANCE_NOT_EXISTS));
+        return success(new BpmProcessInstanceRelationPrintRespVO().setRelation(summary)
+                .setPrintData(Boolean.TRUE.equals(summary.getDetailAvailable())
+                        ? buildPrintData(relation.getTargetProcessInstanceId()) : null));
+    }
+
+    @GetMapping("/manager-page")
+    @Operation(summary = "获得管理流程实例的分页列表", description = "在【流程实例】菜单中，进行调用")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:manager-query')")
+    public CommonResult<PageResult<BpmProcessInstanceRespVO>> getProcessInstanceManagerPage(
+            @Valid BpmProcessInstancePageReqVO pageReqVO) {
+        PageResult<HistoricProcessInstance> pageResult = processInstanceService.getProcessInstancePage(
+                null, pageReqVO);
+        if (CollUtil.isEmpty(pageResult.getList())) {
+            return success(PageResult.empty(pageResult.getTotal()));
+        }
+
+        // 拼接返回
+        Map<String, List<Task>> taskMap = taskService.getTaskMapByProcessInstanceIds(
+                convertList(pageResult.getList(), HistoricProcessInstance::getId));
+        Map<String, ProcessDefinition> processDefinitionMap = processDefinitionService.getProcessDefinitionMap(
+                convertSet(pageResult.getList(), HistoricProcessInstance::getProcessDefinitionId));
+        Map<String, BpmCategoryDO> categoryMap = categoryService.getCategoryMap(
+                convertSet(processDefinitionMap.values(), ProcessDefinition::getCategory));
+        // 发起人信息
+        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(pageResult.getList().stream()
+                .map(HistoricProcessInstance::getStartUserId).map(BpmStartSubjectDTO::getAdminUserId)
+                .filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet()));
+        Map<Long, DeptRespDTO> deptMap = deptApi.getDeptMap(
+                convertSet(userMap.values(), AdminUserRespDTO::getDeptId));
+        Map<String, BpmProcessDefinitionInfoDO> processDefinitionInfoMap = processDefinitionService.getProcessDefinitionInfoMap(
+                convertSet(pageResult.getList(), HistoricProcessInstance::getProcessDefinitionId));
+        return success(BpmProcessInstanceConvert.INSTANCE.buildProcessInstancePage(pageResult,
+                processDefinitionMap, categoryMap, taskMap, userMap, deptMap, processDefinitionInfoMap));
+    }
+
+    @PostMapping("/create")
+    @Operation(summary = "新建流程实例")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<String> createProcessInstance(@Valid @RequestBody BpmProcessInstanceCreateReqVO createReqVO) {
+        return success(processInstanceService.createProcessInstance(getLoginUserId(), createReqVO));
+    }
+
+    @GetMapping("/get")
+    @Operation(summary = "获得指定流程实例", description = "在【流程详细】界面中，进行调用")
+    @Parameter(name = "id", description = "流程实例的编号", required = true)
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<BpmProcessInstanceRespVO> getProcessInstance(@RequestParam("id") String id) {
+        HistoricProcessInstance processInstance = processInstanceService.getHistoricProcessInstance(id);
+        if (processInstance == null) {
+            return success(null);
+        }
+
+        // 拼接返回
+        ProcessDefinition processDefinition = processDefinitionService.getProcessDefinition(
+                processInstance.getProcessDefinitionId());
+        BpmProcessDefinitionInfoDO processDefinitionInfo = processDefinitionService.getProcessDefinitionInfo(
+                processInstance.getProcessDefinitionId());
+        Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(processInstance.getStartUserId());
+        AdminUserRespDTO startUser = startAdminUserId == null ? null : adminUserApi.getUser(startAdminUserId);
+        DeptRespDTO dept = null;
+        if (startUser != null && startUser.getDeptId() != null) {
+            dept = deptApi.getDept(startUser.getDeptId());
+        }
+        return success(BpmProcessInstanceConvert.INSTANCE.buildProcessInstance(processInstance,
+                processDefinition, processDefinitionInfo, startUser, dept));
+    }
+
+    @DeleteMapping("/cancel-by-start-user")
+    @Operation(summary = "用户取消流程实例", description = "取消发起的流程")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:cancel')")
+    public CommonResult<Boolean> cancelProcessInstanceByStartUser(
+            @Valid @RequestBody BpmProcessInstanceCancelReqVO cancelReqVO) {
+        processInstanceService.cancelProcessInstanceByStartUser(getLoginUserId(), cancelReqVO);
+        return success(true);
+    }
+
+    @DeleteMapping("/cancel-by-admin")
+    @Operation(summary = "管理员取消流程实例", description = "管理员撤回流程")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:cancel-by-admin')")
+    public CommonResult<Boolean> cancelProcessInstanceByManager(
+            @Valid @RequestBody BpmProcessInstanceCancelReqVO cancelReqVO) {
+        processInstanceService.cancelProcessInstanceByAdmin(getLoginUserId(), cancelReqVO);
+        return success(true);
+    }
+
+    @GetMapping("/get-approval-detail")
+    @Operation(summary = "获得审批详情")
+    @Parameter(name = "id", description = "流程实例的编号", required = true)
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    @SuppressWarnings("unchecked")
+    public CommonResult<BpmApprovalDetailRespVO> getApprovalDetail(@Valid BpmApprovalDetailReqVO reqVO) {
+        if (StrUtil.isNotEmpty(reqVO.getProcessVariablesStr())) {
+            reqVO.setProcessVariables(JsonUtils.parseObject(reqVO.getProcessVariablesStr(), Map.class));
+        }
+        return success(processInstanceService.getApprovalDetail(getLoginUserId(), reqVO));
+    }
+
+    @GetMapping("/get-next-approval-nodes")
+    @Operation(summary = "获取下一个执行的流程节点")
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    @SuppressWarnings("unchecked")
+    public CommonResult<List<BpmApprovalDetailRespVO.ActivityNode>> getNextApprovalNodes(@Valid BpmApprovalDetailReqVO reqVO) {
+        if (StrUtil.isNotEmpty(reqVO.getProcessVariablesStr())) {
+            reqVO.setProcessVariables(JsonUtils.parseObject(reqVO.getProcessVariablesStr(), Map.class));
+        }
+        return success(processInstanceService.getNextApprovalNodes(getLoginUserId(), reqVO));
+    }
+
+    @GetMapping("/get-bpmn-model-view")
+    @Operation(summary = "获取流程实例的 BPMN 模型视图", description = "在【流程详细】界面中，进行调用")
+    @Parameter(name = "id", description = "流程实例的编号", required = true)
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<BpmProcessInstanceBpmnModelViewRespVO> getProcessInstanceBpmnModelView(
+            @RequestParam(value = "id") String id) {
+        return success(processInstanceService.getProcessInstanceBpmnModelView(id));
+    }
+
+    @GetMapping("/get-print-data")
+    @Operation(summary = "获得流程实例的打印数据")
+    @Parameter(name = "id", description = "流程实例的编号", required = true)
+    @PreAuthorize("@ss.hasPermission('bpm:process-instance:query')")
+    public CommonResult<BpmProcessPrintDataRespVO> getProcessInstancePrintData(
+            @RequestParam("processInstanceId") String processInstanceId) {
+        return success(buildPrintData(processInstanceId));
+    }
+
+    private BpmProcessPrintDataRespVO buildPrintData(String processInstanceId) {
+        HistoricProcessInstance historicProcessInstance = processInstanceService.getHistoricProcessInstance(processInstanceId);
+        if (historicProcessInstance == null) {
+            throw exception(PROCESS_INSTANCE_NOT_EXISTS);
+        }
+        Long startAdminUserId = BpmStartSubjectDTO.getAdminUserId(historicProcessInstance.getStartUserId());
+        AdminUserRespDTO startUser = startAdminUserId == null ? null : adminUserApi.getUser(startAdminUserId);
+        DeptRespDTO dept = startUser != null && startUser.getDeptId() != null ? deptApi.getDept(startUser.getDeptId()) : null;
+        List<HistoricTaskInstance> tasks = taskService.getFinishedTaskListByProcessInstanceIdWithoutCancel(processInstanceId);
+        Map<Long, AdminUserRespDTO> userMap = adminUserApi.getUserMap(
+                convertSet(tasks, item -> Long.valueOf(item.getAssignee())));
+        return BpmProcessInstanceConvert.INSTANCE.buildProcessInstancePrintData(historicProcessInstance,
+                processDefinitionService.getProcessDefinitionInfo(historicProcessInstance.getProcessDefinitionId()),
+                tasks, userMap,
+                startUser != null
+                        ? new UserSimpleBaseVO().setNickname(startUser.getNickname())
+                                .setDeptName(dept == null ? null : dept.getName())
+                        : new UserSimpleBaseVO().setNickname(cn.hutool.core.map.MapUtil.getStr(
+                                historicProcessInstance.getProcessVariables(), "externalStartUserName")));
+    }
+
+}

@@ -1,0 +1,34 @@
+package cn.iocoder.yudao.module.zsjos.controller.admin.workorder.vo;
+import cn.iocoder.yudao.module.zsjos.service.workorder.WorkOrderFieldDefinition;
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.List;
+@Data public class WorkOrderSceneRespVO {
+    private Long id;
+    private String code;
+    private String name;
+    private String remark;
+    private String categoryValue;
+    private String categoryLabel;
+    private String icon;
+    private Integer sort;
+    private String processorType;
+    private List<String> allowedAssignmentTypes;
+    private String sourceQualificationMode;
+    private List<Long> sourceRoleIds;
+    private List<Long> sourceDeptIds;
+    private String targetQualificationMode;
+    private List<Long> targetRoleIds;
+    private List<Long> targetDeptIds;
+    private String rejectionStrategy;
+    private String numberPrefix;
+    private String numberResetPeriod;
+    private Integer numberSequenceWidth;
+    private List<WorkOrderFieldDefinition> fields;
+    private Integer status;
+    private String lifecycleStatus;
+    private Long publishedVersionId;
+    private Integer publishedVersionNo;
+    private LocalDateTime publishedAt;
+    private Integer version;
+}

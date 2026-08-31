@@ -1,0 +1,474 @@
+/* App shell: two-level siders, header, content region, assistant aside, custom backgrounds. */
+
+.crm-shell {
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+}
+
+/* 移动视口用 dvh 跟随地址栏收缩（见文件末的 @supports，本文件按源顺序覆盖） */
+
+/* antd Watermark 包裹层须撑满视口 */
+.crm-watermark-wrapper {
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  inset: 0;
+}
+
+.crm-sider {
+  height: 100vh;
+  border-inline-end: 1px solid var(--crm-border);
+  background: var(--crm-bg-chrome)!important;
+  overflow: hidden;
+}
+
+.crm-sider>.ant-layout-sider-children {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.brand {
+  height: var(--crm-header-h);
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--crm-sp-1);
+  color: var(--crm-color-primary);
+  font-size: var(--crm-font-sm);
+  font-weight: var(--crm-weight-bold);
+  text-align: center;
+  line-height: var(--crm-lh-tight);
+  white-space: pre-line;
+}
+
+.brand-mobile {
+  display: none;
+}
+
+.sider-menu-scroll,.secondary-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.transparent-menu {
+  border-inline-end: 0!important;
+  background: transparent!important;
+}
+
+.transparent-menu .ant-menu-item-selected {
+  font-weight: var(--crm-weight-semibold);
+}
+
+.transparent-menu .ant-menu-item-icon {
+  font-size: var(--crm-icon-md);
+}
+
+.transparent-menu .ant-menu-item-icon+.ant-menu-title-content {
+  margin-inline-start: var(--crm-sp-4);
+}
+
+.sider-toggle {
+  flex: none;
+  border-top: 1px solid var(--crm-border);
+  padding: var(--crm-sp-3);
+  text-align: center;
+  background: inherit;
+}
+
+.sider-toggle .ant-btn {
+  width: 100%;
+}
+
+.secondary-title {
+  height: var(--crm-header-h);
+  min-height: var(--crm-header-h);
+  padding: 0 var(--crm-sp-3) 0 var(--crm-sp-4);
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-1);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.secondary-title .ant-typography {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secondary-sider.ant-layout-sider-collapsed .secondary-title {
+  justify-content: center;
+  padding: 0;
+}
+
+.crm-header {
+  height: var(--crm-header-h);
+  line-height: var(--crm-header-h);
+  padding: 0 var(--crm-sp-5);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-4);
+  flex-shrink: 0;
+  background: var(--crm-bg-chrome);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.header-actions {
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.content-layout {
+  height: calc(100vh - var(--crm-header-h));
+  overflow: hidden;
+}
+
+.content-layout>.ant-layout-content {
+  overflow: auto;
+  background: var(--crm-bg-layout);
+}
+
+/* 页面唯一容器。默认不限宽 —— 多数页面是表格或主从布局，越宽越好用；
+   少数表单/阅读类页面自行取 --crm-page-max-* 限宽。
+   padding 只在这里声明一次，页面类不要重复写（有守卫）。 */
+.workspace-page {
+  padding: var(--crm-page-pad);
+  margin: auto;
+}
+
+.ai-sider {
+  height: 100%;
+  background: var(--crm-bg-chrome)!important;
+  border-inline-start: 1px solid var(--crm-border);
+  padding: var(--crm-sp-5);
+}
+
+@media (max-width: 768px) {
+  /* 移动端以抽屉为唯一导航入口：隐藏全部常驻侧栏（含收缩后的 56px 图标栏、
+     二级栏、单列、mini 栏），内容区不再被侧栏偏移占用。
+     antd Sider 的 inline width 由 .crm-sider 显示控制，这里整栏隐藏即可。 */
+  .primary-sider,
+  .secondary-sider,
+  .single-sider,
+  .mini-sider {
+    display: none!important;
+  }
+
+  .brand-default {
+    display: none;
+  }
+
+  .brand-mobile {
+    display: inline;
+  }
+
+  .crm-header {
+    padding: 0 var(--crm-sp-3);
+  }
+
+  .crm-header>.ant-breadcrumb {
+    display: none;
+  }
+
+  .header-actions {
+    /* header 已由 margin-inline-start:auto 右对齐；宽度 100% 会把移动品牌单元格挤出布局 */
+    justify-content: flex-end;
+  }
+
+  /* 移动端 Header：汉堡 + 品牌/当前页标识 + 必要的用户入口。
+     接单三段控件占宽且非导航必需，窄屏隐藏（状态由全局接单 Alert 提供）。 */
+  .header-dispatch-control {
+    display: none;
+  }
+
+  .mobile-header-brand {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    gap: var(--crm-sp-2);
+  }
+
+  .mobile-header-brand-name {
+    color: var(--crm-color-primary);
+    font-size: var(--crm-font-sm);
+    font-weight: var(--crm-weight-bold);
+    white-space: nowrap;
+  }
+
+  .mobile-header-brand-page {
+    color: var(--crm-text-tertiary);
+    font-size: var(--crm-font-sm);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+}
+
+.crm-shell {
+  background: var(--crm-bg-layout);
+}
+
+.crm-shell .crm-sider {
+  border-color: var(--crm-border);
+  background: var(--crm-bg-chrome)!important;
+}
+
+.crm-shell .crm-header {
+  border-color: var(--crm-border);
+  background: var(--crm-bg-chrome);
+}
+
+.crm-shell .secondary-title,.crm-shell .sider-toggle {
+  border-color: var(--crm-border);
+}
+
+.crm-shell .content-layout>.ant-layout-content {
+  background: var(--crm-bg-layout);
+}
+
+.crm-shell .ai-sider {
+  border-color: var(--crm-border);
+  background: var(--crm-bg-chrome)!important;
+}
+
+.custom-background>.ant-layout,.custom-background .content-layout {
+  background: transparent;
+}
+
+html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass='frosted'] .custom-background .crm-header,html[data-crm-glass='frosted'] .custom-background .ai-sider {
+  backdrop-filter: blur(var(--crm-glass-blur));
+  -webkit-backdrop-filter: blur(var(--crm-glass-blur));
+}
+
+@media(max-width:768px) {
+  .header-actions {
+    gap: var(--crm-sp-1)!important;
+  }
+
+  .ai-action {
+    display: none;
+  }
+}
+
+/* ==================== 一级导航：图标 + 文字垂直排列 ==================== */
+.primary-nav {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--crm-sp-2) var(--crm-sp-1);
+  gap: 2px;
+}
+
+.primary-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  padding: var(--crm-sp-3) 2px;
+  border: none;
+  border-radius: var(--crm-radius-md);
+  background: transparent;
+  color: var(--crm-text-secondary);
+  cursor: pointer;
+  transition: background var(--crm-duration-base), color var(--crm-duration-base);
+  font-size: var(--crm-font-sm);
+  line-height: var(--crm-lh-tight);
+  text-align: center;
+  word-break: keep-all;
+}
+
+.primary-nav-item:hover {
+  background: var(--crm-fill-secondary);
+  color: var(--crm-text);
+}
+
+.primary-nav-item.active {
+  background: var(--crm-color-primary-bg);
+  color: var(--crm-color-primary);
+  font-weight: var(--crm-weight-semibold);
+}
+
+.primary-nav-icon {
+  font-size: var(--crm-icon-md);
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.primary-nav-label {
+  font-size: var(--crm-font-sm);
+  line-height: var(--crm-lh-tight);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 收起状态：只显示图标，按钮缩为正方形 */
+.primary-sider.ant-layout-sider-collapsed .primary-nav-item {
+  padding: var(--crm-sp-3) 0;
+  width: 36px;
+  height: 36px;
+}
+
+
+/* .header-scroll: 顶栏不固定，跟随内容滚动 */
+.header-scroll .content-layout {
+  height: auto;
+  overflow: visible;
+}
+
+.header-scroll .content-layout>.ant-layout-content {
+  overflow: visible;
+}
+
+/* 整个右侧 Layout 改为可滚动，header 在流中 */
+.header-scroll>:last-child {
+  overflow-y: auto;
+  height: 100vh;
+}
+
+/* ==================== 顶部导航模式 ==================== */
+/* .layout-top: 一级菜单移入 header，一级侧栏隐藏 */
+.layout-top .primary-sider {
+  display: none;
+}
+
+.top-primary-menu {
+  flex: 1;
+  min-width: 0;
+  border-bottom: 0;
+  background: transparent!important;
+}
+
+.top-primary-menu .ant-menu-item,
+.top-primary-menu .ant-menu-submenu-title {
+  line-height: var(--crm-header-h);
+}
+
+/* 递归子菜单按内容扩展，同时限制到视口内，避免长名称被默认窄浮层截断。 */
+.workbench-nav-popup>.ant-menu {
+  min-width: 180px;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 24px));
+}
+
+/* ==================== 纯顶栏模式 ==================== */
+/* .layout-top-only: 一二级菜单全部在顶栏 */
+.layout-top-only .primary-sider,
+.layout-top-only .secondary-sider,
+.layout-top-only .single-sider,
+.layout-top-only .mini-sider {
+  display: none;
+}
+
+/* ==================== 左单列模式 ==================== */
+/* .layout-single-sider: 合并为一个侧栏 */
+.layout-single-sider .primary-sider,
+.layout-single-sider .secondary-sider {
+  display: none;
+}
+
+.single-sider {
+  height: 100vh;
+}
+
+/* ==================== mini-float 模式 ==================== */
+/* .layout-mini-float: 56px 图标栏 + popup 二级 */
+.layout-mini-float .primary-sider,
+.layout-mini-float .secondary-sider,
+.layout-mini-float .single-sider {
+  display: none;
+}
+
+/* 栏宽由 React 侧的 MINI_RAIL_W 以 inline style 给出，此处不重复声明，
+   避免两个真值来源漂移。 */
+.mini-sider {
+  height: 100vh;
+}
+
+/* 图标居中、label 与箭头隐藏全部由 antd 的 .ant-menu-inline-collapsed 负责。
+   前提是 Menu 的 collapsedWidth token 等于本栏宽度（见 constants.MINI_RAIL_W）——
+   否则 ul 比栏宽，居中式 padding 算出的位置被 overflow 裁掉，图标偏左。
+   这里只补 antd 不管的部分。 */
+.mini-sider .brand {
+  font-size: var(--crm-font-sm);
+}
+
+/* 二级浮层：给一级名做分组头，否则浮层里只有页面名、没有上下文 */
+.mini-flyout .ant-menu-item-group-title {
+  padding-block: var(--crm-sp-2);
+  color: var(--crm-text-tertiary);
+  font-size: var(--crm-font-sm);
+}
+
+/* ==================== 移动端导航入口 ==================== */
+/* 桌面端隐藏汉堡按钮，移动端显示 */
+.mobile-nav-trigger {
+  display: none;
+}
+
+.mobile-nav-section-title {
+  display: block;
+  padding: var(--crm-sp-3) var(--crm-sp-4) var(--crm-sp-1);
+}
+
+/* 桌面端隐藏移动品牌单元格，避免与侧栏 .brand 重复 */
+.mobile-header-brand {
+  display: none;
+}
+
+/* .header-dispatch-control 仅包裹接单状态控件；无接单权限时控件渲染 null，
+   空的 span 会在 header 里留出一段间隙，故空时整体隐藏。 */
+.header-dispatch-control:empty {
+  display: none;
+}
+
+@media(max-width:768px) {
+  .mobile-nav-trigger {
+    display: inline-flex;
+  }
+
+  /* 移动端统一隐藏除 primary-sider（已由 media query 收缩到 56px）之外的布局变体 */
+  .single-sider,
+  .mini-sider {
+    display: none!important;
+  }
+
+  /* 顶部模式在移动端也隐藏水平菜单，走 drawer */
+  .top-primary-menu {
+    display: none;
+  }
+}
+
+/* 放在本文件末：以源顺序覆盖上方同特异性规则。
+   移动视口用 dvh 跟随地址栏收缩，避免 iOS 上 100vh 超出可视区留下空隙；
+   vh 兜底在前，浏览器不支持 dvh 时忽略本块。 */
+@supports (height: 100dvh) {
+  .crm-shell {
+    height: 100dvh;
+  }
+  .crm-watermark-wrapper {
+    height: 100dvh;
+  }
+  .content-layout {
+    height: calc(100dvh - var(--crm-header-h));
+  }
+}

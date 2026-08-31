@@ -1,0 +1,44 @@
+/* SettingsDrawer 内部样式 */
+
+.settings-layout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--crm-sp-3);
+  margin-top: var(--crm-sp-3);
+}
+
+.settings-layout-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--crm-sp-1);
+  padding: var(--crm-sp-3) var(--crm-sp-1) var(--crm-sp-2);
+  border: 1.5px solid;
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  cursor: pointer;
+  transition: border-color var(--crm-duration-base), box-shadow var(--crm-duration-base);
+}
+
+.settings-layout-item:hover {
+  box-shadow: 0 0 0 2px var(--crm-color-primary-bg);
+}
+
+.settings-layout-item.active {
+  border-width: 2px;
+  box-shadow: 0 0 0 2px var(--crm-color-primary-bg);
+}
+
+.settings-layout-label {
+  font-size: var(--crm-font-xs);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.settings-theme-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--crm-sp-2);
+  margin-top: var(--crm-sp-3);
+}

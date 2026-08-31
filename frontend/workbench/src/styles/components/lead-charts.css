@@ -1,0 +1,204 @@
+/* Lead follow-up charts — right column of overview aside */
+
+.lead-follow-up-charts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-gap);
+}
+
+/* 图表卡片内容整体居中（水平 + 垂直） */
+.lead-card.lead-chart-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+}
+
+.lead-chart-card .lead-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--crm-sp-3);
+}
+
+.lead-charts-loading,
+.lead-charts-empty {
+  padding: var(--crm-card-pad);
+  text-align: center;
+}
+
+/* ========== 左右分栏布局 ========== */
+
+.lead-chart-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--crm-gap);
+  align-items: start;
+}
+
+.lead-chart-split-left,
+.lead-chart-split-right {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--crm-sp-2);
+}
+
+/* 两列 header 强制等高对齐 */
+.lead-chart-split .lead-card-header {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ========== 沉默天数 ========== */
+
+.chart-silent-days {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--crm-sp-2);
+  padding: var(--crm-sp-1) 0;
+}
+
+.chart-silent-days-number {
+  font-size: calc(var(--crm-font-display) * 1.5);
+  font-weight: var(--crm-weight-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.chart-silent-days-label {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+/* 总跟进次数 */
+.chart-total-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--crm-sp-1);
+}
+
+.chart-total-number {
+  font-size: var(--crm-font-display);
+  font-weight: var(--crm-weight-bold);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--crm-text);
+}
+
+.chart-total-label {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+}
+
+/* ========== 环形图 ========== */
+
+.chart-method-donut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.chart-donut-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chart-donut-svg {
+  transform: rotate(-90deg);
+  cursor: pointer;
+}
+
+.chart-donut-svg circle {
+  cursor: pointer;
+}
+
+/* 圆心总数 */
+.chart-donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  text-align: center;
+}
+
+.chart-donut-center-value {
+  font-size: var(--crm-font-lg);
+  font-weight: var(--crm-weight-bold);
+  color: var(--crm-text);
+  line-height: var(--crm-lh-tight);
+}
+
+.chart-donut-center-sub {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+  line-height: var(--crm-lh-tight);
+}
+
+/* 悬浮 tooltip */
+.chart-donut-tooltip {
+  position: absolute;
+  pointer-events: none;
+  transform: translate(-50%, -120%);
+  padding: var(--crm-sp-1) var(--crm-sp-3);
+  border-radius: var(--crm-radius-sm);
+  background: color-mix(in srgb, var(--crm-bg-elevated) 92%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, var(--crm-border) 60%, transparent);
+  box-shadow: var(--crm-shadow-card);
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  z-index: var(--crm-z-raised);
+}
+
+.chart-donut-tooltip-label {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-secondary);
+  font-weight: var(--crm-weight-medium);
+}
+
+.chart-donut-tooltip-value {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text);
+  font-weight: var(--crm-weight-semibold);
+}
+
+/* ========== 跟进频率/间隔 ========== */
+
+.chart-frequency {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-2);
+}
+
+.chart-frequency-svg {
+  width: 100%;
+  height: 48px;
+}
+
+.chart-frequency-legend {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+  text-align: center;
+}
+
+/* ========== 响应式：窄屏时改为上下堆叠 ========== */
+
+@container (max-width: 280px) {
+  .lead-chart-split {
+    grid-template-columns: 1fr;
+  }
+}

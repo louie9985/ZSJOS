@@ -1,0 +1,11 @@
+package cn.iocoder.yudao.module.zsjos.controller.admin.registration.vo;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.Data;
+
+@Data
+public class RegistrationPlannerUpdateReqVO {
+    @NotNull private Long studyPlannerUserId;
+    @NotNull private Integer version;
+    @NotBlankIdempotency private String idempotencyKey;
+}

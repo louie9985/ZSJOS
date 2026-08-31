@@ -1,0 +1,62 @@
+package cn.iocoder.yudao.module.system.service.notify;
+
+import cn.hutool.core.util.StrUtil;
+import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
+import cn.iocoder.yudao.module.system.api.notify.NotifyChannelAdapter;
+import cn.iocoder.yudao.module.system.api.notify.NotifyChannelType;
+import cn.iocoder.yudao.module.system.api.notify.NotifyRecipientMobileProvider;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifyDeliveryContext;
+import cn.iocoder.yudao.module.system.api.notify.dto.NotifySendResult;
+import cn.iocoder.yudao.module.system.api.sms.SmsSendApi;
+import cn.iocoder.yudao.module.system.api.sms.dto.send.SmsSendSingleToUserReqDTO;
+import jakarta.annotation.Resource;
+import org.springframework.stereotype.Component;
+
+import java.util.List;
+
+/** Bridges message-center deliveries to the existing SMS module. */
+@Component
+public class SmsNotifyChannelAdapter implements NotifyChannelAdapter {
+
+    @Resource private SmsSendApi smsSendApi;
+    @org.springframework.beans.factory.annotation.Autowired private List<NotifyRecipientMobileProvider> mobileProviders;
+
+    @Override
+    public String getChannelCode() {
+        return NotifyChannelType.SMS;
+    }
+
+    @Override
+    public NotifySendResult send(NotifyDeliveryContext context) {
+        if (context.getSmsTemplateId() == null || context.getSmsTemplateId().isBlank()) {
+            return NotifySendResult.failure("SMS_TEMPLATE_MISSING", "短信模板编号未配置", false);
+        }
+        try {
+            SmsSendSingleToUserReqDTO request = new SmsSendSingleToUserReqDTO();
+            request.setUserId(context.getUserId());
+            request.setTemplateCode(context.getSmsTemplateId());
+            request.setTemplateParams(context.getVariables());
+            Long sendLogId;
+            if (UserTypeEnum.ADMIN.getValue().equals(context.getUserType())) {
+                sendLogId = smsSendApi.sendSingleSmsToAdmin(request);
+            } else if (UserTypeEnum.MEMBER.getValue().equals(context.getUserType())) {
+                sendLogId = smsSendApi.sendSingleSmsToMember(request);
+            } else {
+                NotifyRecipientMobileProvider provider = mobileProviders.stream()
+                        .filter(item -> item.getUserType().equals(context.getUserType())).findFirst().orElse(null);
+                if (provider == null) {
+                    return NotifySendResult.failure("SMS_RECIPIENT_TYPE_UNSUPPORTED", "短信收件人类型不受支持", false);
+                }
+                String mobile = provider.getMobile(context.getUserId());
+                if (StrUtil.isBlank(mobile)) {
+                    return NotifySendResult.failure("SMS_RECIPIENT_NOT_FOUND", "短信收件人不存在或已停用", false);
+                }
+                request.setMobile(mobile);
+                sendLogId = smsSendApi.sendSingleSms(request, context.getUserType());
+            }
+            return NotifySendResult.success(String.valueOf(sendLogId));
+        } catch (Exception ex) {
+            return NotifySendResult.failure("SMS_SEND_FAILED", "短信发送失败", true);
+        }
+    }
+}

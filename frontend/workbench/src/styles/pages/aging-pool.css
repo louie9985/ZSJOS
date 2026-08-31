@@ -1,0 +1,36 @@
+/* Lead aging collaboration pool. */
+
+.aging-pool-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-4);
+}
+
+.aging-pool-business-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--crm-sp-4);
+  padding: var(--crm-sp-3) var(--crm-sp-4);
+  border-bottom: 1px solid var(--crm-border);
+}
+
+.aging-pool-business-bar>div:first-child {
+  display: grid;
+  gap: var(--crm-sp-1);
+}
+
+.aging-pool-load-more {
+  display: flex;
+  justify-content: center;
+  padding: var(--crm-sp-3);
+}
+
+@media(max-width:768px) {
+  .aging-pool-toolbar,.aging-pool-business-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

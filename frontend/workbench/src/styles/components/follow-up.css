@@ -1,0 +1,160 @@
+/* Follow-up panel: two-column layout (timeline left, form right) + form styles. */
+
+.fu-panel {
+  min-width: 0;
+}
+
+/* ========== Two-column layout ========== */
+
+.fu-panel-layout {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  gap: var(--crm-sp-5);
+  align-items: start;
+}
+
+@media(max-width:768px) {
+  .fu-panel-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ---- Left: timeline column ---- */
+
+.fu-panel-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-3);
+  min-width: 0;
+}
+
+/* ---- Right: form column ---- */
+
+.fu-panel-aside {
+  position: sticky;
+  top: var(--crm-sp-3);
+  min-width: 0;
+}
+
+.fu-panel-aside-placeholder {
+  padding: var(--crm-sp-4);
+  border: 1px dashed var(--crm-border-strong);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-fill-quaternary);
+}
+
+.fu-panel-form-wrapper {
+  padding: var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-md);
+  background: var(--crm-bg-container);
+  box-shadow: var(--crm-shadow-card);
+}
+
+.fu-panel-form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--crm-sp-3);
+}
+
+.fu-panel-form-title {
+  font-size: var(--crm-font-lg);
+  font-weight: var(--crm-weight-semibold);
+  color: var(--crm-text);
+}
+
+/* The form inside the aside uses single-column layout */
+.fu-panel-aside .follow-up-form {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+}
+
+.fu-panel-aside .follow-up-field-grid {
+  grid-template-columns: 1fr;
+}
+
+/* ========== Header ========== */
+
+.fu-panel-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--crm-sp-3);
+}
+
+.fu-panel-title {
+  font-size: var(--crm-font-lg);
+  font-weight: var(--crm-weight-semibold);
+  color: var(--crm-text);
+}
+
+.fu-panel-count {
+  margin-left: var(--crm-sp-1);
+  font-weight: var(--crm-weight-normal);
+  color: var(--crm-text-tertiary);
+}
+
+.fu-panel-filtered {
+  font-size: var(--crm-font-sm);
+  color: var(--crm-text-tertiary);
+}
+
+.fu-panel-spacer {
+  margin-right: auto;
+}
+
+/* ========== States ========== */
+
+.fu-panel-loading {
+  padding: var(--crm-sp-4);
+  text-align: center;
+  color: var(--crm-text-secondary);
+}
+
+.fu-panel-empty {
+  padding: var(--crm-sp-6) 0;
+}
+
+/* ========== Form fields (shared) ========== */
+
+.follow-up-form {
+  padding: var(--crm-sp-5);
+  margin-top: var(--crm-sp-4);
+  border: 1px solid var(--crm-border);
+  border-radius: var(--crm-radius-sm);
+  background: var(--crm-fill-quaternary);
+}
+
+.follow-up-field-grid {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: var(--crm-sp-4);
+}
+
+.follow-up-quick-notes,.follow-up-day-shortcuts {
+  margin-bottom: var(--crm-sp-4);
+}
+
+.follow-up-upload-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--crm-sp-4);
+  margin-bottom: var(--crm-sp-5);
+}
+
+@media(max-width:768px) {
+  .follow-up-form {
+    padding: var(--crm-sp-4);
+  }
+
+  .follow-up-upload-row {
+    flex-direction: column;
+  }
+
+  .follow-up-field-grid {
+    grid-template-columns: 1fr;
+  }
+}

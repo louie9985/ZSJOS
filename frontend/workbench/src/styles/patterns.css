@@ -1,0 +1,44 @@
+/* Cross-page building blocks reused by more than one business page. */
+
+.page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--crm-sp-5);
+}
+
+.page-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--crm-sp-5);
+  margin-bottom: var(--crm-sp-5);
+}
+
+.page-heading h4 {
+  margin: var(--crm-sp-2) 0;
+}
+
+@media(max-width:768px) {
+  .page-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+.required-section-title::before {
+  color: var(--crm-color-error);
+  content: '*';
+  font-family: SimSun, sans-serif;
+  margin-inline-end: var(--crm-sp-1);
+}
+
+/* ==================== 键盘焦点兜底 ====================
+   自绘的可交互元素（列表行、导航按钮、筛选 chip）此前几乎都没有焦点样式，
+   键盘 Tab 过去完全没有反馈。antd 组件自带焦点环，故这里只兜自绘部分。
+
+   用 :where() 把优先级压到 0，任何组件想自定义焦点样式都能直接覆盖；
+   只匹配 :focus-visible 而非 :focus —— 鼠标点击不该出现焦点环。 */
+:where(button, [role='button'], a, [tabindex]:not([tabindex='-1'])):focus-visible {
+  outline: 2px solid var(--crm-color-primary);
+  outline-offset: 2px;
+  border-radius: var(--crm-radius-sm);
+}

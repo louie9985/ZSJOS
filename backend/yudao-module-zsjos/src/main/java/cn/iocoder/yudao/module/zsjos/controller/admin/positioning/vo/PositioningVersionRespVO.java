@@ -1,0 +1,1 @@
+package cn.iocoder.yudao.module.zsjos.controller.admin.positioning.vo; import lombok.Data; @Data public class PositioningVersionRespVO { private Long id; private Long positioningCardId; private Integer versionNo; private String beforeJson; private String afterJson; private String changeReason; private Long proposedByUserId; private Boolean adopted; }
