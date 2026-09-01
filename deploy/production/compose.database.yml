@@ -57,7 +57,7 @@ services:
       ZSJOS_DB_MIGRATION_USER: ${ZSJOS_DB_MIGRATION_USER:-zsjos_migrator}
       ZSJOS_DB_PASSWORD_FILE: /run/secrets/mysql-migration-password
       ZSJOS_DB_RELEASE_VERSION: ${ZSJOS_DB_RELEASE_VERSION:-development}
-      ZSJOS_DB_MODULES: ${ZSJOS_DB_MODULES:-core}
+      ZSJOS_DB_MODULES: ${ZSJOS_DB_MODULES:-core,hrm,fms,eam}
       ZSJOS_DB_BACKUP_DIR: /backups
     volumes:
       - mysql-backups:/backups

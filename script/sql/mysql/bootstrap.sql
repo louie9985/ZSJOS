@@ -160,6 +160,7 @@ SOURCE script/sql/mysql/migrations/V174__complete_zsjos_business_audit.sql;
 SOURCE script/sql/mysql/migrations/V175__lead_source_channel_snapshots.sql;
 SOURCE script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql;
 
+
 INSERT IGNORE INTO `zsjos_module_schema_version`
   (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 SELECT 'core', `version`, `description`, SHA2(COALESCE(`checksum`, `version`), 256), 'baseline', `installed_at`

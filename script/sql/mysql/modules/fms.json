@@ -1,0 +1,12 @@
+{
+  "code": "fms",
+  "description": "Financial Management System module",
+  "dependsOn": ["core"],
+  "schema": "schema/fms.sql",
+  "baseline": null,
+  "migrations": "migrations/fms",
+  "verify": "verify/fms.sql",
+  "enabledJavaModules": ["yudao-module-fms"],
+  "ignoredMappedTables": [],
+  "allowedExtraTables": []
+}
