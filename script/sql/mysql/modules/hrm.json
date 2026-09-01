@@ -1,0 +1,12 @@
+{
+  "code": "hrm",
+  "description": "Human Resource Management module",
+  "dependsOn": ["core"],
+  "schema": "schema/hrm.sql",
+  "baseline": null,
+  "migrations": "migrations/hrm",
+  "verify": "verify/hrm.sql",
+  "enabledJavaModules": ["yudao-module-hrm"],
+  "ignoredMappedTables": [],
+  "allowedExtraTables": []
+}

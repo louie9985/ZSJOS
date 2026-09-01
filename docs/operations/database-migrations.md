@@ -56,8 +56,9 @@ docker compose --env-file deploy/production/.env \
 
 For a real release, set `ZSJOS_DB_MIGRATOR_IMAGE` and
 `ZSJOS_DB_RELEASE_VERSION` to the immutable image tag and release identifier.
-Set `ZSJOS_DB_MODULES=core` to the exact comma-separated module set packaged in the
-application release. Adding an optional module's files does not enable it.
+Set `ZSJOS_DB_MODULES=core,hrm,fms,eam` for the current production application,
+matching the Java modules packaged in `yudao-server`. Adding an optional module's
+files does not enable it.
 The application must use `ZSJOS_DB_APP_USER`; only the migrator receives the DDL
 credential.
 
