@@ -9,7 +9,7 @@ BEGIN
   IF lock_ok <> 1 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'EAM V005 lock unavailable'; END IF;
   START TRANSACTION;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='eam_asset' AND column_name='use_user_name_snapshot') THEN
-    ALTER TABLE `eam_asset` ADD COLUMN `use_user_name_snapshot` varchar(100) DEFAULT NULL COMMENT '使用人姓名快照' AFTER `use_employee_id`;
+    ALTER TABLE `eam_asset` ADD COLUMN `use_user_name_snapshot` varchar(100) DEFAULT NULL COMMENT '使用人姓名快照' AFTER `use_user_id`;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='eam_asset' AND column_name='supervisor_user_id') THEN
     ALTER TABLE `eam_asset` ADD COLUMN `supervisor_user_id` bigint DEFAULT NULL COMMENT '直属上级用户编号' AFTER `use_user_name_snapshot`;

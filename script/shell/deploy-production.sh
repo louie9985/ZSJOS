@@ -28,7 +28,6 @@ load_env() {
   FRONTEND_ADMIN_DIR="${ZSJOS_FRONTEND_ADMIN_DIR:-$REPO_DIR/frontend/admin}"
   FRONTEND_WORKBENCH_DIR="${ZSJOS_FRONTEND_WORKBENCH_DIR:-$REPO_DIR/frontend/workbench}"
   FRONTEND_H5_DIR="${ZSJOS_FRONTEND_H5_DIR:-$REPO_DIR/frontend/h5}"
-  FRONTEND_MEDIA_SCREEN_DIR="${ZSJOS_FRONTEND_MEDIA_SCREEN_DIR:-$REPO_DIR/frontend/media-screen}"
   JAR_PATH="${ZSJOS_JAR_PATH:-$REPO_DIR/backend/yudao-server/target/yudao-server.jar}"
   PID_FILE="${ZSJOS_PID_FILE:-$REPO_DIR/zsjos-server.pid}"
   SERVER_PORT="${SERVER_PORT:-48080}"
@@ -37,8 +36,7 @@ load_env() {
   DB_COMPOSE_FILE="${ZSJOS_DB_COMPOSE_FILE:-$REPO_DIR/deploy/production/compose.database.yml}"
   DB_ENV_FILE="${ZSJOS_DB_ENV_FILE:-$ENV_FILE}"
   SYSTEMD_SERVICE="${ZSJOS_SYSTEMD_SERVICE:-}"
-  CONFIG_FILE="${ZSJOS_CONFIG_FILE:-$REPO_DIR/application-prod.yaml}"
-  DB_URL="${ZSJOS_DB_URL:-jdbc:mysql://127.0.0.1:3306/${ZSJOS_DB_NAME:-zsjos}?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true}""${ZSJOS_DB_URL:-jdbc:mysql://127.0.0.1:3306/${ZSJOS_DB_NAME:-zsjos}?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true}"
+  DB_URL="${ZSJOS_DB_URL:-jdbc:mysql://127.0.0.1:3306/${ZSJOS_DB_NAME:-zsjos}?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true}"
   DB_HOST="${ZSJOS_DB_HOST:-127.0.0.1}"
   DB_PORT="${ZSJOS_DB_PORT:-3306}"
   REDIS_HOST="${REDIS_HOST:-127.0.0.1}"
@@ -94,48 +92,29 @@ build_backend() {
 }
 
 build_frontends() {
-  log "building admin frontend (standalone /admin/)"
+  log "building admin frontend"
   (cd "$FRONTEND_ADMIN_DIR" && env \
     VITE_APP_TITLE="${VITE_APP_TITLE:-}" VITE_APP_HEAD_TITLE="${VITE_APP_HEAD_TITLE:-}" \
-    VITE_BASE_PATH="${VITE_BASE_PATH:-/admin/}" VITE_BASE_URL="${VITE_BASE_URL:-}" \
+    VITE_BASE_PATH="${VITE_BASE_PATH:-/}" VITE_BASE_URL="${VITE_BASE_URL:-}" \
     VITE_API_URL="${VITE_API_URL:-/admin-api}" VITE_UPLOAD_TYPE="${VITE_UPLOAD_TYPE:-server}" \
     VITE_APP_TENANT_ENABLE="${VITE_APP_TENANT_ENABLE:-true}" VITE_APP_CAPTCHA_ENABLE="${VITE_APP_CAPTCHA_ENABLE:-true}" \
     VITE_DROP_DEBUGGER="${VITE_DROP_DEBUGGER:-true}" VITE_DROP_CONSOLE="${VITE_DROP_CONSOLE:-true}" \
     VITE_SOURCEMAP="${VITE_SOURCEMAP:-false}" VITE_OUT_DIR="${VITE_OUT_DIR:-dist-prod}" \
     VITE_APP_BAIDU_CODE="${VITE_APP_BAIDU_CODE:-}" \
-    pnpm install --frozen-lockfile && pnpm ts:check && pnpm run build:prod)
-
-  log "building admin frontend (embedded /admin-embed/)"
-  (cd "$FRONTEND_ADMIN_DIR" && env \
-    VITE_APP_TITLE="${VITE_APP_TITLE:-}" VITE_APP_HEAD_TITLE="${VITE_APP_HEAD_TITLE:-}" \
-    VITE_BASE_PATH="${VITE_ADMIN_EMBED_BASE:-/admin-embed/}" VITE_BASE_URL="${VITE_BASE_URL:-}" \
-    VITE_API_URL="${VITE_API_URL:-/admin-api}" VITE_UPLOAD_TYPE="${VITE_UPLOAD_TYPE:-server}" \
-    VITE_APP_TENANT_ENABLE="${VITE_APP_TENANT_ENABLE:-true}" VITE_APP_CAPTCHA_ENABLE="${VITE_APP_CAPTCHA_ENABLE:-true}" \
-    VITE_DROP_DEBUGGER="${VITE_DROP_DEBUGGER:-true}" VITE_DROP_CONSOLE="${VITE_DROP_CONSOLE:-true}" \
-    VITE_SOURCEMAP="${VITE_SOURCEMAP:-false}" VITE_OUT_DIR="dist-embed" \
-    VITE_APP_BAIDU_CODE="${VITE_APP_BAIDU_CODE:-}" \
-    pnpm run build:prod)
+    pnpm install --frozen-lockfile && pnpm ts:check && pnpm build:prod)
 
   log "building workbench frontend"
   (cd "$FRONTEND_WORKBENCH_DIR" && env \
     VITE_API_BASE_URL="${VITE_API_BASE_URL:-/admin-api}" \
     VITE_ADMIN_EMBED_BASE="${VITE_ADMIN_EMBED_BASE:-/admin-embed/}" \
     VITE_TENANT_ID="${VITE_TENANT_ID:-1}" \
-    npm ci && npm run typecheck && npm run build)
+    npm ci && npm test && npm run typecheck && npm run build)
 
   log "building partner H5 frontend"
   (cd "$FRONTEND_H5_DIR" && env \
     VITE_APP_BASE_API="${VITE_APP_BASE_API:-/part-api}" \
     VITE_APP_REFERENCE_API="${VITE_APP_REFERENCE_API:-/app-api}" \
     VITE_APP_TENANT_ID="${VITE_APP_TENANT_ID:-1}" \
-    npm ci && npm run build)
-
-  log "building media-screen frontend"
-  (cd "$FRONTEND_MEDIA_SCREEN_DIR" && env \
-    VITE_MEDIA_SCREEN_TENANT_ID="${VITE_MEDIA_SCREEN_TENANT_ID:-1}" \
-    VITE_MEDIA_SCREEN_API_BASE_URL="${VITE_MEDIA_SCREEN_API_BASE_URL:-}" \
-    VITE_MEDIA_SCREEN_API_PREFIX="${VITE_MEDIA_SCREEN_API_PREFIX:-/public-api/zsjos/media-screen}" \
-    VITE_MEDIA_SCREEN_ENABLE_MOCK="${VITE_MEDIA_SCREEN_ENABLE_MOCK:-false}" \
     npm ci && npm run build)
 }
 
@@ -154,19 +133,16 @@ db_compose() {
 
 db_plan() {
   load_env; check_env; need_cmd bash
-  export ZSJOS_ENV_FILE="$ENV_FILE"
   (cd "$REPO_DIR" && bash deploy/production/zsjos-db plan production)
 }
 
 db_migrate() {
   load_env; check_env; need_cmd bash
-  export ZSJOS_ENV_FILE="$ENV_FILE"
   (cd "$REPO_DIR" && bash deploy/production/zsjos-db migrate production)
 }
 
 db_verify() {
   load_env; check_env; need_cmd bash
-  export ZSJOS_ENV_FILE="$ENV_FILE"
   (cd "$REPO_DIR" && bash deploy/production/zsjos-db verify production)
 }
 
@@ -174,13 +150,11 @@ install_release() {
   local release_dir="$RELEASES_DIR/$APP_VERSION"
   local old_release=""
   [[ -L "$RELEASES_DIR/current" ]] && old_release="$(readlink -f "$RELEASES_DIR/current")"
-  mkdir -p "$release_dir/admin" "$release_dir/admin-embed" "$release_dir/workbench" "$release_dir/h5" "$release_dir/media-screen" "$release_dir/logs"
+  mkdir -p "$release_dir/admin" "$release_dir/workbench" "$release_dir/h5" "$release_dir/logs"
   cp "$JAR_PATH" "$release_dir/yudao-server.jar"
   cp -a "$FRONTEND_ADMIN_DIR/dist-prod/." "$release_dir/admin/"
-  cp -a "$FRONTEND_ADMIN_DIR/dist-embed/." "$release_dir/admin-embed/"
   cp -a "$FRONTEND_WORKBENCH_DIR/dist/." "$release_dir/workbench/"
   cp -a "$FRONTEND_H5_DIR/dist/." "$release_dir/h5/"
-  cp -a "$FRONTEND_MEDIA_SCREEN_DIR/dist/." "$release_dir/media-screen/"
   [[ -n "$old_release" && "$old_release" != "$release_dir" ]] && printf '%s\n' "$old_release" > "$RELEASES_DIR/previous-release"
   ln -sfn "$release_dir" "$RELEASES_DIR/current"
   ln -sfn "$release_dir/yudao-server.jar" "$REPO_DIR/yudao-server.jar"
@@ -221,9 +195,8 @@ start_server() {
   mkdir -p "$LOG_DIR"
   [[ -f "$RELEASES_DIR/current/yudao-server.jar" ]] || die "current release jar is missing; run build and deploy first"
   [[ -z "$(running_pid)" ]] || die "backend is already running"
-  [[ -f "$CONFIG_FILE" ]] || die "external config not found: $CONFIG_FILE"
   local log_file="$LOG_DIR/server-$(date +%Y%m%d).log"
-  log "starting backend on port $SERVER_PORT (config: $CONFIG_FILE)"
+  log "starting backend on port $SERVER_PORT"
   nohup env \
     TZ="$TZ" \
     SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE" \
@@ -241,14 +214,9 @@ start_server() {
     ZSJOS_WECOM_WORKBENCH_BASE_URL="${ZSJOS_WECOM_WORKBENCH_BASE_URL:-}" \
     ZSJOS_WECOM_PARTNER_H5_BASE_URL="${ZSJOS_WECOM_PARTNER_H5_BASE_URL:-}" \
     ZSJOS_PUBLIC_H5_BASE_URL="${ZSJOS_PUBLIC_H5_BASE_URL:-}" \
-    YUDAO_MEDIA_SCREEN_ENABLED="${YUDAO_MEDIA_SCREEN_ENABLED:-false}" \
-    YUDAO_MEDIA_SCREEN_TRUSTED_PROXIES_0="${YUDAO_MEDIA_SCREEN_TRUSTED_PROXIES_0:-127.0.0.1}" \
-    YUDAO_MEDIA_SCREEN_CLIENTS_0_TENANT_ID="${YUDAO_MEDIA_SCREEN_CLIENTS_0_TENANT_ID:-1}" \
-    YUDAO_MEDIA_SCREEN_CLIENTS_0_CIDRS_0="${YUDAO_MEDIA_SCREEN_CLIENTS_0_CIDRS_0:-127.0.0.1}" \
     java $JAVA_OPTS -jar "$RELEASES_DIR/current/yudao-server.jar" \
     --server.port="$SERVER_PORT" \
     --spring.profiles.active="$SPRING_PROFILES_ACTIVE" \
-    --spring.config.additional-location="file:$CONFIG_FILE" \
     >> "$log_file" 2>&1 &
   echo $! > "$PID_FILE"
   log "backend pid=$(cat "$PID_FILE")"

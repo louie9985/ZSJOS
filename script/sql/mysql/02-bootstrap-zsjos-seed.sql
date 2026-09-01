@@ -369,7 +369,7 @@ INSERT IGNORE INTO `system_menu`
 
 INSERT IGNORE INTO `system_menu`
 (`id`,`name`,`permission`,`type`,`sort`,`parent_id`,`path`,`icon`,`component`,`component_name`,`status`,`visible`,`keep_alive`,`always_show`,`creator`,`create_time`,`updater`,`update_time`,`deleted`) VALUES
-(6856,'主管确认','zsjos:sales-order:supervisor-confirm',2,18,6735,'sales-order-supervisor-confirmations','ep:stamp','zsjos/salesOrderSupervisorConfirmation/index','ZsjosSalesOrderSupervisorConfirmation',0,b'1',b'1',b'1','bootstrap',NOW(),'bootstrap',NOW(),b'0');
+(6856,'主管确认','zsjos:sales-order:supervisor-confirm',3,2,6810,'','','',NULL,0,b'1',b'1',b'0','bootstrap',NOW(),'bootstrap',NOW(),b'0');
 
 INSERT IGNORE INTO `zsjos_schema_version` (`version`, `description`, `checksum`)
 VALUES ('V040', 'Submitter actions and sales complaint queue', 'submitter-actions-complaints-v1');

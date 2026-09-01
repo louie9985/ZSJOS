@@ -26,11 +26,11 @@ SELECT seed.name,0,@zsjos_bpm_form_conf,seed.fields,seed.marker,
 FROM `system_tenant` tenant
 CROSS JOIN (
   SELECT '学员联系延期审批表单' name,
-         JSON_ARRAY(@zsjos_extension_id,@zsjos_service_relation_id,
-                    @zsjos_original_due_at,@zsjos_requested_due_at,
-                    @zsjos_reason_value,@zsjos_reason_label,
-                    @zsjos_description,@zsjos_attachments,
-                    @zsjos_applicant,@zsjos_submitted_at) fields,
+         JSON_ARRAY(JSON_EXTRACT(@zsjos_extension_id,'$'),JSON_EXTRACT(@zsjos_service_relation_id,'$'),
+                    JSON_EXTRACT(@zsjos_original_due_at,'$'),JSON_EXTRACT(@zsjos_requested_due_at,'$'),
+                    JSON_EXTRACT(@zsjos_reason_value,'$'),JSON_EXTRACT(@zsjos_reason_label,'$'),
+                    JSON_EXTRACT(@zsjos_description,'$'),JSON_EXTRACT(@zsjos_attachments,'$'),
+                    JSON_EXTRACT(@zsjos_applicant,'$'),JSON_EXTRACT(@zsjos_submitted_at,'$')) fields,
          'zsjos-system-form:student-contact-extension' marker
 ) seed
 WHERE tenant.deleted=b'0' AND tenant.status=0
