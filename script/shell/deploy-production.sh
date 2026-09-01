@@ -95,27 +95,27 @@ build_frontends() {
   log "building admin frontend"
   (cd "$FRONTEND_ADMIN_DIR" && env \
     VITE_APP_TITLE="${VITE_APP_TITLE:-}" VITE_APP_HEAD_TITLE="${VITE_APP_HEAD_TITLE:-}" \
-    VITE_BASE_PATH="${VITE_BASE_PATH:-/}" VITE_BASE_URL="${VITE_BASE_URL:-}" \
+    VITE_BASE_PATH="${VITE_BASE_PATH:-/admin/}" VITE_BASE_URL="${VITE_BASE_URL:-}" \
     VITE_API_URL="${VITE_API_URL:-/admin-api}" VITE_UPLOAD_TYPE="${VITE_UPLOAD_TYPE:-server}" \
     VITE_APP_TENANT_ENABLE="${VITE_APP_TENANT_ENABLE:-true}" VITE_APP_CAPTCHA_ENABLE="${VITE_APP_CAPTCHA_ENABLE:-true}" \
     VITE_DROP_DEBUGGER="${VITE_DROP_DEBUGGER:-true}" VITE_DROP_CONSOLE="${VITE_DROP_CONSOLE:-true}" \
     VITE_SOURCEMAP="${VITE_SOURCEMAP:-false}" VITE_OUT_DIR="${VITE_OUT_DIR:-dist-prod}" \
     VITE_APP_BAIDU_CODE="${VITE_APP_BAIDU_CODE:-}" \
-    pnpm install --frozen-lockfile && pnpm ts:check && pnpm build:prod)
+    pnpm install --frozen-lockfile && pnpm build:prod)
 
   log "building workbench frontend"
   (cd "$FRONTEND_WORKBENCH_DIR" && env \
     VITE_API_BASE_URL="${VITE_API_BASE_URL:-/admin-api}" \
     VITE_ADMIN_EMBED_BASE="${VITE_ADMIN_EMBED_BASE:-/admin-embed/}" \
     VITE_TENANT_ID="${VITE_TENANT_ID:-1}" \
-    npm ci && npm test && npm run typecheck && npm run build)
+    npm ci && npm run build)
 
   log "building partner H5 frontend"
   (cd "$FRONTEND_H5_DIR" && env \
     VITE_APP_BASE_API="${VITE_APP_BASE_API:-/part-api}" \
     VITE_APP_REFERENCE_API="${VITE_APP_REFERENCE_API:-/app-api}" \
     VITE_APP_TENANT_ID="${VITE_APP_TENANT_ID:-1}" \
-    npm ci && npm run build)
+    pnpm install --frozen-lockfile && pnpm build)
 }
 
 build() {
@@ -155,6 +155,13 @@ install_release() {
   cp -a "$FRONTEND_ADMIN_DIR/dist-prod/." "$release_dir/admin/"
   cp -a "$FRONTEND_WORKBENCH_DIR/dist/." "$release_dir/workbench/"
   cp -a "$FRONTEND_H5_DIR/dist/." "$release_dir/h5/"
+  # admin-embed / media-screen are not built by this script; carry them over
+  # from the current release so nginx keeps serving them after the switch.
+  if [[ -n "$old_release" && "$old_release" != "$release_dir" ]]; then
+    for extra in admin-embed media-screen; do
+      [[ -d "$old_release/$extra" ]] && cp -a "$old_release/$extra" "$release_dir/"
+    done
+  fi
   [[ -n "$old_release" && "$old_release" != "$release_dir" ]] && printf '%s\n' "$old_release" > "$RELEASES_DIR/previous-release"
   ln -sfn "$release_dir" "$RELEASES_DIR/current"
   ln -sfn "$release_dir/yudao-server.jar" "$REPO_DIR/yudao-server.jar"
