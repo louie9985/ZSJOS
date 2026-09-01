@@ -1,5 +1,50 @@
 # Workstream: eam-asset-management
 
+### Delivery entry: 2026-09-01 21:00:00 +08:00
+
+- **Beijing time**: 2026-09-01 21:00:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: f516733f4791abd714b7dfc1706732bcc56b502f
+- **User goal**: 生成包含全部资产分类及自定义字段、可导入生产的统一 Excel，并先使用统一采购属性。
+- **Key decisions**: 所有分类统一使用“实物入库”+“消耗型”；分类表增加交付/持有模式列；导入器支持 FILE(6) 字段类型；不执行生产导入或数据库写入。
+- **Execution or analysis result**: 已确认本地数据库存在 38 个未删除分类和 69 个未删除字段，原采购属性均为空；开始同步导入契约与工作簿。
+- **Changed files**: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; `backend/yudao-module-eam/src/main/resources/eam/eam-category-config-template.xlsx`; 生成的交付 Excel；本 handoff 文件。
+- **Verification evidence**: 待完成模板结构检查、导入解析测试和本地数据库预检。
+- **Dependency or integration impact**: 不新增 npm/Maven 依赖；生产侧需先部署支持新列和 FILE 类型的后端，再上传工作簿。
+- **Remaining work**: 完成代码/模板修改、生成 Excel、执行 focused verification 并记录结果。
+- **Turn status**: in-progress
+
+### Delivery entry: 2026-09-01 21:46:00 +08:00
+
+- **Beijing time**: 2026-09-01 21:46:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: f516733f4791abd714b7dfc1706732bcc56b502f
+- **User goal**: 先统一生成固定采购属性，保证资产分类配置可正常导入。
+- **Key decisions**: 38 个分类统一填“实物入库”+“消耗型”；新增分类表交付/持有模式列；导入器新增 FILE(6)“图片/文件”类型。
+- **Execution or analysis result**: 已从本地 MySQL 读取 38 个分类、69 个字段并生成两工作表 Excel；后端资源模板已同步替换。
+- **Changed files**: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; `backend/yudao-module-eam/src/main/resources/eam/eam-category-config-template.xlsx`; `outputs/eam-category-config/中世健EAM分类配置-统一初始属性.xlsx`; 本 handoff 文件。
+- **Verification evidence**: Artifact workbook 重新导入成功；工作表为 `分类!A1:J39`、`字段!A1:I70`；数据计数 38/69；公式错误扫描 0；`mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile` BUILD SUCCESS；`git diff --check` 通过。按 `*Category*` 的 Maven 测试命令因 reactor 前置模块无匹配测试而失败，未能执行该筛选测试。
+- **Dependency or integration impact**: 不新增依赖、不执行生产导入或数据库修改；目标生产后端需先部署新导入器，再上传工作簿。
+- **Remaining work**: 生产环境执行预检后再确认导入；统一采购属性后续可通过同一模板调整。
+- **Turn status**: implementation-complete; production-validation-pending
+
+### Delivery entry: 2026-09-01 21:50:00 +08:00
+
+- **Beijing time**: 2026-09-01 21:50:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: f516733f4791abd714b7dfc1706732bcc56b502f
+- **User goal**: 修复分类配置导入预检出现 `undefined` 统计、子分类未识别和管理端必填误报。
+- **Key decisions**: 对旧版后端缺少统计字段的响应做前端默认归一化；子分类统计可从明细项回退计算；缺失 `allManagementFieldsOptional` 按兼容安全默认值处理。
+- **Execution or analysis result**: 已修改 Admin EAM 分类导入 API；后端 EAM 编译通过。确认问题来源是生产接口仍运行旧版响应契约，而非 Excel 中没有子分类。
+- **Changed files**: `frontend/admin/src/api/eam/category/index.ts`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; 本 handoff 文件。
+- **Verification evidence**: `mvn -f backend/pom.xml -pl yudao-module-eam -am -DskipTests compile` BUILD SUCCESS；`git diff --check` 通过；Admin `vue-tsc` 因 Node 堆内存上限失败，未完成类型检查。
+- **Dependency or integration impact**: 不新增依赖；需重新部署后端和 Admin 前端后，旧接口字段缺失提示才会消失。
+- **Remaining work**: 生产环境部署新后端/前端后重新上传 Excel 做真实预检；如仍有冲突，读取明细项中的具体冲突原因。
+- **Turn status**: implementation-complete; deployment-validation-pending
+
 ### Delivery entry: 2026-08-31 22:42:30 +08:00
 
 - **Beijing time**: 2026-08-31 22:42:30 +08:00

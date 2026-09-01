@@ -39,6 +39,27 @@ export interface CategoryImportRespVO {
   items: CategoryImportItemVO[]
 }
 
+/** 兼容尚未部署新统计字段的旧版 EAM 后端响应。 */
+const normalizeImportResponse = (response: Partial<CategoryImportRespVO>): CategoryImportRespVO => {
+  const items = Array.isArray(response.items) ? response.items : []
+  const numberOrZero = (value: unknown) => (typeof value === 'number' ? value : 0)
+  return {
+    createCount: numberOrZero(response.createCount),
+    updateCount: numberOrZero(response.updateCount),
+    skipCount: numberOrZero(response.skipCount),
+    conflictCount: numberOrZero(response.conflictCount),
+    categoryCount: numberOrZero(response.categoryCount) || items.filter((item) => item.kind === 'CATEGORY').length,
+    leafCategoryCount:
+      numberOrZero(response.leafCategoryCount) ||
+      items.filter((item) => item.kind === 'CATEGORY' && item.message?.includes('子分类')).length,
+    fieldCount: numberOrZero(response.fieldCount) || items.filter((item) => item.kind === 'FIELD').length,
+    legacyFieldCount: numberOrZero(response.legacyFieldCount),
+    credentialFieldCount: numberOrZero(response.credentialFieldCount),
+    allManagementFieldsOptional: response.allManagementFieldsOptional !== false,
+    items
+  }
+}
+
 // 查询资产分类列表
 export const getCategoryList = async () => {
   return await request.get({ url: '/eam/category/list' })
@@ -75,9 +96,9 @@ const uploadImport = async (url: string, file: File) => {
 }
 
 export const previewImport = async (file: File) => {
-  return await uploadImport('/eam/category/import/preview', file)
+  return normalizeImportResponse(await uploadImport('/eam/category/import/preview', file))
 }
 
 export const commitImport = async (file: File) => {
-  return await uploadImport('/eam/category/import/commit', file)
+  return normalizeImportResponse(await uploadImport('/eam/category/import/commit', file))
 }
