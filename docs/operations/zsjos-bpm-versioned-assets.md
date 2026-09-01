@@ -2,7 +2,7 @@
 
 `script/bpm/manifest.json` 是业务流程资产的交付清单，包括 ZSJOS 业务流程和 EAM 资产流转审批。仓库语义版本与 Flowable 自动生成的定义版本分别登记，不能假设编号相同。已发布目录不可覆盖；流程变更必须新增语义版本目录并更新清单与 SHA-256。
 
-资产版本必须使用严格的 SemVer，且目录版本、文件路径和清单登记的 Process Key 必须一致。BPMN 资产使用 `process.bpmn20.xml`，Simple 设计器资产使用可由“导入模型”直接上传的 `process-model.json`。发布前运行 `python script/bpm/validate_manifest.py`，确认资产格式、Process Key、任务 Key、候选人变量、推荐版本和 SHA-256 全部通过；BPMN 资产还会检查 BPMN DI。CI 会以目标分支基线校验已发布资产的路径和校验和不可变；本地可使用 `--base-ref <ref>` 执行同样的基线检查。fresh bootstrap 在全部 Core/EAM 前置迁移完成后，通过 `script/sql/mysql/05-bootstrap-bpm-models.sql` 为租户 1 创建清单中的未发布模型，但明确排除 `zsjos_partner_open_request`；已有环境的清单模型仍由管理员在 BPM 管理页面人工导入，排除模型不通过该脚本创建。两种路径都不自动发布或启用流程定义。人工导入时，后端忽略文件中的管理员用户编号并将当前导入人设为模型管理员；bootstrap 模型则把租户 1 当时全部启用用户记录为初始模型管理员，最终操作仍受 BPM 菜单权限控制。
+资产版本必须使用严格的 SemVer，且目录版本、文件路径和清单登记的 Process Key 必须一致。BPMN 资产使用 `process.bpmn20.xml`，Simple 设计器资产使用可由“导入模型”直接上传的 `process-model.json`。发布前运行 `python script/bpm/validate_manifest.py`，确认资产格式、Process Key、任务 Key、候选人变量、推荐版本和 SHA-256 全部通过；BPMN 资产还会检查 BPMN DI。CI 会以目标分支基线校验已发布资产的路径和校验和不可变；本地可使用 `--base-ref <ref>` 执行同样的基线检查。管理员在 BPM 管理页面人工载入清单推荐文件并发布，不启用应用启动自动部署。导入模型时，后端忽略文件中的管理员用户编号并将当前导入人设为模型管理员，避免跨环境复制用户关系。
 
 每次发布记录资产版本、SHA-256、Flowable 定义 ID、Flowable 版本、部署时间和操作人。发布后核对 Process Key 和任务 Key，并以受控业务请求创建一个新实例验证待办。新定义只服务新实例，不迁移、不重启、不改写在途实例。
 

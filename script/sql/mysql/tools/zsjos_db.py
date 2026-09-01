@@ -188,15 +188,8 @@ def migrations_for(code: str, manifest: dict) -> list[Migration]:
     numbers = [migration.number for migration in migrations]
     if numbers and numbers[0] != 1:
         fail(f"Migration versions must start at V001 for {code}: {numbers}")
-    # Some reviewed migrations deliberately share a version marker (e.g. the two
-    # V162 files under script/sql/mysql/migrations, applied in fixed order by
-    # bootstrap.sql). Accept exactly one shared pair as long as the deduplicated
-    # sequence is otherwise continuous; reject any other discontinuity.
-    unique_numbers = sorted(set(numbers))
     if numbers and numbers != list(range(numbers[0], numbers[-1] + 1)):
-        shared = numbers == sorted(numbers) and len(unique_numbers) == len(numbers) - 1
-        if not (shared and unique_numbers == list(range(unique_numbers[0], unique_numbers[-1] + 1))):
-            fail(f"Migration versions are not continuous for {code}: {numbers}")
+        fail(f"Migration versions are not continuous for {code}: {numbers}")
     return migrations
 
 
@@ -448,7 +441,7 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
             record = installed.get((code, migration.version))
             if record:
                 recorded_checksum, release = record
-                if release not in ("legacy", "baseline", "pending") and recorded_checksum != migration.checksum:
+                if release not in ("legacy", "baseline") and recorded_checksum != migration.checksum:
                     fail(
                         f"Applied migration checksum changed: {code}/{migration.path.name}; "
                         "restore the applied file and create a new migration"
@@ -456,22 +449,6 @@ def pending_migrations(manifests: dict[str, dict], installed: dict[tuple[str, st
             else:
                 pending.append(migration)
     return pending
-
-
-def foreign_key_semantic_signature(signature: tuple) -> tuple:
-    # RESTRICT and NO ACTION are equivalent referential actions in MySQL/InnoDB.
-    # Normalize both to a single token so identical constraints are not reported
-    # as drift merely because information_schema reports NO ACTION while the
-    # reviewed schema file declares RESTRICT.
-    def norm(rule: str) -> str:
-        return "RESTRICT" if rule.upper() in ("RESTRICT", "NO ACTION") else rule.upper()
-    return (
-        signature[0],
-        signature[1].lower(),
-        signature[2],
-        norm(signature[3]) if len(signature) > 3 else signature[3],
-        norm(signature[4]) if len(signature) > 4 else signature[4],
-    )
 
 
 def schema_drift(client: MysqlClient, manifests: dict[str, dict]) -> list[str]:
@@ -569,7 +546,7 @@ def schema_drift(client: MysqlClient, manifests: dict[str, dict]) -> list[str]:
         actual = actual_foreign_keys.get(key)
         if actual is None:
             drift.append(f"missing foreign key {key[0]}.{key[1]}")
-        elif actual != signature and foreign_key_semantic_signature(signature) != foreign_key_semantic_signature(actual):
+        elif actual != signature:
             drift.append(f"foreign key differs {key[0]}.{key[1]} expected={signature} actual={actual}")
     for key in sorted(actual_foreign_keys):
         if key[0] in desired_tables and key not in desired_foreign_keys:

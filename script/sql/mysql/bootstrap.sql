@@ -18,39 +18,8 @@ SOURCE script/sql/mysql/01-bootstrap-system-seed.sql;
 SOURCE script/sql/mysql/02-bootstrap-zsjos-seed.sql;
 SOURCE script/sql/mysql/03-bootstrap-dictionary-types.sql;
 SOURCE script/sql/mysql/04-bootstrap-zsjos-feedback-dictionary.sql;
-SOURCE script/sql/mysql/migrations/V001__lead_product_ref_nullable.sql;
-SOURCE script/sql/mysql/migrations/V002__lead_management_menu.sql;
-SOURCE script/sql/mysql/migrations/V003__claim_pool_dual_frontend.sql;
-SOURCE script/sql/mysql/migrations/V004__lead_attachment_private_read.sql;
-SOURCE script/sql/mysql/migrations/V005__lead_inbox_filter_config.sql;
-SOURCE script/sql/mysql/migrations/V006__lead_acceptance_follow_up.sql;
-SOURCE script/sql/mysql/migrations/V007__split_lead_inbox_audiences.sql;
-SOURCE script/sql/mysql/migrations/V008__lead_follow_up_and_today_tasks.sql;
-SOURCE script/sql/mysql/migrations/V009__online_round_robin_dispatch.sql;
-SOURCE script/sql/mysql/migrations/V010__personal_message_center.sql;
-SOURCE script/sql/mysql/migrations/V011__configurable_business_notifications.sql;
-SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
-SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
-SOURCE script/sql/mysql/migrations/V014__lead_qualification_and_suspension.sql;
-SOURCE script/sql/mysql/migrations/V015__lead_three_level_appeal.sql;
-SOURCE script/sql/mysql/migrations/V016__complete_lead_notify_templates.sql;
-SOURCE script/sql/mysql/migrations/V017__lead_invalid_remark_templates.sql;
-SOURCE script/sql/mysql/migrations/V018__lead_actions_and_opportunity_followups.sql;
-SOURCE script/sql/mysql/migrations/V019__normalize_historical_valid_leads.sql;
-SOURCE script/sql/mysql/migrations/V020__unified_schema_migration_and_crm_tables.sql;
-SOURCE script/sql/mysql/migrations/V021__lead_intended_product_active_unique_key.sql;
-SOURCE script/sql/mysql/migrations/V022__workbench_foundation.sql;
-SOURCE script/sql/mysql/migrations/V023__sales_order_dual_approval.sql;
-SOURCE script/sql/mysql/migrations/V024__zsjos_bpm_readonly_forms.sql;
-SOURCE script/sql/mysql/migrations/V025__sales_order_workbench_views.sql;
-SOURCE script/sql/mysql/migrations/V026__lead_appeal_reviewer_snapshot.sql;
-SOURCE script/sql/mysql/migrations/V027__configurable_notification_channels.sql;
-SOURCE script/sql/mysql/migrations/V028__notify_channel_adapters.sql;
-SOURCE script/sql/mysql/migrations/V029__sales_order_approval_filter_scheme.sql;
-SOURCE script/sql/mysql/migrations/V030__zsjos_login_security.sql;
 SOURCE script/sql/mysql/migrations/V031__timed_business_notifications.sql;
 SOURCE script/sql/mysql/migrations/V032__normalize_lead_inbox_filter_keys.sql;
-SOURCE script/sql/mysql/migrations/V033__split_work_plan_query_permission.sql;
 SOURCE script/sql/mysql/migrations/V034__lead_aging_collaboration_pool.sql;
 SOURCE script/sql/mysql/migrations/V035__cancel_invalid_lead_pending_tasks.sql;
 SOURCE script/sql/mysql/migrations/V036__subordinate_sales_management.sql;
@@ -75,10 +44,6 @@ SOURCE script/sql/mysql/migrations/V054__lead_business_number.sql;
 SOURCE script/sql/mysql/migrations/V055__sales_order_supervisor_confirmation.sql;
 SOURCE script/sql/mysql/migrations/V056__crm_lifecycle_confirmed_rules.sql;
 SOURCE script/sql/mysql/migrations/V057__lead_runtime_settings.sql;
-SOURCE script/sql/mysql/migrations/V058__hrm_fms_metadata_and_data_cleanup.sql;
-SOURCE script/sql/mysql/migrations/V059__split_filter_json_array_repair.sql;
-SOURCE script/sql/mysql/migrations/V060__migration_registry_reconciliation.sql;
-SOURCE script/sql/mysql/migrations/V061__sales_order_supervisor_menu_id_collision.sql;
 SOURCE script/sql/mysql/migrations/V062__finance_order_export_permission.sql;
 SOURCE script/sql/mysql/migrations/V063__partner_portal_app_api_role.sql;
 SOURCE script/sql/mysql/migrations/V064__bpm_model_import_permission.sql;
@@ -121,14 +86,10 @@ SOURCE script/sql/mysql/migrations/V100__new_media_role_menu_permissions.sql;
 SOURCE script/sql/mysql/migrations/V101__student_basic_info_permission.sql;
 SOURCE script/sql/mysql/migrations/V102__new_media_business_notifications.sql;
 SOURCE script/sql/mysql/migrations/V103__repair_new_media_operator_director_menu.sql;
-SOURCE script/sql/mysql/migrations/V104__new_media_business_dictionary.sql;
-SOURCE script/sql/mysql/migrations/V105__production_ticket_delivery_time_compatibility.sql;
 SOURCE script/sql/mysql/migrations/V106__media_review_graduation_closure.sql;
-SOURCE script/sql/mysql/migrations/V107__new_media_role_operation_permissions.sql;
 SOURCE script/sql/mysql/migrations/V108__new_media_supervisor_review_permissions.sql;
-SOURCE script/sql/mysql/migrations/V109__local_media_bpm_publisher_permission.sql;
-SOURCE script/sql/mysql/migrations/V110__media_account_rebind_callback.sql;
-SOURCE script/sql/mysql/migrations/V111__new_media_operator_partner_student_link_permission.sql;
+SOURCE script/sql/mysql/migrations/V012__system_area_management.sql;
+SOURCE script/sql/mysql/migrations/V013__configurable_area_other_nodes.sql;
 SOURCE script/sql/mysql/migrations/V112__repair_registration_planner_notification_template.sql;
 SOURCE script/sql/mysql/migrations/V113__media_student_center_consolidation.sql;
 SOURCE script/sql/mysql/migrations/V114__student_delivery_stages.sql;
@@ -180,6 +141,9 @@ SOURCE script/sql/mysql/migrations/V159__public_sea_terminology.sql;
 SOURCE script/sql/mysql/migrations/V160__registration_case_close_service.sql;
 SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
 SOURCE script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql;
+-- The purchase-draft file shares the historical V162 marker and uses
+-- INSERT IGNORE for compatibility. Run the canonical permission migration
+-- first so the legacy V162 registry row is created exactly once.
 SOURCE script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql;
 SOURCE script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql;
 SOURCE script/sql/mysql/migrations/V164__notice_highlight_until.sql;
@@ -235,7 +199,3 @@ VALUES
   ('eam','V009','eam public asset access',SHA2('V009__eam_public_asset_access.sql',256),'baseline',NOW()),
   ('eam','V010','eam asset transfer approval',SHA2('V010__eam_asset_transfer_approval.sql',256),'baseline',NOW()),
   ('eam','V011','eam asset data scope',SHA2('V011__eam_asset_data_scope.sql',256),'baseline',NOW());
-
--- Models are seeded only after every declared Core and EAM prerequisite has
--- completed. They remain unpublished until an administrator reviews and deploys them.
-SOURCE script/sql/mysql/05-bootstrap-bpm-models.sql;
