@@ -39,7 +39,13 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
             "多行文本", EamFieldTypeEnum.TEXTAREA.getType(),
             "数字", EamFieldTypeEnum.NUMBER.getType(),
             "日期", EamFieldTypeEnum.DATE.getType(),
-            "下拉选择", EamFieldTypeEnum.SELECT.getType());
+            "下拉选择", EamFieldTypeEnum.SELECT.getType(),
+            "图片/文件", EamFieldTypeEnum.FILE.getType());
+
+    private static final Map<String, Integer> DELIVERY_MODES = Map.of(
+            "实物入库", 1, "数字交付", 2);
+    private static final Map<String, Integer> CUSTODY_MODES = Map.of(
+            "消耗型", 1, "需归还型", 2);
 
     @Resource
     private EamCategoryService categoryService;
@@ -120,6 +126,9 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
             } else if (duplicateCodes.contains(row.code())) {
                 action = "CONFLICT";
                 message = "分类编码在模板中重复";
+            } else if (!DELIVERY_MODES.containsValue(row.deliveryMode()) || !CUSTODY_MODES.containsValue(row.custodyMode())) {
+                action = "CONFLICT";
+                message = "交付模式或持有模式不支持";
             } else if (StrUtil.isNotBlank(row.parentCode())
                     && !fileCodes.contains(row.parentCode()) && !current.containsKey(row.parentCode())) {
                 action = "CONFLICT";
@@ -197,7 +206,8 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
 
     private CategoryRow parseCategory(Map<Integer, String> row) {
         return new CategoryRow(cell(row, 0), cell(row, 1), cell(row, 2), parseStatus(cell(row, 3)),
-                parseInteger(cell(row, 4), 0), parseMode(cell(row, 5)), StrUtil.blankToDefault(cell(row, 6), "个"), cell(row, 7));
+                parseInteger(cell(row, 4), 0), parseMode(cell(row, 5)), StrUtil.blankToDefault(cell(row, 6), "个"), cell(row, 7),
+                parseDeliveryMode(cell(row, 8)), parseCustodyMode(cell(row, 9)));
     }
 
     private FieldRow parseField(Map<Integer, String> row) {
@@ -209,6 +219,7 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
         EamCategorySaveReqVO req = new EamCategorySaveReqVO();
         req.setParentId(parentId); req.setCode(row.code()); req.setName(row.name()); req.setStatus(row.status());
         req.setSort(row.sort()); req.setManagementMode(row.managementMode()); req.setUnit(row.unit()); req.setRemark(row.remark());
+        req.setDeliveryMode(row.deliveryMode()); req.setCustodyMode(row.custodyMode());
         return req;
     }
 
@@ -238,6 +249,7 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
         return Objects.equals(existing.getParentId(), parentId) && Objects.equals(existing.getName(), row.name())
                 && Objects.equals(existing.getStatus(), row.status()) && Objects.equals(existing.getSort(), row.sort())
                 && Objects.equals(existing.getManagementMode(), row.managementMode()) && Objects.equals(existing.getUnit(), row.unit())
+                && Objects.equals(existing.getDeliveryMode(), row.deliveryMode()) && Objects.equals(existing.getCustodyMode(), row.custodyMode())
                 && Objects.equals(StrUtil.nullToEmpty(existing.getRemark()), StrUtil.nullToEmpty(row.remark()));
     }
 
@@ -295,10 +307,13 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
     private static int parseInteger(String value, int fallback) { try { return Integer.parseInt(value); } catch (Exception ignored) { return fallback; } }
     private static int parseStatus(String value) { return "关闭".equals(value) || "1".equals(value) ? 1 : 0; }
     private static int parseMode(String value) { return "批量".equals(value) || "2".equals(value) ? EamManagementModeEnum.BATCH.getMode() : EamManagementModeEnum.SERIALIZED.getMode(); }
+    private static Integer parseDeliveryMode(String value) { return DELIVERY_MODES.getOrDefault(value, parseInteger(value, 1)); }
+    private static Integer parseCustodyMode(String value) { return CUSTODY_MODES.getOrDefault(value, parseInteger(value, 1)); }
     private static boolean parseBoolean(String value, boolean fallback) { return StrUtil.isBlank(value) ? fallback : Set.of("是", "true", "1").contains(value.toLowerCase()); }
 
     private record CategoryRow(String code, String name, String parentCode, Integer status, Integer sort,
-                               Integer managementMode, String unit, String remark) {}
+                               Integer managementMode, String unit, String remark, Integer deliveryMode,
+                               Integer custodyMode) {}
     private record FieldRow(String categoryCode, String fieldKey, String fieldName, String fieldType,
                              String optionSource, String dictType, Boolean adminVisible, Integer sort, String remark,
                              Set<Integer> providedColumns) {
