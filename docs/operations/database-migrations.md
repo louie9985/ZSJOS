@@ -81,6 +81,12 @@ first; an environment without `zsjos_order.submission_request_fingerprint` must 
 start that application version. Historical orders are not backfilled with fabricated
 request fingerprints.
 
+After all Core and EAM prerequisites complete, fresh bootstrap sources
+`05-bootstrap-bpm-models.sql` to create 11 unpublished tenant-1 BPM models and their
+editor resources. It excludes `zsjos_partner_open_request`, preserves existing
+tenant/key models, and creates no deployment, process definition, or process instance.
+Existing environments continue to use the reviewed manual-import procedure.
+
 ## Every production database update
 
 Run these commands from the reviewed release directory:

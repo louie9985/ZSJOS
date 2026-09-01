@@ -6,8 +6,10 @@ company-wide inventory, employee holdings, lifecycle tasks, and their menu permi
 in ownership columns are discarded rather than reinterpreted as employee IDs; development
 records that still need an owner must be reassigned through the HRM employee selector.
 
-The module is non-destructive and repeatable. It never creates purchase, inventory,
-employee-asset, or test business rows. Existing categories are deliberately left with
+The module is non-destructive and repeatable. V006 creates its six baseline root categories
+and six non-credential custom fields for bootstrap tenant `1`; it does not create tenant-0
+category rows. It never creates purchase, inventory, employee-asset, or test business rows.
+Existing categories are deliberately left with
 null delivery/custody policies; an administrator must confirm root-category policies
 before those categories can be used by new procurement records.
 
@@ -31,8 +33,9 @@ owned by BPM, not by EAM tables.
 
 V010 adds immutable transfer snapshots, return/loan-return inspection fields, optimistic locking,
 and the transfer cancel/inspect/workbench permissions. New receive, borrow and allocation records
-start versioned SIMPLE BPM key `eam_asset_transfer`; its `process-model.json` is imported through
-the BPM model administration page. Return and give-back records wait for administrator
+start versioned SIMPLE BPM key `eam_asset_transfer`. A fresh tenant-1 bootstrap creates the
+unpublished Simple model after EAM V011; existing environments import `process-model.json`
+through the BPM model administration page. Return and give-back records wait for administrator
 inspection. Existing transfer rows are not rewritten, and legacy `eam-transfer` instances remain
 readable until they finish.
 
