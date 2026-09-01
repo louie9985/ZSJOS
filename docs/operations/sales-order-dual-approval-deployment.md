@@ -1,12 +1,12 @@
 # 成交订单双中心会签部署
 
-当前推荐资产为 `script/bpm/zsjos_sales_order_dual_approval/1.0.0/process.bpmn20.xml`，流程 Key 固定为 `zsjos_sales_order_dual_approval`。发布前必须运行 `python script/bpm/validate_manifest.py`，并按 `script/bpm/manifest.json` 核对资产版本和 SHA-256。管理员必须在 BPM 管理页面受控创建模型、载入文件、发布并启用，不使用全局自动部署。
+当前推荐资产为 `script/bpm/zsjos_sales_order_dual_approval/1.0.0/process.bpmn20.xml`，流程 Key 固定为 `zsjos_sales_order_dual_approval`。发布前必须运行 `python script/bpm/validate_manifest.py`，并按 `script/bpm/manifest.json` 核对资产版本和 SHA-256。fresh bootstrap 会创建未发布模型；已有环境仍由管理员受控创建模型并载入文件。两种路径都必须由管理员审核、发布并启用，不使用全局自动部署。
 
 发布前按顺序完成：
 
 1. 先集成并执行 V021、V022，再依次执行 `V023__sales_order_dual_approval.sql`、`V024__zsjos_bpm_readonly_forms.sql`、`V025__sales_order_workbench_views.sql`、V026-V028，最后执行 `V029__sales_order_approval_filter_scheme.sql`。缺少 V022 的环境不得继续执行或发布；V029 依赖 V005 的筛选方案表和 V023 的流程定义元数据。
 2. 在 V054 之后执行 `V055__sales_order_supervisor_confirmation.sql`，在迁移链到达 V060 后执行 V061，并在 V075 后执行 `V076__unify_sales_order_approval_entry.sql`。确认 `zsjos_order_approval_config` 的报名履约与财务根部门 ID 有效，且两个部门树均至少有一名启用用户；部门负责人也是普通审批人。需要处理主管确认的订单正式销售，其当前直属部门必须配置启用、不同于销售本人且拥有主管确认权限的 `leaderUserId`。
-3. 在 Admin 进入“工作流程 → 流程管理 → 流程模型”，新建 BPMN 模型：流程标识填写 `zsjos_sales_order_dual_approval`，流程名称填写“成交订单双中心会签”，设为不可见、发起范围为全员，并指定流程管理员。
+3. 在 Admin 进入“工作流程 → 流程管理 → 流程模型”。fresh bootstrap 环境复核已有的未发布模型；已有环境新建 BPMN 模型，流程标识填写 `zsjos_sales_order_dual_approval`，流程名称填写“成交订单双中心会签”，设为不可见、发起范围为全员，并指定流程管理员。
 4. 在“表单设计”选择“成交会签流程关联信息”。该表单只读，只展示 `orderId`、用户可见的 `leadNo` 和 `roundNo`；内部流程变量仍保留 `leadId` 用于业务关联。订单仍由 ZSJOS 工作台提交，不从 Admin 通用流程入口手工发起。
 5. 在“流程设计”点击“打开文件”，选择清单中当前推荐版本文件。不要使用模型列表顶部只接受 JSON 模型包的“导入模型”。发布记录必须登记资产版本、SHA-256、Flowable 定义 ID/版本、部署时间和操作人。
 6. 确认 `registrationReview` 与 `financeReview` 为并行任务组，模型 XML 中 `flowable:signEnable=false`；成交审批不要求签名。每组首个普通处理结果结束同组其余任务。保存并发布为新流程版本；不要迁移、重启或改写在途流程实例。

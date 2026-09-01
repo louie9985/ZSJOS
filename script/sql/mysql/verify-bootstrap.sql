@@ -2031,14 +2031,34 @@ SELECT 'V162 lead submit specify permission' AS check_name,
 SELECT 'EAM production baseline' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
              AND table_name IN ('eam_category','eam_category_field','eam_asset','eam_code_rule'))=4
-          AND (SELECT COUNT(*) FROM eam_category WHERE tenant_id=0 AND parent_id=0 AND deleted=b'0'
+          AND (SELECT COUNT(*) FROM eam_category WHERE tenant_id=1 AND parent_id=0 AND deleted=b'0'
                AND code IN ('IT','DIGITAL','FURNITURE','SUPPLIES','BOOKS','OTHER'))=6
-          AND (SELECT COUNT(*) FROM eam_category_field WHERE tenant_id=0 AND deleted=b'0')>=6
+          AND (SELECT COUNT(*) FROM eam_category_field WHERE tenant_id=1 AND deleted=b'0')>=6
           AND EXISTS (SELECT 1 FROM eam_code_rule WHERE tenant_id=0 AND category_id IS NULL AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM eam_asset WHERE deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM eam_stock_balance WHERE deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM eam_purchase WHERE deleted=b'0'), 'PASS','FAIL') AS result;
 
+SELECT 'BPM tenant-1 bootstrap models' AS check_name,
+       IF(EXISTS (SELECT 1 FROM bpm_category WHERE tenant_id=1 AND code='general-module' AND status=0 AND deleted=b'0')
+          AND (SELECT COUNT(DISTINCT model.KEY_) FROM ACT_RE_MODEL model
+               WHERE model.TENANT_ID_='1' AND model.KEY_ IN
+                 ('eam_asset_transfer','zsjos_feedback_requirement_approval','zsjos_media_reposition',
+                  'zsjos_media_rebind','zsjos_media_over_entitlement','zsjos_media_positioning_ip',
+                  'zsjos_sales_order_dual_approval','zsjos_lead_appeal_review','zsjos_lead_transfer_request',
+                  'zsjos_partner_withdrawal','zsjos_student_contact_extension'))=11
+          AND NOT EXISTS (SELECT 1 FROM ACT_RE_MODEL model
+             LEFT JOIN ACT_GE_BYTEARRAY source ON source.ID_=model.EDITOR_SOURCE_VALUE_ID_
+             WHERE model.TENANT_ID_='1' AND model.KEY_ IN
+                 ('eam_asset_transfer','zsjos_feedback_requirement_approval','zsjos_media_reposition',
+                  'zsjos_media_rebind','zsjos_media_over_entitlement','zsjos_media_positioning_ip',
+                  'zsjos_sales_order_dual_approval','zsjos_lead_appeal_review','zsjos_lead_transfer_request',
+                  'zsjos_partner_withdrawal','zsjos_student_contact_extension')
+               AND (model.DEPLOYMENT_ID_ IS NOT NULL OR source.ID_ IS NULL OR OCTET_LENGTH(source.BYTES_)=0
+                    OR JSON_VALID(model.META_INFO_)=0 OR JSON_LENGTH(JSON_EXTRACT(model.META_INFO_,'$.managerUserIds'))=0))
+          AND EXISTS (SELECT 1 FROM ACT_RE_MODEL model JOIN ACT_GE_BYTEARRAY extra ON extra.ID_=model.EDITOR_SOURCE_EXTRA_VALUE_ID_
+             WHERE model.TENANT_ID_='1' AND model.KEY_='eam_asset_transfer'
+               AND JSON_VALID(CONVERT(extra.BYTES_ USING utf8mb4))=1), 'PASS','FAIL') AS result;
 SELECT 'EAM module registry' AS check_name,
        IF((SELECT COUNT(*) FROM zsjos_module_schema_version
              WHERE module_code='eam' AND version IN
