@@ -29,4 +29,4 @@ VALUES ('V045', 'Register Vue components for dual-frontend Workbench menus',
 INSERT IGNORE INTO `zsjos_module_schema_version`
 (`module_code`,`version`,`description`,`checksum`,`release_version`,`installed_at`)
 VALUES ('core','V045','Register Vue components for dual-frontend Workbench menus',
-        SHA2('dual-frontend-workbench-menu-components-v1',256),'pending',NOW());
+        SHA2('dual-frontend-workbench-menu-components-v1',256),'baseline',NOW());
