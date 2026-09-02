@@ -95,6 +95,7 @@ CREATE TABLE IF NOT EXISTS `eam_asset` (
   `update_time`     datetime      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   `deleted`         bit(1)        NOT NULL DEFAULT b'0'    COMMENT '是否删除',
   `tenant_id`       bigint        NOT NULL DEFAULT 0       COMMENT '租户编号',
+  `version`         int           NOT NULL DEFAULT 0       COMMENT '乐观锁版本',
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_eam_asset_code` (`tenant_id`, `asset_code`, `deleted`),
   KEY `idx_eam_asset_category` (`tenant_id`, `category_id`),
@@ -495,3 +496,58 @@ CREATE TABLE IF NOT EXISTS `eam_employee_asset_task_item` (
   PRIMARY KEY (`id`), KEY `idx_eam_employee_asset_task_item_task` (`tenant_id`,`task_id`),
   KEY `idx_eam_employee_asset_task_item_asset` (`tenant_id`,`asset_id`), KEY `idx_eam_employee_asset_task_item_holding` (`tenant_id`,`holding_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='EAM 员工资产任务明细';
+
+CREATE TABLE IF NOT EXISTS `eam_public_asset_token` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `asset_id` bigint NOT NULL,
+  `token_hash` varchar(64) NOT NULL,
+  `status` tinyint NOT NULL DEFAULT '1',
+  `revoked_at` datetime DEFAULT NULL,
+  `version` int NOT NULL DEFAULT '1',
+  `creator` varchar(64) DEFAULT NULL,
+  `create_time` datetime NOT NULL,
+  `updater` varchar(64) DEFAULT NULL,
+  `update_time` datetime NOT NULL,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_eam_public_asset_token_hash` (`token_hash`),
+  UNIQUE KEY `uk_eam_public_asset_token_asset` (`tenant_id`,`asset_id`,`status`),
+  KEY `idx_eam_public_asset_token_tenant` (`tenant_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='EAM资产公开链接令牌';
+
+CREATE TABLE IF NOT EXISTS `eam_public_edit_audit` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `asset_id` bigint NOT NULL,
+  `employee_id` bigint DEFAULT NULL,
+  `client_ip` varchar(64) DEFAULT NULL,
+  `result_code` varchar(32) NOT NULL,
+  `failure_reason` varchar(255) DEFAULT NULL,
+  `creator` varchar(64) DEFAULT NULL,
+  `create_time` datetime NOT NULL,
+  `updater` varchar(64) DEFAULT NULL,
+  `update_time` datetime NOT NULL,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  KEY `idx_eam_public_edit_audit_asset` (`tenant_id`,`asset_id`),
+  KEY `idx_eam_public_edit_audit_time` (`tenant_id`,`create_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='EAM匿名编辑审计';
+
+CREATE TABLE IF NOT EXISTS `eam_public_edit_code` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint NOT NULL,
+  `employee_id` bigint NOT NULL,
+  `user_id` bigint NOT NULL,
+  `encrypted_code` varchar(512) NOT NULL,
+  `code_hmac` varchar(128) NOT NULL,
+  `status` tinyint NOT NULL DEFAULT '1',
+  `creator` varchar(64) DEFAULT NULL,
+  `create_time` datetime NOT NULL,
+  `updater` varchar(64) DEFAULT NULL,
+  `update_time` datetime NOT NULL,
+  `deleted` bit(1) NOT NULL DEFAULT b'0',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_eam_public_edit_code_employee` (`tenant_id`,`employee_id`),
+  KEY `idx_eam_public_edit_code_user` (`tenant_id`,`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='EAM行政员工公开编辑口令';
