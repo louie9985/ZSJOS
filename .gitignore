@@ -62,7 +62,8 @@ application-my.yaml
 **/.DS_Store
 
 .codex/
-/frontend/h5/node_modules/
+# Node.js dependencies (all projects and temporary tools)
+node_modules/
 
 # 浏览器调试产物（截图 / 控制台日志 / 页面快照）
 .playwright-cli/

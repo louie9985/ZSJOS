@@ -19946,3 +19946,49 @@ equestAttachments。
 - Dependencies: Java 25/Maven、Node.js/pnpm/npm、Docker Compose、现有 `deploy/production/zsjos-db`、Nginx/systemd 由部署环境提供；无新增依赖。
 - Integration order: 新增单文件环境加载与校验 -> 构建/数据库/进程/发布命令 -> 健康检查与回滚入口 -> Shell 静态验证 -> 追加交付记录。
 - Verification plan: `bash -n script/shell/deploy-production.sh`; `shellcheck`（若可用）；命令帮助和只读 `check`；不执行真实生产迁移、停止服务或发布。
+
+## Workstream Registration - 2026-09-01 22:00:00 +08:00
+
+- Workstream ID: `main-gitignore-node-modules`
+- Goal: 修复仓库误跟踪 `node_modules`，补充根目录统一忽略规则并移除当前已跟踪依赖文件。
+- Non-goals: 不删除本地依赖文件；不改写 Git 历史；不处理无关生成物或业务代码。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `558b776dfebd0ee2562908f516a11797224eb6c2`，保留当前工作树既有改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `.gitignore`；Git 索引中的 `tmp/eam-category-xlsx/node_modules`；本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: Git 忽略规则；无新增依赖。
+- Integration order: 补充根目录 `node_modules/` 规则 -> 从索引移除已跟踪依赖 -> 检查忽略命中和索引状态 -> 追加交付记录。
+- Verification plan: `git check-ignore -v --no-index`；`git ls-files` 定向计数；`git diff --check`；确认本地目录仍存在。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-01 22:05:00 +08:00
+
+- Workstream ID: `main-gitignore-node-modules`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `558b776dfebd0ee2562908f516a11797224eb6c2` (uncommitted worktree)
+- User goal: 修复仓库经常误推送 `node_modules` 的问题。
+- Key decisions: 在根 `.gitignore` 增加通用 `node_modules/` 规则；使用 `git rm -r --cached` 移除当前已跟踪的临时依赖，不删除本地文件，不改写 Git 历史。
+- Execution or analysis result: 根规则已生效；`tmp/eam-category-xlsx/node_modules` 的 3333 个索引条目已移除；本地路径保留为指向运行时缓存的 Junction。
+- Changed files: `.gitignore`; `tmp/eam-category-xlsx/node_modules`（从 Git 索引删除）；`handoff/main.md`。
+- Verification evidence: `git check-ignore -v --no-index tmp/eam-category-xlsx/node_modules/package.json` 命中 `.gitignore:66`；`git ls-files` 中 `node_modules` 数量为 0；`git diff --check` 无错误；本地 Junction 目标存在。
+- Dependency or integration impact: 无新增依赖、无业务代码或数据库变化；后续新建任意层级的 `node_modules` 默认不会进入 Git。
+- Remaining work: 需要提交本次删除和 `.gitignore` 修改；若要清理远程历史体积，需另行确认并执行历史重写。
+- Status: `delivered`
+
+## Delivery Entry - 2026-09-02 00:00:00 +08:00
+
+- Workstream ID: `main-production-deploy-script`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `f516733f4791abd714b7dfc1706732bcc56b502f` (uncommitted worktree)
+- User goal: 将生产完整发布流程统一接入 systemd，覆盖停服、构建、数据库迁移、release 安装、遗留 nohup 清理、systemd 启动和健康校验。
+- Key decisions: `deploy` 默认使用 `zsjos-backend.service`；完整流程不再由脚本 nohup 启动后端；严格校验 systemd 单元引用当前 release 和生产环境文件；保留旧 release 与 rollback，不自动回切数据库。
+- Execution or analysis result: 已将部署流程改为 systemd 交接，增加服务/端口/MainPID 校验、遗留 PID 安全清理和原子 current 链接切换；新增生产部署操作文档并补充 systemd/PID 环境变量示例。
+- Changed files: `script/shell/deploy-production.sh`; `deploy/production/.env.production`; `docs/operations/production-deployment.md`; `handoff/main.md`。
+- Verification evidence: Windows 环境无可用 Bash/WSL bash，无法执行 `bash -n`、ShellCheck 或真实 systemd/生产发布；已完成静态 diff 检查和脚本逻辑审阅，待 Linux 生产同构环境验证。
+- Dependency or integration impact: 无新增 Maven/npm 依赖；依赖生产机 sudoers、systemd 单元、ss、Docker Compose 及现有数据库迁移入口；不修改业务代码或数据库脚本。
+- Remaining work: 在 Linux 生产同构环境执行 bash -n、ShellCheck、模拟 release 安装和完整发布演练；确认 systemd 单元的 ExecStart/EnvironmentFile/Restart 策略符合文档。
+- Status: `delivered`

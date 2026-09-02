@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-# ZSJOS production build, database migration, release and process helper.
+# ZSJOS production build, database migration, release and systemd handoff helper.
 # Usage: deploy-production.sh [check|build|db-plan|db-migrate|db-verify|start|stop|restart|health|deploy|rollback]
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,7 +35,7 @@ load_env() {
   JAVA_OPTS="${JAVA_OPTS:--Xms1g -Xmx2g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR}"
   DB_COMPOSE_FILE="${ZSJOS_DB_COMPOSE_FILE:-$REPO_DIR/deploy/production/compose.database.yml}"
   DB_ENV_FILE="${ZSJOS_DB_ENV_FILE:-$ENV_FILE}"
-  SYSTEMD_SERVICE="${ZSJOS_SYSTEMD_SERVICE:-}"
+  SYSTEMD_SERVICE="${ZSJOS_SYSTEMD_SERVICE:-zsjos-backend.service}"
   DB_URL="${ZSJOS_DB_URL:-jdbc:mysql://127.0.0.1:3306/${ZSJOS_DB_NAME:-zsjos}?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true}"
   DB_HOST="${ZSJOS_DB_HOST:-127.0.0.1}"
   DB_PORT="${ZSJOS_DB_PORT:-3306}"
@@ -69,16 +69,28 @@ check_tools() {
   need_cmd pnpm
   need_cmd docker
   need_cmd sha256sum
+  need_cmd sudo
+  need_cmd systemctl
+  need_cmd ss
   docker compose version >/dev/null 2>&1 || die "docker compose v2 is required"
   java -version 2>&1 | head -n 1
   node --version
   pnpm --version
 }
 
+check_systemd() {
+  sudo systemctl cat "$SYSTEMD_SERVICE" >/dev/null 2>&1 || die "systemd service not found: $SYSTEMD_SERVICE"
+  local unit
+  unit="$(sudo systemctl cat "$SYSTEMD_SERVICE")"
+  [[ "$unit" == *"$RELEASES_DIR/current"* ]] || die "systemd unit must reference $RELEASES_DIR/current"
+  [[ "$unit" == *"$ENV_FILE"* ]] || die "systemd unit must reference environment file: $ENV_FILE"
+}
+
 check() {
   load_env
   check_env
   check_tools
+  check_systemd
   [[ "$(git -C "$REPO_DIR" branch --show-current)" == "main" || "${ALLOW_NON_MAIN:-false}" == "true" ]] || warn "current branch is not main"
   log "environment: $ENV_FILE"
   log "release: $APP_VERSION"
@@ -156,70 +168,60 @@ install_release() {
   cp -a "$FRONTEND_WORKBENCH_DIR/dist/." "$release_dir/workbench/"
   cp -a "$FRONTEND_H5_DIR/dist/." "$release_dir/h5/"
   [[ -n "$old_release" && "$old_release" != "$release_dir" ]] && printf '%s\n' "$old_release" > "$RELEASES_DIR/previous-release"
-  ln -sfn "$release_dir" "$RELEASES_DIR/current"
+  ln -sfn "$release_dir" "$RELEASES_DIR/.current-$APP_VERSION"
+  mv -Tf "$RELEASES_DIR/.current-$APP_VERSION" "$RELEASES_DIR/current"
   ln -sfn "$release_dir/yudao-server.jar" "$REPO_DIR/yudao-server.jar"
   log "release installed: $release_dir"
 }
 
-running_pid() {
+legacy_pid() {
   [[ -f "$PID_FILE" ]] || return 0
   local pid
   pid="$(cat "$PID_FILE")"
   kill -0 "$pid" 2>/dev/null && printf '%s\n' "$pid" || true
 }
 
-stop_server() {
+port_pid() {
+  sudo ss -ltnp "sport = :$SERVER_PORT" 2>/dev/null \
+    | sed -n 's/.*pid=\([0-9][0-9]*\).*/\1/p' | head -n 1
+}
+
+systemd_main_pid() {
+  sudo systemctl show -p MainPID --value "$SYSTEMD_SERVICE" 2>/dev/null || true
+}
+
+stop_systemd() {
   load_env
-  local pid
-  pid="$(running_pid)"
-  if [[ -z "$pid" ]]; then
-    log "backend is not running"
-    rm -f "$PID_FILE"
-    return 0
-  fi
-  log "stopping backend pid=$pid"
-  kill -TERM "$pid"
+  log "stopping systemd service: $SYSTEMD_SERVICE"
+  sudo systemctl stop "$SYSTEMD_SERVICE"
   for _ in $(seq 1 120); do
+    sudo systemctl is-active --quiet "$SYSTEMD_SERVICE" || break
+    sleep 1
+  done
+  sudo systemctl is-active --quiet "$SYSTEMD_SERVICE" && die "systemd service did not stop: $SYSTEMD_SERVICE"
+}
+
+cleanup_legacy_pid() {
+  load_env
+  [[ -f "$PID_FILE" ]] || return 0
+  local pid command port_owner
+  pid="$(legacy_pid)"
+  [[ -n "$pid" ]] || { rm -f "$PID_FILE"; return 0; }
+  command="$(ps -p "$pid" -o args= 2>/dev/null || true)"
+  port_owner="$(port_pid)"
+  [[ "$command" == *"yudao-server.jar"* || "$port_owner" == "$pid" ]] || die "refusing to kill unrelated PID $pid from $PID_FILE"
+  log "stopping legacy nohup backend pid=$pid"
+  kill -TERM "$pid" 2>/dev/null || true
+  for _ in $(seq 1 30); do
     kill -0 "$pid" 2>/dev/null || break
     sleep 1
   done
   if kill -0 "$pid" 2>/dev/null; then
-    warn "backend did not stop gracefully; sending KILL"
+    warn "legacy backend did not stop gracefully; sending KILL"
     kill -KILL "$pid"
   fi
+  kill -0 "$pid" 2>/dev/null && die "legacy backend still running: $pid"
   rm -f "$PID_FILE"
-}
-
-start_server() {
-  load_env
-  mkdir -p "$LOG_DIR"
-  [[ -f "$RELEASES_DIR/current/yudao-server.jar" ]] || die "current release jar is missing; run build and deploy first"
-  [[ -z "$(running_pid)" ]] || die "backend is already running"
-  local log_file="$LOG_DIR/server-$(date +%Y%m%d).log"
-  log "starting backend on port $SERVER_PORT"
-  nohup env \
-    TZ="$TZ" \
-    SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE" \
-    SERVER_PORT="$SERVER_PORT" \
-    SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_URL="$DB_URL" \
-    SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_USERNAME="${ZSJOS_DB_APP_USER:-}" \
-    SPRING_DATASOURCE_DYNAMIC_DATASOURCE_MASTER_PASSWORD="${ZSJOS_DB_APP_PASSWORD:-}" \
-    SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_URL="$DB_URL" \
-    SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_USERNAME="${ZSJOS_DB_APP_USER:-}" \
-    SPRING_DATASOURCE_DYNAMIC_DATASOURCE_SLAVE_PASSWORD="${ZSJOS_DB_APP_PASSWORD:-}" \
-    SPRING_DATA_REDIS_HOST="$REDIS_HOST" \
-    SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
-    SPRING_DATA_REDIS_DATABASE="$REDIS_DATABASE" \
-    SPRING_DATA_REDIS_PASSWORD="${REDIS_PASSWORD:-}" \
-    ZSJOS_WECOM_WORKBENCH_BASE_URL="${ZSJOS_WECOM_WORKBENCH_BASE_URL:-}" \
-    ZSJOS_WECOM_PARTNER_H5_BASE_URL="${ZSJOS_WECOM_PARTNER_H5_BASE_URL:-}" \
-    ZSJOS_PUBLIC_H5_BASE_URL="${ZSJOS_PUBLIC_H5_BASE_URL:-}" \
-    java $JAVA_OPTS -jar "$RELEASES_DIR/current/yudao-server.jar" \
-    --server.port="$SERVER_PORT" \
-    --spring.profiles.active="$SPRING_PROFILES_ACTIVE" \
-    >> "$log_file" 2>&1 &
-  echo $! > "$PID_FILE"
-  log "backend pid=$(cat "$PID_FILE")"
 }
 
 health() {
@@ -227,18 +229,30 @@ health() {
   local url="${HEALTH_CHECK_URL:-http://127.0.0.1:$SERVER_PORT/actuator/health}"
   local code
   code="$(curl -k -L -sS -o /dev/null -w '%{http_code}' --max-time 10 "$url" || true)"
+  sudo systemctl is-active --quiet "$SYSTEMD_SERVICE" || die "systemd service is not active: $SYSTEMD_SERVICE"
+  local main_pid="$(systemd_main_pid)"
+  [[ -n "$main_pid" && "$main_pid" != "0" ]] || die "systemd service has no MainPID: $SYSTEMD_SERVICE"
+  [[ "$(port_pid)" == "$main_pid" ]] || die "port $SERVER_PORT is not owned by systemd MainPID $main_pid"
   [[ "$code" == "200" ]] || die "health check failed: $url ($code)"
   log "health check passed: $url"
 }
 
 deploy() {
+  load_env
+  check
+  stop_systemd
   build
   db_plan
   db_migrate
   db_verify
   install_release
-  stop_server || true
-  start_server
+  [[ -f "$RELEASES_DIR/current/yudao-server.jar" ]] || die "installed release jar is missing"
+  cleanup_legacy_pid
+  [[ -z "$(port_pid)" ]] || die "port $SERVER_PORT is still in use before starting $SYSTEMD_SERVICE"
+  log "starting systemd service: $SYSTEMD_SERVICE"
+  sudo systemctl start "$SYSTEMD_SERVICE"
+  sudo systemctl is-active --quiet "$SYSTEMD_SERVICE" || die "systemd service failed to start: $SYSTEMD_SERVICE"
+  sudo systemctl status --no-pager --full "$SYSTEMD_SERVICE" || true
   for _ in $(seq 1 120); do
     if health >/dev/null 2>&1; then return 0; fi
     sleep 1
@@ -253,8 +267,8 @@ rollback() {
   previous="$(cat "$RELEASES_DIR/previous-release" 2>/dev/null || true)"
   [[ -n "$previous" && -d "$previous" && "$previous" != "$current" ]] || die "no previous release is available"
   ln -sfn "$previous" "$RELEASES_DIR/current"
-  stop_server || true
-  start_server
+  stop_systemd
+  sudo systemctl start "$SYSTEMD_SERVICE"
   health
   warn "database was not rolled back; verify application/schema compatibility"
 }
@@ -269,9 +283,9 @@ Commands:
   db-plan     Show read-only production migration plan
   db-migrate  Apply pending production migrations
   db-verify   Verify production database after migration
-  start       Start the current backend release
-  stop        Stop the backend
-  restart     Restart the backend
+  start       Start the current release through systemd
+  stop        Stop the backend through systemd
+  restart     Restart the backend through systemd
   health      Check the local actuator health endpoint
   deploy      Build, migrate, verify, install and start a release
   rollback    Switch to the previous application release (database unchanged)
@@ -282,8 +296,8 @@ main() {
   local command="${1:-help}"
   case "$command" in
     check) check ;; build) build ;; db-plan) db_plan ;; db-migrate) db_migrate ;;
-    db-verify) db_verify ;; start) start_server ;; stop) stop_server ;;
-    restart) stop_server; start_server ;; health) health ;; deploy) deploy ;;
+    db-verify) db_verify ;; start) load_env; sudo systemctl start "$SYSTEMD_SERVICE" ;; stop) stop_systemd ;;
+    restart) stop_systemd; load_env; sudo systemctl start "$SYSTEMD_SERVICE" ;; health) health ;; deploy) deploy ;;
     rollback) rollback ;; help|-h|--help) usage ;; *) usage; die "unknown command: $command" ;;
   esac
 }
