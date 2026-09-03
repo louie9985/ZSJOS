@@ -14,6 +14,10 @@ SOURCE script/sql/mysql/04-bootstrap-zsjos-feedback-dictionary.sql;
 -- are reproduced here through their idempotent data statements.
 SOURCE script/sql/mysql/migrations/V104__new_media_business_dictionary.sql;
 SOURCE script/sql/mysql/migrations/V129__seed_director_form_dictionaries.sql;
+-- Full active dictionary snapshot from the reviewed source database. The dump
+-- contains only system_dict_type/system_dict_data rows with deleted=0 and is
+-- safe to replay with INSERT IGNORE.
+SOURCE script/sql/mysql/dictionary-data/current-database-dictionary-snapshot.sql;
 
 -- Current approved business dictionary snapshot. Keyed by dict_type + value
 -- so reruns preserve administrator edits and do not depend on row IDs.
