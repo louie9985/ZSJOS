@@ -20282,3 +20282,19 @@ equestAttachments。
 - Integration order: 管理端筛除钉钉 -> 员工端来源守护测试 -> 两端定向验证、类型检查和构建 -> 追加交付记录。
 - Verification plan: `frontend/workbench` 定向测试、`npm run typecheck`、`npm run build`；`frontend/admin` `pnpm ts:check`、`pnpm build:local`；scoped `git diff --check`。
 - Status: `in-progress`
+
+## Workstream Registration - 2026-09-03 14:00:00 +08:00
+
+- Workstream ID: `main-resolve-core-v162-duplicate`
+- Goal: 解决 Core 迁移目录两个 `V162` 文件同号问题，恢复唯一、可验证的迁移编号序列。
+- Non-goals: 不修改迁移业务 SQL 语义，不执行数据库写入，不调整分支、提交、推送或无关工作树改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `当前 HEAD（保留工作树既有改动）`
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql`（改名为 V178）、`script/sql/mysql/bootstrap.sql`、`script/sql/mysql/migrations/README.md`、`script/sql/mysql/verify-bootstrap.sql`、本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Core V177 迁移顺序与支付 V162/V163 历史兼容约定；无新增依赖。
+- Integration order: 重命名并更新权限迁移内部标记 -> 调整 bootstrap 顺序 -> 同步 README/校验引用 -> 静态迁移检查。
+- Verification plan: 检查 Core 迁移编号唯一且 V001-V178 连续、全仓引用一致、`git diff --check`，运行可用的迁移检查工具。
+- Status: `in-progress`
