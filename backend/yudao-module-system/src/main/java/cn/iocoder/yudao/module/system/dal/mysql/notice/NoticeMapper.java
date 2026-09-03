@@ -19,8 +19,14 @@ public interface NoticeMapper extends BaseMapperX<NoticeDO> {
     }
 
     default PageResult<NoticeDO> selectPublishedPage(cn.iocoder.yudao.framework.common.pojo.PageParam reqVO) {
+        return selectPublishedPage(reqVO, null);
+    }
+
+    default PageResult<NoticeDO> selectPublishedPage(cn.iocoder.yudao.framework.common.pojo.PageParam reqVO, Long userId) {
         return selectPage(reqVO, new QueryWrapperX<NoticeDO>()
                 .eq("publish_status", "PUBLISHED")
+                .and(userId != null, w -> w.isNull("audience_type").or().eq("audience_type", "ALL")
+                        .or().apply("EXISTS (SELECT 1 FROM system_notice_recipient r WHERE r.notice_id = system_notice.id AND r.user_id = {0} AND r.deleted = 0 AND r.tenant_id = system_notice.tenant_id)", userId))
                 .orderByDesc("CASE WHEN highlight_until IS NOT NULL AND highlight_until > NOW() THEN 1 ELSE 0 END")
                 .orderByDesc("publish_time").orderByDesc("id"));
     }

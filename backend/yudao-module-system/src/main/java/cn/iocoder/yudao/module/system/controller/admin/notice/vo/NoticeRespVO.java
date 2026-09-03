@@ -24,6 +24,10 @@ public class NoticeRespVO {
 
     @Schema(description = "状态，参见 CommonStatusEnum 枚举类", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
+    private String audienceType;
+    private List<Long> targetDeptIds;
+    private List<Long> targetUserIds;
+    private Integer recipientCount;
 
     @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED, example = "时间戳格式")
     private LocalDateTime createTime;

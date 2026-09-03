@@ -682,6 +682,7 @@ const removeProduct = async (row: ProductApi.ZsjosProductVO) => {
       message.success('产品已删除')
     } catch (e: any) {
       if (e?.msg) message.error(e.msg)
+      else message.error('产品删除失败，请稍后重试')
     }
   })
 }

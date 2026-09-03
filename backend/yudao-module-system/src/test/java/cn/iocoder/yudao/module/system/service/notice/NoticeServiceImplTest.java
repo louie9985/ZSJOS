@@ -14,6 +14,9 @@ import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeDO;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeAttachmentMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeReadMapper;
+import cn.iocoder.yudao.module.system.service.dept.DeptService;
+import cn.iocoder.yudao.module.system.service.permission.PermissionService;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import cn.iocoder.yudao.module.system.enums.notice.NoticePublishStatusEnum;
 import jakarta.annotation.Resource;
 import org.junit.jupiter.api.BeforeEach;
@@ -43,6 +46,9 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
     @MockitoBean private FileApi fileApi;
     @MockitoBean private XssCleaner xssCleaner;
     @MockitoBean private WebSocketSenderApi webSocketSenderApi;
+    @MockitoBean private DeptService deptService;
+    @MockitoBean private AdminUserService userService;
+    @MockitoBean private PermissionService permissionService;
 
     @BeforeEach
     void setUp() {

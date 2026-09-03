@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.service.notice;
 
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.enums.UserTypeEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
@@ -14,6 +15,9 @@ import cn.iocoder.yudao.module.system.controller.admin.notice.vo.*;
 import cn.iocoder.yudao.module.system.dal.dataobject.notice.*;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.*;
 import cn.iocoder.yudao.module.system.enums.notice.NoticePublishStatusEnum;
+import cn.iocoder.yudao.module.system.service.dept.DeptService;
+import cn.iocoder.yudao.module.system.service.permission.PermissionService;
+import cn.iocoder.yudao.module.system.service.user.AdminUserService;
 import jakarta.annotation.Resource;
 import org.jsoup.Jsoup;
 import org.springframework.stereotype.Service;
@@ -46,11 +50,16 @@ public class NoticeServiceImpl implements NoticeService {
     @Resource private FileApi fileApi;
     @Resource private XssCleaner xssCleaner;
     @Resource private WebSocketSenderApi webSocketSenderApi;
+    @Resource private NoticeRecipientMapper recipientMapper;
+    @Resource private DeptService deptService;
+    @Resource private AdminUserService userService;
+    @Resource private PermissionService permissionService;
 
     @Override
     @Transactional
     public Long createNotice(NoticeSaveReqVO reqVO, Long userId) {
         NoticeDO notice = BeanUtils.toBean(reqVO, NoticeDO.class);
+        applyAudience(notice, reqVO);
         notice.setContent(cleanContent(reqVO.getContent()));
         notice.setStatus(CommonStatusEnum.ENABLE.getStatus());
         notice.setPublishStatus(NoticePublishStatusEnum.DRAFT.getStatus());
@@ -67,6 +76,7 @@ public class NoticeServiceImpl implements NoticeService {
         Set<Long> existingFileIds = attachmentMapper.selectListByNoticeId(existing.getId()).stream()
                 .map(NoticeAttachmentDO::getInfraFileId).collect(Collectors.toSet());
         NoticeDO update = BeanUtils.toBean(reqVO, NoticeDO.class);
+        applyAudience(update, reqVO);
         update.setContent(cleanContent(reqVO.getContent()));
         update.setPublishStatus(null);
         update.setStatus(CommonStatusEnum.ENABLE.getStatus());
@@ -80,6 +90,7 @@ public class NoticeServiceImpl implements NoticeService {
         requireDraft(requireNotice(id));
         attachmentMapper.deleteByNoticeIds(List.of(id));
         readMapper.deleteByNoticeIds(List.of(id));
+        recipientMapper.deleteByNoticeIds(List.of(id));
         noticeMapper.deleteById(id);
     }
 
@@ -89,6 +100,7 @@ public class NoticeServiceImpl implements NoticeService {
         for (Long id : ids) requireDraft(requireNotice(id));
         attachmentMapper.deleteByNoticeIds(ids);
         readMapper.deleteByNoticeIds(ids);
+        recipientMapper.deleteByNoticeIds(ids);
         noticeMapper.deleteByIds(ids);
     }
 
@@ -120,7 +132,9 @@ public class NoticeServiceImpl implements NoticeService {
     @Override
     @Transactional
     public void publishNotice(Long id) {
-        requireDraft(requireNotice(id));
+        NoticeDO notice = requireNotice(id);
+        requireDraft(notice);
+        freezeRecipients(notice);
         NoticeDO update = new NoticeDO();
         update.setId(id);
         update.setPublishStatus(NoticePublishStatusEnum.PUBLISHED.getStatus());
@@ -154,6 +168,9 @@ public class NoticeServiceImpl implements NoticeService {
                 MAX_TITLE_LENGTH - COPY_TITLE_SUFFIX.length()) + COPY_TITLE_SUFFIX);
         copy.setType(source.getType());
         copy.setContent(source.getContent());
+        copy.setAudienceType(source.getAudienceType());
+        copy.setTargetDeptIds(source.getTargetDeptIds());
+        copy.setTargetUserIds(source.getTargetUserIds());
         copy.setStatus(CommonStatusEnum.ENABLE.getStatus());
         copy.setPublishStatus(NoticePublishStatusEnum.DRAFT.getStatus());
         noticeMapper.insert(copy);
@@ -170,7 +187,7 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     public PageResult<NoticeMyRespVO> getMyNoticePage(PageParam reqVO, Long userId) {
-        PageResult<NoticeDO> page = noticeMapper.selectPublishedPage(reqVO);
+        PageResult<NoticeDO> page = noticeMapper.selectPublishedPage(reqVO, userId);
         Map<Long, NoticeReadDO> reads = readMapper.selectListByNoticeIdsAndUserId(
                 page.getList().stream().map(NoticeDO::getId).toList(), userId).stream()
                 .collect(Collectors.toMap(NoticeReadDO::getNoticeId, Function.identity()));
@@ -180,6 +197,7 @@ public class NoticeServiceImpl implements NoticeService {
     @Override
     public NoticeMyRespVO getMyNotice(Long id, Long userId) {
         NoticeDO notice = requirePublishedNotice(id);
+        ensureRecipient(notice, userId);
         return toMyResp(notice, readMapper.selectByNoticeIdAndUserId(id, userId), true);
     }
 
@@ -188,7 +206,7 @@ public class NoticeServiceImpl implements NoticeService {
         PageParam all = new PageParam();
         all.setPageNo(1);
         all.setPageSize(PageParam.PAGE_SIZE_NONE);
-        List<NoticeDO> published = noticeMapper.selectPublishedPage(all).getList();
+        List<NoticeDO> published = noticeMapper.selectPublishedPage(all, userId).getList();
         Set<Long> readIds = readMapper.selectListByNoticeIdsAndUserId(
                 published.stream().map(NoticeDO::getId).toList(), userId).stream()
                 .map(NoticeReadDO::getNoticeId).collect(Collectors.toSet());
@@ -201,7 +219,8 @@ public class NoticeServiceImpl implements NoticeService {
 
     @Override
     public void markRead(Long id, Long userId) {
-        requirePublishedNotice(id);
+        NoticeDO notice = requirePublishedNotice(id);
+        ensureRecipient(notice, userId);
         if (readMapper.selectByNoticeIdAndUserId(id, userId) != null) return;
         NoticeReadDO read = new NoticeReadDO();
         read.setNoticeId(id);
@@ -231,6 +250,57 @@ public class NoticeServiceImpl implements NoticeService {
     private void requireDraft(NoticeDO notice) {
         if (!NoticePublishStatusEnum.DRAFT.getStatus().equals(notice.getPublishStatus())) {
             throw exception(NOTICE_NOT_DRAFT);
+        }
+    }
+
+    private void applyAudience(NoticeDO notice, NoticeSaveReqVO req) {
+        String type = StrUtil.blankToDefault(req.getAudienceType(), "ALL").toUpperCase(Locale.ROOT);
+        if (!Set.of("ALL", "TARGET").contains(type)) throw exception(NOTICE_RECIPIENT_INVALID);
+        List<Long> deptIds = distinctIds(req.getTargetDeptIds());
+        List<Long> userIds = distinctIds(req.getTargetUserIds());
+        if ("TARGET".equals(type) && deptIds.isEmpty() && userIds.isEmpty()) throw exception(NOTICE_RECIPIENT_INVALID);
+        if (!deptIds.isEmpty()) deptService.validateDeptList(deptIds);
+        if (!userIds.isEmpty()) userService.validateUserList(userIds);
+        notice.setAudienceType(type);
+        notice.setTargetDeptIds(JSONUtil.toJsonStr(deptIds));
+        notice.setTargetUserIds(JSONUtil.toJsonStr(userIds));
+    }
+
+    private List<Long> distinctIds(List<Long> ids) {
+        return ids == null ? List.of() : ids.stream().filter(Objects::nonNull).distinct().toList();
+    }
+
+    private void freezeRecipients(NoticeDO notice) {
+        recipientMapper.deleteByNoticeIds(List.of(notice.getId()));
+        if (!"TARGET".equals(notice.getAudienceType())) return;
+        Set<Long> deptIds = new LinkedHashSet<>(parseIds(notice.getTargetDeptIds()));
+        if (!deptIds.isEmpty()) deptIds.addAll(deptService.getChildDeptList(deptIds).stream().map(item -> item.getId()).toList());
+        Set<Long> userIds = new LinkedHashSet<>(parseIds(notice.getTargetUserIds()));
+        if (!deptIds.isEmpty()) userIds.addAll(userService.getUserListByDeptIds(deptIds).stream().map(item -> item.getId()).toList());
+        userIds.retainAll(permissionService.getEnabledUserIdsByPermission("system:notice:read"));
+        if (userIds.isEmpty()) throw exception(NOTICE_RECIPIENT_INVALID);
+        for (Long userId : userIds) {
+            NoticeRecipientDO recipient = new NoticeRecipientDO();
+            recipient.setNoticeId(notice.getId());
+            recipient.setUserId(userId);
+            recipientMapper.insert(recipient);
+        }
+    }
+
+    private List<Long> parseIds(String json) {
+        if (StrUtil.isBlank(json)) return List.of();
+        try {
+            return JSONUtil.parseArray(json).toList(Long.class);
+        } catch (RuntimeException ex) {
+            throw exception(NOTICE_RECIPIENT_INVALID);
+        }
+    }
+
+    private void ensureRecipient(NoticeDO notice, Long userId) {
+        if (!"TARGET".equals(notice.getAudienceType())) return;
+        if (recipientMapper.selectListByNoticeId(notice.getId()).stream()
+                .noneMatch(item -> Objects.equals(item.getUserId(), userId))) {
+            throw exception(NOTICE_RECIPIENT_INVALID);
         }
     }
 
@@ -282,6 +352,10 @@ public class NoticeServiceImpl implements NoticeService {
         NoticeRespVO result = BeanUtils.toBean(notice, NoticeRespVO.class);
         result.setHighlighted(isHighlighted(notice));
         result.setAttachments(attachmentMapper.selectListByNoticeId(notice.getId()).stream().map(this::toAttachmentVO).toList());
+        result.setTargetDeptIds(parseIds(notice.getTargetDeptIds()));
+        result.setTargetUserIds(parseIds(notice.getTargetUserIds()));
+        result.setRecipientCount("TARGET".equals(notice.getAudienceType())
+                ? recipientMapper.selectListByNoticeId(notice.getId()).size() : null);
         return result;
     }
 

@@ -580,6 +580,11 @@ subordinate-page permissions after compatibility grants are copied. It does not 
 account, ownership or historical converted records. Review the generated grant audit before controlled
 execution; rollback requires a forward permission migration.
 
+ V181 adds non-destructive announcement audience metadata and the immutable `system_notice_recipient`
+ snapshot table. It runs after V180, defaults historical notices to `ALL`, and is repeatable through guarded
+ DDL and version checks. Recipient snapshots are historical authorization facts and are not rolled back by
+ deleting rows.
+
 V148 and V150 use a single stored-procedure call as the failure boundary. This is required because GUI
 statement-batch clients may report a failed `CALL` and still execute later top-level statements. V148 uses
 `information_schema`-guarded dynamic DDL for its three `system_notice` lifecycle columns; do not replace it

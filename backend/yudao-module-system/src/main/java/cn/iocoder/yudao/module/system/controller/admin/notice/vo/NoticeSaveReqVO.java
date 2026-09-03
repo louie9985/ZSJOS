@@ -33,6 +33,15 @@ public class NoticeSaveReqVO {
     @Schema(description = "状态，参见 CommonStatusEnum 枚举类", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
     private Integer status;
 
+    @Schema(description = "接收范围：ALL 全员，TARGET 指定部门/用户")
+    private String audienceType = "ALL";
+
+    @Schema(description = "指定部门编号，包含部门及全部子部门成员")
+    private List<Long> targetDeptIds = new ArrayList<>();
+
+    @Schema(description = "指定用户编号")
+    private List<Long> targetUserIds = new ArrayList<>();
+
     @Schema(description = "高亮提醒截止时间，为空表示不高亮", example = "时间戳格式")
     private java.time.LocalDateTime highlightUntil;
 

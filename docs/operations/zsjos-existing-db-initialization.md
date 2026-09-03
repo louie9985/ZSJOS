@@ -1,16 +1,19 @@
 # 已有数据库配置补齐
 
-`script/sql/mysql/sync-existing-server-config.sql` 用于已有 ZSJOS 数据库的非破坏性补齐。
+`script/sql/mysql/sync-existing-server-config.sql` 用于已有 ZSJOS 数据库的非破坏性补齐和角色权限重建。
 
 ## SQL 执行范围
 
 脚本只执行以下操作：
 
 - 补齐 Core、ZSJOS、BPM 字典类型和仓库已审核的具体字典条目；
-- 按稳定的 `system_role.code` 与 `system_menu.permission` 补齐 V071 声明的角色授权；
-- 已存在的字典、角色、菜单和授权关系不更新、不删除、不禁用。
+- 先把租户 `1、121、122` 的原始 `system_role_menu` 行复制到
+  `zsjos_role_menu_backup_20260904`（按行 ID 幂等）；
+- 按 V071 精确白名单重建兼职、财务、申诉、老板和系统管理员的 ZSJOS 授权；
+- 普通用户重建为通用能力白名单，岗位角色只保留其已审核的业务权限，并清理已确认的越权授权；
+- 旧关系只做 `deleted=1` 逻辑删除，不删除用户、角色、菜单、字典或业务数据。
 
-脚本不会写入用户、业务实例、流程实例、任务、通知、上传文件或其他环境数据，也不会直接操作 Flowable 内部表。脚本会按当前已审核快照补齐 `zsjos_lead_category`（5 条）和 `zsjos_lead_source_channel`（5 条），按类型和值幂等执行，不覆盖管理员已有修改。
+脚本不会写入用户、用户角色绑定、业务实例、流程实例、任务、通知、上传文件或其他环境数据，也不会直接操作 Flowable 内部表。脚本会按当前已审核快照补齐 `zsjos_lead_category`（5 条）和 `zsjos_lead_source_channel`（5 条），按类型和值幂等执行，不覆盖管理员已有修改。备份表是本地恢复依据，不应跨环境直接复制。
 
 从仓库根目录执行：
 
@@ -18,7 +21,9 @@
 mysql --default-character-set=utf8mb4 -u USER -p DATABASE < script/sql/mysql/sync-existing-server-config.sql
 ```
 
-执行前应完成备份和只读检查；脚本可重复执行，重复执行不会产生新的有效字典条目或角色菜单关系。
+命令必须在仓库根目录执行，或把 `script/sql/mysql/` 一并放到 MySQL 客户端可读取的路径；脚本中的 `SOURCE` 路径由客户端解析。MySQL 客户端必须使用 `utf8mb4`。
+
+执行前应完成备份和只读检查。脚本可重复执行：旧关系保持逻辑删除、canonical permission 保证同一租户/角色/权限最多一条有效关系。恢复限制为同一数据库中按备份行 ID 的人工审核前向操作，脚本不提供自动回滚。
 
 ## BPM 流程资产
 

@@ -84,6 +84,7 @@ public interface ErrorCodeConstants {
     ErrorCode NOTICE_NOT_PUBLISHED = new ErrorCode(1_002_008_003, "当前公告未发布或已下线");
     ErrorCode NOTICE_ATTACHMENT_INVALID = new ErrorCode(1_002_008_004, "公告附件不存在、无权引用或不符合限制");
     ErrorCode NOTICE_CONTENT_EMPTY = new ErrorCode(1_002_008_005, "公告正文不能为空");
+    ErrorCode NOTICE_RECIPIENT_INVALID = new ErrorCode(1_002_008_006, "公告接收范围无效或没有可用接收人");
 
     // ========== 短信渠道 1-002-011-000 ==========
     ErrorCode SMS_CHANNEL_NOT_EXISTS = new ErrorCode(1_002_011_000, "短信渠道不存在");

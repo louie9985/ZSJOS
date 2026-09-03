@@ -180,6 +180,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode PRODUCT_REF_IMMUTABLE = new ErrorCode(1_900_004_003, "产品稳定编号创建后不可修改");
     ErrorCode PRODUCT_NOT_ENABLE = new ErrorCode(1_900_004_004, "产品未启用或已下架");
     ErrorCode PRODUCT_IN_USE = new ErrorCode(1_900_004_005, "产品已被客资引用，不能删除，请改为停用");
+    ErrorCode PRODUCT_HAS_SKUS = new ErrorCode(1_900_004_020, "产品下存在 SKU，请先删除 SKU 后再删除产品");
     ErrorCode PRODUCT_REFS_INVALID = new ErrorCode(1_900_004_006, "存在无效、停用或不属于当前租户的产品");
     ErrorCode PRODUCT_CATEGORY_NOT_EXISTS = new ErrorCode(1_900_004_007, "产品分类不存在");
     ErrorCode PRODUCT_CATEGORY_LEVEL_INVALID = new ErrorCode(1_900_004_008, "分类父级无效、已挂课程、形成循环或超过 10 层");

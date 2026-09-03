@@ -56,8 +56,12 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
     @Override @Transactional(rollbackFor = Exception.class)
     public void deleteProduct(Long id) {
         ZsjosProductDO product = validateExists(id);
-        if (intendedProductMapper.selectCountByProductRef(product.getProductRef()) > 0
-                || skuMapper.selectCountBySpuId(id) > 0) throw exception(PRODUCT_IN_USE);
+        if (intendedProductMapper.selectCountByProductRef(product.getProductRef()) > 0) {
+            throw exception(PRODUCT_IN_USE);
+        }
+        if (skuMapper.selectCountBySpuId(id) > 0) {
+            throw exception(PRODUCT_HAS_SKUS);
+        }
         productMapper.deleteById(id);
     }
 

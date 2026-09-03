@@ -12,6 +12,10 @@ export interface NoticeVO {
   publishTime?: number
   offlineTime?: number
   highlightUntil?: number
+  audienceType?: 'ALL' | 'TARGET'
+  targetDeptIds?: number[]
+  targetUserIds?: number[]
+  recipientCount?: number
   highlighted?: boolean
   attachments: NoticeAttachmentVO[]
   creator: string

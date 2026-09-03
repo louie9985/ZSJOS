@@ -424,3 +424,33 @@ guard 反向验证：故意把 `--crm-pane-pad` 改成字面量后测试确实�
 - **Dependency or integration impact**: No new dependencies. 需重新构建并部署 Admin 前端；后端无需因本问题变更。
 - **Remaining work**: 部署新版 Admin 后重新上传同一 Excel，确认预检显示 38/69 及新增/跳过明细；若仍显示 0，应检查浏览器 Network 中 `/admin-api/eam/category/import/preview` 响应的 `data` 层级及缓存版本。
 - **Turn status**: implementation-complete; frontend-api-unpack-fix-verified
+
+### Delivery entry: 2026-09-03 12:12:00 +08:00
+
+- **Beijing time**: 2026-09-03 12:12:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: 8eb48ee957226d199c6eb3a6ae88bb21ff3be151
+- **User goal**: 确认不修改系统已配置字段，基于原始资产台账生成可用于 EAM V3 的转换版模板。
+- **Key decisions**: 原始工作簿保持不变；输出单独的 EAM V3 转换版；系统分类编码、字段标识和字典来源不变；上级、入司日期、使用人承诺、承诺日期保留在原始台账并在转换说明中标明当前解析器不读取；密码、图片/附件、行政核对和交接信息不放入导入数据区。
+- **Execution or analysis result**: 将原两层表头替换为单层系统导入表头，保留原有辅助说明页，新增“转换说明”页；从分类字段说明中收集 40 个去重的已配置自定义字段，并与 18 个标准字段组成 58 列导入表头。
+- **Changed files**: `outputs/asset-ledger-adaptation/中世健资产台账导入转换版.xlsx`; `outputs/asset-ledger-adaptation/中世健资产台账导入转换版.xlsx.inspect.ndjson`; `outputs/asset-ledger-adaptation/asset-ledger-preview.png`; `outputs/asset-ledger-adaptation/conversion-notes-preview.png`; `tmp/asset-ledger-adaptation/build.mjs`; `tmp/asset-ledger-adaptation/verify.mjs`; 本 handoff 文件。
+- **Verification evidence**: Artifact Tool 导入后检查工作表和表头，`资产台账` 为单层 58 列且数据行为空；公式错误扫描匹配 0；完成资产台账和转换说明视觉渲染检查；输出路径与原始文件路径不同，未覆盖原始工作簿。
+- **Dependency or integration impact**: 无新增 npm/Maven 依赖；不修改后端、数据库、分类字段配置或字典。实际数据导入前仍需按转换说明拆分资产行、填写分类编码和资产名称，并执行系统预检。
+- **Remaining work**: 使用真实资产数据填充转换版；如必须批量导入上级、入司日期或承诺信息，需要另行确认并扩展导入器。
+- **Turn status**: implementation-complete; conversion-workbook-verified
+
+### Active scope update: 2026-09-03 12:00:00 +08:00
+
+- **ID**: eam-asset-management
+- **Goal**: 基于用户提供的原始资产台账生成 EAM V3 导入转换版，不修改系统已配置的分类、字段标识或字典。
+- **Non-goals**: 不覆盖或改写 `D:\liulanqi\中世健资产台账导入模板.xlsx`；不修改后端导入器、数据库、EAM 分类字段配置或原始业务表头。
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **Base commit**: 8eb48ee957226d199c6eb3a6ae88bb21ff3be151
+- **Target branch**: main
+- **Ownership scope**: `outputs/asset-ledger-adaptation/中世健资产台账导入转换版.xlsx`; 本 handoff 文件。
+- **Owner**: Codex
+- **Dependencies**: 用户提供原始工作簿；EAM V3 导入契约；bundled artifact-tool runtime。
+- **Integration order**: 原始表读取与样式检查 -> 生成单层表头转换版 -> 结构/字段/视觉校验。
+- **Verification plan**: 检查输出工作表、表头、转换说明、系统固定字段标识、公式错误和视觉渲染；确认原始文件哈希未被写入。

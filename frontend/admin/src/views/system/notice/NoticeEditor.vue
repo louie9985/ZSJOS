@@ -29,6 +29,24 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="发送范围" prop="audienceType">
+          <el-radio-group v-model="formData.audienceType">
+            <el-radio value="ALL">全员</el-radio>
+            <el-radio value="TARGET">指定部门/用户</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="formData.audienceType === 'TARGET'" label="指定部门/用户" prop="targetIds">
+          <el-tree
+            ref="audienceTreeRef"
+            :data="audienceTree"
+            node-key="key"
+            show-checkbox
+            default-expand-all
+            :props="{ label: 'label', children: 'children' }"
+            @check="syncAudienceSelection"
+          />
+          <div class="el-form-item__tip">勾选部门将发送给该部门及全部子部门成员；可同时多选用户。</div>
+        </el-form-item>
         <el-form-item label="高亮提醒截止时间" prop="highlightUntil">
           <el-date-picker v-model="formData.highlightUntil" type="datetime" value-format="x" clearable placeholder="不设置则不高亮" :disabled-date="disabledHighlightDate" />
           <div class="el-form-item__tip">截止时间前将在员工首页公告栏优先置顶</div>
@@ -104,6 +122,9 @@ import type {
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { getFileIcon } from '@/utils/file'
 import * as NoticeApi from '@/api/system/notice'
+import * as DeptApi from '@/api/system/dept'
+import * as UserApi from '@/api/system/user'
+import { handleTree } from '@/utils/tree'
 
 const props = defineProps<{ id?: number }>()
 const emit = defineEmits<{ back: []; saved: [id: number] }>()
@@ -120,8 +141,15 @@ const formData = reactive({
   content: '',
   status: 0,
   highlightUntil: undefined as number | undefined,
+  audienceType: 'ALL' as 'ALL' | 'TARGET',
+  targetDeptIds: [] as number[],
+  targetUserIds: [] as number[],
   attachments: [] as NoticeApi.NoticeAttachmentVO[]
 })
+const audienceTreeRef = ref()
+const audienceTree = ref<any[]>([])
+const deptIds = ref<number[]>([])
+const userIds = ref<number[]>([])
 const rules: FormRules = {
   title: [{ required: true, message: '公告标题不能为空', trigger: 'blur' }],
   type: [{ required: true, message: '公告类型不能为空', trigger: 'change' }],
@@ -148,7 +176,16 @@ const load = async () => {
     formData.type = data.type
     formData.content = data.content
     formData.highlightUntil = data.highlightUntil
+    formData.audienceType = data.audienceType || 'ALL'
+    formData.targetDeptIds = data.targetDeptIds || []
+    formData.targetUserIds = data.targetUserIds || []
     formData.attachments = data.attachments || []
+    await loadAudienceTree()
+    await nextTick()
+    audienceTreeRef.value?.setCheckedKeys([
+      ...formData.targetDeptIds.map((id) => `d:${id}`),
+      ...formData.targetUserIds.map((id) => `u:${id}`)
+    ])
   } finally {
     loading.value = false
   }
@@ -193,6 +230,22 @@ const beforeUpload = (file: UploadRawFile) => {
   return true
 }
 
+const loadAudienceTree = async () => {
+  const [depts, users] = await Promise.all([DeptApi.getSimpleDeptList(), UserApi.getSimpleUserOptions()])
+  const deptTree = handleTree(depts).map((dept: any) => addUsers(dept, users))
+  audienceTree.value = deptTree
+}
+const addUsers = (dept: any, users: UserApi.UserSimpleVO[]): any => {
+  const children = (dept.children || []).map((child: any) => addUsers(child, users))
+  const members = users.filter((user) => user.deptId === dept.id).map((user) => ({ key: `u:${user.id}`, label: user.nickname, leaf: true }))
+  return { ...dept, key: `d:${dept.id}`, label: dept.name, children: [...children, ...members] }
+}
+const syncAudienceSelection = () => {
+  const keys = audienceTreeRef.value?.getCheckedKeys?.() || []
+  formData.targetDeptIds = keys.filter((key: string) => key.startsWith('d:')).map((key: string) => Number(key.slice(2)))
+  formData.targetUserIds = keys.filter((key: string) => key.startsWith('u:')).map((key: string) => Number(key.slice(2)))
+}
+
 const uploadAttachment = async (options: UploadRequestOptions) => {
   const task: UploadTask = { uid: options.file.uid, name: options.file.name, progress: 0, status: 'uploading' }
   uploadTasks.value.push(task)
@@ -228,7 +281,10 @@ const formatFileSize = (size: number) => size >= 1024 * 1024
   ? `${(size / 1024 / 1024).toFixed(1)} MB`
   : `${Math.max(1, Math.round(size / 1024))} KB`
 
-onMounted(load)
+onMounted(async () => {
+  await loadAudienceTree()
+  await load()
+})
 </script>
 
 <style scoped>

@@ -45,6 +45,12 @@ public class NoticeDO extends BaseDO {
      * 枚举 {@link CommonStatusEnum}
      */
     private Integer status;
+    /** 接收范围：ALL 或 TARGET。 */
+    private String audienceType;
+    /** 草稿选择的部门编号 JSON。 */
+    private String targetDeptIds;
+    /** 草稿选择的用户编号 JSON。 */
+    private String targetUserIds;
     private String publishStatus;
     private LocalDateTime publishTime;
     private LocalDateTime offlineTime;

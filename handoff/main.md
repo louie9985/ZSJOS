@@ -18848,6 +18848,20 @@ equestAttachments。
 - Verification plan: 运行管理端 `pnpm ts:check`、目标文件 ESLint、`pnpm build:local`、scoped `git diff --check`；启动本地管理端并检查宽桌面抽屉、窄容器/嵌套条件组和移动宽度的输入框与浮层宽度，登录或后端状态阻断时记录未验证风险。
 - Status: `in-progress`
 
+## Delivery - 2026-09-04 00:50:30 +08:00
+
+- Beijing time: `2026-09-04 00:50:30 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `8eb48ee957226d199c6eb3a6ae88bb21ff3be151` (existing uncommitted work preserved)
+- User goal: 公告支持全员或部门/用户混合指定发送，部门选择包含子部门成员。
+- Key decisions: 草稿保存范围选择；TARGET 在发布时展开为启用且具备 `system:notice:read` 的 ADMIN 用户快照；部门与用户并集去重；历史无范围公告按 ALL 兼容。
+- Execution or analysis result: 完成公告字段、接收人快照表、服务端发布展开与查询/详情/已读授权、Admin 组织树混选 UI、V181 迁移及空库基线同步。
+- Changed files: 公告 System VO/DO/Mapper/Service/测试；`NoticeRecipientDO/Mapper`；Admin 公告 API/编辑器；MySQL V181、bootstrap、core schema、测试 schema；公告架构与迁移文档。
+- Verification evidence: System 模块编译成功；`NoticeMapperTest` 1 项与 `NoticeServiceImplTest` 7 项通过；Admin `pnpm ts:check` 通过；Workbench `npm run typecheck` 通过；`git diff --check` 无错误。未执行真实数据库、真实浏览器及完整前端构建。
+- Dependency or integration impact: 无新增 Maven/npm 依赖；未创建分支、提交或写入外部数据库；Workbench 继续使用原公告 API，服务端过滤接收范围。
+- Remaining work: 需在受控 MySQL 执行 V181 fresh/upgrade 与结构差异验证；需做 Admin 桌面/移动真实浏览器检查；可补充 targeted audience 专项自动化测试。
+
 ## Delivery Entry - 2026-09-03 13:48:00 +08:00
 
 - Workstream ID: `main-hide-dingtalk-profile-binding`
@@ -20325,3 +20339,17 @@ equestAttachments。
 - Verification evidence: Core schema + 01/02/03/04 seed 后执行同步脚本成功；重复执行成功且字典/授权计数保持 245/440/193。`python script/bpm/validate_manifest.py` 未通过，现有 manifest 中反馈审批资产 SHA-256 与文件不一致（脚本未修改该资产）。
 - Dependency or integration impact: 无新增依赖、无真实服务器写入、无分支/提交/推送；BPM 需管理员按 manifest 逐项导入、审核、发布、启用。
 - Remaining work: 在目标服务器备份后执行 SQL；先修复或确认既有 BPM manifest checksum，再进行流程资产导入和发布验证。
+
+## Delivery Entry - 2026-09-04 00:42:29 +08:00
+
+- Workstream ID: `main-product-delete-error-message`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `8eb48ee957226d199c6eb3a6ae88bb21ff3be151`
+- User goal: 为产品配置删除失败提供明确、可行动的前端错误提示。
+- Key decisions: 保留“已被客资引用”和“存在 SKU”两类删除保护；新增独立 `PRODUCT_HAS_SKUS` 错误码，前端直接展示后端稳定文案；不级联删除 SKU、客资或历史数据。
+- Execution or analysis result: 产品删除服务按原因分别抛出错误；管理端与 Workbench 对异常缺少后端消息时提供通用兜底提示；新增两条服务层错误映射测试。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/product/ZsjosProductServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/product/ZsjosProductServiceImplTest.java`; `frontend/admin/src/views/zsjos/product/index.vue`; `frontend/workbench/src/pages/ConfigurationPages.tsx`; 本 handoff 记录。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am "-Dtest=ZsjosProductServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test` 通过，2/2；Workbench `npm run typecheck` 通过；Admin 目标文件 ESLint 通过；`git diff --check` 通过（仅已有换行符提示）。
+- Dependency or integration impact: 无新增依赖；需部署后端与任一前端以生效；保留工作树中其他既有未提交改动，未执行数据库、分支、提交或发布操作。
+- Remaining work: None。

@@ -2964,6 +2964,9 @@ CREATE TABLE IF NOT EXISTS `system_notice` (
   `publish_time` datetime DEFAULT NULL COMMENT '发布时间',
   `offline_time` datetime DEFAULT NULL COMMENT '下线时间',
   `highlight_until` datetime DEFAULT NULL COMMENT '置顶截止时间',
+  `audience_type` varchar(16) DEFAULT 'ALL' COMMENT '接收范围：ALL 全员，TARGET 指定部门/用户',
+  `target_dept_ids` json DEFAULT NULL COMMENT '草稿选择的部门编号',
+  `target_user_ids` json DEFAULT NULL COMMENT '草稿选择的用户编号',
   `creator` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '创建者',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updater` varchar(64) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '' COMMENT '更新者',
@@ -2998,6 +3001,17 @@ CREATE TABLE IF NOT EXISTS `system_notice_read` (
   PRIMARY KEY (`id`), UNIQUE KEY `uk_notice_reader` (`tenant_id`,`notice_id`,`user_id`),
   KEY `idx_notice_reader` (`tenant_id`,`user_id`,`read_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告阅读记录';
+
+CREATE TABLE IF NOT EXISTS `system_notice_recipient` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '接收人记录ID',
+  `notice_id` bigint NOT NULL COMMENT '公告ID',
+  `user_id` bigint NOT NULL COMMENT 'ADMIN用户ID',
+  `creator` varchar(64) DEFAULT '', `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updater` varchar(64) DEFAULT '', `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `deleted` bit(1) NOT NULL DEFAULT b'0', `tenant_id` bigint NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`), UNIQUE KEY `uk_notice_recipient` (`tenant_id`,`notice_id`,`user_id`),
+  KEY `idx_notice_recipient_user` (`tenant_id`,`user_id`,`notice_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='公告指定接收人快照';
 
 -- system_notify_message
 CREATE TABLE IF NOT EXISTS `system_notify_message` (
