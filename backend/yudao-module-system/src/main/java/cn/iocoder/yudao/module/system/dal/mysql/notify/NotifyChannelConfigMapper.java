@@ -10,4 +10,8 @@ public interface NotifyChannelConfigMapper extends BaseMapperX<NotifyChannelConf
     default NotifyChannelConfigDO selectByChannelCode(String channelCode) {
         return selectOne(NotifyChannelConfigDO::getChannelCode, channelCode);
     }
+
+    default void updateEnabled(Long id, boolean enabled) {
+        updateById(new NotifyChannelConfigDO().setId(id).setEnabled(enabled));
+    }
 }

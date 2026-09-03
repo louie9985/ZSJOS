@@ -184,6 +184,8 @@ public interface ErrorCodeConstants {
     ErrorCode NOTIFY_RULE_RECIPIENT_ROLE_INVALID = new ErrorCode(1_002_029_004, "通知规则包含当前场景不支持的事件角色");
     ErrorCode NOTIFY_RULE_ACTION_INVALID = new ErrorCode(1_002_029_005, "通知规则点击动作不受当前场景支持");
     ErrorCode NOTIFY_RULE_RECIPIENT_EMPTY = new ErrorCode(1_002_029_006, "通知规则至少需要一个事件角色或指定用户");
+    ErrorCode NOTIFY_CHANNEL_CONFIG_NOT_EXISTS = new ErrorCode(1_002_029_007, "通知渠道配置不存在");
+    ErrorCode NOTIFY_CHANNEL_CREDENTIAL_INVALID = new ErrorCode(1_002_029_008, "企业微信社交客户端凭据未完整配置或未启用");
 
     // ========== 地区管理 1-002-030-000 ==========
     ErrorCode AREA_NOT_EXISTS = new ErrorCode(1_002_030_000, "地区不存在");

@@ -20312,3 +20312,16 @@ equestAttachments。
 - Verification evidence: Core 迁移编号检查结果为 `count=178 max=178 duplicates= missing=`；`python script/sql/mysql/tools/zsjos_db.py check` 通过；旧权限迁移文件名/`migration-V162` 残留扫描无命中；`git diff --check` 无错误（仅行尾转换 warning）。
 - Dependency or integration impact: bootstrap 现在按 `V162` 支付、`V163` 退款、`V164-V177`、`V178` 权限迁移顺序执行；历史已部署数据库未被修改。
 - Remaining work: 受控 MySQL 环境中的 fresh/upgrade 执行与 `verify-bootstrap.sql` 实测仍待具备数据库环境后完成。
+## Delivery Entry - 2026-09-03 00:00:00 +08:00
+
+- Workstream ID: `main-existing-db-config-sync`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `16e026a672dfd4ab087d9a84179ccd544df30a99` (uncommitted worktree)
+- User goal: 为已有数据库生成流程资产、字典数据和角色权限的非破坏性补齐方案。
+- Key decisions: 新增 insert-only SQL；按 role.code/menu.permission 补齐 V071 allowlist；BPM 保持资产文件导入，不复制 Flowable 内部表；不删除或覆盖现有数据。
+- Execution or analysis result: 新增同步脚本和 BPM 导入说明；脚本在受控 MySQL 测试库完成 fresh 基线后执行并重复执行通过，结果未产生额外有效行。
+- Changed files: `script/sql/mysql/sync-existing-server-config.sql`; `docs/operations/zsjos-existing-db-initialization.md`; `handoff/main.md`。
+- Verification evidence: Core schema + 01/02/03/04 seed 后执行同步脚本成功；重复执行成功且字典/授权计数保持 245/440/193。`python script/bpm/validate_manifest.py` 未通过，现有 manifest 中反馈审批资产 SHA-256 与文件不一致（脚本未修改该资产）。
+- Dependency or integration impact: 无新增依赖、无真实服务器写入、无分支/提交/推送；BPM 需管理员按 manifest 逐项导入、审核、发布、启用。
+- Remaining work: 在目标服务器备份后执行 SQL；先修复或确认既有 BPM manifest checksum，再进行流程资产导入和发布验证。

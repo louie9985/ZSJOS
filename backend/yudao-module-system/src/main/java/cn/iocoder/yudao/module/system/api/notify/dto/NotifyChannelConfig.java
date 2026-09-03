@@ -10,4 +10,5 @@ public class NotifyChannelConfig {
     String channelCode;
     String provider;
     String configJson;
+    Boolean enabled;
 }

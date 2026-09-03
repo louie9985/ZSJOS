@@ -86,6 +86,16 @@ Read only the architecture documents relevant to the task:
 
 ## 4. Risk, external state, and database initialization and synchronization
 
+### Encoding and charset contract
+
+- Repository source files, SQL files, HTTP responses, and persisted user-visible text **MUST** use UTF-8; new text files **SHOULD** include an explicit UTF-8 declaration when the format supports one.
+- MySQL commands that insert or update Chinese text **MUST** establish `utf8mb4` on the client connection (for example `mysql --default-character-set=utf8mb4` and `SET NAMES utf8mb4`). A UTF-8 SQL file alone does not guarantee a UTF-8 client connection.
+- PowerShell here-strings, pipes into `docker exec -i`, IDE database consoles, and CI runners are separate encoding boundaries. The command's file encoding, pipe encoding, MySQL client character set, table/column charset, and application/JDBC connection charset **MUST** be treated as independent checks.
+- **MUST NOT** use a terminal's rendered output as proof that persisted text is correct. Garbled output may be a display/code-page problem, while values such as `ä¼...` indicate the original UTF-8 bytes were decoded as another charset and written back (double encoding).
+- Before delivering a database text change, verification **MUST** query the value through a UTF-8 client and inspect `HEX(column)` for representative Chinese text. If a repair is needed, the SQL source and the controlled development database **MUST** be corrected together.
+- Migration files that seed or repair Chinese labels **MUST** set `SET NAMES utf8mb4`, document the exact data scope and repeatability, and avoid copying text from a garbled terminal rendering.
+- Java/Spring services **MUST** keep HTTP, servlet, JSON, JDBC, and resource encodings aligned to UTF-8. Frontend builds and browser checks should verify the response bytes and rendered text when a user-visible label changed.
+
 The following require separate, explicit confirmation even when related to the task:
 
 - Clearing or deleting database data, accounts, roles, permissions, or files in bulk.
