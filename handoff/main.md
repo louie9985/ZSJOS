@@ -18848,6 +18848,21 @@ equestAttachments。
 - Verification plan: 运行管理端 `pnpm ts:check`、目标文件 ESLint、`pnpm build:local`、scoped `git diff --check`；启动本地管理端并检查宽桌面抽屉、窄容器/嵌套条件组和移动宽度的输入框与浮层宽度，登录或后端状态阻断时记录未验证风险。
 - Status: `in-progress`
 
+## Delivery Entry - 2026-09-03 13:48:00 +08:00
+
+- Workstream ID: `main-hide-dingtalk-profile-binding`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `fa3130ffbe441dacb6063017b763c769be64c791` (uncommitted worktree)
+- User goal: 隐藏管理端和员工工作台个人主页的钉钉绑定入口，同时保留企业微信绑定、钉钉登录和后端能力。
+- Key decisions: 管理端在个人主页社交列表初始化时仅投影企业微信类型 `30`；员工端原有个人主页已经仅渲染并处理企业微信，本次补充测试约束其拒绝钉钉类型 `20` 回调；不改登录页、后端 API、已有绑定数据或权限菜单。
+- Execution or analysis result: 管理端不再显示钉钉绑定/解绑行；员工端继续只显示企业微信且钉钉回调不具备有效绑定条件。
+- Changed files: `frontend/admin/src/views/Profile/components/UserSocial.vue`; `frontend/workbench/src/pages/UserProfilePage.test.ts`; `handoff/main.md`。
+- Verification evidence: Workbench `npm test -- src/pages/UserProfilePage.test.ts` 通过（5 tests）；`npm run typecheck` 随生产构建的 `tsc -b` 通过；`npm run build` 通过（保留既有大 chunk 警告）。Admin `pnpm build:local` 通过（存在既有 lightningcss 警告）；`pnpm ts:check` 未通过，命中多处既有类型错误，未涉及本次改动文件；`git diff --check` 无错误，仅有换行符提示。
+- Dependency or integration impact: 无新增依赖；不涉及后端、数据库、菜单权限、登录流程或外部状态；保留工作树其他既有改动。
+- Remaining work: 未执行真实浏览器桌面/移动宽度检查，需在可用环境中确认个人主页视觉入口隐藏；无需其他代码变更。
+- Status: `delivered`
+
 ### Delivery Entry - 2026-08-31 22:46:40 +08:00
 
 - Beijing time: 2026-08-31 22:46:40
@@ -18861,6 +18876,36 @@ equestAttachments。
 - Verification evidence: EAM 依赖链编译成功；EAM 定向测试 5/5 通过（`EamAssetChangeLogServiceImplTest`、`EamAssetServiceImplTest`）；授权注解静态检查确认两查询接口均包含四类资产查看权限；本次文件 `git diff --check` 无错误。
 - Dependency or integration impact: 无新增依赖、数据库、菜单或角色配置变更；后端重启/重新部署后生效。资产对象数据范围与分类字段增删改权限不变。
 - Remaining work: 需在用户 233 的真实登录态重新打开一条下属员工资产详情，确认动态字段和变更记录均正常加载。
+- Status: `delivered`
+
+## Workstream Registration - 2026-09-03 13:18:00
+
+- Workstream ID: `main-wecom-business-notification-rules`
+- Goal: 为现有业务通知补齐企业微信模板与租户规则，并让新租户默认通知初始化在对应企微模板存在时同步创建企微规则。
+- Non-goals: 不启用租户企微渠道，不修改用户企微接收偏好，不补发历史消息，不直接写当前数据库，不新增依赖，不切换分支或提交推送。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `fa3130ffbe441dacb6063017b763c769be64c791`
+- Target branch: 当前本地 `main`
+- Ownership scope: System 通知默认规则 DTO/Service/测试；`script/sql/mysql/migrations/V177__wecom_business_notification_rules.sql`; `script/sql/mysql/bootstrap.sql`; `docs/api/system-business-notifications.md`; 本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 System NotifyRule/NotifyTemplate、企微渠道适配器、租户通知配置、企业微信用户映射；无新增依赖。
+- Integration order: 扩展默认规则渠道字段与初始化 -> 新增 V177 模板/规则镜像迁移 -> 接入 bootstrap -> 更新通知 API 文档 -> 定向测试、编译与 SQL 静态检查 -> 追加交付记录。
+- Verification plan: `mvn -f backend/pom.xml -pl yudao-module-system -am -DskipTests compile`; `mvn -f backend/pom.xml -pl yudao-module-system "-Dtest=NotifyRuleServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test`; SQL 重复性/路径扫描；`git diff --check`。
+
+## Delivery Entry - 2026-09-03 13:26:30
+
+- Workstream ID: `main-wecom-business-notification-rules`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `fa3130ffbe441dacb6063017b763c769be64c791` (uncommitted worktree)
+- User goal: 确认后继续为业务通知配置企业微信规则。
+- Key decisions: 新增 V177 前向迁移，按非删除业务 `in_app` 模板/规则生成对应 `_WECOM` 模板和 `wecom` 规则；保留源规则状态、收件人、动作和定时字段；不启用企微渠道、不改变用户偏好、不重发历史消息。新租户默认初始化在对应企微模板存在时同步创建企微规则。
+- Execution or analysis result: 完成 DTO 渠道字段、默认规则双渠道初始化、V177 幂等 SQL、bootstrap 接入和通知契约文档说明；未执行真实数据库写入。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/api/notify/dto/NotifyDefaultRuleReqDTO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notify/NotifyRuleServiceImpl.java`; `backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/service/notify/NotifyRuleServiceImplTest.java`; `script/sql/mysql/migrations/V177__wecom_business_notification_rules.sql`; `script/sql/mysql/bootstrap.sql`; `docs/api/system-business-notifications.md`; `handoff/main.md`。
+- Verification evidence: System 依赖链编译 `BUILD SUCCESS`；`NotifyRuleServiceImplTest` 10/10 通过；`git diff --check` 无空白错误（仅 LF/CRLF 转换提示）；V177 已接入 bootstrap 且包含版本登记、模板/规则去重条件。未安装/未连接 MySQL，未执行 fresh 或升级数据库实测。
+- Dependency or integration impact: 无新增依赖、无分支/提交/推送、无真实外部消息发送；部署 V177 后企微规则会按源规则启停状态生成，但实际投递仍受租户企微渠道、应用凭据、用户绑定和 `wecom_enabled` 控制。
+- Remaining work: 在受控 MySQL 环境执行 V177 升级/重复执行和 fresh bootstrap 对比；配置企微凭据后做真实接口投递验证；若后续新增业务场景，需同时提供对应 `_WECOM` 模板。
 - Status: `delivered`
 
 ## Delivery Entry - 2026-08-31 23:08:30 +08:00
@@ -19992,3 +20037,18 @@ equestAttachments。
 - Dependency or integration impact: 无新增 Maven/npm 依赖；依赖生产机 sudoers、systemd 单元、ss、Docker Compose 及现有数据库迁移入口；不修改业务代码或数据库脚本。
 - Remaining work: 在 Linux 生产同构环境执行 bash -n、ShellCheck、模拟 release 安装和完整发布演练；确认 systemd 单元的 ExecStart/EnvironmentFile/Restart 策略符合文档。
 - Status: `delivered`
+## Workstream Registration - 2026-09-03 13:41:40 +08:00
+
+- Workstream ID: `main-hide-dingtalk-profile-binding`
+- Goal: 隐藏管理端和员工工作台个人主页的钉钉绑定入口，保留企业微信绑定、钉钉登录和后端社交能力。
+- Non-goals: 不修改钉钉登录入口、后端社交 API、已有绑定数据、权限菜单、数据库、分支、提交、推送或其他工作树改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `fa3130ffbe441dacb6063017b763c769be64c791`，保留当前工作树既有改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/Profile/components/UserSocial.vue`; `frontend/workbench/src/pages/UserProfilePage.tsx`; `frontend/workbench/src/pages/UserProfilePage.test.ts`; 本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue Admin、React Workbench 社交绑定实现；无新增依赖。
+- Integration order: 管理端筛除钉钉 -> 员工端来源守护测试 -> 两端定向验证、类型检查和构建 -> 追加交付记录。
+- Verification plan: `frontend/workbench` 定向测试、`npm run typecheck`、`npm run build`；`frontend/admin` `pnpm ts:check`、`pnpm build:local`；scoped `git diff --check`。
+- Status: `in-progress`

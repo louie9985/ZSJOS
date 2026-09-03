@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.service.notify;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.system.api.notify.NotifyActionType;
+import cn.iocoder.yudao.module.system.api.notify.NotifyChannelType;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifyDefaultRuleReqDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRespDTO;
 import cn.iocoder.yudao.module.system.api.notify.dto.NotifySceneRoleRespDTO;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.times;
 import static org.mockito.ArgumentMatchers.any;
 
 @ExtendWith(MockitoExtension.class)
@@ -159,6 +161,30 @@ class NotifyRuleServiceImplTest {
         service.initializeDefaultRules(List.of(seed));
 
         verify(notifyRuleMapper, never()).insert(any(NotifyRuleDO.class));
+    }
+
+    @Test
+    void initializeDefaultRulesAlsoCreatesWecomRuleWhenTemplateExists() {
+        NotifyDefaultRuleReqDTO seed = NotifyDefaultRuleReqDTO.builder().name("default rule")
+                .sceneCode("test.scene").templateCode("TEST_TEMPLATE")
+                .recipientRoles(List.of("owner")).actionType(NotifyActionType.MESSAGE_DETAIL).build();
+        NotifyTemplateDO inApp = NotifyTemplateDO.builder().id(2L).sceneCode("test.scene")
+                .channelCode(NotifyChannelType.IN_APP).build();
+        NotifyTemplateDO wecom = NotifyTemplateDO.builder().id(3L).sceneCode("test.scene")
+                .channelCode(NotifyChannelType.WECOM).build();
+        when(notifyTemplateService.getNotifyTemplateByCodeFromCache("TEST_TEMPLATE")).thenReturn(inApp);
+        when(notifyTemplateService.getNotifyTemplateByCodeFromCache("TEST_TEMPLATE_WECOM")).thenReturn(wecom);
+        when(notifyTemplateService.getNotifyTemplate(2L)).thenReturn(inApp);
+        when(notifyTemplateService.getNotifyTemplate(3L)).thenReturn(wecom);
+        when(notifyRuleMapper.selectCount(any())).thenReturn(0L);
+        stubValidCatalog();
+
+        service.initializeDefaultRules(List.of(seed));
+
+        ArgumentCaptor<NotifyRuleDO> captor = ArgumentCaptor.forClass(NotifyRuleDO.class);
+        verify(notifyRuleMapper, times(2)).insert(captor.capture());
+        assertEquals(List.of(NotifyChannelType.IN_APP, NotifyChannelType.WECOM),
+                captor.getAllValues().stream().map(NotifyRuleDO::getChannelCode).toList());
     }
 
     private void stubValidCatalog() {

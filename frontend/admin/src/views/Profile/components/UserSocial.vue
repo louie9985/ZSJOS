@@ -32,6 +32,7 @@ defineProps<{
 }>()
 const message = useMessage()
 const socialUsers = ref<any[]>([])
+const VISIBLE_SOCIAL_TYPES = new Set([SystemUserSocialTypeEnum.WECHAT_ENTERPRISE.type])
 
 const initSocial = async () => {
   socialUsers.value = [] // 重置避免无限增长
@@ -40,6 +41,7 @@ const initSocial = async () => {
   // 检查该社交平台是否已绑定
   for (const i in SystemUserSocialTypeEnum) {
     const socialUser = { ...SystemUserSocialTypeEnum[i] }
+    if (!VISIBLE_SOCIAL_TYPES.has(socialUser.type)) continue
     socialUsers.value.push(socialUser)
     if (bindSocialUserList && bindSocialUserList.length > 0) {
       for (const bindUser of bindSocialUserList) {

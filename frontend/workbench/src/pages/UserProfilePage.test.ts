@@ -15,6 +15,11 @@ describe('WeCom OAuth callback parsing', () => {
   it('rejects callbacks for other social types', () => {
     expect(parseWecomCallback('?type=20&code=abc&state=xyz').hasValidSocialCallback).toBe(false)
   })
+
+  it('keeps the profile binding contract limited to WeCom', () => {
+    expect(parseWecomCallback('?type=30&code=abc&state=xyz').type).toBe(30)
+    expect(parseWecomCallback('?type=20&code=abc&state=xyz').type).not.toBe(30)
+  })
 })
 
 describe('avatar upload sequencing', () => {

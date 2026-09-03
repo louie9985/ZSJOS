@@ -11,6 +11,8 @@ public class NotifyDefaultRuleReqDTO {
     String name;
     String sceneCode;
     String templateCode;
+    /** Optional channel override; legacy/default seeds remain in_app. */
+    String channelCode;
     List<String> recipientRoles;
     String actionType;
     String timingStage;

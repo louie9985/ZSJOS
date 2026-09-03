@@ -26,6 +26,11 @@ do not resolve this recipient role. V080 preserves enabled, disabled, or edited 
 and does not backfill historical messages. V016 and V080 insert only missing active template codes
 and never overwrite administrator-created or modified templates.
 
+V177 creates a separate `wecom` template and rule for each non-deleted business `in_app` template
+and rule present when the migration runs. It preserves the source rule's status, recipients, action,
+and timing fields, is repeatable, and does not enable the tenant WeCom channel or user push preference.
+Generated rules affect only future business events; historical in-app messages are not re-sent.
+
 `in_app` rules use `system_notify_business_outbox` and join the publishing business transaction.
 The unique boundary is tenant + source event key + target rule. Workers claim rows with a unique
 `claim_token`; completion and failure updates must still own that token, so an expired worker cannot
