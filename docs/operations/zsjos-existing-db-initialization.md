@@ -10,7 +10,7 @@
 - 按稳定的 `system_role.code` 与 `system_menu.permission` 补齐 V071 声明的角色授权；
 - 已存在的字典、角色、菜单和授权关系不更新、不删除、不禁用。
 
-脚本不会写入用户、业务实例、流程实例、任务、通知、上传文件或其他环境数据，也不会直接操作 Flowable 内部表。`zsjos_lead_category` 和 `zsjos_lead_source_channel` 只创建类型，不预置业务选项。
+脚本不会写入用户、业务实例、流程实例、任务、通知、上传文件或其他环境数据，也不会直接操作 Flowable 内部表。脚本会按当前已审核快照补齐 `zsjos_lead_category`（5 条）和 `zsjos_lead_source_channel`（5 条），按类型和值幂等执行，不覆盖管理员已有修改。
 
 从仓库根目录执行：
 
