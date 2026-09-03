@@ -140,10 +140,8 @@ SOURCE script/sql/mysql/migrations/V158__retire_announcement_center_duplicate.sq
 SOURCE script/sql/mysql/migrations/V159__public_sea_terminology.sql;
 SOURCE script/sql/mysql/migrations/V160__registration_case_close_service.sql;
 SOURCE script/sql/mysql/migrations/V161__media_calendar_all_view.sql;
-SOURCE script/sql/mysql/migrations/V162__lead_submit_permission_decoupling.sql;
 -- The purchase-draft file shares the historical V162 marker and uses
--- INSERT IGNORE for compatibility. Run the canonical permission migration
--- first so the legacy V162 registry row is created exactly once.
+-- INSERT IGNORE for compatibility and remains the canonical V162 owner.
 SOURCE script/sql/mysql/migrations/V162__zsjos_purchase_intent_payment_draft.sql;
 SOURCE script/sql/mysql/migrations/V163__zsjos_payment_refund_reconciliation.sql;
 SOURCE script/sql/mysql/migrations/V164__notice_highlight_until.sql;
@@ -160,6 +158,7 @@ SOURCE script/sql/mysql/migrations/V174__complete_zsjos_business_audit.sql;
 SOURCE script/sql/mysql/migrations/V175__lead_source_channel_snapshots.sql;
 SOURCE script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql;
 SOURCE script/sql/mysql/migrations/V177__wecom_business_notification_rules.sql;
+SOURCE script/sql/mysql/migrations/V178__lead_submit_permission_decoupling.sql;
 
 
 INSERT IGNORE INTO `zsjos_module_schema_version`

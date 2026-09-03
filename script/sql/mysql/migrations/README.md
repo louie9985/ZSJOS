@@ -808,9 +808,9 @@ the calendar directory receive the page, and role grants are inherited only from
 the calendar directory or account-calendar page. The migration is additive and repeatable; rollback is
 forward-only through a later permission/menu migration that disables the page and revokes grants.
 
-### V162 lead submit specify permission
+### V178 lead submit specify permission
 
-V162 follows V161 and adds the ungranted server-owned button permission `zsjos:lead:submit:specify`
+V178 follows V177 and adds the ungranted server-owned button permission `zsjos:lead:submit:specify`
 under the existing lead submit page `6736` as `指定销售`. It does not change lead submission data,
 dispatch logic, or any existing role-menu grant. Tenant packages that already contain the submit page
 receive the new button menu, but no role is auto-granted this permission. The migration is additive,

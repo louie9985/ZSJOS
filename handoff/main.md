@@ -20298,3 +20298,17 @@ equestAttachments。
 - Integration order: 重命名并更新权限迁移内部标记 -> 调整 bootstrap 顺序 -> 同步 README/校验引用 -> 静态迁移检查。
 - Verification plan: 检查 Core 迁移编号唯一且 V001-V178 连续、全仓引用一致、`git diff --check`，运行可用的迁移检查工具。
 - Status: `in-progress`
+
+## Delivery - 2026-09-03 15:11:43 +08:00
+
+- Beijing time: `2026-09-03 15:11:43 +08:00`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `90bded4afb43245e12fc56f383efed14f52681ee`
+- User goal: 解决两个 Core `V162` 迁移脚本编号重复问题。
+- Key decisions: 保留支付草稿迁移作为历史 `V162`；将客资提交指定销售权限迁移统一调整为 `V178`，依赖从 `V161` 调整为 `V177`，并将其放到 bootstrap 最后执行。
+- Execution or analysis result: 完成权限迁移文件版本标记、存储过程名、bootstrap 顺序、迁移 README 与 verify-bootstrap 断言同步；未执行数据库写入或 destructive SQL。
+- Changed files: `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `script/sql/mysql/migrations/V178__lead_submit_permission_decoupling.sql`; `script/sql/mysql/verify-bootstrap.sql`; 本 handoff 记录。
+- Verification evidence: Core 迁移编号检查结果为 `count=178 max=178 duplicates= missing=`；`python script/sql/mysql/tools/zsjos_db.py check` 通过；旧权限迁移文件名/`migration-V162` 残留扫描无命中；`git diff --check` 无错误（仅行尾转换 warning）。
+- Dependency or integration impact: bootstrap 现在按 `V162` 支付、`V163` 退款、`V164-V177`、`V178` 权限迁移顺序执行；历史已部署数据库未被修改。
+- Remaining work: 受控 MySQL 环境中的 fresh/upgrade 执行与 `verify-bootstrap.sql` 实测仍待具备数据库环境后完成。

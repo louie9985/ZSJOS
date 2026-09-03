@@ -2009,9 +2009,9 @@ SELECT 'V161 media calendar schedule view' AS check_name,
                      AND all_calendar_grant.menu_id=73604 AND all_calendar_grant.deleted=b'0')),
           'PASS','FAIL') AS result;
 
-SELECT 'V162 lead submit specify permission' AS check_name,
-       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V162')
-          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V162')
+SELECT 'V178 lead submit specify permission' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V178')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V178')
           AND EXISTS (SELECT 1 FROM system_menu
                WHERE id=6820 AND parent_id=6736 AND name='指定销售'
                  AND permission='zsjos:lead:submit:specify' AND type=3 AND deleted=b'0')
