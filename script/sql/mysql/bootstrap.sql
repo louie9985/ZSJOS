@@ -159,6 +159,7 @@ SOURCE script/sql/mysql/migrations/V173__lead_submitter_assist_request.sql;
 SOURCE script/sql/mysql/migrations/V174__complete_zsjos_business_audit.sql;
 SOURCE script/sql/mysql/migrations/V175__lead_source_channel_snapshots.sql;
 SOURCE script/sql/mysql/migrations/V176__employee_contract_anniversary_reminders.sql;
+SOURCE script/sql/mysql/migrations/V177__wecom_business_notification_rules.sql;
 
 
 INSERT IGNORE INTO `zsjos_module_schema_version`

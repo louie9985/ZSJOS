@@ -87,24 +87,41 @@ public class NotifyRuleServiceImpl implements NotifyRuleService {
     public void initializeDefaultRules(List<NotifyDefaultRuleReqDTO> rules) {
         if (rules == null) return;
         for (NotifyDefaultRuleReqDTO seed : rules) {
-            NotifyTemplateDO template = notifyTemplateService.getNotifyTemplateByCodeFromCache(seed.getTemplateCode());
-            if (template == null) continue;
-            boolean exists = notifyRuleMapper.selectCount(new LambdaQueryWrapper<NotifyRuleDO>()
-                    .eq(NotifyRuleDO::getSceneCode, seed.getSceneCode())
-                    .eq(NotifyRuleDO::getTemplateId, template.getId())
-                    .eq(seed.getTimingStage() != null, NotifyRuleDO::getTimingStage, seed.getTimingStage())
-                    .eq(seed.getTimingOffsetMinutes() != null, NotifyRuleDO::getTimingOffsetMinutes,
-                            seed.getTimingOffsetMinutes())) > 0;
-            if (exists) continue;
-            NotifyRuleSaveReqVO reqVO = new NotifyRuleSaveReqVO();
-            reqVO.setName(seed.getName()); reqVO.setSceneCode(seed.getSceneCode());
-            reqVO.setChannelCode(NotifyChannelType.IN_APP); reqVO.setTemplateId(template.getId());
-            reqVO.setRecipientRoles(seed.getRecipientRoles()); reqVO.setSpecifiedUserIds(List.of());
-            reqVO.setActionType(seed.getActionType()); reqVO.setTimingStage(seed.getTimingStage());
-            reqVO.setTimingOffsetMinutes(seed.getTimingOffsetMinutes());
-            reqVO.setStatus(CommonStatusEnum.ENABLE.getStatus());
-            createNotifyRule(reqVO);
+            String channelCode = seed.getChannelCode() == null || seed.getChannelCode().isBlank()
+                    ? NotifyChannelType.IN_APP : seed.getChannelCode();
+            initializeDefaultRule(seed, seed.getTemplateCode(), channelCode, seed.getName());
+            // Every business default also gets a separately rendered WeCom rule when the
+            // corresponding channel template is present. Existing tenants are backfilled by V177.
+            if (NotifyChannelType.IN_APP.equals(channelCode)) {
+                String wecomCode = seed.getTemplateCode() + "_WECOM";
+                NotifyTemplateDO wecomTemplate = notifyTemplateService.getNotifyTemplateByCodeFromCache(wecomCode);
+                if (wecomTemplate != null) {
+                    initializeDefaultRule(seed, wecomCode, NotifyChannelType.WECOM, seed.getName() + "（企微）");
+                }
+            }
         }
+    }
+
+    private void initializeDefaultRule(NotifyDefaultRuleReqDTO seed, String templateCode, String channelCode,
+                                       String name) {
+        NotifyTemplateDO template = notifyTemplateService.getNotifyTemplateByCodeFromCache(templateCode);
+        if (template == null) return;
+        boolean exists = notifyRuleMapper.selectCount(new LambdaQueryWrapper<NotifyRuleDO>()
+                .eq(NotifyRuleDO::getSceneCode, seed.getSceneCode())
+                .eq(NotifyRuleDO::getTemplateId, template.getId())
+                .eq(NotifyRuleDO::getChannelCode, channelCode)
+                .eq(seed.getTimingStage() != null, NotifyRuleDO::getTimingStage, seed.getTimingStage())
+                .eq(seed.getTimingOffsetMinutes() != null, NotifyRuleDO::getTimingOffsetMinutes,
+                        seed.getTimingOffsetMinutes())) > 0;
+        if (exists) return;
+        NotifyRuleSaveReqVO reqVO = new NotifyRuleSaveReqVO();
+        reqVO.setName(name); reqVO.setSceneCode(seed.getSceneCode());
+        reqVO.setChannelCode(channelCode); reqVO.setTemplateId(template.getId());
+        reqVO.setRecipientRoles(seed.getRecipientRoles()); reqVO.setSpecifiedUserIds(List.of());
+        reqVO.setActionType(seed.getActionType()); reqVO.setTimingStage(seed.getTimingStage());
+        reqVO.setTimingOffsetMinutes(seed.getTimingOffsetMinutes());
+        reqVO.setStatus(CommonStatusEnum.ENABLE.getStatus());
+        createNotifyRule(reqVO);
     }
 
     private void validateRule(NotifyRuleSaveReqVO reqVO) {
