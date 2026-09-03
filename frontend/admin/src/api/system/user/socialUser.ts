@@ -26,6 +26,7 @@ export const socialUnbind = (type, openid) => {
 // 社交授权的跳转
 export const socialAuthRedirect = (type, redirectUri) => {
   return request.get({
-    url: '/system/auth/social-auth-redirect?type=' + type + '&redirectUri=' + redirectUri
+    url: '/system/auth/social-auth-redirect',
+    params: { type, redirectUri }
   })
 }

@@ -2,7 +2,7 @@
   <el-form-item label="服务器地址" prop="config.serverUrl">
     <el-input
       v-model="config.serverUrl"
-      placeholder="请输入 WebSocket 地址，如：ws://localhost:8080/ws"
+      placeholder="请输入 WebSocket 地址，如：ws://127.0.0.1:8080/ws"
     />
   </el-form-item>
   <el-form-item label="连接超时(ms)" prop="config.connectTimeoutMs">

@@ -57,7 +57,7 @@ const emit = defineEmits<{
 }>()
 const bindSocial = () => {
   // 社交绑定
-  const type = getUrlValue('type')
+  const type = route.query.type
   const code = route.query.code
   const state = route.query.state
   if (!code) {
@@ -69,17 +69,10 @@ const bindSocial = () => {
   })
 }
 
-// 双层 encode 需要在回调后进行 decode
-function getUrlValue(key: string): string {
-  const url = new URL(decodeURIComponent(location.href))
-  return url.searchParams.get(key) ?? ''
-}
-
 const bind = (row) => {
-  // 双层 encode 解决钉钉回调 type 参数丢失的问题
-  const redirectUri = location.origin + '/user/profile?' + encodeURIComponent(`type=${row.type}`)
+  const redirectUri = location.origin + `/user/profile?type=${row.type}`
   // 进行跳转
-  socialAuthRedirect(row.type, encodeURIComponent(redirectUri)).then((res) => {
+  socialAuthRedirect(row.type, redirectUri).then((res) => {
     window.location.href = res
   })
 }

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { isLatestAvatarUpload, parseWecomCallback } from './UserProfilePage'
+import { buildWecomRedirectUri, isLatestAvatarUpload, parseWecomCallback } from './UserProfilePage'
 
 describe('WeCom OAuth callback parsing', () => {
+  it('builds an unencoded callback URL for the HTTP client to encode once', () => {
+    expect(buildWecomRedirectUri('https://testos.zhongshijian.top')).toBe(
+      'https://testos.zhongshijian.top/user/profile?type=30'
+    )
+  })
+
   it('accepts only WeCom callbacks with code and state', () => {
     expect(parseWecomCallback('?type=30&code=abc&state=xyz')).toEqual({
       type: 30, code: 'abc', state: 'xyz', hasValidSocialCallback: true

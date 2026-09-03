@@ -18,6 +18,7 @@
 package cn.iocoder.yudao.module.system.framework.justauth.core;
 
 import cn.hutool.core.collection.CollUtil;
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.EnumUtil;
 import cn.hutool.core.util.ReflectUtil;
 import cn.hutool.core.util.StrUtil;
@@ -41,6 +42,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 // TODO @芋艿：等官方发布 1.4.1！！！
@@ -92,12 +94,20 @@ public class AuthRequestFactory {
      * @return {@link AuthRequest}
      */
     public AuthRequest get(String source) {
+        return get(source, null);
+    }
+
+    /**
+     * Creates the request after applying tenant-owned client settings, so JustAuth validates
+     * the effective configuration instead of an optional empty default configuration.
+     */
+    public AuthRequest get(String source, Consumer<AuthConfig> configurer) {
         if (StrUtil.isBlank(source)) {
             throw new AuthException(AuthResponseStatus.NO_AUTH_SOURCE);
         }
 
         // 获取 JustAuth 中已存在的
-        AuthRequest authRequest = getDefaultRequest(source);
+        AuthRequest authRequest = getDefaultRequest(source, configurer);
 
         // 如果获取不到则尝试取自定义的
         if (authRequest == null) {
@@ -158,7 +168,7 @@ public class AuthRequestFactory {
      * @param source {@link AuthSource}
      * @return {@link AuthRequest}
      */
-    private AuthRequest getDefaultRequest(String source) {
+    private AuthRequest getDefaultRequest(String source, Consumer<AuthConfig> configurer) {
         AuthDefaultSource authDefaultSource;
 
         try {
@@ -173,9 +183,15 @@ public class AuthRequestFactory {
         if (config == null) {
             return null;
         }
+        AuthConfig effectiveConfig = new AuthConfig();
+        BeanUtil.copyProperties(config, effectiveConfig);
+        if (configurer != null) {
+            configurer.accept(effectiveConfig);
+        }
 
         // 配置 http config
-        configureHttpConfig(authDefaultSource.name(), config, properties.getHttpConfig());
+        configureHttpConfig(authDefaultSource.name(), effectiveConfig, properties.getHttpConfig());
+        config = effectiveConfig;
 
         switch (authDefaultSource) {
             case GITHUB:

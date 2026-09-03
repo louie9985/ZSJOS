@@ -9,7 +9,7 @@ pnpm install
 pnpm dev
 ```
 
-默认前端端口为 `5174`，开发环境 `/admin-api` HTTP 请求和 `/infra/ws` WebSocket 连接代理到 `http://localhost:48080`。可用 `VITE_API_BASE_URL` 指定生产 API 地址。所有接口默认携带 `tenant-id: 1`，可用 `VITE_TENANT_ID` 覆盖。
+默认前端端口为 `5174`，开发环境 `/admin-api` HTTP 请求和 `/infra/ws` WebSocket 连接代理到 `http://127.0.0.1:48080`。可用 `VITE_API_BASE_URL` 指定生产 API 地址。所有接口默认携带 `tenant-id: 1`，可用 `VITE_TENANT_ID` 覆盖。
 
 如果菜单的 `workbenchRenderMode` 配置为 `admin_embed`，Workbench 会从同源
 `/admin-embed/` 打开 Vue Admin 的内容页。为了本地保持一个浏览器 origin：

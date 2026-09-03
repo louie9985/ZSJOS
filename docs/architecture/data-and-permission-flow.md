@@ -31,7 +31,9 @@ the avatar menu. This route is not derived from permission menus. It reads and u
 current System user through `/system/user/profile/*`, uploads avatar images through Infra
 file storage, and uses `/system/social-user/*` plus the System social-auth redirect for the
 current user's WeCom binding. The client accepts only the WeCom social type, does not expose
-a WeCom login entry, and clears OAuth callback parameters after binding; it does not infer
+a WeCom login entry, and clears OAuth callback parameters after binding. Admin and Workbench
+pass the raw callback URL to their HTTP clients so query serialization encodes it exactly once;
+callers must not pre-encode `redirectUri`. The clients do not infer
 organization or permission data locally.
 
 The employee workbench currently uses the administration API prefix and the system

@@ -1,0 +1,265 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_ROOT="${PROJECT_ROOT:-/opt/parttimecrm/app}"
+COMPOSE_FILE="${COMPOSE_FILE:-${PROJECT_ROOT}/docker-compose.prod.yml}"
+PROJECT_NAME="${PROJECT_NAME:-parttimecrm}"
+ENV_FILE="${ENV_FILE:-/opt/parttimecrm/env/backend.env}"
+DATA_DIR="${PARTTIMECRM_DATA_DIR:-/opt/parttimecrm/data}"
+LOCK_FILE="${PARTTIMECRM_DEPLOY_LOCK_FILE:-/run/lock/parttimecrm-deploy.lock}"
+STATE_DIR="${WATCHDOG_STATE_DIR:-/var/lib/parttimecrm-watchdog}"
+RELEASE_METADATA_FILE="${RELEASE_METADATA_FILE:-/opt/parttimecrm/deploy/current-release.env}"
+FAILURE_THRESHOLD="${WATCHDOG_FAILURE_THRESHOLD:-3}"
+RESTART_COOLDOWN_SECONDS="${WATCHDOG_RESTART_COOLDOWN_SECONDS:-300}"
+OUTBOX_HEARTBEAT_MAX_AGE_SECONDS="${OUTBOX_HEARTBEAT_MAX_AGE_SECONDS:-60}"
+OUTBOX_OLDEST_PENDING_ALERT_SECONDS="${OUTBOX_OLDEST_PENDING_ALERT_SECONDS:-60}"
+
+mkdir -p "$(dirname "${LOCK_FILE}")" "${STATE_DIR}"
+chmod 700 "${STATE_DIR}"
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  exit 0
+fi
+
+if [ -f "${ENV_FILE}" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "${ENV_FILE}"
+  set +a
+fi
+if [ -f "${RELEASE_METADATA_FILE}" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "${RELEASE_METADATA_FILE}"
+  set +a
+  if [ -n "${NEW_BACKEND_IMAGE:-}" ]; then
+    export BACKEND_IMAGE="${NEW_BACKEND_IMAGE}"
+  fi
+fi
+export PARTTIMECRM_ENV_FILE="${ENV_FILE}"
+export PARTTIMECRM_DATA_DIR="${DATA_DIR}"
+
+cd "${PROJECT_ROOT}"
+
+compose() {
+  if docker compose version >/dev/null 2>&1; then
+    docker compose -f "${COMPOSE_FILE}" -p "${PROJECT_NAME}" "$@"
+  else
+    docker-compose -f "${COMPOSE_FILE}" -p "${PROJECT_NAME}" "$@"
+  fi
+}
+
+alert() {
+  local message="$1"
+  if command -v logger >/dev/null 2>&1; then
+    logger -p daemon.err -t parttimecrm-watchdog -- "${message}"
+  fi
+  echo "${message}" >&2
+}
+
+service_state() {
+  local service="$1"
+  local container_id
+  container_id="$(compose ps -q "${service}" 2>/dev/null || true)"
+  if [ -z "${container_id}" ]; then
+    echo "missing"
+    return
+  fi
+  docker inspect -f '{{if eq .State.Status "running"}}{{if .State.Health}}{{.State.Health.Status}}{{else}}running{{end}}{{else}}{{.State.Status}}{{end}}' \
+    "${container_id}" 2>/dev/null || echo "inspect-error"
+}
+
+check_restartable_service() {
+  local service="$1"
+  local dependency
+  local dependency_state
+  local dependencies=()
+  local state
+  local failures_file="${STATE_DIR}/${service}.failures"
+  local restart_file="${STATE_DIR}/${service}.last-restart"
+  local failures=0
+  local last_restart=0
+  local now
+
+  case "${service}" in
+    backend-ws)
+      dependencies=(redis-channel)
+      ;;
+    celery-business-worker)
+      dependencies=(redis-broker)
+      ;;
+    celery-realtime-worker)
+      dependencies=(redis-broker redis-channel)
+      ;;
+    celery-wecom-worker)
+      dependencies=(redis-broker)
+      ;;
+    celery-beat)
+      dependencies=(redis-broker celery-business-worker celery-realtime-worker celery-wecom-worker)
+      ;;
+  esac
+  for dependency in "${dependencies[@]}"; do
+    dependency_state="$(service_state "${dependency}")"
+    if [ "${dependency_state}" != "healthy" ] && [ "${dependency_state}" != "running" ]; then
+      printf '0\n' >"${failures_file}"
+      alert "service=${service} restart deferred because ${dependency}=${dependency_state}"
+      return
+    fi
+  done
+
+  state="$(service_state "${service}")"
+  if [ "${state}" = "healthy" ] || [ "${state}" = "running" ]; then
+    printf '0\n' >"${failures_file}"
+    return
+  fi
+
+  if [ -f "${failures_file}" ]; then
+    read -r failures <"${failures_file}" || failures=0
+  fi
+  failures=$((failures + 1))
+  printf '%s\n' "${failures}" >"${failures_file}"
+  alert "service=${service} state=${state} consecutive_failures=${failures}"
+  if [ "${failures}" -lt "${FAILURE_THRESHOLD}" ]; then
+    return
+  fi
+
+  now="$(date +%s)"
+  if [ -f "${restart_file}" ]; then
+    read -r last_restart <"${restart_file}" || last_restart=0
+  fi
+  if [ "$((now - last_restart))" -lt "${RESTART_COOLDOWN_SECONDS}" ]; then
+    alert "service=${service} restart suppressed by ${RESTART_COOLDOWN_SECONDS}s cooldown"
+    return
+  fi
+
+  if [ "${state}" = "unhealthy" ] || [ "${state}" = "running" ]; then
+    compose restart "${service}"
+  else
+    compose up -d --no-deps "${service}"
+  fi
+  printf '%s\n' "${now}" >"${restart_file}"
+  printf '0\n' >"${failures_file}"
+  alert "service=${service} restarted after ${failures} consecutive failures"
+}
+
+restartable_services=(
+  backend-http
+  backend-ws
+  redis-broker
+  redis-channel
+  redis-cache
+  celery-business-worker
+  celery-realtime-worker
+  celery-wecom-worker
+)
+for service in "${restartable_services[@]}"; do
+  check_restartable_service "${service}"
+done
+
+check_outbox_heartbeats() {
+  local failures_file="${STATE_DIR}/outbox-heartbeats.failures"
+  local restart_file="${STATE_DIR}/celery-beat-heartbeat.last-restart"
+  local backend_container
+  local dependency
+  local failures=0
+  local last_restart=0
+  local now
+  local state
+
+  backend_container="$(compose ps -q backend-http 2>/dev/null || true)"
+  if [ -n "${backend_container}" ] && timeout 10s docker exec "${backend_container}" \
+    uv run --no-sync python manage.py shell -c \
+    "from datetime import timedelta; from django.utils import timezone; from apps.notifications.models import OutboundDispatcherState; cutoff = timezone.now() - timedelta(seconds=${OUTBOX_HEARTBEAT_MAX_AGE_SECONDS}); names = set(OutboundDispatcherState.objects.filter(dispatcher__in=['realtime','wecom','email'], heartbeat_at__gte=cutoff, last_error='').values_list('dispatcher', flat=True)); raise SystemExit(0 if names == {'realtime','wecom','email'} else 1)" \
+    >/dev/null 2>&1; then
+    printf '0\n' >"${failures_file}"
+    return
+  fi
+
+  alert "Outbox dispatcher heartbeat is missing, stale, or failing"
+  for dependency in redis-broker backend-http celery-business-worker celery-realtime-worker celery-wecom-worker; do
+    state="$(service_state "${dependency}")"
+    if [ "${state}" != "healthy" ] && [ "${state}" != "running" ]; then
+      printf '0\n' >"${failures_file}"
+      return
+    fi
+  done
+
+  if [ -f "${failures_file}" ]; then
+    read -r failures <"${failures_file}" || failures=0
+  fi
+  failures=$((failures + 1))
+  printf '%s\n' "${failures}" >"${failures_file}"
+  if [ "${failures}" -lt "${FAILURE_THRESHOLD}" ]; then
+    return
+  fi
+
+  now="$(date +%s)"
+  if [ -f "${restart_file}" ]; then
+    read -r last_restart <"${restart_file}" || last_restart=0
+  fi
+  if [ "$((now - last_restart))" -lt "${RESTART_COOLDOWN_SECONDS}" ]; then
+    alert "service=celery-beat heartbeat restart suppressed by cooldown"
+    return
+  fi
+  alert "Outbox dispatcher heartbeat stale; celery-beat is intentionally disabled"
+  printf '%s\n' "${now}" >"${restart_file}"
+  printf '0\n' >"${failures_file}"
+  alert "service=celery-beat restarted after stale Outbox dispatcher heartbeats"
+}
+
+# celery-beat/outbox dispatching is intentionally disabled in this deployment.
+# Do not launch heavyweight Django probes or report unavailable dispatcher heartbeats.
+
+report_outbox_backlog() {
+  local backend_container
+  local snapshot
+  local summary
+  local outbox_status
+  local broker_available
+  local oldest_due
+  local expired_leases
+  local failed_24h
+
+  backend_container="$(compose ps -q backend-http 2>/dev/null || true)"
+  if [ -z "${backend_container}" ]; then
+    alert "Outbox status unavailable because backend-http is missing"
+    return
+  fi
+  snapshot="$(timeout 10s docker exec "${backend_container}" \
+    uv run --no-sync python manage.py outbox_status --json --broker-timeout 1 \
+    2>/dev/null || true)"
+  if [ -z "${snapshot}" ]; then
+    alert "Outbox status command failed"
+    return
+  fi
+  summary="$(printf '%s' "${snapshot}" | timeout 5s docker exec -i "${backend_container}" \
+    uv run --no-sync python -c \
+    'import json, sys; payload = json.load(sys.stdin); states = payload.get("dispatchers", []); oldest = max((item.get("oldestDueAgeSeconds") or 0 for item in states), default=0); expired = sum(item.get("expiredLeaseCount") or 0 for item in states); failed = sum(item.get("failed24h") or 0 for item in states); print(payload.get("status", "unknown"), 1 if payload.get("brokerAvailable") is True else 0, oldest, expired, failed)' \
+    2>/dev/null || true)"
+  if [ -z "${summary}" ]; then
+    alert "Outbox status JSON could not be parsed"
+    return
+  fi
+  read -r outbox_status broker_available oldest_due expired_leases failed_24h <<<"${summary}"
+  if [ "${broker_available}" != "1" ]; then
+    alert "Outbox Broker probe failed; dependent services will not be restarted blindly"
+  fi
+  if [ "${outbox_status}" != "paused_maintenance" ] && \
+    [ "${oldest_due}" -gt "${OUTBOX_OLDEST_PENDING_ALERT_SECONDS}" ]; then
+    alert "Outbox oldest due event age=${oldest_due}s exceeds ${OUTBOX_OLDEST_PENDING_ALERT_SECONDS}s"
+  fi
+  if [ "${expired_leases}" -gt 0 ]; then
+    alert "Outbox expired leases=${expired_leases}; lease recovery should be inspected"
+  fi
+  if [ "${failed_24h}" -gt 0 ]; then
+    alert "Outbox failed events in 24h=${failed_24h}"
+  fi
+}
+
+# Outbox backlog reporting is disabled with celery-beat intentionally off.
+
+if ! systemctl is-active --quiet nginx; then
+  alert "service=nginx state=inactive; alert only, automatic restart is disabled"
+elif ! nginx -t >/dev/null 2>&1; then
+  alert "service=nginx configuration test failed; alert only, automatic restart is disabled"
+fi

@@ -2,7 +2,7 @@
   <el-form-item label="JDBC 地址" prop="config.jdbcUrl">
     <el-input
       v-model="config.jdbcUrl"
-      placeholder="请输入JDBC连接地址，如：jdbc:mysql://localhost:3306/iot_data"
+      placeholder="请输入JDBC连接地址，如：jdbc:mysql://127.0.0.1:3306/iot_data"
     />
   </el-form-item>
   <el-form-item label="用户名" prop="config.username">

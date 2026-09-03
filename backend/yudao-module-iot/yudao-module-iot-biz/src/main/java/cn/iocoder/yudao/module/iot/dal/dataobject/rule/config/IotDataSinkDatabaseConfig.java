@@ -17,9 +17,9 @@ public class IotDataSinkDatabaseConfig extends IotAbstractDataSinkConfig {
     /**
      * JDBC 连接地址
      *
-     * 例如：jdbc:mysql://localhost:3306/iot_data
-     * 例如：jdbc:postgresql://localhost:5432/iot_data
-     * 例如：jdbc:dm://localhost:5236/iot_data
+     * 例如：jdbc:mysql://127.0.0.1:3306/iot_data
+     * 例如：jdbc:postgresql://127.0.0.1:5432/iot_data
+     * 例如：jdbc:dm://127.0.0.1:5236/iot_data
      *
      * HikariCP 会根据 URL 自动检测并加载对应的 JDBC 驱动
      */

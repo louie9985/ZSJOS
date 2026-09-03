@@ -1,6 +1,6 @@
 <template>
   <el-form-item label="服务地址" prop="config.bootstrapServers">
-    <el-input v-model="config.bootstrapServers" placeholder="请输入服务地址，如：localhost:9092" />
+    <el-input v-model="config.bootstrapServers" placeholder="请输入服务地址，如：127.0.0.1:9092" />
   </el-form-item>
   <el-form-item label="用户名" prop="config.username">
     <el-input v-model="config.username" placeholder="请输入用户名" />

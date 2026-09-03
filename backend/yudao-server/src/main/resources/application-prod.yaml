@@ -1,0 +1,345 @@
+server:
+  port: 48080
+  forward-headers-strategy: framework
+spring:
+  autoconfigure:
+    exclude:
+    - org.springframework.ai.vectorstore.qdrant.autoconfigure.QdrantVectorStoreAutoConfiguration
+    - org.springframework.ai.vectorstore.redis.autoconfigure.RedisVectorStoreAutoConfiguration
+    - org.springframework.ai.vectorstore.milvus.autoconfigure.MilvusVectorStoreAutoConfiguration
+    - org.dromara.trans.config.TransServiceConfig
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeChatAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAgentAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeImageAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeVideoAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioSpeechAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAudioTranscriptionAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeRerankAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeEmbeddingAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeMultimodalEmbeddingAutoConfiguration
+    - com.alibaba.cloud.ai.autoconfigure.dashscope.DashScopeAsyncToolCallingManagerAutoConfiguration
+  datasource:
+    dynamic:
+      primary: master
+      datasource:
+        master:
+          url: jdbc:mysql://127.0.0.1:3306/zsjos?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: ${ZSJOS_DB_APP_USER:zsjos_app}
+          password: ${ZSJOS_DB_APP_PASSWORD}
+          name: master
+        slave:
+          lazy: true
+          url: jdbc:mysql://127.0.0.1:3306/zsjos?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true
+          username: ${ZSJOS_DB_APP_USER:zsjos_app}
+          password: ${ZSJOS_DB_APP_PASSWORD}
+          name: slave
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:1}
+  quartz:
+    auto-startup: true
+    job-store-type: jdbc
+    jdbc:
+      initialize-schema: NEVER
+  ai:
+    vectorstore:
+      redis:
+        initialize-schema: true
+        index-name: knowledge_index
+        prefix: 'knowledge_segment:'
+      qdrant:
+        initialize-schema: true
+        collection-name: knowledge_segment
+        host: 127.0.0.1
+        port: 6334
+      milvus:
+        initialize-schema: true
+        database-name: default
+        collection-name: knowledge_segment
+        client:
+          host: 127.0.0.1
+          port: 19530
+    openai:
+      base-url: ${OPENAI_BASE_URL:https://api.openai.com}
+      api-key: ${OPENAI_API_KEY:sk-xxxx}
+    anthropic:
+      base-url: ${ANTHROPIC_BASE_URL:https://api.anthropic.com}
+      api-key: ${ANTHROPIC_API_KEY:sk-xxxx}
+    ollama:
+      base-url: http://127.0.0.1:11434
+      chat:
+        model: llama3
+    stabilityai:
+      api-key: ${STABILITYAI_API_KEY:sk-xxxx}
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:sk-xxxx}
+    deepseek:
+      api-key: ${DEEPSEEK_API_KEY:sk-xxxx}
+      chat:
+        model: deepseek-v4-flash
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY:sk-xxxx}
+        chat:
+          model: gemini-2.5-flash
+    model:
+      rerank: false
+    mcp:
+      server:
+        enabled: false
+        name: yudao-mcp-server
+        version: 1.0.0
+        instructions: 一个 MCP 示例服务
+        sse-endpoint: /sse
+      client:
+        enabled: false
+        name: mcp
+        sse:
+          connections:
+            filesystem:
+              url: http://127.0.0.1:8089
+              sse-endpoint: /sse
+        annotation-scanner:
+          enabled: false
+  application:
+    name: yudao-server
+yudao:
+  ai:
+    doubao:
+      enable: true
+      api-key: ${DOUBAO_API_KEY:sk-xxxx}
+      model: doubao-seed-2-1-turbo-260628
+    hunyuan:
+      enable: true
+      api-key: ${HUNYUAN_API_KEY:sk-xxxx}
+      model: hy3-preview
+    siliconflow:
+      enable: true
+      api-key: ${SILICONFLOW_API_KEY:sk-xxxx}
+      model: deepseek-ai/DeepSeek-V4-Pro
+    xinghuo:
+      enable: true
+      api-key: ${XINGHUO_API_KEY:sk-xxxx}
+      model: x2-flash
+    baichuan:
+      enable: true
+      api-key: ${BAICHUAN_API_KEY:sk-xxxx}
+      model: Baichuan-M3
+    yiyan:
+      enable: false
+      api-key: ${YIYAN_API_KEY:sk-xxxx}
+      model: ernie-5.1
+    zhipu:
+      enable: false
+      api-key: ${ZHIPU_API_KEY:sk-xxxx}
+      model: glm-5.2
+    minimax:
+      enable: false
+      api-key: ${MINIMAX_API_KEY:sk-xxxx}
+      model: MiniMax-M3
+    moonshot:
+      enable: false
+      api-key: ${MOONSHOT_API_KEY:sk-xxxx}
+      model: kimi-k2.6
+    stepfun:
+      enable: false
+      api-key: ${STEPFUN_API_KEY:sk-xxxx}
+      model: step-3.7-flash
+    grok:
+      enable: false
+      api-key: ${GROK_API_KEY:sk-xxxx}
+      model: grok-4.3
+    midjourney:
+      enable: true
+      base-url: https://api.holdai.top/mj
+      api-key: ${MIDJOURNEY_API_KEY:sk-xxxx}
+      notify-url: http://java.nat300.top/admin-api/ai/image/midjourney/notify
+    suno:
+      enable: true
+      base-url: http://127.0.0.1:3001
+    web-search:
+      enable: true
+      api-key: ${WEB_SEARCH_API_KEY:sk-xxxx}
+  info:
+    version: 1.0.0
+    base-package: cn.iocoder.yudao
+  web:
+    admin-ui:
+      url: https://testos.zhongshijian.top
+  xss:
+    enable: false
+    exclude-urls:
+    - ${spring.boot.admin.context-path}/**
+    - ${management.endpoints.web.base-path}/**
+  security:
+    permit-all_urls:
+    - /admin-api/mp/open/**
+    - /public-api/zsjos/media-screen/**
+    - /public-api/eam/asset/**
+  media-screen:
+    enabled: ${YUDAO_MEDIA_SCREEN_ENABLED:false}
+    trusted-proxies:
+    - ${YUDAO_MEDIA_SCREEN_TRUSTED_PROXIES_0:127.0.0.1}
+    clients:
+    - tenant-id: ${YUDAO_MEDIA_SCREEN_CLIENTS_0_TENANT_ID:1}
+      cidrs:
+      - ${YUDAO_MEDIA_SCREEN_CLIENTS_0_CIDRS_0:127.0.0.1}
+    cache:
+      stats-ttl-seconds: ${YUDAO_MEDIA_SCREEN_CACHE_STATS_TTL_SECONDS:15}
+      history-ttl-seconds: ${YUDAO_MEDIA_SCREEN_CACHE_HISTORY_TTL_SECONDS:60}
+      maintenance-ttl-seconds: ${YUDAO_MEDIA_SCREEN_CACHE_MAINTENANCE_TTL_SECONDS:5}
+      refresh-interval-seconds: ${YUDAO_MEDIA_SCREEN_CACHE_REFRESH_INTERVAL_SECONDS:5}
+      stale-if-error-seconds: ${YUDAO_MEDIA_SCREEN_CACHE_STALE_IF_ERROR_SECONDS:60}
+    snapshot:
+      hour: ${YUDAO_MEDIA_SCREEN_SNAPSHOT_HOUR:4}
+      minute: ${YUDAO_MEDIA_SCREEN_SNAPSHOT_MINUTE:0}
+      scan-delay-ms: ${YUDAO_MEDIA_SCREEN_SNAPSHOT_SCAN_DELAY_MS:300000}
+  codegen:
+    base-package: ${yudao.info.base-package}
+    db-schemas: ${spring.datasource.dynamic.datasource.master.name}
+    front-type: 20
+    vo-type: 10
+    delete-batch-enable: true
+    unit-test-enable: false
+    import-enable: false
+  tenant:
+    enable: true
+    ignore-urls:
+    - /jmreport/*
+    ignore-visit-urls:
+    - /admin-api/system/user/profile/**
+    - /admin-api/system/auth/**
+    ignore-tables: null
+    ignore-caches:
+    - user_role_ids
+    - permission_menu_ids
+    - oauth_client
+    - notify_template
+    - mail_account
+    - mail_template
+    - sms_template
+    - iot:device
+    - iot:thing_model_list
+  sms-code:
+    expire-times: 10m
+    send-frequency: 1m
+    send-maximum-quantity-per-day: 10
+    begin-code: 9999
+    end-code: 9999
+  trade:
+    order:
+      pay-expire-time: 2h
+      receive-expire-time: 14d
+      comment-expire-time: 7d
+      status-sync-to-wxa-enable: true
+    express:
+      client: kd_100
+      kd-niao:
+        api-key: ${KD_NIAO_API_KEY:}
+        business-id: ${KD_NIAO_BUSINESS_ID:}
+        request-type: 1002
+      kd100:
+        key: ${KD100_KEY:}
+        customer: ${KD100_CUSTOMER:}
+  iot:
+    message-bus:
+      type: redis
+  websocket:
+    enable: true
+    path: /infra/ws
+    sender-type: local
+    sender-rocketmq:
+      topic: ${spring.application.name}-websocket
+      consumer-group: ${spring.application.name}-websocket-consumer
+    sender-rabbitmq:
+      exchange: ${spring.application.name}-websocket-exchange
+      queue: ${spring.application.name}-websocket-queue
+    sender-kafka:
+      topic: ${spring.application.name}-websocket
+      consumer-group: ${spring.application.name}-websocket-consumer
+  swagger:
+    title: 芋道快速开发平台
+    description: 提供管理后台、用户 App 的所有功能
+    version: ${yudao.info.version}
+    url: ${yudao.web.admin-ui.url}
+    email: xingyu4j@vip.qq.com
+    license: MIT
+    license-url: https://gitee.com/zhijiantianya/ruoyi-vue-pro/blob/master/LICENSE
+  api-encrypt:
+    enable: false
+    algorithm: AES
+    request-key: 52549111389893486934626385991395
+    response-key: 96103715984234343991809655248883
+  public-asset:
+    h5-base-url: ${EAM_PUBLIC_H5_BASE_URL:${ZSJOS_PUBLIC_H5_BASE_URL:http://127.0.0.1:10086}}
+    passcode-encryption-key: ${EAM_PUBLIC_PASSCODE_ENCRYPTION_KEY:}
+    rate-limit:
+      max-failures: 5
+      lock-minutes: 30
+    limits:
+      max-history-days: 366
+    new-media:
+      department-ids: []
+    snapshot:
+      hour: 4
+      minute: 0
+      scan-delay-ms: 300000
+  pay:
+    orderNotifyUrl: https://testos.zhongshijian.top/admin-api/pay/order/notify
+    refundNotifyUrl: https://testos.zhongshijian.top/admin-api/pay/refund/notify
+  captcha:
+    enable: false
+zsjos:
+  wecom:
+    workbench-base-url: ${ZSJOS_WECOM_WORKBENCH_BASE_URL}
+    partner-h5-base-url: ${ZSJOS_WECOM_PARTNER_H5_BASE_URL}
+    ticket-ttl-minutes: ${ZSJOS_WECOM_TICKET_TTL_MINUTES:30}
+  positioning:
+    public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL}
+    confirmation-link-ttl-hours: ${ZSJOS_POSITIONING_CONFIRMATION_LINK_TTL_HOURS:168}
+  payment:
+    allinpay:
+      enabled: ${ZSJOS_ALLINPAY_ENABLED:false}
+      cusid: ${ZSJOS_ALLINPAY_CUSID:}
+      appid: ${ZSJOS_ALLINPAY_APPID:}
+      orgid: ${ZSJOS_ALLINPAY_ORGID:}
+      unionorder-url: ${ZSJOS_ALLINPAY_UNIONORDER_URL:https://syb-test.allinpay.com/apiweb/h5unionpay/unionorder}
+      unitorder-pay-url: ${ZSJOS_ALLINPAY_UNITORDER_PAY_URL:https://syb-test.allinpay.com/apiweb/unitorder/pay}
+      query-url: ${ZSJOS_ALLINPAY_QUERY_URL:https://syb-test.allinpay.com/apiweb/tranx/query}
+      close-url: ${ZSJOS_ALLINPAY_CLOSE_URL:https://syb-test.allinpay.com/apiweb/tranx/close}
+      refund-url: ${ZSJOS_ALLINPAY_REFUND_URL:https://syb-test.allinpay.com/apiweb/tranx/refund}
+      refund-query-url: ${ZSJOS_ALLINPAY_REFUND_QUERY_URL:}
+      refund-notify-url: ${ZSJOS_ALLINPAY_REFUND_NOTIFY_URL:}
+      refund-version: ${ZSJOS_ALLINPAY_REFUND_VERSION:11}
+      return-url: ${ZSJOS_ALLINPAY_RETURN_URL:}
+      notify-url: ${ZSJOS_ALLINPAY_NOTIFY_URL:}
+      public-base-url: ${ZSJOS_PUBLIC_H5_BASE_URL:}
+      merchant-private-key-location: ${ZSJOS_ALLINPAY_PRIVATE_KEY:}
+      platform-public-key-location: ${ZSJOS_ALLINPAY_PUBLIC_KEY:}
+      link-hmac-secret: ${ZSJOS_PAYMENT_LINK_HMAC_SECRET:}
+      allowed-payinfo-hosts: ${ZSJOS_ALLINPAY_PAYINFO_HOSTS:}
+      link-ttl-hours: ${ZSJOS_PAYMENT_LINK_TTL_HOURS:24}
+      connect-timeout-seconds: ${ZSJOS_ALLINPAY_CONNECT_TIMEOUT_SECONDS:10}
+      read-timeout-seconds: ${ZSJOS_ALLINPAY_READ_TIMEOUT_SECONDS:20}
+wx:
+  mp:
+    app-id: ${WX_MP_APP_ID:}
+    secret: ${WX_MP_SECRET:}
+    config-storage:
+      type: RedisTemplate
+      key-prefix: wx
+      http-client-type: HttpComponents
+  miniapp:
+    appid: ${WX_MINIAPP_APP_ID:}
+    secret: ${WX_MINIAPP_SECRET:}
+    config-storage:
+      type: RedisTemplate
+      key-prefix: wa
+      http-client-type: HttpComponents
+flowable:
+  database-schema-update: true
+  db-history-used: true
+  check-process-definitions: false
+  history-level: audit

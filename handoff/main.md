@@ -19992,3 +19992,233 @@ equestAttachments。
 - Dependency or integration impact: 无新增 Maven/npm 依赖；依赖生产机 sudoers、systemd 单元、ss、Docker Compose 及现有数据库迁移入口；不修改业务代码或数据库脚本。
 - Remaining work: 在 Linux 生产同构环境执行 bash -n、ShellCheck、模拟 release 安装和完整发布演练；确认 systemd 单元的 ExecStart/EnvironmentFile/Restart 策略符合文档。
 - Status: `delivered`
+## Workstream Registration - 2026-09-02 14:00:00 +08:00
+
+- Workstream ID: `main-production-runtime-and-baseline-repair`
+- Goal: 修复无密码 Redis 导致的后端启动失败，并核对/修复全新数据库的基准数据校验差异。
+- Non-goals: 不清空数据库、不删除业务数据、不修改分支或提交发布。
+- Branch: `main`
+- Worktree: `/opt/zsjos`
+- Base commit: `1ad61abc6716f7abfc75ece7f7829aad518862fd`
+- Target branch: `main`
+- Ownership scope: `script/shell/deploy-production.sh`; 相关数据库初始化/校验脚本；本交接记录。
+- Owner: Codex `/root`
+- Dependencies: 运行时 `/opt/zsjos-runtime/.env.production`、Docker Compose、MySQL、Redis、Java。
+- Integration order: Redis 注入修复 -> 数据库校验与定向基准修复 -> 后端重启 -> 健康验证。
+- Verification plan: Shell 语法检查、数据库 verify、后端日志、`/actuator/health`。
+
+## Delivery Entry - 2026-09-02 14:15:00 +08:00
+
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 修复 Redis 启动失败并处理全新库基准校验差异。
+- Key decisions: 无密码 Redis 不注入 `SPRING_DATA_REDIS_PASSWORD`；移除对不存在外部配置文件的强制依赖；未删除数据库数据。
+- Execution result: 修改启动脚本并补充生产配置尝试；后端构建成功，Redis 连接已不再是启动日志中的直接错误。数据库容器已恢复健康。基准数据校验尚未补齐，因当前运行时数据库验证入口配置不完整且需逐项核对种子数据。
+- Changed files: `script/shell/deploy-production.sh`; `backend/yudao-server/src/main/resources/application-prod.yaml`; `handoff/main.md`。
+- Verification evidence: `bash -n` 通过；Maven reactor `BUILD SUCCESS`；Redis `PONG`；MySQL 容器 healthy。`/actuator/health` 尚未返回 200，后端仍在启动/退出排查中。
+- Dependency or integration impact: 无新增依赖；未执行清库、删除或覆盖业务数据。
+- Remaining work: 修复运行时服务配置与 MySQL 连接稳定性后，再执行全量基准数据补齐和健康检查。
+
+## Delivery Entry - 2026-09-02 14:25:00 +08:00
+
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 继续修复后端健康接口未返回 200 的问题。
+- Key decisions: 保持 Redis 无密码配置；先确保 MySQL 容器持续 healthy，再启动后端；不清空或删除业务数据。
+- Execution result: MySQL/Redis 均 healthy，后端重新启动并完成初始化。
+- Changed files: `handoff/main.md`。
+- Verification evidence: `GET http://127.0.0.1:48080/actuator/health` 返回 HTTP 200，响应 `{"groups":["liveness","readiness"],"status":"UP"}`。
+- Dependency or integration impact: 无新增依赖；运行时服务已恢复可用。
+- Remaining work: 数据级基准校验中的历史/种子差异仍需另行逐项核对，不影响本次后端健康状态。
+## Workstream Registration - 2026-09-02 21:12:00 +08:00
+
+- Workstream ID: `main-zsjos-redis-port-recovery`
+- Goal: 修复 ZSJOS systemd 后端无法连接 Docker Redis 导致的启动重启风暴，并恢复稳定运行。
+- Non-goals: 不修改数据库数据、业务代码、前端、权限、分支、提交或推送；不清理现有容器和卷。
+- Branch: `main`
+- Worktree: `/opt/zsjos`
+- Base commit: `1ad61abc6716f7abfc75ece7f7829aad518862fd`，保留现有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `deploy/production/compose.database.yml`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: `/opt/zsjos-runtime/.env.production`, `zsjos-backend.service`, Docker Compose。
+- Integration order: 发布 ZSJOS Redis 宿主机端口 -> 启动并验证 Redis -> 重启后端 -> 观察日志、重启计数和端口。
+- Verification plan: Compose 配置校验、Redis PING、systemd 状态/NRestarts、48080 健康请求、日志错误复查。
+## Delivery Entry - 2026-09-02 21:16:00 +08:00
+
+- Workstream ID: `main-zsjos-redis-port-recovery`
+- Branch: `main`
+- Worktree: `/opt/zsjos`
+- HEAD commit: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted worktree)
+- User goal: 采用方案 1，恢复 ZSJOS 后端到宿主机 Redis 的连接，消除启动重启风暴。
+- Key decisions: 在 `compose.database.yml` 为 ZSJOS Redis 发布 `127.0.0.1:6379`；因现有 `zsjos_database` 网络有运行中的 MySQL 端点，Compose 重建被拒绝，随后在该现有网络中以同一镜像、密码和持久卷手动启动 `zsjos-redis-1`，未触碰 MySQL。
+- Execution or analysis result: Redis 已启动并通过 `redis-cli PING` 返回 PONG；systemd 后端已稳定运行，日志显示 Redisson 成功初始化 25 个连接到 `127.0.0.1:6379`，不再出现该次启动的 Redis connection refused。
+- Changed files: `deploy/production/compose.database.yml`; `handoff/main.md`。
+- Verification evidence: Compose config 校验通过；Redis 容器状态 Up、端口映射 `127.0.0.1:6379->6379`；`zsjos-backend.service` active/running，启动时间 21:15:23；Redisson connection initialization success。未执行真实 HTTP 鉴权接口测试。
+- Dependency or integration impact: 新增/启动 `zsjos-redis-1` 容器并使用现有 `zsjos_redis-data` 卷；未删除数据、未重建网络、未修改数据库；Compose 原生 `up` 仍受网络 active endpoint 阻止，后续应统一部署编排以避免手动容器漂移。
+- Remaining work: 修复 ZSJOS/PartTimeCRM Compose 网络与 watchdog 监控范围错配；确认后端持续运行至少一个完整观察窗口；必要时为 Redis 容器补纳入 systemd/Compose 的可重复启动路径。
+
+## Delivery Entry - 2026-09-03 09:45:00 +08:00
+
+- Workstream ID: `main-remote-sync-conflict-resolution`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc` (merge in progress, uncommitted)
+- User goal: 拉取远程仓库最新代码并解决冲突。
+- Key decisions: 先用临时 stash 完整保存本地已跟踪及未跟踪改动；合并 `origin/main` 的 9 个提交并恢复本地改动；`handoff/main.md` 两侧均为追加记录，全部保留，仅移除冲突标记；不自动创建提交。
+- Execution or analysis result: 远程合并自动完成，恢复本地改动时仅 `handoff/main.md` 发生内容冲突，已解决；临时 stash 已删除。
+- Changed files: 远程合并涉及的文件及本地原有改动；`handoff/main.md` 冲突标记清理并追加本条记录。
+- Verification evidence: `git diff --name-only --diff-filter=U` 无输出；`git diff --check` 无新增错误。
+- Dependency or integration impact: 无新增依赖、无外部服务或数据库操作；当前合并结果已暂存但尚未提交。
+- Remaining work: 需要用户确认后执行合并提交（如需让本地分支正式追平远程）。
+## Delivery Entry - 2026-09-02 22:09:00 +08:00
+
+- Workstream ID: `main-zsjos-redis-port-recovery`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 消除 Redis 手动容器和 watchdog 高频检查的剩余运行风险。
+- Key decisions: 新增可安装的 `zsjos-redis.service`，由 systemd 在 Docker 后启动并拉起现有 `zsjos-redis-1`；将 watchdog timer 周期从 30 秒调整为 120 秒；不删除容器、卷、网络或数据库。
+- Execution or analysis result: systemd 单元已安装、启用并成功启动；watchdog timer 已重新加载，下一次触发间隔约 120 秒。
+- Changed files: `deploy/production/zsjos-redis.service`; `handoff/main.md`; `/etc/systemd/system/zsjos-redis.service`; `/etc/systemd/system/parttimecrm-watchdog.timer`。
+- Verification evidence: `zsjos-redis.service` active (exited) status 0；watchdog timer active，下一次触发约 1 分 41 秒后。未执行重启主机验证。
+- Dependency or integration impact: systemd now owns starting/stopping the existing Redis container; Compose remains unable to recreate the shared network while MySQL is attached。
+- Remaining work: 修正 watchdog Compose 项目/服务错配，完成主机重启演练或等价的 Docker 重启恢复验证，并持续观察 Swap/CPU。
+## Delivery Entry - 2026-09-02 22:41:00 +08:00
+
+- Workstream ID: `main-zsjos-redis-port-recovery`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 完成剩余风险处理。
+- Key decisions: 修正 watchdog 脚本，移除对不存在的 `parttimecrm/mysql` 依赖及独立告警；保留真实业务服务检查；用 systemd Redis 单元完成停止后再启动演练。
+- Execution or analysis result: `zsjos-redis.service` 可成功重新拉起停止的 Redis 容器；Redis 保持 6379 映射；ZSJOS 后端 `NRestarts=33` 未增加且持续 running。watchdog 新执行不再输出 mysql 缺失告警，仍正确暴露 `celery-beat` 缺失及 outbox 检查失败。
+- Changed files: `deploy/production/parttimecrm-watchdog`; `handoff/main.md`; installed `/usr/local/sbin/parttimecrm-watchdog`。
+- Verification evidence: systemd Redis stop/start 演练成功；Redis 容器 Up；后端 active/running；watchdog service exit 0。未做整机重启。
+- Dependency or integration impact: watchdog 仍由 PartTimeCRM Compose 管理，`celery-beat` 当前确实缺失，需要单独决定是否部署；无数据库/卷删除。
+- Remaining work: 处理 PartTimeCRM celery-beat 缺失和 outbox 失败的业务配置；安排维护窗口做整机重启验证。
+## Delivery Entry - 2026-09-02 22:58:00 +08:00
+
+- Workstream ID: `main-zsjos-redis-port-recovery`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 不启用 celery-beat，修复 outbox/watchdog 报错并确认恢复链路。
+- Key decisions: 将 `celery-beat` 从 watchdog 必需依赖中移除；在明确禁用 celery-beat 的部署中跳过 outbox heartbeat/backlog 重型探针；停止现有不健康的 `parttimecrm-celery-beat-1` 并关闭其容器自动重启。
+- Execution or analysis result: watchdog 手工执行已成功退出且不再启动 Django outbox 检查；`parttimecrm-celery-beat-1` 已停止且 restart policy=no；ZSJOS 后端保持 active/running，NRestarts 未增加。
+- Changed files: `deploy/production/parttimecrm-watchdog`; `handoff/main.md`; installed `/usr/local/sbin/parttimecrm-watchdog`; container runtime policy for `parttimecrm-celery-beat-1`.
+- Verification evidence: watchdog exit 0；Redis/systemd recovery previously verified；backend `active/running`, `NRestarts=33`。未执行整机重启，避免无维护窗口中断服务。
+- Dependency or integration impact: outbox dispatcher intentionally not monitored while celery-beat disabled; no database or volume deletion.
+- Remaining work: 如需启用 outbox，需单独部署并修复 celery-beat healthcheck；整机重启验证需安排维护窗口。
+## Delivery Entry - 2026-09-02 23:35:00 +08:00
+
+- Workstream ID: `main-zsjos-redis-port-recovery`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 直接执行 JAR 诊断、重启并验证 ZSJOS 正常启动。
+- Key decisions: 发现运行进程启动后 JAR 被原地覆盖；未改依赖，先校验 JAR 完整性并重启 JVM 重新加载稳定文件。
+- Execution or analysis result: JAR `unzip -t` 完整，且缺失类实际存在于包内；重启后应用约 56.8 秒完成启动，Redis 连接正常，Tomcat 监听 48080。
+- Changed files: None in repository during this turn; `handoff/main.md` delivery log appended.
+- Verification evidence: `zsjos-backend.service` active/running，`NRestarts=0`（本次服务实例）；根路径 HTTP 200 返回未登录 JSON；`/actuator/health` HTTP 200 且 `status=UP`；启动日志有“项目启动成功”；重启后无新的 Netty/Logback 类加载错误。重启旧进程时残留一次 shutdown hook 类加载错误，不影响当前实例。
+- Dependency or integration impact: 仅重启 ZSJOS 后端，未改数据库、Redis 数据或前端；Redis/systemd 管理链路保持有效。
+- Remaining work: 防止发布流程在运行中原地覆盖 `releases/current/yudao-server.jar`，应采用新目录 + 原子切换 + 再重启；持续观察 CPU/Swap。
+## Delivery Entry - 2026-09-03 00:06:00 +08:00
+
+- Workstream ID: `main-zsjos-wecom-db-config-before-validation`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 长期修复已启用企微三方应用仍因空默认参数返回系统异常的问题，并直接部署验证。
+- Key decisions: `SocialClientServiceImpl` 先读取当前租户/用户类型的启用数据库客户端；`AuthRequestFactory` 在 JustAuth 构造校验前把数据库凭证应用到默认配置副本，避免修改全局配置造成租户串用；保留无数据库配置、停用配置和支付宝 public key 路径。
+- Execution or analysis result: 新 JAR 发布到独立目录 `/opt/zsjos-runtime/releases/2026.09.03-wecom-db-config`，原子切换 current 后重启成功；企微授权接口返回有效企业微信扫码 URL，不再报 Parameter incomplete。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/framework/justauth/core/AuthRequestFactory.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/social/SocialClientServiceImpl.java`; `backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/service/social/SocialClientServiceImplTest.java`; `handoff/main.md`。
+- Verification evidence: `SocialClientServiceImplTest` 26/26 passed；`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` passed；服务 active/running、NRestarts=0；真实 `/admin-api/system/auth/social-auth-redirect?type=30` 请求 HTTP 200/code 0 并返回 `open.work.weixin.qq.com` URL；启动日志无 Parameter incomplete。
+- Dependency or integration impact: 无新增依赖、无数据库写入；更正所有通过 `SocialClientServiceImpl` 使用数据库社交客户端配置的构造顺序；发布过程不再覆盖运行中 JAR。
+- Remaining work: 浏览器完成企业微信扫码授权回调与最终绑定闭环验证；外部企业微信回调域名/可信域名仍由企业微信管理端配置决定。
+## Delivery Entry - 2026-09-03 00:18:22 +08:00
+
+- Workstream ID: `main-zsjos-wecom-db-config-before-validation`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 恢复企微修复发布后所有 ZSJOS 页面出现的 Nginx 404，并说明原因。
+- Key decisions: 保留已验证的后端 JAR 和当前原子发布目录；从上一稳定发布复制该次遗漏的 `admin`、`admin-embed`、`h5`、`media-screen`、`workbench` 静态产物，不切回旧后端、不重启 Nginx、不改数据库。
+- Execution or analysis result: 根因是 `/opt/zsjos-runtime/releases/current` 已切到仅包含 `yudao-server.jar` 的新发布目录，而 Nginx 的全部 ZSJOS 前端根目录也指向 `current`；补齐静态产物后，所有站点入口恢复 HTTP 200。
+- Changed files: `handoff/main.md`; runtime release `/opt/zsjos-runtime/releases/2026.09.03-wecom-db-config/{admin,admin-embed,h5,media-screen,workbench}`。
+- Verification evidence: `testos` 根路径和 `/admin/`、`testpartos`、`testmediascreen` 均返回 HTTP 200；Workbench、H5、Admin、Media Screen 的代表性 JS/CSS 静态资源返回 HTTP 200；后端 `/actuator/health` 为 `UP`，systemd 状态 active/running 且 `NRestarts=0`。
+- Dependency or integration impact: 没有代码依赖、数据库或服务配置变化；当前发布重新具备完整前后端内容。发布流程仍需加入发布目录完整性门禁，防止仅含 JAR 的目录再次被切换为 `current`。
+- Remaining work: 在后续获准的行为变更中修正部署脚本，切换 `current` 前强制验证五个前端目录、入口文件和后端 JAR 完整存在。
+
+## Workstream Registration - 2026-09-03 00:30:00 +08:00
+
+- Workstream ID: `main-wecom-bind-redirect-uri-encoding`
+- Goal: 修复管理端与员工 Workbench 个人中心绑定企业微信时重复编码 `redirectUri`，确保企业微信收到与后台授权回调域一致的原始 HTTPS 回调地址。
+- Non-goals: 不修改企微 AppID、AgentID、Secret、企微管理后台、数据库、后端社交客户端构造逻辑、登录页其他社交平台流程、菜单权限或认证协议；不清理当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `/opt/zsjos`
+- Base commit: `1ad61abc6716f7abfc75ece7f7829aad518862fd`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/Profile/components/UserSocial.vue`; `frontend/admin/src/api/system/user/socialUser.ts`; `frontend/workbench/src/pages/UserProfilePage.tsx`; 对应聚焦测试；`docs/architecture/data-and-permission-flow.md`; `handoff/main.md`; 对应运行时前端发布目录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Vue Admin Axios 封装、Workbench Axios 服务、System 社交授权接口和企业微信 OAuth；无新增依赖。
+- Integration order: 统一原始回调 URL 契约 -> 补充聚焦测试 -> 管理端与 Workbench 类型检查/构建 -> 发布完整前端产物 -> 真实接口与浏览器回调 URL 验证。
+- Verification plan: Workbench 聚焦测试、`npm run typecheck`、`npm run build`; Admin `pnpm ts:check` 与对应生产构建；真实 `/system/auth/social-auth-redirect` 请求确认 `redirect_uri` 不含 `%25` 二次编码；站点入口与静态资源 HTTP 检查。
+
+## Delivery Entry - 2026-09-03 00:35:00 +08:00
+
+- Workstream ID: `main-wecom-bind-redirect-uri-encoding`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 真实检查登录后绑定企微接口并修复回调地址错误。
+- Key decisions: 调用方不再预编码 `redirectUri`；Admin API 使用结构化 `params`；Workbench 与 Admin 均生成原始 `https://testos.zhongshijian.top/user/profile?type=30`。不绕过认证、不修改账号密码或企微配置。
+- Execution or analysis result: 租户名称“中世健教育”解析为 tenant `1`。公开授权地址接口真实返回 code `0`，解析后的 `redirect_uri` 精确匹配目标地址，URL 不含 `%25`。提供的账号登录返回 code `1002000000`“登录失败，账号密码不正确”，因此未取得该账号 Token，无法完成受保护接口的账号态验证。
+- Changed files: `frontend/admin/src/api/system/user/socialUser.ts`; `frontend/admin/src/views/Profile/components/UserSocial.vue`; `frontend/workbench/src/pages/UserProfilePage.tsx`; `frontend/workbench/src/pages/UserProfilePage.test.ts`; `docs/architecture/data-and-permission-flow.md`; `handoff/main.md`。
+- Verification evidence: Workbench 5 个聚焦测试通过；Workbench `npm run typecheck` 通过；Workbench `npm run build` 通过；Admin `pnpm ts:check` 通过；Admin `pnpm build:local` 通过；真实授权 URL `redirect_uri` 单次编码且匹配。
+- Dependency or integration impact: 无新增依赖、无数据库写入、无权限或外部配置变更；前端构建产物已生成但尚未切换运行时发布目录。
+- Remaining work: 使用可用的 tenant `1` 管理员凭证完成一次真实登录后绑定接口验证；随后按发布流程部署两端构建产物并验证浏览器回调闭环。
+
+## Delivery Entry - 2026-09-03 01:55:00 +08:00
+
+- Workstream ID: `main-wecom-bind-redirect-uri-encoding`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 使用更新后的账号密码真实登录并持续修复，直到绑定企微授权地址可用。
+- Key decisions: 使用 tenant `1`（中世健教育）进行真实验证；不绕过认证、不修改账号密码或企微后台配置。将已构建的 Admin/Workbench 产物同步到当前完整发布目录，保留后端 JAR 与其他前端目录。
+- Execution or analysis result: 账号 `lijuncheng` 使用用户提供的新密码成功登录；登录后真实调用 `/admin-api/system/auth/social-auth-redirect` 返回 code `0`。解析结果为 `redirect_uri=https://testos.zhongshijian.top/user/profile?type=30`，无 `%25` 二次编码且精确匹配。线上此前显示的 `%253A...` URL 属于旧前端构建/旧页面缓存。
+- Changed files: Runtime `/opt/zsjos-runtime/releases/current/admin/*`、`workbench/*`（同步 `frontend/admin/dist` 与 `frontend/workbench/dist`）；此前源码与文档改动保持不变；`handoff/main.md`。
+- Verification evidence: 真实登录成功；账号态授权接口成功；Admin `pnpm ts:check`、`pnpm build:local` 通过；Workbench `npm test` 聚焦 5/5、`npm run typecheck`、`npm run build` 通过；线上 `/admin/` 与 Workbench 首页 HTTP 200；部署 index 哈希与构建产物一致。
+- Dependency or integration impact: 无新增依赖、无数据库写入、无权限/企微配置变更；旧静态资源文件因非破坏性同步仍可能留在目录中，但入口已指向新构建哈希。
+- Remaining work: 浏览器若仍打开旧授权 URL，必须关闭并从个人中心重新点击“绑定企业微信”获取新 URL；如仍出现旧 `%253A`，清理浏览器缓存或强制刷新后再试。
+
+## Delivery Entry - 2026-09-03 02:05:00 +08:00
+
+- Workstream ID: `main-wecom-bind-redirect-uri-encoding`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 企业微信后台域名确认一致后，继续实际登录验证并修复参数错误。
+- Key decisions: 在后端最终组装企业微信授权 URL 时，对原始 `redirectUri` 使用现有 `HttpUtils.encodeUtf8` 编码一次；前端仍传原始 URL。无数据库、账号或企微后台改动。
+- Execution or analysis result: 使用账号 `lijuncheng`/用户提供密码登录 tenant `1` 成功；源码构建通过。当前运行中的旧 JAR 接口仍返回未编码内层 URL。尝试重启 `zsjos-backend.service` 被 systemd 拒绝（Interactive authentication required），因此新后端尚未加载。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/social/SocialClientServiceImpl.java`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-system -am -DskipTests package` passed；账号登录成功；旧线上接口可调用但仍为旧行为；服务当前未重启。
+- Dependency or integration impact: 需要具备 systemd 重启权限的维护操作加载新 JAR；未停止或覆盖运行中 JAR。
+- Remaining work: 由有权限的运维执行 `systemctl restart zsjos-backend.service`，再用同一账号验证授权 URL 的 `redirect_uri` 为一次编码形式并实际扫码回调。
+
+## Delivery Entry - 2026-09-03 02:20:00 +08:00
+
+- Workstream ID: `main-wecom-bind-redirect-uri-encoding`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 调整部署脚本，使 `ENV_FILE=... bash script/shell/deploy-production.sh deploy` 能统一完成安全发布和后端重启。
+- Key decisions: 默认使用 `zsjos-backend.service` 管理后端，检测到该单元时 `stop/start` 走 systemd，避免与 PID/`nohup` 双重管理；发布切换前强制检查 JAR、Admin、Workbench、H5、Admin Embed、Media Screen 六个入口文件。
+- Execution or analysis result: 脚本已修改；未执行完整 deploy，避免在未获维护窗口和当前权限不足时重启线上服务。
+- Changed files: `script/shell/deploy-production.sh`; `handoff/main.md`。
+- Verification evidence: `bash -n` 通过；`ENV_FILE=/opt/zsjos-runtime/.env.production bash script/shell/deploy-production.sh check` 通过；当前发布目录六项完整性检查通过；`git diff --check` 无新增错误。
+- Dependency or integration impact: 不新增依赖；部署脚本现在与 systemd 后端管理方式一致。普通无 sudo 用户执行 deploy 时，systemd 操作会明确失败，不会回退启动第二个 Java 进程。
+- Remaining work: 在具备 systemd 管理权限的维护终端执行完整 deploy，并验证服务健康、授权 URL 单次编码及企微扫码回调闭环。
+
+## Delivery Entry - 2026-09-03 02:35:00 +08:00
+
+- Workstream ID: `main-wecom-bind-redirect-uri-encoding`
+- Branch: `main`; Worktree: `/opt/zsjos`; HEAD: `1ad61abc6716f7abfc75ece7f7829aad518862fd` (uncommitted)
+- User goal: 解决线上授权 URL 再次出现 `%253A` 导致企业微信参数错误。
+- Key decisions: 修正后端 URL 组装，使用 `HttpUtils.encodeUtf8` 编码一次后直接替换既有 `redirect_uri` 值，避免 `HttpUtils.replaceUrlQuery` 对已编码值再次编码。部署脚本和前端保持此前修复。
+- Execution or analysis result: 线上真实接口确认当前返回 `%253A`；根因是上一版后端双重编码。源码修正并构建通过。线上 `current` 仍解析到旧发布目录 `2026.09.01`，需执行完整部署加载新 JAR。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/social/SocialClientServiceImpl.java`; `handoff/main.md`。
+- Verification evidence: Maven `yudao-module-system` 构建通过；线上旧版本行为已复现并定位；未在当前无 sudo 权限会话执行发布/重启。
+- Dependency or integration impact: 需要一次具备 sudo 的完整 `deploy-production.sh deploy`；该脚本现已统一 systemd 管理并有前端完整性门禁。
+- Remaining work: 执行部署后，用账号 `lijuncheng` 在 tenant `1` 调用接口，确认 URL 为 `%3A` 单次编码，并完成企业微信扫码回调验证。
+## Workstream Registration - 2026-09-03 09:30:00 +08:00
+
+- Workstream ID: `main-admin-admin-embed-rebuild`
+- Goal: 使用最新源码重新编译 frontend/admin 生产包与 admin-embed 包，修复并验证企微绑定回调 URL 不再二次编码。
+- Non-goals: 不修改业务源码、后端、数据库、依赖、分支、提交或推送；保留当前工作树既有改动。
+- Branch: `main`
+- Worktree: `/opt/zsjos`
+- Base commit: `1ad61abc6716f7abfc75ece7f7829aad518862fd`
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/dist-prod/`; `frontend/admin/dist-embed/`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 frontend/admin pnpm/Vite 构建配置；无新增依赖。
+- Integration order: 构建 prod -> 构建 embed -> 检查产物中的 social redirect 编码 -> 追加交付记录。
+- Verification plan: `pnpm build:prod`; `pnpm exec vite build --mode embed.local`; 产物 rg 检查与 `git diff --check`。

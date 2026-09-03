@@ -192,7 +192,11 @@ public class SocialClientServiceImplTest extends BaseDbUnitTest {
         AuthConfig authConfig = mock(AuthConfig.class);
         AuthRequest authRequest = mock(AuthDefaultRequest.class);
         ReflectUtil.setFieldValue(authRequest, "config", authConfig);
-        when(authRequestFactory.get(eq("WECHAT_MP"))).thenReturn(authRequest);
+        when(authRequestFactory.get(eq("WECHAT_MP"), any())).thenAnswer(invocation -> {
+            java.util.function.Consumer<AuthConfig> configurer = invocation.getArgument(1);
+            configurer.accept(authConfig);
+            return authRequest;
+        });
         // mock 数据
         SocialClientDO client = randomPojo(SocialClientDO.class, o -> o.setStatus(CommonStatusEnum.ENABLE.getStatus())
                 .setUserType(userType).setSocialType(socialType));
@@ -202,7 +206,9 @@ public class SocialClientServiceImplTest extends BaseDbUnitTest {
         AuthRequest result = socialClientService.buildAuthRequest(socialType, userType);
         // 断言
         assertSame(authRequest, result);
-        assertNotSame(authConfig, ReflectUtil.getFieldValue(authRequest, "config"));
+        verify(authConfig).setClientId(client.getClientId());
+        verify(authConfig).setClientSecret(client.getClientSecret());
+        verify(authConfig).setAgentId(client.getAgentId());
     }
 
     // =================== 微信公众号独有 ===================

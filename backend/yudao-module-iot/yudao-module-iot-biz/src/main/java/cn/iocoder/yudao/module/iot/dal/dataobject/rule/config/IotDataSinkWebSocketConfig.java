@@ -60,7 +60,7 @@ public class IotDataSinkWebSocketConfig extends IotAbstractDataSinkConfig {
 
     /**
      * WebSocket 服务器地址
-     * 例如：ws://localhost:8080/ws 或 wss://example.com/ws
+     * 例如：ws://127.0.0.1:8080/ws 或 wss://example.com/ws
      */
     private String serverUrl;
 

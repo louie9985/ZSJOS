@@ -3,7 +3,7 @@
     语音录制面板
     - 三态机：idle 未录 / recording 录制中 / preview 试听阶段
     - 录制完成后可试听、重录或发送
-    - 需浏览器支持 MediaRecorder（HTTPS 或 localhost）
+    - 需浏览器支持 MediaRecorder（HTTPS 或 127.0.0.1）
     - 仅 idle 状态点击外部会关闭，避免录制 / 试听阶段被误关丢内容
   -->
   <div
@@ -136,7 +136,7 @@ function handleDocumentClick(e: MouseEvent) {
 /** 开始录制：申请麦克风 + 启动 MediaRecorder + 启动每秒计时 */
 async function startRecord() {
   if (!navigator.mediaDevices?.getUserMedia) {
-    message.error('当前浏览器不支持录音（需要 HTTPS 或 localhost）')
+    message.error('当前浏览器不支持录音（需要 HTTPS 或 127.0.0.1）')
     return
   }
   const owner = {}

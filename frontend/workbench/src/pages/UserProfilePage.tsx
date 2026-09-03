@@ -18,6 +18,9 @@ export const parseWecomCallback = (search: string) => {
   return { type, code, state, hasValidSocialCallback: type === WECOM_TYPE && Boolean(code && state) }
 }
 
+export const buildWecomRedirectUri = (origin: string) =>
+  `${origin}${APP_ROUTES.USER_PROFILE}?type=${WECOM_TYPE}`
+
 export const isLatestAvatarUpload = (requestId: number, latestRequestId: number) =>
   requestId === latestRequestId
 
@@ -76,7 +79,7 @@ export default function UserProfilePage({ onUserChange }: { onUserChange: (user:
   const bind = async () => {
     if (binding) return
     setBinding(true)
-    try { const redirectUri = `${window.location.origin}${APP_ROUTES.USER_PROFILE}?type=${WECOM_TYPE}`; window.location.href = await api.socialAuthRedirect(WECOM_TYPE, encodeURIComponent(redirectUri)) } catch (e) { setBinding(false); message.error(errorText(e)) }
+    try { const redirectUri = buildWecomRedirectUri(window.location.origin); window.location.href = await api.socialAuthRedirect(WECOM_TYPE, redirectUri) } catch (e) { setBinding(false); message.error(errorText(e)) }
   }
   const unbind = () => {
     if (!social || socialLoading) return

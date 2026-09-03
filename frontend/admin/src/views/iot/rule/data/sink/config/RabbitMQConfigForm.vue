@@ -1,6 +1,6 @@
 <template>
   <el-form-item label="主机地址" prop="config.host">
-    <el-input v-model="config.host" placeholder="请输入主机地址，如：localhost" />
+    <el-input v-model="config.host" placeholder="请输入主机地址，如：127.0.0.1" />
   </el-form-item>
   <el-form-item label="端口" prop="config.port">
     <el-input-number

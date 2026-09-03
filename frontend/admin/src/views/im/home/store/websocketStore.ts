@@ -294,7 +294,7 @@ export const useImWebSocketStore = defineStore('imWebSocketStore', {
       if (baseUrl && baseUrl.length > 0) {
         return baseUrl.replace(/^http/, 'ws')
       }
-      // 当前页面协议 + host（如 http://localhost:8080），替换成 ws://localhost:8080
+      // 当前页面协议 + host（如 http://127.0.0.1:8080），替换成 ws://127.0.0.1:8080
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
       const host = window.location.host
       return `${protocol}//${host}`

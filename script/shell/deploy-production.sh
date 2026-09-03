@@ -32,10 +32,13 @@ load_env() {
   PID_FILE="${ZSJOS_PID_FILE:-$REPO_DIR/zsjos-server.pid}"
   SERVER_PORT="${SERVER_PORT:-48080}"
   SPRING_PROFILES_ACTIVE="${SPRING_PROFILES_ACTIVE:-prod}"
+  # The packaged jar contains its production profile; do not force an external
+  # config file that may be absent during release switching.
+  unset ZSJOS_CONFIG_FILE
   JAVA_OPTS="${JAVA_OPTS:--Xms1g -Xmx2g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=$LOG_DIR}"
   DB_COMPOSE_FILE="${ZSJOS_DB_COMPOSE_FILE:-$REPO_DIR/deploy/production/compose.database.yml}"
   DB_ENV_FILE="${ZSJOS_DB_ENV_FILE:-$ENV_FILE}"
-  SYSTEMD_SERVICE="${ZSJOS_SYSTEMD_SERVICE:-}"
+  SYSTEMD_SERVICE="${ZSJOS_SYSTEMD_SERVICE:-zsjos-backend.service}"
   DB_URL="${ZSJOS_DB_URL:-jdbc:mysql://127.0.0.1:3306/${ZSJOS_DB_NAME:-zsjos}?useSSL=false&connectionTimeZone=Asia/Shanghai&forceConnectionTimeZoneToSession=true&allowPublicKeyRetrieval=true&nullCatalogMeansCurrent=true&rewriteBatchedStatements=true}"
   DB_HOST="${ZSJOS_DB_HOST:-127.0.0.1}"
   DB_PORT="${ZSJOS_DB_PORT:-3306}"
@@ -162,6 +165,15 @@ install_release() {
       [[ -d "$old_release/$extra" ]] && cp -a "$old_release/$extra" "$release_dir/"
     done
   fi
+  for required in \
+    "$release_dir/yudao-server.jar" \
+    "$release_dir/admin/index.html" \
+    "$release_dir/workbench/index.html" \
+    "$release_dir/h5/index.html" \
+    "$release_dir/admin-embed/index.html" \
+    "$release_dir/media-screen/index.html"; do
+    [[ -f "$required" ]] || die "release completeness check failed: missing $required"
+  done
   [[ -n "$old_release" && "$old_release" != "$release_dir" ]] && printf '%s\n' "$old_release" > "$RELEASES_DIR/previous-release"
   ln -sfn "$release_dir" "$RELEASES_DIR/current"
   ln -sfn "$release_dir/yudao-server.jar" "$REPO_DIR/yudao-server.jar"
@@ -177,6 +189,11 @@ running_pid() {
 
 stop_server() {
   load_env
+  if [[ -n "$SYSTEMD_SERVICE" ]] && systemctl cat "$SYSTEMD_SERVICE" >/dev/null 2>&1; then
+    log "stopping backend service=$SYSTEMD_SERVICE"
+    systemctl stop "$SYSTEMD_SERVICE"
+    return 0
+  fi
   local pid
   pid="$(running_pid)"
   if [[ -z "$pid" ]]; then
@@ -199,11 +216,20 @@ stop_server() {
 
 start_server() {
   load_env
+  if [[ -n "$SYSTEMD_SERVICE" ]] && systemctl cat "$SYSTEMD_SERVICE" >/dev/null 2>&1; then
+    log "starting backend service=$SYSTEMD_SERVICE"
+    systemctl start "$SYSTEMD_SERVICE"
+    return 0
+  fi
   mkdir -p "$LOG_DIR"
   [[ -f "$RELEASES_DIR/current/yudao-server.jar" ]] || die "current release jar is missing; run build and deploy first"
   [[ -z "$(running_pid)" ]] || die "backend is already running"
   local log_file="$LOG_DIR/server-$(date +%Y%m%d).log"
   log "starting backend on port $SERVER_PORT"
+  local redis_password_args=()
+  if [[ -n "${REDIS_PASSWORD:-}" ]]; then
+    redis_password_args+=("SPRING_DATA_REDIS_PASSWORD=$REDIS_PASSWORD")
+  fi
   nohup env \
     TZ="$TZ" \
     SPRING_PROFILES_ACTIVE="$SPRING_PROFILES_ACTIVE" \
@@ -217,7 +243,7 @@ start_server() {
     SPRING_DATA_REDIS_HOST="$REDIS_HOST" \
     SPRING_DATA_REDIS_PORT="$REDIS_PORT" \
     SPRING_DATA_REDIS_DATABASE="$REDIS_DATABASE" \
-    SPRING_DATA_REDIS_PASSWORD="${REDIS_PASSWORD:-}" \
+    "${redis_password_args[@]}" \
     ZSJOS_WECOM_WORKBENCH_BASE_URL="${ZSJOS_WECOM_WORKBENCH_BASE_URL:-}" \
     ZSJOS_WECOM_PARTNER_H5_BASE_URL="${ZSJOS_WECOM_PARTNER_H5_BASE_URL:-}" \
     ZSJOS_PUBLIC_H5_BASE_URL="${ZSJOS_PUBLIC_H5_BASE_URL:-}" \

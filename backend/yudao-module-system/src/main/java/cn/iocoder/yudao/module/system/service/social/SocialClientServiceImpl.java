@@ -172,7 +172,10 @@ public class SocialClientServiceImpl implements SocialClientService {
         AuthRequest authRequest = buildAuthRequest(socialType, userType);
         // 生成跳转地址
         String authorizeUri = authRequest.authorize(AuthStateUtils.createState());
-        return HttpUtils.replaceUrlQuery(authorizeUri, "redirect_uri", redirectUri);
+        // redirect_uri is itself a query value. Replace its existing value after encoding once;
+        // HttpUtils.replaceUrlQuery would encode an already-encoded value a second time.
+        String encodedRedirectUri = HttpUtils.encodeUtf8(redirectUri);
+        return authorizeUri.replaceFirst("([?&])redirect_uri=[^&]*", "$1redirect_uri=" + encodedRedirectUri);
     }
 
     @Override
@@ -199,29 +202,23 @@ public class SocialClientServiceImpl implements SocialClientService {
      */
     @VisibleForTesting
     AuthRequest buildAuthRequest(Integer socialType, Integer userType) {
-        // 1. 先查找默认的配置项，从 application-*.yaml 中读取
-        AuthRequest request = authRequestFactory.get(SocialTypeEnum.valueOfType(socialType).getSource());
-        Assert.notNull(request, String.format("社交平台(%d) 不存在", socialType));
-        // 2. 查询 DB 的配置项，如果存在则进行覆盖
+        // Read the tenant configuration before construction because JustAuth validates in its constructor.
         SocialClientDO client = socialClientMapper.selectBySocialTypeAndUserType(socialType, userType);
         if (client != null && Objects.equals(client.getStatus(), CommonStatusEnum.ENABLE.getStatus())) {
-            // 2.1 构造新的 AuthConfig 对象
-            AuthConfig authConfig = (AuthConfig) ReflectUtil.getFieldValue(request, "config");
-            AuthConfig newAuthConfig = ReflectUtil.newInstance(authConfig.getClass());
-            BeanUtil.copyProperties(authConfig, newAuthConfig);
-            // 2.2 修改对应的 clientId + clientSecret 密钥
-            newAuthConfig.setClientId(client.getClientId());
-            newAuthConfig.setClientSecret(client.getClientSecret());
-            if (client.getAgentId() != null) { // 如果有 agentId 则修改 agentId
-                newAuthConfig.setAgentId(client.getAgentId());
-            }
-            // 2.3 设置会 request 里，进行后续使用
+            AuthRequest request = authRequestFactory.get(SocialTypeEnum.valueOfType(socialType).getSource(), config -> {
+                config.setClientId(client.getClientId());
+                config.setClientSecret(client.getClientSecret());
+                config.setAgentId(client.getAgentId());
+            });
+            Assert.notNull(request, String.format("社交平台(%d) 不存在", socialType));
             if (SocialTypeEnum.ALIPAY_MINI_PROGRAM.getType().equals(socialType)) {
-                // 特殊：如果是支付宝的小程序，多了 publicKey 属性，可见 AuthConfig 里的 alipayPublicKey 字段说明
-                return new AuthAlipayRequest(newAuthConfig, client.getPublicKey());
+                AuthConfig config = (AuthConfig) ReflectUtil.getFieldValue(request, "config");
+                return new AuthAlipayRequest(config, client.getPublicKey());
             }
-            ReflectUtil.setFieldValue(request, "config", newAuthConfig);
+            return request;
         }
+        AuthRequest request = authRequestFactory.get(SocialTypeEnum.valueOfType(socialType).getSource());
+        Assert.notNull(request, String.format("社交平台(%d) 不存在", socialType));
         return request;
     }
 

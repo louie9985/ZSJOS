@@ -27,15 +27,15 @@ export default defineConfig(({ command }) => ({
     strictPort: true,
     proxy: {
       '/public-api': {
-        target: 'http://192.168.2.17:48080',
+        target: 'http://127.0.0.1:48080',
         changeOrigin: true
       },
       '/part-api': {
-        target: 'http://192.168.2.17:48080',
+        target: 'http://127.0.0.1:48080',
         changeOrigin: true
       },
       '/app-api': {
-        target: 'http://192.168.2.17:48080',
+        target: 'http://127.0.0.1:48080',
         changeOrigin: true
       }
     }
