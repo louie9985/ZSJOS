@@ -73,8 +73,13 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
         while (!pending.isEmpty()) {
             int before = pending.size();
             pending.removeIf(row -> {
-                Long parentId = StrUtil.isBlank(row.parentCode()) ? 0L
-                        : current.containsKey(row.parentCode()) ? current.get(row.parentCode()).getId() : null;
+                Long parentId;
+                if (StrUtil.isBlank(row.parentCode())) {
+                    parentId = 0L;
+                } else {
+                    EamCategoryDO parent = current.get(row.parentCode());
+                    parentId = parent == null ? null : parent.getId();
+                }
                 if (parentId == null) {
                     return false;
                 }
@@ -82,7 +87,19 @@ public class EamCategoryImportServiceImpl implements EamCategoryImportService {
                 EamCategoryDO existing = current.get(row.code());
                 if (existing == null) {
                     Long id = categoryService.createCategory(req);
-                    current.put(row.code(), categoryService.getCategory(id));
+                    if (id == null) {
+                        throw exception(CATEGORY_IMPORT_FILE_INVALID, "新分类未返回主键：" + row.code());
+                    }
+                    EamCategoryDO created = categoryService.getCategory(id);
+                    if (created == null) {
+                        // Keep the current import's hierarchy usable if a transactional follow-up read is delayed.
+                        created = new EamCategoryDO().setId(id).setCode(row.code()).setName(row.name())
+                                .setParentId(parentId).setStatus(row.status()).setSort(row.sort())
+                                .setManagementMode(row.managementMode()).setUnit(row.unit())
+                                .setDeliveryMode(row.deliveryMode()).setCustodyMode(row.custodyMode())
+                                .setRemark(row.remark());
+                    }
+                    current.put(row.code(), created);
                 } else if (!sameCategory(existing, row, parentId)) {
                     req.setId(existing.getId());
                     categoryService.updateCategory(req);

@@ -48,11 +48,14 @@ const normalizeImportResponse = (response: Partial<CategoryImportRespVO>): Categ
     updateCount: numberOrZero(response.updateCount),
     skipCount: numberOrZero(response.skipCount),
     conflictCount: numberOrZero(response.conflictCount),
-    categoryCount: numberOrZero(response.categoryCount) || items.filter((item) => item.kind === 'CATEGORY').length,
+    categoryCount:
+      numberOrZero(response.categoryCount) ||
+      items.filter((item) => item.kind === 'CATEGORY').length,
     leafCategoryCount:
       numberOrZero(response.leafCategoryCount) ||
       items.filter((item) => item.kind === 'CATEGORY' && item.message?.includes('子分类')).length,
-    fieldCount: numberOrZero(response.fieldCount) || items.filter((item) => item.kind === 'FIELD').length,
+    fieldCount:
+      numberOrZero(response.fieldCount) || items.filter((item) => item.kind === 'FIELD').length,
     legacyFieldCount: numberOrZero(response.legacyFieldCount),
     credentialFieldCount: numberOrZero(response.credentialFieldCount),
     allManagementFieldsOptional: response.allManagementFieldsOptional !== false,
@@ -92,7 +95,8 @@ export const importTemplate = async () => {
 const uploadImport = async (url: string, file: File) => {
   const data = new FormData()
   data.append('file', file)
-  return await request.upload<CategoryImportRespVO>({ url, data })
+  const response = await request.upload<{ data?: Partial<CategoryImportRespVO> }>({ url, data })
+  return response.data || {}
 }
 
 export const previewImport = async (file: File) => {

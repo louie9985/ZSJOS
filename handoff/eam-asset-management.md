@@ -1,5 +1,20 @@
 # Workstream: eam-asset-management
 
+## Active scope update: 2026-09-03
+
+- **ID**: eam-asset-management
+- **Goal**: 修复全新环境资产分类 Excel 首次导入，优先调整工作簿为父分类先于子分类，并保留导入器顺序防护。
+- **Non-goals**: 不修改分类/字段业务内容，不连接或写入生产数据库，不调整数据库结构、权限或其他 EAM 功能。
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **Base commit**: c6483f33968fee9c5e9c197fab21fa1224639bea
+- **Target branch**: main
+- **Ownership scope**: `outputs/eam-category-config/中世健EAM分类配置-统一初始属性.xlsx`; `backend/yudao-module-eam/src/main/resources/eam/eam-category-config-template.xlsx`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; EAM 分类导入测试；本 handoff 文件。
+- **Owner**: Codex
+- **Dependencies**: Existing EAM import contract, bundled artifact-tool runtime, isolated H2 test database.
+- **Integration order**: 工作簿排序与模板同步 -> 导入器防护收敛 -> 空库首次/重复导入测试 -> 编译与视觉验证。
+- **Verification plan**: 检查每个父分类行号小于子分类；验证 38 分类/69 字段和固定模式值不变；隔离空库执行首次及重复 commit；运行 EAM 专项测试、编译和 `git diff --check`。
+
 ### Delivery entry: 2026-09-01 21:00:00 +08:00
 
 - **Beijing time**: 2026-09-01 21:00:00 +08:00
@@ -365,3 +380,47 @@ guard 反向验证：故意把 `--crm-pane-pad` 改成字面量后测试确实�
 - **Dependency or integration impact**: 不新增依赖；仅影响管理端 EAM 资产更新请求字段序列化。
 - **Remaining work**: 需确认 Network Request Payload 中 `useDeptId`、`useEmployeeId` 为 null，并验证后端清空数据库字段。
 - **Turn status**: implementation-complete; verification-pending
+### Delivery entry: 2026-09-02 17:07:00 +08:00
+
+- **Beijing time**: 2026-09-02 17:07:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: f516733f4791abd714b7dfc1706732bcc56b502f
+- **User goal**: 在完全空环境验证资产分类配置 Excel 导入，并修复服务器错误。
+- **Key decisions**: 使用隔离 H2 空库执行真实 `preview + commit` Service/Mapper 链路；导入器创建分类后若跟读为空，使用已知创建数据维持父子解析，避免空指针；旧伪表头 XSSFWorkbook 测试标记为不支持格式。
+- **Execution or analysis result**: 生产模板成功导入 38 个分类和 69 个字段；交付模式/持有模式均为 1，文件类型字段为 FILE(6)，管理端字段全部选填。定位并修复了空库导入过程中创建分类后跟读为空导致的 NPE。
+- **Changed files**: `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportDbTest.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImplTest.java`。
+- **Verification evidence**: `mvn --% -f backend/pom.xml -pl yudao-module-eam -am -Dtest=EamCategoryImportDbTest,EamCategoryImportServiceImplTest -Dsurefire.failIfNoSpecifiedTests=false test` passed; 5 tests, 0 failures, 0 errors, 3 legacy-format tests skipped. `git diff --check` passed.
+- **Dependency or integration impact**: No new dependencies. Production must deploy the matching backend build containing the importer fix and use the synchronized template resource.
+- **Remaining work**: 未连接真实测试服务器 HTTP 环境；需在部署目标执行一次接口级 preview/commit 并确认数据库迁移版本一致。
+- **Turn status**: implementation-complete; isolated empty-database verification-passed
+
+### Delivery entry: 2026-09-03 10:04:09 +08:00
+
+- **Beijing time**: 2026-09-03 10:04:09 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: c6483f33968fee9c5e9c197fab21fa1224639bea
+- **User goal**: 优先从 Excel 修复全新父分类无法导入、已有父分类时子分类可正常导入的问题。
+- **Key decisions**: 基于原 38 条交付模板进行拓扑重排，所有父分类先于子分类；不使用当前仅 36 条分类的本地数据库重建模板；同时保留导入器对任意父子顺序的防护，并将新分类无主键转换为明确导入错误。
+- **Execution or analysis result**: Excel 前 7 条为根分类，后续 31 条均在父分类之后；分类内容集合和字段表未改变。后端不再因未出现的新父分类触发 null 拆箱 NPE，支持子分类行先于新父分类行。
+- **Changed files**: `outputs/eam-category-config/中世健EAM分类配置-统一初始属性.xlsx`; `backend/yudao-module-eam/src/main/resources/eam/eam-category-config-template.xlsx`; `backend/yudao-module-eam/src/main/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImpl.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportDbTest.java`; `backend/yudao-module-eam/src/test/java/cn/iocoder/yudao/module/eam/service/category/EamCategoryImportServiceImplTest.java`; `tmp/eam-category-xlsx/build.mjs`; `tmp/eam-category-xlsx/verify.mjs`; 本 handoff 文件。
+- **Verification evidence**: Artifact Tool 检查 38 分类、69 字段、父级顺序违规 0、分类内容集合未变化、字段表未变化、公式错误 0，并完成两张工作表视觉检查；空 H2 数据库正常顺序及故意子级在前两项 commit 测试通过；首次导入 38/69，重复导入 0 新增、0 更新、107 跳过；专项 Maven 结果 6 tests、0 failures、0 errors、3 legacy fixture skipped，BUILD SUCCESS；输出文件与后端资源模板 SHA-256 一致；`git diff --check` 通过。
+- **Dependency or integration impact**: No new dependencies. Production should deploy the backend importer fix and use the reordered workbook; no database schema change.
+- **Remaining work**: 未连接真实测试/生产服务器执行 HTTP 上传；生产验证仍需确认目标后端已部署本次修复。测试夹具二次序列化与 FastExcel 不兼容的 3 个旧测试继续跳过，但两项真实模板 DB 测试均执行通过。
+- **Turn status**: implementation-complete; workbook-and-empty-database-verification-passed
+
+### Delivery entry: 2026-09-03 11:20:00 +08:00
+
+- **Beijing time**: 2026-09-03 11:20:00 +08:00
+- **Branch**: main
+- **Worktree**: D:\ZSJ-OS
+- **HEAD commit**: c6483f33968fee9c5e9c197fab21fa1224639bea
+- **User goal**: 解释分类导入预检始终显示 0，但确认导入实际成功。
+- **Key decisions**: 保持后端响应契约不变，修复 Admin 分类导入 API 对 `request.upload()` 返回值的解包层级；上传请求返回完整 `{code,data,msg}`，页面应归一化 `response.data`。
+- **Execution or analysis result**: 已确认截图中的 0 是前端显示错误，不代表后端预检结果为 0；确认导入成功是因为 commit 请求实际执行。分类预检和提交现在均读取业务数据层，统计及明细会正常显示。
+- **Changed files**: `frontend/admin/src/api/eam/category/index.ts`; 本 handoff 文件。
+- **Verification evidence**: `prettier --check src/api/eam/category/index.ts` passed；`eslint src/api/eam/category/index.ts` passed；`vue-tsc --noEmit` 运行完成但被仓库既有无关类型错误阻断，未发现该 API 文件错误。
+- **Dependency or integration impact**: No new dependencies. 需重新构建并部署 Admin 前端；后端无需因本问题变更。
+- **Remaining work**: 部署新版 Admin 后重新上传同一 Excel，确认预检显示 38/69 及新增/跳过明细；若仍显示 0，应检查浏览器 Network 中 `/admin-api/eam/category/import/preview` 响应的 `data` 层级及缓存版本。
+- **Turn status**: implementation-complete; frontend-api-unpack-fix-verified
