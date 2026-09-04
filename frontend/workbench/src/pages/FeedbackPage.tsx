@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
-  Alert, Badge, Button, Descriptions, Empty, Form, Input, Modal, Segmented,
+  Alert, Badge, Button, Descriptions, Empty, Form, Image, Input, Modal, Segmented,
   Select, Skeleton, Space, Spin, Tag, Timeline, Typography, message
 } from 'antd'
 import {
@@ -63,9 +63,24 @@ function displayValue(value: unknown): string {
 
 function AttachmentLinks({ items = [] }: { items?: FeedbackAttachment[] }) {
   if (!items.length) return null
-  return <div className="feedback-file-links">{items.map(item => item.url
-    ? <Typography.Link key={item.id} href={item.url} target="_blank">{item.name || `附件 ${item.id}`}</Typography.Link>
-    : <span key={item.id}>{item.name || `附件 ${item.id}`}</span>)}</div>
+  const images = items.filter(isImageAttachment)
+  const files = items.filter(item => !isImageAttachment(item))
+  return <div className="feedback-file-links">
+    {images.length > 0 && <Image.PreviewGroup><div className="feedback-detail-image-grid">
+      {images.map(item => item.url
+        ? <Image key={item.id} width={88} height={72} src={item.url} alt={item.name || `图片 ${item.id}`} />
+        : <span className="feedback-detail-image-missing" key={item.id}>{item.name || `图片 ${item.id}`}</span>)}
+    </div></Image.PreviewGroup>}
+    {files.map(item => item.url
+      ? <Typography.Link key={item.id} href={item.url} target="_blank">{item.name || `附件 ${item.id}`}</Typography.Link>
+      : <span key={item.id}>{item.name || `附件 ${item.id}`}</span>)}
+  </div>
+}
+
+function isImageAttachment(item: FeedbackAttachment) {
+  const type = item.type?.toLowerCase() || ''
+  const name = item.name?.toLowerCase() || ''
+  return type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)
 }
 
 function FeedbackCard({ item, onClick, disabled = false }: { item: FeedbackRecord; onClick: () => void; disabled?: boolean }) {

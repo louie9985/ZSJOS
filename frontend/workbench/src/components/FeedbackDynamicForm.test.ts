@@ -55,7 +55,7 @@ describe('feedback dynamic form values', () => {
     expect(source).toContain('preview={{ mask: \'预览\' }}')
     expect(source).toContain('previewUrl: localPreviewUrl')
     expect(source).toContain('URL.revokeObjectURL')
-    expect(source).toContain('!imageOnly && value.map')
+    expect(source).toContain('value.filter(file => !isImageAttachment(file)).map')
     expect(source).toContain('<Typography.Link href={file.url}')
   })
 })

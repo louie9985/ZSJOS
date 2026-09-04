@@ -9,6 +9,7 @@ import { useEmitt } from '@/hooks/web/useEmitt'
 import { NOTIFY_MESSAGE_CHANGED_EVENT } from '@/utils/notifyMessage'
 import { ElNotification } from 'element-plus'
 import * as LeadApi from '@/api/zsjos/leadManagement'
+import * as FeedbackApi from '@/api/zsjos/feedback'
 
 defineOptions({ name: 'Message' })
 
@@ -89,6 +90,20 @@ const showPersistedNotification = async (messageId: number) => {
         notification.close()
         if (!detail.readStatus) await NotifyMessageApi.updateNotifyMessageRead(detail.id)
         emitter.emit(NOTIFY_MESSAGE_CHANGED_EVENT)
+        if (detail.actionType === 'business_detail' && detail.bizType === 'feedback' && detail.bizId) {
+          try {
+            const feedback = await FeedbackApi.getFeedback(detail.bizId)
+            const path = feedback.feedbackType === 'REQUIREMENT'
+              ? '/feedback-management/requirements'
+              : feedback.feedbackType === 'BUG'
+                ? '/feedback-management/bugs'
+                : '/feedback-management/support'
+            await router.push({ path, query: { feedbackId: String(detail.bizId) } })
+            return
+          } catch {
+            message.warning('当前账号无权查看该反馈，已打开消息详情')
+          }
+        }
         if (detail.actionType === 'business_detail' && detail.bizType === 'lead' && detail.bizId) {
           const target = { path: '/zsjos/leads/manage', query: { leadId: String(detail.bizId) } }
           if (router.resolve(target).matched.length > 0) {
@@ -104,7 +119,9 @@ const showPersistedNotification = async (messageId: number) => {
           }
         }
         if (detail.actionType !== 'none') {
-          await router.push({ path: '/messages/all', query: { messageId: String(detail.id) } })
+          // Admin 的“我的站内信”实际挂载在 /user/notify-message；旧的
+          // /messages/all 不存在，导致 WebSocket 弹窗点击后无法进入消息详情。
+          await router.push({ path: '/user/notify-message', query: { messageId: String(detail.id) } })
         }
       }
     })

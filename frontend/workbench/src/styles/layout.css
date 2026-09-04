@@ -321,6 +321,24 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   white-space: nowrap;
 }
 
+/* 菜单任务提醒保持紧凑，避免徽标覆盖菜单文字。 */
+.menu-task-badge {
+  margin-inline-end: var(--crm-sp-1);
+  line-height: 1;
+}
+
+.menu-task-badge .ant-badge-count {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 var(--crm-sp-1);
+  border-radius: 7px;
+  font-size: var(--crm-font-xs);
+  line-height: 14px;
+  transform: scale(.82);
+  transform-origin: center;
+  box-shadow: 0 0 0 1px var(--crm-border);
+}
+
 /* 收起状态：只显示图标，按钮缩为正方形 */
 .primary-sider.ant-layout-sider-collapsed .primary-nav-item {
   padding: var(--crm-sp-3) 0;

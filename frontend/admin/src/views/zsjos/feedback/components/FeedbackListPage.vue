@@ -148,12 +148,7 @@
             :label="field.label"
           >
             <template v-if="fileValues(detail.values?.[field.key]).length">
-              <div v-for="file in fileValues(detail.values?.[field.key])" :key="file.id">
-                <el-link v-if="file.url" :href="file.url" target="_blank" type="primary">
-                  {{ file.name || `附件 ${file.id}` }}
-                </el-link>
-                <span v-else>{{ file.name || `附件 ${file.id}` }}</span>
-              </div>
+              <AttachmentLinks :items="fileValues(detail.values?.[field.key])" />
             </template>
             <span v-else>{{ displayValue(detail.values?.[field.key]) }}</span>
           </el-descriptions-item>
@@ -293,7 +288,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, defineComponent, h, onMounted, reactive, ref, resolveComponent } from 'vue'
+import { computed, defineComponent, h, onMounted, reactive, ref, resolveComponent, watch } from 'vue'
 import * as FeedbackApi from '@/api/zsjos/feedback'
 import { useMessage } from '@/hooks/web/useMessage'
 import { useUserStore } from '@/store/modules/user'
@@ -371,6 +366,25 @@ const displayValue = (value: unknown) => {
   return String(value)
 }
 
+const isImageAttachment = (item: FeedbackApi.FeedbackAttachment) => {
+  const type = item.type?.toLowerCase() || ''
+  const name = item.name?.toLowerCase() || ''
+  return type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)
+}
+
+const imagePreview = (item: FeedbackApi.FeedbackAttachment, size = 88) =>
+  item.url
+    ? h(resolveComponent('el-image') as any, {
+        src: item.url,
+        previewSrcList: [item.url],
+        fit: 'cover',
+        class: 'feedback-image-preview',
+        style: { width: `${size}px`, height: `${size}px` },
+        preview: true,
+        alt: item.name || `图片 ${item.id}`
+      })
+    : h('span', { class: 'feedback-image-missing' }, item.name || `图片 ${item.id}`)
+
 const AttachmentLinks = defineComponent({
   props: { items: { type: Array as () => FeedbackApi.FeedbackAttachment[], default: () => [] } },
   setup(componentProps) {
@@ -378,15 +392,14 @@ const AttachmentLinks = defineComponent({
       h(
         'div',
         { class: 'feedback-attachment-links' },
-        componentProps.items.map((item) =>
-          item.url
-            ? h(
-                'a',
-                { href: item.url, target: '_blank', rel: 'noreferrer' },
-                item.name || `附件 ${item.id}`
-              )
-            : h('span', item.name || `附件 ${item.id}`)
-        )
+        [
+          componentProps.items.some(isImageAttachment) && h('div', { class: 'feedback-image-grid' }, componentProps.items.filter(isImageAttachment).map((item) => imagePreview(item))),
+          ...componentProps.items.filter((item) => !isImageAttachment(item)).map((item) =>
+            item.url
+              ? h('a', { href: item.url, target: '_blank', rel: 'noreferrer' }, item.name || `附件 ${item.id}`)
+              : h('span', item.name || `附件 ${item.id}`)
+          )
+        ]
       )
   }
 })
@@ -422,7 +435,8 @@ const FeedbackUpload = defineComponent({
         ),
         ...componentProps.modelValue.map((item) =>
           h('div', { class: 'feedback-upload-item', key: item.id }, [
-            h('span', item.name || `附件 ${item.id}`),
+             isImageAttachment(item) ? imagePreview(item, 72) : h('span', item.name || `附件 ${item.id}`),
+             isImageAttachment(item) && h('span', { class: 'feedback-upload-name' }, item.name || `图片 ${item.id}`),
             h(
               resolveComponent('el-button') as any,
               { link: true, type: 'danger', onClick: () => remove(item.id) },
@@ -485,6 +499,18 @@ const openDetail = async (id: number) => {
   detailOpen.value = true
   await reloadDetail()
 }
+
+const route = useRoute()
+const openRouteFeedback = async () => {
+  const id = Number(route.query.feedbackId)
+  if (!Number.isSafeInteger(id) || id <= 0) return
+  await load()
+  await openDetail(id)
+}
+
+watch(() => route.query.feedbackId, () => {
+  void openRouteFeedback()
+})
 
 const afterAction = async (successMessage: string) => {
   message.success(successMessage)
@@ -551,6 +577,7 @@ const requestSurvey = async () => {
 
 onMounted(async () => {
   await Promise.all([load(), loadCandidates()])
+  await openRouteFeedback()
 })
 </script>
 
@@ -594,6 +621,46 @@ onMounted(async () => {
   flex-direction: column;
   align-items: flex-start;
   gap: 6px;
+}
+
+.feedback-image-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.feedback-image-preview {
+  overflow: hidden;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
+  background: var(--el-fill-color-light);
+}
+
+.feedback-image-preview :deep(img) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.feedback-image-missing {
+  display: inline-flex;
+  width: 88px;
+  height: 88px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--el-border-color);
+  border-radius: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  text-align: center;
+}
+
+.feedback-upload-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .feedback-upload-item {

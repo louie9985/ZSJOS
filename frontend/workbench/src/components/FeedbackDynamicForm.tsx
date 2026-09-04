@@ -90,38 +90,30 @@ export function FeedbackAttachmentInput({
     >
       <Button icon={<UploadOutlined/>}>上传{imageOnly ? '图片' : '附件'}</Button>
     </Upload>
-    {imageOnly && value.length > 0 ? <Image.PreviewGroup>
-      <div className="feedback-image-grid">
-        {value.map(file => <div className="feedback-image-item" key={file.id}>
-          {file.previewUrl || file.url
-            ? <Image
-                src={file.previewUrl || file.url}
-                alt={file.name || `图片 ${file.id}`}
-                preview={{ mask: '预览' }}
-              />
-            : <div className="feedback-image-missing"><PictureOutlined/><span>{file.name || `图片 ${file.id}`}</span></div>}
-          <Button
-            className="feedback-image-remove"
-            type="text"
-            danger
-            icon={<DeleteOutlined/>}
-            aria-label={`移除${file.name || '图片'}`}
-            title="移除图片"
-            onClick={() => remove(file)}
-          />
-          <Typography.Text ellipsis={{ tooltip: file.name }} className="feedback-image-name">
-            {file.name || `图片 ${file.id}`}
-          </Typography.Text>
-        </div>)}
-      </div>
-    </Image.PreviewGroup> : !imageOnly && value.map(file => <div className="feedback-attachment-row" key={file.id}>
-      <Space size={6}>
-        <PaperClipOutlined/>
-        {file.url ? <Typography.Link href={file.url} target="_blank">{file.name || `附件 ${file.id}`}</Typography.Link> : <span>{file.name || `附件 ${file.id}`}</span>}
-      </Space>
-      <Button type="text" danger icon={<DeleteOutlined/>} aria-label="移除附件" onClick={() => remove(file)}/>
-    </div>)}
+    {value.length > 0 && <>
+      {value.some(file => isImageAttachment(file)) && <Image.PreviewGroup>
+        <div className="feedback-image-grid">
+          {value.filter(file => isImageAttachment(file)).map(file => <div className="feedback-image-item" key={file.id}>
+            {file.previewUrl || file.url
+              ? <Image src={file.previewUrl || file.url} alt={file.name || `图片 ${file.id}`} preview={{ mask: '预览' }}/>
+              : <div className="feedback-image-missing"><PictureOutlined/><span>{file.name || `图片 ${file.id}`}</span></div>}
+            <Button className="feedback-image-remove" type="text" danger icon={<DeleteOutlined/>} aria-label={`移除${file.name || '图片'}`} title="移除图片" onClick={() => remove(file)}/>
+            <Typography.Text ellipsis={{ tooltip: file.name }} className="feedback-image-name">{file.name || `图片 ${file.id}`}</Typography.Text>
+          </div>)}
+        </div>
+      </Image.PreviewGroup>}
+      {!imageOnly && value.filter(file => !isImageAttachment(file)).map(file => <div className="feedback-attachment-row" key={file.id}>
+        <Space size={6}><PaperClipOutlined/>{file.url ? <Typography.Link href={file.url} target="_blank">{file.name || `附件 ${file.id}`}</Typography.Link> : <span>{file.name || `附件 ${file.id}`}</span>}</Space>
+        <Button type="text" danger icon={<DeleteOutlined/>} aria-label="移除附件" onClick={() => remove(file)}/>
+      </div>)}
+    </>}
   </div>
+}
+
+function isImageAttachment(file: FeedbackAttachment) {
+  const type = file.type?.toLowerCase() || ''
+  const name = file.name?.toLowerCase() || ''
+  return type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)
 }
 
 export default function FeedbackDynamicForm({

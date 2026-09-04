@@ -20353,3 +20353,33 @@ equestAttachments。
 - Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am "-Dtest=ZsjosProductServiceImplTest" "-Dsurefire.failIfNoSpecifiedTests=false" test` 通过，2/2；Workbench `npm run typecheck` 通过；Admin 目标文件 ESLint 通过；`git diff --check` 通过（仅已有换行符提示）。
 - Dependency or integration impact: 无新增依赖；需部署后端与任一前端以生效；保留工作树中其他既有未提交改动，未执行数据库、分支、提交或发布操作。
 - Remaining work: None。
+
+## Workstream Registration - 2026-09-04 00:00:00 +08:00
+
+- Workstream ID: `main-workbench-menu-badge-size`
+- Goal: 缩小员工工作台菜单栏待办红点，避免遮挡菜单文字。
+- Non-goals: 不修改服务端菜单、权限、待办计数、消息页或其他业务 Badge；不新增依赖，不切换分支，不提交或发布。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `554d50a690b93b276aae5adac41804646f7ba747`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/layouts/navItems.tsx`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/styles/layout.css`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 React Workbench、Ant Design Badge 与导航样式；无新增依赖。
+- Integration order: 导航 Badge 增加统一样式类 -> 缩小徽标尺寸并调整偏移 -> 运行 Workbench 测试、类型检查和构建 -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 02:17:30 +08:00
+
+- Workstream ID: `main-workbench-menu-badge-size`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `554d50a690b93b276aae5adac41804646f7ba747` (uncommitted worktree)
+- User goal: 把菜单栏的红点提醒做小一点，不要挡住文字。
+- Key decisions: 仅为 Workbench 导航待办 Badge 增加统一 `menu-task-badge` 样式；将徽标缩放为紧凑尺寸、使用现有 CRM spacing/font/color tokens，并把部分导航偏移从 8px 调整为 4px；不改变计数、菜单、权限或其他页面 Badge。
+- Execution or analysis result: 侧栏、顶栏、单列/迷你浮层/移动菜单共用的导航 Badge 均已接入紧凑样式，红点与文字间距得到保留。
+- Changed files: `frontend/workbench/src/layouts/navItems.tsx`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/styles/layout.css`; 本 handoff 记录。
+- Verification evidence: `npm test -- src/layouts/navItems.test.tsx` passed，12/12；`npm run typecheck` passed；`npm run build` passed，Vite 仅保留既有大 chunk warning；`git diff --check` 未发现新增空白错误（仅已有 LF/CRLF 提示）。完整 `npm test` 仍有仓库既有 9 个 guard/style failures，与本次改动无关。
+- Dependency or integration impact: 无新增依赖、无数据库/API/权限变更、未切换分支、未提交或发布；当前工作树其他未提交改动保留。
+- Remaining work: 浏览器桌面/移动宽度实测未执行；如需线上视觉确认，部署后刷新 Workbench 静态资源即可。
