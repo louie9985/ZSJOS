@@ -95,7 +95,7 @@ class RuntimeBoundary extends React.Component<React.PropsWithChildren, { error?:
 function toPrimaryItems(items: PrimaryNavigationItem[], badgeResolver?: (path: string) => { count: number } | undefined): MenuItem[] {
   return items.map(item => ({
     key: item.key,
-    label: badgeResolver?.(item.menu.path)?.count ? <Badge className="menu-task-badge" count={badgeResolver(item.menu.path)?.count} overflowCount={99}><span>{item.label}</span></Badge> : item.label,
+    label: badgeResolver?.(item.menu.path)?.count ? <Badge className="menu-task-badge" count={badgeResolver(item.menu.path)?.count} overflowCount={99}><span className="menu-task-text">{item.label}</span></Badge> : item.label,
     title: item.label,
     icon: <BackendMenuIcon icon={item.icon}/>
   }))
@@ -312,7 +312,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <span className="primary-nav-icon"><BackendMenuIcon icon={item.icon}/></span>
-                  {!primaryCollapsed && <span className="primary-nav-label">{item.label}{(resolveMenuTaskBadge(item.menu.path)?.count ?? 0) > 0 && <Badge className="menu-task-badge" count={resolveMenuTaskBadge(item.menu.path)?.count} overflowCount={99} />}</span>}
+                  {!primaryCollapsed && <span className="primary-nav-label"><span className="menu-task-text">{item.label}</span>{(resolveMenuTaskBadge(item.menu.path)?.count ?? 0) > 0 && <Badge className="menu-task-badge" count={resolveMenuTaskBadge(item.menu.path)?.count} overflowCount={99} />}</span>}
                 </button>
               )
               return primaryCollapsed

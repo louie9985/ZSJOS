@@ -18848,6 +18848,20 @@ equestAttachments。
 - Verification plan: 运行管理端 `pnpm ts:check`、目标文件 ESLint、`pnpm build:local`、scoped `git diff --check`；启动本地管理端并检查宽桌面抽屉、窄容器/嵌套条件组和移动宽度的输入框与浮层宽度，登录或后端状态阻断时记录未验证风险。
 - Status: `in-progress`
 
+## Delivery Entry - 2026-09-04 10:42:00 +08:00
+
+- Workstream ID: `main-workbench-calendar-all-shared-view`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `71e60cf49c0599e05c6a682ff7fdafd35cc89c3f` (uncommitted worktree)
+- User goal: `/calendar/all` 面向所有人展示，不应出现编导、运营等个人筛选栏。
+- Key decisions: 仅共享日历视图移除关键词、状态、阶段、编导、运营筛选及 `calendarCandidates()` 请求；账号日历 `/calendar/overview` 保留原筛选能力；后端可选筛选参数保持兼容。
+- Execution or analysis result: `/calendar/all` 左侧现仅保留日历导航和月份切换，日程统计不再显示筛选条件；共享事件颜色改用稳定状态值映射，不依赖筛选字典加载。
+- Changed files: `frontend/workbench/src/pages/MediaCalendarPage.tsx`; `frontend/workbench/src/pages/media-calendar.test.ts`; `handoff/main.md`。
+- Verification evidence: `npm test -- src/pages/media-calendar.test.ts` passed，5/5；`npm run typecheck` passed；`npm run build` passed，Vite 仅保留既有大 chunk warning；`git diff --check` 无新增空白错误。
+- Dependency or integration impact: 无新增依赖、无后端/API/数据库/权限变更、未切换分支、未提交或发布；保留工作树其他未提交改动。
+- Remaining work: 浏览器线上页面未实测；部署后建议打开 `/calendar/all` 确认左侧不再显示筛选控件。
+
 ## Delivery - 2026-09-04 00:50:30 +08:00
 
 - Beijing time: `2026-09-04 00:50:30 +08:00`
@@ -20383,3 +20397,62 @@ equestAttachments。
 - Verification evidence: `npm test -- src/layouts/navItems.test.tsx` passed，12/12；`npm run typecheck` passed；`npm run build` passed，Vite 仅保留既有大 chunk warning；`git diff --check` 未发现新增空白错误（仅已有 LF/CRLF 提示）。完整 `npm test` 仍有仓库既有 9 个 guard/style failures，与本次改动无关。
 - Dependency or integration impact: 无新增依赖、无数据库/API/权限变更、未切换分支、未提交或发布；当前工作树其他未提交改动保留。
 - Remaining work: 浏览器桌面/移动宽度实测未执行；如需线上视觉确认，部署后刷新 Workbench 静态资源即可。
+
+## Delivery Entry - 2026-09-04 10:08:40 +08:00
+
+- Workstream ID: `main-workbench-menu-badge-size`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `554d50a690b93b276aae5adac41804646f7ba747` (uncommitted worktree)
+- User goal: 复查菜单文字占位后，修复红点仍覆盖菜单文字的问题。
+- Key decisions: 不再依赖缩放或绝对定位；导航 Badge 改为正常 flex 布局，红点使用 `position: static` 独立占位，菜单文本单独使用可收缩、省略的 `menu-task-text`；一级侧栏同步拆分文字和红点节点。
+- Execution or analysis result: 所有共用导航构建入口的菜单文字/红点现在按可用宽度分配空间，红点不会覆盖文字；长文字会在自身区域显示省略号。
+- Changed files: `frontend/workbench/src/layouts/navItems.tsx`; `frontend/workbench/src/main.tsx`; `frontend/workbench/src/styles/layout.css`; 本 handoff 记录。
+- Verification evidence: `npm test -- src/layouts/navItems.test.tsx` passed，12/12；`npm run typecheck` passed；`npm run build` passed，Vite 仅保留既有大 chunk warning；本轮未执行浏览器实测。
+- Dependency or integration impact: 无新增依赖、无 API/数据库/权限变更、未切换分支、未提交或发布；保留工作树其他未提交改动。
+- Remaining work: 如需确认真实像素效果，部署或启动 Workbench 后需在桌面及移动宽度检查长菜单名和 1/2/3 位数字红点。
+## Workstream Registration - 2026-09-04 10:30:00 +08:00
+
+- Workstream ID: `main-workbench-calendar-weekday-fix`
+- Goal: 修复 Workbench 大日历日期与星期错位，统一按周一到周日显示并避免纯日期时区偏移。
+- Non-goals: 不修改后端日期字段、数据库、Admin 日历、菜单权限、分支、提交或发布；保留工作树既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `71e60cf49c0599e05c6a682ff7fdafd35cc89c3f`
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/pages/MediaCalendarPage.tsx`; `frontend/workbench/src/pages/media-calendar.test.ts`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Day.js、Workbench React/Vite/TypeScript；无新增依赖。
+- Integration order: 统一周一起始和星期标题 -> 纯日期解析 -> 补充边界测试 -> 运行定向测试、类型检查和构建 -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test -- src/pages/media-calendar.test.ts`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 10:25:00 +08:00
+
+- Workstream ID: `main-workbench-calendar-weekday-fix`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `71e60cf49c0599e05c6a682ff7fdafd35cc89c3f` (uncommitted worktree)
+- User goal: 修复大日历日期与星期对不上，并提供精确获取方式。
+- Key decisions: 统一 Workbench 大日历和日程月历为周一到周日；显式计算周一网格起点；业务 `YYYY-MM-DD` 日期按 `Asia/Shanghai` 解析，不依赖浏览器 UTC 默认行为。
+- Execution or analysis result: 修复月历主网格、小日历星期标题和日期排期条的日期解析；新增星期映射、月初周起点和上海日期解析测试。
+- Changed files: `frontend/workbench/src/pages/MediaCalendarPage.tsx`; `frontend/workbench/src/pages/media-calendar.test.ts`; `handoff/main.md`。
+- Verification evidence: `npm test -- src/pages/media-calendar.test.ts` passed，5/5；`npm run typecheck` passed；`npm run build` passed，Vite 仅保留既有大 chunk warning；`git diff --check` 无新增空白错误（仅已有 LF/CRLF 提示）。
+- Dependency or integration impact: 无新增依赖、无后端/API/数据库/权限变更、未切换分支、未提交或发布；保留工作树其他未提交改动。
+- Remaining work: 浏览器桌面/移动宽度实测未执行；部署后建议抽查月初、跨月和闰年月份。
+
+## Workstream Registration - 2026-09-04 10:35:00 +08:00
+
+- Workstream ID: `main-workbench-calendar-all-shared-view`
+- Goal: 将 `/calendar/all` 收敛为全员共享日历，移除个人筛选栏和候选人请求。
+- Non-goals: 不修改 `/calendar/overview` 账号日历筛选、不修改后端接口参数/权限、数据库、Admin 日历、分支、提交或发布。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `71e60cf49c0599e05c6a682ff7fdafd35cc89c3f`
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/pages/MediaCalendarPage.tsx`; `frontend/workbench/src/pages/media-calendar.test.ts`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Workbench React/Vite/TypeScript 和媒体账号日历 API；无新增依赖。
+- Integration order: 区分共享/账号视图筛选状态 -> 移除共享视图候选请求和筛选控件 -> 更新测试 -> 运行定向验证 -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test -- src/pages/media-calendar.test.ts`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
+- Status: `in-progress`

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import dayjs from 'dayjs'
 import { describe, expect, it } from 'vitest'
-import { mediaCalendarTone, mediaCalendarWindow } from './MediaCalendarPage'
+import { calendarWeekdayLabel, mediaCalendarTone, mediaCalendarWindow, mondayOfWeek, parseCalendarDate } from './MediaCalendarPage'
 
 describe('media account calendar', () => {
   it('uses Monday through Sunday for the week view and exact natural quarter bounds', () => {
@@ -11,6 +11,18 @@ describe('media account calendar', () => {
     const quarter = mediaCalendarWindow(dayjs('2026-08-26'), 'quarter')
     expect(quarter.start.format('YYYY-MM-DD')).toBe('2026-07-01')
     expect(quarter.end.format('YYYY-MM-DD')).toBe('2026-09-30')
+  })
+
+  it('keeps weekday labels aligned with the Monday-first grid', () => {
+    expect(mondayOfWeek(dayjs('2026-09-01')).format('YYYY-MM-DD')).toBe('2026-08-31')
+    expect(calendarWeekdayLabel(dayjs('2026-08-31'))).toBe('一')
+    expect(calendarWeekdayLabel(dayjs('2026-09-06'))).toBe('日')
+  })
+
+  it('parses business dates as Shanghai calendar dates', () => {
+    const value = parseCalendarDate('2026-09-01')
+    expect(value.format('YYYY-MM-DD')).toBe('2026-09-01')
+    expect(value.day()).toBe(2)
   })
 
   it('maps the four current-status groups to stable semantic tones', () => {
@@ -34,6 +46,8 @@ describe('media account calendar', () => {
     expect(page).not.toContain('api.simpleUsers()')
     expect(page).toContain('api.mediaAccount.calendarCandidates()')
     expect(page).toContain('api.mediaAccount.calendarAll(params)')
+    expect(page).toContain('if (isAllCalendar) return')
+    expect(page).not.toContain('media-schedule-filter-stack')
     expect(page).toContain('onReload={() => void load(1)}')
     expect(page).toContain("'日历日程'")
     expect(page).toContain('media-schedule-page')

@@ -33,7 +33,7 @@ export function buildNavMenuItems(
   } = {}
 ): MenuItem[] {
   const { childIcons = true, expandSuffix, groupChildren = false, popupClassName, badgeResolver } = options
-  const labelFor = (label: string, path: string) => { const badge = badgeResolver?.(path); return badge?.count ? <Badge className="menu-task-badge" count={badge.count} overflowCount={99} offset={[4, 0]}><span>{label}</span></Badge> : label }
+  const labelFor = (label: string, path: string) => { const badge = badgeResolver?.(path); return badge?.count ? <Badge className="menu-task-badge" count={badge.count} overflowCount={99}><span className="menu-task-text">{label}</span></Badge> : label }
   const buildChildren = (nodes: SecondaryNavigationItem[]): MenuItem[] => nodes.map(node => {
     const icon = childIcons ? <BackendMenuIcon icon={node.icon}/> : undefined
     if (node.children.length === 0) {
@@ -42,7 +42,7 @@ export function buildNavMenuItems(
     const childCount = node.children.reduce((sum, child) => sum + (badgeResolver?.(child.menu.path)?.count ?? 0), 0)
     return {
       key: node.key,
-      label: childCount ? <Badge className="menu-task-badge" count={childCount} overflowCount={99}><span>{node.label}</span></Badge> : node.label,
+      label: childCount ? <Badge className="menu-task-badge" count={childCount} overflowCount={99}><span className="menu-task-text">{node.label}</span></Badge> : node.label,
       title: node.label,
       ...(icon ? { icon } : {}),
       ...(popupClassName ? { popupClassName } : {}),
@@ -64,7 +64,7 @@ export function buildNavMenuItems(
     return {
       key: primary.key,
       // 展开标记只加在真有二级的项上
-      label: expandSuffix ? <span>{primaryCount ? <Badge className="menu-task-badge" count={primaryCount} overflowCount={99}><span>{primary.label}</span></Badge> : primary.label}{expandSuffix}</span> : (primaryCount ? <Badge className="menu-task-badge" count={primaryCount} overflowCount={99}><span>{primary.label}</span></Badge> : primary.label),
+      label: expandSuffix ? <span>{primaryCount ? <Badge className="menu-task-badge" count={primaryCount} overflowCount={99}><span className="menu-task-text">{primary.label}</span></Badge> : primary.label}{expandSuffix}</span> : (primaryCount ? <Badge className="menu-task-badge" count={primaryCount} overflowCount={99}><span className="menu-task-text">{primary.label}</span></Badge> : primary.label),
       title: primary.label,
       icon,
       ...(popupClassName ? { popupClassName } : {}),
@@ -87,7 +87,7 @@ function buildHierarchicalItems(menus: WorkbenchMenu[], options: HierarchicalMen
     const icon = childIcons ? <BackendMenuIcon icon={menu.icon}/> : undefined
     if (children.length === 0) {
       const badge = badgeResolver?.(menu.path)
-      return { key: menu.path, label: badge?.count ? <Badge className="menu-task-badge" count={badge.count} overflowCount={99}><span>{menu.name}</span></Badge> : menu.name, title: menu.name, ...(icon ? { icon } : {}) }
+      return { key: menu.path, label: badge?.count ? <Badge className="menu-task-badge" count={badge.count} overflowCount={99}><span className="menu-task-text">{menu.name}</span></Badge> : menu.name, title: menu.name, ...(icon ? { icon } : {}) }
     }
     return {
       key: menu.path,

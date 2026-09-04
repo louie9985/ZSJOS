@@ -313,18 +313,31 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
 }
 
 .primary-nav-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--crm-sp-1);
   font-size: var(--crm-font-sm);
   line-height: var(--crm-lh-tight);
   max-width: 100%;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* 菜单任务提醒保持紧凑，避免徽标覆盖菜单文字。 */
+/* 菜单任务提醒参与正常布局，单独占位，不覆盖菜单文字。 */
 .menu-task-badge {
-  margin-inline-end: var(--crm-sp-1);
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
   line-height: 1;
+}
+
+.menu-task-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .menu-task-badge .ant-badge-count {
@@ -334,8 +347,8 @@ html[data-crm-glass='frosted'] .custom-background .crm-sider,html[data-crm-glass
   border-radius: 7px;
   font-size: var(--crm-font-xs);
   line-height: 14px;
-  transform: scale(.82);
-  transform-origin: center;
+  position: static;
+  transform: none;
   box-shadow: 0 0 0 1px var(--crm-border);
 }
 
