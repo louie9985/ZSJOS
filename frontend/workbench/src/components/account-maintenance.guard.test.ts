@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { canViewAccountHistory } from "./AccountMaintenancePanel";
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from "../test/sourceGuard";
 
 describe("media account maintenance panel", () => {
   it("loads all four authoritative dictionaries and persists values rather than labels", () => {
@@ -13,7 +14,7 @@ describe("media account maintenance panel", () => {
     expect(source).toContain("MEDIA_ACCOUNT_PRIMARY_PROBLEM");
     expect(source).toContain("MEDIA_ACCOUNT_EXECUTION_MEASURE");
     expect(source).toContain("primaryProblemValues");
-    expect(source).not.toContain("currentStatusLabelSnapshot: values");
+    expectSourceNotToContainTokens(source, "currentStatusLabelSnapshot: values");
   });
 
   it("exposes only immutable maintenance history without retired legacy-stage records", () => {
@@ -48,9 +49,9 @@ describe("media account maintenance panel", () => {
       "src/components/AccountMaintenancePanel.tsx",
       "utf8",
     );
-    expect(source).toContain("if (!account || !canViewHistory) return");
-    expect(source).toContain("if (account && canViewHistory) void loadHistory");
-    expect(source).toContain("{canViewHistory && (");
+    expectSourceToContainTokens(source, "if (!account || !canViewHistory) return");
+    expectSourceToContainTokens(source, "if (account && canViewHistory) void loadHistory");
+    expectSourceToContainTokens(source, "{canViewHistory && (");
     expect(source).toContain('className="media-account-history-tabs"');
   });
 

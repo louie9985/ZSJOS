@@ -46,6 +46,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_P
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_OWNED;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.PERMISSION_QUERY_SUBMITTED;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -453,6 +454,30 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void detailHidesOwnerTransferWhileSalesOrderIsActive() {
+        when(securityFrameworkService.hasPermission("zsjos:lead:owner-transfer")).thenReturn(true);
+        when(securityFrameworkService.hasPermission("zsjos:sales-order:create")).thenReturn(true);
+        when(salesOrderPermissionService.canRevise(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(20L))).thenReturn(true);
+        OpportunityDO opportunity = new OpportunityDO();
+        opportunity.setId(30L); opportunity.setStatus("following");
+        assertActions(actionLead("valid", "owned", true), opportunity,
+                "OWNER_TRANSFER", "ENTER_DEAL");
+
+        SalesOrderDO pendingOrder = new SalesOrderDO();
+        pendingOrder.setId(40L); pendingOrder.setStatus("pending_approval");
+        assertActions(actionLead("valid", "owned", true), opportunity, pendingOrder);
+
+        SalesOrderDO revisionOrder = new SalesOrderDO();
+        revisionOrder.setId(41L); revisionOrder.setStatus("revision_required");
+        assertActions(actionLead("valid", "owned", true), opportunity, revisionOrder,
+                "REVISE_DEAL");
+        LeadManagementRespVO wonResult = assertActions(actionLead("won", "owned", true), null,
+                "ENTER_REPURCHASE");
+        assertFalse(wonResult.getAvailableActions().contains("OWNER_TRANSFER"));
+    }
+
+    @Test
     void detailProjectsQualificationAndFollowUpIndependently() {
         LeadDO firstFollow = actionLead("submitted", "owned", false);
         assertProjection(firstFollow, null, "pending", "first_follow_pending", "active");
@@ -496,6 +521,8 @@ class LeadManagementServiceImplTest {
     @Test
     void detailAlwaysProjectsSubmitterAssistWhenReadableAndPermitted() {
         when(securityFrameworkService.hasPermission("zsjos:lead:request-submitter-assist")).thenReturn(true);
+        when(leadObjectPermissionService.canRequestSubmitterAssist(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(20L))).thenReturn(true);
 
         assertActions(actionLead("closed", "owned", false), null, "REQUEST_SUBMITTER_ASSIST");
     }
@@ -550,11 +577,9 @@ class LeadManagementServiceImplTest {
         when(securityFrameworkService.hasPermission("zsjos:lead:update")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:lead-follow-up:create")).thenReturn(true);
         when(securityFrameworkService.hasPermission("zsjos:lead:qualify")).thenReturn(true);
-        when(securityFrameworkService.hasPermission("zsjos:sales-order:create")).thenReturn(true);
-
         LeadManagementRespVO result = service.getLead(1L, 30L);
 
-        assertEquals(List.of("ADD_FOLLOW_UP", "ENTER_DEAL"), result.getAvailableActions().stream()
+        assertEquals(List.of("ADD_FOLLOW_UP"), result.getAvailableActions().stream()
                 .map(LeadManagementRespVO.ActionVO::getCode).toList());
     }
 

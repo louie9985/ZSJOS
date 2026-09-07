@@ -4,7 +4,7 @@ import { BellOutlined, CheckOutlined, ClockCircleOutlined, CloseOutlined, Delete
 import { api, type AssignmentUser, type DictData, type LeadAppealEvidence, type LeadAttachment, type ManagedLead, type MyStudent, type StudentContactContext, type StudentContactRecord } from '../services/api'
 import { applyInvalidRemarkTemplate } from '../services/leadManagement'
 import { DICT_TYPE } from '../constants'
-import { defaultLeadDetailTab, detailTabsFromProjection, resolveLeadDetailTab, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
+import { defaultLeadDetailTab, resolveLeadDetailTab, resolveVisibleLeadDetailTabs, type LeadDetailMode, type LeadDetailTab } from '../services/leadFollowUp'
 import { uploadDeferredFiles, type DeferredUploadItem } from '../services/deferredUpload'
 import { useSubmissionGuard } from '../services/submissionGuard'
 import LeadDetailOverview from './LeadDetailOverview'
@@ -32,7 +32,7 @@ export type LeadDetailExtraTab = { key: string; label: string; children: ReactNo
 
 export type StudentLeadContext = { service: MyStudent['services'][number]; contactContext: StudentContactContext; contactRecords: StudentContactRecord[] }
 
-export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner }: {
+export default function LeadDetail({ lead, categories, categoryLabel, channelLabel, mode, autoExpandFollowUp, initialTab, activeTab: controlledActiveTab, onTabChange, onDirtyChange, onChanged, extraTabs = [], baseTabs, contextHeader, contextToolbarActions = [], studentContext, studentService, studentToolbarActions = [], overviewContent, hideProviderOwner }: {
   lead: ManagedLead
   categories: DictData[]
   categoryLabel: (value?: string) => string
@@ -47,6 +47,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   extraTabs?: LeadDetailExtraTab[]
   baseTabs?: LeadDetailTab[]
   contextHeader?: ReactNode
+  contextToolbarActions?: ToolbarAction[]
   studentContext?: StudentLeadContext
   studentService?: MyStudent['services'][number]
   studentToolbarActions?: ToolbarAction[]
@@ -57,7 +58,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const managerMode = mode === 'manager-readonly'
   // Read-only planners still need the server-authorized sales follow-up history.
   const [studentInfoLinkMode, setStudentInfoLinkMode] = useState<'generate' | 'view'>()
-  const visibleTabs = baseTabs ? Array.from(new Set([...baseTabs, ...(lead.visibleTabs?.includes('student-info') ? ['student-info' as const] : [])])) : detailTabsFromProjection(lead.visibleTabs)
+  const visibleTabs = resolveVisibleLeadDetailTabs(baseTabs, lead.visibleTabs)
   const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
   const visibleTabKey = visibleTabs.join(',')
   const [internalActiveTab, setInternalActiveTab] = useState<string>(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
@@ -288,6 +289,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     actions.has('SUBMITTER_COMPLAINT') && { key: 'submitter-complaint', icon: <WarningOutlined/>, label: '投诉', danger: true, onClick: () => setComplaintOpen(true) },
     actions.has('ENTER_REPURCHASE') && { key: 'enter-repurchase', icon: <FileAddOutlined/>, label: '录入复购', disabled: !actions.get('ENTER_REPURCHASE')?.enabled, onClick: () => setRepurchaseOpen(true) },
     ...qualificationAlertActions,
+    ...contextToolbarActions,
     ...studentToolbarActions,
   ].filter(Boolean) as ToolbarAction[]
 

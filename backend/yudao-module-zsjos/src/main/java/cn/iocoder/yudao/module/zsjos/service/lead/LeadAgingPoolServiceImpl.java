@@ -439,6 +439,7 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
         }
     }
     @Override public LeadAgingPoolCycleDO getActiveCycle(Long leadId) { return cycleMapper.selectActiveByLeadId(leadId); }
+    @Override public boolean hasActiveManualPublicSea(Long leadId) { return publicSeaRecordMapper.selectByLeadId(leadId) != null; }
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void markDealPending(Long leadId, Long salesUserId, LocalDateTime now) {
@@ -544,7 +545,10 @@ public class LeadAgingPoolServiceImpl implements LeadAgingPoolService {
                 actions.add(ACTION_ENTER_DEAL);
             }
         }
-        if (Objects.equals(userId, cycle.getCollaboratorUserId())
+        boolean canRequestTransfer = AGING_POOL_WAITING_ASSIGNMENT.equals(cycle.getStatus())
+                ? !Objects.equals(userId, cycle.getOriginalOwnerUserId()) && canRead(cycle, userId)
+                : Objects.equals(userId, cycle.getCollaboratorUserId());
+        if (canRequestTransfer
                 && canRead(cycle.getLeadId(), userId) && !hasActiveApproval(cycle.getLeadId())
                 && securityFrameworkService.hasPermission("zsjos:lead-aging-pool:transfer-request")) {
             actions.add("REQUEST_TRANSFER");

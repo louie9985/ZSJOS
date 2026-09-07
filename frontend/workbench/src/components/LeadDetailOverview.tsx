@@ -743,9 +743,27 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                   <StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} />
                 </section>
               )}
+              {!studentContext && lead && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
+                <section className="lead-card">
+                  <div className="lead-card-header">
+                    <Typography.Text strong>时效进度</Typography.Text>
+                  </div>
+                  <div className="lead-deadlines">
+                    {[
+                      { key: 'firstFollowUp', label: '首次跟进截止', deadline: lead.currentAssignmentFirstFollowUpDeadlineAt, completedAt: lead.currentAssignmentFirstFollowUpAt },
+                      { key: 'qualification', label: '客资有效性判定', deadline: lead.qualificationDeadlineAt, completedAt: lead.qualifiedAt }
+                    ]
+                      .filter(item => !!item.deadline)
+                      .sort((a, b) => (b.deadline || 0) - (a.deadline || 0))
+                      .map(item => (
+                        <DeadlineIndicator key={item.key} label={item.label} deadline={item.deadline} completedAt={item.completedAt} />
+                      ))}
+                  </div>
+                </section>
+              )}
 
-              {slots?.timeline && <section className="lead-card">
-                {slots.timeline}
+              {(slots?.timeline || lead) && <section className="lead-card">
+                {slots?.timeline || (lead && <FlowTimeline lead={lead} />)}
               </section>}
             </div>
           </div>
@@ -754,6 +772,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
         {/* 右侧边栏 3 列：提示 → 工具条 → 状态卡 → 跟进图表 */}
         <aside className="lead-overview-aside">
           {/* 磨砂工具条 */}
+          {!studentContext && lead && <AsideAlerts lead={lead} />}
           {toolbar}
           {slots?.sidebarBeforeStatus}
           {/* 状态卡：Pipeline + 色条标签墙 */}
@@ -765,6 +784,7 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                 : null)}
             </div>
           </section>
+          {!studentContext && showFollowUp && lead && <LeadFollowUpCharts leadId={lead.id} />}
         </aside>
       </div>
     </div>

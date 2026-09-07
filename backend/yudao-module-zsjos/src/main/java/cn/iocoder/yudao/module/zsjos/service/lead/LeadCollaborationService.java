@@ -55,10 +55,15 @@ public class LeadCollaborationService {
      */
     public void requireCanEnterDealForUpdate(LeadDO lead, Long operatorUserId) {
         if (Objects.equals(lead.getOwnerUserId(), operatorUserId)) {
-            lockCollaborationRows(lead.getId(), operatorUserId, lead.getOwnerUserId());
+            var cycle = agingPoolService.getActiveCycle(lead.getId());
+            var manual = publicSeaRecordMapper.selectByLeadIdForUpdate(
+                    lead.getId(), TenantContextHolder.getRequiredTenantId());
+            if (cycle != null || manual != null) {
+                throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT);
+            }
             return;
         }
-        throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_TRANSFER);
+        throw exception(cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT);
     }
 
     private void lockCollaborationRows(Long leadId, Long operatorUserId, Long ownerUserId) {

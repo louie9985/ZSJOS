@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { leadSourceDispatchTag } from './LeadDetailOverview'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('Lead detail source dispatch tag', () => {
   it('labels new-media automatic and specified assignments', () => {
@@ -19,8 +20,8 @@ describe('Lead detail source dispatch tag', () => {
   it('hides the provider row from lead detail overview output', () => {
     const source = readFileSync('src/components/LeadDetailOverview.tsx', 'utf8')
     expect(source).toContain('hideProviderOwner?: boolean')
-    expect(source).toContain('!hideProviderOwner && <div className="lead-profile-row">')
-    expect(source).toContain('providerOwnerNameSnapshot || \'-\'')
+    expectSourceToContainTokens(source, '!hideProviderOwner && <div className="lead-profile-row">')
+    expectSourceToContainTokens(source, 'providerOwnerNameSnapshot || \'-\'')
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
     expect(page).toContain('hideProviderOwner/>')
   })

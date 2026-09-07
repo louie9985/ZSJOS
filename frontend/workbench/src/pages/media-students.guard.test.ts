@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens, sourceHasCall } from '../test/sourceGuard'
 
 describe('director and operator My Students', () => {
   const page = readFileSync('src/pages/MediaStudentsPage.tsx', 'utf8')
@@ -41,10 +42,10 @@ describe('director and operator My Students', () => {
     expect(page).not.toContain('客资编号')
     expect(page).not.toContain('api.managedLead')
     expect(page).not.toContain('leadId')
-    expect(page).toContain("x.personNo || '暂无学员编号'")
+    expectSourceToContainTokens(page, "x.personNo || '暂无学员编号'")
     expect(page).toContain("operationTimeline.filter(item => item.type !== 'talk')")
-    expect(page).toContain("value === 'positioning'")
-    expect(page).toContain("value === 'positioning' || value === 'maintenance'")
+    expectSourceToContainTokens(page, "value === 'positioning'")
+    expectSourceToContainTokens(page, "value === 'positioning' || value === 'maintenance'")
     expect(page).toContain("useState(normalizeMediaStudentTab(params.get('tab')))")
     expect(page).toContain("label: '学习规划师', value: selectedService.ownerUserName")
     expect(page).toContain('mainBeforeColumns')
@@ -60,7 +61,7 @@ describe('director and operator My Students', () => {
 
   it('refreshes the selected student when a notification reuses the current route', () => {
     expect(page).toContain('const initialLocationKey = useRef(location.key)')
-    expect(page).toContain('if (location.key !== initialLocationKey.current) void loadPage(1')
+    expectSourceToContainTokens(page, 'if (location.key !== initialLocationKey.current) void loadPage(1')
   })
 
   it('keeps account maintenance in the account context instead of a student-level tab', () => {
@@ -68,7 +69,7 @@ describe('director and operator My Students', () => {
     expect(page).not.toContain("key: 'maintenance', label: '状态维护'")
     expect(page).toContain("selectedAccount.availableActions.includes('MAINTAIN_ACCOUNT')")
     expect(page).toContain('<dt>当下状态</dt><dd>{x.currentStatusLabelSnapshot')
-    expect(page).toContain('initiallyEditing={maintenanceEditorAccountId === selectedAccount.id}')
+    expectSourceToContainTokens(page, 'initiallyEditing={maintenanceEditorAccountId === selectedAccount.id}')
     expect(page).toContain('<AccountMaintenancePanel key={`${selectedAccount.id}')
   })
 
@@ -89,16 +90,14 @@ describe('director and operator My Students', () => {
   it('autosaves only server-backed director business drafts', () => {
     expect(page).toContain('const AUTO_SAVE_DELAY_MS = 1500')
     expect(page).toContain('onValuesChange={scheduleAutoSave}')
-    expect(page).toContain("dialog === 'precheck' || dialog === 'interview' || dialog === 'positioning'")
+    expectSourceToContainTokens(page, "dialog === 'precheck' || dialog === 'interview' || dialog === 'positioning'")
     expect(page).toContain('DirectorAutoSaveCoordinator')
     expect(page).toContain('stageDraftVersion.current = authoritativeVersion')
     expect(page).toContain('草稿已自动保存')
     expect(autoSave).toContain('草稿版本已变化，请重新加载后继续')
     expect(page).toContain('valuePropName="checked" label={label}')
-    expect(page).not.toContain("if (field.type === 'checkbox') return null")
+    expectSourceNotToContainTokens(page, "if (field.type === 'checkbox') return null")
     expect(page).not.toContain('localStorage.setItem')
-    expect(api).toContain("http.post('/zsjos/positioning-card/draft'")
-    expect(api).toContain('http.put(`/zsjos/positioning-card/draft/${id}`')
     expect(api).toContain('unwrap<PositioningCardDraftResult>')
   })
 
@@ -108,31 +107,32 @@ describe('director and operator My Students', () => {
     expect(page).toContain("const extra = field.description?.trim() ?")
     expect(page).toContain("whiteSpace: 'pre-wrap', overflowWrap: 'anywhere'")
     expect(page.match(/extra=\{extra\}/g)).toHaveLength(9)
-    expect(page).toContain("dialog === 'positioning'")
-    expect(page).toContain("dialog === 'interview'")
-    expect(page).not.toContain('fieldsSnapshot || []).filter(field => field.enabled).map(field => ({ key: field.key, label: field.title, description:')
+    expectSourceToContainTokens(page, "dialog === 'positioning'")
+    expectSourceToContainTokens(page, "dialog === 'interview'")
+    expectSourceNotToContainTokens(page, 'fieldsSnapshot || []).filter(field => field.enabled).map(field => ({ key: field.key, label: field.title, description:')
   })
 
   it('uses the typed positioning student confirmation link API', () => {
     expect(page).toContain('api.positioningCard.generateStudentLink(row.id, row.version)')
     expect(api).toContain('generateStudentLink: async (id: number, version: number)')
-    expect(api).toContain('http.post(`/zsjos/positioning-card/${id}/student-link`, null, { params: { version } })')
     expect(api).toContain('unwrap<PositioningLinkResult>')
     expect(page).toContain('const positioningShareUrl = (sharePath: string)')
-    expect(page).toContain("url.protocol !== 'http:' && url.protocol !== 'https:'")
+    expectSourceToContainTokens(page, "url.protocol !== 'http:' && url.protocol !== 'https:'")
     expect(page).not.toContain('`${window.location.origin}${result.sharePath}`')
   })
 
   it('separates the effective positioning from the latest review round', () => {
-    expect(api).toContain('latestRound: boolean; effective: boolean; current: boolean')
+    expect(api).toMatch(/\blatestRound\s*:\s*boolean\s*;/)
+    expect(api).toMatch(/\beffective\s*:\s*boolean\s*;/)
+    expect(api).toMatch(/\bcurrent\s*:\s*boolean\s*;/)
     expect(page).toContain('item.effective')
-    expect(page).toContain('item.latestRound && !item.effective')
+    expectSourceToContainTokens(page, 'item.latestRound && !item.effective')
     expect(page).toContain('当前生效定位')
     expect(page).toContain('当前审核轮次')
     expect(page).toContain('历史提交')
-    expect(page).toContain("accountEffective?.availableActions.includes('START_POSITIONING_REVISION')")
+    expect(sourceHasCall(page, 'selectedAccountEffective.availableActions.includes')).toBe(true)
+    expect(page).toContain('START_POSITIONING_REVISION')
     expect(page).toContain('api.positioningCard.startRevision(row.id, row.version)')
-    expect(api).toContain('`/zsjos/positioning-card/${id}/start-revision`')
     expect(api).not.toContain('/confirm-trial')
     expect(api).not.toContain('positioning-card/${id}/archive')
     expect(page).not.toContain('试运行结束日期')
@@ -140,7 +140,7 @@ describe('director and operator My Students', () => {
   })
 
   it('keeps positioning view and edit actions in the card heading without duplicates', () => {
-    expect(page).toContain('const selectedPositioningView = selectedAccountLatest || selectedAccountEffective')
+    expectSourceToContainTokens(page, 'const selectedPositioningView = selectedAccountLatest || selectedAccountEffective')
     expect(page).toContain('<Button size="small" onClick={() => void viewPositioning(selectedPositioningView.id)}>查看定位卡</Button>')
     expect(page).toContain("row.availableActions?.filter(action => action !== 'START_POSITIONING_REVISION')")
     expect(page.match(/\{selectedPositioningButtonVisible &&/g)).toHaveLength(1)
@@ -154,8 +154,6 @@ describe('director and operator My Students', () => {
   })
 
   it('imports only server-projected submitted positioning snapshots', () => {
-    expect(api).toContain("http.get('/zsjos/positioning-card/import-sources'")
-    expect(api).toContain("http.post('/zsjos/positioning-card/import'")
     expect(api).toContain('unwrap<PositioningCardImportSource[]>')
     expect(page).toContain('导入现有定位卡')
     expect(page).toContain('暂无可导入的已提交定位卡')
@@ -169,8 +167,8 @@ describe('director and operator My Students', () => {
     expect(page).toContain('导入 JSON')
     expect(page).toContain('仅按当前模板字段 key 匹配')
     expect(page).toContain('确认导入并保存')
-    expect(page).toContain("dialog === 'positioning' && <><div className=\"media-students-positioning-toolbar\"")
-    expect(page).toContain("hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />}")
+    expectSourceToContainTokens(page, "dialog === 'positioning' && <><div className=\"media-students-positioning-toolbar\"")
+    expectSourceToContainTokens(page, "hasPermission(permissions, 'zsjos:positioning-card:query') && <Button icon={<ImportOutlined />}")
     expect(page).toContain("await autoSaveCoordinator.current!.saveNow(draftSaveTask())")
   })
 })

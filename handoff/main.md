@@ -111,6 +111,33 @@
 
 # Main Workstream
 
+## Workstream Registration - 2026-09-07 00:00:00 +08:00
+
+- Workstream ID: `main-aging-pool-toolbar-deal-gate`
+- Goal: 将公海池操作统一接入 Lead 详情 OverflowToolbar，并禁止活动公海客资录入或补正成交，保留服务端授权的非成交操作与主管公海管理操作。
+- Non-goals: 不修改数据库结构、BPM 流程、权限标识、历史数据、分支、提交或推送；保留当前工作树其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: 当前 HEAD `0f5734a73506259660e6286c11bae7c016c6a423`（工作树含既有未提交修改）。
+- Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS Lead/订单服务动作投影、成交入口校验及测试；Workbench `LeadDetail`、`LeadAgingPoolPage`、公海守卫测试；公海/订单/架构文档；本 handoff 文件。
+- Owner: Codex `/root`。
+- Dependencies: 现有 LeadAgingPoolService、LeadCollaborationService、服务端 `availableActions`、React Workbench `OverflowToolbar`；无新增依赖。
+- Integration order: 登记工作流 -> 后端动作与成交门禁 -> Workbench 统一工具条 -> 聚焦测试 -> 文档同步 -> 前后端验证 -> 追加交付记录。
+- Verification plan: ZSJOS 聚焦 Maven 测试；Workbench `npm test`、`npm run typecheck`、`npm run build`；scoped `git diff --check`；真实浏览器/HTTP 若环境可用再验收并记录。
+
+## Delivery Entry - 2026-09-07 12:35:00 +08:00
+
+- Workstream ID: `main-aging-pool-toolbar-deal-gate`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted worktree)
+- User goal: 将公海池操作统一放入详情 OverflowToolbar，并禁止活动公海客资录入/补正成交，仅允许按服务端授权进行非成交操作和正式转派申请。
+- Key decisions: 新增 Lead 详情上下文工具条动作入口；公海页面将指派、退出、申请转派注入统一工具条；活动老化公海和人工公海均隐藏成交动作并在成交服务边界拒绝；waiting_assignment 下符合范围销售可申请转派；主管管理动作保持不变；历史 `deal_pending` 不迁移。
+- Execution or analysis result: 完成 Workbench 页面和共享详情组件调整，新增稳定错误码与成交门禁，扩展公海服务判断和详情动作投影，更新 API/架构/状态机/模块规则文档。
+- Changed files: `backend/yudao-module-zsjos/AGENTS.md`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAgingPoolServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadCollaborationService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/order/SalesOrderServiceImpl.java`; related ZSJOS tests; `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/pages/LeadAgingPoolPage.tsx`; `frontend/workbench/src/pages/lead-aging-pool.guard.test.ts`; `docs/api/zsjos-lead-aging-pool.md`; `docs/api/zsjos-sales-order.md`; `docs/architecture/data-and-permission-flow.md`; `docs/business/lead-order-state-machine.md`; this handoff file.
+- Verification evidence: ZSJOS focused Maven reactor tests passed 53/53 (`LeadAgingPoolServiceImplTest`, `LeadCollaborationServiceTest`, `LeadManagementServiceImplTest`); Workbench `npm test` passed 102 files/566 tests; `npm run typecheck` passed; `npm run build` passed; scoped `git diff --check` reported no whitespace errors, only existing LF/CRLF warnings.
+- Dependency or integration impact: No new dependency, database schema, permission identifier, BPM or external service change; current unrelated worktree modifications preserved. Real browser and authenticated HTTP acceptance were not run because no runtime session was started.
+- Remaining work: Run authenticated desktop/mobile browser checks and endpoint-level acceptance in an available environment; no known code/test blocker remains.
+
 ## Workstream Registration - 2026-09-06 22:40:00 +08:00
 
 - Workstream ID: `main-notice-targeting-complete-fix`
@@ -21441,3 +21468,112 @@ equestAttachments。
 - Dependency or integration impact: 无新增依赖、API、SQL、数据库、权限、配置、代理方式、外部状态、服务启停、分支、提交或推送；保留所有其他未提交改动。
 - Remaining work: 未启动完整应用连接真实 MySQL/Redis 验证运行时启动；服务启停按仓库规则需要单独确认。
 - Status: `implemented; focused wiring test and server package passed; runtime restart pending`。
+
+## Workstream Registration - 2026-09-07 11:30:00 +08:00
+
+- Workstream ID: `main-lead-overview-content-restore`
+- Goal: 恢复普通客资概览中的客资流转时间线、右侧提示条和跟进图表。
+- Non-goals: 不修改后端接口、数据库、权限、学员详情 studentContext 分支、依赖、分支、提交或外部服务状态。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `0f5734a73506259660e6286c11bae7c016c6a423`; Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/workbench/src/components/LeadDetailOverview.tsx`; `handoff/main.md`。
+- Owner: Codex；Dependencies: 现有 Workbench LeadDetailOverview 组件与 CSS；无新增依赖。
+- Integration order: 恢复三个普通客资渲染调用 -> 工作台定向测试 -> typecheck/build -> 追加交付记录。
+- Verification plan: Workbench `npm test`、`npm run typecheck`、`npm run build`；`git diff --check`；可用时进行真实浏览器桌面/移动宽度检查。
+
+## Delivery Entry - 2026-09-07 11:05:28 +08:00
+
+- Workstream ID: `main-lead-overview-content-restore`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted)。
+- User goal: 恢复普通客资概览中的客资流转时间线、右侧提示条和跟进图表。
+- Key decisions: 恢复 `FlowTimeline` 的普通客资默认调用、`AsideAlerts` 和 `LeadFollowUpCharts` 的普通客资渲染；保留 `studentContext` 条件，未改后端契约、权限或数据库。
+- Execution or analysis result: 三个概览区域已恢复；未修改其他用户工作树文件。
+- Changed files: `frontend/workbench/src/components/LeadDetailOverview.tsx`; `handoff/main.md`。
+- Verification evidence: `npm test -- src/components/LeadDetailOverview.lifecycle.test.ts src/components/LeadDetailOverview.source.test.ts` 通过 7/7；`npm run typecheck` 通过；`npm run build` 通过；scoped `git diff --check` 通过。全量 `npm test` 有 7 项既有守卫/样式基线失败，与本次改动无关。
+- Dependency or integration impact: 无新增依赖、API、SQL、数据库、权限、分支、提交、推送或外部服务变更；保留 `LOG_FILE_IS_UNDEFINED`、`frontend/workbench/.cache/`、`jrebel-classpath-44060.jar` 等既有工作树变化。
+- Remaining work: 未执行真实登录浏览器桌面/移动验收；需在可用运行环境中确认真实客资数据下的视觉呈现。
+- Status: `implemented; focused tests, typecheck and production build passed; browser acceptance pending`。
+
+## Delivery Entry - 2026-09-07 11:11:00 +08:00
+
+- Workstream ID: `main-lead-overview-content-restore`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted)。
+- User goal: 在已恢复概览内容的基础上，恢复普通客资的“时效进度”卡片。
+- Key decisions: 普通客资按 `currentAssignmentFirstFollowUpDeadlineAt/currentAssignmentFirstFollowUpAt` 与 `qualificationDeadlineAt/qualifiedAt` 渲染时效指标；保留 studentContext 的联系任务和学生任务流水线，不改后端契约。
+- Execution or analysis result: 普通客资时效进度卡已恢复，指标按截止时间倒序排列并复用现有 `DeadlineIndicator`。
+- Changed files: `frontend/workbench/src/components/LeadDetailOverview.tsx`; `handoff/main.md`。
+- Verification evidence: `npm test -- src/components/LeadDetailOverview.lifecycle.test.ts src/components/LeadDetailOverview.source.test.ts` 通过 7/7；`npm run typecheck` 通过；`npm run build` 通过；scoped `git diff --check` 通过。
+- Dependency or integration impact: 无新增依赖、API、SQL、数据库、权限、分支、提交、推送或外部服务变更。
+- Remaining work: 未执行真实登录浏览器桌面/移动验收；需在可用运行环境中确认真实客资字段存在时的视觉呈现。
+- Status: `implemented; focused tests, typecheck and production build passed; browser acceptance pending`。
+
+## Workstream Registration - 2026-09-07 11:43:00 +08:00
+
+- Workstream ID: `main-workbench-source-guard-hardening`
+- Goal: 修复 Workbench 全量测试中的 7 个基线失败，并全面加固读取源码的测试，避免仅因空白、换行、分号或单双引号变化而误报。
+- Non-goals: 不修改后端接口、数据库、菜单、权限或业务流程；不新增依赖；不清理、覆盖或重新格式化当前工作树其他既有修改；不切换分支、不提交、不推送、不启停外部服务。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0f5734a73506259660e6286c11bae7c016c6a423`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/**/*test.ts`; `frontend/workbench/src/**/*test.tsx`; 新增 Workbench 测试辅助文件；`frontend/workbench/src/services/leadFollowUp.ts`; `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/styles/pages/feedback.css`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 TypeScript 编译器 API、Vitest、Axios 测试设施及 Workbench React/Vite/Ant Design 6；无新增依赖。
+- Integration order: 建立并自测源码 AST 查询辅助 -> 将可执行逻辑迁为行为测试 -> 加固其余格式敏感守卫 -> 修复反馈字号 token -> 运行定向测试 -> 全量测试/typecheck/build -> 浏览器检查 -> 追加交付记录。
+- Verification plan: `npm test --` 定向运行原 4 个失败文件、辅助工具测试和定位卡 API 测试；`npm test`; `npm run typecheck`; `npm run build`; 反馈缺图占位桌面/移动与三档字号浏览器检查；scoped `git diff --check`。
+
+## Workstream Registration Correction - 2026-09-07 12:02:31 +08:00
+
+- Workstream ID: `main-workbench-source-guard-hardening`
+- Ownership scope correction: 在原登记范围上补充 `frontend/workbench/src/styles/tokens.css`，用于定义反馈缺图占位的三档语义字号 token；补充 `frontend/workbench/src/services/positioningCardApi.test.ts`、`frontend/workbench/src/test/sourceGuard.ts`、`frontend/workbench/src/test/sourceGuard.test.ts`。`frontend/workbench/src/components/LeadDetailOverview.tsx` 仍属于任务开始前的用户改动，本工作流未修改其生产实现。
+- Coordination result: 当前主工作树没有其他文件修改型 AI 工作流并行写入上述文件；任务开始前已有的 `LOG_FILE_IS_UNDEFINED`、`LeadDetailOverview.tsx`、SQL、其他 handoff、本地缓存和 JAR 变化均保留。
+
+## Delivery Entry - 2026-09-07 12:02:31 +08:00
+
+- Workstream ID: `main-workbench-source-guard-hardening`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted worktree)
+- User goal: 修复 Workbench 全量测试的 7 个既有失败，并全面加固当前读取源码的测试，使复合代码约束不再依赖空白、缩进、分号、单双引号或单行排版。
+- Key decisions: 消息分类转发和定位卡 HTTP 契约改为真实函数行为测试；学员详情页签规则提取为 `resolveVisibleLeadDetailTabs` 纯函数并直接测试；新增复用 TypeScript 编译器 API 的 AST 调用及 token 序列辅助；仅将复合调用、条件、对象和 JSX 断言迁移，路由、权限码、文案、CSS 类名及禁止原子标识继续精确字符串检查；反馈缺图字号使用三档语义 token，默认仍为 12px。
+- Execution or analysis result: 原 7 个失败已修复；审计了 Workbench 当前 40 个直接读取源码的测试文件，并迁移其中 28 个含格式敏感复合断言的文件；辅助工具新增 7 项自测；构建生成的 `tsconfig.tsbuildinfo` 变更已移除。任务开始前的用户改动未回退或覆盖。
+- Changed files: `frontend/workbench/src/test/sourceGuard.ts`; `frontend/workbench/src/test/sourceGuard.test.ts`; `frontend/workbench/src/services/positioningCardApi.test.ts`; `frontend/workbench/src/services/leadFollowUp.ts`; `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/styles/pages/feedback.css`; `frontend/workbench/src/styles/tokens.css`; `frontend/workbench/src/components/{FeedbackDynamicForm.test.ts,ForcedFormProvider.guard.test.ts,LeadDetailAssist.source.test.ts,LeadDetailOverview.source.test.ts,LeadFlowHistoryPanel.test.ts,MessageCenter.guard.test.ts,account-maintenance.guard.test.ts,announcement.guard.test.ts}`; `frontend/workbench/src/pages/{business-inbox-alignment.guard.test.ts,desktop-detail-drawer.guard.test.ts,eam-assets.guard.test.ts,feedback-route.guard.test.ts,global-inbox-layout.guard.test.ts,inbox-advanced-filter.guard.test.ts,lead-aging-pool.guard.test.ts,lead-batch-actions.guard.test.ts,lead-management-unified.guard.test.ts,lead-submission-steps.guard.test.ts,lead-table-sorting-resizing.guard.test.ts,media-calendar.test.ts,media-students.guard.test.ts,messageinboxpage.guard.test.ts,production-ticket-positioning.guard.test.ts,registration-close.guard.test.ts,sales-order-approval-unified.guard.test.ts,student-sales-history.guard.test.ts,subordinate-lead-actions.guard.test.ts,subordinate-partner.guard.test.ts,subordinate-sales-lazy.guard.test.ts}`; `frontend/workbench/src/services/{homeEntry.test.ts,notifyMessage.test.ts,todayTasks.test.ts}`; `handoff/main.md`。
+- Verification evidence: 定向失败文件、源码辅助工具和定位卡 API 测试通过；Workbench 全量 `npm test` 通过 102/102 文件、566/566 测试；`npm run typecheck` 通过；`npm run build` 通过（6298 modules，只有既有大 chunk 警告）；scoped `git diff --check` 通过。真实登录反馈页在 1440x900 和 390x844 下无横向溢出或重叠，浏览器加载的 CSS 使用新 token，三档计算字号分别为 10px、12px、14px，并已恢复默认字号与视口。
+- Dependency or integration impact: 无新增 npm 依赖、外部 API、后端、路由、数据模型、菜单、权限、数据库、分支、提交、推送或外部服务变化；生产行为仅包含行为中性的页签纯函数提取和反馈字号 token 化。
+- Remaining work: 当前反馈环境没有可用记录，无法让真实缺图实体进入占位渲染分支；已验证真实页面布局、已加载规则及三档计算 token，带缺图记录的端到端占位内容仍需后续数据可用时确认。浏览器控制台存在与本次无关的 Ant Design 废弃提示。
+- Status: `implemented; full tests, typecheck, build and available browser checks passed`。
+
+## Workstream Registration - 2026-09-07 12:06:09 +08:00
+
+- Workstream ID: `main-lead-owner-transfer-deal-gate`
+- Goal: 成交订单处于审核中或驳回待补正状态时，禁止销售本人转派对应客资，并同步详情可用动作。
+- Non-goals: 不调整销售主管、资格异常或管理员转派；不调整公海释放、成交审批状态机、接口结构、数据库、菜单权限、依赖、分支、提交、推送或外部服务状态；不覆盖当前工作树其他既有修改。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `0f5734a73506259660e6286c11bae7c016c6a423`，并保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java`; 对应 Lead Service 聚焦测试；`docs/api/zsjos-lead-submission-dispatch.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 `SalesOrderMapper.selectActiveByLeadId`、`SalesOrderConstants.ACTIVE_ORDER_STATUSES`、Lead 行锁与服务端 `availableActions` 投影；无新增依赖。
+- Integration order: 本人转派命令增加活动成交订单校验 -> 详情动作投影隐藏本人转派 -> 新增稳定错误码 -> 补充聚焦测试与 API 文档 -> 运行后端及 Workbench 验证 -> 追加交付记录。
+- Verification plan: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am test`; Workbench `npm test`、`npm run typecheck`、`npm run build`; scoped `git diff --check`；运行环境可用时验证真实接口和桌面/移动入口。
+
+## Delivery Entry - 2026-09-07 12:19:28 +08:00
+
+- Workstream ID: `main-lead-owner-transfer-deal-gate`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted worktree)
+- User goal: 成交订单处于 `pending_approval` 或 `revision_required` 时禁止销售本人转派客资，订单终止后恢复，并同步详情动作与批量失败结果。
+- Key decisions: 本人转派在 Lead 行锁内校验终态和 `SalesOrderConstants.ACTIVE_ORDER_STATUSES`；新增稳定错误码 `1_900_003_131`；详情投影在活动订单期间移除 `OWNER_TRANSFER`；批量本人转派继续复用同一命令；主管、资格异常、管理员转派及公海释放保持不变。
+- Execution or analysis result: 已实现命令端强制拒绝与详情入口隐藏；审核中、待补正、无活动订单和审批完成终态均有聚焦覆盖；未新增接口字段、数据库变更或依赖，未覆盖工作区其他未提交修改。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/enums/ZsjosErrorCodeConstants.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandServiceTest.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImplTest.java`; `docs/api/zsjos-lead-submission-dispatch.md`; `handoff/main.md`。
+- Verification evidence: 聚焦 Maven 测试通过 47/47（`LeadManagementServiceImplTest` 43、`LeadOwnerCommandServiceTest` 4）；Workbench `npm test` 通过 102/102 文件、566/566 测试，`npm run typecheck` 和 `npm run build` 通过（仅既有大 chunk 警告）；scoped `git diff --check` 通过（仅 Git 的 LF/CRLF 提示）。计划中的 Maven reactor 全量测试在既有 Infra `CodegenEngineUniappTest.testExecute_treeSearch` 处停止；直接 ZSJOS 全量测试执行 833 项，出现 6 个失败和 8 个错误，均位于本任务外的既有测试，两个本次聚焦测试类在该轮通过。
+- Dependency or integration impact: 无新增依赖、SQL、数据库、接口结构、菜单权限、前端代码、分支、提交、推送或外部服务变更；Workbench 继续依据服务端 `availableActions` 自动隐藏入口。
+- Remaining work: 未启动或重启后端，故真实 HTTP 拒绝结果和桌面/移动真实页面入口尚未做运行时验收；外部服务启停需另行确认。全量后端既有失败需由对应模块工作流处理。
+- Status: `implemented; focused backend and Workbench verification passed; full backend baseline and runtime acceptance pending`。
+
+## Delivery Verification Correction - 2026-09-07 12:21:20 +08:00
+
+- Workstream ID: `main-lead-owner-transfer-deal-gate`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted worktree)。
+- Correction: 在交付条目后补充了明确覆盖“订单终止后恢复本人转派”的 `transferAllowsLeadAfterOrderTermination` 测试；最终聚焦 Maven 测试为 48/48 通过，其中 `LeadManagementServiceImplTest` 43/43、`LeadOwnerCommandServiceTest` 5/5。上一条中的 47/47 和命令测试 4 项已由本条更正。
+- Changed files: `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandServiceTest.java`; `handoff/main.md`。
+- Dependency or integration impact: None。
+- Remaining work: 与上一交付条目一致。

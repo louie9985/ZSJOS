@@ -43,6 +43,12 @@ contact fields only after server-side object authorization and include `availabl
 must not derive actions from A/B identities. Stable command conflicts distinguish missing cycles,
 manager denial, invalid candidates, invalid owner, invalid state, and idempotency-key conflicts.
 
+While an active public-sea cycle exists, `availableActions` never includes first-purchase deal entry
+or deal revision. A qualifying same-team sales user may receive `REQUEST_TRANSFER` in
+`waiting_assignment`; only the assigned collaborator B may receive it in `assigned`. Formal transfer
+or manager exit ends the active cycle before deal entry becomes available. `deal_pending` remains only
+for compatibility with historical in-flight approvals.
+
 Visibility, manager authority, and collaborator candidates follow formal owner A's current department.
 The entry-time department snapshot remains audit data only, so organization changes do not leave the
 Opportunity visible to A's former team.

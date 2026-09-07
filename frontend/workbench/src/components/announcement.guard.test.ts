@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('announcement surface guards', () => {
   it('registers the server-owned Workbench route', () => {
@@ -10,9 +11,9 @@ describe('announcement surface guards', () => {
 
   it('removes executable rich-text content and hardens external links', () => {
     const source = readFileSync(new URL('./SafeRichText.tsx', import.meta.url), 'utf8')
-    expect(source).toContain("querySelectorAll('script,iframe,object,embed,form')")
-    expect(source).toContain("startsWith('on')")
-    expect(source).toContain("new Set(['http:', 'https:', 'mailto:'])")
-    expect(source).toContain("link.rel = 'noopener noreferrer'")
+    expectSourceToContainTokens(source, "querySelectorAll('script,iframe,object,embed,form')")
+    expectSourceToContainTokens(source, "startsWith('on')")
+    expectSourceToContainTokens(source, "new Set(['http:', 'https:', 'mailto:'])")
+    expectSourceToContainTokens(source, "link.rel = 'noopener noreferrer'")
   })
 })

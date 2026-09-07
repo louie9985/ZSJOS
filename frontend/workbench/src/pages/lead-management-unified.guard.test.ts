@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('unified Lead management route', () => {
   it('renders one canonical page and redirects legacy relation routes', () => {
     const routeHost = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
 
-    expect(routeHost).toContain('APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>')
+    expectSourceToContainTokens(routeHost, 'APP_ROUTES.LEAD_MANAGEMENT) return <LeadManagementPage permissions={permissions}/>')
     expect(routeHost).toContain("relationScope: 'submitted'")
     expect(routeHost).toContain("relationScope: 'owned'")
     expect(routeHost).not.toContain('<LeadManagementPage audience=')
@@ -14,7 +15,7 @@ describe('unified Lead management route', () => {
   it('uses one unified relation scope', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
 
-    expect(page).toContain("const audience: LeadAudience = 'all'")
+    expectSourceToContainTokens(page, "const audience: LeadAudience = 'all'")
     expect(page).toContain('relationScope: routeState?.relationScope')
   })
 
@@ -25,7 +26,7 @@ describe('unified Lead management route', () => {
       '成交待审核', '已成交', '已判无效', '已关闭', '已挂起']) {
       expect(page).toContain(`label: '${label}'`)
     }
-    expect(page).toContain("simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus")
+    expectSourceToContainTokens(page, "simpleStatus: simpleStatus === 'all' ? undefined : simpleStatus")
     expect(page).not.toContain('我提交的')
     expect(page).not.toContain('我负责的')
     expect(page).not.toContain("label: '待分配'")
@@ -36,7 +37,7 @@ describe('unified Lead management route', () => {
   it('silently refreshes the changed lead without losing its selection', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
 
-    expect(page).toContain('preferredSelectedId: id, silent: true')
+    expectSourceToContainTokens(page, 'preferredSelectedId: id, silent: true')
     expect(page).toContain('loadDetail(id, true)')
   })
 
@@ -44,7 +45,7 @@ describe('unified Lead management route', () => {
     const page = readFileSync('src/pages/LeadManagementPage.tsx', 'utf8')
 
     expect(page).toContain('preserveRequestedId: routeSelectionRef.current !== undefined')
-    expect(page).toContain('setItems(current => current.some(item => item.id === id) ? current : pinLeadFirst(current, loaded))')
+    expectSourceToContainTokens(page, 'setItems(current => current.some(item => item.id === id) ? current : pinLeadFirst(current, loaded))')
     expect(page).toContain('const loaded = await api.managedLead(leadId)')
     expect(page).toContain('routeSelectionRef.current = undefined')
   })
@@ -56,7 +57,7 @@ describe('unified Lead management route', () => {
     expect(detail).toContain('setFollowUpRefreshVersion(current => current + 1)')
     expect(detail).toContain('refreshVersion={followUpRefreshVersion}')
     expect(detail).toContain('onSuccess={handleStandaloneFollowUpSuccess}')
-    expect(panel).toContain('useEffect(() => { void loadRecords() }, [loadRecords, refreshVersion])')
+    expectSourceToContainTokens(panel, 'useEffect(() => { void loadRecords() }, [loadRecords, refreshVersion])')
   })
 
   it('renders the permission-scoped next follow-up time in the detail hero', () => {
@@ -64,7 +65,7 @@ describe('unified Lead management route', () => {
     const api = readFileSync('src/services/api.ts', 'utf8')
 
     expect(api).toContain('nextFollowUpAt?: Timestamp')
-    expect(detail).toContain("visibleTabs.includes('follow-ups') && lead.nextFollowUpAt")
+    expectSourceToContainTokens(detail, "visibleTabs.includes('follow-ups') && lead.nextFollowUpAt")
     expect(detail).toContain('className="lead-hero-next-followup"')
     expect(detail).toContain('formatTimestamp(lead.nextFollowUpAt)')
   })

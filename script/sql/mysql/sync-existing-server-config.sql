@@ -81,7 +81,7 @@ WHERE rm.deleted=b'0' AND rm.tenant_id IN (1,121,122) AND m.permission<>''
   AND (r.code IN ('center_head','academic_specialist','exam_manager','exam_specialist','career_planner',
                   'career_manager','ip_teacher','product_rd_head','teaching_assistant','recruitment_manager',
                   'recruitment_specialist','hr_specialist','admin_manager','admin_specialist')
-       OR (r.code IN ('content_director','new_media_operator') AND (m.permission LIKE 'zsjos:lead:%'
+       OR (r.code='content_director' AND (m.permission LIKE 'zsjos:lead:%'
            OR m.permission LIKE 'zsjos:lead-detail:%' OR m.permission='zsjos:partner:query'))
        OR (r.code='dept_manager' AND m.permission IN ('bpm:model:create','bpm:model:update','bpm:model:deploy',
            'bpm:model:import','bpm:category:create','bpm:category:query'))
@@ -126,7 +126,7 @@ JOIN (SELECT permission,MIN(id) id FROM system_menu WHERE deleted=b'0' AND permi
 JOIN `system_menu` m ON m.id=canonical.id
 WHERE r.deleted=b'0' AND r.tenant_id IN (1,121,122)
   AND r.code IN ('content_director','new_media_operator','filming_editor','study_planner','delivery_manager')
-  AND NOT (r.code IN ('content_director','new_media_operator')
+  AND NOT (r.code='content_director'
            AND (m.permission LIKE 'zsjos:lead:%' OR m.permission LIKE 'zsjos:lead-detail:%'
                 OR m.permission='zsjos:partner:query'))
   AND NOT (r.code='delivery_manager' AND m.permission IN ('bpm:task-assign-rule:query','bpm:task-assign-rule:update'))

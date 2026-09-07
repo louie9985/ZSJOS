@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const routeHostSource = readFileSync(new URL('../layouts/RouteHost.tsx', import.meta.url), 'utf8')
 const pageSource = readFileSync(new URL('./FeedbackPage.tsx', import.meta.url), 'utf8')
@@ -10,12 +11,12 @@ describe('feedback workbench route contract', () => {
     expect(APP_ROUTES.FEEDBACK).toBe('/zsjos/feedback')
     expect(RENDERABLE_APP_ROUTES.has(APP_ROUTES.FEEDBACK)).toBe(true)
     expect(routeHostSource).toContain("import FeedbackPage from '../pages/FeedbackPage'")
-    expect(routeHostSource).toContain('menu?.path === APP_ROUTES.FEEDBACK')
+    expectSourceToContainTokens(routeHostSource, 'menu?.path === APP_ROUTES.FEEDBACK')
   })
 
   it('opens notification deep links only through the independent read permission', () => {
-    expect(pageSource).toContain("searchParams.get('feedbackId')")
-    expect(pageSource).toContain("hasPermission(permissions, 'zsjos:feedback:read')")
+    expectSourceToContainTokens(pageSource, "searchParams.get('feedbackId')")
+    expectSourceToContainTokens(pageSource, "hasPermission(permissions, 'zsjos:feedback:read')")
     expect(pageSource).toContain('disabled={!canRead}')
   })
 })

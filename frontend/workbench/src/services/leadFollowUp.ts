@@ -19,6 +19,16 @@ export const parseLeadDetailTab = (value?: string | null): LeadDetailTab | undef
 export const detailTabsFromProjection = (tabs?: LeadDetailTab[]): LeadDetailTab[] =>
   tabs?.length ? Array.from(new Set(tabs)) : ['overview']
 
+export const resolveVisibleLeadDetailTabs = (
+  baseTabs: LeadDetailTab[] | undefined,
+  projectedTabs: LeadDetailTab[] | undefined,
+): LeadDetailTab[] => baseTabs
+  ? Array.from(new Set([
+      ...baseTabs,
+      ...(projectedTabs?.includes('student-info') ? ['student-info' as const] : []),
+    ]))
+  : detailTabsFromProjection(projectedTabs)
+
 export const shouldShowLeadOrderTab = (tabs?: LeadDetailTab[]) => detailTabsFromProjection(tabs).includes('orders')
 
 export const defaultLeadDetailTab = (openFollowUp: boolean): LeadDetailTab =>

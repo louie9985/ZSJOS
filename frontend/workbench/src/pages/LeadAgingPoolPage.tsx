@@ -13,7 +13,7 @@ import {
   Typography,
   message,
 } from "antd";
-import { UserSwitchOutlined } from "@ant-design/icons";
+import { ExportOutlined, MessageOutlined, UserSwitchOutlined } from "@ant-design/icons";
 import {
   api,
   type LeadAgingPoolItem,
@@ -23,6 +23,7 @@ import {
   type ManagedLead,
 } from "../services/api";
 import LeadDetail from "../components/LeadDetail";
+import type { ToolbarAction } from "../components/OverflowToolbar";
 import { NameAvatar } from "../components/LeadDetailOverview";
 import { formatTimestamp } from "../services/time";
 import { AdvancedFilterToolbar, filterCount } from "../components/AdvancedFilter";
@@ -286,13 +287,14 @@ export default function LeadAgingPoolPage() {
               action={!isLeadInboxUnauthorized(detailError) ? <Button size="small" onClick={() => void loadDetail(selected)}>重试</Button> : undefined}/>
             : !selected ? <Empty description="选择一条客资查看详情" />
             : !detail ? <Skeleton active paragraph={{ rows: 10 }} />
-            : <><div className="aging-pool-business-bar"><div><Typography.Text strong>公海协作</Typography.Text><Typography.Text type="secondary">A：{selected.originalOwnerUserName || `#${selected.originalOwnerUserId}`} · B：{selected.collaboratorUserName || "待指派"} · 到期 {formatTimestamp(selected.dueAt)}</Typography.Text></div><Space wrap>
-                {selected.availableActions.includes("ASSIGN") && <Button icon={<UserSwitchOutlined/>} onClick={() => void openAssign()}>{selected.collaboratorUserId ? "换派B" : "指派B"}</Button>}
-                {selected.availableActions.includes("EXIT") && <Button danger onClick={() => setExitOpen(true)}>退出公海</Button>}
-                {selected.availableActions.includes("REQUEST_TRANSFER") && <Button icon={<UserSwitchOutlined/>} onClick={() => setTransferOpen(true)}>申请转给我</Button>}
-              </Space></div>
+            : <><div className="aging-pool-business-bar"><div><Typography.Text strong>公海协作</Typography.Text><Typography.Text type="secondary">A：{selected.originalOwnerUserName || `#${selected.originalOwnerUserId}`} · B：{selected.collaboratorUserName || "待指派"} · 到期 {formatTimestamp(selected.dueAt)}</Typography.Text></div></div>
               <LeadDetail lead={detail} categories={[]} categoryLabel={value => value || "未记录"} channelLabel={value => value || "未记录"}
-                mode="owner" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void load()}/></>}
+                mode="owner" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void load()}
+                contextToolbarActions={[
+                  selected.availableActions.includes("ASSIGN") && { key: "aging-pool-assign", icon: <UserSwitchOutlined/>, label: selected.collaboratorUserId ? "换派B" : "指派B", onClick: () => void openAssign() },
+                  selected.availableActions.includes("EXIT") && { key: "aging-pool-exit", icon: <ExportOutlined/>, label: "退出公海", danger: true, onClick: () => setExitOpen(true) },
+                  selected.availableActions.includes("REQUEST_TRANSFER") && { key: "aging-pool-transfer-request", icon: <MessageOutlined/>, label: "申请转给我", onClick: () => setTransferOpen(true) },
+                ].filter(Boolean) as ToolbarAction[]}/></>}
         </main>
       </div>
       <Modal

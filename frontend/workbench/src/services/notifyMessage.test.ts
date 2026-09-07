@@ -29,6 +29,12 @@ describe('notify message inbox state', () => {
       pageSize: 10,
       readStatus: false
     })
+    expect(buildNotifyMessagePageParams('all', 1, 20, '  学员  ', 'lead')).toEqual({
+      pageNo: 1,
+      pageSize: 20,
+      keyword: '学员',
+      category: 'lead',
+    })
   })
 
   it('keeps read messages in the all view and removes them from the unread view', () => {
@@ -43,5 +49,10 @@ describe('notify message inbox state', () => {
   it('builds cursor requests without client-side ordering or page offsets', () => {
     expect(buildNotifyMessageCursorParams('all')).toEqual({ cursor: undefined, limit: 20 })
     expect(buildNotifyMessageCursorParams('unread', 'opaque', 10)).toEqual({ cursor: 'opaque', limit: 10, readStatus: false })
+    expect(buildNotifyMessageCursorParams('all', undefined, 20, '  回款  ', 'reward')).toEqual({
+      limit: 20,
+      keyword: '回款',
+      category: 'reward',
+    })
   })
 })

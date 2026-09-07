@@ -178,6 +178,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_COMPLAINT_RESULT_INVALID = new ErrorCode(1_900_003_077, "销售投诉处理结论无效");
     ErrorCode LEAD_SUBMITTER_ACTION_STATE_INVALID = new ErrorCode(1_900_003_078, "当前客资状态不允许提交人补充、催促或投诉");
     ErrorCode LEAD_SUPPLEMENT_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_130, "补充资料请求标识已用于其他内容，请重新提交");
+    ErrorCode LEAD_OWNER_TRANSFER_DEAL_ACTIVE = new ErrorCode(1_900_003_131,
+            "当前客资存在审核中或待补正的成交订单，销售本人不可转派");
     ErrorCode LEAD_SUBMITTER_ASSIST_RECIPIENT_MISSING = new ErrorCode(1_900_003_079, "当前客资缺少可通知的提交人");
     ErrorCode LEAD_SUBMITTER_ASSIST_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_080, "幂等键已用于其他提交人协助请求");
 
@@ -222,6 +224,8 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode SALES_ORDER_ENTRY_FORBIDDEN = new ErrorCode(1_900_006_002, "当前客资状态或归属不允许录入成交");
     ErrorCode SALES_ORDER_ENTRY_REQUIRES_TRANSFER = new ErrorCode(1_900_006_021,
             "公海协同销售必须先完成正式转派后才能录入成交");
+    ErrorCode SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT = new ErrorCode(1_900_006_022,
+            "客资仍在公海池中，退出公海或完成正式转派后才能录入成交");
     ErrorCode SALES_ORDER_ACTIVE_DUPLICATE = new ErrorCode(1_900_006_003, "该客资已有未完成成交订单");
     ErrorCode SALES_ORDER_CONTACT_REQUIRED = new ErrorCode(1_900_006_004, "手机号和微信号至少填写一个");
     ErrorCode SALES_ORDER_AMOUNT_INVALID = new ErrorCode(1_900_006_005, "订单金额与成交课程金额不一致");

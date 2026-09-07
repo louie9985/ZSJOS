@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('registration close-service', () => {
   it('renders the close action only through server permissions and typed api', () => {
@@ -7,7 +8,7 @@ describe('registration close-service', () => {
     const api = readFileSync('src/services/api.ts', 'utf8')
     const routeHost = readFileSync('src/layouts/RouteHost.tsx', 'utf8')
 
-    expect(page).toContain('hasPermission(permissions, "zsjos:registration:close")')
+    expectSourceToContainTokens(page, 'hasPermission(permissions, "zsjos:registration:close")')
     expect(page).toContain('关闭服务')
     expect(page).toContain('closeOpen')
     expect(page).toContain('closeRegistration')

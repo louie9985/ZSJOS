@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const page = readFileSync(new URL('LeadManagementPage.tsx', import.meta.url), 'utf8')
 const api = readFileSync(new URL('../services/api.ts', import.meta.url), 'utf8')
@@ -7,9 +8,9 @@ const api = readFileSync(new URL('../services/api.ts', import.meta.url), 'utf8')
 describe('lead table batch actions', () => {
   it('keeps selection and ProTable batch controls in table mode', () => {
     expect(page).toContain('rowSelection={leadRowSelection}')
-    expect(page).toContain('preserveSelectedRowKeys: true')
+    expectSourceToContainTokens(page, 'preserveSelectedRowKeys: true')
     expect(page).toContain('showSizeChanger: true')
-    expect(page).toContain('pageSizeOptions: [20, 50, 100]')
+    expectSourceToContainTokens(page, 'pageSizeOptions: [20, 50, 100]')
     expect(page).toContain('sizeChanged ? 1 : nextPage')
     expect(page).toContain('lead-management-table-toolbar-left')
     expect(page.indexOf('lead-management-batch-toolbar')).toBeLessThan(page.indexOf('lead-management-table-filter-toolbar'))
@@ -22,7 +23,7 @@ describe('lead table batch actions', () => {
     expect(page).toContain('lead-management-batch-toolbar')
 
     expect(page).toContain('setSelectedRowKeys([])')
-    expect(page).toContain('setSelectedLeadMap(new Map())')
+    expectSourceToContainTokens(page, 'setSelectedLeadMap(new Map())')
     const styles = readFileSync(new URL('../styles/pages/lead-management.css', import.meta.url), 'utf8')
     expect(styles).toMatch(/\.lead-management-table-toolbar-left \{[^}]*flex-wrap: nowrap;/)
     expect(styles).toMatch(/\.lead-management-table-toolbar-left \{[^}]*min-width: 1040px;/)

@@ -4,6 +4,7 @@ import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.order.SalesOrderMapper;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import jakarta.annotation.Resource;
 import org.springframework.stereotype.Service;
@@ -13,11 +14,13 @@ import java.util.List;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
+import static cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.ACTIVE_ORDER_STATUSES;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 
 @Service
 public class LeadOwnerCommandService {
     @Resource private LeadMapper leadMapper;
+    @Resource private SalesOrderMapper salesOrderMapper;
     @Resource private LeadDispatchService dispatchService;
     @Resource private LeadAgingPoolService agingPoolService;
     @Resource private LeadAssignmentService assignmentService;
@@ -29,7 +32,13 @@ public class LeadOwnerCommandService {
     @Transactional(rollbackFor = Exception.class)
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "owner-transfer")
     public void transfer(Long leadId, Long targetUserId, Long ownerUserId, String reason, String idempotencyKey) {
-        requireOwnedLead(leadId, ownerUserId);
+        LeadDO lead = requireOwnedLead(leadId, ownerUserId);
+        if (STATUS_WON.equals(lead.getStatus()) || STATUS_CLOSED.equals(lead.getStatus())) {
+            throw exception(LEAD_PERMISSION_DENIED);
+        }
+        if (salesOrderMapper.selectActiveByLeadId(leadId, ACTIVE_ORDER_STATUSES) != null) {
+            throw exception(LEAD_OWNER_TRANSFER_DEAL_ACTIVE);
+        }
         dispatchService.transferOwned(leadId, ownerUserId, targetUserId, ownerUserId, reason, idempotencyKey);
     }
 

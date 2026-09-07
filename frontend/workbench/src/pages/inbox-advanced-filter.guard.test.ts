@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 const root = resolve(process.cwd(), 'src')
 const read = (file: string) => readFileSync(resolve(root, file), 'utf8')
@@ -23,8 +24,8 @@ const targetSurfaces = [
 describe('business inbox advanced-filter guard', () => {
   it('does not load unscoped system users for personnel filter options', () => {
     const source = read('components/AdvancedFilter.tsx')
-    expect(source).not.toContain('api.simpleUsers()')
-    expect(source).not.toContain("source === 'visible-users'")
+    expectSourceNotToContainTokens(source, 'api.simpleUsers()')
+    expectSourceNotToContainTokens(source, "source === 'visible-users'")
   })
 
   it.each(targetSurfaces)('%s wires the %s server filter scene and page key', (file, scene, pageKey) => {
@@ -79,14 +80,14 @@ describe('business inbox advanced-filter guard', () => {
     expect(source).toContain('advanced-filter-template-panel')
     expect(toolbarSource).not.toContain('advanced-filter-template-select')
     expect(toolbarSource).not.toContain('SaveOutlined')
-    expect(source).toContain('setDraft(cloneFilterGroup(template.filter))')
+    expectSourceToContainTokens(source, 'setDraft(cloneFilterGroup(template.filter))')
     expect(source).toContain('filter: effective')
-    expect(source).not.toContain('onChange(cloneFilterGroup(template.filter))')
+    expectSourceNotToContainTokens(source, 'onChange(cloneFilterGroup(template.filter))')
   })
 
   it('renders duration diff as drawer-only structured controls', () => {
     const source = read('components/AdvancedFilter.tsx')
-    expect(source).toContain("condition.fieldKey === 'duration.diff'")
+    expectSourceToContainTokens(source, "condition.fieldKey === 'duration.diff'")
     expect(source).toContain('advanced-filter-duration-control')
     expect(source).toContain('startFieldKey')
     expect(source).toContain('endFieldKey')

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { flowAttachmentState, flowPanelState } from './LeadFlowHistoryPanel'
 import flowHistorySource from './LeadFlowHistoryPanel.tsx?raw'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 const flowHistoryStyles = readFileSync(new URL('../styles/components/flow-history.css', import.meta.url), 'utf8')
 
@@ -34,8 +35,8 @@ describe('Lead flow-history attachment presentation', () => {
     expect(flowHistorySource).toContain('原因：')
     expect(flowHistorySource).toContain('备注：')
     expect(flowHistorySource).toContain('附件')
-    expect(flowHistorySource).toContain('{items.map(item => <FlowItem')
-    expect(flowHistorySource).not.toContain('items.sort(')
+    expectSourceToContainTokens(flowHistorySource, '{items.map(item => <FlowItem')
+    expectSourceNotToContainTokens(flowHistorySource, 'items.sort(')
     expect(flowHistorySource).not.toContain('lead-flow-history-node')
   })
 

@@ -128,6 +128,7 @@
   --crm-font-lg: 14px;
   /* 读数字号：倒计时一类需要一眼看清的数字，比正文层级明显高一档 */
   --crm-font-display: 18px;
+  --crm-font-feedback-image-missing: 12px;
   --crm-font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* 图标字号。**不随字号档缩放** —— 图标尺寸变化会破坏 antd Menu / Button
@@ -239,6 +240,7 @@ html[data-crm-font='small'] {
   --crm-font-base: 12px;
   --crm-font-lg: 14px;
   --crm-font-display: 16px;
+  --crm-font-feedback-image-missing: 10px;
 }
 
 html[data-crm-font='large'] {
@@ -247,6 +249,7 @@ html[data-crm-font='large'] {
   --crm-font-base: 14px;
   --crm-font-lg: 16px;
   --crm-font-display: 18px;
+  --crm-font-feedback-image-missing: 14px;
 }
 
 /* ==================== 圆角分档 ==================== */

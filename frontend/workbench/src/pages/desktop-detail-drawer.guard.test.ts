@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 const detailPages = [
   'pages/MessageInboxPage.tsx',
@@ -40,13 +41,13 @@ describe('employee detail drawer breakpoints', () => {
 
       expect(openLines.length).toBeGreaterThan(0)
       if (page.endsWith('MessageInboxPage.tsx')) {
-        expect(source).toContain('inboxLayoutMode === \'table\'')
+        expectSourceToContainTokens(source, "inboxLayoutMode === 'table'")
         expect(source).toContain('message-inbox-detail-pane')
         expect(source).toContain('message-inbox-table-drawer')
         expect(source).toContain('placement="right"')
-        expect(source).not.toContain('if (selected) setDrawerOpen(true)')
+        expectSourceNotToContainTokens(source, 'if (selected) setDrawerOpen(true)')
       } else if (page.includes('SalesOrderSupervisorInbox.tsx'))
-        expect(source).toContain("window.matchMedia(\"(max-width: 768px)\").matches")
+        expectSourceToContainTokens(source, "window.matchMedia('(max-width: 768px)').matches")
       else for (const line of openLines)
         expect(line).toContain("window.matchMedia('(max-width: 768px)').matches")
       if (!page.endsWith('MessageInboxPage.tsx'))

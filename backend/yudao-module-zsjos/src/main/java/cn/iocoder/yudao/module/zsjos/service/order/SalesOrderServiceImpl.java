@@ -294,6 +294,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
         OpportunityDO opportunity = null;
         if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
             lead = requireRevisionLead(order.getLeadId());
+            collaborationService.requireCanEnterDealForUpdate(lead, userId);
             opportunity = requireEligibleOpportunity(lead);
             requireNoOtherActiveOrder(order.getId(), lead.getId(), null);
         } else {

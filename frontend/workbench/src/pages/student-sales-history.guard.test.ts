@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { detailTabsFromProjection } from '../services/leadFollowUp'
+import { detailTabsFromProjection, resolveVisibleLeadDetailTabs } from '../services/leadFollowUp'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('study planner student sales history', () => {
   it('shows only the history tabs projected by the server', () => {
@@ -13,7 +14,7 @@ describe('study planner student sales history', () => {
   it('reuses the complete Lead detail for an assigned student', () => {
     const page = readFileSync('src/pages/RegistrationPages.tsx', 'utf8')
     expect(page).toContain('const leadId = service?.leadId;')
-    expect(page).not.toContain('service?.leadId || student.leadId')
+    expectSourceNotToContainTokens(page, 'service?.leadId || student.leadId')
     expect(page).toContain('mode="student-readonly"')
     expect(page).not.toContain('<LeadDetail\n      lead={{')
     expect(page).toContain("key: 'lead-history'")
@@ -23,15 +24,25 @@ describe('study planner student sales history', () => {
 
   it('keeps student mode read-only', () => {
     const detail = readFileSync('src/components/LeadDetail.tsx', 'utf8')
-    expect(detail).toContain("const readOnly = mode === 'student-readonly'")
+    expectSourceToContainTokens(detail, "const readOnly = mode === 'student-readonly'")
     expect(detail).toContain("item.code.startsWith('SUPERVISOR_')")
     expect(detail).toContain('const actions = readOnly ? new Map')
-    expect(detail).toContain('const visibleTabs = baseTabs || detailTabsFromProjection(lead.visibleTabs)')
+    expect(detail).toContain('resolveVisibleLeadDetailTabs')
+  })
+
+  it('merges only the server-projected student information tab into fixed student tabs', () => {
+    expect(resolveVisibleLeadDetailTabs(['overview', 'orders'], ['student-info', 'follow-ups'])).toEqual([
+      'overview',
+      'orders',
+      'student-info',
+    ])
+    expect(resolveVisibleLeadDetailTabs(['overview', 'orders'], ['follow-ups'])).toEqual(['overview', 'orders'])
+    expect(resolveVisibleLeadDetailTabs(undefined, ['overview', 'follow-ups'])).toEqual(['overview', 'follow-ups'])
   })
 
   it('uses service contact and order snapshots in the planner overview', () => {
     const overview = readFileSync('src/components/LeadDetailOverview.tsx', 'utf8')
-    expect(overview).toContain('const service = studentContext?.service || studentService')
+    expectSourceToContainTokens(overview, 'const service = studentContext?.service || studentService')
     expect(overview).toContain("service ? '成交产品' : '意向产品'")
     expect(overview).toContain('<LatestStudentContact records={studentContext.contactRecords} />')
     expect(overview).toContain("{ key: 'student_first_contact', label: '首联' }")

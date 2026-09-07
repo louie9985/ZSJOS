@@ -147,6 +147,9 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 /zsjos/lead/owner/{leadId}/release-public-sea`（权限
 `zsjos:lead:owner-release-public-sea`）将本人符合公海前置条件的客资进入公海待分配，
 保留正式负责人快照并沿用公海通知与后续认领逻辑。
+销售本人转派以成交订单活动状态为业务前置条件：对应客资存在 `pending_approval` 或
+`revision_required` 首购订单时，详情不返回 `OWNER_TRANSFER`，转派命令返回
+`LEAD_OWNER_TRANSFER_DEAL_ACTIVE`；订单主动终止后恢复。该约束不改变主管、资格异常或管理员转派权限。
 判有效前释放进入抢单池并清除当前归属；判有效后释放创建公海周期，保留正式归属，
 可同步指定符合范围的实际跟进销售。挂起状态额外允许恢复，成交和关闭状态不允许这些操作。
 

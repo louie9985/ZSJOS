@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const source = readFileSync(new URL('./SubordinateSalesPage.tsx', import.meta.url), 'utf8')
 const mainSource = readFileSync(new URL('../main.tsx', import.meta.url), 'utf8')
@@ -9,7 +10,7 @@ const dispatchControlSource = readFileSync(new URL('../components/SalesDispatchS
 describe('subordinate sales lazy-list contract', () => {
   it('uses the shared append sentinel pattern and no pagination control', () => {
     expect(source).toContain('new IntersectionObserver')
-    expect(source).toContain('rootMargin: "240px 0px"')
+    expectSourceToContainTokens(source, 'rootMargin: "240px 0px"')
     expect(source).toContain('appendSubordinateSalesRows')
     expect(source).toContain('subordinate-sales-load-sentinel')
     expect(source).not.toContain('<Pagination')
@@ -26,12 +27,12 @@ describe('subordinate sales lazy-list contract', () => {
     expect(dispatchControlSource).toContain('useSalesDispatchStatus()')
     expect(mainSource).toContain('<SalesDispatchStatusAlert />')
     expect(todayTasksSource).not.toContain('SalesDispatchStatusAlert')
-    expect(dispatchControlSource).toContain("color={status?.mode === 'accepting' ? 'success' : 'error'}")
-    expect(dispatchControlSource).toContain("color={pageActive ? 'processing' : 'error'}")
+    expectSourceToContainTokens(dispatchControlSource, "color={status?.mode === 'accepting' ? 'success' : 'error'}")
+    expectSourceToContainTokens(dispatchControlSource, "color={pageActive ? 'processing' : 'error'}")
   })
 
   it('binds the pending Lead assignment entry to the accept permission', () => {
-    expect(mainSource).toContain("(info.permissions || []).includes('zsjos:lead:accept') && (")
+    expectSourceToContainTokens(mainSource, "(info.permissions || []).includes('zsjos:lead:accept') && (")
     expect(mainSource).toContain('aria-label="待接客资"')
   })
 

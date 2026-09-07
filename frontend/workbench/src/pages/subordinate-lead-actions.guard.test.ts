@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 import detailSource from '../components/LeadDetail.tsx?raw'
 import pageSource from './SubordinateSalesPage.tsx?raw'
 import apiSource from '../services/api.ts?raw'
@@ -9,7 +10,7 @@ describe('subordinate Lead supervisor actions', () => {
     expect(detailSource).toContain("label: '释放至抢单池'")
     expect(detailSource).toContain("label: '释放至公海池'")
     expect(detailSource).toContain("openQualificationAction('releasePublicSea', true)")
-    expect(detailSource).toContain('managerMode || supervisorAction')
+    expectSourceToContainTokens(detailSource, 'managerMode || supervisorAction')
     expect(detailSource).toContain('api.supervisorRestoreLead')
     expect(detailSource).toContain('api.supervisorReleasePublicSeaLead')
     expect(detailSource).toContain('api.subordinateTransferCandidates()')

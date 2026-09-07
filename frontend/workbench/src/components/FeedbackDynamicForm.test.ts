@@ -5,6 +5,7 @@ import {
   serializeFeedbackFormValues
 } from './FeedbackDynamicForm'
 import type { FeedbackField } from '../services/feedbackApi'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const fields: FeedbackField[] = [
   { key: 'title', label: '标题', type: 'text', required: true },
@@ -52,8 +53,8 @@ describe('feedback dynamic form values', () => {
     const source = readFileSync(new URL('./FeedbackDynamicForm.tsx', import.meta.url), 'utf8')
 
     expect(source).toContain('<Image.PreviewGroup>')
-    expect(source).toContain('preview={{ mask: \'预览\' }}')
-    expect(source).toContain('previewUrl: localPreviewUrl')
+    expectSourceToContainTokens(source, 'preview={{ mask: \'预览\' }}')
+    expectSourceToContainTokens(source, 'previewUrl: localPreviewUrl')
     expect(source).toContain('URL.revokeObjectURL')
     expect(source).toContain('value.filter(file => !isImageAttachment(file)).map')
     expect(source).toContain('<Typography.Link href={file.url}')

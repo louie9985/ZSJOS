@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { LEAD_DISPATCH_MODE_LABELS } from '../constants'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const root = new URL('.', import.meta.url)
 const pages = [
@@ -42,10 +43,10 @@ describe('global inbox layout mode', () => {
     expect(lead).toContain('toolBarRender')
     expect(lead).toContain('lead-management-table-filter-toolbar')
     expect(lead).toContain('AdvancedFilterToolbar scene="lead" pageKey="lead_management"')
-    expect(detail).toContain("if (tab === 'follow-ups')")
-    expect(detail).toContain("if (tab === 'appeals')")
-    expect(detail).toContain("if (tab === 'complaints')")
-    expect(detail).toContain("if (tab === 'flow-history')")
+    expectSourceToContainTokens(detail, "if (tab === 'follow-ups')")
+    expectSourceToContainTokens(detail, "if (tab === 'appeals')")
+    expectSourceToContainTokens(detail, "if (tab === 'complaints')")
+    expectSourceToContainTokens(detail, "if (tab === 'flow-history')")
     expect(detail).toContain('LeadCustomerOrders')
   })
 })

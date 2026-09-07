@@ -28,6 +28,7 @@ public interface LeadAgingPoolService {
     boolean canOperate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
     void requireCanOperateForUpdate(Long leadId, Long formalOwnerUserId, Long operatorUserId);
     LeadAgingPoolCycleDO getActiveCycle(Long leadId);
+    boolean hasActiveManualPublicSea(Long leadId);
     void markDealPending(Long leadId, Long salesUserId, LocalDateTime now);
     void handleOrderRejected(Long leadId, LocalDateTime now);
     void completeConversion(Long leadId, Long salesUserId, LocalDateTime now);

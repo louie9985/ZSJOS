@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import dayjs from 'dayjs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 import { calendarWeekdayLabel, mediaCalendarTone, mediaCalendarWindow, mondayOfWeek, parseCalendarDate } from './MediaCalendarPage'
 
 describe('media account calendar', () => {
@@ -43,10 +44,10 @@ describe('media account calendar', () => {
     expect(routes).toContain('APP_ROUTES.MEDIA_CALENDAR')
     expect(routes).toContain('APP_ROUTES.MEDIA_ALL_CALENDAR')
     expect(page).not.toContain('api.mediaAccount.maintain')
-    expect(page).not.toContain('api.simpleUsers()')
+    expectSourceNotToContainTokens(page, 'api.simpleUsers()')
     expect(page).toContain('api.mediaAccount.calendarCandidates()')
     expect(page).toContain('api.mediaAccount.calendarAll(params)')
-    expect(page).toContain('if (isAllCalendar) return')
+    expectSourceToContainTokens(page, 'if (isAllCalendar) return')
     expect(page).not.toContain('media-schedule-filter-stack')
     expect(page).toContain('onReload={() => void load(1)}')
     expect(page).toContain("'日历日程'")

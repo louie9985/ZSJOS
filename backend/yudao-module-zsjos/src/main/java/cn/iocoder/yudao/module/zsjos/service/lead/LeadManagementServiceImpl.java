@@ -571,6 +571,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                                                 SalesOrderDO activeOrder,
                                                                 Long currentUserId) {
         LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
+        boolean activePublicSea = agingPoolCycle != null || agingPoolService.hasActiveManualPublicSea(lead.getId());
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
         if (STATUS_WON.equals(lead.getStatus()) && leadObjectPermissionService.canReadAsOwnerOrManager(lead, currentUserId)) {
             if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.CREATE)
@@ -606,7 +607,8 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         if (Objects.equals(currentUserId, lead.getOwnerUserId())
                 && securityFrameworkService.hasPermission(PERMISSION_OWNER_TRANSFER)
                 && ASSIGNMENT_OWNED.equals(lead.getAssignmentStatus())
-                && !STATUS_SUSPENDED.equals(lead.getStatus())) {
+                && !Set.of(STATUS_SUSPENDED, STATUS_WON, STATUS_CLOSED).contains(lead.getStatus())
+                && activeOrder == null) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_OWNER_TRANSFER, true));
         }
         if (Objects.equals(currentUserId, lead.getOwnerUserId())
@@ -646,13 +648,15 @@ public class LeadManagementServiceImpl implements LeadManagementService {
             if (agingPoolCycle == null && canUpdate) actions.add(new LeadManagementRespVO.ActionVO(ACTION_EDIT_BASIC, true));
             if (canFollow) actions.add(new LeadManagementRespVO.ActionVO(ACTION_ADD_FOLLOW_UP, true));
             if (agingPoolCycle == null && canQualify) actions.add(new LeadManagementRespVO.ActionVO(ACTION_JUDGE_INVALID, true));
-            boolean canCreateOrder = securityFrameworkService.hasPermission("zsjos:sales-order:create");
-            boolean formalOwner = agingPoolCycle == null || Objects.equals(lead.getOwnerUserId(), currentUserId);
-            if (activeOrder == null) {
-                actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder && formalOwner));
-            } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
-                actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL,
-                        canCreateOrder && formalOwner && salesOrderPermissionService.canRevise(activeOrder, currentUserId)));
+            if (!activePublicSea) {
+                boolean canCreateOrder = securityFrameworkService.hasPermission("zsjos:sales-order:create");
+                boolean formalOwner = Objects.equals(lead.getOwnerUserId(), currentUserId);
+                if (activeOrder == null) {
+                    actions.add(new LeadManagementRespVO.ActionVO(ACTION_ENTER_DEAL, canCreateOrder && formalOwner));
+                } else if (cn.iocoder.yudao.module.zsjos.enums.SalesOrderConstants.STATUS_REVISION_REQUIRED.equals(activeOrder.getStatus())) {
+                    actions.add(new LeadManagementRespVO.ActionVO(ACTION_REVISE_DEAL,
+                            canCreateOrder && formalOwner && salesOrderPermissionService.canRevise(activeOrder, currentUserId)));
+                }
             }
         } else if (STATUS_WON.equals(lead.getStatus())) {
             boolean enabled = securityFrameworkService.hasPermission("zsjos:sales-order:create")

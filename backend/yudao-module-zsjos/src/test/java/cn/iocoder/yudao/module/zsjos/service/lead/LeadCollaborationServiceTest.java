@@ -13,7 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_COLLABORATION_POOL_CONFLICT;
-import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_TRANSFER;
+import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,7 +35,7 @@ class LeadCollaborationServiceTest {
     void collaboratorCannotEnterDealBeforeFormalTransfer() {
         var error = assertThrows(cn.iocoder.yudao.framework.common.exception.ServiceException.class,
                 () -> service.requireCanEnterDealForUpdate(lead(), 30L));
-        assertEquals(SALES_ORDER_ENTRY_REQUIRES_TRANSFER.getCode(), error.getCode());
+        assertEquals(SALES_ORDER_ENTRY_REQUIRES_POOL_EXIT.getCode(), error.getCode());
     }
 
     @Test

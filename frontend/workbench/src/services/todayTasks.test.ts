@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { APP_ROUTES, RENDERABLE_APP_ROUTES } from '../constants'
 import { canOpenAllCalendar, canQueryBpmTasks, canReadAnnouncements } from '../pages/TodayTasksPage'
+import { expectSourceToContainTokens } from '../test/sourceGuard'
 
 const source = readFileSync(new URL('../pages/TodayTasksPage.tsx', import.meta.url), 'utf8')
 const styles = readFileSync(new URL('../styles/pages/today-tasks.css', import.meta.url), 'utf8')
@@ -45,16 +46,16 @@ describe('today task permissions', () => {
   })
 
   it('opens submitter-assistance tasks in the Lead detail route', () => {
-    expect(source).toContain("task.actionCode === 'OPEN_LEAD_SUBMITTER_ASSIST'")
-    expect(source).toContain('state: { leadId: task.bizId }')
+    expectSourceToContainTokens(source, "task.actionCode === 'OPEN_LEAD_SUBMITTER_ASSIST'")
+    expectSourceToContainTokens(source, 'state: { leadId: task.bizId }')
   })
 
   it('keeps the home calendar month and weekday labels in Chinese', () => {
     const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
     expect(source).toContain("import zhCNCalendarLocale from 'antd/es/calendar/locale/zh_CN'")
     expect(source).toContain('const homeCalendarLocale = {')
-    expect(source).toContain("shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']")
-    expect(source).toContain("shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']")
+    expectSourceToContainTokens(source, "shortMonths: ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月']")
+    expectSourceToContainTokens(source, "shortWeekDays: ['日', '一', '二', '三', '四', '五', '六']")
     expect(calendarPanel).toContain('locale={homeCalendarLocale}')
   })
 
@@ -62,7 +63,7 @@ describe('today task permissions', () => {
     const calendarPanel = source.split('function HomeCalendarPanel')[1] ?? ''
     expect(calendarPanel).toContain('headerRender={() => null}')
     expect(calendarPanel).toContain('APP_ROUTES.MEDIA_ALL_CALENDAR')
-    expect(calendarPanel).toContain("if (info.source === 'date') openCalendar()")
+    expectSourceToContainTokens(calendarPanel, "if (info.source === 'date') openCalendar()")
     expect(calendarPanel).not.toContain('onPanelChange')
   })
 

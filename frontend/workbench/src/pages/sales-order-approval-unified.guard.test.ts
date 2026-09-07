@@ -1,11 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 describe('unified sales-order approval entry', () => {
   it('renders review and supervisor worklists from the same page by permission', () => {
     const source = readFileSync('src/pages/SalesOrderApprovalPage.tsx', 'utf8')
 
-    expect(source).toContain('resolveSalesOrderApprovalAccess(permissions)')
+    expectSourceToContainTokens(source, 'resolveSalesOrderApprovalAccess(permissions)')
     expect(source).toContain('<SalesOrderSupervisorInbox')
     expect(source).toContain('requestedConfirmationId={requestedConfirmationId}')
     expect(source).toContain("label: '订单审批'")
@@ -29,8 +30,8 @@ describe('unified sales-order approval entry', () => {
     const detail = readFileSync('src/components/SalesOrderDetailCards.tsx', 'utf8')
     const entry = readFileSync('src/components/SalesOrderEntryModal.tsx', 'utf8')
 
-    expect(detail).toContain("mode === 'approval-todo' && canReview")
-    expect(detail).not.toContain('canReview && !supervisorPending')
+    expectSourceToContainTokens(detail, "mode === 'approval-todo' && canReview")
+    expectSourceNotToContainTokens(detail, 'canReview && !supervisorPending')
     expect(detail).toContain('<SalesOrderApprovalRail nodes={approvalNodes}/>')
     expect(detail).toContain('sales-order-approval-sidebar')
     expect(detail).toContain('<Timeline className="sales-order-approval-track"')
@@ -53,7 +54,7 @@ describe('unified sales-order approval entry', () => {
     const api = readFileSync('src/services/api.ts', 'utf8')
 
     expect(supervisor).toContain('type SupervisorInboxScope = "todo" | "done" | "all"')
-    expect(supervisor).toContain('scope === "all" ? undefined : scope === "done"')
+    expectSourceToContainTokens(supervisor, 'scope === "all" ? undefined : scope === "done"')
     expect(supervisor).toContain('{ label: "全部", value: "all" }')
     expect(api).toContain('handled?: boolean;')
   })
@@ -64,7 +65,7 @@ describe('unified sales-order approval entry', () => {
     const styles = readFileSync('src/styles/pages/sales-order.css', 'utf8')
 
     expect(api).toContain('leadProfile?: {')
-    expect(detail).toContain('leadProfile && <section className="sales-order-info-block sales-order-info-block-wide">')
+    expectSourceToContainTokens(detail, 'leadProfile && <section className="sales-order-info-block sales-order-info-block-wide">')
     expect(detail).toContain('>客资编号</span>')
     expect(detail).toContain('leadProfile.leadNo')
     expect(detail).toContain('<CopyButton value={leadProfile.submittedMobile}/>')

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { expectSourceNotToContainTokens, expectSourceToContainTokens } from '../test/sourceGuard'
 
 const inboxSources = [
   'MessageInboxPage.tsx',
@@ -37,12 +38,12 @@ describe('business inbox alignment', () => {
     const leadAppeal = readFileSync('src/pages/LeadAppealPage.tsx', 'utf8')
     const api = readFileSync('src/services/api.ts', 'utf8')
 
-    expect(approvalCenter).toContain('api.bpmBusinessTaskTarget(task.id, view)')
-    expect(approvalCenter).not.toContain('api.salesOrderApprovalTaskTarget(task.id)')
+    expectSourceToContainTokens(approvalCenter, 'api.bpmBusinessTaskTarget(task.id, view)')
+    expectSourceNotToContainTokens(approvalCenter, 'api.salesOrderApprovalTaskTarget(task.id)')
     expect(approvalCenter).toContain('当前账号无权打开该业务审批')
     expect(api).toContain('export type BpmBusinessTaskTarget')
     expect(api).toContain('processDefinitionKey?: string')
-    expect(api).toContain('bpmBusinessTaskTarget: async (taskId: string, view: "todo" | "done")')
+    expect(api).toMatch(/bpmBusinessTaskTarget:\s*async\s*\(taskId:\s*string,\s*view:\s*["']todo["']\s*\|\s*["']done["']\)/)
     expect(leadAppeal).toContain("useSearchParams")
     expect(leadAppeal).toContain("appealId")
     expect(leadAppeal).toContain("leadId")
@@ -53,12 +54,12 @@ describe('business inbox alignment', () => {
     const approvalCenter = readFileSync('src/pages/BpmApprovalCenterPage.tsx', 'utf8')
 
     expect(approvalCenter).toContain('new IntersectionObserver')
-    expect(approvalCenter).toContain('rootMargin: "240px 0px"')
+    expectSourceToContainTokens(approvalCenter, 'rootMargin: "240px 0px"')
     expect(approvalCenter).toContain('bpm-approval-load-sentinel')
     expect(approvalCenter).toContain('api.bpmTaskPage(view, {')
     expect(approvalCenter).toContain('pageNo: nextPage')
-    expect(approvalCenter).toContain('name: keyword.trim() || undefined')
-    expect(approvalCenter).toContain('setTasks(current => appendTasks(current, result.list))')
+    expectSourceToContainTokens(approvalCenter, 'name: keyword.trim() || undefined')
+    expectSourceToContainTokens(approvalCenter, 'setTasks(current => appendTasks(current, result.list))')
     expect(approvalCenter).not.toContain('<Pagination')
   })
 
@@ -68,11 +69,11 @@ describe('business inbox alignment', () => {
     const appeals = readFileSync('src/pages/LeadAppealPage.tsx', 'utf8')
     const duplicateReviews = readFileSync('src/pages/LeadDuplicateReviewPage.tsx', 'utf8')
 
-    expect(messageInbox).toContain('if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
-    expect(announcements).toContain('if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
-    expect(appeals).toContain('if (useTableLayout || !node || !hasMore || loading || loadingMore || !cursor) return')
+    expectSourceToContainTokens(messageInbox, 'if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
+    expectSourceToContainTokens(announcements, 'if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
+    expectSourceToContainTokens(appeals, 'if (useTableLayout || !node || !hasMore || loading || loadingMore || !cursor) return')
     expect(duplicateReviews).toContain('loadedPageRef.current + 1')
-    expect(duplicateReviews).toContain('setItems(current => useTableLayout || !append')
+    expectSourceToContainTokens(duplicateReviews, 'setItems(current => useTableLayout || !append')
   })
 
   it('exposes refresh actions on confirmed business inboxes', () => {
