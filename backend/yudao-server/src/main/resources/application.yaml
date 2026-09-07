@@ -1,6 +1,8 @@
 spring:
   application:
     name: yudao-server
+  profiles:
+    default: local
 
   # 注意:不在此声明 spring.profiles.active。profile(如 prod/local)一律由启动命令
   # --spring.profiles.active=... 指定;若写死在这里,当 prod 配置文件作为 profile 专用

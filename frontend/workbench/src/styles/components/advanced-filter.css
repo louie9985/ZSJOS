@@ -99,7 +99,7 @@
   min-width: 0;
 }
 
-.advanced-filter-condition>div,
+.advanced-filter-value-control,
 .advanced-filter-condition .ant-select,
 .advanced-filter-condition .ant-picker,
 .advanced-filter-condition .ant-input-number {
@@ -126,7 +126,7 @@
     grid-template-columns: 1fr 100px 34px;
   }
 
-  .advanced-filter-condition>div {
+  .advanced-filter-value-control {
     grid-row: 2;
     grid-column: 1/-1;
   }

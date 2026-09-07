@@ -81,6 +81,8 @@ public class LeadBasicInfoService {
             lead.setLeadCategory(categorySelection.value());
             lead.setLeadCategoryLabelSnapshot(categorySelection.labelSnapshot());
         }
+        LocalDateTime now = LocalDateTime.now();
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
         productMapper.deleteByLeadId(leadId);
         insertProducts(leadId, req.getIntendedProducts(), snapshots);
@@ -95,7 +97,7 @@ public class LeadBasicInfoService {
         event.setEventType("lead_basic_info_updated"); event.setAggregateType(BIZ_TYPE_LEAD);
         event.setAggregateId(leadId); event.setOperatorUserId(userId); event.setReason(req.getReason().trim());
         event.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("changedFields", changedFields)));
-        event.setOccurredAt(LocalDateTime.now()); event.setIdempotencyKey("lead-basic-info:" + UUID.randomUUID());
+        event.setOccurredAt(now); event.setIdempotencyKey("lead-basic-info:" + UUID.randomUUID());
         eventMapper.insert(event);
     }
 

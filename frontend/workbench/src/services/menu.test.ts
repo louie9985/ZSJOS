@@ -5,6 +5,7 @@ import {
   buildTwoLevelNavigation,
   canOpenLeadDetailDeepLink,
   filterRenderableMenus,
+  findAdminEmbedPath,
   findMenuByPath,
   findPageByPath,
   findPrimaryByPath,
@@ -192,6 +193,36 @@ describe('workbench menu conversion', () => {
       '/zsjos/work-orders/available',
       '/zsjos/work-orders/mine'
     ])
+  })
+
+  it('keeps admin-only pages attached to their admin embed parent', () => {
+    const routes = buildMenuTree([menu({
+      id: 79972,
+      name: '工单中心',
+      path: '/zsjos/work-orders',
+      workbenchRenderMode: 'admin_embed',
+      children: [
+        menu({ id: 79973, parentId: 79972, name: '工单模板', path: 'templates', workbenchRenderMode: 'admin_only' }),
+        menu({ id: 79977, parentId: 79972, name: '运行审计', path: 'audit', workbenchRenderMode: 'admin_only' })
+      ]
+    })])
+
+    expect(findAdminEmbedPath(routes, '/zsjos/work-orders/templates')).toBe('/zsjos/work-orders')
+    expect(findAdminEmbedPath(routes, '/zsjos/work-orders/audit')).toBe('/zsjos/work-orders')
+    expect(findAdminEmbedPath(routes, '/zsjos/work-orders/create')).toBeUndefined()
+    expect(findAdminEmbedPath(routes, '/zsjos/work-orders/available')).toBeUndefined()
+    expect(findAdminEmbedPath(routes, '/zsjos/work-orders/mine')).toBeUndefined()
+  })
+
+  it('does not route standalone admin-only pages through an iframe', () => {
+    const routes = buildMenuTree([menu({
+      id: 1,
+      name: 'Standalone admin page',
+      path: '/admin-only-page',
+      workbenchRenderMode: 'admin_only'
+    })])
+
+    expect(findAdminEmbedPath(routes, '/admin-only-page')).toBeUndefined()
   })
 
   it('covers all server-owned page routes and excludes obsolete aliases', () => {

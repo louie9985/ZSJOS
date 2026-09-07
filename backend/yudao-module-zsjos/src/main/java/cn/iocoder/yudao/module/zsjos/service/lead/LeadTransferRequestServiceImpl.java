@@ -95,8 +95,9 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         record.setLeadId(leadId); record.setFromOwnerUserId(lead.getOwnerUserId());
         record.setRequestedOwnerUserId(requesterUserId); record.setOwnerDeptIdSnapshot(owner.getDeptId());
         record.setTransferReviewerUserId(dept.getLeaderUserId());
+        LocalDateTime now = LocalDateTime.now();
         record.setReason(request.getReason().trim()); record.setStatus("pending");
-        record.setIdempotencyKey(request.getIdempotencyKey()); record.setSubmittedAt(LocalDateTime.now());
+        record.setIdempotencyKey(request.getIdempotencyKey()); record.setSubmittedAt(now);
         try {
             requestMapper.insert(record);
         } catch (DuplicateKeyException duplicate) {
@@ -128,6 +129,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
             throw exception(LEAD_TRANSFER_PROCESS_UNAVAILABLE);
         }
         requestMapper.updateById(record);
+        leadMapper.touchActivity(leadId, now);
         notifyEventPublisher.publish(TRANSFER_REQUESTED, leadId, "lead-transfer-requested:" + record.getId(),
                 requesterUserId, record.getSubmittedAt(), Map.of(
                         "transferReviewerUserId", record.getTransferReviewerUserId(),
@@ -158,6 +160,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
                 request.setStatus("invalidated");
                 request.setResolvedAt(now); request.setResolutionReason(transferResult.reason());
                 requestMapper.updateById(request);
+                leadMapper.touchActivity(request.getLeadId(), now);
                 notifyEventPublisher.publish(TRANSFER_REQUEST_INVALIDATED, request.getLeadId(),
                         "lead-transfer-invalidated:" + request.getId(), request.getRequestedOwnerUserId(), now,
                         Map.of("requesterUserId", request.getRequestedOwnerUserId(),
@@ -170,6 +173,7 @@ public class LeadTransferRequestServiceImpl implements LeadTransferRequestServic
         }
         request.setResolvedAt(now); request.setResolutionReason(reason);
         requestMapper.updateById(request);
+        leadMapper.touchActivity(request.getLeadId(), now);
         String scene = "approved".equals(request.getStatus()) ? TRANSFER_REQUEST_APPROVED
                 : "rejected".equals(request.getStatus()) ? TRANSFER_REQUEST_REJECTED : TRANSFER_REQUEST_INVALIDATED;
         Map<String, Object> payload = new java.util.LinkedHashMap<>();

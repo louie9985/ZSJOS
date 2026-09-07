@@ -72,7 +72,10 @@ public class LeadFlowHistoryService {
 
         List<LeadFlowHistoryRespVO> result = new ArrayList<>();
         PartnerDO partner = lead.getPartnerId() == null ? null : partnerMapper.selectById(lead.getPartnerId());
-        result.add(submission(lead, users, partner));
+        LeadFlowHistoryRespVO submitted = submission(lead, users, partner);
+        var remarks = LeadRemarkHistoryService.project(lead, events, null, true);
+        if (remarks.hasLegacy()) submitted.setRemark(null);
+        result.add(submitted);
         events.forEach(event -> result.add(fromEvent(event, users, followUps, assignmentsById)));
         assignments.stream().filter(item -> !referencedAssignments.contains(item.getId()))
                 .forEach(item -> result.add(fromAssignment(item, users)));
@@ -107,6 +110,14 @@ public class LeadFlowHistoryService {
                 node, eventSource(event, assignment, system),
                 system ? "系统" : name(users, event.getOperatorUserId()), eventReason(event, assignment));
         vo.setRemark(eventRemark(event, followUps));
+        if (LeadSupplementSnapshot.EVENT.equals(event.getEventType())) {
+            Map<?, ?> payload = LeadRemarkHistoryService.payload(event);
+            if (payload != null && LeadSupplementSnapshot.MODE.equals(payload.get("remarkMode"))) {
+                // The actor may be a Partner; a missing ADMIN user ID does not mean a system action.
+                vo.setOperator("提交人");
+                vo.setSource("partner".equals(payload.get("submitterType")) ? "兼职端" : "员工工作台");
+            }
+        }
         applyEventTransitions(vo, event);
         vo.setFromOwner(name(users, optionalLong(event.getRelatedObjectRefs(), "fromOwnerUserId")
                 .orElse(assignment == null ? null : assignment.getFromOwnerUserId())));
@@ -264,6 +275,7 @@ public class LeadFlowHistoryService {
     }
     private static String eventRemark(BusinessEventDO event, Map<Long, LeadFollowUpRecordDO> followUps) {
         return switch (Objects.toString(event.getEventType(), "")) {
+            case "lead_submitter_supplemented" -> LeadRemarkHistoryService.appendedRemark(event);
             case "lead_qualified_valid", "lead_qualified_invalid" -> event.getReason();
             case "lead_follow_up_recorded" -> optionalLong(event.getRelatedObjectRefs(), "followUpRecordId")
                     .map(followUps::get).map(LeadFollowUpRecordDO::getRemark).orElse(null);

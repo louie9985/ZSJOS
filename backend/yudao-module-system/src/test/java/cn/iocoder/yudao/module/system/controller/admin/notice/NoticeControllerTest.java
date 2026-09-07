@@ -17,7 +17,10 @@ class NoticeControllerTest {
         assertPermission("publish", "@ss.hasPermission('system:notice:publish')", Long.class);
         assertPermission("offline", "@ss.hasPermission('system:notice:offline')", Long.class);
         assertPermission("getMyNoticePage", "@ss.hasPermission('system:notice:read')",
-                cn.iocoder.yudao.framework.common.pojo.PageParam.class);
+                cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeMyPageReqVO.class);
+        assertPermission("getMyNoticeCursor", "@ss.hasPermission('system:notice:read')",
+                cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeMyCursorReqVO.class);
+        assertPermission("getRecipientOptions", "@ss.hasAnyPermissions('system:notice:create','system:notice:update')");
         assertPermission("getMyNotice", "@ss.hasPermission('system:notice:read')", Long.class);
         assertPermission("getUnreadSummary", "@ss.hasPermission('system:notice:read')");
         assertPermission("markRead", "@ss.hasPermission('system:notice:read')", Long.class);

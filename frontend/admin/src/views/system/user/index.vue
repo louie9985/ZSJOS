@@ -53,6 +53,17 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item label="在线状态" prop="online">
+            <el-select
+              v-model="queryParams.online"
+              placeholder="请选择在线状态"
+              clearable
+              class="!w-240px"
+            >
+              <el-option label="在线" :value="true" />
+              <el-option label="离线" :value="false" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="创建时间" prop="createTime">
             <el-date-picker
               v-model="queryParams.createTime"
@@ -107,6 +118,20 @@
         </el-form>
       </ContentWrap>
       <ContentWrap>
+        <div class="mb-12px flex min-h-32px flex-wrap items-center gap-12px">
+          <el-tag v-if="onlineAvailable === true" type="success" effect="plain">
+            当前在线 {{ onlineCount }} 人
+          </el-tag>
+          <el-tag v-else-if="onlineAvailable === null" type="info" effect="plain">
+            正在获取在线状态
+          </el-tag>
+          <template v-else>
+            <el-tag type="warning" effect="plain">在线状态暂不可用</el-tag>
+            <el-button link type="primary" :loading="onlineRefreshing" @click="refreshOnlineData">
+              <Icon icon="ep:refresh" />重试
+            </el-button>
+          </template>
+        </div>
         <el-table v-loading="loading" :data="list" @selection-change="handleRowCheckboxChange">
           <el-table-column type="selection" width="55" />
           <el-table-column label="用户编号" align="center" key="id" prop="id" />
@@ -115,7 +140,9 @@
               <div class="flex flex-col items-center gap-1">
                 <el-avatar
                   :src="getAvatarSource(scope.row)"
-                  :style="getAvatarSource(scope.row) ? { backgroundColor: 'transparent' } : undefined"
+                  :style="
+                    getAvatarSource(scope.row) ? { backgroundColor: 'transparent' } : undefined
+                  "
                   @error="markAvatarFailed(scope.row.id)"
                 >
                   {{ scope.row.nickname?.slice(0, 1) || '员' }}
@@ -146,6 +173,18 @@
             :show-overflow-tooltip="true"
           />
           <el-table-column label="手机号码" align="center" prop="mobile" width="120" />
+          <el-table-column label="在线状态" align="center" width="100">
+            <template #default="scope">
+              <el-tag v-if="onlineAvailable === null" type="info" effect="plain">获取中</el-tag>
+              <el-tag v-else-if="onlineAvailable === false" type="warning" effect="plain">
+                暂不可用
+              </el-tag>
+              <el-tag v-else-if="onlineUserIds.has(scope.row.id)" type="success" effect="dark">
+                在线
+              </el-tag>
+              <el-tag v-else type="info" effect="plain">离线</el-tag>
+            </template>
+          </el-table-column>
           <el-table-column label="状态" key="status">
             <template #default="scope">
               <el-switch
@@ -250,15 +289,22 @@ const { t } = useI18n() // 国际化
 
 const loading = ref(true) // 列表的加载中
 const total = ref(0) // 列表的总页数
-const list = ref([]) // 列表的数
+const list = ref<UserApi.UserVO[]>([]) // 列表的数据
 const defaultAvatar = ref('')
 const failedAvatarUserIds = ref<Set<number>>(new Set())
+const onlineAvailable = ref<boolean | null>(null)
+const onlineCount = ref(0)
+const onlineUserIds = ref<Set<number>>(new Set())
+const onlineRefreshing = ref(false)
+let onlineRefreshTimer: ReturnType<typeof setInterval> | undefined
+let onlineStatusRequestSequence = 0
 const queryParams = reactive({
   pageNo: 1,
   pageSize: 10,
   username: undefined,
   mobile: undefined,
   status: undefined,
+  online: undefined as boolean | undefined,
   deptId: undefined as number | undefined,
   createTime: []
 })
@@ -272,8 +318,47 @@ const getList = async () => {
     list.value = data.list
     total.value = data.total
     failedAvatarUserIds.value = new Set()
+    await refreshOnlineStatus()
+  } catch {
+    if (queryParams.online !== undefined) {
+      onlineAvailable.value = false
+    }
   } finally {
     loading.value = false
+  }
+}
+
+const refreshOnlineStatus = async () => {
+  const requestSequence = ++onlineStatusRequestSequence
+  onlineRefreshing.value = true
+  try {
+    const data = await UserApi.getUserOnlineStatus(list.value.map((user) => user.id))
+    if (requestSequence !== onlineStatusRequestSequence) return
+    onlineAvailable.value = data.available
+    onlineCount.value = data.onlineCount ?? 0
+    onlineUserIds.value = data.available ? new Set(data.onlineUserIds) : new Set()
+  } catch {
+    if (requestSequence !== onlineStatusRequestSequence) return
+    onlineAvailable.value = false
+    onlineUserIds.value = new Set()
+  } finally {
+    if (requestSequence === onlineStatusRequestSequence) {
+      onlineRefreshing.value = false
+    }
+  }
+}
+
+const refreshOnlineData = async () => {
+  if (queryParams.online === undefined) {
+    await refreshOnlineStatus()
+  } else {
+    await getList()
+  }
+}
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') {
+    void refreshOnlineData()
   }
 }
 
@@ -442,5 +527,16 @@ const handleRole = (row: UserApi.UserVO) => {
 onMounted(() => {
   getList()
   loadDefaultAvatar()
+  onlineRefreshTimer = setInterval(() => {
+    if (document.visibilityState === 'visible') {
+      void refreshOnlineData()
+    }
+  }, 30_000)
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+})
+
+onBeforeUnmount(() => {
+  if (onlineRefreshTimer) clearInterval(onlineRefreshTimer)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
 })
 </script>

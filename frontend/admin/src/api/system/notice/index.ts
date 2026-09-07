@@ -31,6 +31,11 @@ export interface NoticeAttachmentVO {
   downloadUrl?: string
 }
 
+export interface NoticeRecipientOptionsVO {
+  departments: Array<{ id: number; parentId: number; name: string }>
+  users: Array<{ id: number; nickname: string; deptId?: number; selectable: boolean; disabledReason?: string }>
+}
+
 // 查询公告列表
 export const getNoticePage = (params: PageParam) => {
   return request.get({ url: '/system/notice/page', params })
@@ -40,6 +45,8 @@ export const getNoticePage = (params: PageParam) => {
 export const getNotice = (id: number) => {
   return request.get({ url: '/system/notice/get?id=' + id })
 }
+
+export const getNoticeRecipientOptions = () => request.get<NoticeRecipientOptionsVO>({ url: '/system/notice/recipient-options' })
 
 // 新增公告
 export const createNotice = (data: NoticeVO) => {

@@ -6,6 +6,7 @@ import cn.iocoder.yudao.framework.common.util.json.JsonUtils;
 import cn.iocoder.yudao.framework.tenant.core.util.TenantUtils;
 import cn.iocoder.yudao.framework.websocket.core.listener.WebSocketMessageListener;
 import cn.iocoder.yudao.framework.websocket.core.message.JsonWebSocketMessage;
+import cn.iocoder.yudao.framework.websocket.core.session.WebSocketSessionLifecycleListener;
 import cn.iocoder.yudao.framework.websocket.core.util.WebSocketFrameworkUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.socket.TextMessage;
@@ -34,11 +35,14 @@ public class JsonWebSocketMessageHandler extends TextWebSocketHandler {
      * type 与 WebSocketMessageListener 的映射
      */
     private final Map<String, WebSocketMessageListener<Object>> listeners = new HashMap<>();
+    private final List<? extends WebSocketSessionLifecycleListener> lifecycleListeners;
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    public JsonWebSocketMessageHandler(List<? extends WebSocketMessageListener> listenersList) {
+    public JsonWebSocketMessageHandler(List<? extends WebSocketMessageListener> listenersList,
+                                       List<? extends WebSocketSessionLifecycleListener> lifecycleListeners) {
         listenersList.forEach((Consumer<WebSocketMessageListener>)
                 listener -> listeners.put(listener.getType(), listener));
+        this.lifecycleListeners = lifecycleListeners;
     }
 
     @Override
@@ -49,6 +53,13 @@ public class JsonWebSocketMessageHandler extends TextWebSocketHandler {
         }
         // 1.2 ping 心跳消息，直接返回 pong 消息。
         if (message.getPayloadLength() == 4 && Objects.equals(message.getPayload(), "ping")) {
+            lifecycleListeners.forEach(listener -> {
+                try {
+                    listener.onHeartbeat(session);
+                } catch (Throwable ex) {
+                    log.warn("[handleTextMessage][session({}) 生命周期监听器处理心跳异常]", session.getId(), ex);
+                }
+            });
             session.sendMessage(new TextMessage("pong"));
             return;
         }

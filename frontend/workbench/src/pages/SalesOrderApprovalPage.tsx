@@ -37,6 +37,9 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
   const [optionKey, setOptionKey] = useState('all')
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
+  const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(PAGE_SIZE)
+  const [tableTotal, setTableTotal] = useState(0)
   const [items, setItems] = useState<SalesOrderListItem[]>([])
   const [cursor, setCursor] = useState<string>()
   const [hasMore, setHasMore] = useState(true)
@@ -87,9 +90,13 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
     const version = ++requestVersion.current
     setLoading(true); setError('')
     try {
-      const result = await api.salesOrderApprovalCursor({ cursor: targetCursor, limit: PAGE_SIZE, center, groupKey, optionKey, keyword: keyword.trim() || undefined, advancedFilter })
+      const result = useTableLayout
+        ? await api.salesOrderApprovalInbox({ pageNo: tablePage, pageSize: tablePageSize, center, groupKey, optionKey, keyword: keyword.trim() || undefined, advancedFilter })
+        : await api.salesOrderApprovalCursor({ cursor: targetCursor, limit: PAGE_SIZE, center, groupKey, optionKey, keyword: keyword.trim() || undefined, advancedFilter })
       if (version !== requestVersion.current) return
-      setItems(current => replace ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey)); setCursor(result.nextCursor); setHasMore(result.hasMore)
+      setItems(current => replace || useTableLayout ? result.list : mergeSalesOrderListItems(current, result.list, salesOrderTaskKey));
+      if ('total' in result) setTableTotal(result.total)
+      else { setCursor(result.nextCursor); setHasMore(result.hasMore) }
       if (replace) setSelectedKey(current => current && result.list.some(item => salesOrderTaskKey(item) === current) ? current : result.list[0] ? salesOrderTaskKey(result.list[0]) : undefined)
     } catch (loadError) {
       if (version === requestVersion.current) setError(loadError instanceof Error ? loadError.message : '成交审批加载失败')
@@ -97,7 +104,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
       inflightPages.current.delete(requestKey)
       if (version === requestVersion.current) setLoading(false)
     }
-  }, [advancedFilter, center, groupKey, keyword, optionKey])
+  }, [advancedFilter, center, groupKey, keyword, optionKey, tablePage, tablePageSize, useTableLayout])
 
   useEffect(() => { void loadProfile() }, [loadProfile])
   useEffect(() => {
@@ -212,7 +219,7 @@ export default function SalesOrderApprovalPage({ permissions }: { permissions: s
         </> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无可用审批筛选配置"/>}
       </div>
     </header>
-    {useTableLayout ? <ProTable<SalesOrderListItem> className="business-inbox-table" rowKey={salesOrderTaskKey} search={false} options={{ density: true, fullScreen: true, setting: true }} columnsState={{ persistenceKey: 'crm-sales-order-approval-table-columns', persistenceType: 'localStorage' }} loading={loading} dataSource={items} pagination={false} scroll={{ x: 6200 }} columns={buildSalesOrderTableColumns(item => { setSelectedKey(salesOrderTaskKey(item)); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) })} /> : <div className="business-inbox-layout"><aside className="business-inbox-list-pane"><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" pageKey={center ? `sales_order_approval:${center}` : undefined} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>{center === 'finance' && permissions.includes('zsjos:export:finance-order') && <Button icon={<DownloadOutlined/>} onClick={exportFinanceOrders}>导出</Button>}</div>
+    {useTableLayout ? <><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" pageKey={center ? `sales_order_approval:${center}` : undefined} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/>{center === 'finance' && permissions.includes('zsjos:export:finance-order') && <Button icon={<DownloadOutlined/>} onClick={exportFinanceOrders}>导出</Button>}</div><ProTable<SalesOrderListItem> className="business-inbox-table" rowKey={salesOrderTaskKey} search={false} options={{ density: true, fullScreen: true, setting: true }} columnsState={{ persistenceKey: 'crm-sales-order-approval-table-columns', persistenceType: 'localStorage' }} loading={loading} dataSource={items} pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }} scroll={{ x: 6200 }} columns={buildSalesOrderTableColumns(item => { setSelectedKey(salesOrderTaskKey(item)); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) })} /> </> : <div className="business-inbox-layout"><aside className="business-inbox-list-pane"><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" pageKey={center ? `sales_order_approval:${center}` : undefined} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>{center === 'finance' && permissions.includes('zsjos:export:finance-order') && <Button icon={<DownloadOutlined/>} onClick={exportFinanceOrders}>导出</Button>}</div>
       {error && <Alert className="business-inbox-error" type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadPage(undefined, true)}>重试</Button>}/>}
       <div className="business-inbox-scroll" onScroll={event => { const node = event.currentTarget; if (!loading && hasMore && cursor && node.scrollHeight - node.scrollTop - node.clientHeight < 80) void loadPage(cursor, false) }}>
         {!loading && !items.length && !error ? <Empty description="暂无成交审批"/> : items.map(item => <button key={salesOrderTaskKey(item)} type="button" className={salesOrderTaskKey(item) === selectedKey ? 'business-inbox-item active' : 'business-inbox-item'} onClick={() => { setSelectedKey(salesOrderTaskKey(item)); if (window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>

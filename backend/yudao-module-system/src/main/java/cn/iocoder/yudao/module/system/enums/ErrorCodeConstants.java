@@ -49,6 +49,7 @@ public interface ErrorCodeConstants {
     ErrorCode USER_MOBILE_NOT_EXISTS = new ErrorCode(1_002_003_010, "该手机号尚未注册");
     ErrorCode USER_LOGIN_IDENTIFIER_EXISTS = new ErrorCode(1_002_003_012, "用户名或手机号已被其他账号用作登录标识");
     ErrorCode USER_LAST_SUPER_ADMIN_FORBIDDEN = new ErrorCode(1_002_003_013, "必须至少保留一名启用的超级管理员");
+    ErrorCode USER_ONLINE_STATUS_UNAVAILABLE = new ErrorCode(1_002_003_014, "在线状态暂不可用，请稍后重试");
     ErrorCode USER_REGISTER_DISABLED = new ErrorCode(1_002_003_011, "注册功能已关闭");
 
     // ========== 部门模块 1-002-004-000 ==========

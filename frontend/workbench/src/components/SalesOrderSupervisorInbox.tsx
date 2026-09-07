@@ -67,6 +67,9 @@ export default function SalesOrderSupervisorInbox({
   const [scope, setScope] = useState<SupervisorInboxScope>("todo"),
     [keyword, setKeyword] = useState("");
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>();
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageSize, setTablePageSize] = useState(20);
+  const [tableTotal, setTableTotal] = useState(0);
   const [items, setItems] = useState<SalesOrderSupervisorInboxItem[]>([]),
     [selectedId, setSelectedId] = useState<number>();
   const [detail, setDetail] = useState<SalesOrder>(),
@@ -100,20 +103,25 @@ export default function SalesOrderSupervisorInbox({
       else setLoading(true);
       setError("");
       try {
-        const result = await api.salesOrderSupervisorCursor({
+        const result = useTableLayout
+          ? await api.salesOrderSupervisorInbox({ pageNo: tablePage, pageSize: tablePageSize, handled, keyword: keyword.trim() || undefined, advancedFilter })
+          : await api.salesOrderSupervisorCursor({
           cursor: append ? cursor : undefined,
           limit: 20,
           handled,
           keyword: keyword.trim() || undefined,
           advancedFilter,
-        });
+          });
         if (generation !== listGeneration.current) return;
         const pinnedTarget = targetConfirmation.current;
         const replacement = pinnedTarget
           ? [pinnedTarget, ...result.list.filter((item) => item.id !== pinnedTarget.id)]
           : result.list;
+        setTableTotal('total' in result ? result.total : 0);
         setItems((current) =>
-          append
+          useTableLayout || !append
+            ? replacement
+            : append
             ? [
                 ...current,
                 ...result.list.filter(
@@ -123,8 +131,7 @@ export default function SalesOrderSupervisorInbox({
               ]
             : replacement,
         );
-        setCursor(result.nextCursor);
-        setHasMore(result.hasMore);
+        if ('nextCursor' in result) { setCursor(result.nextCursor); setHasMore(result.hasMore); }
         if (!append)
           setSelectedId((current) =>
             pinnedTarget ? pinnedTarget.id : current && replacement.some((item) => item.id === current)
@@ -145,7 +152,7 @@ export default function SalesOrderSupervisorInbox({
         }
       }
     },
-    [advancedFilter, cursor, handled, keyword, scope],
+    [advancedFilter, cursor, handled, keyword, scope, tablePage, tablePageSize, useTableLayout],
   );
   useEffect(() => {
     void load();
@@ -181,7 +188,7 @@ export default function SalesOrderSupervisorInbox({
   useEffect(() => {
     const root = scrollRef.current,
       node = sentinelRef.current;
-    if (!root || !node || !hasMore || loading || loadingMore || !cursor) return;
+    if (useTableLayout || !root || !node || !hasMore || loading || loadingMore || !cursor) return;
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0]?.isIntersecting) void load(true);
@@ -190,7 +197,7 @@ export default function SalesOrderSupervisorInbox({
     );
     observer.observe(node);
     return () => observer.disconnect();
-  }, [cursor, hasMore, load, loading, loadingMore]);
+  }, [cursor, hasMore, load, loading, loadingMore, useTableLayout]);
   const selected = useMemo(
     () => items.find((item) => item.id === selectedId),
     [items, selectedId],
@@ -330,7 +337,7 @@ export default function SalesOrderSupervisorInbox({
         </div>
       </header>
       {useTableLayout ? (
-        <ProTable<SalesOrderSupervisorInboxItem>
+        <><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="order" pageKey="sales_order_supervisor_confirm" placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<SalesOrderSupervisorInboxItem>
           className="business-inbox-table"
           rowKey="id"
           search={false}
@@ -338,7 +345,7 @@ export default function SalesOrderSupervisorInbox({
           columnsState={{ persistenceKey: "crm-sales-order-supervisor-table-columns", persistenceType: "localStorage" }}
           loading={loading}
           dataSource={items}
-          pagination={false}
+          pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
           scroll={{ x: 1900 }}
           locale={{ emptyText: <Empty description="暂无主管审批" /> }}
           columns={[
@@ -353,7 +360,7 @@ export default function SalesOrderSupervisorInbox({
             { title: "处理时间", dataIndex: "decidedAt", width: 170, render: value => formatTimestamp(value as SalesOrderSupervisorInboxItem["decidedAt"]) },
             { title: "操作", key: "action", width: 88, fixed: "right", hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelectedId(item.id); setDrawerOpen(true) }}>详细</Button> }
           ]}
-        />
+        /></>
       ) : <div className="business-inbox-layout">
         <aside className="business-inbox-list-pane">
           <div className="business-inbox-toolbar">

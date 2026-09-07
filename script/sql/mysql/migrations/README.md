@@ -887,6 +887,19 @@ departments, users, or work-order instances and does not delete historical rows.
 indexes, empty category data, relative Workbench paths, tenant-package coverage, and both version markers with
 `verify-bootstrap.sql`. Rollback is forward-only once published versions or snapshots use the new schema.
 
+### V184 work-order scene legacy-column compatibility
+
+V184 follows V183 and repairs the V115 scene columns `source_post_code`, `target_post_code`,
+and `assignment_mode`. The current template contract uses role/department qualification and
+assignment fields, so these retained compatibility columns must allow `NULL` for newly created
+templates. The migration changes only column nullability through guarded `information_schema`
+checks; existing values and all business, permission, and dictionary rows are preserved.
+It is repeatable, records both schema-version markers, and is included after V183 in fresh
+bootstrap. Because the original V183 file did not write version markers, V184 verifies all three
+V183 tables and idempotently backfills the V183 markers before recording V184. Missing or
+incompatible tables/columns abort before any V184 marker is written. Rollback is forward-only
+because restoring `NOT NULL` would reintroduce the insert failure for the current template API.
+
 ### V167 WeCom login and push preference closed loop
 
 V167 follows V166 and adds user-level `wecom_enabled` flags to `system_users` and

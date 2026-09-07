@@ -10,6 +10,7 @@ import java.util.List;
 public class LeadManagementRespVO {
 
     private Long id;
+    private Integer version;
     private String leadNo;
     private Long personId;
     private String submittedName;
@@ -39,6 +40,8 @@ public class LeadManagementRespVO {
     private String leadCategory;
     private String leadCategoryLabelSnapshot;
     private String remark;
+    private List<LeadRemarkRespVO> remarkHistory;
+    private Boolean remarkHistoryIncomplete;
     private String status;
     private String assignmentStatus;
     private String handlingStage;

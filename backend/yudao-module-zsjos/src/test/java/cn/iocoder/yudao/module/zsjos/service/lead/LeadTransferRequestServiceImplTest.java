@@ -66,6 +66,7 @@ class LeadTransferRequestServiceImplTest {
                 "同团队销售转派申请审批通过：本人持续跟进");
         assertEquals("approved", request.getStatus());
         verify(requestMapper).updateById(request);
+        verify(leadMapper).touchActivity(eq(2L), any(java.time.LocalDateTime.class));
     }
 
     @Test
@@ -106,6 +107,7 @@ class LeadTransferRequestServiceImplTest {
 
         assertEquals(9L, result);
         verify(agingPoolService).canRead(cycle, 20L);
+        verify(leadMapper, never()).touchActivity(anyLong(), any());
         verifyNoInteractions(adminUserApi, deptApi, processInstanceApi, notifyEventPublisher);
     }
 
@@ -224,6 +226,7 @@ class LeadTransferRequestServiceImplTest {
         verify(processInstanceApi).createProcessInstance(eq(20L), captor.capture());
         assertEquals("KZ202608160000000002", captor.getValue().getVariables().get("leadNo"));
         assertEquals(2L, captor.getValue().getVariables().get("leadId"));
+        verify(leadMapper).touchActivity(eq(2L), any(java.time.LocalDateTime.class));
     }
 
     private void prepareCreateThroughInsert(String idempotencyKey) {

@@ -67,11 +67,14 @@ import static cn.iocoder.yudao.module.zsjos.service.lead.SupervisorLeadActionPol
 
 @Service
 public class LeadManagementServiceImpl implements LeadManagementService {
+    @Resource private LeadSubmitterFeedbackPermissionProvider submitterFeedbackPermission;
 
     private static final String QUERY_ALL_PERMISSION = "zsjos:lead:query-all";
 
     @Resource
     private LeadMapper leadMapper;
+    @Resource
+    private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Resource
     private LeadIntendedProductMapper intendedProductMapper;
     @Resource
@@ -93,6 +96,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     @Resource private AdvancedFilterService advancedFilterService;
     @Resource private PartnerMapper partnerMapper;
     @Resource private BusinessTaskMapper businessTaskMapper;
+    @Resource private LeadRemarkHistoryService remarkHistoryService;
 
     @Override
     public PageResult<LeadManagementRespVO> getLeadPage(LeadManagementPageReqVO reqVO, Long userId) {
@@ -405,6 +409,9 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         result.setFollowUpStatus(LeadStateProjection.followUp(lead, opportunity));
         result.setOperationalStatus(LeadStateProjection.operational(lead));
         if (detail) {
+            var remarks = remarkHistoryService.get(lead, result.getSourceUserName(), blindIdentity && viewerIsOwner);
+            result.setRemarkHistory(remarks.items());
+            result.setRemarkHistoryIncomplete(remarks.incomplete());
             if (visibleTabs.contains(DETAIL_TAB_FOLLOW_UPS)) {
                 BusinessTaskDO pendingFollowUp = businessTaskMapper.selectPendingFollowUpReminderByLeadId(lead.getId());
                 result.setNextFollowUpAt(pendingFollowUp == null ? null : pendingFollowUp.getDueAt());
@@ -481,7 +488,7 @@ public class LeadManagementServiceImpl implements LeadManagementService {
         // through the ADMIN permission evaluator.
         result.setVisibleTabs(List.of(DETAIL_TAB_OVERVIEW, DETAIL_TAB_FOLLOW_UPS,
                 DETAIL_TAB_APPEALS, DETAIL_TAB_COMPLAINTS, DETAIL_TAB_ORDERS,
-                DETAIL_TAB_FLOW_HISTORY));
+                DETAIL_TAB_FLOW_HISTORY, cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.TAB));
         result.setAvailableActions(resolvePartnerActions(lead, partnerId));
         return result;
     }
@@ -518,6 +525,14 @@ public class LeadManagementServiceImpl implements LeadManagementService {
     private List<String> resolveVisibleTabs(LeadDO lead, Long userId) {
         List<String> tabs = new ArrayList<>();
         tabs.add(DETAIL_TAB_OVERVIEW);
+        if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.READ)
+                && leadObjectPermissionService.canReadDetail(lead, userId)) {
+            tabs.add(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.TAB);
+        }
+        if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.READ_PERMISSION)
+                && submitterFeedbackPermission.canRead(lead, userId)) {
+            tabs.add(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.TAB);
+        }
         if (leadObjectPermissionService.canReadSubordinatePartnerLead(lead, userId)) {
             tabs.add(DETAIL_TAB_FOLLOW_UPS);
             tabs.add(DETAIL_TAB_APPEALS);
@@ -557,7 +572,21 @@ public class LeadManagementServiceImpl implements LeadManagementService {
                                                                 Long currentUserId) {
         LeadAgingPoolCycleDO agingPoolCycle = agingPoolService.getActiveCycle(lead.getId());
         List<LeadManagementRespVO.ActionVO> actions = new ArrayList<>();
-        if (securityFrameworkService.hasPermission(PERMISSION_REQUEST_SUBMITTER_ASSIST)) {
+        if (STATUS_WON.equals(lead.getStatus()) && leadObjectPermissionService.canReadAsOwnerOrManager(lead, currentUserId)) {
+            if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.CREATE)
+                    && studentInfoForms.submitted(lead.getId()) == null) {
+                actions.add(new LeadManagementRespVO.ActionVO(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.ACTION, true));
+            }
+            if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.LINK)) {
+                actions.add(new LeadManagementRespVO.ActionVO("VIEW_STUDENT_INFO_FORM_LINK", true));
+            }
+        }
+        if (securityFrameworkService.hasPermission(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.CREATE_PERMISSION)
+                && submitterFeedbackPermission.canCreate(lead, currentUserId)) {
+            actions.add(new LeadManagementRespVO.ActionVO(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.ACTION, true));
+        }
+        if (securityFrameworkService.hasPermission(PERMISSION_REQUEST_SUBMITTER_ASSIST)
+                && leadObjectPermissionService.canRequestSubmitterAssist(lead, currentUserId)) {
             actions.add(new LeadManagementRespVO.ActionVO(ACTION_REQUEST_SUBMITTER_ASSIST, true));
         }
         boolean suspended = STATUS_SUSPENDED.equals(lead.getStatus())

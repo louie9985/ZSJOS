@@ -103,6 +103,9 @@ describe('business inbox advanced-filter guard', () => {
     expect(styles).toContain('container-type: inline-size')
     expect(styles).toContain('@container(max-width:500px)')
     expect(styles).toContain('grid-column: 1/-1')
+    expect(component).toContain('advanced-filter-value-control')
+    expect(styles).toContain('.advanced-filter-value-control')
+    expect(styles).not.toContain('.advanced-filter-condition>div')
   })
 
   it('keeps the claim pool on a fixed twelve-card server page', () => {

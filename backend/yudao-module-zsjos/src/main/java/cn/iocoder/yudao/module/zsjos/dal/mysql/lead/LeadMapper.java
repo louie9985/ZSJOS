@@ -14,6 +14,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
@@ -30,6 +31,13 @@ import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DISPATCH_AUTO;
 
 @Mapper
 public interface LeadMapper extends BaseMapperX<LeadDO> {
+    static void advanceActivity(LeadDO lead, LocalDateTime activityAt) {
+        if (lead == null || activityAt == null) return;
+        if (lead.getLastActivityAt() == null || activityAt.isAfter(lead.getLastActivityAt())) {
+            lead.setLastActivityAt(activityAt);
+        }
+    }
+
     default LeadDO selectByLeadNo(String leadNo) {
         return selectOne(new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getLeadNo, leadNo));
     }
@@ -544,8 +552,24 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     }
 
     default void touchActivity(Long leadId, java.time.LocalDateTime occurredAt) {
+        if (leadId == null || occurredAt == null) return;
         update(new LeadDO().setLastActivityAt(occurredAt),
-                new LambdaQueryWrapperX<LeadDO>().eq(LeadDO::getId, leadId));
+                new LambdaQueryWrapperX<LeadDO>()
+                        .eq(LeadDO::getId, leadId)
+                        .eq(LeadDO::getTenantId, cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder.getRequiredTenantId())
+                        .eq(LeadDO::getDeleted, false)
+                        .and(wrapper -> wrapper.isNull(LeadDO::getLastActivityAt)
+                                .or().lt(LeadDO::getLastActivityAt, occurredAt)));
+    }
+
+    default int updateVersionAndTouchActivity(Long leadId, Integer version, LocalDateTime activityAt) {
+        Objects.requireNonNull(activityAt, "activityAt");
+        LambdaUpdateWrapper<LeadDO> update = new LambdaUpdateWrapper<LeadDO>()
+                .eq(LeadDO::getId, leadId)
+                .eq(LeadDO::getVersion, version)
+                .set(LeadDO::getVersion, version + 1);
+        setMonotonicActivity(update, activityAt);
+        return update(null, update);
     }
 
     default Map<String, Long> selectManagementStatusCounts(Long visibleUserId, List<Long> managedOwnerUserIds) {
@@ -674,13 +698,16 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                                 .le(LeadDO::getOwnershipStartedAt, cutoff)))
                 .orderByAsc(LeadDO::getOwnershipStartedAt).last("LIMIT 200"));
     }
-    default int updateUnassignedToPending(Long id, Long assigneeId, LocalDateTime expiresAt, Integer attempt) {
-        return update(null, new LambdaUpdateWrapper<LeadDO>()
+    default int updateUnassignedToPending(Long id, Long assigneeId, LocalDateTime expiresAt, Integer attempt,
+                                          LocalDateTime activityAt) {
+        LambdaUpdateWrapper<LeadDO> update = new LambdaUpdateWrapper<LeadDO>()
                 .eq(LeadDO::getId, id).eq(LeadDO::getAssignmentStatus, ASSIGNMENT_UNASSIGNED)
                 .set(LeadDO::getAssignmentStatus, ASSIGNMENT_PENDING)
                 .set(LeadDO::getPendingAssigneeUserId, assigneeId)
                 .set(LeadDO::getPendingExpiresAt, expiresAt)
-                .set(LeadDO::getAssignmentAttemptCount, attempt));
+                .set(LeadDO::getAssignmentAttemptCount, attempt);
+        setMonotonicActivity(update, activityAt);
+        return update(null, update);
     }
     default PageResult<LeadDO> selectPublicPoolPage(PageParam pageParam, String keyword, List<Long> matchedLeadIds) {
         LambdaQueryWrapperX<LeadDO> query = new LambdaQueryWrapperX<LeadDO>()
@@ -696,18 +723,21 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
     default PageResult<LeadDO> selectPublicPoolPage(PageParam pageParam) {
         return selectPublicPoolPage(pageParam, null, null);
     }
-    default int updatePublicPoolToOwned(Long id, Long ownerId) {
-        return update(null, new LambdaUpdateWrapper<LeadDO>()
+    default int updatePublicPoolToOwned(Long id, Long ownerId, LocalDateTime activityAt) {
+        LambdaUpdateWrapper<LeadDO> update = new LambdaUpdateWrapper<LeadDO>()
                 .eq(LeadDO::getId, id).eq(LeadDO::getAssignmentStatus, "public_pool")
                 .set(LeadDO::getAssignmentStatus, "owned")
                 .set(LeadDO::getOwnerUserId, ownerId)
                 .set(LeadDO::getCurrentAssignmentHistoryId, null)
                 .set(LeadDO::getCurrentAssignmentFirstFollowUpAt, null)
                 .set(LeadDO::getCurrentAssignmentFirstFollowUpDeadlineAt, null)
-                .set(LeadDO::getNextFollowUpAt, null));
+                .set(LeadDO::getNextFollowUpAt, null);
+        setMonotonicActivity(update, activityAt);
+        return update(null, update);
     }
-    default int updatePendingResult(Long id, Long assigneeId, String newStatus, Long ownerId) {
-        return update(null, new LambdaUpdateWrapper<LeadDO>()
+    default int updatePendingResult(Long id, Long assigneeId, String newStatus, Long ownerId,
+                                    LocalDateTime activityAt) {
+        LambdaUpdateWrapper<LeadDO> update = new LambdaUpdateWrapper<LeadDO>()
                 .eq(LeadDO::getId, id).eq(LeadDO::getAssignmentStatus, ASSIGNMENT_PENDING)
                 .eq(LeadDO::getPendingAssigneeUserId, assigneeId)
                 .set(LeadDO::getAssignmentStatus, newStatus)
@@ -717,7 +747,15 @@ public interface LeadMapper extends BaseMapperX<LeadDO> {
                 .set(LeadDO::getCurrentAssignmentHistoryId, null)
                 .set(LeadDO::getCurrentAssignmentFirstFollowUpAt, null)
                 .set(LeadDO::getCurrentAssignmentFirstFollowUpDeadlineAt, null)
-                .set(LeadDO::getNextFollowUpAt, null));
+                .set(LeadDO::getNextFollowUpAt, null);
+        setMonotonicActivity(update, activityAt);
+        return update(null, update);
+    }
+
+    private static void setMonotonicActivity(LambdaUpdateWrapper<LeadDO> update, LocalDateTime activityAt) {
+        Objects.requireNonNull(activityAt, "activityAt");
+        update.setSql("last_activity_at = CASE WHEN last_activity_at IS NULL OR last_activity_at < {0} "
+                + "THEN {0} ELSE last_activity_at END", activityAt);
     }
 
     default List<LeadDO> selectExpiredQualifications(LocalDateTime now) {

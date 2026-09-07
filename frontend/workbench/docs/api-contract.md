@@ -1,5 +1,21 @@
 # API 约定
 
+## 客资备注历史
+
+详情使用 `remarkHistory` 逐条显示首次、补充和有来源依据的历史备注；`remarkHistoryIncomplete`
+表示部分旧证据无法还原。仅旧接口缺少该字段时回退到 `remark`，空数组不回退。
+补充备注默认空白、只追加，未填写不清空原备注；同一内容失败重试保留幂等键。
+列表备注字段仍为原有单值，不表示全部补充内容。完整契约见 `docs/api/zsjos-lead-submitter-actions.md`。
+
+## 客资销售反馈
+
+客资详情新增服务端投影的 `submitter-feedback` 页签与 `REPLY_SUBMITTER` 动作，
+`version` 是发送命令的并发版本。typed service 位于 `leadSubmitterFeedback.ts`，
+使用现有 ADMIN 认证与租户请求层；读取/创建权限分别为
+`zsjos:lead:submitter-feedback:read` 和 `zsjos:lead:submitter-feedback:create`。
+消息 `zsjos.lead.submitter_feedback_created` 跳到反馈页签，完整约定见
+[客资销售反馈](../../../docs/api/lead-submitter-feedback.md)。
+
 ## 员工头像
 
 `GET /admin-api/system/auth/get-permission-info` 在 `user.avatar` 返回当前员工个人头像，并在
@@ -142,3 +158,16 @@ WebSocket 使用 `/infra/ws?token=...`，不带 `/admin-api` 前缀。当前消�
 资产卡状态展示使用 System 字典 `eam_asset_status`；持有状态、需求状态和员工资产任务状态
 来自 EAM 技术状态契约。页面分别处理加载、成功、空数据、失败与重试；HTTP 403 保留当前
 会话并由全局无权限状态处理。
+
+## 收件箱双布局查询
+
+支持表格布局的收件箱保持同一查询条件：收件箱左侧使用 cursor 或页码追加实现滚动懒加载，
+表格使用对应的 `PageResult` 接口进行服务端分页。表格页支持每页 20、50、100 条和快速跳页；
+搜索、筛选、状态切换后重新从首批或第一页请求，ProTable 的刷新、列设置、密度和全屏按钮保持可用。
+消息与公告的关键词、阅读状态、分类/类型、高亮和时间条件由 System 查询接口在分页前处理；
+BPM 任务名称等条件由 BPM `todo-page`/`done-page` 接口处理。
+
+客资收件箱的服务端结果固定按 `lastActivityAt DESC, id DESC` 返回，cursor 编码同一组字段。
+Workbench 只把未查看客资和通知深链目标等特殊集合移到顶部，其余客资保留服务端相对顺序；
+加载更多按 cursor 追加，业务操作成功和实时分配事件到达后重新读取首批并保留当前详情选择。
+置顶、查看详情、选中和标记已读都不得修改 `lastActivityAt`。消息继续按收到时间、公告继续按发布时间排序。

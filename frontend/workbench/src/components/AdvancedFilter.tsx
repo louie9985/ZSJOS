@@ -96,7 +96,7 @@ function ConditionRow({ value, fields, relativeDateOptions, onChange, onRemove }
   return <div className="advanced-filter-condition">
     <Select showSearch optionFilterProp="label" popupMatchSelectWidth={FILTER_SELECT_POPUP_WIDTH} value={field?.fieldKey} onChange={setField} options={fieldOptions}/>
     <Select popupMatchSelectWidth={FILTER_COMPACT_POPUP_WIDTH} value={value.operator} onChange={setOperator} options={(field?.operators || []).map(item => ({ value: item, label: operatorLabels[item] || item }))}/>
-    <div>{control}</div>
+    <div className="advanced-filter-value-control">{control}</div>
     <Button aria-label="删除条件" type="text" danger icon={<DeleteOutlined/>} onClick={onRemove}/>
   </div>
 }
@@ -159,22 +159,22 @@ export function AdvancedFilterToolbar({ scene, pageKey, placeholder, value, keyw
   const loadOptions = useCallback(async (source?: string) => {
     if (!source) return []
     if (source.startsWith('dict:')) return (await api.dictDataByType(source.slice(5))).map(item => ({ value: item.value, label: item.label }))
-    return []
+    throw new Error(`不支持的筛选选项来源: ${source}`)
   }, [])
   const loadCatalog = useCallback(async () => {
     setCatalogState('loading')
     try {
       const catalog = await api.advancedFilterCatalog(scene)
       setRelativeDateOptions(catalog.relativeDateOptions || [])
-      setFields(catalog.fields.map(field => field.optionSource && !field.options.length ? { ...field, optionsLoading: true } : field))
+      setFields(catalog.fields.map(field => field.optionSource && !field.options.length ? { ...field, optionsLoading: true, optionsState: 'loading' } : { ...field, optionsState: field.options.length ? 'ready' : 'empty' }))
       setCatalogState('ready')
       await Promise.all(catalog.fields.map(async field => {
         if (!field.optionSource || field.options.length) return
         try {
           const options = await loadOptions(field.optionSource)
-          setFields(current => current.map(item => item.fieldKey === field.fieldKey ? { ...item, options, optionsLoading: false } : item))
+          setFields(current => current.map(item => item.fieldKey === field.fieldKey ? { ...item, options, optionsLoading: false, optionsState: options.length ? 'ready' : 'empty' } : item))
         } catch {
-          setFields(current => current.map(item => item.fieldKey === field.fieldKey ? { ...item, optionsLoading: false, optionsError: true, retryOptions: () => void loadCatalog() } : item))
+          setFields(current => current.map(item => item.fieldKey === field.fieldKey ? { ...item, optionsLoading: false, optionsState: 'error', optionsError: true, retryOptions: () => void loadCatalog() } : item))
         }
       }))
     } catch { setCatalogState('error'); setFields([]) }

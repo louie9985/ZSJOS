@@ -25,7 +25,7 @@ import {
 import { CheckOutlined, DeleteOutlined, DownOutlined, EditOutlined, PhoneOutlined, PlusOutlined, ReloadOutlined, UploadOutlined, UpOutlined, UserAddOutlined } from "@ant-design/icons";
 import { useLocation } from "react-router-dom";
 import dayjs from "dayjs";
-import { NameAvatar } from "../components/LeadDetailOverview";
+import LeadDetailOverview, { NameAvatar } from "../components/LeadDetailOverview";
 import LeadDetail from "../components/LeadDetail";
 import StudentDetail from "../components/StudentDetail";
 import SalesOrderEntryModal from "../components/SalesOrderEntryModal";
@@ -816,41 +816,18 @@ export function MyStudentsPage({ permissions = [] }: { permissions?: string[] })
       openTaskType={taskTarget?.openContactTask ? taskTarget.taskType : undefined}
       onRefresh={refreshCurrentStudent}
     >
-      {(studentToolbarActions) => leadDetail ? <LeadDetail
-      lead={{
-        ...leadDetail,
-        submittedName: selected.name ?? leadDetail.submittedName,
-        submittedMobile: selected.mobile ?? leadDetail.submittedMobile,
-        submittedWechatId: selected.wechatId ?? leadDetail.submittedWechatId,
-      }}
-      categories={categories}
-      categoryLabel={(value) => dictionaryDisplayLabel(categories, value, categoryError)}
-      channelLabel={(value) => dictionaryDisplayLabel(channels, value, channelError)}
-      mode="student-readonly"
-      autoExpandFollowUp={false}
-      onDirtyChange={() => undefined}
-      onChanged={() => void refreshCurrentStudent()}
-      studentToolbarActions={canStudentRepurchase
-         ? [...studentToolbarActions, { key: 'student-repurchase', icon: <PlusOutlined />, label: '录入复购', onClick: () => setRepurchaseOpen(true) }]
-         : studentToolbarActions}
-      contextHeader={selectedService ? <div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div> : undefined}
-      studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }}
-      extraTabs={[
-        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} />{selectedService.attributeValues?.length ? <Space wrap style={{ marginTop: 12 }}>{selectedService.attributeValues.map(value => <Tag key={value}>{value}</Tag>)}</Space> : null}</section> },
-        { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> }
-      ]}
-    /> : <StudentDetail
+      {(studentToolbarActions) => <StudentDetail
       student={selected}
       service={selectedService}
       contactContext={studentContactContext}
       contactRecords={studentContactRecords}
-      toolbar={<OverflowToolbar actions={canStudentRepurchase
-        ? [...studentToolbarActions, { key: 'student-repurchase', icon: <PlusOutlined />, label: '录入复购', onClick: () => setRepurchaseOpen(true) }]
-        : studentToolbarActions} />}
+      toolbar={<OverflowToolbar actions={studentToolbarActions} />}
       contextHeader={<div style={{ marginBottom: 16 }}><Typography.Text strong>当前课程服务</Typography.Text><Select style={{ width: '100%', marginTop: 8 }} value={selectedService.serviceRelationId} onChange={value => void selectService(value)} options={selected.services.map(service => ({ value: service.serviceRelationId, label: `${service.courseName || service.skuName || '课程服务'} · ${service.orderNo || service.orderId}` }))}/></div>}
+      overviewContent={<LeadDetailOverview student={selected} lead={leadDetail} categoryLabel={(value: string | undefined) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value: string | undefined) => dictionaryDisplayLabel(channels, value, channelError)} showFollowUp={false} studentContext={{ service: selectedService, contactContext: studentContactContext, contactRecords: studentContactRecords }} />}
       extraTabs={[
-        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} />{selectedService.attributeValues?.length ? <Space wrap style={{ marginTop: 12 }}>{selectedService.attributeValues.map(value => <Tag key={value}>{value}</Tag>)}</Space> : null}</section> },
-        { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> }
+        { key: 'student-contact', label: '联系记录', forceRender: true, children: <StudentContactDetail service={selectedService} /> },
+        { key: 'student-service', label: '课程服务', children: <section className="registration-summary-card"><DetailFieldGrid items={[{ key: 'course', label: '课程', value: selectedService.courseName || selectedService.skuName }, { key: 'sku', label: '具体方案', value: selectedService.skuName }, { key: 'category', label: '分类', value: selectedService.categoryPath?.join(' / ') }, { key: 'order', label: '订单号', value: selectedService.orderNo }, { key: 'status', label: '服务状态', value: serviceStatusLabel(selectedService.status) }, { key: 'director', label: '编导', value: selectedService.contentDirectorUserName || '未分配' }, { key: 'career', label: '职业规划师', value: selectedService.careerPlannerUserName || '未分配' }]} /></section> },
+        ...(leadDetail ? [{ key: 'lead-history', label: '客资历史', children: <LeadDetail lead={leadDetail} categories={categories} categoryLabel={(value) => dictionaryDisplayLabel(categories, value, categoryError)} channelLabel={(value) => dictionaryDisplayLabel(channels, value, channelError)} mode="student-readonly" autoExpandFollowUp={false} onDirtyChange={() => undefined} onChanged={() => void refreshCurrentStudent()} /> }] : [])
       ]}
     />}
     </StudentPlannerOperations>

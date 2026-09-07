@@ -65,6 +65,7 @@ class StudentContactServiceImplTest {
     @Mock private BusinessTaskCommandService taskCommandService;
     @Mock private SalesOrderMapper orderMapper;
     @Mock private PermissionApi permissionApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoPermissionProvider studentInfoPermission;
     @Mock private AdminUserApi adminUserApi;
     @Mock private StudentContactConfigService configService;
     @Mock private PersonMapper personMapper;
@@ -75,6 +76,7 @@ class StudentContactServiceImplTest {
 
     @BeforeEach
     void grantDeliveryStagePermissionForServiceContractTests() {
+        lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq("zsjos:student-info-form:read"))).thenReturn(false);
         lenient().when(permissionApi.hasAnyPermissions(anyLong(), eq(PERMISSION_DELIVERY_STAGE_SUBMIT))).thenReturn(true);
         lenient().when(directorConfigService.interviewAppointmentHours()).thenReturn(96);
         lenient().when(directorConfigService.trialDays()).thenReturn(14);
@@ -111,6 +113,20 @@ class StudentContactServiceImplTest {
         StudentContactContextRespVO result = service.getContext(10L, 7L);
 
         assertEquals(List.of(), result.getAvailableActions());
+    }
+
+    @Test
+    void collectionTabRequiresFeaturePermissionAndLeadVisibility() {
+        prepareContext();
+        ServiceRelationDO relation = relation("accepted"); relation.setOrderId(100L);
+        when(relationMapper.selectById(10L)).thenReturn(relation);
+        when(permissionApi.hasAnyPermissions(7L, "zsjos:student-info-form:read")).thenReturn(true);
+        var order = new cn.iocoder.yudao.module.zsjos.dal.dataobject.order.SalesOrderDO(); order.setLeadId(5L);
+        when(orderMapper.selectById(100L)).thenReturn(order);
+        when(studentInfoPermission.hasPermission(5L, "read", 7L)).thenReturn(true);
+        assertEquals(true, service.getContext(10L, 7L).getVisibleTabs().contains("student-info"));
+        when(studentInfoPermission.hasPermission(5L, "read", 7L)).thenReturn(false);
+        assertFalse(service.getContext(10L, 7L).getVisibleTabs().contains("student-info"));
     }
 
     @Test

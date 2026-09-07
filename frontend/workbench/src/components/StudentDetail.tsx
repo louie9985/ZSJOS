@@ -5,6 +5,7 @@ import type { MyStudent, StudentContactContext } from '../services/api'
 import { formatTimestamp } from '../services/time'
 import LeadDetailOverview, { type LeadOverviewSlots, type StudentOverviewContext } from './LeadDetailOverview'
 import type { LeadDetailExtraTab } from './LeadDetail'
+import StudentInfoPanel from './StudentInfoPanel'
 
 export default function StudentDetail({ student, service, contactContext, contactRecords = [], toolbar, overviewSlots, overviewContent, contextHeader, extraTabs = [], activeTab: controlledActiveTab, onTabChange }: {
   student: MyStudent
@@ -21,11 +22,12 @@ export default function StudentDetail({ student, service, contactContext, contac
 }) {
   const [internalActiveTab, setInternalActiveTab] = useState('overview')
   const studentContext = contactContext ? { service, contactContext, contactRecords } : undefined
+  const collectionLeadId = service.leadId ?? student.leadId
   const items: LeadDetailExtraTab[] = [{
     key: 'overview',
     label: '概览',
     children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview student={student} showFollowUp={false} categoryLabel={() => '-'} channelLabel={() => '-'} toolbar={toolbar} studentContext={studentContext} studentService={service} slots={overviewSlots} />}</div>
-  }, ...extraTabs]
+  }, ...(collectionLeadId && contactContext?.visibleTabs.includes('student-info') ? [{ key: 'student-info', label: '学员信息', children: <StudentInfoPanel key={collectionLeadId} leadId={collectionLeadId} /> }] : []), ...extraTabs]
   const keys = new Set(items.map(item => item.key))
   const activeTab = controlledActiveTab && keys.has(controlledActiveTab)
     ? controlledActiveTab : keys.has(internalActiveTab) ? internalActiveTab : items[0]?.key

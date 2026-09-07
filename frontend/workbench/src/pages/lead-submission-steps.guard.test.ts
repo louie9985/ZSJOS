@@ -36,6 +36,11 @@ describe('lead submission stepped form', () => {
     expect(pageSource).toContain('onConfirm={submit}')
   })
 
+  it('shows the selected customer region before the final submit confirmation opens', () => {
+    expect(pageSource).toContain('const path: string[] = summary?.regionPath || []')
+    expect(pageSource).not.toContain('const path: string[] = pendingValues?.regionPath || []')
+  })
+
   it('renders dispatch mode as consequence cards, not a bare radio list', () => {
     expect(pageSource).toContain('className="lead-dispatch-options"')
     expect(pageSource).toContain('lead-dispatch-option')

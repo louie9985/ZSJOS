@@ -27,4 +27,10 @@ public class NotifyMessageMyPageReqVO extends PageParam {
     @Schema(description = "业务类型")
     private String bizType;
 
+    @Schema(description = "关键词")
+    private String keyword;
+
+    @Schema(description = "消息分类")
+    private String category;
+
 }

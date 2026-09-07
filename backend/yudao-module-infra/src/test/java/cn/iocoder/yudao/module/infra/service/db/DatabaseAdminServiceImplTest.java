@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_EXECUTE_FAIL;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_VALUE_INVALID;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_SENSITIVE_COLUMN;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_TABLE_NOT_EXISTS;
 import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_TABLE_READONLY;
@@ -165,7 +165,7 @@ public class DatabaseAdminServiceImplTest extends BaseMockitoUnitTest {
         assertServiceException(() -> databaseAdminService.createRow(new DatabaseAdminRowCreateReqVO()
                 .setDataSourceConfigId(DATA_SOURCE_CONFIG_ID)
                 .setTableName("db_admin_user")
-                .setValues(Map.of("username", "bad-age", "age", "not-a-number"))), DATABASE_ADMIN_EXECUTE_FAIL);
+                .setValues(Map.of("username", "bad-age", "age", "not-a-number"))), DATABASE_ADMIN_VALUE_INVALID, "age");
     }
 
     @Test

@@ -180,6 +180,39 @@ public class FeedbackDynamicFormService {
         return JsonUtils.parseObject(valueJson, Map.class);
     }
 
+    public Map<String, Object> readDisplayValues(String valueJson, List<FeedbackFormRespVO.Field> fields) {
+        Map<String, Object> values = parseValueSnapshot(valueJson);
+        Map<Long, List<Map<Object, Object>>> attachmentsById = new LinkedHashMap<>();
+        for (FeedbackFormRespVO.Field field : fields) {
+            if (!"image".equals(field.getType()) && !"upload".equals(field.getType())) continue;
+            if (!(values.get(field.getKey()) instanceof Collection<?> attachments)) continue;
+            List<Object> resolved = new ArrayList<>();
+            for (Object item : attachments) {
+                if (!(item instanceof Map<?, ?> snapshot)) {
+                    resolved.add(item);
+                    continue;
+                }
+                Map<Object, Object> copy = new LinkedHashMap<>(snapshot);
+                // Historical metadata stays frozen; expired upload URLs are never a read fallback.
+                copy.put("url", null);
+                if (snapshot.get("id") != null) {
+                    try {
+                        Long id = Long.valueOf(String.valueOf(snapshot.get("id")));
+                        attachmentsById.computeIfAbsent(id, unused -> new ArrayList<>()).add(copy);
+                    } catch (NumberFormatException ignored) {
+                        // Malformed historical IDs cannot be used to recover an access URL.
+                    }
+                }
+                resolved.add(copy);
+            }
+            values.put(field.getKey(), resolved);
+        }
+        Map<Long, String> urls = FeedbackFileUrls.resolve(fileApi, attachmentsById.keySet());
+        attachmentsById.forEach((id, attachments) ->
+                attachments.forEach(attachment -> attachment.put("url", urls.get(id))));
+        return values;
+    }
+
     private Object normalizeValue(FeedbackFormRespVO.Field field, Object value, Long userId,
                                   List<Long> attachmentIds) {
         try {

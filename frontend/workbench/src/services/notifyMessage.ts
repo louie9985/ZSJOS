@@ -5,11 +5,15 @@ export type NotifyMessageView = 'all' | 'unread'
 export const buildNotifyMessagePageParams = (
   view: NotifyMessageView,
   pageNo: number,
-  pageSize: number
+  pageSize: number,
+  keyword?: string,
+  category?: string
 ): NotifyMessagePageParams => ({
   pageNo,
   pageSize,
   ...(view === 'unread' ? { readStatus: false } : {})
+  ,...(keyword?.trim() ? { keyword: keyword.trim() } : {})
+  ,...(category && category !== 'all' ? { category } : {})
 })
 
 export const applyReadStatus = (
@@ -25,8 +29,10 @@ export const applyReadStatus = (
   return view === 'unread' ? updated.filter(item => !selectedIds.has(item.id)) : updated
 }
 
-export const buildNotifyMessageCursorParams = (view: NotifyMessageView, cursor?: string, limit = 20): NotifyMessageCursorParams => ({
-  cursor,
+export const buildNotifyMessageCursorParams = (view: NotifyMessageView, cursor?: string, limit = 20, keyword?: string, category?: string): NotifyMessageCursorParams => ({
   limit,
+  ...(cursor ? { cursor } : {}),
   ...(view === 'unread' ? { readStatus: false } : {})
+  ,...(keyword?.trim() ? { keyword: keyword.trim() } : {})
+  ,...(category && category !== 'all' ? { category } : {})
 })

@@ -24,7 +24,7 @@ public class DatabaseAdminRowUpdateReqVO {
     @NotNull(message = "主键值不能为空")
     private Object primaryKeyValue;
 
-    @Schema(description = "字段值", requiredMode = Schema.RequiredMode.REQUIRED)
+    @Schema(description = "仅包含修改的列；null 表示 SQL NULL，空字符串保持空字符串", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "字段值不能为空")
     private Map<String, Object> values;
 

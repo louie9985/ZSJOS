@@ -373,6 +373,14 @@ public class LeadAssignmentServiceImpl implements LeadAssignmentService {
         return CommonStatusEnum.ENABLE.getStatus().equals(relation.getStatus());
     }
 
+    @Override
+    public Set<Long> getActiveTargetUserIds(String sceneCode, Long sourceUserId) {
+        if (sourceUserId == null) return Set.of();
+        return relationMapper.selectListBySourceUserIds(sceneCode, Set.of(sourceUserId)).stream()
+                .filter(this::isEnabledRelation).map(LeadAssignmentRelationDO::getTargetUserId)
+                .filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
     private List<AdminUserRespDTO> getUsersByPostCode(String postCode, boolean enabledOnly) {
         PostRespDTO post = postApi.getPostByCode(postCode);
         if (post == null || !CommonStatusEnum.ENABLE.getStatus().equals(post.getStatus())) {

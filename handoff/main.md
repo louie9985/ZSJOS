@@ -111,6 +111,33 @@
 
 # Main Workstream
 
+## Workstream Registration - 2026-09-06 22:40:00 +08:00
+
+- Workstream ID: `main-notice-targeting-complete-fix`
+- Goal: 完整修复公告全员/部门/用户定向发送、树选择、员工可见性、游标排序和公告测试回归。
+- Non-goals: 不新增第三方依赖；不修改真实权限、共享数据库数据、分支、提交或推送；保留其他未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`。
+- Ownership scope: System Notice 后端 VO/Controller/Service/Mapper/测试；Admin NoticeEditor 与 notice API；Workbench 公告 API/页面；V181 兼容测试 schema；公告架构/迁移文档；本 handoff 文件。
+- Owner: Codex `/root`。
+- Dependencies: System 用户、部门、权限公共服务，MyBatis-Plus 租户插件，Vue Admin、React Workbench；无新增依赖。
+- Integration order: 修复接收范围语义和批量查询 -> 增加树选项契约与 Admin 交互 -> 统一游标排序 -> 同步测试/schema/文档 -> 后端与两端验证。
+- Verification plan: System `mvn -pl yudao-module-system -am test`; Admin `pnpm ts:check && pnpm lint && pnpm build:local`; Workbench `npm test && npm run typecheck && npm run build`; scoped diff check；受控 MySQL migration 静态/重复执行检查。
+
+## Workstream Registration - 2026-09-06 22:08:09 +08:00
+
+- Workstream ID: `main-workbench-filter-view-equivalence`
+- Goal: 修复 Workbench 财务端高级筛选布局，并补齐所有已接入表格视图页面的筛选、分页、错误态、详情和财务导出功能等价。
+- Non-goals: 不回退当前工作树既有用户改动；不修改后端权限、菜单、数据库、业务筛选语义或新增依赖；不切换分支、提交、推送或执行真实导出任务。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `88313524d2d575fa22b72811245643ba33f7ff17`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/components/AdvancedFilter.tsx`; `frontend/workbench/src/styles/components/advanced-filter.css`; `frontend/workbench/src/pages/SalesOrderApprovalPage.tsx`; 相关 Workbench 守卫测试；本 handoff 文件。
+- Owner: Codex `/root`
+- Dependencies: 现有 React/Vite/TypeScript/Ant Design 6、Workbench AdvancedFilter、订单审批 page/cursor API 与 `zsjos:export:finance-order` 权限；无新增依赖。
+- Integration order: 修复筛选值控件布局 -> 补齐财务表格导出入口 -> 更新守卫测试 -> 运行 Workbench 测试/typecheck/build -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`; 浏览器登录态可用时检查财务主从/表格/移动布局。
+
 ## Workstream Registration - 2026-08-31 16:10:00 +08:00
 
 - Workstream ID: `main-production-bootstrap-seed`
@@ -18846,7 +18873,202 @@ equestAttachments。
 - Dependencies: 现有 Vue 3、Element Plus `el-select`、高级筛选条件组组件及当前未提交的时间作差控件改动；无新增依赖。
 - Integration order: 在现有组件改动上调整值选择器浮层策略 -> 将条件行改为稳定网格并使用容器查询换行 -> 运行管理端静态/构建检查 -> 在桌面与移动宽度进行浏览器验证 -> 追加交付记录。
 - Verification plan: 运行管理端 `pnpm ts:check`、目标文件 ESLint、`pnpm build:local`、scoped `git diff --check`；启动本地管理端并检查宽桌面抽屉、窄容器/嵌套条件组和移动宽度的输入框与浮层宽度，登录或后端状态阻断时记录未验证风险。
+## Workstream Registration - Lead Remark History - 2026-09-06
+
+- Workstream ID: `main-lead-remark-history`
+- Goal: Preserve initial and appended submitter remarks, recover evidenced legacy text, and render all remarks in three existing clients.
+- Non-goals: No SQL, dependencies, remark editing/deletion, permission changes, branches, commits or publication.
+- Branch / target branch: `main` / `main`
+- Absolute worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`; preserve existing work.
+- Owner: Codex `/root`, remark-history workstream.
+- Ownership scope: LeadSubmitterActionService, new LeadRemarkHistoryService and supplement snapshot, LeadFlowHistoryService, LeadManagementServiceImpl detail projection, LeadManagementRespVO/LeadRemarkRespVO, BusinessEventMapper and the supplement conflict error constant; focused backend tests; Workbench LeadDetailOverview/LeadBasicInfoModal/API types and `.cache/lead-remark-check.*` visual fixture; Admin existing Lead detail/API types; H5 lead detail/supplement/API types; directly affected docs and this handoff.
+- Dependencies: Existing Lead authorization, event persistence, JSON, three frontend toolchains; no new dependencies.
+- Integration order: Event write and history projection -> detail and flow contracts -> clients -> tests/docs -> delivery.
+- Verification plan: Focused backend tests/compile, three frontend type/build checks, browser and database read-only checks where available; report unavailable checks explicitly.
+
+- Delivery Entry - 2026-09-06 14:43:20 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复员工工作台所有菜单高级筛选字段无法选择、目录权限不一致和选项加载失败问题。
+- Key decisions: 目录接口补齐 `media-student:query-my` 与 `sales-order:create`；目录字段增加 optionsState/optionsErrorCode；前端区分选项加载状态并对未知 source 报错；不新增静态业务选项。
+- Execution or analysis result: 已完成后端响应类型与目录授权调整，前端字典/人员选项状态处理调整；筛选条件协议保持兼容。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/advancedfilter/vo/AdvancedFilterCatalogRespVO.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/advancedfilter/AdvancedFilterController.java`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/components/AdvancedFilter.tsx`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` BUILD SUCCESS；`frontend/workbench npm run typecheck` 通过。
+- Dependency or integration impact: 无新增依赖、数据库、分支、提交或发布；目录 JSON 增加可选字段，旧客户端可兼容读取。
+- Remaining work: 建议在真实环境用全量、本人、主管、无范围账号逐菜单执行浏览器验收；本轮未启动外部服务。
+- Status: `completed`
+
+
+## Delivery Entry - 2026-09-04 00:48:00 +08:00
+
+- Workstream ID: `main-product-status-tabs`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `8eb48ee957226d199c6eb3a6ae88bb21ff3be151`
+- User goal: 所有停用课程从正常产品配置中移入“已停用”视图，不再默认显示。
+- Key decisions: 两端都向现有产品分页接口传递 `status=0/1`；默认显示启用课程；停用页保留查看、编辑、启用和既有删除入口；不改变后端状态、快照和删除规则。
+- Execution or analysis result: Admin 产品页新增“正常使用/已停用”切换并按状态加载；Workbench 产品配置页新增同样的 Segmented 切换，停用页隐藏新增按钮。
+- Changed files: `frontend/admin/src/views/zsjos/product/index.vue`; `frontend/workbench/src/pages/ConfigurationPages.tsx`; 本 handoff 记录。
+- Verification evidence: Workbench `npm run typecheck` 通过；Admin 产品页 ESLint 通过；`git diff --check` 未通过仓库全量检查，原因是已有日志文件 `LOG_FILE_IS_UNDEFINED` 的 trailing whitespace，非本次改动；本次改动文件仅有换行符转换提示。
+- Dependency or integration impact: 无新增依赖、后端/API 契约兼容；保留工作树其他未提交改动，未执行数据库、分支、提交或发布操作。
+- Remaining work: 如需视觉微调，可在具备登录会话后进行两端产品页浏览器抽查。
+- Status: `completed`
+
+- Delivery Entry - 2026-09-06 13:40:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复员工工作台所有菜单高级筛选字段无法选择、目录权限不一致和选项加载失败问题。
+- Key decisions: 保持现有筛选条件协议；以服务端权限、数据范围和字典为唯一来源；扩展目录字段选项状态以区分 loading/empty/error/ready；补齐媒体学生和订单创建权限目录访问。
+- Execution or analysis result: 已确认 `AdvancedFilterController` 权限列表与学生媒体菜单、订单列表权限存在不一致；前端仅处理 `dict:` 选项源且无法区分空选项与加载失败。
+- Changed files: 待实施。
+- Verification evidence: 待执行后端测试、前端测试与类型检查。
+- Dependency or integration impact: 无新增依赖；影响高级筛选目录响应及工作台筛选渲染。
+- Remaining work: 实施修复并完成验证。
 - Status: `in-progress`
+
+## Delivery Entry - 2026-09-06 17:10:00 +08:00
+
+- Workstream ID: `main-inbox-dual-layout-query`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`（保留未提交工作树改动）
+- User goal: 补全全部收件箱在收件箱/表格双布局下的搜索、筛选、懒加载和服务端分页能力。
+- Key decisions: 表格模式改用已有 PageResult 接口并受控分页；收件箱模式继续使用 cursor 或页码追加；消息和公告查询参数在 System 模块扩展；保留 ProTable 原生选项和现有详情布局。
+- Execution or analysis result: 订单、申诉、重复复核、订单审批、主管确认、消息、公告和 BPM 表格分支已接入服务端分页；订单/申诉/审批/主管/重复复核表格补充筛选工具栏；消息和公告补充关键词查询；System 消息/公告接口完成对应参数与数据库查询条件。
+- Changed files: Workbench 收件箱页面、`src/services/api.ts`、`src/services/notifyMessage.ts`、Workbench API 文档；System 通知消息/公告 Request VO、Mapper、Service、Controller；现有收件箱守卫测试。
+- Verification evidence: Workbench 定向守卫测试 37/37 通过；`npm run typecheck` 通过；`npm run build` 通过；`mvn -f backend/pom.xml -pl yudao-module-system -am -DskipTests compile` 通过；scoped `git diff --check` 无错误。
+- Dependency / integration impact: 无新增依赖、数据库结构、权限或 Git 操作；后端与 Workbench 需协同发布。工作树中的其他 System/Admin/ZSJOS 改动未回滚。
+
+## Delivery Entry - 2026-09-06 21:45:00 +08:00
+
+- Workstream ID: `main-work-order-admin-embed-route`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 根据代码审查结果完整修复工单模板/运行审计的 Vue Admin iframe 路由问题。
+- Key decisions: `native` 页面不继承 iframe 祖先；fallback 导航始终过滤完整授权树；无 iframe 祖先的 `admin_only` 页面回退到首个可访问页面；关闭 Tab 时清理 admin_embed/admin_only 路由；不修改后端菜单、权限、数据库或依赖。
+- Execution or analysis result: 已完成路由承载判定、导航过滤、独立管理页回退和 iframe Tab 清理，并补充 native/admin_only 路径测试。
+- Changed files: `frontend/workbench/src/main.tsx`; `frontend/workbench/src/services/menu.ts`; `frontend/workbench/src/services/menu.test.ts`; `handoff/main.md`。
+- Verification evidence: 聚焦测试 25/25 通过；`npm run typecheck` 通过；`npm run build` 通过。全量测试 553 项中 548 项通过，5 项为既有 media-students 源码守卫和 feedback.css 字体 token 守卫失败；scoped `git diff --check` 无错误，仅有 LF-to-CRLF 提示。浏览器 CDP/认证会话不可用，未完成真实点击验收。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限/分支/提交/发布变更；保留其他未提交工作树修改。
+- Remaining work: 使用已登录 Workbench 会话验收工单模板、运行审计及三个 native 工单页面。
+- Status: `implemented; browser acceptance pending`
+- Remaining work: 本轮未完成所有页面的服务端排序白名单与列宽拖动统一抽取；未完成 BPM 分类/时间筛选 UI 和真实登录浏览器验收；需补对应后端测试及完整 Workbench 测试回归。
+- Status: `partially implemented; remaining planned work identified`
+
+## Delivery Entry - 2026-09-06 17:12:00 +08:00
+
+- Workstream ID: `main-inbox-dual-layout-query`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: 统一收件箱懒加载与表格服务端分页，并补齐双布局搜索筛选能力。
+- Key decisions: 未将本地数组分页冒充服务端分页；消息/公告查询条件在 System Mapper 执行；保留 ProTable 原生操作区和既有详情抽屉。
+- Execution or analysis result: 已为订单、申诉、重复复核、订单审批、主管确认、消息、公告和 BPM 表格分支接入服务端分页；多个页面补充表格模式搜索筛选；System 消息关键词/分类和公告关键词/类型/阅读/高亮/时间查询契约已编译通过。
+- Changed files: Workbench 收件箱页面、服务 API 和消息查询辅助；System 通知消息/公告 VO、Mapper、Service、Controller；Workbench 收件箱守卫测试和 API 文档。
+- Verification evidence: 收件箱定向测试 37/37 通过；`npm run typecheck` 通过；`npm run build` 通过；System reactor compile 通过；全量 Workbench 547/552 通过。
+- Dependency / integration impact: 无新增依赖、数据库结构、权限、分支、提交或服务操作；共享工作树其他改动保留。
+- Remaining work: 方案要求的全页面服务端排序白名单和列宽统一抽取尚未完成；BPM 分类/时间筛选控件尚未完成；重复复核收件箱仍需真正懒加载追加；部分页面仍需筛选变化清空选择/详情的细化；未完成真实登录桌面/移动浏览器验收和对应后端测试。
+- Known unrelated failures: 全量测试中 `src/pages/media-students.guard.test.ts` 4 项和 `src/styles/styles.guard.test.ts` 1 项失败，涉及既有 positioning-card API 守卫及 feedback.css 字号守卫，不属于本工作流改动。
+- Status: `partially implemented; do not treat as complete`
+
+## Delivery Entry - 2026-09-05 19:40:00 +08:00
+
+- Workstream ID: `main-planner-student-overview-alignment`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 补全学习规划师“我的学员”客户概览，使其与销售端一致并恢复跟进历史。
+- Key decisions: 规划师保留服务端 `visibleTabs` 返回的只读销售详情标签；Lead 存在时概览优先显示销售端最近跟进、时效、流转和状态，学员联系任务作为补充上下文；无 Lead 时保留兼容降级。
+- Execution or analysis result: 移除 `student-readonly` 对 `follow-ups` 的前端过滤；规划师概览不再用联系记录替换 Lead 最近跟进，不再用学员任务状态替换 Lead 状态卡；保留课程服务和联系记录扩展标签。
+- Changed files: `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/pages/student-sales-history.guard.test.ts`; `handoff/main.md`。
+- Verification evidence: 聚焦 Vitest 10/10 通过；`npm run typecheck` 通过；`npm run build` 通过；`git diff --check` 通过（仅行尾转换提示）。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限变更；未切换分支、提交或发布；保留其他工作树修改。
+- Remaining work: 需要带有效规划师和销售账号的浏览器验收确认实际服务关系具备 `leadId` 且服务端 `visibleTabs` 包含 `follow-ups`。
+- Status: `completed`
+
+## Workstream Registration - 2026-09-05 18:00:00 +08:00
+
+- Workstream ID: `main-planner-student-overview-alignment`
+- Goal: 让学习规划师“我的学员”概览完整复用销售端客户概览与跟进历史，并保留规划师课程服务信息。
+- Non-goals: 不修改后端数据、权限、菜单、数据库或第三方依赖；不覆盖其他未提交改动；不切换分支、提交或发布。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/components/LeadDetail.tsx`; `frontend/workbench/src/pages/RegistrationPages.tsx`; 相关 Workbench 测试与本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有 Lead 详情 API、服务端 `visibleTabs` 投影、React/Ant Design；无新增依赖。
+- Integration order: 恢复只读跟进标签 -> 对齐规划师 Lead 概览 -> 保留课程服务/联系记录扩展 -> 聚焦测试、类型检查和构建 -> 追加交付记录。
+- Verification plan: Workbench 相关 Vitest、`npm run typecheck`、`npm run build`、scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-05 19:09:13 +08:00
+
+- Workstream ID: `main-lead-submitter-assist-public-sea-scope`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复公海 C 其他销售可见“请求提交人协助”的权限问题，并重新验证 A/B/C 规则。
+- Key decisions: 公海周期存在时，提交人协助仅允许原销售 A 或协同销售 B；非公海 Lead 保留原有详情可见性规则；同步收紧详情动作投影，避免只修后端提交校验而前端仍显示按钮。
+- Execution or analysis result: `LeadObjectPermissionService` 新增公海 A/B 对象校验；`LeadManagementServiceImpl` 仅在该对象校验通过时投影 `REQUEST_SUBMITTER_ASSIST`；新增 A/B 允许、C 拒绝的单元测试。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadManagementServiceImpl.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadObjectPermissionServiceTest.java`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am "-Dtest=LeadObjectPermissionServiceTest" "-Dsurefire.failIfNoSpecifiedTests=false" test` passed, 21 tests; `git diff --check` passed with only existing LF-to-CRLF warnings. Live browser revalidation after code change was not run because the running backend/frontend processes were not restarted.
+- Dependency or integration impact: No new dependency, database change, migration, branch, commit, or publication; runtime needs backend restart to load the authorization change.
+- Remaining work: Restart the backend and re-login A/B/C to confirm the live action button is absent for C and present for A/B; verify direct C submission returns the stable permission error.
+- Status: `completed`
+
+## Delivery Entry - 2026-09-05 12:44:16 +08:00
+
+- Workstream ID: `main-code-review-full-fix`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 实施全量代码审查修复方案。
+- Key decisions: 保留已部署迁移兼容性；补公告游标权限、服务层 limit 校验、发布行锁及异常接收人快照保护；补产品删除租户行锁；修正反馈通知路由。useRoute、V181 兼容 DDL、JSON 目标列和旧 AI 日志问题按现状核验，不作错误改动。
+- Execution or analysis result: 上述代码修复已完成；未执行共享数据库、Redis 或服务启停操作。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/NoticeController.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/NoticeServiceImpl.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeMapper.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/product/ZsjosProductServiceImpl.java`; `frontend/admin/src/layout/components/Message/src/Message.vue`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-system,yudao-module-zsjos -am -DskipTests compile` passed; only existing compiler warnings were reported. No frontend, Redis, SQL integration, browser, or runtime startup verification completed.
+- Dependency or integration impact: No new dependency, branch, commit, push, or external state mutation.
+- Remaining work: Implement and verify remaining Redis atomicity, frontend request guards/pagination, attachment content detection, compatible V182 migration, tenant-scoped sync script, runtime Logback/AI configuration, and full acceptance matrix.
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 00:58:00 +08:00
+
+- Workstream ID: `main-product-status-tabs`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `8eb48ee957226d199c6eb3a6ae88bb21ff3be151`
+- User goal: 保留原课程分类和课程显示位置，将所有停用课程集中到独立区域；停用分类默认不展开。
+- Key decisions: 原课程区域只查询启用课程；新增独立折叠的“已停用课程”区域查询全部停用课程；移除此前替换原位置的状态页签；停用/启用后刷新两块区域；分类树仅默认展开启用且有子节点的分类。
+- Execution or analysis result: Admin 与 Workbench 均完成独立停用课程区域；停用课程区域支持查看、编辑、启用和既有删除入口；Workbench 使用 Ant Design `Collapse`，Admin 使用 Element Plus `el-collapse`。
+- Changed files: `frontend/admin/src/views/zsjos/product/index.vue`; `frontend/workbench/src/pages/ConfigurationPages.tsx`; 本 handoff 记录。
+- Verification evidence: Workbench `npm run typecheck` 通过；Admin 产品页 ESLint 通过；本次两端文件 `git diff --check` 无新增空白错误，仅有 LF/CRLF 转换提示。
+- Dependency or integration impact: 无新增依赖、后端接口兼容；未执行数据库、分支、提交或发布操作；保留其他既有未提交改动。
+- Remaining work: 具备登录会话后可补充两端产品页浏览器视觉抽查。
+- Status: `completed`
+
+## Delivery Entry - 2026-09-04 00:55:00 +08:00
+
+- Workstream ID: `main-product-status-tabs`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `8eb48ee957226d199c6eb3a6ae88bb21ff3be151`
+- User goal: 所有停用课程从正常产品配置中移入“已停用”视图，不再默认显示。
+- Key decisions: 两端均使用既有产品分页接口的 `status=0/1` 过滤；默认显示启用课程；停用视图保留查看、编辑、启用和原有删除入口；不改变后端状态、快照或删除规则。
+- Execution or analysis result: Admin 产品页新增“正常使用/已停用”切换并按状态加载；Workbench 新增同样的 Segmented 切换，停用视图隐藏新增按钮。
+- Changed files: `frontend/admin/src/views/zsjos/product/index.vue`; `frontend/workbench/src/pages/ConfigurationPages.tsx`; 本 handoff 记录。
+- Verification evidence: Workbench `npm run typecheck` 通过；Admin 产品页 ESLint 通过；全量 `git diff --check` 仅命中工作树既有 `LOG_FILE_IS_UNDEFINED` 日志 trailing whitespace，未发现本次代码新增空白错误。
+- Dependency or integration impact: 无新增依赖；前后端 API 兼容；未执行数据库、分支、提交或发布操作。
+- Remaining work: 具备登录会话后可补充两端浏览器视觉抽查。
+- Status: `completed`
 
 ## Delivery Entry - 2026-09-04 10:42:00 +08:00
 
@@ -20456,3 +20678,766 @@ equestAttachments。
 - Integration order: 区分共享/账号视图筛选状态 -> 移除共享视图候选请求和筛选控件 -> 更新测试 -> 运行定向验证 -> 追加交付记录。
 - Verification plan: `cd frontend/workbench && npm test -- src/pages/media-calendar.test.ts`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
 - Status: `in-progress`
+
+## Workstream Registration - 2026-09-04 12:53:53 +08:00
+
+- Workstream ID: `main-workbench-server-error-page`
+- Goal: 将员工工作台权限加载阶段的网络、超时和 HTTP 5xx 错误转换为友好的中文服务器连接错误页，避免展示 Axios 英文异常。
+- Non-goals: 不修改后端、认证与权限语义、菜单配置、Admin/H5、数据库、依赖、分支、提交或发布；不覆盖当前工作树其他既有改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树既有 `LOG_FILE_IS_UNDEFINED` 改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/services/serverError.test.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/tsconfig.tsbuildinfo`; `docs/architecture/data-and-permission-flow.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Axios、React、Ant Design 6 和 Vitest；无新增依赖。
+- Integration order: 请求错误归一化 -> 权限错误页 -> 聚焦测试与认证文档 -> 完整前端验证与浏览器桌面/移动检查 -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test -- src/services/serverError.test.ts`; `npm test`; `npm run typecheck`; `npm run build`; 桌面与移动宽度浏览器检查；scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 13:02:06 +08:00
+
+- Workstream ID: `main-workbench-server-error-page`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 服务器连接失败时显示友好的中文错误界面，不再暴露 `Request failed with status code 502` 等英文异常，并提示“服务器连接错误，请联系管理员”。
+- Key decisions: 在 Workbench Axios 响应边界统一归一化网络失败、超时和 HTTP 5xx；保留 401、403、主动取消和稳定业务错误的独立处理；权限加载失败改用 Ant Design `Result` 整页状态并保留重试、返回登录操作。
+- Execution or analysis result: 权限初始化遇到 502 等服务器连接错误时展示指定中文主文案和友好说明；重试会重新请求，返回登录会清理当前平台认证状态；其他明确错误不会被误标为 500。
+- Changed files: `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/services/serverError.test.ts`; `frontend/workbench/src/main.tsx`; `frontend/workbench/tsconfig.tsbuildinfo`; `docs/architecture/data-and-permission-flow.md`; `handoff/main.md`。
+- Verification evidence: 聚焦 Vitest `src/services/serverError.test.ts` 通过 7/7；`npm run typecheck` 通过；`npm run build` 通过并仅有既有大 chunk warning；完整 `npm test` 共 542 项、536 项通过，6 项既有 guard/style 失败（消息中心 1、媒体学员定位卡 4、feedback 字号 1），均不涉及本次文件；使用本地 502 模拟接口在 1440x900 与 390x844 浏览器视口确认中文文案、布局和按钮无重叠，并验证重试及返回登录；scoped `git diff --check` 通过，仅有行尾转换 warning。
+- Dependency or integration impact: 无新增依赖、无后端/API/数据库/权限语义变更、未切换分支、未提交或发布；保留用户既有 `LOG_FILE_IS_UNDEFINED` 改动。
+- Remaining work: None。
+- Status: `completed`
+
+## Delivery Entry - 2026-09-06 13:57:26 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复 Spring 启动时无法创建 `WebSocketPresenceServiceImpl`、报无默认构造器的问题。
+- Key decisions: 在单参数构造器上添加 `@Autowired`，明确使用 Redis DAO 构造路径；保留带 `Clock` 的包可见构造器供测试使用，不新增依赖或改变业务逻辑。
+- Execution or analysis result: Spring 将不再尝试查找无参构造器，可通过公开构造器注入 `WebSocketPresenceRedisDAO`。
+- Changed files: `backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/service/websocket/WebSocketPresenceServiceImpl.java`; `handoff/main.md`。
+- Verification evidence: `mvn -f D:\ZSJ-OS\backend\pom.xml -pl yudao-module-infra,yudao-server -am -DskipTests compile` passed; `git diff --check` passed for the source file。
+- Dependency or integration impact: 无新增依赖、数据库、权限、分支、提交或发布变更；保留当前工作树其他未提交改动。
+- Remaining work: 重新启动 `YudaoServerApplication`，确认完整应用上下文和 Tomcat 正常启动。
+- Status: `completed`
+
+## Workstream Registration - 2026-09-04 00:00:00 +08:00
+
+- Workstream ID: `main-product-status-tabs`
+- Goal: 产品配置页按启用/停用状态分栏展示，默认隐藏停用课程。
+- Non-goals: 不删除产品、不修改历史快照、不改变新客资产品目录或后端状态语义。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `8eb48ee957226d199c6eb3a6ae88bb21ff3be151`
+- Target branch: `main`
+- Ownership scope: `frontend/admin/src/views/zsjos/product/index.vue`; `frontend/workbench/src/pages/ConfigurationPages.tsx`; 本 handoff 记录。
+- Owner: Codex `/root`
+- Dependencies: 现有产品分页接口 `status` 查询参数与启停权限；无新增依赖。
+- Integration order: 两端状态筛选 UI -> 查询参数接入 -> 类型检查/ESLint/diff 检查 -> 交付记录。
+- Verification plan: Workbench typecheck；Admin 产品页 ESLint；`git diff --check`。
+- Status: `in-progress`
+# Delivery Entry - 2026-09-04 13:32:00 +08:00
+
+- Workstream ID: `main-message-announcement-cursor-inbox`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 将消息中心和通知公告收件箱统一改为游标懒加载，取消用户可见分页。
+- Key decisions: 消息中心所有布局统一调用通知游标接口并通过 cursor ref 避免 loading effect 循环；System Notice 新增按 `publish_time + id`、用户绑定的游标接口；公告与消息均使用 sentinel 自动追加并保留手动重试/加载入口；旧分页接口保留兼容。
+- Execution or analysis result: 前后端游标链路已实现，消息中心表格分页已移除，公告分页器已移除，追加列表按 ID 去重并显示加载结束/错误状态；更新受影响的前端守护断言和架构说明。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/vo/NoticeMyCursorReqVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/NoticeController.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeMapper.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/NoticeService.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/NoticeServiceImpl.java`; `frontend/workbench/src/pages/MessageInboxPage.tsx`; `frontend/workbench/src/pages/AnnouncementCenterPage.tsx`; `frontend/workbench/src/services/api.ts`; `frontend/workbench/src/services/notifyMessage.ts`; `frontend/workbench/src/styles/pages/announcements.css`; related guard tests; `docs/architecture/data-and-permission-flow.md`; this handoff record.
+- Verification evidence: Workbench focused tests passed 10/10; `npm run typecheck` passed; `npm run build` passed with existing large-chunk warning; System `mvn -f backend/pom.xml -pl yudao-module-system -am -DskipTests compile` passed; scoped `git diff --check` reported only existing LF/CRLF conversion warnings. Full Workbench suite had 7 failures, including 5 pre-existing unrelated guard/style failures; no live browser or real HTTP environment was available.
+- Dependency or integration impact: No new dependency, no database migration, no permission/menu/auth change, no branch/commit/publish operation. Backend and Workbench must be deployed together for announcement scrolling; legacy pagination callers remain supported.
+- Remaining work: Add/execute backend unit tests for announcement cursor edge cases and perform desktop/mobile browser and real endpoint verification when a runtime environment is available.
+
+# Workstream Registration - 2026-09-04 13:15:00 +08:00
+
+- Workstream ID: `main-message-announcement-cursor-inbox`
+- Goal: 将 Workbench 消息中心（全部/未读）与通知公告统一调整为后端游标驱动的滚动懒加载，修复消息中心 loading 循环，并保留详情、已读、错误重试和实时刷新行为。
+- Non-goals: 不改客资、订单审批、BPM 审批等其他业务收件箱；不改菜单权限、认证、租户、数据库、分支、提交或发布；不引入依赖；保留当前工作树既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/pages/MessageInboxPage.tsx`; `frontend/workbench/src/pages/AnnouncementCenterPage.tsx`; `frontend/workbench/src/services/api.ts`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/`; 相关测试、样式、架构文档；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 System Notice/Notify 公共 API、MyBatis-Plus、Workbench React/Vite/Ant Design 6；无新增依赖。
+- Integration order: 公告游标 VO/Mapper/Service/Controller -> Workbench API 类型与请求 -> 消息/公告页面统一 sentinel 懒加载与 loading 修复 -> 聚焦测试/样式 -> 前后端验证 -> 追加交付记录。
+- Verification plan: Workbench `npm test`, `npm run typecheck`, `npm run build`; System 定向 Maven 测试/编译；scoped `git diff --check`；可用环境下桌面与移动浏览器检查。
+- Status: `in-progress`
+
+## Workstream Registration - 2026-09-04 13:30:00 +08:00
+
+- Workstream ID: `main-workbench-lead-region-confirmation`
+- Goal: 修复 Workbench 提交客资第四步“信息确认”未显示已选客户地区的问题。
+- Non-goals: 不修改地区 API、地区数据源、客资提交参数、后端逻辑、菜单权限、数据库、分支、提交或发布；不覆盖当前工作树其他既有改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/workbench/src/pages/LeadSubmissionPage.tsx`; `frontend/workbench/src/pages/lead-submission-steps.guard.test.ts`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Workbench React、Ant Design Cascader、地区树服务与 Vitest；无新增依赖。
+- Integration order: 确认页地区改为读取实时表单汇总 -> 增加聚焦回归守护 -> 运行定向测试、类型检查、构建和 scoped diff 检查 -> 追加交付记录。
+- Verification plan: `cd frontend/workbench && npm test -- src/pages/lead-submission-steps.guard.test.ts`; `npm run typecheck`; `npm run build`; scoped `git diff --check`；可用时在桌面和移动宽度浏览器检查第四步地区展示。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 13:34:42 +08:00
+
+- Workstream ID: `main-workbench-lead-region-confirmation`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复提交客资已选择客户地区，但第四步信息确认仍显示 `—` 的问题。
+- Key decisions: 确认页地区与姓名、联系方式等字段统一读取第四步实时 `summary`；保留 `pendingValues` 仅用于最终不可逆确认后的提交快照；不修改地区树、API 或提交参数。
+- Execution or analysis result: 进入第四步时即可使用当前表单的 `regionPath` 反查并显示省市标签，不再依赖点击最终提交按钮后才生成的 `pendingValues`；新增源码守护防止回归。
+- Changed files: `frontend/workbench/src/pages/LeadSubmissionPage.tsx`; `frontend/workbench/src/pages/lead-submission-steps.guard.test.ts`; `handoff/main.md`。
+- Verification evidence: `npm test -- src/pages/lead-submission-steps.guard.test.ts` 通过，6/6；`npm run typecheck` 通过；`npm run build` 通过，仅有既有大 chunk warning；scoped `git diff --check` 通过，仅有行尾转换 warning；本地浏览器可打开 Workbench，但因无已登录会话停留在登录页，未能完成提交页桌面/移动交互检查。
+- Dependency or integration impact: 无新增依赖，无后端/API/数据库/权限变更，未切换分支、提交或发布；保留当前工作树其他未提交改动。
+- Remaining work: 部署或使用有效测试账号后，在桌面和移动宽度抽查选择地区并进入第四步的显示结果。
+- Status: `completed`
+## Workstream Registration - 2026-09-04 14:31:00 +08:00
+
+- Workstream ID: `main-v181-mysql-ddl-compatibility`
+- Goal: 修复 V181 公告指定接收人迁移在当前 MySQL 版本上因 `ADD COLUMN IF NOT EXISTS` 不兼容而失败的问题。
+- Non-goals: 不直接修改数据库、不改应用代码或 bootstrap 结构、不删除或重写业务数据、不切换分支、不提交或发布。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/migrations/V181__notice_recipient_targeting.sql`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 `system_notice` 表、`information_schema`、V180 迁移顺序；无新增依赖。
+- Integration order: 兼容性 DDL 修复 -> SQL 静态检查/重复执行语义检查 -> 追加交付记录。
+- Verification plan: 检查脚本不再使用不兼容的 `ADD COLUMN IF NOT EXISTS`，运行 `git diff --check`；若本地 Docker/MySQL 可用，再执行受控迁移和重复执行验证。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 14:31:42 +08:00
+
+- Workstream ID: `main-v181-mysql-ddl-compatibility`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复 V181 公告指定接收人迁移因 `ADD COLUMN IF NOT EXISTS` 不兼容导致的失败。
+- Key decisions: 用存储过程中的 `information_schema.columns` 条件判断逐列执行兼容 DDL；保留公告接收人表、历史公告默认值和双版本登记；不直接修改共享开发数据库。
+- Execution or analysis result: 三个公告受众列改为可重复的条件添加；现场 `yudao-mysql` 为 8.4.11 且当前缺少 `audience_type`，与用户报告的部分执行状态一致。
+- Changed files: `script/sql/mysql/migrations/V181__notice_recipient_targeting.sql`; `docs/operations/database-migrations.md`; `handoff/main.md`。
+- Verification evidence: `git diff --check` 对本次文件未发现空白错误（仅有 LF/CRLF 转换提示）；脚本检索确认不再使用实际的 `ADD COLUMN IF NOT EXISTS`；`zsjos_db.py check` 与 `test-upgrade` 被现有 core baseline/schema drift 阻断，未能完成仓库全量数据库测试；未直接执行共享数据库迁移。
+- Dependency or integration impact: 无新增依赖、无应用/API/权限变更；部署时需显式重跑 V181 以修复已部分执行的环境；保留当前工作树其他未提交改动。
+- Remaining work: 在受控、获准的数据库环境执行 V181 并验证三列、接收人表及双版本登记；当前共享库的实际修复尚未执行。
+- Status: `completed`
+# Workstream Registration - 2026-09-04 15:14:48 +08:00
+
+- Workstream ID: `main-user-online-presence`
+- Goal: 在 Vue 用户管理中展示当前租户全部 ADMIN 员工的实时在线状态，支持在线/离线筛选、在线人数统计、30 秒刷新和多后端实例 Redis 汇总。
+- Non-goals: 不使用 OAuth token 有效期冒充在线；不复用或改变 Lead 接单页面 presence；不展示终端、连接数、IP、上线时间或最后活跃时间；不新增数据库表、菜单权限或依赖；不修改 WebSocket sender 配置；不切换分支、提交或发布；不覆盖当前工作树既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-framework/yudao-spring-boot-starter-websocket/` WebSocket 生命周期扩展；`backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/` 在线 presence API/Redis 实现及测试；`backend/yudao-module-system/` 用户在线查询、筛选、VO、错误码及测试；`frontend/admin/src/api/system/user/` 与 `frontend/admin/src/views/system/user/`；直接受影响的实时通信和权限架构文档；`handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 WebSocket starter、Infra Redis、System 用户/租户/权限能力、Vue Admin Element Plus；无新增第三方或 Maven/npm 依赖。
+- Integration order: WebSocket 生命周期监听扩展 -> Infra Redis presence 与内部 API -> System 在线状态接口和分页筛选 -> Vue 用户管理展示/筛选/轮询 -> 文档同步 -> 后端和 Admin 验证 -> 追加交付记录。
+- Verification plan: Framework/Infra/System 聚焦单元测试与相关 Maven 编译；`frontend/admin` 执行 `pnpm ts:check`、任务文件 lint、`pnpm build:local`；浏览器桌面/移动检查；scoped `git diff --check`；可用时验证真实 WebSocket、90 秒超时与多实例 Redis 汇总。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 15:42:08 +08:00
+
+- Workstream ID: `main-user-online-presence`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 在 Vue 用户管理中展示当前租户全部 ADMIN 员工的实时在线状态，支持状态筛选、全租户在线人数和 30 秒刷新，并以 Redis 汇总多实例 WebSocket presence。
+- Key decisions: 在线以已认证 `/infra/ws` 活跃 session 为准；Redis ZSET 按租户和用户类型隔离，以 `userId:sessionId` 为成员并采用 90 秒超时；System 只统计现存且启用的 ADMIN 用户，禁用用户始终按离线展示；状态接口沿用 `system:user:query`，状态查询可降级而在线筛选在 Redis 故障时返回独立错误；登录 presence 与 Lead 接单页面 presence 保持完全独立。
+- Execution or analysis result: WebSocket starter 已提供连接、心跳、断开生命周期扩展且隔离监听器异常；Infra 已实现 Redis presence 和内部查询 API；System 用户分页已支持可选在线筛选并新增轻量状态/人数接口；Vue 用户管理已增加状态列、筛选、统计、重试、30 秒轮询和页面可见性恢复；实时通信及权限架构文档已同步。
+- Changed files: `backend/yudao-framework/yudao-spring-boot-starter-websocket/src/main/java/cn/iocoder/yudao/framework/websocket/config/YudaoWebSocketAutoConfiguration.java`; `backend/yudao-framework/yudao-spring-boot-starter-websocket/src/main/java/cn/iocoder/yudao/framework/websocket/core/handler/JsonWebSocketMessageHandler.java`; `backend/yudao-framework/yudao-spring-boot-starter-websocket/src/main/java/cn/iocoder/yudao/framework/websocket/core/session/WebSocketSessionHandlerDecorator.java`; `backend/yudao-framework/yudao-spring-boot-starter-websocket/src/main/java/cn/iocoder/yudao/framework/websocket/core/session/WebSocketSessionLifecycleListener.java`; Infra WebSocket presence API/Redis DAO/service/listener and focused test; System user controller/VO/mapper/service/error code and focused tests; `frontend/admin/src/api/system/user/index.ts`; `frontend/admin/src/views/system/user/index.vue`; `docs/architecture/system-overview.md`; `docs/architecture/data-and-permission-flow.md`; this handoff record.
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-system -am -DskipTests compile` passed; focused Infra/System Maven tests passed (Infra 2, System 43); Admin scoped Prettier and ESLint passed; `pnpm ts:check` passed; `pnpm build:local` passed with only the existing Lightning CSS `*zoom: 1` warning; scoped `git diff --check` passed with line-ending warnings only. The local browser reached `http://127.0.0.1:5175/` and loaded the app, but redirected to login because no authenticated session was available; login bootstrap also showed existing tenant lookup 404 responses, so the user-management page itself was not visually exercised.
+- Dependency or integration impact: No new dependency, database/SQL/menu/button permission, WebSocket sender configuration, branch, commit, or publication change. System continues using its existing Infra module dependency. Existing unrelated worktree changes were preserved.
+- Remaining work: With authorized test accounts, complete desktop/mobile browser checks plus two-account, multi-tab, PC/mobile, 90-second abnormal-disconnect and two-backend-node/shared-Redis acceptance. These runtime scenarios remain unverified in the current unauthenticated local browser session.
+- Status: `completed`
+
+## Workstream Registration - 2026-09-04 17:54:23 +08:00
+
+- Workstream ID: `main-director-field-remarks`
+- Goal: 复用编导动态表单既有 `description` 字段，为定位卡和采访表单提供管理员可配置、配置预览可见、员工填写时可见的字段备注。
+- Non-goals: 不修改后端/API/数据库结构、字段值校验、既有已发布模板、历史详情、拍剪快照或学员 H5 确认页；不新增依赖，不切换分支、不提交或发布，不覆盖当前工作树其他未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `frontend/admin/src/views/zsjos/directorTemplate/index.vue`; `frontend/workbench/src/pages/DirectorConfigPages.tsx`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; 对应 Workbench 聚焦测试；`docs/api/registration-fulfillment-api.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Director 模板 `description` 契约、Vue Element Plus、React Ant Design 6 和 Vitest；无新增依赖。
+- Integration order: 两端配置文案/长度提示 -> Vue 配置预览 -> Workbench 填写备注 -> 聚焦测试与接口文档 -> 前端验证和浏览器检查 -> 追加交付记录。
+- Verification plan: Workbench `npm test`、`npm run typecheck`、`npm run build`；Admin `pnpm ts:check`、`pnpm lint`、`pnpm build:local`；桌面/移动浏览器检查；scoped `git diff --check`。
+- Status: `in-progress`
+
+## Delivery Entry - 2026-09-04 18:10:28 +08:00
+
+- Workstream ID: `main-director-field-remarks`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 为定位卡和采访表单的每个填写字段提供管理员可配置的通用备注，并在配置预览及员工填写时展示。
+- Key decisions: 复用既有版本化 `description` 契约；配置端统一称为“填写备注”并限制 500 字；填写控件使用辅助说明区展示多行备注；空备注不占位；不新增前端约束校验，不修改历史详情、拍剪快照、学员确认页或既有发布版本。
+- Execution or analysis result: Vue Admin 与 React Workbench 模板配置均可编辑带字数提示的填写备注；Vue 预览在控件下方展示备注；Workbench 的采访和定位卡共用渲染覆盖 9 个控件分支并显示备注；接口文档已同步。
+- Changed files: `frontend/admin/src/views/zsjos/directorTemplate/index.vue`; `frontend/workbench/src/pages/DirectorConfigPages.tsx`; `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `frontend/workbench/src/pages/media-students.guard.test.ts`; `docs/api/registration-fulfillment-api.md`; `handoff/main.md`。
+- Verification evidence: 新增 Workbench 聚焦用例通过 1/1；Workbench `npm run typecheck` 和 `npm run build` 通过，构建仅有既有大 chunk warning；Admin 目标文件 ESLint、Stylelint 和 `pnpm build:local` 通过，构建仅有既有 `*zoom` CSS warning；scoped `git diff --check` 通过，仅有行尾转换 warning。Workbench 全量测试 546 项中 541 项通过，5 项既有失败为 `api.ts` 引号格式导致的 4 个源码守护和 `feedback.css` 字号守护；Admin 全量 `ts:check` 与 `lint` 被其他既有文件错误阻断。浏览器确认 Workbench `http://127.0.0.1:5180/` 和 Admin `http://127.0.0.1:5181/` 可加载，但均停留登录页且无可复用会话，未能进入功能页完成桌面/移动视觉检查。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/SQL/权限变更，无分支、提交或发布操作；管理员需自行复制草稿、配置备注并发布后才影响新草稿。
+- Remaining work: 使用授权测试账号完成配置预览及采访/定位卡填写页的桌面和移动视觉验收；如需“内容支柱”立即显示“请选择 3-5 项”，由管理员在新模板草稿中配置并发布。
+- Status: `completed`
+- Workstream Registration - 2026-09-06 13:24:19 +08:00
+
+- Workstream ID: `main`
+- Goal: 允许直接运行 `YudaoServerApplication` 时默认加载本地 Spring Profile，同时保持生产显式 Profile 启动行为不变。
+- Non-goals: 不修改启动类、生产配置、Maven 配置、数据库或外部服务；不切换分支、不提交、不发布。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-server/src/main/resources/application.yaml`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: 现有 Spring Boot Profile 机制，无新增依赖。
+- Integration order: 增加 `spring.profiles.default: local` -> YAML 检查 -> Maven 编译验证。
+- Verification plan: 检查配置差异并执行 `mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package`。
+- Status: `in-progress`
+
+- Delivery Entry - 2026-09-06 13:24:19 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 直接运行 `YudaoServerApplication.java` 时能够启动项目，并确认不影响生产服务器。
+- Key decisions: 在公共 `application.yaml` 增加 `spring.profiles.default: local`；不设置 `spring.profiles.active`，因此命令行显式指定 `prod` 时仍由显式配置覆盖默认值。
+- Execution or analysis result: 已修改公共 Spring 配置，使未指定 Profile 的直接运行默认使用 `local`。
+- Changed files: `backend/yudao-server/src/main/resources/application.yaml`; `handoff/main.md`。
+- Verification evidence: 待执行 Maven 编译和配置差异检查。
+- Dependency or integration impact: 无新增依赖、数据库、权限、分支、提交或发布变更；生产显式指定 Profile 的启动行为不变。
+- Remaining work: 执行 Maven 编译验证并确认结果。
+- Status: `in-progress`
+- Delivery Entry - 2026-09-06 13:26:24 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 直接运行启动类时默认加载 `local` Profile，且不影响生产显式 Profile 启动。
+- Key decisions: 使用 Spring Boot `spring.profiles.default: local`，保留命令行 `spring.profiles.active` 覆盖能力。
+- Execution or analysis result: 配置已生效于公共 YAML，未修改 Java 启动类及生产专用配置。
+- Changed files: `backend/yudao-server/src/main/resources/application.yaml`; `handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 通过，25 个 Reactor 模块全部 SUCCESS，生成 `backend/yudao-server/target/yudao-server.jar`。
+- Dependency or integration impact: 无新增依赖、数据库、权限、分支、提交或发布变更；显式指定 `prod` 时仍优先使用 `prod`。
+- Remaining work: None。
+- Status: `completed`
+
+## Workstream Registration - 2026-09-06 +08:00
+
+- Workstream ID: `main-lead-submitter-feedback`
+- Goal: Implement the approved Lead sales-to-submitter feedback and notification loop for Workbench and Partner H5.
+- Non-goals: Editing/deleting replies, BPM, external notification channels, account grants, unrelated changes, Git operations.
+- Branch / target branch: `main` / `main`
+- Absolute worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- Owner: Codex `/root`; serialized local work, preserving existing changes.
+- Ownership scope: ZSJOS Lead feedback controllers/services/DAL/permissions/constants/tests; Workbench Lead detail, API, tab and notification routing; H5 Lead detail/API/message routing; new MySQL migration and bootstrap verification; directly affected API/business/architecture/permission/operations documentation; `handoff/main.md`.
+- Dependencies: Existing Lead authority and versioning, System notifications, Infra files, Partner accounts, existing frontend libraries. No new package dependency.
+- Integration order: Persistence and permissions -> transactional feedback/files/notifications -> Workbench and H5 -> SQL/docs -> verification.
+- Verification plan: Focused backend permissions/service tests and module build; frontend tests/typecheck/build; controlled SQL execution/repeatability/schema and UTF-8 HEX checks where available; desktop/mobile browser checks. Shared DB mutations or real account grants require exact target review.
+
+## Delivery Entry - 2026-09-06 15:28:05 +08:00
+
+- Workstream ID: `main-lead-submitter-feedback`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: Implement the approved Lead submitter reminder and sales feedback loop with multiline feedback and attachments.
+- Key decisions: Canonical provider ownership resolves recipients; typed ADMIN/Partner recipient snapshots; current sales owner only, terminal-state rejection; immutable append-only records; Lead version and scoped idempotency; tenant/Lead/uploader file bindings with 24-hour temporary validity; System transactional Outbox; existing identity masking; no automatic real-account grants.
+- Execution result: Added feedback APIs, persistence, permission provider, server-projected tab/action, Workbench compose/history, Partner read/history and notification navigation. Existing reminder rules were read-only verified enabled for in_app and wecom, targeting owner. New feedback seeds only in_app.
+- Changed files: New LeadSubmitterFeedback* controller/VO/DO/Mapper/service/permission classes and tests; LeadManagementRespVO, LeadManagementServiceImpl, LeadNotifySceneProvider, LeadSubmitterFeedbackConstants, ZsjosErrorCodeConstants; LeadManagementServiceImplTest and LeadNotifySceneProviderTest; Workbench LeadDetail, LeadSubmitterFeedbackPanel, api, leadFollowUp, notifyMessageAction, leadSubmitterFeedback service/test; H5 LeadSubmitterFeedback component, lead API/detail, message detail, generated components.d.ts and build metadata; SQL V182, baseline, schema/core, bootstrap and verify scripts; docs/api/lead-submitter-feedback.md, architecture permission/ownership/matrix, Lead lifecycle, Workbench API/architecture, migration operations; this handoff. Existing unrelated work preserved.
+- Verification evidence: Backend 26 focused tests PASS; Workbench 33 focused tests PASS, typecheck and build PASS; H5 build including vue-tsc PASS; yudao-server dependency-graph package PASS; scoped diff check PASS. V182 executed twice against zlf182b with all four SQL checks PASS and verified Chinese HEX. Fresh baseline feedback tables in zlf182c match upgraded zlf182b SHOW CREATE TABLE exactly.
+- Verification limitations: Full Maven reactor stops at existing Infra CodegenEngineUniappTest.testExecute_treeSearch failure. Existing LeadManagementServiceImplTest assistance projection assertion fails against current worktree permission behavior. Full Workbench suite 541 pass/5 fail in existing font-size and media-students source guards. Full fresh bootstrap blocked by V158 menu ID 79913 conflict; static DB check blocked by existing announcement schema/baseline formatting mismatch. Authenticated desktop/mobile feature checks and real message delivery unverified.
+- Dependency/integration impact: No new npm/Maven dependencies, branches, commits, service restart or real role/account grant. Existing ruoyi-vue-pro DB remains at V181, read-only inspected. Isolated validation databases zsjos_feedback_v182_verify, zlf182a, zlf182b, zlf182c and container /tmp/zsjos-feedback-v182 retained; no production/business instances copied into them.
+- Remaining work: Explicitly approve applying V182 to local ruoyi-vue-pro (two empty tables, two menu permissions, one template, one tenant notification rule and version records), configure intended roles separately, refresh/start runtime as approved, verify authenticated flows on desktop/mobile, and resolve independently identified bootstrap/full-suite blockers before release. Full implementation details and evidence are in docs/api/lead-submitter-feedback.md.
+- Status: Code implemented; activation and full end-to-end acceptance pending.
+
+## Delivery Entry - 2026-09-06 15:40:00 +08:00
+
+- Workstream ID: `main-media-students-layout`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: Keep 我的学员 in master-detail layout when global inbox layout is set to table.
+- Key decisions: Preserve existing page-level master-detail rendering; document invariant in component source. No API, permission, or data changes.
+- Execution result: Added explicit source invariant comment.
+- Changed files: `frontend/workbench/src/pages/MediaStudentsPage.tsx`; `handoff/main.md`.
+- Verification evidence: Not run; source-only clarification.
+- Dependency or integration impact: None.
+- Remaining work: Browser verification of the existing page under table preference.
+
+## Workstream Registration - 2026-09-06 15:34:00 +08:00
+
+- Workstream ID: `main-database-admin-typed-edit`
+- Goal: Implement approved lossless database editor, sparse updates, typed JDBC binding and safe diagnostics.
+- Non-goals: Feedback domain changes, real business data edits, migrations, account grants, shared service changes, Git operations, new dependencies.
+- Branch / target branch: `main` / `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- Owner: Codex `/root`; serialized editing, preserving unrelated changes.
+- Ownership scope: Infra database-admin controller/VO/service/tests; Infra error and database-admin log constants; Admin databaseAdmin API/view/helpers/tests; `docs/api/database-admin.md`; `handoff/main.md`.
+- Dependencies: Existing JDBC/MySQL/H2, validation/JSON/logging, Vue/Element Plus, Node test runner; no new dependencies.
+- Integration order: Controlled reproduction -> backend types/errors -> frontend sparse editor -> regression/build/browser -> documentation and delivery.
+- Verification plan: H2 unit and isolated MySQL integration tests, UTF-8 HEX checks, Admin Node tests/typecheck/scoped lint/build, desktop/mobile browser and permission checks; no production rows copied.
+## Workstream Registration - 2026-09-06 16:00 +08:00
+
+- Workstream ID: `main-student-information-collection`
+- Goal: Implement the post-sale student information collection form with versioned preset fields, public token submission, Workbench generation/viewing, and Admin configuration.
+- Non-goals: No custom fields, no SMS/login, no BPM, no synchronization into Lead master fields, no Git branch/commit/publish, no destructive database changes.
+- Branch / target branch: `main` / `main`
+- Absolute worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`, preserving existing uncommitted work.
+- Ownership scope: New ZSJOS student information collection backend/DAL/API/SQL; Workbench and Admin direct consumers; directly affected tests and docs; this handoff.
+- Owner: Codex
+- Dependencies: Existing SalesOrder, Lead permission, System dictionary/area APIs, public H5 routing and existing dynamic form patterns. No new package dependency.
+- Integration order: Persistence/configuration -> public and Workbench APIs -> Admin/Workbench/H5 consumers -> tests and SQL verification.
+- Verification plan: Scoped backend compilation/tests, Workbench/Admin type checks/builds, SQL syntax/repeatability review, and diff checks.
+- Status: `in-progress`
+- Delivery Entry - 2026-09-06 16:12:00 +08:00
+
+- Workstream ID: `main-student-information-collection`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: Implement post-sale student information collection with configurable preset fields, token submission, and student information visibility.
+- Key decisions: Corrected the entry point to the won Lead overview; removed the order relationship; added additive versioned configuration, token form, and immutable field snapshot tables; seeded the 16 requested preset fields; used System dictionary/area source metadata and snapshot columns; no existing business rows or Lead master fields modified.
+- Execution or analysis result: SQL baseline and read-only verification were added and bootstrap now includes V183. API, service, Controller, Admin, Workbench, H5, and permission wiring remain unimplemented because the existing worktree contains overlapping uncommitted feature changes requiring an additional integration pass.
+- Changed files: `script/sql/mysql/migrations/V183__student_information_collection.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-student-information-collection.sql`; `docs/api/student-information-collection.md`; `handoff/main.md`.
+- Verification evidence: Scoped `git diff --check` passed with only the repository's line-ending warning. SQL execution and Java/frontend builds were not run; no runtime feature behavior is verified.
+- Dependency or integration impact: No new dependencies, branches, commits, permissions, accounts, or database execution. Existing uncommitted work preserved.
+- Remaining work: Implement and test the backend APIs and permission checks, connect order generation and Lead tab, add Admin/Workbench/H5 UI, add menu/permission migration and execute controlled SQL verification.
+- Status: `incomplete`
+
+## Delivery Entry - 2026-09-06 15:59:00 +08:00
+
+- Workstream ID: `main-lead-remark-history`
+- Branch / worktree / HEAD: `main`; `D:\ZSJ-OS`; `037496d1f2895e3f83319cb07185f9513b664f05`.
+- User goal: Implement the approved append-only Lead remark plan, including evidenced legacy history and three existing clients.
+- Key decisions: Preserve Lead.remark; store typed append_v1 snapshots in existing supplement events; use locked idempotency replay with content/subject validation; recover exact legacy texts without inventing attribution; apply detail identity masking and keep flow permission separate. No schema change or historical rewrite.
+- Execution result: Implemented command, history projection, detail VO and flow projection; Workbench/Admin/H5 render all notes; H5 no longer prefills old text; unchanged retries reuse their key. Temporary visual fixtures were created for verification and removed afterwards.
+- Changed files: Backend LeadSupplementSnapshot, LeadRemarkHistoryService, LeadRemarkRespVO (new); LeadSubmitterActionService, LeadManagementServiceImpl, LeadManagementRespVO, LeadFlowHistoryService, BusinessEventMapper, ZsjosErrorCodeConstants; tests LeadRemarkHistoryServiceTest and LeadSupplementRemarkTest (new), LeadManagementServiceImplTest and LeadFlowHistoryServiceTest; Workbench LeadDetailOverview, LeadBasicInfoModal, services/api.ts and LeadRemarkHistory.test.tsx (new); Admin lead/index.vue and leadManagement API; H5 lead/detail.vue, lead/supplement.vue and api/lead.ts; docs/api/zsjos-lead-submitter-actions.md, docs/api/zsjos-lead-flow-history.md, frontend/workbench/docs/api-contract.md; handoff/main.md.
+- Verification evidence: Final 31 focused backend tests passed (including real Spring transactions over isolated H2 persistence, concurrent replay/distinct commands, rollback, ownership, tenant, length and epoch JSON contracts); 28 focused Workbench tests passed; Workbench typecheck passed; Workbench/H5/Admin builds passed; scoped Admin eslint and diff checks passed. Actual Workbench note component verified in browser at 1280x900 and 390x844, with three entries, no horizontal overflow and working expand/collapse.
+- Database evidence: Development ruoyi-vue-pro has 0 active lead_submitter_supplemented events, so no real legacy samples could be audited. A connection-local temporary table copied from zsjos_business_event accepted append_v1 JSON; Chinese test text HEX was E5A487E6B3A8E9AA8CE8AF81 with utf8mb4 client/connection; tenant/idempotency unique index confirmed. Connection closed and temporary table disappeared; no business rows changed.
+- Verification limitations: Admin full typecheck failed in unrelated BPM/System/EAM/MES/exportTask files. An earlier broad backend run passed 63/64 tests; existing detailAlwaysProjectsSubmitterAssistWhenReadableAndPermitted failed against pre-existing assist permission changes, which were preserved. Final focused selection passed. Real authenticated three-client submission/API checks and Admin/H5 browser checks remain unverified because no test login was available. H2 transaction tests do not substitute for a full MySQL-backed service HTTP test.
+- Dependency / integration impact: No dependencies, branches, commits, permission grants, service restart, SQL migration or publication. Existing work preserved. Backend and clients need coordinated deployment and stale H5 forms must refresh; reverting the command service to the previous version would restore overwrite behavior.
+- Remaining work: Authenticated three-client end-to-end acceptance and deployment; independently address existing broader verification failures. No remaining planned code changes identified.
+- Status: `implemented; end-to-end acceptance pending`
+- Workstream Registration - 2026-09-06 16:00:29 +08:00
+
+- Workstream ID: `main-work-order-admin-embed-route`
+- Goal: 修复 Workbench 点击工单模板/运行审计后无法稳定停留在 Vue Admin 对应页面的问题。
+- Non-goals: 不修改后端菜单权限、数据库、SQL、Admin 业务页面、依赖或 Git 分支/提交。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留既有未提交改动。
+- Target branch: `main`
+- Ownership scope: Workbench 菜单授权树、Admin iframe 路由同步及对应菜单测试；本 handoff 记录。
+- Owner: Codex
+- Dependencies: 现有 React/Vite/React Router、Vue Admin embed bridge；无新增依赖。
+- Integration order: 保留完整授权树 -> 解析 admin_embed 祖先 -> iframe 路由回归测试 -> Workbench 检查。
+- Verification plan: Workbench 聚焦测试、typecheck、build、scoped diff check。
+- Status: `completed`
+
+## Delivery Entry - 2026-09-06 16:04:00 +08:00
+
+- Workstream ID: `main-database-admin-typed-edit`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: Implement the approved database editor repair: preserve types and nulls, send only changed columns, bind JDBC values safely and provide diagnosable errors.
+- Key decisions: Keep existing endpoints/permissions; exact numeric and temporal strings in database-admin responses only; BIT(1) booleans versus native numeric TINYINT(1); explicit NULL/default/value modes; no-change update disabled; generated/binary/unsupported columns read-only; safe SQLState/vendor-code classification with no row values or signed URLs logged. No shared auth/serialization refactor or new dependency.
+- Execution result: MySQL temporary-table and prepared-statement reproduction confirmed string false into BIT(1) fails with 1406/22001. Implemented typed codec/metadata, sparse updates, zero-affected-row existence check, default-only inserts, safe errors/access logging, frontend controls/retry and isolated component fixture. Original production request remains unavailable, so reproduction identifies a confirmed failure mechanism rather than asserting its exclusive historical cause.
+- Changed files: Infra `controller/admin/db/DatabaseAdminController.java`; DB column/create/update VOs; `service/db/DatabaseAdminServiceImpl.java` and new `DatabaseAdminValueCodec.java`; Infra error and database-admin log constants; existing DatabaseAdminServiceImplTest and new DatabaseAdminValueCodecTest/DatabaseAdminMySqlTest/DatabaseAdminControllerContractTest; Admin databaseAdmin API/view and new rowEditor helper; new Admin Node test and `tests/browser/databaseAdmin/` fixture; `docs/api/database-admin.md`; this handoff entry and registration.
+- Verification evidence: Infra reactor build and 19 focused tests passed (including 2 actual MySQL modes, permissions, request validation, log privacy); MySQL UTF-8 HEX E6B58BE8AF95 verified; Admin Node tests 5/5; scoped ESLint/Stylelint/Prettier and production-mode local build passed; diff whitespace check passed. Browser checked actual Vue editor/Dialog against isolated fixture at 1440x1000 and 390x844, including sparse payload, boolean update, retry, null/default states, empty list and absent unauthorized actions.
+- Verification limitations: Full Admin typecheck reports 22 existing errors outside databaseAdmin; no databaseAdmin diagnostics. Real browser session expired, so authenticated deployed route/embedded runtime not verified. MariaDB not exercised. No shared backend restart or real record write performed.
+- Dependency/integration impact: No dependency/schema/menu/account/Git changes. Source, API and build must be activated together and old pages refreshed. Isolated MySQL database `codex_db_admin_20260906` contains only uniquely named synthetic tables and is retained. Test-only Vite server on `http://127.0.0.1:5188/` (process 14312) remains available; it has no database connection and is excluded from production entrypoints. Other workstreams' changes were preserved.
+- Remaining work: Verify authenticated actual entry after coordinated frontend/backend activation; resolve unrelated global typecheck failures before full release; obtain separate authorization before cleaning retained test data or changing shared runtime state.
+- Status: `implemented and controlled verification passed; deployed acceptance pending`
+
+## Delivery Entry - 2026-09-07 00:00:00 +08:00
+
+- Workstream ID: `main-database-admin-typed-edit`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: Apply the requested code-review remediation for database-admin editing.
+- Key decisions: Rejected the review suggestion to change MySQL empty-map insert syntax because MySQL 8.4 accepts `INSERT INTO table () VALUES ()` and the existing isolated integration test passed it. Accepted the TEXT/LONGTEXT length-check finding; bounded character checks now apply only to CHAR/VARCHAR/NCHAR/NVARCHAR.
+- Execution or analysis result: Updated `DatabaseAdminValueCodec` and added a regression proving a LONGTEXT whose reported metadata size is 1 still accepts a multi-character value, while VARCHAR remains bounded. Updated the API contract and handoff.
+- Changed files: `backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/service/db/DatabaseAdminValueCodec.java`; `backend/yudao-module-infra/src/test/java/cn/iocoder/yudao/module/infra/service/db/DatabaseAdminValueCodecTest.java`; `docs/api/database-admin.md`; `handoff/main.md`.
+- Verification evidence: MySQL empty-map create had already passed in the isolated `DatabaseAdminMySqlTest`; post-change codec and Infra focused tests rerun below.
+- Dependency or integration impact: No dependencies, schema, data, permission, service, branch, commit or publication changes.
+- Remaining work: None for the review findings; authenticated deployed-route acceptance remains pending from the original delivery entry.
+
+## Delivery Entry - 2026-09-07 00:29:00 +08:00
+
+- Workstream ID: `main-database-admin-typed-edit`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: Apply the confirmed code-review remediation.
+- Key decisions: The proposed MySQL empty-map insert change was rejected after direct MySQL 8.4 verification showed `INSERT INTO table () VALUES ()` is valid and already passed the isolated integration test. The valid TEXT/LONGTEXT finding was fixed by limiting client length checks to bounded character types.
+- Execution or analysis result: `DatabaseAdminValueCodec` now skips `COLUMN_SIZE` pre-rejection for TEXT/CLOB and native JSON while preserving VARCHAR/CHAR limits. Documentation and codec regression coverage were updated.
+- Changed files: `backend/yudao-module-infra/src/main/java/cn/iocoder/yudao/module/infra/service/db/DatabaseAdminValueCodec.java`; `backend/yudao-module-infra/src/test/java/cn/iocoder/yudao/module/infra/service/db/DatabaseAdminValueCodecTest.java`; `docs/api/database-admin.md`; `handoff/main.md`.
+- Verification evidence: Frontend database-admin tests 5/5, scoped ESLint/Stylelint/Prettier passed. Infra focused tests passed 18/18 plus 1 skipped when MySQL env was absent; explicit isolated MySQL rerun passed 2/2 (both affected-row modes). `git diff --check` passed with only existing LF/CRLF notices.
+- Dependency or integration impact: No dependency, schema, data, permissions, service, branch, commit or publication changes.
+- Remaining work: No remaining code-review findings. Original authenticated deployed-route acceptance remains pending.
+
+- Delivery Entry - 2026-09-06 16:02:30 +08:00
+
+- Workstream ID: `main-work-order-admin-embed-route`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复点击“工单模板/运行审计”后离开 Vue Admin 或跳转到其他位置的问题。
+- Key decisions: 保留完整服务端授权菜单树供当前路由和 iframe 同步使用；导航展示仍过滤 `admin_only` 原生页面；通过最近的 `admin_embed` 父菜单维持同一个 Vue Admin iframe；不修改后端菜单、权限、数据库或依赖。
+- Execution or analysis result: `admin_only` 工单模板和运行审计路由现在可由 Vue Admin iframe 切换，父 Workbench 会识别其 `admin_embed` 祖先，不再因找不到当前菜单而隐藏 iframe 或触发错误回退。
+- Changed files: `frontend/workbench/src/main.tsx`; `frontend/workbench/src/services/menu.ts`; `frontend/workbench/src/services/menu.test.ts`; `handoff/main.md`。
+- Verification evidence: Workbench 聚焦 Vitest 24/24 通过；`npm run typecheck` 通过；`npm run build` 通过，只有既有大 chunk warning。浏览器 CDP 未连接，未完成认证后的真实点击检查。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限/分支/提交/发布变更；保留其他未提交工作树修改。
+- Remaining work: 使用已登录 Workbench 会话在桌面端实际点击“工单模板”和“运行审计”完成端到端浏览器确认；当前环境无可用浏览器 CDP/认证会话。
+- Status: `implemented; browser acceptance pending`
+
+## Delivery Entry - 2026-09-06 16:20:00 +08:00
+
+- Workstream ID: `main-work-order-admin-embed-route`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 根据代码审查结果完整修复工单模板/运行审计的 Vue Admin iframe 路由问题。
+- Key decisions: `native` 页面不继承 iframe 祖先；fallback 导航始终过滤完整授权树；无 iframe 祖先的 `admin_only` 页面回退到首个可访问页面；关闭 Tab 时清理 admin_embed/admin_only 路由；不修改后端菜单、权限、数据库或依赖。
+- Execution or analysis result: 已修正 Workbench 菜单承载判定、导航过滤、独立管理页回退和 iframe Tab 清理，并补充 native/admin_only 路径测试。
+- Changed files: `frontend/workbench/src/main.tsx`; `frontend/workbench/src/services/menu.ts`; `frontend/workbench/src/services/menu.test.ts`; `handoff/main.md`。
+- Verification evidence: 待执行 Workbench 全量测试、typecheck、build 和 scoped diff check。
+- Dependency or integration impact: 无新增依赖、后端/API/数据库/权限/分支/提交/发布变更；保留其他未提交工作树修改。
+- Remaining work: 完成自动化验证；在有认证会话的浏览器中验收模板、审计及三项 native 工单页面。
+- Status: `in-progress`
+## Workstream Registration - 2026-09-06 16:06:20 +08:00
+
+- Workstream ID: `main-lead-last-activity-ordering`
+- Goal: 完善客资收件箱最近业务更新时间维护，保留前端特殊置顶并确保普通客资按 `lastActivityAt DESC, id DESC` 排序。
+- Non-goals: 不改变消息中心和通知公告排序口径；不新增依赖、字段、菜单、权限、分支、提交、数据库执行或外部服务状态。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: Lead 服务、Lead Mapper、Workbench 客资排序辅助与相关测试、直接受影响的架构/API 文档、`handoff/main.md`。
+- Owner: Codex
+- Dependencies: 现有 Lead DAL、租户上下文、Workbench Lead API；无新增依赖。
+- Integration order: 统一安全活动时间写入 -> 补齐已确认业务操作 -> 保留并验证前端特殊置顶 -> 补充后端/前端测试和文档 -> 运行定向验证。
+- Verification plan: ZSJOS Lead 定向 Maven 测试；Workbench 客资相关测试、typecheck/build；scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-06 16:26:00 +08:00
+
+- Workstream ID: `main-lead-last-activity-ordering`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- User goal: 保留客资前端特殊置顶，并补全客资业务操作对 `lastActivityAt` 的维护，使普通客资按最近业务更新时间倒序。
+- Key decisions: 继续使用现有 `lastActivityAt`；`touchActivity` 增加租户、未删除和只向后推进条件；接单、跟进、基本资料、资格判定、申诉改判、老化池、提交人补充/反馈、派单和成交状态更新显式推进活动时间；消息和公告排序口径未改变。
+- Execution or analysis result: 后端活动时间写入点已补齐并保持 Workbench 未查看/通知目标置顶逻辑；未新增依赖、字段、迁移或外部状态操作。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/dal/mysql/lead/LeadMapper.java`; Lead 资格、派单、老化池、申诉、基本资料、提交人操作/反馈和订单服务；`handoff/main.md`。
+- Verification evidence: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` passed; Workbench `npm test -- --run src/services/leadManagement.test.ts` passed 22/22; `npm run typecheck` passed; scoped `git diff --check` passed. Focused backend tests passed for LeadMapperSql, aging pool, appeal, basic info and qualification. Dispatch test suite retains two failures from existing relation-label stubs/assertions unrelated to this change.
+- Dependency or integration impact: None; existing uncommitted work in the shared `main` worktree was preserved.
+- Remaining work: Real database and browser acceptance with two leads is unverified; full backend test suite remains unverified because of the pre-existing dispatch test failures.
+
+## Workstream Registration - 2026-09-06 16:30:00 +08:00
+
+- Workstream ID: `main-inbox-dual-layout-query`
+- Goal: 统一九个收件箱页面的双布局查询能力，收件箱使用懒加载，表格使用服务端分页，并补齐搜索、筛选、排序和错误状态。
+- Non-goals: 不修改数据库结构、权限模型、详情页业务语义或引入依赖；不回滚其他工作流改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前未提交改动。
+- Target branch: `main`
+- Ownership scope: Workbench 收件箱页面/API 类型与 System/BPM 查询契约、相关测试和直接受影响文档。
+- Owner: Codex
+- Dependencies: 现有 React、Ant Design Pro、System/BPM/ZSJOS 公共接口；无新增依赖。
+- Integration order: 表格页码请求 -> 共用筛选工具栏 -> 消息/公告/BPM 查询契约 -> 测试与文档。
+- Verification plan: Workbench 聚焦测试、typecheck、build；System/BPM/ZSJOS 相关测试；scoped diff check。
+- Status: `in-progress`
+## Workstream Registration - 2026-09-06 17:19:36 +08:00
+
+- Workstream ID: `main-work-order-scene-v184-legacy-nullability`
+- Goal: 修复新版通用工单模板保存时因 V115 旧字段非空约束导致的服务器 500。
+- Non-goals: 不创建工单模板；不修改字典、角色权限或附件上限；不处理 JRebel 定时任务 StackOverflowError；不执行本地数据库迁移。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `script/sql/mysql/migrations/V184__repair_work_order_scene_legacy_columns.sql`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/main.md`。
+- Owner: Codex `/root`
+- Dependencies: Core V183、`zsjos_work_order_scene`、现有迁移/验证工具；无新增依赖。
+- Integration order: 新增 V184 兼容迁移 -> 同步 fresh baseline/bootstrap -> 增加验证断言和迁移说明 -> 运行 SQL 守卫与静态检查 -> 追加交付记录。
+- Verification plan: `zsjos-db.ps1 check`; `python script/sql/mysql/tools/zsjos_db.py test-guardrails`; fresh/upgrade checks where Docker database tooling is available; `git diff --check`。
+
+## Delivery Entry - 2026-09-06 17:24:00 +08:00
+
+- Workstream ID: `main-work-order-scene-v184-legacy-nullability`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复通用工单模板保存时因旧版岗位字段非空约束导致的服务器 500。
+- Key decisions: 新增 V184，仅将 `zsjos_work_order_scene.source_post_code`、`target_post_code`、`assignment_mode` 改为可空；保留历史值和 Java 兼容字段；同步 fresh baseline、bootstrap 和验证；不创建模板、不改权限/字典/附件规则、不执行开发库迁移。V183 无版本标记，因此 V184 以其创建的配置表作为依赖事实。
+- Execution or analysis result: 已新增 V184 guarded migration，并同步 `schema/core.sql`、`00-bootstrap-schema.sql`、`bootstrap.sql`、`verify-bootstrap.sql` 和迁移 README。未修改业务行或外部数据库。
+- Changed files: `script/sql/mysql/migrations/V184__repair_work_order_scene_legacy_columns.sql`; `script/sql/mysql/schema/core.sql`; `script/sql/mysql/00-bootstrap-schema.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/main.md`。
+- Verification evidence: scoped `git diff --check` 无本次新增空白错误；三份 schema/bootstrap 定义已确认一致。`zsjos_db.py check`、`test-fresh`、`test-upgrade`、`test-guardrails` 均被当前工作树已有 Core desired-schema/baseline drift 阻断，错误为 `Desired schema differs from the fresh baseline for core`，未进入 V184 执行。
+- Dependency or integration impact: 无新增依赖、分支、提交或发布；升级环境需在发布迁移器中执行 V184，fresh bootstrap 会按 V183 后加载 V184；真实开发库迁移尚未执行，需单独确认外部数据库变更。
+- Remaining work: 在清理/协调既有 baseline drift 后运行完整 fresh/upgrade/guardrail 验证，并在受控数据库执行 V184 后验证模板保存、发布和目录接口。
+
+## Delivery Entry - 2026-09-06 17:32:00 +08:00
+
+- Workstream ID: `main-work-order-scene-v184-legacy-nullability`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 按代码审查意见完成通用工单模板保存 500 的完整兼容修复。
+- Key decisions: V184 在任何 DDL/版本登记前验证三张 V183 表、工单旧列存在且类型长度正确；缺失/漂移即失败；移除迁移专属列注释；V184 幂等补齐 V183 两套版本标记；Core bootstrap 将 V183/V184 放到 V182 后、版本复制点前；验证增加 V183/V184 标记及列定义检查。
+- Execution or analysis result: 已完成迁移、bootstrap 顺序、验证 SQL 和迁移文档修正；未创建模板、未改权限/字典/附件规则、未执行开发数据库 DDL。
+- Changed files: `script/sql/mysql/migrations/V184__repair_work_order_scene_legacy_columns.sql`; `script/sql/mysql/bootstrap.sql`; `script/sql/mysql/verify-bootstrap.sql`; `script/sql/mysql/migrations/README.md`; `handoff/main.md`。此前本工作流同步的 baseline 文件保持不变。
+- Verification evidence: Core migration discovery确认 V181/V182/V183/V184连续且 V184 SQL可拆分为6条语句；scoped `git diff --check` 无本次新增空白错误。`zsjos_db.py check` 与 `test-guardrails` 仍被工作树既有 Core desired-schema/baseline drift 阻断，未进入数据库验证。
+- Dependency or integration impact: 无新增依赖、分支、提交或发布；V184 需由发布迁移器执行。外部数据库迁移和真实 HTTP 验证未执行。
+- Remaining work: 先解决无关 baseline drift，再执行 fresh/upgrade/guardrail 验证；获得数据库变更确认后在受控库执行 V184，并验证模板保存、发布及目录接口。
+## Delivery Entry - 2026-09-06 00:00:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05d` (uncommitted worktree)
+- User goal: 统一学习规划师学员详情展示，缺少客资数据时保留组件并显示空态。
+- Key decisions: 规划师详情固定使用学员服务视角；最近联系、联系任务时效和服务阶段只使用当前 serviceRelationId；销售跟进、销售时效和销售统计不再渲染；真实 Lead 仅作为独立只读历史补充。
+- Execution or analysis result: 完成详情分支统一、概览数据源调整、无 Lead 档案与备注空态、规划师任务时效/阶段展示及 API 文档更新。
+- Changed files: `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `docs/api/registration-fulfillment-api.md`; `handoff/main.md`。
+- Verification evidence: `npm run typecheck` passed. Full tests, build and browser verification remain pending.
+- Dependency or integration impact: 无新增依赖或后端接口变更；工作区存在其他未提交改动，未清理。
+- Remaining work: 运行 Workbench tests/build，并补充针对统一详情与空态的组件测试及浏览器检查。
+
+## Delivery Entry - 2026-09-06 18:05:00 +08:00
+
+- Workstream ID: `main`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05d` (uncommitted worktree)
+- User goal: 统一学习规划师学员详情展示。
+- Key decisions: 固定 StudentDetail 学员服务主体；规划师最近联系、联系任务时效和服务阶段来自 serviceRelationId；销售跟进、销售时效、销售统计不再渲染；Lead 仅独立只读历史。
+- Execution or analysis result: 完成代码、API 文档和 guard 测试更新；无 Lead 时保留档案、备注附件和任务卡并显示空态。
+- Changed files: `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `frontend/workbench/src/pages/student-sales-history.guard.test.ts`; `docs/api/registration-fulfillment-api.md`; `handoff/main.md`。
+- Verification evidence: `npm run typecheck` passed; `npm test -- src/pages/student-sales-history.guard.test.ts` passed; `npm run build` passed. Full `npm test` has unrelated existing failures in `styles.guard.test.ts` and `media-students.guard.test.ts`.
+- Dependency or integration impact: 无新增依赖、接口或数据库变更；未清理其他工作树改动。
+- Remaining work: 浏览器桌面/移动实测与完整回归需在可用环境继续执行；全量测试既有失败需另行处理。
+
+## Workstream Registration - 2026-09-06 18:20:00 +08:00
+
+- Workstream ID: `main-lead-last-activity-complete-fix`
+- Goal: 完整修复客资业务活动时间维护，保留前端特殊置顶，并验证普通客资按 `lastActivityAt DESC, id DESC` 稳定排序。
+- Non-goals: 不新增字段或依赖；不改变消息、公告排序；不执行数据库同步；不切换分支、不提交、不推送；不清理当前工作树其他改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: Lead 活动时间相关 Mapper/Service、对应后端测试、Workbench 客资排序辅助测试、直接受影响文档、`handoff/main.md`。
+- Owner: Codex
+- Dependencies: 现有 Lead、Order、BPM、租户与 Workbench API；无新增依赖。
+- Integration order: 补齐遗漏写入 -> 统一同事务时间 -> 增加单元/SQL/前端排序测试 -> 更新文档 -> 定向与构建验证 -> 追加交付记录。
+- Verification plan: ZSJOS 定向测试与模块编译；Workbench 客资测试、typecheck、build；scoped `git diff --check`；可用时做真实浏览器/接口验收。
+
+## Delivery Entry - 2026-09-06 18:57:02 +08:00
+
+- Workstream ID: `main-lead-last-activity-complete-fix`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 完整修复客资最近业务更新时间维护，保持特殊客资置顶，并让普通客资按 `lastActivityAt DESC, id DESC` 稳定排序。
+- Key decisions: 继续使用 `zsjos_lead.last_activity_at`；`LeadMapper.touchActivity` 增加当前租户、未删除和只向后推进条件；实体写入统一使用 `LeadMapper.advanceActivity`；派单条件更新和提交人反馈版本更新使用 SQL 原子单调时间；无进展提醒不推进活动时间；消息和公告排序不变。
+- Execution or analysis result: 已覆盖基本资料、提交人补充/反馈、派单归属、跟进、资格判定/挂起恢复、申诉/投诉、公海协作、转派申请及非复购成交状态等业务写入路径。确认游标和默认分页保持 `last_activity_at DESC, id DESC`，Workbench 仅移动特殊置顶集合并保留服务端普通顺序。同步更新 Lead API、数据权限架构和 Workbench API 契约文档。
+- Changed files: Lead Mapper、Lead 相关服务和订单服务；Lead Mapper 与相关服务测试；`docs/api/zsjos-lead-submission-dispatch.md`、`docs/architecture/data-and-permission-flow.md`、`frontend/workbench/docs/api-contract.md`、`handoff/main.md`。文件与其他并行工作流存在共享未提交修改，未清理或回退。
+- Verification evidence: Lead 活动时间相关定向测试 `113` 项全部通过；派单受影响的 `10` 项单独测试全部通过；Workbench 客资测试 `22/22` 通过；`npm run typecheck` 和 `npm run build` 通过，构建仅有既有大 chunk warning；相关文件 `git diff --check` 通过。完整派单测试类保留两条既有关系标签桩/断言失败；全 reactor 测试此前被 System Notice Mapper 的旧 `PageParam` 编译错误阻断。
+- Dependency or integration impact: 无新增依赖、字段、迁移、权限、API 路径、分支、提交或数据库操作；保持当前租户/逻辑删除约束和既有消息、公告排序口径。`ocr` 连接测试成功，但聚焦代码审查运行超过预期且内部 `git grep` 正则搜索失败后无汇总，已停止并按未完成处理，不能作为通过证据。
+- Remaining work: 未执行真实数据库双客资验收、真实接口验收和桌面/移动浏览器验收；需在可用环境验证旧客资数据中的 `last_activity_at` 完整性及操作后跨页移动。完整派单类的两条既有关系标签测试和全 reactor 既有编译问题仍需单独治理。
+- Status: `implemented; focused verification passed; real acceptance pending`
+
+## Workstream Registration - 2026-09-06 23:27:00 +08:00
+
+- Workstream ID: `main-lead-source-provider-notification-fix`
+- Goal: 修复普通新媒体提交客资时误收“销售提交客资关联你为提交来源”通知，仅允许销售自拓录明确关联的新媒体提供方收到该消息。
+- Non-goals: 不修改 `submitter`/`operator` 通知语义、HTTP API、前端、通知模板、数据库结构或规则配置；不删除或改写历史消息；不清理当前工作树其他既有未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`。
+- Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProviderTest.java`; `handoff/main.md`。保留上述源文件和测试文件中现有的提交人反馈功能改动。
+- Owner: Codex。
+- Dependencies: 现有 Lead 冻结来源字段、System 通知场景与规则解析；无新增依赖。
+- Integration order: 收紧 `new_media_provider` 解析 -> 保持提交人和 Partner 解析兼容 -> 补充来源组合回归测试 -> 聚焦测试与模块编译 -> 追加交付记录。
+- Verification plan: 运行 `LeadNotifySceneProviderTest`，联合运行 `LeadSubmissionServiceImplTest`、`LeadProviderAttributionServiceTest`、`LeadNotificationTenantInitializerTest`，执行 ZSJOS 模块编译和 scoped `git diff --check`；不重启服务或写入共享数据库。
+
+## Delivery Entry - 2026-09-06 23:32:00 +08:00
+
+- Workstream ID: `main-lead-source-provider-notification-fix`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)。
+- User goal: 修复新媒体员工提交客资时误收“销售提交客资关联你为提交来源”消息，只让销售自拓录关联新媒体提供方时触发。
+- Key decisions: 将 `new_media_provider` 与普通 `submitter` 分开解析；仅当客资为 `sales_self_sourced`、已明确记录提供方、提供方字段与冻结系统用户归属一致且提供方不是操作人时投递；以持久化冻结字段为准，不信任事件 payload；Partner 仅保留提交人语义。
+- Execution or analysis result: 已收紧运行时收件人解析，普通新媒体、兼职、未选提供方、冻结字段不一致和操作人即提供方均不再解析该角色；销售自拓关联另一名新媒体提供方仍正常解析。现有提交人反馈功能改动已保留。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProviderTest.java`; `handoff/main.md`。
+- Verification evidence: `LeadNotifySceneProviderTest`、`LeadProviderAttributionServiceTest`、`LeadNotificationTenantInitializerTest` 共 18/18 通过；`mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` 通过；scoped `git diff --check` 通过，仅有既有 LF/CRLF 提示。联合验证中的 `LeadSubmissionServiceImplTest` 20 项有 3 项因该测试现存来源渠道字典 mock 缺失而失败（错误码 `1900003086`），本次未修改该服务或测试。
+- Dependency or integration impact: 无新增依赖、API、前端、模板、SQL、权限、数据库写入、历史消息变更、服务重启、分支或提交操作；现有架构和通知文档已准确描述目标行为，无需重复修改。
+- Remaining work: 部署或重启需另行确认；在授权测试环境中分别提交普通新媒体、销售自拓有提供方和销售自拓无提供方客资，核对实际站内信收件人。可另行修复 `LeadSubmissionServiceImplTest` 的字典 mock 基线问题。
+- Status: `implemented; focused verification passed; runtime acceptance pending`。
+
+## Workstream Registration Correction - 2026-09-07 10:10:00 +08:00
+
+- Workstream ID: `main-lead-submitter-feedback-mapper-injection-fix`
+- Goal: 修复 `LeadSubmitterFeedbackService` 启动时将现有 `FeedbackMapper` Bean 错误注入为 `LeadSubmitterFeedbackMapper` 的失败。
+- Non-goals: 不修改提交人反馈业务逻辑、Mapper SQL、代理方式、Spring/MyBatis 配置、数据库、依赖、分支、提交、推送或外部服务状态；不清理当前工作树其他既有未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`；Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterFeedbackService.java`；对应 Mapper 注入上下文聚焦测试；`handoff/main.md`。
+- Owner: Codex；Dependencies: 现有 Spring `@Resource` 注入规则与 MyBatis Mapper Bean 命名；无新增依赖。
+- Integration order: 修正字段名及引用 -> 增加 Bean 名冲突回归测试 -> 聚焦测试 -> ZSJOS 模块编译与服务端装配检查 -> scoped diff check -> 追加交付记录。
+- Verification plan: 运行 Mapper 注入上下文测试和现有 `LeadSubmitterFeedbackServiceTest`；执行 ZSJOS 模块编译、服务端跳过测试打包与 scoped `git diff --check`；不启动或重启共享服务。
+- Correction note: 前一条同工作流登记因补丁上下文匹配到文件中部；遵守 append-only 约束不改写该记录，本条在文件末尾重新确认有效登记。
+
+## Workstream Registration - 2026-09-07 10:07:42 +08:00
+
+- Workstream ID: `main-lead-submitter-feedback-mapper-injection-fix`
+- Goal: 修复 `LeadSubmitterFeedbackService` 启动时将现有 `FeedbackMapper` Bean 错误注入为 `LeadSubmitterFeedbackMapper` 的失败。
+- Non-goals: 不修改提交人反馈业务逻辑、Mapper SQL、代理方式、Spring/MyBatis 配置、数据库、依赖、分支、提交、推送或外部服务状态；不清理当前工作树其他既有未提交改动。
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`，保留当前工作树全部既有未提交改动。
+- Target branch: 当前本地 `main`
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterFeedbackService.java`；对应 Mapper 注入上下文聚焦测试；`handoff/main.md`。
+- Owner: Codex
+- Dependencies: 现有 Spring `@Resource` 注入规则与 MyBatis Mapper Bean 命名；无新增依赖。
+- Integration order: 修正字段名及引用 -> 增加 Bean 名冲突回归测试 -> 聚焦测试 -> ZSJOS 模块编译与服务端装配检查 -> scoped diff check -> 追加交付记录。
+- Verification plan: 运行 Mapper 注入上下文测试和现有 `LeadSubmitterFeedbackServiceTest`；执行 `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile`、`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 与 scoped `git diff --check`；不启动或重启共享服务。
+
+## Delivery Entry - 2026-09-06 23:16:18 +08:00
+
+- Workstream ID: `main-notice-targeting-complete-fix`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 完整修复系统公告全员/部门/用户发送范围，并完成代码审查与验证。
+- Key decisions: 定向公告保存部门与用户选择，发布时展开部门及子部门成员、按 `system:notice:read` 和启用状态求交集并去重后批量保存快照；管理端使用独立勾选树，禁选无阅读权限用户，支持未分配部门、搜索、空态、错误重试；游标固定快照时间并绑定筛选指纹，已读查询显式同租户，发布/下线/草稿变更使用行锁；无新增依赖、无真实数据库或权限变更。
+- Execution or analysis result: 完成接收人选项 API、VO 契约元数据、树形选择和员工端公告游标消费；补充部门展开+用户去重、无权限用户拒绝、游标 SQL 快照查询测试；按 `open-code-review` 技能执行 CLI/LLM 连通性检查和公告范围审查，审查 CLI 因内部 `git grep` 正则错误未产出汇总，未据此修改无关文件。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/NoticeController.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/vo/NoticeMyCursorReqVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/vo/NoticeMyPageReqVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/vo/NoticeRecipientDeptVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/vo/NoticeRecipientOptionsRespVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/controller/admin/notice/vo/NoticeRecipientUserVO.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeMapper.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeRecipientMapper.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/NoticeService.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/service/notice/NoticeServiceImpl.java`; notice tests; `frontend/admin/src/api/system/notice/index.ts`; `frontend/admin/src/views/system/notice/NoticeEditor.vue`; `frontend/workbench/src/pages/AnnouncementCenterPage.tsx`; `frontend/workbench/src/styles/pages/announcements.css`; `script/sql/mysql/migrations/V181__notice_recipient_targeting.sql`。
+- Verification evidence: System Maven targeted tests passed 13/13 including H2 cursor query; Workbench typecheck passed and build passed；Admin `pnpm build:local` passed；Admin typecheck completed with only pre-existing unrelated errors；Workbench full tests 549/555 passed, six failures are pre-existing unrelated guards; scoped `git diff --check` passed with only LF/CRLF conversion warnings；未执行真实登录浏览器验收（无前端 dev server/登录会话）。
+- Dependency or integration impact: 无新增 npm/Maven 依赖、分支、提交、推送、共享数据库操作或真实权限变更；V181 迁移保持幂等 information_schema 守卫；保留工作树其他未提交修改。
+- Remaining work: 在可用登录会话和前端开发服务器下完成管理端桌面/移动树交互及 Workbench 公告分页视觉验收；解决工作树既有六项 Workbench 守卫和 Admin 全量类型错误后再做全量绿灯。
+- Status: `implemented; focused verification passed; browser acceptance pending`
+
+## Delivery Entry - 2026-09-06 22:18:00 +08:00
+
+- Workstream ID: `main-workbench-filter-view-equivalence`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)。
+- User goal: 在确认范围内完成财务高级筛选修复，并保证表格视图不丢失筛选、分页、错误态、详情和财务导出能力。
+- Key decisions: 保留并审查工作树已有双布局分页/筛选改动；共享筛选条件行新增专用值控件类，窄容器规则不再匹配 Ant Design Select 根 div；财务导出权限按钮在审批主从和表格视图均渲染；不新增依赖、不改后端权限/菜单/数据库、不执行真实导出任务。
+- Execution or analysis result: 完成高级筛选布局冲突修复、财务表格导出入口和两项源码守卫；当前已有改动覆盖订单、申诉、重复复核、BPM、公告、消息等表格分页/筛选接线。
+- Changed files: `frontend/workbench/src/components/AdvancedFilter.tsx`; `frontend/workbench/src/styles/components/advanced-filter.css`; `frontend/workbench/src/pages/SalesOrderApprovalPage.tsx`; `frontend/workbench/src/pages/inbox-advanced-filter.guard.test.ts`; `frontend/workbench/src/pages/business-inbox-alignment.guard.test.ts`; `handoff/main.md`。
+- Verification evidence: 本次范围聚焦测试 50/50 通过；`npm run typecheck` 通过；`npm run build` 通过（仅现有大 chunk warning）；全量 `npm test` 549/555 通过，剩余 6 项为工作树既有媒体学员定位卡、消息分类源码守卫和样式字号守卫失败；scoped `git diff --check` 仅报告 LF/CRLF 提示。浏览器可连接本地 Workbench 但无登录会话，未完成登录后逐菜单视觉验收。
+- Dependency or integration impact: 无新增依赖、API、数据库、菜单或权限变化；财务导出按钮仍由服务端权限独立控制；保留所有其他用户未提交改动。
+- Remaining work: 需在可用登录会话下按主从/表格/移动宽度完成真实菜单回归；全量测试中的 6 项既有失败需由对应工作流另行修复。
+- Status: `implemented; focused verification passed; build passed; real browser acceptance pending`
+## Workstream Registration - 2026-09-06 19:20:00 +08:00
+
+- Workstream ID: `main-content-director-partner-visibility`
+- Goal: 编导通过现有用户关系场景绑定新媒体运营后，实时只读查看运营当前归属的兼职及其客资。
+- Non-goals: 不复制兼职归属数据，不开放编导财务数据或运营操作权限，不修改分支、提交或外部数据库。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`
+- Ownership scope: 用户关系场景 SQL、LeadAssignmentService、PartnerOwnershipService、handoff/main.md。
+- Owner: Codex `/root`; Dependencies: System 岗位 API、现有用户关系表、兼职归属表及对象权限。
+- Integration order: 新增场景种子 -> 暴露有效目标用户查询 -> 合并编导关系到兼职可读员工集合 -> 编译验证。
+- Verification plan: `mvn -f backend/pom.xml -pl yudao-module-zsjos -am -DskipTests compile` and scoped diff check.
+
+## Delivery Entry - 2026-09-06 19:23:30 +08:00
+
+- Workstream ID: `main-content-director-partner-visibility`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 确认执行编导绑定运营后查看运营兼职数据方案。
+- Key decisions: 新增 `content_director_partner_visibility` 场景；编导可绑定多个运营；按当前归属实时计算；兼职主体及客资只读。
+- Execution or analysis result: 增加关系服务有效目标用户集合接口，PartnerOwnershipService 将编导绑定运营合并进可读员工集合，SQL 增加可重复执行的场景种子。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAssignmentService.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadAssignmentServiceImpl.java`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/personnel/PartnerOwnershipService.java`; `script/sql/zsjos_user_relation_scene_management.sql`; `handoff/main.md`.
+- Verification evidence: Maven reactor compile passed for `yudao-module-zsjos` and dependencies.
+- Dependency or integration impact: No new dependency, no branch/commit/database execution; existing worktree changes preserved.
+- Remaining work: 需补充专门的权限单测及前端关系场景展示/端到端浏览器验证。
+## Delivery Entry - 2026-09-06 19:48:00 +08:00
+
+- Workstream ID: `main`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `037496d1f2895e3f83319cb07185f9513b664f05d` (uncommitted).
+- User goal: 修复规划师详情回归，恢复联系记录并避免销售阶段覆盖服务阶段。
+- Key decisions: 固定添加 `student-contact`；`studentContext` 优先渲染 StudentTaskPipeline/Labels；不改后端契约。
+- Result: 完成两个前端修复，规划师有 Lead 时仍展示服务阶段。
+- Changed files: `frontend/workbench/src/pages/RegistrationPages.tsx`; `frontend/workbench/src/components/LeadDetailOverview.tsx`; `handoff/main.md`。
+- Verification: `npm run typecheck` 与 `npm test -- src/pages/student-sales-history.guard.test.ts` 均通过。
+- Integration impact: 无新增依赖、接口或数据库变更；其他未提交改动保留。
+- Remaining work: 完整测试、构建和浏览器回归可继续执行。
+
+## Workstream Registration - 2026-09-06 20:05:00 +08:00
+
+- Workstream ID: `main-inbox-dual-layout-query-fix`
+- Goal: 修复全部收件箱双布局查询改动中的分页/懒加载隔离、筛选条件丢失、消息分类与公告排序不一致问题。
+- Non-goals: 不新增依赖、不修改数据库结构、不改变业务权限和详情业务语义、不清理其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`。
+- Ownership scope: Workbench 收件箱页面/API 类型、System 消息公告查询 VO/Mapper/Service、对应测试与直接受影响文档。
+- Owner: Codex
+- Dependencies: 现有 ProTable、System/BPM/ZSJOS 查询接口和权限契约；无新增依赖。
+- Integration order: 隔离布局请求 -> 补齐追加参数和复核懒加载 -> 统一消息分类/公告排序 -> 补充测试 -> typecheck/build/模块测试 -> 追加交付记录。
+- Verification plan: Workbench 定向测试、`npm run typecheck`、`npm run build`、System 定向测试/编译、`git diff --check`；真实浏览器/接口验收如环境可用。
+
+## Delivery Entry - 2026-09-06 22:04:00 +08:00
+
+- Workstream ID: `main-inbox-dual-layout-query-fix`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)。
+- User goal: 修复收件箱双布局改动中的懒加载、分页、追加筛选条件和消息/公告查询一致性缺陷。
+- Key decisions: 表格模式完全跳过懒加载哨兵；BPM 追加请求保留关键词；重复复核按页追加并重置页游标；公告统一按发布时间和 ID 倒序；消息分类补齐投诉、注册、支付口径；不新增依赖、数据库或权限。
+- Execution or analysis result: 已完成相关页面和 System Mapper 修复，并补充 Workbench 守卫断言；未修改其他工作流改动。
+- Changed files: `frontend/workbench/src/pages/MessageInboxPage.tsx`; `frontend/workbench/src/pages/AnnouncementCenterPage.tsx`; `frontend/workbench/src/pages/BpmApprovalCenterPage.tsx`; `frontend/workbench/src/pages/LeadAppealPage.tsx`; `frontend/workbench/src/pages/LeadDuplicateReviewPage.tsx`; `frontend/workbench/src/components/SalesOrderSupervisorInbox.tsx`; `frontend/workbench/src/pages/business-inbox-alignment.guard.test.ts`; `frontend/workbench/src/services/notifyMessageCategory.ts`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notice/NoticeMapper.java`; `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/dal/mysql/notify/NotifyMessageMapper.java`; `handoff/main.md`。
+- Verification evidence: Workbench `npm run typecheck` passed；Workbench build passed；`npm test -- src/pages/business-inbox-alignment.guard.test.ts` passed 7/7；System Maven compile passed；scoped `git diff --check` passed。未执行真实登录浏览器和数据库接口验收。
+- Dependency or integration impact: 无新增依赖、分支、提交、数据库操作或权限变化；保留 ProTable 原生分页/操作能力及现有未提交工作树内容。
+- Remaining work: 方案中服务端排序白名单及公告/BPM 完整筛选 UI 尚未在本次修复中扩展；需后续单独实现并做真实接口/浏览器验收。
+- Status: `implemented; focused verification passed; real acceptance pending`
+
+## Delivery Correction - 2026-09-06 23:34:00 +08:00
+
+- Workstream ID: `main-lead-source-provider-notification-fix`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)。
+- User goal: 修复新媒体员工提交客资时误收销售自拓来源关联消息，仅让销售自拓录明确关联的新媒体提供方收到。
+- Key decisions: `new_media_provider` 独立于 `submitter` 解析；要求销售自拓来源、明确记录提供方、提供方与冻结系统用户归属一致且不同于操作人；以持久化冻结字段为准；Partner 不能作为该角色。
+- Execution or analysis result: 修复和回归测试均已完成。前一组 23:27 工作流登记与 23:32 交付记录因补丁上下文匹配到文件中部而未处于文件末尾；遵守 append-only 约束不删除或重写原记录，本纠正条目在文件末尾确认其内容和结果有效。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProvider.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadNotifySceneProviderTest.java`; `handoff/main.md`。
+- Verification evidence: 通知解析、归属和租户初始化聚焦测试 18/18 通过；ZSJOS 依赖链编译通过；scoped `git diff --check` 通过，仅有既有 LF/CRLF 提示。`LeadSubmissionServiceImplTest` 的 3 项现存来源渠道字典 mock 失败未由本次改动引起。
+- Dependency or integration impact: 无新增依赖、API、前端、模板、SQL、权限、数据库写入、历史消息变更、服务重启、分支或提交操作。
+- Remaining work: 在另行授权的部署环境完成普通新媒体、销售自拓有提供方和无提供方三类真实消息验收；部署或重启不在本次授权范围。
+- Status: `implemented; focused verification passed; runtime acceptance pending`。
+
+## Workstream Registration Correction - 2026-09-07 10:11:40 +08:00
+
+- Workstream ID: `main-lead-submitter-feedback-mapper-injection-fix`
+- Goal: 修复 `LeadSubmitterFeedbackService` 启动时将现有 `FeedbackMapper` Bean 错误注入为 `LeadSubmitterFeedbackMapper` 的失败。
+- Non-goals: 不修改提交人反馈业务逻辑、Mapper SQL、代理方式、Spring/MyBatis 配置、数据库、依赖、分支、提交、推送或外部服务状态；不清理当前工作树其他既有未提交改动。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `037496d1f2895e3f83319cb07185f9513b664f05`；Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterFeedbackService.java`；`backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterFeedbackServiceContextTest.java`；`handoff/main.md`。
+- Owner: Codex；Dependencies: 现有 Spring `@Resource` 注入规则与 MyBatis Mapper Bean 命名；无新增依赖。
+- Integration order: 修正字段名及引用 -> 增加 Bean 名冲突回归测试 -> 聚焦测试 -> 服务端装配打包 -> scoped diff check -> 追加交付记录。
+- Verification plan: Mapper 注入上下文测试、现有提交人反馈业务测试、ZSJOS 依赖链编译、服务端跳过测试打包与 scoped `git diff --check`；不启动或重启共享服务。
+- Correction note: 前两条同工作流登记因补丁上下文匹配到文件中部；遵守 append-only 约束不改写既有记录，本条在文件末尾重新确认有效登记。
+
+## Delivery Entry - 2026-09-07 10:11:40 +08:00
+
+- Workstream ID: `main-lead-submitter-feedback-mapper-injection-fix`
+- Branch: `main`
+- Worktree: `D:\ZSJ-OS`
+- HEAD commit: `037496d1f2895e3f83319cb07185f9513b664f05` (uncommitted worktree)
+- User goal: 修复应用启动时 `feedbackMapper` JDK 动态代理无法注入 `LeadSubmitterFeedbackMapper` 的错误。
+- Key decisions: 将 `@Resource` 字段及引用改为与 MyBatis 默认 Bean 名一致的 `leadSubmitterFeedbackMapper`；保留 JDK 代理和全局 Spring/MyBatis 配置；新增同时注册两个 Mapper Bean 的上下文回归测试。
+- Execution or analysis result: 已消除按字段名误命中现有 `FeedbackMapper` 的注入冲突；上下文测试确认目标 Service 注入 `LeadSubmitterFeedbackMapper`，原有提交人反馈业务测试保持通过。首次测试装配因具体类 Mock 被 Spring 继续处理其内部依赖而失败，改为直接注册依赖单例后通过。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterFeedbackService.java`; `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadSubmitterFeedbackServiceContextTest.java`; `handoff/main.md`。
+- Verification evidence: `LeadSubmitterFeedbackServiceContextTest` 与 `LeadSubmitterFeedbackServiceTest` 共 10/10 通过；`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 的 25 模块 reactor 全部成功并生成 `yudao-server.jar`；tracked 与两个未跟踪目标文件 scoped whitespace check 无错误，仅有工作树 LF/CRLF 转换提示。
+- Dependency or integration impact: 无新增依赖、API、SQL、数据库、权限、配置、代理方式、外部状态、服务启停、分支、提交或推送；保留所有其他未提交改动。
+- Remaining work: 未启动完整应用连接真实 MySQL/Redis 验证运行时启动；服务启停按仓库规则需要单独确认。
+- Status: `implemented; focused wiring test and server package passed; runtime restart pending`。

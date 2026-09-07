@@ -68,12 +68,19 @@ dependencies and Spring component scanning.
   reconnect or duplicate delivery may trigger another fetch, but cannot create another message.
 - Business realtime events such as `zsjos_lead_assignment` are invalidation hints. Clients
   refresh the corresponding business API instead of treating the WebSocket payload as stored truth.
+- Authenticated WebSocket connection lifecycle is also the source for the administrator user
+  list's login presence. Each node records `(tenant, user type, user, session)` in a shared Redis
+  sorted set on connection and heartbeat; a user is online while at least one session has refreshed
+  within 90 seconds. Normal disconnect removes only that session, while the timeout covers abnormal
+  disconnects and permits consistent presence queries across backend nodes.
 - System announcements follow the same invalidation rule: `notice-published` asks authorized
   Workbench clients to refresh their database-backed unread summary, while announcement content
   and read state remain authoritative in `system_notice` and `system_notice_read`.
 - `yudao.websocket.sender-type=local` supports a single backend instance. Multi-instance
   deployments must use one of the configured shared senders, normally Redis, and verify
-  cross-node delivery before release.
+  cross-node delivery before release. The Redis-backed login presence registry is cross-node even
+  when message delivery still uses `local`; it does not make local WebSocket message delivery
+  multi-instance capable.
 
 ## User feedback contract
 

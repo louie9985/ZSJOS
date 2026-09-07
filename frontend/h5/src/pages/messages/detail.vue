@@ -16,7 +16,7 @@ const loadError = ref('')
 const businessTarget = computed(() => {
   const item = detail.value
   if (!item?.bizId || item.actionType !== 'business_detail') return undefined
-  if (item.bizType === 'lead') return `/lead/${item.bizId}`
+  if (item.bizType === 'lead') return `/lead/${item.bizId}${item.sceneCode === 'zsjos.lead.submitter_feedback_created' ? '#submitter-feedback' : ''}`
   if (item.bizType === 'cashback') return '/earnings'
   if (item.bizType === 'withdrawal') return `/withdrawal/${item.bizId}`
   if (item.bizType === 'feedback') return `/feedback/${item.bizId}`

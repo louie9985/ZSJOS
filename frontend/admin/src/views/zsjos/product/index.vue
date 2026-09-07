@@ -46,7 +46,7 @@
           v-else
           node-key="id"
           :data="categories"
-          default-expand-all
+          :default-expanded-keys="expandedCategoryKeys"
           highlight-current
           :expand-on-click-node="false"
           @node-click="selectCategory"
@@ -73,8 +73,7 @@
       </el-col>
       <el-col :xs="24" :md="16">
         <div class="panel-heading"
-          ><span>课程 SPU</span
-          ><el-button
+          ><span>课程 SPU</span><el-button
             type="primary"
             size="small"
             :disabled="!selectedCategory || !!selectedCategory.children?.length"
@@ -139,6 +138,22 @@
         </el-table>
       </el-col>
     </el-row>
+    <el-collapse v-if="disabledProducts.length" class="mt-16px">
+      <el-collapse-item name="disabled-products">
+        <template #title>已停用课程（{{ disabledProducts.length }}）</template>
+        <el-table :data="disabledProducts" size="small" :show-overflow-tooltip="true">
+          <el-table-column label="课程名称" prop="name" min-width="150" />
+          <el-table-column label="稳定编号" prop="productRef" min-width="210" />
+          <el-table-column label="分类" prop="categoryName" min-width="120" />
+          <el-table-column label="操作" width="280" fixed="right"><template #default="scope">
+            <el-button link type="primary" v-hasPermi="['zsjos:product:update']" @click="openProduct(scope.row)">编辑</el-button>
+            <el-button link type="primary" v-hasPermi="['zsjos:product:sku-query']" @click="openSkuConfig(scope.row)">属性/SKU</el-button>
+            <el-button link v-hasPermi="['zsjos:product:status']" :loading="isProcessing(`product-status:${scope.row.id}`)" @click="toggleProduct(scope.row)">启用</el-button>
+            <ZsjosPopconfirm :action="`删除课程 SPU「${scope.row.name}」`" danger @confirm="removeProduct(scope.row)"><el-button link type="danger" :loading="isProcessing(`product-delete:${scope.row.id}`)" v-hasPermi="['zsjos:product:delete']">删除</el-button></ZsjosPopconfirm>
+          </template></el-table-column>
+        </el-table>
+      </el-collapse-item>
+    </el-collapse>
   </ContentWrap>
 
   <el-dialog
@@ -459,6 +474,7 @@ const error = ref('')
 const categories = ref<ProductApi.ZsjosProductCategoryVO[]>([])
 const selectedCategory = ref<ProductApi.ZsjosProductCategoryVO>()
 const products = ref<ProductApi.ZsjosProductVO[]>([])
+const disabledProducts = ref<ProductApi.ZsjosProductVO[]>([])
 const categoryDialog = ref(false)
 const categoryEditing = ref(false)
 const categoryFormRef = ref<FormInstance>()
@@ -495,6 +511,15 @@ const productForm = reactive<ProductApi.ZsjosProductSaveReqVO & { productRef?: s
   status: 0,
   sort: 0,
   remark: ''
+})
+const expandedCategoryKeys = computed(() => {
+  const keys: number[] = []
+  const visit = (nodes: ProductApi.ZsjosProductCategoryVO[]) => nodes.forEach((node) => {
+    if (node.status === 0 && node.children?.length) keys.push(node.id)
+    if (node.status === 0 && node.children?.length) visit(node.children)
+  })
+  visit(categories.value)
+  return keys
 })
 const categoryRules: FormRules = {
   name: [{ required: true, message: '请输入分类名称', trigger: 'blur' }],
@@ -569,7 +594,7 @@ const load = async () => {
   try {
     categories.value = await ProductApi.getCategoryTree()
     if (selectedCategory.value) selectedCategory.value = findCategory(selectedCategory.value.id)
-    await loadProducts()
+    await Promise.all([loadProducts(), loadDisabledProducts()])
   } catch (e: any) {
     error.value = e?.msg || e?.message || '产品分类加载失败'
   } finally {
@@ -588,9 +613,14 @@ const loadProducts = async () => {
   const data = await ProductApi.getProductPage({
     pageNo: 1,
     pageSize: 100,
-    categoryId: selectedCategory.value.id
+    categoryId: selectedCategory.value.id,
+    status: 0
   })
   products.value = data.list || []
+}
+const loadDisabledProducts = async () => {
+  const data = await ProductApi.getProductPage({ pageNo: 1, pageSize: 100, status: 1 })
+  disabledProducts.value = data.list || []
 }
 const openCategory = (row?: ProductApi.ZsjosProductCategoryVO) => {
   categoryEditing.value = !!row
@@ -657,7 +687,7 @@ const saveProduct = async () => {
     if (productEditing.value) await ProductApi.updateProduct(productForm)
     else await ProductApi.createProduct(productForm)
     productDialog.value = false
-    await loadProducts()
+    await load()
     message.success('产品已保存')
   } finally {
     saving.value = false
@@ -670,7 +700,7 @@ const prepareProductSave = async () => {
 const toggleProduct = async (row: ProductApi.ZsjosProductVO) => {
   await withProcessing(`product-status:${row.id}`, async () => {
     await ProductApi.updateProductStatus({ id: row.id, status: row.status === 0 ? 1 : 0 })
-    await loadProducts()
+    await load()
     message.success('状态已更新')
   })
 }
@@ -678,7 +708,7 @@ const removeProduct = async (row: ProductApi.ZsjosProductVO) => {
   await withProcessing(`product-delete:${row.id}`, async () => {
     try {
       await ProductApi.deleteProduct(row.id)
-      await loadProducts()
+      await load()
       message.success('产品已删除')
     } catch (e: any) {
       if (e?.msg) message.error(e.msg)

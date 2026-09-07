@@ -4,10 +4,38 @@ SET NAMES utf8mb4;
 -- Dependency/order: run after Core V180. Repeatable through guarded DDL and version inserts.
 -- Rollback limitation: recipient snapshots for published notices are historical authorization facts and must not be deleted implicitly.
 
-ALTER TABLE `system_notice`
-  ADD COLUMN IF NOT EXISTS `audience_type` varchar(16) DEFAULT 'ALL' COMMENT '接收范围：ALL 全员，TARGET 指定部门/用户',
-  ADD COLUMN IF NOT EXISTS `target_dept_ids` json DEFAULT NULL COMMENT '草稿选择的部门编号',
-  ADD COLUMN IF NOT EXISTS `target_user_ids` json DEFAULT NULL COMMENT '草稿选择的用户编号';
+-- MySQL versions used by existing installations do not support
+-- `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`; guard each additive DDL
+-- operation through information_schema instead.
+DROP PROCEDURE IF EXISTS `zsjos_v181_add_notice_columns`;
+DELIMITER $$
+CREATE PROCEDURE `zsjos_v181_add_notice_columns`()
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema=DATABASE() AND table_name='system_notice' AND column_name='audience_type'
+  ) THEN
+    ALTER TABLE `system_notice`
+      ADD COLUMN `audience_type` varchar(16) DEFAULT 'ALL' COMMENT '接收范围：ALL 全员，TARGET 指定部门/用户';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema=DATABASE() AND table_name='system_notice' AND column_name='target_dept_ids'
+  ) THEN
+    ALTER TABLE `system_notice`
+      ADD COLUMN `target_dept_ids` json DEFAULT NULL COMMENT '草稿选择的部门编号';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema=DATABASE() AND table_name='system_notice' AND column_name='target_user_ids'
+  ) THEN
+    ALTER TABLE `system_notice`
+      ADD COLUMN `target_user_ids` json DEFAULT NULL COMMENT '草稿选择的用户编号';
+  END IF;
+END$$
+DELIMITER ;
+CALL `zsjos_v181_add_notice_columns`();
+DROP PROCEDURE IF EXISTS `zsjos_v181_add_notice_columns`;
 
 CREATE TABLE IF NOT EXISTS `system_notice_recipient` (
   `id` bigint NOT NULL AUTO_INCREMENT, `notice_id` bigint NOT NULL, `user_id` bigint NOT NULL,

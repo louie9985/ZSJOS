@@ -64,10 +64,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void start(LeadDO lead, Long specifiedSalesUserId, Long submitterUserId) {
+        LocalDateTime now = LocalDateTime.now();
         if (DISPATCH_SELF.equals(lead.getDispatchMode())) {
-            LocalDateTime now = LocalDateTime.now();
             lead.setAssignmentStatus(ASSIGNMENT_OWNED); lead.setOwnerUserId(submitterUserId);
-            lead.setOwnershipStartedAt(now); leadMapper.updateById(lead);
+            lead.setOwnershipStartedAt(now); LeadMapper.advanceActivity(lead, now); leadMapper.updateById(lead);
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, submitterUserId,
                     submitterUserId, null, 1, null, "销售自拓直接归属", now);
             lead.setCurrentAssignmentHistoryId(history.getId());
@@ -82,9 +82,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             lead.setAssignmentStatus(ASSIGNMENT_PENDING);
             lead.setPendingAssigneeUserId(specifiedSalesUserId);
             lead.setPendingExpiresAt(null);
+            LeadMapper.advanceActivity(lead, now);
             leadMapper.updateById(lead);
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_DISPATCH, specifiedSalesUserId,
-                    submitterUserId, null, null, null);
+                    submitterUserId, null, null, null, null, now);
             lifecycleTaskService.createAssignmentTask(lead.getId(), specifiedSalesUserId,
                     history.getId(), null, lead.getDispatchMode());
             notifySales(specifiedSalesUserId, lead.getId(), "assigned");
@@ -95,8 +96,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         LeadAssignmentRuleDO rule = requireRule();
         RuleConfig config = readConfig(rule.getConfigJson());
         lead.setAssignmentRuleSnapshot(JsonUtils.toJsonString(config));
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
-        dispatchNext(lead, rule, config, submitterUserId, null);
+        dispatchNext(lead, rule, config, submitterUserId, null, now);
     }
 
     @Override public List<LeadAssignmentUserRespVO> getEligibleSalesUsers() { return assignmentService.getEligibleSalesUsers(); }
@@ -110,10 +112,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     }
 
     private void dispatchNext(LeadDO lead, LeadAssignmentRuleDO rule, RuleConfig config,
-                              Long operatorUserId, String priorAction) {
+                              Long operatorUserId, String priorAction, LocalDateTime activityAt) {
         Set<Long> tried = new HashSet<>(historyMapper.selectTriedSalesUserIds(lead.getId()));
         if (tried.size() >= config.maxAttempts()) {
-            moveToPool(lead, operatorUserId, "无可继续尝试的启用销售");
+            moveToPool(lead, operatorUserId, "无可继续尝试的启用销售", activityAt);
             return;
         }
         Set<Long> eligible = assignmentService.getEligibleSalesUsers().stream()
@@ -121,7 +123,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         try {
             long poolSize = dispatchRedisRepository.poolSize();
             if (poolSize == 0) {
-                moveToPool(lead, operatorUserId, "当前没有页面在线的销售专员");
+                moveToPool(lead, operatorUserId, "当前没有页面在线的销售专员", activityAt);
                 return;
             }
             long scanBudget = poolSize * MAX_POOL_SCAN_ROUNDS;
@@ -147,8 +149,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                 }
                 try {
                     int attempt = tried.size() + 1;
-                    LocalDateTime expiresAt = LocalDateTime.now().plusSeconds(config.acceptTimeoutSeconds());
-                    if (leadMapper.updateUnassignedToPending(lead.getId(), chosen, expiresAt, attempt) == 0) {
+                    LocalDateTime expiresAt = activityAt.plusSeconds(config.acceptTimeoutSeconds());
+                    if (leadMapper.updateUnassignedToPending(lead.getId(), chosen, expiresAt, attempt, activityAt) == 0) {
                         releaseReservation(lead.getId(), chosen);
                         return;
                     }
@@ -156,8 +158,9 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                     lead.setPendingAssigneeUserId(chosen);
                     lead.setPendingExpiresAt(expiresAt);
                     lead.setAssignmentAttemptCount(attempt);
+                    LeadMapper.advanceActivity(lead, activityAt);
                     LeadAssignmentHistoryDO history = addHistory(lead, ACTION_DISPATCH, chosen, operatorUserId,
-                            rule.getId(), attempt, expiresAt);
+                            rule.getId(), attempt, expiresAt, null, activityAt);
                     lifecycleTaskService.createAssignmentTask(lead.getId(), chosen, history.getId(),
                             expiresAt, lead.getDispatchMode());
                     notifySales(chosen, lead.getId(), priorAction == null ? "assigned" : "reassigned");
@@ -169,7 +172,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
                     throw ex;
                 }
             }
-            moveToPool(lead, operatorUserId, "轮询三圈后没有可接单销售");
+            moveToPool(lead, operatorUserId, "轮询三圈后没有可接单销售", activityAt);
         } catch (RedisConnectionFailureException | RedisSystemException ex) {
             log.error("[dispatchNext][leadId({}) Redis 轮询失败，客资保持未分配等待重试]", lead.getId(), ex);
         }
@@ -192,16 +195,16 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     @ZsjosPermission(bizType = "lead", bizId = "#leadId", action = "accept")
     public void accept(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
-        if (leadMapper.updatePendingResult(leadId, userId, ASSIGNMENT_OWNED, userId) == 0) {
+        LocalDateTime acceptedAt = LocalDateTime.now();
+        if (leadMapper.updatePendingResult(leadId, userId, ASSIGNMENT_OWNED, userId, acceptedAt) == 0) {
             throw exception(LEAD_ASSIGNMENT_ALREADY_HANDLED);
         }
-        LocalDateTime acceptedAt = LocalDateTime.now();
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_ACCEPT, userId, userId,
                 null, lead.getAssignmentAttemptCount(), null, null, acceptedAt);
         lead.setAssignmentStatus(ASSIGNMENT_OWNED);
         lead.setOwnerUserId(userId);
         lead.setOwnershipStartedAt(acceptedAt);
-        lead.setLastActivityAt(acceptedAt);
+        LeadMapper.advanceActivity(lead, acceptedAt);
         lead.setRecycleSourceOwnerUserId(null);
         lead.setPendingAssigneeUserId(null);
         lead.setPendingExpiresAt(null);
@@ -223,10 +226,10 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     public void reject(Long leadId, Long userId) {
         LeadDO lead = requireLead(leadId);
         if (DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) throw exception(LEAD_ASSIGNMENT_REJECT_FORBIDDEN);
-        if (leadMapper.updatePendingResult(leadId, userId, ASSIGNMENT_UNASSIGNED, null) == 0) {
+        LocalDateTime rejectedAt = LocalDateTime.now();
+        if (leadMapper.updatePendingResult(leadId, userId, ASSIGNMENT_UNASSIGNED, null, rejectedAt) == 0) {
             throw exception(LEAD_ASSIGNMENT_ALREADY_HANDLED);
         }
-        LocalDateTime rejectedAt = LocalDateTime.now();
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_REJECT, userId, userId, null,
                 lead.getAssignmentAttemptCount(), null, null, rejectedAt);
         lifecycleTaskService.cancelAssignmentTask(leadId, userId, rejectedAt, "销售拒绝自动派单");
@@ -237,7 +240,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setPendingExpiresAt(null);
         notifyEventPublisher.publish(REJECTED, leadId, "lead-rejected:" + history.getId(), userId,
                 rejectedAt, eventContext(lead, userId, lead.getOwnerUserId(), null));
-        dispatchNext(lead, requireRule(), snapshotConfig(lead), userId, ACTION_REJECT);
+        dispatchNext(lead, requireRule(), snapshotConfig(lead), userId, ACTION_REJECT, rejectedAt);
     }
 
     @Override
@@ -248,12 +251,12 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         RuleConfig config = readConfig(requireRule().getConfigJson());
         LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         LeadDO lead = requireLead(leadId);
-        if (leadMapper.updatePublicPoolToOwned(leadId, userId) == 0) throw exception(LEAD_CLAIM_ALREADY_TAKEN);
+        LocalDateTime claimedAt = LocalDateTime.now();
+        if (leadMapper.updatePublicPoolToOwned(leadId, userId, claimedAt) == 0) throw exception(LEAD_CLAIM_ALREADY_TAKEN);
         if (claimDailyCounterMapper.reserve(TenantContextHolder.getRequiredTenantId(), userId, today,
                 config.dailyClaimLimit()) == 0) {
             throw exception(LEAD_CLAIM_DAILY_LIMIT_REACHED);
         }
-        LocalDateTime claimedAt = LocalDateTime.now();
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_CLAIM, userId, userId,
                 null, null, null, null, claimedAt);
         lifecycleTaskService.cancelFirstFollowUpTasks(leadId, claimedAt, "客资重新归属");
@@ -265,6 +268,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);
         lead.setNextFollowUpAt(null);
+        LeadMapper.advanceActivity(lead, claimedAt);
         leadMapper.updateById(lead);
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(lifecycleTaskService.createFirstFollowUpTask(
                 leadId, userId, history.getId(), claimedAt, EVENT_LEAD_CLAIMED, ASSIGNMENT_PUBLIC_POOL));
@@ -381,6 +385,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         lead.setCurrentAssignmentHistoryId(history.getId());
         lead.setCurrentAssignmentFirstFollowUpAt(null);
         lead.setNextFollowUpAt(null);
+        LeadMapper.advanceActivity(lead, transferredAt);
         leadMapper.updateById(lead);
         OpportunityDO opportunity = opportunityMapper.selectByLeadId(leadId);
         if (opportunity != null) {
@@ -410,8 +415,8 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         for (LeadDO lead : leadMapper.selectExpiredPending(LocalDateTime.now())) {
             Long candidate = lead.getPendingAssigneeUserId();
             if (candidate == null || DISPATCH_SPECIFIED.equals(lead.getDispatchMode())) continue;
-            if (leadMapper.updatePendingResult(lead.getId(), candidate, ASSIGNMENT_UNASSIGNED, null) == 0) continue;
             LocalDateTime expiredAt = LocalDateTime.now();
+            if (leadMapper.updatePendingResult(lead.getId(), candidate, ASSIGNMENT_UNASSIGNED, null, expiredAt) == 0) continue;
             LeadAssignmentHistoryDO history = addHistory(lead, ACTION_TIMEOUT, candidate, 0L, null,
                     lead.getAssignmentAttemptCount(), null, null, expiredAt);
             lifecycleTaskService.cancelAssignmentTask(lead.getId(), candidate, expiredAt, "自动派单超时");
@@ -421,7 +426,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
             lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
             notifyEventPublisher.publish(EXPIRED, lead.getId(), "lead-expired:" + history.getId(), 0L,
                     expiredAt, eventContext(lead, candidate, lead.getOwnerUserId(), "接单超时"));
-            dispatchNext(lead, requireRule(), snapshotConfig(lead), 0L, ACTION_TIMEOUT);
+            dispatchNext(lead, requireRule(), snapshotConfig(lead), 0L, ACTION_TIMEOUT, expiredAt);
             count++;
         }
         return count;
@@ -432,7 +437,7 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
     public int processUnassignedRetries() {
         int count = 0;
         for (LeadDO lead : leadMapper.selectRetryableUnassignedAuto()) {
-            dispatchNext(lead, requireRule(), snapshotConfig(lead), 0L, null);
+            dispatchNext(lead, requireRule(), snapshotConfig(lead), 0L, null, LocalDateTime.now());
             if (!ASSIGNMENT_UNASSIGNED.equals(lead.getAssignmentStatus())) {
                 count++;
             }
@@ -440,16 +445,17 @@ public class LeadDispatchServiceImpl implements LeadDispatchService {
         return count;
     }
 
-    private void moveToPool(LeadDO lead, Long operatorUserId, String reason) {
+    private void moveToPool(LeadDO lead, Long operatorUserId, String reason, LocalDateTime activityAt) {
         lead.setAssignmentStatus(ASSIGNMENT_PUBLIC_POOL);
         lead.setPendingAssigneeUserId(null); lead.setPendingExpiresAt(null);
-        lead.setPublicPoolAt(LocalDateTime.now());
+        lead.setPublicPoolAt(activityAt);
+        LeadMapper.advanceActivity(lead, activityAt);
         leadMapper.updateById(lead);
-        lifecycleTaskService.cancelAssignmentTask(lead.getId(), null, LocalDateTime.now(), reason);
-        lifecycleTaskService.cancelFirstFollowUpTasks(lead.getId(), LocalDateTime.now(), reason);
-        lifecycleTaskService.cancelFollowUpReminders(lead.getId(), LocalDateTime.now(), reason);
+        lifecycleTaskService.cancelAssignmentTask(lead.getId(), null, activityAt, reason);
+        lifecycleTaskService.cancelFirstFollowUpTasks(lead.getId(), activityAt, reason);
+        lifecycleTaskService.cancelFollowUpReminders(lead.getId(), activityAt, reason);
         LeadAssignmentHistoryDO history = addHistory(lead, ACTION_PUBLIC_POOL, null, operatorUserId,
-                null, null, null, reason);
+                null, null, null, reason, activityAt);
         notifyEventPublisher.publish(PUBLIC_POOL, lead.getId(), "lead-public-pool:" + history.getId(),
                 operatorUserId, history.getOccurredAt(), eventContext(lead, null, lead.getOwnerUserId(), reason));
     }

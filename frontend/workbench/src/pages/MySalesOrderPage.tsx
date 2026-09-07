@@ -27,6 +27,9 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<SalesOrderListItem[]>([])
   const [cursor, setCursor] = useState<string>()
+  const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(PAGE_SIZE)
+  const [tableTotal, setTableTotal] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [selectedId, setSelectedId] = useState<number>()
   const [detail, setDetail] = useState<SalesOrder>()
@@ -57,7 +60,9 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
     if (activePages.current.has(key)) return
     activePages.current.add(key); setLoading(true); setError('')
     try {
-      const result = await (team ? api.teamSalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }) : api.mySalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }))
+      const result = useTableLayout
+        ? await (team ? api.teamSalesOrderPage({ pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }) : api.mySalesOrderPage({ pageNo: tablePage, pageSize: tablePageSize, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }))
+        : await (team ? api.teamSalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }) : api.mySalesOrderCursor({ cursor: targetCursor, limit: PAGE_SIZE, status: status === 'all' ? undefined : status, keyword: keyword || undefined, advancedFilter }))
       if (version !== listVersion.current) return
       let nextItems = result.list
       const requestedId = replace ? requestedOrderId.current : undefined
@@ -66,7 +71,9 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
         if (version !== listVersion.current) return
         nextItems = [salesOrderDetailToListItem(requestedOrder), ...result.list]
       }
-      setItems(current => replace ? nextItems : mergeSalesOrderListItems(current, nextItems)); setCursor(result.nextCursor); setHasMore(result.hasMore)
+      setItems(current => replace || useTableLayout ? nextItems : mergeSalesOrderListItems(current, nextItems));
+      if ('total' in result) setTableTotal(result.total)
+      else { setCursor(result.nextCursor); setHasMore(result.hasMore) }
       if (replace) {
         setSelectedId(current => requestedId || (current && nextItems.some(item => item.id === current) ? current : nextItems[0]?.id))
         if (requestedId) {
@@ -77,7 +84,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
     } catch (loadError) {
       if (version === listVersion.current) setError(loadError instanceof Error ? loadError.message : '我的订单加载失败')
     } finally { activePages.current.delete(key); if (version === listVersion.current) setLoading(false) }
-  }, [advancedFilter, keyword, status, team])
+  }, [advancedFilter, keyword, status, tablePage, tablePageSize, team, useTableLayout])
 
   const reload = useCallback(() => {
     const version = ++listVersion.current
@@ -86,6 +93,9 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
   }, [loadCounts, loadPage])
 
   useEffect(() => { reload() }, [reload])
+  useEffect(() => {
+    if (useTableLayout) void loadPage(undefined, true, listVersion.current)
+  }, [loadPage, useTableLayout])
 
   const loadDetail = useCallback(async (id: number) => {
     const version = ++detailVersion.current
@@ -121,7 +131,7 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       className="sales-order-inbox-error" type="warning" showIcon message={countsError}
       action={<Button size="small" onClick={() => void loadCounts()}>重试</Button>}/>
     }
-    {useTableLayout ? <ProTable<SalesOrderListItem>
+    {useTableLayout ? <div className="sales-order-table-area"><div className="sales-order-table-toolbar"><AdvancedFilterToolbar scene="order" pageKey={team ? "sales_order_team" : "sales_order_my"} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<SalesOrderListItem>
       className="sales-order-inbox-table"
       rowKey="id"
       search={false}
@@ -129,11 +139,11 @@ export default function MySalesOrderPage({ team = false }: { team?: boolean }) {
       columnsState={{ persistenceKey: `crm-sales-order-${team ? 'team' : 'my'}-table-columns`, persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
-      pagination={false}
+      pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size); } }}
       scroll={{ x: 6200 }}
       locale={{ emptyText: <Empty description="暂无订单" /> }}
       columns={buildSalesOrderTableColumns(item => { setSelectedId(item.id); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) })}
-    /> : <div className="sales-order-inbox-layout">
+    /></div> : <div className="sales-order-inbox-layout">
       <aside className="sales-order-list-pane">
         <AdvancedFilterToolbar scene="order" pageKey={team ? "sales_order_team" : "sales_order_my"} placeholder="搜索订单号 / 学员姓名 / 手机号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/>
         {error && <Alert

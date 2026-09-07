@@ -29,4 +29,13 @@ public class NotifyMessageMyCursorReqVO {
     @DateTimeFormat(pattern = FORMAT_YEAR_MONTH_DAY_HOUR_MINUTE_SECOND)
     private LocalDateTime[] createTime;
 
+    @Schema(description = "关键词")
+    private String keyword;
+
+    @Schema(description = "消息分类")
+    private String category;
+
+    @Schema(description = "业务类型")
+    private String bizType;
+
 }

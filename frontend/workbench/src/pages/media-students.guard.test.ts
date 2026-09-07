@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 
 describe('director and operator My Students', () => {
   const page = readFileSync('src/pages/MediaStudentsPage.tsx', 'utf8')
+  const configPage = readFileSync('src/pages/DirectorConfigPages.tsx', 'utf8')
   const api = readFileSync('src/services/api.ts', 'utf8')
   const autoSave = readFileSync('src/services/directorAutoSave.ts', 'utf8')
   const style = readFileSync('src/styles/pages/media-students.css', 'utf8')
@@ -99,6 +100,17 @@ describe('director and operator My Students', () => {
     expect(api).toContain("http.post('/zsjos/positioning-card/draft'")
     expect(api).toContain('http.put(`/zsjos/positioning-card/draft/${id}`')
     expect(api).toContain('unwrap<PositioningCardDraftResult>')
+  })
+
+  it('shows optional versioned field remarks on every director form control', () => {
+    expect(configPage).toContain('label="填写备注"')
+    expect(configPage).toContain('maxLength={500} showCount')
+    expect(page).toContain("const extra = field.description?.trim() ?")
+    expect(page).toContain("whiteSpace: 'pre-wrap', overflowWrap: 'anywhere'")
+    expect(page.match(/extra=\{extra\}/g)).toHaveLength(9)
+    expect(page).toContain("dialog === 'positioning'")
+    expect(page).toContain("dialog === 'interview'")
+    expect(page).not.toContain('fieldsSnapshot || []).filter(field => field.enabled).map(field => ({ key: field.key, label: field.title, description:')
   })
 
   it('uses the typed positioning student confirmation link API', () => {

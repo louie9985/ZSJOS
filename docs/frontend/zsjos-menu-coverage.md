@@ -101,8 +101,10 @@ does not keep a separate Card/List/Pagination presentation or infer actions from
 
 ### Media student center
 
+- 学员信息收集表配置由 Admin 原生页面 `zsjos/studentInfoFormConfig/index` 承载，菜单使用 `config:query` 权限。Workbench 不实现配置编辑页面，只消费客资操作、快照及服务上下文的权限投影；公开填写由 H5 `/student-info-form` 承载。完整接口与配置约束见 [收集表契约](../api/student-information-collection.md)。
+
 - `/zsjos/media-students` is rendered by `MediaStudentsPage` and requires `zsjos:media-student:query-my`.
-- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its three tabs are overview, third-party platform accounts (including positioning cards and account-scoped status maintenance), and content production history. The former student-information/talk-record tab is not part of the media workspace; old `tab=student` links fall back to overview, while retired `tab=maintenance` and `tab=positioning` links resolve to the account tab.
+- The page follows the same responsive master-detail layout as `/zsjos/my-students`. Its base tabs are overview, third-party platform accounts (including positioning cards and account-scoped status maintenance), and content production history. The new `student-info` collection-snapshot tab is added only when the server projects its independent read permission and Lead visibility. It does not restore the retired talk-record tab: old `tab=student` links fall back to overview, while retired `tab=maintenance` and `tab=positioning` links resolve to the account tab.
 - Directors see their service-relation or account responsibility scope. Operators see only students related to accounts, content, positioning, or tasks they currently own. Each detail and command is re-authorized independently by the backend.
 - 账号状态维护使用服务端按钮权限 `zsjos:media-account:maintenance`，按钮节点挂在当前媒体学员页面菜单 `7022` 下；Workbench 在每个账号行展示该账号的状态摘要和服务端投影的维护/查看入口，完整快照与历史位于选中账号区域，不建立学员级“状态维护”页签。已退役的第三方账号页面 `6970` 不再承载该按钮或任何前端权限来源。
 - 定位卡运营确认和退回继续使用 `zsjos:positioning-card:operator-confirm`、`zsjos:positioning-card:operator-reject`；生成或重新生成学员外链使用独立按钮权限 `zsjos:positioning-card:student-link-generate`。V134 将该按钮挂在媒体学员页下并授予现有 `new_media_operator` 角色，服务端仍独立校验当前运营归属、最新版和状态。

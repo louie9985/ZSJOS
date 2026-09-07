@@ -78,6 +78,8 @@ public class AdminUserServiceImpl implements AdminUserService {
     @Resource
     private PermissionService permissionService;
     @Resource
+    private AdminUserOnlineService adminUserOnlineService;
+    @Resource
     private PasswordEncoder passwordEncoder;
     @Resource
     @Lazy // 延迟，避免循环依赖报错
@@ -359,8 +361,26 @@ public class AdminUserServiceImpl implements AdminUserService {
             }
         }
 
+        Set<Long> excludedUserIds = null;
+        if (reqVO.getOnline() != null) {
+            Set<Long> onlineUserIds = adminUserOnlineService.getRequiredOnlineUserIds();
+            if (Boolean.TRUE.equals(reqVO.getOnline())) {
+                if (userIds == null) {
+                    userIds = new HashSet<>(onlineUserIds);
+                } else {
+                    userIds = new HashSet<>(userIds);
+                    userIds.retainAll(onlineUserIds);
+                }
+                if (CollUtil.isEmpty(userIds)) {
+                    return PageResult.empty();
+                }
+            } else {
+                excludedUserIds = onlineUserIds;
+            }
+        }
+
         // 分页查询
-        return userMapper.selectPage(reqVO, getDeptCondition(reqVO.getDeptId()), userIds);
+        return userMapper.selectPage(reqVO, getDeptCondition(reqVO.getDeptId()), userIds, excludedUserIds);
     }
 
     @Override

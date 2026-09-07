@@ -19,6 +19,7 @@ const leadId = Number(route.params.id)
 const { loadLeadCategories } = useDict()
 
 const submitting = ref(false)
+let supplementAttempt: { content: string; key: string } | undefined
 const dataLoading = ref(true)
 const dataError = ref('')
 
@@ -63,7 +64,7 @@ async function loadForm() {
       skuUnknown: !product.skuRef,
       primary: product.primary
     }))
-    form.remark = lead.remark || ''
+    form.remark = ''
   } catch {
     dataError.value = '客资资料加载失败，请重试'
   } finally {
@@ -81,7 +82,7 @@ async function handleSubmit() {
   if (!form.products.some(product => product.primary)) return showToast('请设置一个主意向课程')
   submitting.value = true
   try {
-    await supplementLead(leadId, {
+    const payload = {
       provinceCode: form.area.provinceCode,
       cityCode: form.area.cityCode,
       leadCategory: form.leadCategory,
@@ -93,8 +94,10 @@ async function handleSubmit() {
             primary: p.primary
           })),
       remark: form.remark.trim() || undefined,
-      idempotencyKey: createIdempotencyKey()
-    })
+    }
+    const content = JSON.stringify(payload)
+    if (supplementAttempt?.content !== content) supplementAttempt = { content, key: createIdempotencyKey() }
+    await supplementLead(leadId, { ...payload, idempotencyKey: supplementAttempt.key })
     showSuccessToast('补充成功')
     router.back()
   } catch {
@@ -144,7 +147,7 @@ const categoryLabel = () => leadCategories.value.find(c => c.value === form.lead
 
         <van-field
           v-model="form.remark"
-          label="备注"
+          label="补充备注"
           type="textarea"
           placeholder="补充备注信息"
           maxlength="1000"

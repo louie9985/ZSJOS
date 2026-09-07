@@ -28,11 +28,12 @@ import {
   SettingOutlined
 } from '@ant-design/icons'
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
-import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, type PermissionInfo } from './services/api'
+import { api, AUTH_EXPIRED_EVENT, AuthenticationError, buildMenuTree, clearAuthStorage, getAuthAccessToken, migrateLegacyAuthStorage, SERVER_CONNECTION_ERROR_MESSAGE, type PermissionInfo } from './services/api'
 import {
   buildTwoLevelNavigation,
   canOpenLeadDetailDeepLink,
   filterRenderableMenus,
+  findAdminEmbedPath,
   findMenuByPath,
   findPageByPath,
   findPrimaryByPath,
@@ -152,11 +153,13 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   // 移动端侧栏由 layout.css 在整个 ≤768px 视口隐藏（抽屉成为唯一导航入口），
   // 无需再用 matchMedia 同步 primarySider 的 collapsed 状态。
   const authorizedMenus = useMemo(
-    () => filterRenderableMenus(buildMenuTree(info.menus || []), RENDERABLE_APP_ROUTES),
+    () => buildMenuTree(info.menus || []),
     [info.menus]
   )
   const navigationMenus = useMemo(() => {
-    if (!info.workbenchMenus || info.workbenchLayoutMeta?.fallback) return authorizedMenus
+    if (!info.workbenchMenus || info.workbenchLayoutMeta?.fallback) {
+      return filterRenderableMenus(authorizedMenus, RENDERABLE_APP_ROUTES)
+    }
     return filterRenderableMenus(buildMenuTree(info.workbenchMenus, '/', true), RENDERABLE_APP_ROUTES)
   }, [authorizedMenus, info.workbenchLayoutMeta?.fallback, info.workbenchMenus])
   const navigation = useMemo(() => buildTwoLevelNavigation(navigationMenus), [navigationMenus])
@@ -164,27 +167,36 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
   const leadDetailDeepLink = useMemo(() => {
     return canOpenLeadDetailDeepLink(location.pathname, location.search, info.permissions || [])
   }, [info.permissions, location.pathname, location.search])
+  const currentMenu = useMemo(
+    () => findMenuByPath(authorizedMenus, location.pathname),
+    [authorizedMenus, location.pathname]
+  )
+  const adminEmbedPath = findAdminEmbedPath(authorizedMenus, location.pathname)
   const inaccessiblePathFallback = useMemo(
-    () => leadDetailDeepLink ? undefined : getInaccessiblePathFallback(navigation, location.pathname, authorizedMenus),
-    [leadDetailDeepLink, navigation, location.pathname, authorizedMenus]
+    () => {
+      if (leadDetailDeepLink) return undefined
+      if (currentMenu?.workbenchRenderMode === 'admin_only' && !adminEmbedPath) {
+        return getInitialTarget(navigation)
+      }
+      return getInaccessiblePathFallback(navigation, location.pathname, authorizedMenus)
+    },
+    [adminEmbedPath, authorizedMenus, currentMenu, leadDetailDeepLink, location.pathname, navigation]
   )
   const activePrimary = useMemo(
     () => findPrimaryByPath(navigation, location.pathname),
     [navigation, location.pathname]
   )
-  const currentMenu = useMemo(
-    () => findMenuByPath(authorizedMenus, location.pathname),
-    [authorizedMenus, location.pathname]
+  const adminEmbedPresentation = resolveAdminEmbedPresentation(
+    authPlatform,
+    adminEmbedPath ? 'admin_embed' : currentMenu?.workbenchRenderMode
   )
-  const adminEmbedPresentation = resolveAdminEmbedPresentation(authPlatform, currentMenu?.workbenchRenderMode)
   const mobileAdminEmbed = adminEmbedPresentation === 'mobile-blocked'
   const activeAdminEmbedPath = adminEmbedPresentation === 'frame'
-    ? currentMenu?.path
+    ? adminEmbedPath
     : undefined
 
   const handleAdminRouteChange = useCallback((path: string) => {
-    const menu = findMenuByPath(authorizedMenus, path)
-    if (menu?.workbenchRenderMode === 'admin_embed' && path !== location.pathname) {
+    if (findAdminEmbedPath(authorizedMenus, path) && path !== location.pathname) {
       navigate(path)
     }
   }, [authorizedMenus, location.pathname, navigate])
@@ -197,8 +209,7 @@ function Shell({ info, authPlatform, onLogout, onUserChange }: { info: Permissio
     const currentPaths = new Set(tabs.map(tab => tab.key))
     previousTabsRef.current.forEach(tab => {
       if (currentPaths.has(tab.key)) return
-      const menu = findMenuByPath(authorizedMenus, tab.key)
-      if (menu?.workbenchRenderMode === 'admin_embed') {
+      if (findAdminEmbedPath(authorizedMenus, tab.key)) {
         adminEmbedFrameRef.current?.closeRoute(tab.key)
       }
     })
@@ -558,7 +569,7 @@ function Root({ authPlatform }: { authPlatform: AuthPlatform }) {
   if (!logged) return location.pathname === APP_ROUTES.WECOM_CLICK && !publicLoginRedirect
     ? <WecomClickPage authPlatform={authPlatform} onNeedLogin={targetPath => setPublicLoginRedirect(targetPath)} />
     : <LoginPage platform={authPlatform} initialError={error} onLogin={() => { setError(''); setInfo(undefined); setLoginRedirectPending(true); setLogged(true) }}/>
-  if (error) return <div className="center-page"><Card title="权限信息加载失败"><Alert type="error" message={error}/><Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space></Card></div>
+  if (error) return <div className="center-page"><Result status={error === SERVER_CONNECTION_ERROR_MESSAGE ? '500' : 'error'} title={error} subTitle={error === SERVER_CONNECTION_ERROR_MESSAGE ? '权限信息暂时无法加载，请检查网络后重试。' : '权限信息加载失败，请重试或返回登录。'} extra={<Space><Button type="primary" onClick={() => { setError(''); setPermissionAttempt(value => value + 1) }}>重试</Button><Button onClick={() => { clearAuthStorage(authPlatform); setError(''); setInfo(undefined); setPublicLoginRedirect(''); setLoginRedirectPending(false); setLogged(false) }}>返回登录</Button></Space>}/></div>
   if (!info) return <div className="center-page">正在读取权限菜单...</div>
   return <DefaultEmployeeAvatarProvider defaultAvatar={info.defaultAvatar}><OverlayCoordinatorProvider><RealtimeProvider platform={authPlatform}><ForcedFormProvider><AnnouncementProvider enabled={(info.permissions || []).includes('system:notice:read')}><SalesDispatchStatusProvider canAccept={(info.permissions || []).includes('zsjos:lead:accept')}><NotifyMessageProvider><MenuTaskBadgeProvider>
     <Shell authPlatform={authPlatform} info={info} onUserChange={user => setInfo(current => current ? { ...current, user: { ...current.user, ...user } } : current)} onLogout={async () => {

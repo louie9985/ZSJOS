@@ -158,7 +158,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
                 FOLLOW_UP_RECORD_SCOPE_LEAD, record.getId(),
                 reqVO.getNextFollowUpAt(), occurredAt);
         lead.setLastFollowUpAt(occurredAt);
-        lead.setLastActivityAt(occurredAt);
+        LeadMapper.advanceActivity(lead, occurredAt);
         lead.setLastFollowUpRecordId(record.getId());
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
@@ -245,7 +245,7 @@ public class LeadFollowUpServiceImpl implements LeadFollowUpService {
         if (!Objects.equals(record.getCategoryBefore(), categoryAfter)) {
             lead.setLeadCategoryLabelSnapshot(record.getCategoryAfterLabelSnapshot());
         }
-        lead.setLastFollowUpAt(occurredAt); lead.setLastActivityAt(occurredAt);
+        lead.setLastFollowUpAt(occurredAt); LeadMapper.advanceActivity(lead, occurredAt);
         lead.setNextFollowUpAt(reqVO.getNextFollowUpAt());
         lead.setFollowUpCount((lead.getFollowUpCount() == null ? 0 : lead.getFollowUpCount()) + 1);
         leadMapper.updateById(lead);

@@ -3,6 +3,11 @@ package cn.iocoder.yudao.module.zsjos.enums;
 import cn.iocoder.yudao.framework.common.exception.ErrorCode;
 
 public interface ZsjosErrorCodeConstants {
+    ErrorCode LEAD_FEEDBACK_STATE_INVALID = new ErrorCode(1_900_003_120, "当前客资状态不允许回复提交人");
+    ErrorCode LEAD_FEEDBACK_VERSION_CONFLICT = new ErrorCode(1_900_003_121, "客资已发生变化，请刷新后重试");
+    ErrorCode LEAD_FEEDBACK_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_122, "本次发送标识已用于其他反馈内容");
+    ErrorCode LEAD_FEEDBACK_ATTACHMENT_INVALID = new ErrorCode(1_900_003_123, "附件无效、已过期、已绑定或不属于当前客资和上传人");
+    ErrorCode LEAD_FEEDBACK_RECIPIENT_MISSING = new ErrorCode(1_900_003_124, "当前客资缺少可用的反馈接收人");
     ErrorCode FORCED_FORM_NOT_EXISTS = new ErrorCode(1_900_004_001, "强制表单不存在");
     ErrorCode FORCED_FORM_FIELD_INVALID = new ErrorCode(1_900_004_002, "强制表单字段配置无效");
     ErrorCode FORCED_FORM_DICT_INVALID = new ErrorCode(1_900_004_003, "强制表单字典配置无效");
@@ -172,6 +177,7 @@ public interface ZsjosErrorCodeConstants {
     ErrorCode LEAD_COMPLAINT_ALREADY_HANDLED = new ErrorCode(1_900_003_076, "该销售投诉已由其他人员处理");
     ErrorCode LEAD_COMPLAINT_RESULT_INVALID = new ErrorCode(1_900_003_077, "销售投诉处理结论无效");
     ErrorCode LEAD_SUBMITTER_ACTION_STATE_INVALID = new ErrorCode(1_900_003_078, "当前客资状态不允许提交人补充、催促或投诉");
+    ErrorCode LEAD_SUPPLEMENT_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_130, "补充资料请求标识已用于其他内容，请重新提交");
     ErrorCode LEAD_SUBMITTER_ASSIST_RECIPIENT_MISSING = new ErrorCode(1_900_003_079, "当前客资缺少可通知的提交人");
     ErrorCode LEAD_SUBMITTER_ASSIST_IDEMPOTENCY_CONFLICT = new ErrorCode(1_900_003_080, "幂等键已用于其他提交人协助请求");
 

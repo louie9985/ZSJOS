@@ -38,6 +38,8 @@ public class PartnerOwnershipService {
     @Resource private PartnerMapper partnerMapper;
     @Resource private PermissionApi permissionApi;
     @Resource private AdminUserApi adminUserApi;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService leadAssignmentService;
+    public static final String DIRECTOR_VISIBILITY_SCENE = "content_director_partner_visibility";
 
     public PartnerOwnershipDO getByPartnerId(Long partnerId) {
         return ownershipMapper.selectByPartnerId(partnerId);
@@ -75,6 +77,7 @@ public class PartnerOwnershipService {
         var scope = permissionApi.getDeptDataPermission(employeeUserId);
         Set<Long> userIds = new HashSet<>();
         userIds.add(employeeUserId);
+        userIds.addAll(leadAssignmentService.getActiveTargetUserIds(DIRECTOR_VISIBILITY_SCENE, employeeUserId));
         if (scope == null) return userIds;
         List<AdminUserRespDTO> scopedUsers;
         if (Boolean.TRUE.equals(scope.getAll())) {

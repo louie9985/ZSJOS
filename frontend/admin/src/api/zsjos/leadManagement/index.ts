@@ -50,6 +50,8 @@ export interface LeadManagementVO {
   cityName?: string
   leadCategory?: string
   leadCategoryLabelSnapshot?: string
+  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: number; operatorName?: string }>
+  remarkHistoryIncomplete?: boolean
   remark?: string
   status: string
   assignmentStatus: string

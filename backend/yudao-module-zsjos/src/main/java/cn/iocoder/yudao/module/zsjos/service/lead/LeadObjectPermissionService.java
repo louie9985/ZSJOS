@@ -75,7 +75,7 @@ public class LeadObjectPermissionService {
             case "claim" -> ASSIGNMENT_PUBLIC_POOL.equals(lead.getAssignmentStatus());
             case "admin-transfer" -> true; // Controller feature permission remains mandatory.
             case "owner-transfer", "owner-release-public-sea" -> Objects.equals(userId, lead.getOwnerUserId());
-            case "request-submitter-assist" -> canReadDetail(lead, userId);
+            case "request-submitter-assist" -> canRequestSubmitterAssist(lead, userId);
             case "qualification-manage" -> canManageQualificationException(lead, userId);
             default -> false;
         };
@@ -120,6 +120,20 @@ public class LeadObjectPermissionService {
         }
         return salesOrderMapper.selectByLeadId(lead.getId()).stream()
                 .anyMatch(order -> salesOrderObjectPermissionService.canRead(order, userId));
+    }
+
+    /**
+     * Submitter assistance is a sales workflow action. In the collaboration
+     * public sea, only the original owner (A) or assigned collaborator (B) may
+     * request it; read-only visibility for other sales must not grant the action.
+     */
+    public boolean canRequestSubmitterAssist(LeadDO lead, Long userId) {
+        LeadAgingPoolCycleDO cycle = agingPoolCycleMapper.selectActiveByLeadId(lead.getId());
+        if (cycle != null) {
+            return Objects.equals(userId, cycle.getOriginalOwnerUserId())
+                    || Objects.equals(userId, cycle.getCollaboratorUserId());
+        }
+        return canReadDetail(lead, userId);
     }
 
     public boolean canReadSubordinatePartnerLead(LeadDO lead, Long userId) {

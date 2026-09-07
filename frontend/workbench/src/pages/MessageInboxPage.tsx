@@ -1,4 +1,4 @@
-import { Alert, App, Avatar, Badge, Button, Drawer, Empty, Grid, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
+import { Alert, App, Avatar, Badge, Button, Drawer, Empty, Grid, Input, Segmented, Skeleton, Space, Tag, Typography } from 'antd'
 import { BellOutlined, CheckOutlined, EyeOutlined, LinkOutlined, ReloadOutlined } from '@ant-design/icons'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -26,7 +26,6 @@ import {
   type NotifyLeadAction
 } from '../services/notifyMessageAction'
 
-const PAGE_SIZE = 20
 const CURSOR_LIMIT = 20
 
 type LeadActionProbe = { messageId: number; status: 'loading' | 'error' }
@@ -111,11 +110,13 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const requestSequence = useRef(0)
   const [messages, setMessages] = useState<NotifyMessage[]>([])
   const [category, setCategory] = useState<NotifyMessageCategory>('all')
+  const [keyword, setKeyword] = useState('')
+  const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(CURSOR_LIMIT)
+  const [tableTotal, setTableTotal] = useState(0)
   const [selected, setSelected] = useState<NotifyMessage>()
   const [cursor, setCursor] = useState<string>()
   const [hasMore, setHasMore] = useState(true)
-  const [pageNo, setPageNo] = useState(1)
-  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
@@ -126,11 +127,9 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   const [leadActionProbe, setLeadActionProbe] = useState<LeadActionProbe>()
   const [leadProbeAttempt, setLeadProbeAttempt] = useState(0)
   const loadMoreRef = useRef<HTMLDivElement>(null)
+  const cursorRef = useRef<string | undefined>(undefined)
 
-  const visibleMessages = useMemo(
-    () => messages.filter(item => category === 'all' || notifyMessageCategoryOf(item) === category),
-    [category, messages]
-  )
+  const visibleMessages = messages
 
   const loadCursor = useCallback(async (append = false) => {
     const requestId = ++requestSequence.current
@@ -138,18 +137,21 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
     else {
       setLoading(true)
       setCursor(undefined)
+      cursorRef.current = undefined
       setHasMore(true)
     }
     try {
-      const data = await api.myNotifyMessageCursor(
-        buildNotifyMessageCursorParams(view, append ? cursor : undefined, CURSOR_LIMIT)
-      )
+      const data = useTableLayout
+        ? await api.myNotifyMessagePage(buildNotifyMessagePageParams(view, tablePage, tablePageSize, keyword, category))
+        : await api.myNotifyMessageCursor(buildNotifyMessageCursorParams(view, append ? cursorRef.current : undefined, CURSOR_LIMIT, keyword, category))
       if (requestId !== requestSequence.current) return
-      setMessages(current => append
+      setTableTotal('total' in data ? data.total : 0)
+      setMessages(current => useTableLayout
+        ? data.list
+        : append
         ? [...current, ...data.list.filter(item => !current.some(existing => existing.id === item.id))]
         : data.list)
-      setCursor(data.nextCursor)
-      setHasMore(data.hasMore)
+      if ('nextCursor' in data) { setCursor(data.nextCursor); cursorRef.current = data.nextCursor; setHasMore(data.hasMore) }
       if (!append) setSelected(current => reconcileSelected(current, data.list, useTableLayout))
       setError('')
       setUnauthorized(false)
@@ -163,42 +165,14 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
         setLoadingMore(false)
       }
     }
-  }, [cursor, useTableLayout, view])
-
-  const loadPage = useCallback(async (nextPage = 1) => {
-    const requestId = ++requestSequence.current
-    setLoading(true)
-    setPageNo(nextPage)
-    try {
-      const data = await api.myNotifyMessagePage(buildNotifyMessagePageParams(view, nextPage, PAGE_SIZE))
-      if (requestId !== requestSequence.current) return
-      setMessages(data.list)
-      setTotal(data.total)
-      setCursor(undefined)
-      setHasMore(false)
-      setSelected(current => reconcileSelected(current, data.list, true))
-      setError('')
-      setUnauthorized(false)
-    } catch (loadError) {
-      if (requestId !== requestSequence.current) return
-      setUnauthorized(loadError instanceof AuthenticationError)
-      setError(loadError instanceof Error ? loadError.message : '消息加载失败')
-    } finally {
-      if (requestId === requestSequence.current) setLoading(false)
-    }
-  }, [view])
+  }, [category, keyword, tablePage, tablePageSize, useTableLayout, view])
 
   useEffect(() => {
     setLeadActions({})
     setLeadActionProbe(undefined)
     setLeadProbeAttempt(0)
-    if (useTableLayout) {
-      setPageNo(1)
-      void loadPage(1)
-    } else {
-      void loadCursor(false)
-    }
-  }, [loadCursor, loadPage, useTableLayout, view])
+    void loadCursor(false)
+  }, [loadCursor, view])
 
   useEffect(() => {
     setCategory('all')
@@ -254,7 +228,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
 
   useEffect(() => {
     const node = loadMoreRef.current
-    if (!node || !hasMore || loading || loadingMore || useTableLayout) return
+    if (useTableLayout || !node || !hasMore || loading || loadingMore) return
     const observer = new IntersectionObserver(entries => {
       if (entries[0]?.isIntersecting) void loadCursor(true)
     }, { root: node.parentElement, rootMargin: '160px' })
@@ -263,8 +237,7 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
   }, [hasMore, loadCursor, loading, loadingMore, useTableLayout])
 
   useRealtimeEvent('notify-message-new', () => {
-    if (useTableLayout) void loadPage(pageNo)
-    else void loadCursor(false)
+    void loadCursor(false)
   })
 
   const markRead = useCallback(async (item: NotifyMessage) => {
@@ -276,9 +249,6 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       setSelected(current => current?.id === item.id
         ? { ...current, readStatus: true, readTime }
         : current)
-      if (useTableLayout && view === 'unread') {
-        setTotal(current => Math.max(0, current - 1))
-      }
       await refreshUnreadCount()
     } catch (markError) {
       toast.error(markError instanceof Error ? markError.message : '标记已读失败')
@@ -299,11 +269,9 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       const readTime = Date.now()
       setMessages(current => applyReadStatus(current, current.map(item => item.id), view, readTime))
       setSelected(current => current ? { ...current, readStatus: true, readTime } : current)
-      if (useTableLayout && view === 'unread') {
-        setTotal(0)
-        setPageNo(1)
-      } else if (view === 'unread') {
+      if (view === 'unread') {
         setCursor(undefined)
+        cursorRef.current = undefined
         setHasMore(false)
       }
       await refreshUnreadCount()
@@ -383,9 +351,8 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
       window.location.reload()
       return
     }
-    if (useTableLayout) void loadPage(pageNo)
-    else void loadCursor(false)
-  }, [loadCursor, loadPage, pageNo, unauthorized, useTableLayout])
+    void loadCursor(false)
+  }, [loadCursor, unauthorized])
   const errorAlert = error && <Alert
     className="business-inbox-error"
     type={unauthorized ? 'warning' : 'error'}
@@ -409,14 +376,14 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
         <Button icon={<ReloadOutlined/>} onClick={() => {
           setLeadActions({})
           setLeadProbeAttempt(value => value + 1)
-          if (useTableLayout) void loadPage(pageNo)
-          else void loadCursor(false)
+          void loadCursor(false)
           void refreshUnreadCount()
         }}>刷新</Button>
         <Button type="primary" icon={<CheckOutlined/>} loading={markingAll} disabled={unreadCount === 0} onClick={() => void markAllRead()}>全部已读</Button>
       </Space>
     </header>
     <div className="message-inbox-category-bar">
+      <Input.Search allowClear value={keyword} placeholder="搜索消息标题、摘要或正文" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ maxWidth: 360 }} />
       <Segmented
         block
         value={category}
@@ -434,9 +401,9 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
             loading={loading}
             dataSource={visibleMessages}
             search={false}
-            options={{ density: true, fullScreen: true, setting: true, reload: () => { if (view === 'unread') void loadPage(pageNo); else void loadCursor(false) } }}
+            options={{ density: true, fullScreen: true, setting: true, reload: () => void loadCursor(false) }}
             columnsState={{ persistenceKey: 'crm-message-table-columns', persistenceType: 'localStorage' }}
-            pagination={{ current: pageNo, pageSize: PAGE_SIZE, total, showSizeChanger: false, onChange: next => void loadPage(next) }}
+            pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
             size="middle"
             bordered
             scroll={{ x: 2100 }}
@@ -447,6 +414,9 @@ export default function MessageInboxPage({ view }: { view: NotifyMessageView }) 
             ].filter(Boolean).join(' ')}
             columns={tableColumns}
           />
+          {!useTableLayout && !loading && <div ref={loadMoreRef} className="message-inbox-load-more">
+            {loadingMore ? <Button type="text" size="small" loading>正在加载更多</Button> : error ? <Button type="text" size="small" icon={<ReloadOutlined/>} onClick={() => void loadCursor(true)}>重试加载</Button> : hasMore ? <Button type="text" size="small" onClick={() => void loadCursor(true)}>继续下滑加载</Button> : messages.length > 0 ? '已加载全部消息' : null}
+          </div>}
         </div>
       </>
     ) : (

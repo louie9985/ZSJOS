@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.infra.controller.admin.db;
 
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
+import cn.iocoder.yudao.framework.apilog.core.annotation.ApiAccessLog;
 import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminDataPageReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminRowCreateReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminRowDeleteReqVO;
@@ -40,6 +41,7 @@ public class DatabaseAdminController {
     private DatabaseAdminService databaseAdminService;
 
     @GetMapping("/table/list")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "获得数据库表列表")
     @Parameters({
             @Parameter(name = "dataSourceConfigId", description = "数据源配置编号", required = true, example = "0"),
@@ -55,6 +57,7 @@ public class DatabaseAdminController {
     }
 
     @GetMapping("/table/detail")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "获得数据库表详情")
     @PreAuthorize("@ss.hasPermission('infra:database-admin:query')")
     public CommonResult<DatabaseAdminTableDetailRespVO> getTableDetail(
@@ -64,6 +67,7 @@ public class DatabaseAdminController {
     }
 
     @GetMapping("/data/page")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "获得数据库表数据分页")
     @PreAuthorize("@ss.hasPermission('infra:database-admin:query')")
     public CommonResult<DatabaseAdminTableDataRespVO> getTableDataPage(@Valid DatabaseAdminDataPageReqVO reqVO) {
@@ -71,6 +75,7 @@ public class DatabaseAdminController {
     }
 
     @PostMapping("/row/create")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "新增数据库表行")
     @PreAuthorize("@ss.hasPermission('infra:database-admin:create')")
     public CommonResult<Boolean> createRow(@Valid @RequestBody DatabaseAdminRowCreateReqVO reqVO) {
@@ -79,6 +84,7 @@ public class DatabaseAdminController {
     }
 
     @PutMapping("/row/update")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "更新数据库表行")
     @PreAuthorize("@ss.hasPermission('infra:database-admin:update')")
     public CommonResult<Boolean> updateRow(@Valid @RequestBody DatabaseAdminRowUpdateReqVO reqVO) {
@@ -87,6 +93,7 @@ public class DatabaseAdminController {
     }
 
     @DeleteMapping("/row/delete")
+    @ApiAccessLog(requestEnable = false, responseEnable = false)
     @Operation(summary = "删除数据库表行")
     @PreAuthorize("@ss.hasPermission('infra:database-admin:delete')")
     public CommonResult<Boolean> deleteRow(@Valid @RequestBody DatabaseAdminRowDeleteReqVO reqVO) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, Avatar, Button, Empty, Form, Input, Modal, Select, Skeleton, Space, Tabs, Tag, Typography, message } from 'antd'
 import { api, type AdvancedFilterGroup, type LeadDuplicateReview, type LeadDuplicateReviewDecision } from '../services/api'
 import { formatTimestamp } from '../services/time'
@@ -63,6 +63,14 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
   const [items, setItems] = useState<LeadDuplicateReview[]>([])
+  const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(20)
+  const [tableTotal, setTableTotal] = useState(0)
+  const [loadedPage, setLoadedPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
+  const loadedPageRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<LeadDuplicateReview>()
@@ -78,17 +86,43 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
     [items]
   )
 
-  const load = useCallback(async () => {
-    setLoading(true); setError('')
-    try {
-      const next = (await api.duplicateReviewPage({ status, pageNo: 1, pageSize: 100, keyword: keyword || undefined, advancedFilter })).list
-      setItems(next)
-      setSelected(current => next.find(item => item.id === current?.id) ?? next[0])
+  const load = useCallback(async (append = false) => {
+    const page = useTableLayout ? tablePage : (append ? loadedPageRef.current + 1 : 1)
+    if (append) setLoadingMore(true)
+    else {
+      loadedPageRef.current = 0
+      setLoadedPage(0)
+      setLoading(true)
     }
-    catch (cause) { setItems([]); setSelected(undefined); setError(cause instanceof Error ? cause.message : '复核队列加载失败') }
-    finally { setLoading(false) }
-  }, [advancedFilter, keyword, status])
+    setError('')
+    try {
+      const result = await api.duplicateReviewPage({ status, pageNo: page, pageSize: useTableLayout ? tablePageSize : 100, keyword: keyword || undefined, advancedFilter })
+      const next = result.list
+      setItems(current => useTableLayout || !append
+        ? next
+        : [...current, ...next.filter(item => !current.some(existing => existing.id === item.id))])
+      setTableTotal(result.total)
+      loadedPageRef.current = page
+      setLoadedPage(page)
+      setHasMore(page * (useTableLayout ? tablePageSize : 100) < result.total)
+      if (!append) setSelected(current => next.find(item => item.id === current?.id) ?? next[0])
+    }
+    catch (cause) {
+      if (!append) { setItems([]); setSelected(undefined) }
+      setError(cause instanceof Error ? cause.message : '复核队列加载失败')
+    }
+    finally { setLoading(false); setLoadingMore(false) }
+  }, [advancedFilter, keyword, status, tablePage, tablePageSize, useTableLayout])
   useEffect(() => { void load() }, [load])
+  useEffect(() => {
+    const node = loadMoreRef.current
+    if (useTableLayout || !node || !hasMore || loading || loadingMore) return
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting)) void load(true)
+    }, { root: node.parentElement, rootMargin: '160px' })
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [hasMore, load, loading, loadingMore, useTableLayout])
 
   const openProcess = async (row: LeadDuplicateReview) => {
     setProcessing(row); form.resetFields(); setFiles([])
@@ -158,7 +192,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       <Tabs activeKey={status} onChange={key => setStatus(key as typeof status)} items={[{ key: 'pending', label: '待处理' }, { key: 'completed', label: '已处理' }]}/>
     </header>
     {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void load()}>重试</Button>}/>} 
-    {useTableLayout ? <ProTable<LeadDuplicateReview>
+    {useTableLayout ? <><div className="message-inbox-toolbar"><AdvancedFilterToolbar scene="duplicate_review" pageKey="lead_duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<LeadDuplicateReview>
       className="business-inbox-table"
       rowKey="id"
       search={false}
@@ -166,7 +200,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
       columnsState={{ persistenceKey: 'crm-lead-duplicate-review-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
-      pagination={false}
+      pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
       scroll={{ x: 2600 }}
       locale={{ emptyText: <Empty description="暂无复核任务" /> }}
       columns={[
@@ -184,7 +218,7 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
         { title: '复核时间', dataIndex: 'reviewedAt', render: (_, item) => formatTimestamp(item.reviewedAt), width: 170 },
         { title: '操作', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => selectReview(item)}>详细</Button> }
       ]}
-    /> : <div className="message-inbox-layout">
+    /></> : <div className="message-inbox-layout">
       <aside className="message-inbox-list-pane">
         <div className="message-inbox-toolbar"><AdvancedFilterToolbar scene="duplicate_review" pageKey="lead_duplicate_review" placeholder="搜索姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={setKeyword} onChange={setAdvancedFilter}/></div>
         <div className="message-inbox-list" aria-label="重复客资复核列表">
@@ -204,6 +238,9 @@ export default function LeadDuplicateReviewPage({ permissions }: { permissions: 
                 <div className="message-inbox-item-meta"><span>{formatTimestamp(item.createTime)}</span></div>
               </button>
             }) : !error && <Empty description="暂无复核任务"/>}
+          <div ref={loadMoreRef} className="business-inbox-list-state">
+            {loadingMore ? '正在加载更多' : error ? <Button type="text" size="small" onClick={() => void load(true)}>重试加载</Button> : hasMore ? '继续下滑加载' : items.length > 0 ? '已加载全部复核任务' : null}
+          </div>
         </div>
       </aside>
       <main className="message-inbox-detail-pane">{detail}</main>

@@ -3,6 +3,20 @@ import referenceRequest from './reference'
 import type { DictItem } from '@/stores/app'
 import type { ApiDateValue } from '@/utils/format'
 
+export interface LeadSubmitterFeedback {
+  id: number
+  feedback: string
+  salesName?: string
+  submitterName?: string
+  createTime: ApiDateValue
+  attachments: Array<{ fileId: number; originalName: string; contentType: string; fileSize: number; url?: string }>
+}
+
+export function getLeadSubmitterFeedback(leadId: number, pageNo = 1) {
+  return request.get<never, { list: LeadSubmitterFeedback[]; total: number }>(
+    `/zsjos/lead/${leadId}/submitter-feedback/page`, { params: { pageNo, pageSize: 10 } })
+}
+
 export interface LeadCatalog {
   categoryTree: CategoryNode[]
   spus: SpuItem[]
@@ -87,6 +101,8 @@ export interface LeadListItem {
   sourceChannelLabelSnapshot?: string
   leadCategory: string
   leadCategoryLabelSnapshot?: string
+  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: number; operatorName?: string }>
+  remarkHistoryIncomplete?: boolean
   status: string
   assignmentStatus: string
   handlingStage?: string

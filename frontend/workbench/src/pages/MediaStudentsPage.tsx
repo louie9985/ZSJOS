@@ -80,6 +80,7 @@ const positioningFormValues = (values: Record<string, unknown>, fields: Director
   }),
 )
 export default function MediaStudentsPage({ permissions = [] }: { permissions?: string[] }) {
+  // The student inbox deliberately remains master-detail for every global inbox layout setting.
   const location = useLocation()
   const initialLocationKey = useRef(location.key)
   const { message, modal } = App.useApp()
@@ -474,18 +475,19 @@ export default function MediaStudentsPage({ permissions = [] }: { permissions?: 
       return form.getFieldValue('submit') === false || !empty ? Promise.resolve() : Promise.reject(new Error(`请填写${field.title}`))
     } }] : undefined
     const label = <span>{field.title} {field.required ? <Typography.Text type="danger">（必填）</Typography.Text> : <Typography.Text type="secondary">（选填）</Typography.Text>}</span>
-    if (field.type === 'textarea') return <Form.Item key={field.key} name={name} label={label} rules={rules}><Input.TextArea rows={4} /></Form.Item>
-    if (field.type === 'number') return <Form.Item key={field.key} name={name} label={label} rules={rules}><InputNumber style={{ width: '100%' }} /></Form.Item>
-    if (field.type === 'date' || field.type === 'datetime') return <Form.Item key={field.key} name={name} label={label} rules={rules}><DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /></Form.Item>
-    if (field.type === 'region') return <div key={field.key}>{legacyRegionText && <Alert type="warning" showIcon message={`历史地区：${legacyRegionText}`} description="历史文本仅保留用于草稿兼容，正式提交前请从系统地区中重新选择。"/>}<Form.Item name={name} label={label} rules={rules}><Cascader options={areas} fieldNames={{ label: 'name', value: 'id', children: 'children' }} changeOnSelect showSearch placeholder="请选择地区" style={{ width: '100%' }} /></Form.Item></div>
+    const extra = field.description?.trim() ? <Typography.Text type="secondary" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{field.description}</Typography.Text> : undefined
+    if (field.type === 'textarea') return <Form.Item key={field.key} name={name} label={label} rules={rules} extra={extra}><Input.TextArea rows={4} /></Form.Item>
+    if (field.type === 'number') return <Form.Item key={field.key} name={name} label={label} rules={rules} extra={extra}><InputNumber style={{ width: '100%' }} /></Form.Item>
+    if (field.type === 'date' || field.type === 'datetime') return <Form.Item key={field.key} name={name} label={label} rules={rules} extra={extra}><DatePicker showTime={field.type === 'datetime'} style={{ width: '100%' }} /></Form.Item>
+    if (field.type === 'region') return <div key={field.key}>{legacyRegionText && <Alert type="warning" showIcon message={`历史地区：${legacyRegionText}`} description="历史文本仅保留用于草稿兼容，正式提交前请从系统地区中重新选择。"/>}<Form.Item name={name} label={label} rules={rules} extra={extra}><Cascader options={areas} fieldNames={{ label: 'name', value: 'id', children: 'children' }} changeOnSelect showSearch placeholder="请选择地区" style={{ width: '100%' }} /></Form.Item></div>
     if (field.type === 'dict' || field.type === 'select' || field.type === 'multi_select' || field.type === 'radio' || field.type === 'checkbox_group') {
       const options = (fieldDicts[field.dictType || ''] || []).map(item => ({ value: item.value, label: item.label }))
-      if (field.type === 'radio') return <Form.Item key={field.key} name={name} label={<span>{field.title} <Typography.Text type={field.required ? 'danger' : 'secondary'}>（单选·{field.required ? '必填' : '选填'}）</Typography.Text></span>} rules={rules}><Radio.Group options={options} /></Form.Item>
-      if (field.type === 'checkbox_group') return <Form.Item key={field.key} name={name} label={<span>{field.title} <Typography.Text type={field.required ? 'danger' : 'secondary'}>（多选·{field.required ? '必填' : '选填'}）</Typography.Text></span>} rules={rules}><Checkbox.Group options={options} /></Form.Item>
-      return <Form.Item key={field.key} name={name} label={label} rules={rules}><Select mode={field.multiple || field.type === 'multi_select' ? 'multiple' : undefined} options={options} /></Form.Item>
+      if (field.type === 'radio') return <Form.Item key={field.key} name={name} label={<span>{field.title} <Typography.Text type={field.required ? 'danger' : 'secondary'}>（单选·{field.required ? '必填' : '选填'}）</Typography.Text></span>} rules={rules} extra={extra}><Radio.Group options={options} /></Form.Item>
+      if (field.type === 'checkbox_group') return <Form.Item key={field.key} name={name} label={<span>{field.title} <Typography.Text type={field.required ? 'danger' : 'secondary'}>（多选·{field.required ? '必填' : '选填'}）</Typography.Text></span>} rules={rules} extra={extra}><Checkbox.Group options={options} /></Form.Item>
+      return <Form.Item key={field.key} name={name} label={label} rules={rules} extra={extra}><Select mode={field.multiple || field.type === 'multi_select' ? 'multiple' : undefined} options={options} /></Form.Item>
     }
-    if (field.type === 'checkbox') return <Form.Item key={field.key} name={name} valuePropName="checked" label={label} rules={rules}><Checkbox>勾选</Checkbox></Form.Item>
-    return <Form.Item key={field.key} name={name} label={label} rules={rules}><Input /></Form.Item>
+    if (field.type === 'checkbox') return <Form.Item key={field.key} name={name} valuePropName="checked" label={label} rules={rules} extra={extra}><Checkbox>勾选</Checkbox></Form.Item>
+    return <Form.Item key={field.key} name={name} label={label} rules={rules} extra={extra}><Input /></Form.Item>
   }
   const interviewFields = directorContext?.directorForms?.interview?.fields || []
   const interviewGroups = Array.from(new Set(interviewFields.map(field => field.group || '基本信息')))

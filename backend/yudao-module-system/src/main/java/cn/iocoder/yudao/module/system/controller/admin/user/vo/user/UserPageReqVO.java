@@ -38,4 +38,7 @@ public class UserPageReqVO extends PageParam {
     @Schema(description = "角色编号", example = "1024")
     private Long roleId;
 
+    @Schema(description = "在线状态；true 仅在线，false 仅离线")
+    private Boolean online;
+
 }

@@ -176,6 +176,7 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             throw exception(LEAD_APPEAL_PROCESS_UNAVAILABLE);
         }
         appealMapper.updateById(appeal);
+        leadMapper.touchActivity(leadId, now);
         BusinessEventDO event = addEvent(EVENT_LEAD_APPEAL_SUBMITTED, lead, userId, appeal,
                 STATUS_INVALID, appeal.getStatus(), appeal.getReason(), appeal.getEvidenceRefs(), now,
                 reqVO.getIdempotencyKey());
@@ -405,8 +406,11 @@ public class LeadAppealServiceImpl implements LeadAppealService {
             lead.setQualifiedAt(now);
             lead.setConvertedAt(now);
             lead.setValidDescription(reqVO.getReason().trim());
+            LeadMapper.advanceActivity(lead, now);
             leadMapper.updateById(lead);
             cashbackService.ensureValidCashback(lead.getId());
+        } else {
+            leadMapper.touchActivity(lead.getId(), now);
         }
         String eventType = overturn ? EVENT_LEAD_APPEAL_OVERTURNED : EVENT_LEAD_APPEAL_UPHELD;
         String scene = overturn ? cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.APPEAL_OVERTURNED

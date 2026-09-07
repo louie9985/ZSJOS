@@ -86,6 +86,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setQualifiedByUserId(userId);
         lead.setQualifiedAt(now);
         lead.setConvertedAt(now);
+        LeadMapper.advanceActivity(lead, now);
         if (!Objects.equals(lead.getLeadCategory(), category.value())) {
             lead.setLeadCategory(category.value());
             lead.setLeadCategoryLabelSnapshot(category.labelSnapshot());
@@ -132,6 +133,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setInvalidEvidenceRefs(buildEvidenceJson(reqVO.getAttachments(), userId));
         lead.setValidDescription(null);
         lead.setNextFollowUpAt(null);
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
         lifecycleTaskService.cancelFirstFollowUpTasks(leadId, now, "客资判定无效");
         lifecycleTaskService.cancelFollowUpReminders(leadId, now, "客资判定无效");
@@ -205,6 +207,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lifecycleTaskService.cancelQualificationTask(leadId, lead.getQualificationRoundNo(), now, "主管恢复并重启判定");
         lead.setStatus(STATUS_SUBMITTED);
         lead.setSuspendedAt(null);
+        LeadMapper.advanceActivity(lead, now);
         lifecycleTaskService.createQualificationTask(lead, lead.getOwnerUserId(), now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_RESTORED, lead, userId, STATUS_SUSPENDED, STATUS_SUBMITTED,
@@ -243,6 +246,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setCurrentAssignmentFirstFollowUpAt(null);
         lead.setCurrentAssignmentFirstFollowUpDeadlineAt(null);
         lead.setNextFollowUpAt(null);
+        LeadMapper.advanceActivity(lead, now);
         lifecycleTaskService.createQualificationTask(lead, reqVO.getSalesUserId(), now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_TRANSFERRED, lead, userId, suspended ? STATUS_SUSPENDED : ASSIGNMENT_RECYCLE_PENDING,
@@ -274,6 +278,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setRecycleSourceOwnerUserId(fromOwner);
         lead.setOwnerUserId(null);
         clearCurrentAssignment(lead);
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_RECYCLED, lead, userId, STATUS_SUSPENDED, ASSIGNMENT_RECYCLE_PENDING,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
@@ -304,6 +309,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setRecycleSourceOwnerUserId(fromOwner);
         lead.setPublicPoolAt(now);
         clearCurrentAssignment(lead);
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_RELEASED, lead, userId,
                 suspended ? STATUS_SUSPENDED : ASSIGNMENT_RECYCLE_PENDING, ASSIGNMENT_PUBLIC_POOL,
@@ -335,6 +341,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setRecycleSourceOwnerUserId(fromOwner);
         lead.setOwnerUserId(null);
         clearCurrentAssignment(lead);
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_RECYCLED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_RECYCLE_PENDING,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
@@ -365,6 +372,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
         lead.setRecycleSourceOwnerUserId(fromOwner);
         lead.setPublicPoolAt(now);
         clearCurrentAssignment(lead);
+        LeadMapper.advanceActivity(lead, now);
         leadMapper.updateById(lead);
         addEvent(EVENT_LEAD_RELEASED, lead, userId, ASSIGNMENT_OWNED, ASSIGNMENT_PUBLIC_POOL,
                 reqVO.getReason().trim(), key, Map.of("fromOwnerUserId", fromOwner,
@@ -389,6 +397,7 @@ public class LeadQualificationServiceImpl implements LeadQualificationService {
             if (qualificationTaskId != null) taskReminderService.emitDueForTask(qualificationTaskId, now);
             lead.setStatus(STATUS_SUSPENDED);
             lead.setSuspendedAt(now);
+            LeadMapper.advanceActivity(lead, now);
             leadMapper.updateById(lead);
             lifecycleTaskService.cancelQualificationTask(lead.getId(), lead.getQualificationRoundNo(), now,
                     "有效性判定超时自动挂起");

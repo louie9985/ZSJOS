@@ -250,14 +250,14 @@ export default function LeadSubmissionPage({
     finally { submittingRef.current = false; setSubmitting(false) }
   }
 
+  const summary = current === lastIndex ? (pendingValues || form.getFieldsValue(true)) : undefined
   const regionLabel = useMemo(() => {
-    const path: string[] = pendingValues?.regionPath || []
+    const path: string[] = summary?.regionPath || []
     if (!path.length) return '—'
     const province = areaOptions.find(item => item.value === path[0])
     const city = province?.children?.find(item => item.value === path[1])
     return [province?.label, city?.label].filter(Boolean).join(' / ') || '—'
-  }, [pendingValues, areaOptions])
-  const summary = current === lastIndex ? (pendingValues || form.getFieldsValue(true)) : undefined
+  }, [summary?.regionPath, areaOptions])
 
   return <section className="workspace-page lead-submission-page">
     {remote.error && <Alert showIcon type="error" message={remote.error} action={<Button icon={<ReloadOutlined />} onClick={() => void loadOptions()}>重试</Button>} />}

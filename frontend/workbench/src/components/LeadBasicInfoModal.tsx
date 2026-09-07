@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Alert, App, Button, Cascader, Form, Input, Modal, Select, Space, Spin } from 'antd'
 import { ReloadOutlined } from '@ant-design/icons'
 import { api, type AreaNode, type DictData, type LeadCatalog, type ManagedLead } from '../services/api'
@@ -27,6 +27,7 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
 }) {
   const { message } = App.useApp()
   const [form] = Form.useForm<Values>()
+  const supplementAttempt = useRef<{ content: string; key: string } | undefined>(undefined)
   const mobile = Form.useWatch('mobile', form)
   const wechatId = Form.useWatch('wechatId', form)
   const [areas, setAreas] = useState<AreaNode[]>([])
@@ -80,6 +81,7 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
       regionPath: undefined, leadCategory: lead.leadCategory,
       reason: ''
     })
+    supplementAttempt.current = undefined
     const selections = products.map(selectionFromManagedProduct)
     setProducts(selections)
     setPrimaryKey(selections[products.findIndex(item => item.primary)]?.key)
@@ -113,10 +115,12 @@ export default function LeadBasicInfoModal({ lead, open, onClose, onChanged, onD
       const [provinceCode, cityCode] = normalizeLeadAreaPath(values.regionPath)
       const intendedProducts = products.map(item => ({ spuRef: item.spuRef, skuRef: item.skuRef, spuUnknown: item.spuUnknown,
         skuUnknown: item.skuUnknown, primary: item.key === primaryKey }))
-      if (submitterOnly) await api.supplementLead(lead.id, {
-        provinceCode, cityCode, leadCategory: values.leadCategory!, intendedProducts,
-        remark: values.reason?.trim() || undefined, idempotencyKey: createIdempotencyKey()
-      })
+      if (submitterOnly) {
+        const payload = { provinceCode, cityCode, leadCategory: values.leadCategory!, intendedProducts, remark: values.reason?.trim() || undefined }
+        const content = JSON.stringify(payload)
+        if (supplementAttempt.current?.content !== content) supplementAttempt.current = { content, key: createIdempotencyKey() }
+        await api.supplementLead(lead.id, { ...payload, idempotencyKey: supplementAttempt.current.key })
+      }
       else await api.updateLeadBasicInfo(lead.id, {
         name: values.name.trim(), mobile: values.mobile?.trim() || undefined, wechatId: values.wechatId?.trim() || undefined,
         provinceCode, cityCode, leadCategory: values.leadCategory,

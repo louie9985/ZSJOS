@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.zsjos.service.product;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.tenant.core.context.TenantContextHolder;
 import cn.iocoder.yudao.module.zsjos.controller.admin.product.vo.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductCategoryDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.product.ZsjosProductDO;
@@ -55,7 +56,8 @@ public class ZsjosProductServiceImpl implements ZsjosProductService {
 
     @Override @Transactional(rollbackFor = Exception.class)
     public void deleteProduct(Long id) {
-        ZsjosProductDO product = validateExists(id);
+        ZsjosProductDO product = productMapper.selectByIdForUpdate(id, TenantContextHolder.getRequiredTenantId());
+        if (product == null) throw exception(PRODUCT_NOT_EXISTS);
         if (intendedProductMapper.selectCountByProductRef(product.getProductRef()) > 0) {
             throw exception(PRODUCT_IN_USE);
         }

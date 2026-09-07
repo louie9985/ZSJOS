@@ -89,6 +89,8 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
     private OAuth2TokenService oauth2TokenService;
     @MockitoBean
     private AdminUserProducer adminUserProducer;
+    @MockitoBean
+    private AdminUserOnlineService adminUserOnlineService;
 
     @BeforeEach
     public void before() {
@@ -369,6 +371,38 @@ public class AdminUserServiceImplTest extends BaseDbUnitTest {
         assertEquals(1, pageResult.getTotal());
         assertEquals(1, pageResult.getList().size());
         assertPojoEquals(dbUser, pageResult.getList().get(0));
+    }
+
+    @Test
+    public void testGetUserPage_online() {
+        AdminUserDO onlineUser = randomAdminUserDO();
+        AdminUserDO offlineUser = randomAdminUserDO();
+        userMapper.insert(onlineUser);
+        userMapper.insert(offlineUser);
+        when(adminUserOnlineService.getRequiredOnlineUserIds()).thenReturn(singleton(onlineUser.getId()));
+        UserPageReqVO reqVO = new UserPageReqVO();
+        reqVO.setOnline(true);
+
+        PageResult<AdminUserDO> pageResult = userService.getUserPage(reqVO);
+
+        assertEquals(1, pageResult.getTotal());
+        assertEquals(onlineUser.getId(), pageResult.getList().get(0).getId());
+    }
+
+    @Test
+    public void testGetUserPage_offline() {
+        AdminUserDO onlineUser = randomAdminUserDO();
+        AdminUserDO offlineUser = randomAdminUserDO();
+        userMapper.insert(onlineUser);
+        userMapper.insert(offlineUser);
+        when(adminUserOnlineService.getRequiredOnlineUserIds()).thenReturn(singleton(onlineUser.getId()));
+        UserPageReqVO reqVO = new UserPageReqVO();
+        reqVO.setOnline(false);
+
+        PageResult<AdminUserDO> pageResult = userService.getUserPage(reqVO);
+
+        assertEquals(1, pageResult.getTotal());
+        assertEquals(offlineUser.getId(), pageResult.getList().get(0).getId());
     }
 
     /**

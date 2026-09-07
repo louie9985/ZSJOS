@@ -28,6 +28,13 @@ export interface UserSimpleVO {
   deptName?: string
 }
 
+export interface UserOnlineStatusVO {
+  available: boolean
+  onlineUserIds: number[]
+  onlineCount?: number
+  observedAt: Date
+}
+
 // 保留旧返回类型，避免扩大影响尚未迁移的上游管理页面。
 export const getSimpleUserList = (): Promise<UserVO[]> => {
   return request.get({ url: '/system/user/simple-list' })
@@ -54,6 +61,14 @@ export const getSimpleUserListByNickname = (nickname: string) => {
 // 查询用户管理列表
 export const getUserPage = (params: PageParam) => {
   return request.get({ url: '/system/user/page', params })
+}
+
+// 查询当前页用户在线状态及当前租户在线人数
+export const getUserOnlineStatus = (userIds: number[]) => {
+  return request.get<UserOnlineStatusVO>({
+    url: '/system/user/online-status',
+    params: userIds.length > 0 ? { userIds: userIds.join(',') } : undefined
+  })
 }
 
 // 查询用户管理列表

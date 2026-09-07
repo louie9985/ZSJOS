@@ -30,21 +30,30 @@
           </el-select>
         </el-form-item>
         <el-form-item label="发送范围" prop="audienceType">
-          <el-radio-group v-model="formData.audienceType">
+          <el-radio-group v-model="formData.audienceType" @change="handleAudienceTypeChange">
             <el-radio value="ALL">全员</el-radio>
             <el-radio value="TARGET">指定部门/用户</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item v-if="formData.audienceType === 'TARGET'" label="指定部门/用户" prop="targetIds">
+        <el-form-item v-if="formData.audienceType === 'TARGET'" label="指定部门/用户" prop="targetUserIds">
+          <div v-if="audienceLoadError" class="notice-audience-error">
+            <span>{{ audienceLoadError }}</span>
+            <el-button link type="primary" :loading="audienceLoading" @click="loadAudienceTree">重试</el-button>
+          </div>
+          <el-input v-model="audienceFilter" clearable placeholder="搜索部门或用户" class="notice-audience-filter" />
           <el-tree
+            v-if="!audienceLoadError"
             ref="audienceTreeRef"
             :data="audienceTree"
             node-key="key"
             show-checkbox
+            check-strictly
             default-expand-all
+            :filter-node-method="filterAudienceNode"
             :props="{ label: 'label', children: 'children' }"
             @check="syncAudienceSelection"
           />
+          <el-empty v-if="!audienceLoadError && !audienceLoading && !audienceTree.length" description="暂无可选部门或用户" />
           <div class="el-form-item__tip">勾选部门将发送给该部门及全部子部门成员；可同时多选用户。</div>
         </el-form-item>
         <el-form-item label="高亮提醒截止时间" prop="highlightUntil">
@@ -122,8 +131,6 @@ import type {
 import { DICT_TYPE, getIntDictOptions } from '@/utils/dict'
 import { getFileIcon } from '@/utils/file'
 import * as NoticeApi from '@/api/system/notice'
-import * as DeptApi from '@/api/system/dept'
-import * as UserApi from '@/api/system/user'
 import { handleTree } from '@/utils/tree'
 
 const props = defineProps<{ id?: number }>()
@@ -148,12 +155,17 @@ const formData = reactive({
 })
 const audienceTreeRef = ref()
 const audienceTree = ref<any[]>([])
-const deptIds = ref<number[]>([])
-const userIds = ref<number[]>([])
+const audienceLoading = ref(false)
+const audienceLoadError = ref('')
+const audienceFilter = ref('')
 const rules: FormRules = {
   title: [{ required: true, message: '公告标题不能为空', trigger: 'blur' }],
   type: [{ required: true, message: '公告类型不能为空', trigger: 'change' }],
-  content: [{ required: true, message: '公告正文不能为空', trigger: 'blur' }]
+  content: [{ required: true, message: '公告正文不能为空', trigger: 'blur' }],
+  targetUserIds: [{ validator: (_rule, _value, callback) => {
+    if (formData.audienceType === 'TARGET' && !formData.targetDeptIds.length && !formData.targetUserIds.length) callback(new Error('请至少选择一个部门或用户'))
+    else callback()
+  }, trigger: 'change' }]
 }
 type UploadTask = {
   uid: number
@@ -180,7 +192,6 @@ const load = async () => {
     formData.targetDeptIds = data.targetDeptIds || []
     formData.targetUserIds = data.targetUserIds || []
     formData.attachments = data.attachments || []
-    await loadAudienceTree()
     await nextTick()
     audienceTreeRef.value?.setCheckedKeys([
       ...formData.targetDeptIds.map((id) => `d:${id}`),
@@ -231,19 +242,57 @@ const beforeUpload = (file: UploadRawFile) => {
 }
 
 const loadAudienceTree = async () => {
-  const [depts, users] = await Promise.all([DeptApi.getSimpleDeptList(), UserApi.getSimpleUserOptions()])
-  const deptTree = handleTree(depts).map((dept: any) => addUsers(dept, users))
-  audienceTree.value = deptTree
+  audienceLoading.value = true
+  audienceLoadError.value = ''
+  try {
+    const options = await NoticeApi.getNoticeRecipientOptions()
+  const depts = options.departments
+  const users = options.users
+  const usersByDept = new Map<number, NoticeApi.NoticeRecipientOptionsVO['users']>()
+  users.forEach((user) => {
+    if (user.deptId != null) usersByDept.set(user.deptId, [...(usersByDept.get(user.deptId) || []), user])
+  })
+  const represented = new Set<number>()
+  const deptTree = handleTree(depts).map((dept: any) => addUsers(dept, usersByDept, represented))
+  const unassigned = users.filter((user) => !represented.has(user.id)).map((user) => ({
+    key: `u:${user.id}`,
+    label: user.selectable ? user.nickname : `${user.nickname}（不可接收）`,
+    disabled: !user.selectable,
+    leaf: true
+  }))
+  audienceTree.value = unassigned.length ? [...deptTree, { key: 'g:unassigned', label: '未分配部门', children: unassigned }] : deptTree
+  await nextTick()
+  audienceTreeRef.value?.setCheckedKeys([
+    ...formData.targetDeptIds.map((id) => `d:${id}`),
+    ...formData.targetUserIds.map((id) => `u:${id}`)
+  ])
+  } catch (error) {
+    audienceLoadError.value = error instanceof Error ? error.message : '发送范围加载失败，请稍后重试'
+  } finally {
+    audienceLoading.value = false
+  }
 }
-const addUsers = (dept: any, users: UserApi.UserSimpleVO[]): any => {
-  const children = (dept.children || []).map((child: any) => addUsers(child, users))
-  const members = users.filter((user) => user.deptId === dept.id).map((user) => ({ key: `u:${user.id}`, label: user.nickname, leaf: true }))
+const addUsers = (dept: any, usersByDept: Map<number, NoticeApi.NoticeRecipientOptionsVO['users']>, represented: Set<number>): any => {
+  const children = (dept.children || []).map((child: any) => addUsers(child, usersByDept, represented))
+  const members = (usersByDept.get(dept.id) || []).map((user) => { represented.add(user.id); return { key: `u:${user.id}`, label: user.selectable ? user.nickname : `${user.nickname}（不可接收）`, disabled: !user.selectable, leaf: true } })
   return { ...dept, key: `d:${dept.id}`, label: dept.name, children: [...children, ...members] }
 }
 const syncAudienceSelection = () => {
   const keys = audienceTreeRef.value?.getCheckedKeys?.() || []
   formData.targetDeptIds = keys.filter((key: string) => key.startsWith('d:')).map((key: string) => Number(key.slice(2)))
   formData.targetUserIds = keys.filter((key: string) => key.startsWith('u:')).map((key: string) => Number(key.slice(2)))
+}
+const filterAudienceNode = (value: string, data: any) => {
+  if (!value) return true
+  return String(data.label || '').toLowerCase().includes(value.toLowerCase())
+}
+watch(audienceFilter, (value) => audienceTreeRef.value?.filter?.(value))
+const handleAudienceTypeChange = (value: 'ALL' | 'TARGET') => {
+  if (value === 'ALL') {
+    formData.targetDeptIds = []
+    formData.targetUserIds = []
+    audienceTreeRef.value?.setCheckedKeys([])
+  }
 }
 
 const uploadAttachment = async (options: UploadRequestOptions) => {
@@ -293,6 +342,8 @@ onMounted(async () => {
 .notice-editor-actions { display: flex; gap: 8px; }
 .notice-editor-body { width: min(1120px, calc(100% - 32px)); margin: 24px auto; padding: 24px; background: var(--el-bg-color); border-radius: 8px; }
 .notice-editor-type { width: 240px; }
+.notice-audience-filter { width: min(420px, 100%); margin-bottom: 12px; }
+.notice-audience-error { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 12px; color: var(--el-color-danger); background: var(--el-color-danger-light-9); border-radius: 6px; }
 .notice-editor-body :deep(.el-upload-dragger) { width: 100%; }
 .notice-editor-body :deep(.el-upload) { width: 100%; }
 .notice-attachment-list { width: 100%; margin-top: 12px; }

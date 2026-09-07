@@ -867,6 +867,7 @@ public class SalesOrderServiceImpl implements SalesOrderService {
             if (lead != null && !ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {
                 lead.setStatus(STATUS_WON);
                 lead.setNextFollowUpAt(null);
+                LeadMapper.advanceActivity(lead, now);
                 leadMapper.updateById(lead);
             }
             if (!ORDER_TYPE_REPURCHASE.equals(order.getOrderType())) {

@@ -16,6 +16,21 @@ public class DatabaseAdminColumnRespVO {
     @Schema(description = "JDBC 字段类型", requiredMode = Schema.RequiredMode.REQUIRED, example = "-5")
     private Integer jdbcType;
 
+    @Schema(description = "列长度或数值精度")
+    private Long columnSize;
+
+    @Schema(description = "小数位或小数秒位数")
+    private Integer decimalDigits;
+
+    @Schema(description = "数据库默认值表达式")
+    private String defaultValue;
+
+    @Schema(description = "是否生成列")
+    private Boolean generated;
+
+    @Schema(description = "编辑类型：boolean/integer/decimal/float/date/time/datetime/text/json/readonly")
+    private String valueKind;
+
     @Schema(description = "字段注释", example = "编号")
     private String remarks;
 

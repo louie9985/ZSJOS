@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.enums.common.SexEnum;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
+import cn.iocoder.yudao.module.system.service.user.AdminUserOnlineService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.Parameters;
@@ -49,6 +50,8 @@ public class UserController {
     private AdminUserService userService;
     @Resource
     private DeptService deptService;
+    @Resource
+    private AdminUserOnlineService adminUserOnlineService;
 
     @PostMapping("/create")
     @Operation(summary = "新增用户")
@@ -114,6 +117,14 @@ public class UserController {
                 convertList(pageResult.getList(), AdminUserDO::getDeptId));
         return success(new PageResult<>(UserConvert.INSTANCE.convertList(pageResult.getList(), deptMap),
                 pageResult.getTotal()));
+    }
+
+    @GetMapping("/online-status")
+    @Operation(summary = "获得用户在线状态")
+    @PreAuthorize("@ss.hasPermission('system:user:query')")
+    public CommonResult<UserOnlineStatusRespVO> getUserOnlineStatus(
+            @RequestParam(value = "userIds", required = false) List<Long> userIds) {
+        return success(adminUserOnlineService.getOnlineStatus(userIds));
     }
 
     @GetMapping("/list")

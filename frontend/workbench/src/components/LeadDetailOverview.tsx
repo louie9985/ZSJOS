@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Empty, Image, Tag, Typography } from 'antd'
+import { Alert, Empty, Image, Tag, Typography } from 'antd'
 import {
   CopyOutlined,
   ClockCircleOutlined,
@@ -309,8 +309,9 @@ function FlowTimeline({ lead }: { lead: ManagedLead }) {
 
 /* ========== 备注与附件 ========== */
 
-function RemarksAndAttachments({ lead }: { lead: ManagedLead }) {
-  const hasRemark = Boolean(lead.remark || lead.invalidDescription)
+export function RemarksAndAttachments({ lead }: { lead: ManagedLead }) {
+  const remarks = lead.remarkHistory ?? (lead.remark ? [{ id: 'legacy-current', kind: 'legacy', content: lead.remark, occurredAt: undefined, operatorName: undefined }] : [])
+  const hasRemark = Boolean(remarks.length || lead.invalidDescription || lead.remarkHistoryIncomplete)
   const hasAttachments = Boolean(lead.attachments?.length)
   if (!hasRemark && !hasAttachments) return (
     <div className="lead-remarks-attachments">
@@ -326,17 +327,23 @@ function RemarksAndAttachments({ lead }: { lead: ManagedLead }) {
       <div className="lead-section-header">
         <Typography.Text strong>备注与附件</Typography.Text>
       </div>
-      {lead.remark && (
-        <div className="lead-remark-block">
-          <Typography.Text type="secondary" className="lead-remark-label">提交备注</Typography.Text>
+      {lead.remarkHistoryIncomplete && <Alert type="warning" showIcon title="部分历史备注无法还原" />}
+      {remarks.map(remark => (
+        <div className="lead-remark-block" key={remark.id}>
+          <Typography.Text type="secondary" className="lead-remark-label">
+            {remark.kind === 'submission' ? '提交备注' : remark.kind === 'supplement' ? '补充备注' : '历史备注'}
+            {remark.operatorName && ` · ${remark.operatorName}`}
+            {remark.occurredAt && ` · ${formatTimestamp(remark.occurredAt)}`}
+          </Typography.Text>
           <Typography.Paragraph
             className="lead-remark-text"
+            style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}
             ellipsis={{ rows: 3, expandable: 'collapsible', symbol: (expanded: boolean) => expanded ? '收起' : '展开' }}
           >
-            {lead.remark}
+            {remark.content}
           </Typography.Paragraph>
         </div>
-      )}
+      ))}
       {lead.invalidDescription && (
         <div className="lead-remark-block">
           <Typography.Text type="secondary" className="lead-remark-label">无效原因</Typography.Text>
@@ -648,6 +655,9 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                     }
                   </div>
                 </div>
+                {studentContext && !lead && <div className="lead-profile-meta">
+                  <div className="lead-profile-row"><span className="lead-field-label">客资</span><span className="lead-field-value lead-field-empty">未关联客资</span></div>
+                </div>}
                 {lead && <div className="lead-profile-meta">
                   <div className="lead-profile-row">
                     <span className="lead-field-label">来源</span>
@@ -708,44 +718,34 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
                   )}
                 </section>
 
-                {(slots?.latestActivity || studentContext || (showFollowUp && lead)) && <section className="lead-card">
-                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead && <LatestFollowUp leadId={lead.id} />)}
+                {(slots?.latestActivity || studentContext || lead) && <section className="lead-card">
+                  {slots?.latestActivity || (studentContext ? <LatestStudentContact records={studentContext.contactRecords} /> : lead ? <LatestFollowUp leadId={lead.id} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无最近联系" />)}
                 </section>}
               </div>
 
               {/* 满宽：备注与附件 */}
-              {lead && <section className="lead-card">
-                <RemarksAndAttachments lead={lead} />
-              </section>}
+              <section className="lead-card">
+                {lead ? <RemarksAndAttachments lead={lead} /> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="未关联客资，暂无备注或附件" />}
+              </section>
             </div>
 
             {/* 4 列：时效进度 + 客资流转 */}
             <div className="lead-overview-col-secondary">
-              {studentContext?.contactContext.currentTask?.dueAt && <section className="lead-card">
+              {studentContext && <section className="lead-card">
                 <div className="lead-card-header"><Typography.Text strong>联系任务时效</Typography.Text></div>
-                <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div>
+                {studentContext.contactContext.currentTask?.dueAt ? <div className="lead-deadlines"><DeadlineIndicator label="下次联系截止" deadline={new Date(studentContext.contactContext.currentTask.dueAt).getTime()} /></div> : <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无待处理联系任务" />}
               </section>}
-              {!studentContext && lead && (lead.currentAssignmentFirstFollowUpDeadlineAt || lead.qualificationDeadlineAt) && (
+              {studentContext && (
                 <section className="lead-card">
                   <div className="lead-card-header">
                     <Typography.Text strong>时效进度</Typography.Text>
                   </div>
-                  <div className="lead-deadlines">
-                    {[
-                      { key: 'firstFollowUp', label: '首次跟进截止', deadline: lead.currentAssignmentFirstFollowUpDeadlineAt, completedAt: lead.currentAssignmentFirstFollowUpAt },
-                      { key: 'qualification', label: '客资有效性判定', deadline: lead.qualificationDeadlineAt, completedAt: lead.qualifiedAt }
-                    ]
-                      .filter(item => !!item.deadline)
-                      .sort((a, b) => (b.deadline || 0) - (a.deadline || 0))
-                      .map(item => (
-                        <DeadlineIndicator key={item.key} label={item.label} deadline={item.deadline} completedAt={item.completedAt} />
-                      ))}
-                  </div>
+                  <StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} />
                 </section>
               )}
 
-              {(slots?.timeline || lead) && <section className="lead-card">
-                {slots?.timeline || (lead && <FlowTimeline lead={lead} />)}
+              {slots?.timeline && <section className="lead-card">
+                {slots.timeline}
               </section>}
             </div>
           </div>
@@ -753,7 +753,6 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
 
         {/* 右侧边栏 3 列：提示 → 工具条 → 状态卡 → 跟进图表 */}
         <aside className="lead-overview-aside">
-          {!studentContext && lead && <AsideAlerts lead={lead} />}
           {/* 磨砂工具条 */}
           {toolbar}
           {slots?.sidebarBeforeStatus}
@@ -762,10 +761,10 @@ export default function LeadDetailOverview({ lead, student, categoryLabel, chann
             <div className="lead-status-card-body">
               {slots?.taskStatus || (studentContext
                 ? <><StudentTaskPipeline context={studentContext.contactContext} records={studentContext.contactRecords} /><div className="lead-status-divider" /><StudentTaskLabels context={studentContext.contactContext} /></>
-                : lead ? <><LeadStatusPipeline lead={lead} /><div className="lead-status-divider" /><LeadStatusLabels lead={lead} /></> : null)}
+                : lead ? <><LeadStatusPipeline lead={lead} /><div className="lead-status-divider" /><LeadStatusLabels lead={lead} /></>
+                : null)}
             </div>
           </section>
-          {!studentContext && showFollowUp && lead && <LeadFollowUpCharts leadId={lead.id} />}
         </aside>
       </div>
     </div>

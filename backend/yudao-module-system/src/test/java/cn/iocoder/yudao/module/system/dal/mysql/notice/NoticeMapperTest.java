@@ -20,6 +20,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -58,6 +59,19 @@ class NoticeMapperTest extends BaseDbUnitTest {
         TenantContextHolder.setTenantId(1L);
         assertEquals(tenantOne.getId(), noticeMapper.selectPublishedPage(page()).getList().get(0).getId());
         assertNotNull(readMapper.selectByNoticeIdAndUserId(tenantOne.getId(), 7L));
+    }
+
+    @Test
+    void shouldQueryPublishedCursorWithSnapshotTime() {
+        TenantContextHolder.setTenantId(1L);
+        NoticeDO notice = publishedNotice("游标公告");
+        notice.setHighlightUntil(LocalDateTime.now().plusHours(1));
+        noticeMapper.insert(notice);
+
+        List<NoticeDO> rows = noticeMapper.selectPublishedCursor(7L, LocalDateTime.now(),
+                null, null, null, 20, null, null, null, null, null);
+
+        assertEquals(List.of(notice.getId()), rows.stream().map(NoticeDO::getId).toList());
     }
 
     private NoticeDO publishedNotice(String title) {

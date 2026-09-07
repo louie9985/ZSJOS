@@ -79,6 +79,7 @@ public class StudentContactServiceImpl implements StudentContactService {
     @Resource private BusinessTaskCommandService taskCommandService;
     @Resource private SalesOrderMapper orderMapper;
     @Resource private LeadMapper leadMapper;
+    @Resource private cn.iocoder.yudao.module.zsjos.service.studentinfo.StudentInfoPermissionProvider studentInfoPermission;
     @Resource private LeadAssignmentRelationMapper userRelationMapper;
     @Resource private AdminUserApi adminUserApi;
     @Resource private DeptApi deptApi;
@@ -120,6 +121,15 @@ public class StudentContactServiceImpl implements StudentContactService {
             Object configured = tabs == null ? null : tabs.get(type);
             if (configured instanceof Collection<?> values) values.stream().map(String::valueOf).forEach(visible::add);
             result.setVisibleTabs(visible);
+        }
+        if (permissionApi.hasAnyPermissions(userId, cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.READ)) {
+            SalesOrderDO collectionOrder = orderMapper.selectById(relation.getOrderId());
+            if (collectionOrder != null && collectionOrder.getLeadId() != null
+                    && studentInfoPermission.hasPermission(collectionOrder.getLeadId(), "read", userId)) {
+                List<String> tabs = new ArrayList<>(result.getVisibleTabs());
+                tabs.add(cn.iocoder.yudao.module.zsjos.enums.StudentInfoConstants.TAB);
+                result.setVisibleTabs(tabs);
+            }
         }
         List<String> availableActions = new ArrayList<>();
         boolean accepted = "accepted".equals(relation.getAcceptanceStatus());

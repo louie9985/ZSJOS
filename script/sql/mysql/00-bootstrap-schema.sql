@@ -5776,8 +5776,8 @@ CREATE TABLE IF NOT EXISTS `system_notify_business_outbox` (
 CREATE TABLE IF NOT EXISTS `zsjos_work_order_scene` (
  `id` bigint NOT NULL AUTO_INCREMENT, `tenant_id` bigint NOT NULL DEFAULT 0,
  `code` varchar(64) NOT NULL, `name` varchar(128) NOT NULL, `remark` varchar(500) DEFAULT NULL,
- `source_post_code` varchar(64) NOT NULL, `target_post_code` varchar(64) NOT NULL,
- `assignment_mode` varchar(32) NOT NULL, `fields_json` json NOT NULL, `status` tinyint NOT NULL DEFAULT 1,
+ `source_post_code` varchar(64) DEFAULT NULL, `target_post_code` varchar(64) DEFAULT NULL,
+ `assignment_mode` varchar(32) DEFAULT NULL, `fields_json` json NOT NULL, `status` tinyint NOT NULL DEFAULT 1,
  `category_value` varchar(100) DEFAULT NULL, `category_label_snapshot` varchar(128) DEFAULT NULL, `icon` varchar(64) DEFAULT NULL, `sort` int NOT NULL DEFAULT 0,
  `processor_type` varchar(32) DEFAULT 'GENERIC', `allowed_assignment_types_json` json DEFAULT NULL,
  `source_qualification_mode` varchar(32) DEFAULT NULL, `source_role_scopes_json` json DEFAULT NULL, `source_dept_scopes_json` json DEFAULT NULL,
@@ -6746,3 +6746,85 @@ CREATE TABLE IF NOT EXISTS `zsjos_workbench_capacity` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='新媒体员工容量和在线状态';
 
 SET FOREIGN_KEY_CHECKS=1;
+
+CREATE TABLE IF NOT EXISTS zsjos_lead_submitter_feedback (
+  id bigint NOT NULL AUTO_INCREMENT,
+  lead_id bigint NOT NULL,
+  submitter_subject_type varchar(16) NOT NULL,
+  submitter_user_id bigint DEFAULT NULL,
+  partner_account_id bigint DEFAULT NULL,
+  partner_id bigint DEFAULT NULL,
+  sales_user_id bigint NOT NULL,
+  sales_name_snapshot varchar(128) DEFAULT NULL,
+  submitter_name_snapshot varchar(128) DEFAULT NULL,
+  feedback text NOT NULL,
+  request_version int NOT NULL,
+  idempotency_key varchar(128) NOT NULL,
+  request_fingerprint varchar(64) NOT NULL,
+  creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_tenant_lead_sales_intent (tenant_id,lead_id,sales_user_id,idempotency_key),
+  KEY idx_tenant_lead_created (tenant_id,lead_id,create_time,id),
+  KEY idx_tenant_submitter_created (tenant_id,submitter_subject_type,submitter_user_id,create_time),
+  KEY idx_tenant_partner_created (tenant_id,partner_account_id,create_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客资销售反馈';
+
+-- A null feedback_id is a temporary upload. Only an unexpired upload by the current sales owner
+-- for this tenant and Lead may be bound; once bound it is immutable and no longer expires.
+CREATE TABLE IF NOT EXISTS zsjos_lead_submitter_feedback_attachment (
+  id bigint NOT NULL AUTO_INCREMENT, lead_id bigint NOT NULL,
+  feedback_id bigint DEFAULT NULL, file_id bigint NOT NULL, uploader_user_id bigint NOT NULL,
+  original_name varchar(255) NOT NULL, content_type varchar(128) NOT NULL, file_size bigint NOT NULL,
+  expires_at datetime NOT NULL, sort int NOT NULL DEFAULT 0,
+  creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  deleted bit(1) NOT NULL DEFAULT b'0', tenant_id bigint NOT NULL DEFAULT 0,
+  PRIMARY KEY (id), UNIQUE KEY uk_tenant_file (tenant_id,file_id),
+  KEY idx_tenant_feedback (tenant_id,feedback_id,sort),
+  KEY idx_tenant_temporary_expiry (tenant_id,feedback_id,expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='客资销售反馈附件';
+
+-- UTF-8. Student information collection schema; empty business tables only.
+CREATE TABLE IF NOT EXISTS zsjos_student_info_form (
+ id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, lead_id bigint NOT NULL,
+ sales_user_id bigint NOT NULL, config_version_id bigint NOT NULL,
+ token_hash char(64) NOT NULL, token_ciphertext varchar(512) NOT NULL,
+ status varchar(16) NOT NULL, expires_at datetime NOT NULL, revoked_at datetime DEFAULT NULL,
+ submitted_at datetime DEFAULT NULL, submit_source varchar(16) DEFAULT NULL,
+ active_lead_id bigint GENERATED ALWAYS AS (IF(status='DRAFT' AND deleted=b'0',lead_id,NULL)) STORED,
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0',
+ PRIMARY KEY(id), UNIQUE KEY uk_student_info_token(token_hash),
+ UNIQUE KEY uk_student_info_active(tenant_id,active_lead_id),
+ KEY idx_student_info_lead(tenant_id,lead_id,id), KEY idx_student_info_expiry(tenant_id,status,expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员信息收集表';
+
+CREATE TABLE IF NOT EXISTS zsjos_student_info_form_value (
+ id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, form_id bigint NOT NULL,
+ field_key varchar(64) NOT NULL, field_type varchar(32) NOT NULL, value_text text,
+ dict_type varchar(100) DEFAULT NULL, value_code varchar(200) DEFAULT NULL,
+ value_label_snapshot varchar(512) DEFAULT NULL, area_code_path varchar(128) DEFAULT NULL,
+ area_label_snapshot varchar(512) DEFAULT NULL, `sensitive` bit(1) NOT NULL DEFAULT b'0',
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0',
+ PRIMARY KEY(id), UNIQUE KEY uk_student_info_field(tenant_id,form_id,field_key)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员信息字段快照';
+
+CREATE TABLE IF NOT EXISTS zsjos_student_info_form_config (
+ id bigint NOT NULL AUTO_INCREMENT, tenant_id bigint NOT NULL, version_no int NOT NULL,
+ revision int NOT NULL DEFAULT 0, status varchar(16) NOT NULL, fields_json json NOT NULL,
+ published_at datetime DEFAULT NULL,
+ creator varchar(64) DEFAULT '', create_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+ updater varchar(64) DEFAULT '', update_time datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ deleted bit(1) NOT NULL DEFAULT b'0',
+ PRIMARY KEY(id), UNIQUE KEY uk_student_info_config_version(tenant_id,version_no),
+ KEY idx_student_info_config_state(tenant_id,status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学员信息收集表配置';
+
+CREATE TABLE IF NOT EXISTS zsjos_student_info_config_lock (
+ tenant_id bigint NOT NULL, PRIMARY KEY(tenant_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收集表配置租户锁';

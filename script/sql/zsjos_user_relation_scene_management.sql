@@ -40,6 +40,19 @@ WHERE tenant.deleted = b'0'
   );
 
 -- 工作台菜单同时服务 React Workbench 与 Vue Admin 工作台，子路径必须包含 leads/。
+INSERT INTO `zsjos_user_relation_scene`
+  (`name`, `code`, `source_label`, `target_label`, `source_post_code`, `target_post_code`,
+   `status`, `remark`, `creator`, `create_time`, `updater`, `update_time`, `deleted`, `tenant_id`)
+SELECT '编导查看运营兼职', 'content_director_partner_visibility', '编导', '新媒体运营',
+       'content_director', 'new_media_operator', 0,
+       '编导只读查看所绑定运营当前归属的兼职及其客资',
+       '1', NOW(), '1', NOW(), b'0', tenant.id
+FROM system_tenant tenant
+WHERE tenant.deleted = b'0'
+  AND NOT EXISTS (SELECT 1 FROM zsjos_user_relation_scene scene
+                  WHERE scene.tenant_id = tenant.id
+                    AND scene.code = 'content_director_partner_visibility');
+
 UPDATE system_menu
 SET path = 'leads/assignment-relations',
     name = '派单关系配置',

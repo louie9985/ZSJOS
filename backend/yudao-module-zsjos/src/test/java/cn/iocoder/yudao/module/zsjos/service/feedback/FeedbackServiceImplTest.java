@@ -105,6 +105,72 @@ class FeedbackServiceImplTest {
     }
 
     @Test
+    void detailRefreshesFormSurveyReplyAndResultAttachmentUrls() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_WAITING);
+        row.setValueSnapshotJson("form-values");
+        row.setResultAttachmentIdsJson("[3,4]");
+        when(feedbackMapper.selectById(200L)).thenReturn(row);
+        FeedbackReplyDO reply = new FeedbackReplyDO();
+        reply.setAttachmentIdsJson("[3]");
+        when(replyMapper.selectByFeedbackId(200L)).thenReturn(List.of(reply));
+        FeedbackSurveyDO survey = new FeedbackSurveyDO();
+        survey.setValueSnapshotJson("survey-values");
+        when(surveyMapper.selectByFeedbackId(200L)).thenReturn(survey);
+        when(dynamicFormService.readDisplayValues(eq("form-values"), any())).thenReturn(Map.of("image", "fresh-form"));
+        when(dynamicFormService.readDisplayValues(eq("survey-values"), any())).thenReturn(Map.of("image", "fresh-survey"));
+        when(fileApi.getFileInfo(3L)).thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO(
+                3L, 1L, "logo.png", "zsjos/feedback/logo.png", "expired", "image/png", 128L, "11"));
+        when(fileApi.getFileInfo(4L)).thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO(
+                4L, 1L, "missing.png", "zsjos/feedback/missing.png", "expired", "image/png", 128L, "11"));
+        when(fileApi.presignGetUrls(List.of(3L, 4L), null)).thenThrow(new IllegalStateException("Unavailable"));
+        when(fileApi.presignGetUrl(3L, null)).thenReturn("fresh");
+        when(fileApi.presignGetUrl(4L, null)).thenThrow(new IllegalStateException("Unavailable"));
+
+        var detail = service.getOwn(200L, 11L);
+
+        assertEquals("fresh-form", detail.getValues().get("image"));
+        assertEquals("fresh-survey", detail.getSurvey().getValues().get("image"));
+        assertEquals("fresh", detail.getResultAttachments().getFirst().getUrl());
+        assertEquals("fresh", detail.getReplies().getFirst().getAttachments().getFirst().getUrl());
+        assertEquals("missing.png", detail.getResultAttachments().get(1).getName());
+        assertEquals(null, detail.getResultAttachments().get(1).getUrl());
+        assertEquals("form-values", row.getValueSnapshotJson());
+        verify(fileApi).presignGetUrls(List.of(3L, 4L), null);
+        verify(fileApi).presignGetUrl(3L, null);
+        verify(fileApi).getFileInfo(3L);
+        verify(feedbackMapper, never()).updateById(any(FeedbackDO.class));
+    }
+
+    @Test
+    void detailBatchesResultAndAllReplyAttachmentsAndPreservesTheirOrder() {
+        FeedbackDO row = feedback(FeedbackConstants.TYPE_BUG, FeedbackConstants.STATUS_WAITING);
+        row.setResultAttachmentIdsJson("[4,3]");
+        when(feedbackMapper.selectById(200L)).thenReturn(row);
+        FeedbackReplyDO reply = new FeedbackReplyDO();
+        reply.setAttachmentIdsJson("[3,4,5]");
+        when(replyMapper.selectByFeedbackId(200L)).thenReturn(List.of(reply, reply));
+        for (Long id : List.of(3L, 4L)) {
+            when(fileApi.getFileInfo(id)).thenReturn(new cn.iocoder.yudao.module.infra.api.file.dto.FileInfoRespDTO(
+                    id, 1L, "logo.png", "zsjos/feedback/logo.png", "expired", "image/png", 128L, "11"));
+        }
+        when(fileApi.getFileInfo(5L)).thenThrow(new IllegalStateException("Missing"));
+        when(fileApi.presignGetUrls(List.of(4L, 3L), null)).thenReturn(Map.of(3L, "fresh-3", 4L, "fresh-4"));
+
+        var detail = service.getOwn(200L, 11L);
+
+        assertEquals(List.of("fresh-4", "fresh-3"), detail.getResultAttachments().stream()
+                .map(attachment -> attachment.getUrl()).toList());
+        for (var response : detail.getReplies()) {
+            assertEquals("fresh-3", response.getAttachments().getFirst().getUrl());
+            assertEquals(null, response.getAttachments().get(2).getUrl());
+            assertEquals(5L, response.getAttachments().get(2).getId());
+        }
+        verify(fileApi).presignGetUrls(List.of(4L, 3L), null);
+        for (Long id : List.of(3L, 4L, 5L)) verify(fileApi).getFileInfo(id);
+        org.mockito.Mockito.verifyNoMoreInteractions(fileApi);
+    }
+
+    @Test
     void supportCreatePersistsBusinessNumberAndDictionarySnapshot() {
         FeedbackConfigDO config = config(FeedbackConstants.TYPE_SUPPORT, false);
         stubOpenConfig(config);

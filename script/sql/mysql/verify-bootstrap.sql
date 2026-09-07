@@ -1,5 +1,6 @@
 -- Read-only verification. Every row should report PASS on a usable installation.
 SET NAMES utf8mb4;
+SOURCE script/sql/mysql/verify-lead-submitter-feedback.sql;
 
 SELECT 'new_media_workflow_schema' AS check_name,
        IF((SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE()
@@ -1983,6 +1984,19 @@ SELECT 'V157 generic work-order center schema and menus' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=79962 AND parent_id=79972 AND path='available' AND workbench_render_mode='native' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=79963 AND parent_id=79972 AND path='mine' AND workbench_render_mode='native' AND deleted=b'0')
           AND (SELECT COUNT(*) FROM system_menu WHERE id IN (79973,79977) AND workbench_render_mode='admin_only' AND deleted=b'0')=2,
+          'PASS','FAIL') AS result;
+
+SELECT 'V184 work-order scene legacy columns nullable' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V183')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V183')
+          AND EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V184')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version WHERE module_code='core' AND version='V184')
+          AND (SELECT COUNT(*) FROM information_schema.columns
+               WHERE table_schema=DATABASE() AND table_name='zsjos_work_order_scene'
+                 AND column_name IN ('source_post_code','target_post_code','assignment_mode')
+                 AND is_nullable='YES'
+                 AND ((column_name IN ('source_post_code','target_post_code') AND data_type='varchar' AND character_maximum_length=64)
+                   OR (column_name='assignment_mode' AND data_type='varchar' AND character_maximum_length=32)))=3,
           'PASS','FAIL') AS result;
 
 SELECT 'V160 registration close-service button' AS check_name,

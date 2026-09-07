@@ -238,6 +238,29 @@ class LeadObjectPermissionServiceTest {
             assertDoesNotThrow(() -> service.check(1L, "enter-deal"));
         }
     }
+
+    @Test
+    void publicSeaSubmitterAssistOnlyAllowsOwnerAndCollaborator() {
+        LeadDO lead = lead(10L, 20L);
+        LeadAgingPoolCycleDO cycle = new LeadAgingPoolCycleDO();
+        cycle.setLeadId(1L);
+        cycle.setOriginalOwnerUserId(20L);
+        cycle.setCollaboratorUserId(30L);
+        cycle.setStatus("assigned");
+        when(leadMapper.selectById(1L)).thenReturn(lead);
+        when(agingPoolCycleMapper.selectActiveByLeadId(1L)).thenReturn(cycle);
+
+        try (MockedStatic<SecurityFrameworkUtils> security = mockStatic(SecurityFrameworkUtils.class)) {
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(20L);
+            assertDoesNotThrow(() -> service.check(1L, "request-submitter-assist"));
+
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(30L);
+            assertDoesNotThrow(() -> service.check(1L, "request-submitter-assist"));
+
+            security.when(SecurityFrameworkUtils::getLoginUserId).thenReturn(40L);
+            assertThrows(ServiceException.class, () -> service.check(1L, "request-submitter-assist"));
+        }
+    }
     private void assertReadAllowed(Long userId) {
         assertActionAllowed(userId, "read");
     }

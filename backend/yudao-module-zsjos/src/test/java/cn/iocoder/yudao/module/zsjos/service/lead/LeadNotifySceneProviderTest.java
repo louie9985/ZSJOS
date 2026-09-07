@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.*;
 import static cn.iocoder.yudao.module.zsjos.enums.LeadNotifySceneConstants.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -36,6 +37,16 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class LeadNotifySceneProviderTest {
+    @Test
+    void feedbackUsesFrozenTypedRecipient() {
+        var event = NotifyBusinessEvent.builder().sceneCode(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE)
+                .bizId(1L).payload(Map.of("feedback.recipientType", "PARTNER", "feedback.recipientId", 90L)).build();
+        assertEquals(Set.of(NotifyRecipientDTO.partner(90L)), provider.resolveRecipients(event, Set.of("submitter")));
+        event = NotifyBusinessEvent.builder().sceneCode(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE)
+                .bizId(1L).payload(Map.of("feedback.recipientType", "ADMIN", "feedback.recipientId", 90L)).build();
+        assertEquals(Set.of(NotifyRecipientDTO.admin(90L)), provider.resolveRecipients(event, Set.of("submitter")));
+        assertTrue(provider.resolveRecipients(event, Set.of("owner")).isEmpty());
+    }
 
     @InjectMocks
     private LeadNotifySceneProvider provider;
@@ -54,8 +65,8 @@ class LeadNotifySceneProviderTest {
     void registersAllScenesWithSceneSpecificVariables() {
         List<NotifySceneRespDTO> scenes = provider.getScenes();
 
-        assertEquals(42, scenes.size());
-        assertEquals(42, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
+        assertEquals(43, scenes.size());
+        assertEquals(43, scenes.stream().map(NotifySceneRespDTO::getCode).distinct().count());
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("lead.no"));
         assertFalse(variableKeys(scene(scenes, ASSIGNED)).contains("lead.name"));
         assertTrue(variableKeys(scene(scenes, ASSIGNED)).contains("assignment.attempt"));
@@ -89,17 +100,38 @@ class LeadNotifySceneProviderTest {
     }
 
     @Test
-    void resolvesDedicatedProviderOnlyFromFrozenAttribution() {
-        NotifyBusinessEvent linked = NotifyBusinessEvent.builder().sceneCode(CREATED)
+    void resolvesDedicatedProviderOnlyForSalesSelfSourcedFrozenProvider() {
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setSourceType(SOURCE_SALES_SELF)
+                .setSourceProviderRecorded(true).setSourceProviderUserId(20L)
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(20L));
+        NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED)
                 .bizId(1L).operatorUserId(10L).payload(Map.of("newMediaProviderUserId", 99L)).build();
-        NotifyBusinessEvent unlinked = NotifyBusinessEvent.builder().sceneCode(CREATED)
-                .bizId(2L).operatorUserId(10L).payload(Map.of()).build();
-        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setProviderOwnerType("system_user")
-                .setProviderOwnerId(20L));
 
         assertEquals(Set.of(NotifyRecipientDTO.admin(20L)),
-                provider.resolveRecipients(linked, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
-        assertEquals(Set.of(), provider.resolveRecipients(unlinked, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
+                provider.resolveRecipients(event, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
+    }
+
+    @Test
+    void doesNotResolveDedicatedProviderForOtherSubmissionKindsOrInvalidFrozenAttribution() {
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setSourceType(SOURCE_INTERNAL_NEW_MEDIA)
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(20L));
+        when(leadMapper.selectById(2L)).thenReturn(new LeadDO().setSourceType(SOURCE_SALES_SELF)
+                .setSourceProviderRecorded(true).setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(10L));
+        when(leadMapper.selectById(3L)).thenReturn(new LeadDO().setSourceType(SOURCE_SALES_SELF)
+                .setSourceProviderRecorded(true).setSourceProviderUserId(20L)
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(21L));
+        when(leadMapper.selectById(4L)).thenReturn(new LeadDO().setSourceType(SOURCE_SALES_SELF)
+                .setSourceProviderRecorded(false).setSourceProviderUserId(20L)
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(20L));
+        when(leadMapper.selectById(5L)).thenReturn(new LeadDO().setSourceType(SOURCE_SALES_SELF)
+                .setSourceProviderRecorded(true).setSourceProviderUserId(10L)
+                .setProviderOwnerType(PROVIDER_OWNER_SYSTEM_USER).setProviderOwnerId(10L));
+
+        for (long leadId = 1L; leadId <= 5L; leadId++) {
+            NotifyBusinessEvent event = NotifyBusinessEvent.builder().sceneCode(CREATED)
+                    .bizId(leadId).operatorUserId(10L).build();
+            assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
+        }
     }
 
     @Test
@@ -123,7 +155,7 @@ class LeadNotifySceneProviderTest {
     void resolvesPartnerSubmitterAndOwningEmployeeSeparately() {
         PartnerAccountDO account = new PartnerAccountDO();
         account.setId(71L); account.setPartnerId(70L);
-        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setProviderOwnerType("partner")
+        when(leadMapper.selectById(1L)).thenReturn(new LeadDO().setProviderOwnerType(PROVIDER_OWNER_PARTNER)
                 .setProviderOwnerId(70L));
         when(partnerAccountMapper.selectByPartnerId(70L)).thenReturn(account);
         NotifyBusinessEvent event = NotifyBusinessEvent.builder().bizId(1L)
@@ -131,6 +163,7 @@ class LeadNotifySceneProviderTest {
 
         assertEquals(Set.of(NotifyRecipientDTO.partner(71L)),
                 provider.resolveRecipients(event, Set.of(ROLE_SUBMITTER)));
+        assertEquals(Set.of(), provider.resolveRecipients(event, Set.of(ROLE_NEW_MEDIA_PROVIDER)));
         assertEquals(Set.of(NotifyRecipientDTO.admin(30L)),
                 provider.resolveRecipients(event, Set.of(ROLE_PARTNER_OWNER)));
     }

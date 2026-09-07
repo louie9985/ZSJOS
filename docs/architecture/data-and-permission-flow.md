@@ -1,5 +1,23 @@
 # Data and Permission Flow
 
+## Student Information Collection
+
+Collection operations use independent `zsjos:student-info-form:*` menu/button permissions
+and the `student-info` object provider. Related planners/directors read through existing
+Lead visibility relationships, with separate sensitive-read and export permissions. Public
+tokens locate the owning tenant, then all business reads/writes enforce that tenant.
+Template versions and dictionary/area labels are immutable snapshots. See
+[the collection contract](../api/student-information-collection.md).
+
+## Lead Submitter Feedback
+
+Lead sales feedback uses server-owned read/create menu permissions and the ZSJOS
+`lead-submitter-feedback` object permission provider. Only the current owner can create;
+employee and Partner recipients read only their own feedback. Partner account IDs remain
+separate from ADMIN IDs. Recipient and identity snapshots, temporary attachment binding,
+versioning, System Outbox and both frontend consumers are documented in
+[the feedback API contract](../api/lead-submitter-feedback.md).
+
 ## WeCom click tickets
 
 WeCom notification click tickets are short-lived, one-time Redis capabilities. The anonymous
@@ -66,6 +84,7 @@ The workbench HTTP client centralizes:
 - Authentication storage cleanup on logout or failed recovery; failed recovery also emits one global event that unmounts the workbench and returns directly to login.
 - Unwrapping the backend's standard response envelope.
 - Forced-form blocking errors: `FORCED_FORM_REQUIRED` is a business gate, not an authentication failure, and emits a local forced-form event without clearing tokens or returning to login.
+- Network failures, timeouts, and HTTP `5xx` responses are normalized to the user-facing message `服务器连接错误，请联系管理员`; authentication, authorization, and stable backend business errors retain their distinct handling. Permission bootstrap failures use a retryable full-page error state instead of exposing the Axios exception text.
 
 ### Forced form gate
 
@@ -290,9 +309,9 @@ WebSocket events are refresh hints, while the persisted message page remains aut
 
 - System owns announcement drafts, lifecycle, attachment snapshots and per-ADMIN-user read records. Existing `system_notice` rows remain `DRAFT` after the upgrade and are never exposed implicitly.
 - Vue Admin uses the existing System notice page for draft editing, attachment upload, publishing, taking offline and copying to a new draft. Published content is immutable; corrections require taking the announcement offline and copying it.
-- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Notices are shown in the employee home announcement panel and the `/messages/notice` center; the former header entry and unread bar are no longer rendered. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu as a read-only page. V164 adds an optional `highlight_until` deadline; active highlights are sorted first server-side, then by publish time descending.
+- React Workbench reads only current-tenant `PUBLISHED` rows through `system:notice:read`. Notices are shown in the employee home announcement panel and the `/messages/notice` center; the former header entry and unread bar are no longer rendered. The original `通知公告` menu remains the server-owned page entry; V158 stores the read permission as the `79913` button under menu `107`, so it is returned in the permission string set without creating another visible page. The workbench resolves the same authorized menu as a read-only page. The announcement center uses `/system/notice/my-cursor` with `publish_time DESC, id DESC` for additive scroll loading; `/system/notice/my-page` remains compatible for legacy callers. V164 adds an optional `highlight_until` deadline; active highlights are sorted first server-side, then by publish time descending.
 - `system_notice_read` is unique by tenant, notice and ADMIN user. Reconnects and offline sessions therefore preserve unread truth. The `notice-published` WebSocket event carries only an invalidation hint; clients always refresh the unread summary API.
-- Notices may target `ALL` enabled ADMIN users with `system:notice:read`, or `TARGET` departments and/or users. Department selections include the complete department subtree; mixed department/user selections are unioned and de-duplicated. TARGET selections are expanded into immutable `system_notice_recipient` user snapshots at publish time, and every list/detail/read operation enforces that snapshot. Existing notices without targeting columns remain ALL for compatibility.
+- Notices may target `ALL` enabled ADMIN users with `system:notice:read`, or `TARGET` departments and/or users. The administration tree keeps department and user selections independent, shows enabled users without read permission as disabled, and keeps users without a current department in a separate group. Department selections include the complete department subtree at publish time; mixed department/user selections are unioned and de-duplicated. TARGET selections are expanded into immutable `system_notice_recipient` user snapshots at publish time, and every list/detail/read operation enforces that snapshot. Existing notices without targeting columns remain ALL for compatibility.
 - Announcement body HTML is cleaned by the backend XSS cleaner before persistence and defensively sanitized again in Workbench. Attachments store the Infra file ID plus name, MIME type, size and sort snapshots; download URLs are short-lived and never persisted. Missing Infra files retain their snapshot metadata and render as unavailable.
 
 The partner H5 exposes persisted personal messages through `/part-api/zsjos/messages/**`. The Controller validates the Partner context and supplies the Partner Account ID with `user_type=PARTNER` to every page, detail, read, and unread-count service call. Notification idempotency includes `user_type`, so equal ADMIN and PARTNER numeric IDs cannot collide. External notification channels consume the same typed identity: System dispatches ADMIN and MEMBER through their established APIs, while a module-owned mobile Provider resolves PARTNER only after both account and subject state checks. The SMS log retains the original PARTNER type and never interprets a Partner Account ID as an ADMIN ID.
@@ -507,6 +526,7 @@ otherwise
 - Page and status-count queries retain the submitted/owned list boundary. A single-record detail request uses the unified Lead object reader instead: submitter, current owner, owner-department leader, `query-all`, authorized aging/manual-public-sea participant or manager, readable participant/approver of an order whose `lead_id` is the requested Lead, and owner of an active service relation on such an order. Sharing only the same Person, including a repurchase order with no `lead_id`, grants no Lead access. Aging-pool detail visibility delegates to the same `LeadAgingPoolService.canRead` rule as its list/detail API. A menu or peer-department relationship alone grants no object access.
 - 员工工作台统一从 `/zsjos/leads/manage` 进入，并通过 `relationScope=all|submitted|owned` 切换范围。`submitted` 要求 `zsjos:lead:query-submitted` 并消费提交人方案，`owned` 要求 `zsjos:lead:query-owned` 并消费负责人方案；旧 inbox API 与路由仅作兼容。成交审批继续使用独立的 `reviewer` 方案。
 - 提交人和负责人客资收件箱使用服务端游标每批读取 `20` 条。工作台使用左侧滚动容器内的底部哨兵提前加载下一批；切换搜索、分组或环节时废弃旧请求结果、回到列表顶部并重新读取首批。游标排序固定为 `last_activity_at DESC, id DESC`，下一批失败必须保留已加载客资并提供局部重试。旧分页接口继续保留给兼容调用方。
+- `zsjos_lead.last_activity_at` 是客资最近业务活动时间。基本资料和提交人补充、派单与归属变化、跟进、判定与挂起恢复、申诉/投诉处理、公海协作、正式提交人反馈，以及直接改变非复购 Lead 状态的订单流程都在各自业务事务中推进该值；已有业务事件时间时使用事件时间，否则同一操作生成一次当前时间。写入只接受晚于现值的时间，补偿或乱序事件不能将其改旧。查看详情、选择记录、标记已读、上传未提交的临时附件和发送任务提醒不推进该值，通用 `update_time` 也不作为替代。
 - 通用 `GET /zsjos/lead/page` 继续服务管理端；一旦请求携带 `audience`，Service 仍校验对应视角权限，前端隐藏控件不能代替授权。
 - 统一客资页固定使用 `relationScope=all`，对提交人与负责人两类已授权关系取去重并集，不再让前端通过“我提交的/我负责的”切换关系范围；旧接口传入 `submitted` 或 `owned` 仍必须具备对应关系权限。页面保留单选的简单状态标签，`simpleStatus` 只在上述关系并集内追加生命周期条件。跨订单、学员、商机或审批入口只可用内部 `leadId` 深链读取指定详情，绝不把该关系人的客资加入管理列表。
 - 详情响应由服务端投影 `overviewVisible`、`visibleTabs`、`sourceLabel`、`sourceUserName`、`ownerUserName` 和 `identityMaskMode`。`visibleTabs` 由独立 System 功能权限与统一对象关系共同决定；申诉页签对拥有申诉读取/审核能力的用户可见，也对当前 Lead 原提交人可见，但申诉记录接口仍校验 Lead 对象可读和同一申诉读取规则。`flow-history` 仅在当前用户持有 `zsjos:lead-detail:flow-read` 时投影，流转接口还必须通过同一个 Lead 对象读取检查。前端不得根据角色名、详情 mode 或关系字符串推断。跟进、申诉、投诉、订单和流转记录接口仍分别执行对象校验，隐藏页签不构成授权。
@@ -591,6 +611,11 @@ authoritative; configuring collaborator B does not transfer Lead or Opportunity 
 - Sales acceptance requires `zsjos:lead:accept`; fresh initialization and V006 grant it to roles that already hold the claim action instead of inferring access from a role or post display name.
 - The same permission only exposes the workbench intake control. The backend separately confirms the current account remains an enabled `sales_specialist` post holder before admitting it to the tenant-scoped Redis pool; role labels never establish eligibility.
 - Page presence and intake preference are independent. A 30-second workbench heartbeat maintains a 90-second Redis presence key, while the accepting/paused preference is persisted by ZSJOS and defaults to paused. Effective automatic-assignment eligibility requires both online presence and accepting mode.
+- The user-management login presence is a separate System/Infra contract based on any authenticated
+  ADMIN `/infra/ws` connection. It aggregates sessions by tenant in Redis, uses WebSocket `ping`
+  activity with a 90-second timeout, and powers `system:user:query` protected status, count, and
+  online/offline filtering. It must not be reused as Lead intake eligibility, and the Lead page
+  presence must not be presented as global employee login status.
 - Redis owns only pool rotation, transient presence, and one-pending reservation. Lead assignment status, candidate history, expiry, ownership and business tasks remain database-owned; automatic timeout recovery scans `pending_expires_at` rather than expired Redis keys.
 - The workbench starts pending queries and WebSocket invalidation only when the permission response contains that permission. Authorized load failures remain visible and retryable.
 - A pending assignment is represented by Lead assignment fields plus a `lead_assignment_accept` business task. Accept, reject, timeout and administrative cancellation complete or cancel that task in the same business transaction.

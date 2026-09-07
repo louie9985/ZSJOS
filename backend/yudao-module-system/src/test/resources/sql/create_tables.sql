@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS "system_notice" (
 	"content" text NOT NULL COMMENT '公告内容',
 	"type" tinyint NOT NULL COMMENT '公告类型（1通知 2公告）',
 	"status" tinyint NOT NULL DEFAULT '0' COMMENT '公告状态（0正常 1关闭）',
-	"audience_type" varchar(16) DEFAULT 'ALL', "target_dept_ids" varchar(1000), "target_user_ids" varchar(1000),
+	"audience_type" varchar(16) DEFAULT 'ALL', "target_dept_ids" clob, "target_user_ids" clob,
 	"publish_status" varchar(16) NOT NULL DEFAULT 'DRAFT',
 	"publish_time" datetime DEFAULT NULL,
 	"offline_time" datetime DEFAULT NULL,

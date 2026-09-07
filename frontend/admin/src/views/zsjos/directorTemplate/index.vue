@@ -25,11 +25,11 @@
           <el-form-item label="控件类型"><el-select v-model="activeField.type" :disabled="activeField.systemField" class="w-100%"><el-option v-for="type in fieldTypes" :key="type.value" :label="type.label" :value="type.value" /></el-select></el-form-item>
           <el-form-item v-if="enumField" label="关联系统字典" required><el-select v-model="activeField.dictType" filterable class="w-100%" @change="previewDict"><el-option v-for="item in dictTypes" :key="item.type" :label="`${item.name} (${item.type})`" :value="item.type" /></el-select><div class="dict-preview">当前启用项 {{ dictCount }} 个<span v-if="dictError">，加载失败，请重试</span></div></el-form-item>
           <el-form-item label="分组"><el-input v-model="activeField.group" /></el-form-item>
-          <el-form-item label="说明"><el-input v-model="activeField.description" type="textarea" /></el-form-item>
+          <el-form-item label="填写备注"><el-input v-model="activeField.description" type="textarea" :maxlength="500" show-word-limit /></el-form-item>
           <el-space><el-switch v-model="activeField.enabled" active-text="启用" /><el-switch v-model="activeField.required" active-text="必填" /></el-space>
         </el-form>
       </section>
-      <section class="preview"><div class="section-title"><strong>表单预览</strong><el-radio-group v-model="previewMode" size="small"><el-radio-button value="desktop">桌面</el-radio-button><el-radio-button value="mobile">移动</el-radio-button></el-radio-group></div><div class="preview-body" :class="previewMode"><el-form label-position="top"><el-form-item v-for="field in fields.filter(x=>x.enabled)" :key="field.key" :label="field.title" :required="field.required"><el-input disabled :placeholder="field.description || '预览控件'" /></el-form-item></el-form></div></section>
+      <section class="preview"><div class="section-title"><strong>表单预览</strong><el-radio-group v-model="previewMode" size="small"><el-radio-button value="desktop">桌面</el-radio-button><el-radio-button value="mobile">移动</el-radio-button></el-radio-group></div><div class="preview-body" :class="previewMode"><el-form label-position="top"><el-form-item v-for="field in fields.filter(x=>x.enabled)" :key="field.key" :label="field.title" :required="field.required"><el-input disabled placeholder="预览控件" /><div v-if="field.description?.trim()" class="field-remark">{{ field.description }}</div></el-form-item></el-form></div></section>
     </div>
     <div v-if="current" class="footer-actions"><el-button @click="copy">复制为新草稿</el-button><el-button type="primary" @click="save">保存草稿</el-button><el-button type="success" @click="publishDraft">发布</el-button></div>
   </ContentWrap>
@@ -53,4 +53,94 @@ const publishDraft=async()=>{const t=current.value,v=t?.draft;if(!t||!v)return m
 const createTemplate=async()=>{await Api.createPositioning({templateCode:`positioning_${Date.now()}`,name:'新定位卡模板',defaultTemplate:false,fields:fields.value});message.success('模板已创建');await load()}
 watch(()=>route.path,load);onMounted(load)
 </script>
-<style scoped>.header-row,.section-title,.footer-actions{display:flex;align-items:center;justify-content:space-between;gap:16px}.header-row{margin-bottom:20px}.header-row h2{margin:0 0 6px}.header-row span{color:var(--el-text-color-secondary)}.designer{display:grid;grid-template-columns:minmax(250px,1fr) minmax(280px,1fr) minmax(300px,1.2fr);gap:16px}.field-list,.properties,.preview{border:1px solid var(--el-border-color);padding:16px;min-height:480px}.field-row{width:100%;display:flex;justify-content:space-between;align-items:center;border:0;border-bottom:1px solid var(--el-border-color-lighter);background:transparent;padding:12px;text-align:left}.field-row.active{background:var(--el-color-primary-light-9)}.field-row small{display:block;color:var(--el-text-color-secondary);margin-top:4px}.dict-preview{font-size:12px;color:var(--el-text-color-secondary);margin-top:6px}.preview-body.mobile{max-width:360px}.footer-actions{justify-content:flex-end;margin-top:16px}@media(max-width:1000px){.designer{grid-template-columns:1fr}.field-list,.properties,.preview{min-height:auto}}</style>
+<style scoped>
+.header-row,
+.section-title,
+.footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.header-row {
+  margin-bottom: 20px;
+}
+
+.header-row h2 {
+  margin: 0 0 6px;
+}
+
+.header-row span {
+  color: var(--el-text-color-secondary);
+}
+
+.designer {
+  display: grid;
+  grid-template-columns: minmax(250px, 1fr) minmax(280px, 1fr) minmax(300px, 1.2fr);
+  gap: 16px;
+}
+
+.field-list,
+.properties,
+.preview {
+  min-height: 480px;
+  padding: 16px;
+  border: 1px solid var(--el-border-color);
+}
+
+.field-row {
+  display: flex;
+  width: 100%;
+  padding: 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  justify-content: space-between;
+  align-items: center;
+}
+
+.field-row.active {
+  background: var(--el-color-primary-light-9);
+}
+
+.field-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--el-text-color-secondary);
+}
+
+.dict-preview,
+.field-remark {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.field-remark {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.preview-body.mobile {
+  max-width: 360px;
+}
+
+.footer-actions {
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+@media (width <= 1000px) {
+  .designer {
+    grid-template-columns: 1fr;
+  }
+
+  .field-list,
+  .properties,
+  .preview {
+    min-height: auto;
+  }
+}
+</style>

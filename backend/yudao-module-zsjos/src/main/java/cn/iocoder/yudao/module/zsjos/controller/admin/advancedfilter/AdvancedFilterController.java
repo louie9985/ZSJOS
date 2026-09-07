@@ -27,13 +27,13 @@ public class AdvancedFilterController {
             + "'zsjos:lead:query-all','zsjos:lead-aging-pool:query',"
             + "'zsjos:lead:qualification:query','zsjos:subordinate-sales:query'))"
             + " || (#scene == 'order' && @ss.hasAnyPermissions('zsjos:sales-order:query-own',"
-            + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm'))"
+            + "'zsjos:sales-order:query-team','zsjos:sales-order:review','zsjos:sales-order:supervisor-confirm','zsjos:sales-order:create'))"
             + " || (#scene == 'lead_appeal' && @ss.hasAnyPermissions('zsjos:lead:appeal:query',"
             + "'zsjos:lead:appeal:review-sales-manager','zsjos:lead:appeal:review-quality',"
             + "'zsjos:lead:appeal:review-chairman'))"
             + " || (#scene == 'duplicate_review' && @ss.hasPermission('zsjos:lead-duplicate-review:query'))"
             + " || (#scene == 'registration' && @ss.hasPermission('zsjos:registration:query-pool'))"
-            + " || (#scene == 'student' && @ss.hasPermission('zsjos:student:query-my'))"
+            + " || (#scene == 'student' && @ss.hasAnyPermissions('zsjos:student:query-my','zsjos:media-student:query-my'))"
             + " || (#scene == 'subordinate_sales' && @ss.hasPermission('zsjos:subordinate-sales:query'))")
     public CommonResult<AdvancedFilterCatalogRespVO> catalog(@RequestParam String scene) {
         var userScope = visibleUserService.resolve(scene, getLoginUserId());

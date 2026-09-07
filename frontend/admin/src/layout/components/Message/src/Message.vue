@@ -94,10 +94,10 @@ const showPersistedNotification = async (messageId: number) => {
           try {
             const feedback = await FeedbackApi.getFeedback(detail.bizId)
             const path = feedback.feedbackType === 'REQUIREMENT'
-              ? '/feedback-management/requirements'
+              ? '/zsjos/feedback/requirement'
               : feedback.feedbackType === 'BUG'
-                ? '/feedback-management/bugs'
-                : '/feedback-management/support'
+                ? '/zsjos/feedback/bug'
+                : '/zsjos/feedback/support'
             await router.push({ path, query: { feedbackId: String(detail.bizId) } })
             return
           } catch {

@@ -9,9 +9,9 @@ export const addFollowUpDays = (now: Date, days: number) => {
 export const shouldBlockLeadSwitch = (dirty: boolean) => dirty
 
 export type LeadDetailMode = 'all' | 'submitter' | 'owner' | 'manager-readonly' | 'student-readonly'
-export type LeadDetailTab = 'overview' | 'follow-ups' | 'orders' | 'appeals' | 'complaints' | 'flow-history'
+export type LeadDetailTab = 'overview' | 'follow-ups' | 'orders' | 'appeals' | 'complaints' | 'flow-history' | 'submitter-feedback' | 'student-info'
 
-const LEAD_DETAIL_TABS: LeadDetailTab[] = ['overview', 'follow-ups', 'orders', 'appeals', 'complaints', 'flow-history']
+const LEAD_DETAIL_TABS: LeadDetailTab[] = ['overview', 'follow-ups', 'orders', 'appeals', 'complaints', 'flow-history', 'submitter-feedback', 'student-info']
 
 export const parseLeadDetailTab = (value?: string | null): LeadDetailTab | undefined =>
   LEAD_DETAIL_TABS.includes(value as LeadDetailTab) ? value as LeadDetailTab : undefined

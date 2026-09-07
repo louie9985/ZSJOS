@@ -3,6 +3,7 @@ package cn.iocoder.yudao.module.system.controller.admin.notice;
 import cn.iocoder.yudao.framework.common.pojo.CommonResult;
 import cn.iocoder.yudao.framework.common.pojo.PageParam;
 import cn.iocoder.yudao.framework.common.pojo.PageResult;
+import cn.iocoder.yudao.framework.common.pojo.CursorPageResult;
 import cn.iocoder.yudao.module.system.controller.admin.notice.vo.*;
 import cn.iocoder.yudao.module.system.service.notice.NoticeService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -65,6 +66,13 @@ public class NoticeController {
         return success(noticeService.getNotice(id));
     }
 
+    @GetMapping("/recipient-options")
+    @Operation(summary = "获得公告接收人选项")
+    @PreAuthorize("@ss.hasAnyPermissions('system:notice:create','system:notice:update')")
+    public CommonResult<NoticeRecipientOptionsRespVO> getRecipientOptions() {
+        return success(noticeService.getRecipientOptions());
+    }
+
     @PostMapping("/attachment/upload")
     @Operation(summary = "上传公告附件")
     @PreAuthorize("@ss.hasAnyPermissions('system:notice:create','system:notice:update')")
@@ -94,8 +102,15 @@ public class NoticeController {
 
     @GetMapping("/my-page")
     @PreAuthorize("@ss.hasPermission('system:notice:read')")
-    public CommonResult<PageResult<NoticeMyRespVO>> getMyNoticePage(@Validated PageParam reqVO) {
+    public CommonResult<PageResult<NoticeMyRespVO>> getMyNoticePage(@Valid NoticeMyPageReqVO reqVO) {
         return success(noticeService.getMyNoticePage(reqVO, getLoginUserId()));
+    }
+
+    @GetMapping("/my-cursor")
+    @Operation(summary = "使用游标获得我的通知公告")
+    @PreAuthorize("@ss.hasPermission('system:notice:read')")
+    public CommonResult<CursorPageResult<NoticeMyRespVO>> getMyNoticeCursor(@Validated NoticeMyCursorReqVO reqVO) {
+        return success(noticeService.getMyNoticeCursor(reqVO, getLoginUserId()));
     }
 
     @GetMapping("/my-get")

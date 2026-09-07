@@ -172,9 +172,19 @@
           <el-descriptions-item label="分配状态">{{
             assignmentStatusLabel(detail.assignmentStatus)
           }}</el-descriptions-item>
-          <el-descriptions-item label="提交备注" :span="2">{{
-            detail.remark || '-'
-          }}</el-descriptions-item>
+          <el-descriptions-item label="备注信息" :span="2">
+            <el-alert v-if="detail.remarkHistoryIncomplete" title="部分历史备注无法还原" type="warning" :closable="false" />
+            <template v-if="detail.remarkHistory != null">
+              <div v-for="item in detail.remarkHistory" :key="item.id">
+                <strong>{{ item.kind === 'submission' ? '提交备注' : item.kind === 'supplement' ? '补充备注' : '历史备注' }}</strong>
+                <span v-if="item.operatorName"> · {{ item.operatorName }}</span>
+                <span v-if="item.occurredAt"> · {{ formatZsjosTimestamp(item.occurredAt) }}</span>
+                <p style="white-space: pre-wrap; overflow-wrap: anywhere">{{ item.content }}</p>
+              </div>
+              <span v-if="!detail.remarkHistory.length">暂无备注</span>
+            </template>
+            <span v-else style="white-space: pre-wrap; overflow-wrap: anywhere">{{ detail.remark || '暂无备注' }}</span>
+          </el-descriptions-item>
           <el-descriptions-item v-if="detail.closeReason" label="关闭原因" :span="2">{{
             detail.closeReason
           }}</el-descriptions-item>

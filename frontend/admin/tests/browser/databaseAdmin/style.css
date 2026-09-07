@@ -1,0 +1,20 @@
+body {
+  margin: 16px;
+  font:
+    14px Arial,
+    sans-serif;
+  background: #f5f6f7;
+  color: #242424;
+}
+section {
+  padding: 16px;
+  margin-bottom: 16px;
+  background: white;
+}
+.el-select {
+  width: 220px;
+}
+output {
+  display: block;
+  overflow-wrap: anywhere;
+}

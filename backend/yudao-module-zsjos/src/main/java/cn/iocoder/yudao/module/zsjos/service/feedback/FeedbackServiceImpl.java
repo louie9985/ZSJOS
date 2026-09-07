@@ -943,7 +943,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         FeedbackRespVO result = toCard(row, userId, admin);
         result.setFormId(row.getFormId());
         result.setFields(dynamicFormService.parseSnapshot(row.getFormSnapshotJson()));
-        result.setValues(dynamicFormService.parseValueSnapshot(row.getValueSnapshotJson()));
+        result.setValues(dynamicFormService.readDisplayValues(row.getValueSnapshotJson(), result.getFields()));
         result.setSupportTypeValue(row.getSupportTypeValue());
         result.setSupportTypeLabel(row.getSupportTypeLabelSnapshot());
         result.setProcessInstanceId(row.getProcessInstanceId());
@@ -951,7 +951,6 @@ public class FeedbackServiceImpl implements FeedbackService {
         result.setRejectReason(row.getRejectReason());
         result.setCompletedResult(row.getCompletedResult());
         result.setResultAttachmentIds(parseLongs(row.getResultAttachmentIdsJson()));
-        result.setResultAttachments(toAttachments(result.getResultAttachmentIds()));
         result.setReplies(replyMapper.selectByFeedbackId(row.getId()).stream().map(reply -> {
             FeedbackRespVO.Reply response = new FeedbackRespVO.Reply();
             response.setId(reply.getId());
@@ -960,17 +959,22 @@ public class FeedbackServiceImpl implements FeedbackService {
             response.setAuthorType(reply.getAuthorType());
             response.setContent(reply.getContent());
             response.setAttachmentIds(parseLongs(reply.getAttachmentIdsJson()));
-            response.setAttachments(toAttachments(response.getAttachmentIds()));
             response.setCreateTime(reply.getCreateTime());
             return response;
         }).toList());
+        List<Long> attachmentIds = new ArrayList<>(result.getResultAttachmentIds());
+        result.getReplies().forEach(reply -> attachmentIds.addAll(reply.getAttachmentIds()));
+        Map<Long, FeedbackRespVO.Attachment> attachments = toAttachments(attachmentIds);
+        result.setResultAttachments(result.getResultAttachmentIds().stream().map(attachments::get).toList());
+        result.getReplies().forEach(reply -> reply.setAttachments(
+                reply.getAttachmentIds().stream().map(attachments::get).toList()));
         FeedbackSurveyDO survey = surveyMapper.selectByFeedbackId(row.getId());
         if (survey != null) {
             FeedbackRespVO.Survey response = new FeedbackRespVO.Survey();
             response.setStatus(survey.getStatus());
             response.setFormId(survey.getFormId());
             response.setFields(dynamicFormService.parseSnapshot(survey.getFormSnapshotJson()));
-            response.setValues(dynamicFormService.parseValueSnapshot(survey.getValueSnapshotJson()));
+            response.setValues(dynamicFormService.readDisplayValues(survey.getValueSnapshotJson(), response.getFields()));
             response.setRequestedAt(survey.getRequestedAt());
             response.setSubmittedAt(survey.getSubmittedAt());
             result.setSurvey(response);
@@ -978,25 +982,28 @@ public class FeedbackServiceImpl implements FeedbackService {
         return result;
     }
 
-    private List<FeedbackRespVO.Attachment> toAttachments(Collection<Long> ids) {
-        if (ids == null || ids.isEmpty()) return List.of();
-        return ids.stream().map(id -> {
+    private Map<Long, FeedbackRespVO.Attachment> toAttachments(Collection<Long> ids) {
+        Map<Long, FeedbackRespVO.Attachment> attachments = new LinkedHashMap<>();
+        List<Long> availableIds = new ArrayList<>();
+        for (Long id : ids.stream().distinct().toList()) {
             FeedbackRespVO.Attachment attachment = new FeedbackRespVO.Attachment();
             attachment.setId(id);
+            attachments.put(id, attachment);
             FileInfoRespDTO file;
             try {
                 file = fileApi.getFileInfo(id);
             } catch (RuntimeException ignored) {
-                return attachment;
+                continue;
             }
             if (file != null) {
                 attachment.setName(file.getName());
                 attachment.setType(file.getType());
                 attachment.setSize(file.getSize());
-                attachment.setUrl(file.getUrl());
+                availableIds.add(id);
             }
-            return attachment;
-        }).toList();
+        }
+        FeedbackFileUrls.resolve(fileApi, availableIds).forEach((id, url) -> attachments.get(id).setUrl(url));
+        return attachments;
     }
 
     private void applyActions(FeedbackRespVO result, FeedbackDO row, Long userId, boolean admin) {

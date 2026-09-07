@@ -127,6 +127,9 @@ export default function LeadAppealPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [keyword, setKeyword] = useState('')
   const [advancedFilter, setAdvancedFilter] = useState<AdvancedFilterGroup>()
+  const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(20)
+  const [tableTotal, setTableTotal] = useState(0)
   const listScrollRef = useRef<HTMLDivElement>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
   const { submitting: saving, run: runDecision, resetIntent } = useSubmissionGuard()
@@ -173,17 +176,16 @@ export default function LeadAppealPage() {
     else setLoading(true)
     setError('')
     try {
-      const result = await api.leadAppealInboxCursor(handled, {
-        cursor: append ? cursor : undefined,
-        limit: 20,
-        keyword: keyword || undefined,
-        advancedFilter
-      })
-      setItems(current => append
+      const result = useTableLayout
+        ? await api.leadAppealInboxPage(handled, { pageNo: tablePage, pageSize: tablePageSize, keyword: keyword || undefined, advancedFilter })
+        : await api.leadAppealInboxCursor(handled, { cursor: append ? cursor : undefined, limit: 20, keyword: keyword || undefined, advancedFilter })
+      setTableTotal('total' in result ? result.total : 0)
+      setItems(current => useTableLayout || !append
+        ? result.list
+        : append
         ? [...current, ...result.list.filter(item => !current.some(existing => existing.id === item.id))]
         : result.list)
-      setCursor(result.nextCursor)
-      setHasMore(result.hasMore)
+      if ('nextCursor' in result) { setCursor(result.nextCursor); setHasMore(result.hasMore) }
       if (!append) {
         const target = result.list.find(isTargetItem)
         const nextSelected = target || result.list[0]
@@ -196,19 +198,20 @@ export default function LeadAppealPage() {
       setLoading(false)
       setLoadingMore(false)
     }
-  }, [advancedFilter, cursor, handled, hasTarget, isTargetItem, keyword, locateTarget])
+  }, [advancedFilter, cursor, handled, hasTarget, isTargetItem, keyword, locateTarget, tablePage, tablePageSize, useTableLayout])
 
   useEffect(() => { void load() }, [advancedFilter, handled, keyword, load])
   useEffect(() => {
     const node = sentinelRef.current
-    if (!node || !hasMore || loading || loadingMore || !cursor) return
+    if (useTableLayout || !node || !hasMore || loading || loadingMore || !cursor) return
     const observer = new IntersectionObserver(entries => {
       if (entries[0]?.isIntersecting) void load(true)
     }, { root: node.parentElement, rootMargin: '160px' })
     observer.observe(node)
     return () => observer.disconnect()
-  }, [cursor, hasMore, load, loading, loadingMore])
+  }, [cursor, hasMore, load, loading, loadingMore, useTableLayout])
   useEffect(() => {
+    if (useTableLayout) return
     const node = listScrollRef.current
     if (!node) return
     const onScroll = () => {
@@ -218,7 +221,7 @@ export default function LeadAppealPage() {
     }
     node.addEventListener('scroll', onScroll)
     return () => node.removeEventListener('scroll', onScroll)
-  }, [cursor, hasMore, load, loading, loadingMore])
+  }, [cursor, hasMore, load, loading, loadingMore, useTableLayout])
 
   const setDecision = (next: 'overturn' | 'uphold' | undefined) => {
     setConfirmOpen(false)
@@ -272,7 +275,7 @@ export default function LeadAppealPage() {
         />
       </div>
     </header>
-    {useTableLayout ? <ProTable<LeadAppeal>
+    {useTableLayout ? <><div className="business-inbox-toolbar"><AdvancedFilterToolbar scene="lead_appeal" pageKey="lead_appeal" placeholder="搜索客资编号 / 姓名 / 手机号 / 微信号" keyword={keyword} value={advancedFilter} onKeyword={value => { setKeyword(value); setTablePage(1) }} onChange={value => { setAdvancedFilter(value); setTablePage(1) }}/></div><ProTable<LeadAppeal>
       className="business-inbox-table"
       rowKey="id"
       search={false}
@@ -280,7 +283,7 @@ export default function LeadAppealPage() {
       columnsState={{ persistenceKey: 'crm-lead-appeal-table-columns', persistenceType: 'localStorage' }}
       loading={loading}
       dataSource={items}
-      pagination={false}
+      pagination={{ current: tablePage, pageSize: tablePageSize, total: tableTotal, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
       scroll={{ x: 2800 }}
       locale={{ emptyText: <Empty description="暂无申诉" /> }}
       columns={[
@@ -303,7 +306,7 @@ export default function LeadAppealPage() {
         { title: '处理时间', dataIndex: 'decidedAt', render: (_, item) => formatTimestamp(item.decidedAt), width: 170 },
         { title: '操作', key: 'action', width: 88, fixed: 'right', hideInSetting: true, render: (_, item) => <Button type="link" onClick={() => { setSelected(item); if (useTableLayout || window.matchMedia('(max-width: 768px)').matches) setDrawerOpen(true) }}>详细</Button> }
       ]}
-    /> : <div className="business-inbox-layout">
+    /></> : <div className="business-inbox-layout">
       <aside className="business-inbox-list-pane">
         <div className="business-inbox-toolbar">
           <AdvancedFilterToolbar

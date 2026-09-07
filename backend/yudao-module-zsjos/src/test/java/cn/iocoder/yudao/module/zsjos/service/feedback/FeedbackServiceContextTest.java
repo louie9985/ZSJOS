@@ -15,6 +15,7 @@ import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackNoDailyCounterMa
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackReplyMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackRoundMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.feedback.FeedbackSurveyMapper;
+import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.PartnerMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderHistoryMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.workorder.WorkOrderMapper;
 import org.junit.jupiter.api.Test;
@@ -46,6 +47,7 @@ class FeedbackServiceContextTest {
             .withBean("roleApi", RoleApi.class, () -> mock(RoleApi.class))
             .withBean("permissionApi", PermissionApi.class, () -> mock(PermissionApi.class))
             .withBean("fileApi", FileApi.class, () -> mock(FileApi.class))
+            .withBean("partnerMapper", PartnerMapper.class, () -> mock(PartnerMapper.class))
             .withBean("notifyBusinessEventApi", NotifyBusinessEventApi.class,
                     () -> mock(NotifyBusinessEventApi.class))
             .withBean(FeedbackServiceImpl.class);

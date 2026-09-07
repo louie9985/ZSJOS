@@ -134,6 +134,22 @@ export function getInaccessiblePathFallback(items: PrimaryNavigationItem[], path
   return getInitialTarget(items)
 }
 
+export function findAdminEmbedPath(menus: WorkbenchMenu[], targetPath: string): string | undefined {
+  const visit = (nodes: WorkbenchMenu[], embedPath?: string): string | undefined => {
+    for (const menu of nodes) {
+      const currentEmbedPath = menu.workbenchRenderMode === 'admin_embed' ? menu.path : embedPath
+      if (menu.path === targetPath) {
+        return menu.workbenchRenderMode === 'admin_embed' || menu.workbenchRenderMode === 'admin_only'
+          ? currentEmbedPath
+          : undefined
+      }
+      const descendant = visit(menu.children, currentEmbedPath)
+      if (descendant) return descendant
+    }
+  }
+  return visit(menus)
+}
+
 const LEAD_DETAIL_ENTRY_PERMISSIONS = new Set([
   'zsjos:lead:query',
   'zsjos:subordinate-sales:query',

@@ -2,7 +2,6 @@ package cn.iocoder.yudao.module.infra.controller.admin.db.vo;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
@@ -20,8 +19,8 @@ public class DatabaseAdminRowCreateReqVO {
     @NotBlank(message = "表名不能为空")
     private String tableName;
 
-    @Schema(description = "字段值", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotEmpty(message = "字段值不能为空")
+    @Schema(description = "字段值；省略的列使用数据库默认值，允许空映射", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotNull(message = "字段值不能为空")
     private Map<String, Object> values;
 
 }

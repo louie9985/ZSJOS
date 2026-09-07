@@ -9,11 +9,14 @@ import cn.iocoder.yudao.module.infra.api.websocket.WebSocketSenderApi;
 import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeAttachmentVO;
 import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeMyRespVO;
 import cn.iocoder.yudao.module.system.controller.admin.notice.vo.NoticeSaveReqVO;
+import cn.iocoder.yudao.module.system.dal.dataobject.dept.DeptDO;
+import cn.iocoder.yudao.module.system.dal.dataobject.user.AdminUserDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeAttachmentDO;
 import cn.iocoder.yudao.module.system.dal.dataobject.notice.NoticeDO;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeAttachmentMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeMapper;
 import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeReadMapper;
+import cn.iocoder.yudao.module.system.dal.mysql.notice.NoticeRecipientMapper;
 import cn.iocoder.yudao.module.system.service.dept.DeptService;
 import cn.iocoder.yudao.module.system.service.permission.PermissionService;
 import cn.iocoder.yudao.module.system.service.user.AdminUserService;
@@ -26,6 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 import static cn.iocoder.yudao.framework.test.core.util.AssertUtils.assertServiceException;
 import static cn.iocoder.yudao.module.system.enums.ErrorCodeConstants.*;
@@ -42,6 +46,7 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
     @Resource private NoticeMapper noticeMapper;
     @Resource private NoticeAttachmentMapper attachmentMapper;
     @Resource private NoticeReadMapper readMapper;
+    @Resource private NoticeRecipientMapper recipientMapper;
 
     @MockitoBean private FileApi fileApi;
     @MockitoBean private XssCleaner xssCleaner;
@@ -158,6 +163,76 @@ class NoticeServiceImplTest extends BaseDbUnitTest {
         assertEquals(50, copy.getTitle().length());
         assertTrue(copy.getTitle().endsWith("（副本）"));
         assertEquals(NoticePublishStatusEnum.DRAFT.getStatus(), copy.getPublishStatus());
+    }
+
+    @Test
+    void shouldFreezeTargetUsersAndRejectNonRecipients() {
+        when(permissionService.getEnabledUserIdsByPermission("system:notice:read")).thenReturn(Set.of(USER_ID));
+        NoticeSaveReqVO request = saveRequest("<p>定向正文</p>");
+        request.setAudienceType("TARGET");
+        request.setTargetUserIds(List.of(USER_ID, USER_ID));
+
+        Long id = noticeService.createNotice(request, USER_ID);
+        noticeService.publishNotice(id);
+
+        assertEquals(1, recipientMapper.selectListByNoticeId(id).size());
+        assertEquals(id, noticeService.getMyNotice(id, USER_ID).getId());
+        assertServiceException(() -> noticeService.getMyNotice(id, 8L), NOTICE_RECIPIENT_INVALID);
+        assertServiceException(() -> noticeService.markRead(id, 8L), NOTICE_RECIPIENT_INVALID);
+    }
+
+    @Test
+    void shouldClearHiddenTargetsWhenSavingAllAudience() {
+        NoticeSaveReqVO request = saveRequest("<p>全员正文</p>");
+        request.setAudienceType("ALL");
+        request.setTargetDeptIds(List.of(999L));
+        request.setTargetUserIds(List.of(999L));
+
+        NoticeDO stored = noticeMapper.selectById(noticeService.createNotice(request, USER_ID));
+
+        assertEquals("[]", stored.getTargetDeptIds());
+        assertEquals("[]", stored.getTargetUserIds());
+    }
+
+    @Test
+    void shouldExpandDepartmentAndDeduplicateExplicitUsersAtPublish() {
+        DeptDO child = new DeptDO();
+        child.setId(20L);
+        AdminUserDO departmentUser = user(30L, 20L);
+        AdminUserDO explicitUser = user(USER_ID, null);
+        when(permissionService.getEnabledUserIdsByPermission("system:notice:read"))
+                .thenReturn(Set.of(USER_ID, 30L));
+        when(userService.getUserListByDeptIds(Set.of(10L, 20L)))
+                .thenReturn(List.of(departmentUser, explicitUser));
+        when(deptService.getChildDeptList(Set.of(10L))).thenReturn(List.of(child));
+
+        NoticeSaveReqVO request = saveRequest("<p>部门公告</p>");
+        request.setAudienceType("TARGET");
+        request.setTargetDeptIds(List.of(10L));
+        request.setTargetUserIds(List.of(USER_ID));
+        Long id = noticeService.createNotice(request, USER_ID);
+        noticeService.publishNotice(id);
+
+        assertEquals(Set.of(USER_ID, 30L), recipientMapper.selectListByNoticeId(id).stream()
+                .map(row -> row.getUserId()).collect(java.util.stream.Collectors.toSet()));
+    }
+
+    @Test
+    void shouldRejectExplicitUserWithoutReadPermission() {
+        when(permissionService.getEnabledUserIdsByPermission("system:notice:read")).thenReturn(Set.of());
+        NoticeSaveReqVO request = saveRequest("<p>无权限</p>");
+        request.setAudienceType("TARGET");
+        request.setTargetUserIds(List.of(USER_ID));
+
+        assertServiceException(() -> noticeService.createNotice(request, USER_ID), NOTICE_RECIPIENT_INVALID);
+    }
+
+    private AdminUserDO user(Long id, Long deptId) {
+        AdminUserDO user = new AdminUserDO();
+        user.setId(id);
+        user.setDeptId(deptId);
+        user.setStatus(0);
+        return user;
     }
 
     private NoticeSaveReqVO saveRequest(String content) {

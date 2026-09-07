@@ -22,6 +22,9 @@ import FollowUpModal from './FollowUpModal'
 import { formatTimestamp } from '../services/time'
 import EmployeeSelect from './EmployeeSelect'
 import DeferredAttachmentPicker from './DeferredAttachmentPicker'
+import LeadSubmitterFeedbackPanel from './LeadSubmitterFeedbackPanel'
+import StudentInfoPanel from './StudentInfoPanel'
+import StudentInfoLinkModal from './StudentInfoLinkModal'
 
 type QualificationAction = 'restore' | 'transfer' | 'recycle' | 'release' | 'releasePublicSea'
 
@@ -52,7 +55,9 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
 }) {
   const readOnly = mode === 'student-readonly'
   const managerMode = mode === 'manager-readonly'
-  const visibleTabs = (baseTabs || detailTabsFromProjection(lead.visibleTabs)).filter(tab => mode !== 'student-readonly' || tab !== 'follow-ups')
+  // Read-only planners still need the server-authorized sales follow-up history.
+  const [studentInfoLinkMode, setStudentInfoLinkMode] = useState<'generate' | 'view'>()
+  const visibleTabs = baseTabs ? Array.from(new Set([...baseTabs, ...(lead.visibleTabs?.includes('student-info') ? ['student-info' as const] : [])])) : detailTabsFromProjection(lead.visibleTabs)
   const requestedInitialTab = initialTab || defaultLeadDetailTab(autoExpandFollowUp)
   const visibleTabKey = visibleTabs.join(',')
   const [internalActiveTab, setInternalActiveTab] = useState<string>(resolveLeadDetailTab(visibleTabs, requestedInitialTab))
@@ -75,6 +80,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   const [followUpFormDirty, setFollowUpFormDirty] = useState(false)
   const [basicInfoOpen, setBasicInfoOpen] = useState(false)
   const [basicInfoDirty, setBasicInfoDirty] = useState(false)
+  const [feedbackDirty, setFeedbackDirty] = useState(false)
   const [validOpen, setValidOpen] = useState(false)
   const [validCategory, setValidCategory] = useState<string | undefined>(lead.leadCategory)
   const [validRemark, setValidRemark] = useState('')
@@ -112,8 +118,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
       || item.code.startsWith('SUPERVISOR_') || item.code === 'REQUEST_SUBMITTER_ASSIST')
       .map(item => [item.code, item]))
 
-  useEffect(() => { onDirtyChange(readOnly ? false : followUpFormDirty || basicInfoDirty) },
-    [basicInfoDirty, followUpFormDirty, onDirtyChange, readOnly])
+  useEffect(() => { onDirtyChange(readOnly ? false : followUpFormDirty || basicInfoDirty || feedbackDirty) },
+    [basicInfoDirty, feedbackDirty, followUpFormDirty, onDirtyChange, readOnly])
 
   const judgeValid = async () => {
     setValidConfirmOpen(false)
@@ -268,6 +274,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   ].filter(Boolean) as ToolbarAction[]
 
   const toolbarActions: ToolbarAction[] = [
+    actions.has('GENERATE_STUDENT_INFO_FORM') && { key: 'student-info-generate', icon: <FileAddOutlined/>, label: '生成信息收集表', onClick: () => setStudentInfoLinkMode('generate') },
+    actions.has('VIEW_STUDENT_INFO_FORM_LINK') && { key: 'student-info-link', icon: <FileAddOutlined/>, label: '收集表链接', onClick: () => setStudentInfoLinkMode('view') },
     actions.has('ADD_FOLLOW_UP') && { key: 'follow-up', icon: <PlusOutlined/>, label: '跟进', onClick: () => setFollowUpModalOpen(true) },
     actions.has('JUDGE_VALID') && { key: 'judge-valid', icon: <CheckOutlined/>, label: '判有效', onClick: () => void openValid() },
     actions.has('JUDGE_INVALID') && { key: 'judge-invalid', icon: <CloseOutlined/>, label: '判无效', danger: true, onClick: () => void openInvalid() },
@@ -284,6 +292,8 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
   ].filter(Boolean) as ToolbarAction[]
 
   const tabItems: LeadDetailExtraTab[] = visibleTabs.map<LeadDetailExtraTab>(tab => {
+    if (tab === 'student-info') return { key: tab, label: '学员信息', children: <StudentInfoPanel key={lead.id} leadId={lead.id}/> }
+    if (tab === 'submitter-feedback') return { key: tab, label: '销售反馈', children: <LeadSubmitterFeedbackPanel key={lead.id} lead={lead} canCreate={!readOnly && actions.has('REPLY_SUBMITTER')} onChanged={onChanged} onDirtyChange={setFeedbackDirty}/> }
     if (tab === 'overview') return { key: tab, label: '概览', children: <div className="lead-detail-tab-content">{overviewContent || <LeadDetailOverview lead={lead} categoryLabel={categoryLabel} channelLabel={channelLabel} showFollowUp={visibleTabs.includes('follow-ups')} toolbar={toolbarActions.length ? <OverflowToolbar actions={toolbarActions}/> : undefined} studentContext={studentContext} studentService={studentService} hideProviderOwner={hideProviderOwner}/>}</div> }
     if (tab === 'follow-ups') return { key: tab, label: `跟进记录 (${followUpTotal})`, forceRender: true, children: <div className="lead-detail-tab-content lead-detail-follow-up"><LeadFollowUpPanel lead={lead} open={followUpOpen} refreshVersion={followUpRefreshVersion} onOpen={!readOnly && actions.has('ADD_FOLLOW_UP') ? () => setFollowUpOpen(true) : undefined} onClose={() => setFollowUpOpen(false)} onDirtyChange={readOnly ? undefined : setFollowUpFormDirty} onChanged={onChanged} onTotalChange={setFollowUpTotal}/></div> }
     if (tab === 'appeals') return { key: tab, label: '申诉记录', forceRender: true, children: <div className="lead-detail-tab-content"><LeadAppealPanel lead={lead} onChanged={onChanged}/></div> }
@@ -297,6 +307,7 @@ export default function LeadDetail({ lead, categories, categoryLabel, channelLab
     ? controlledActiveTab : fallbackTab
 
   return <div className="lead-inbox-detail">
+    {studentInfoLinkMode && <StudentInfoLinkModal key={lead.id} leadId={lead.id} mode={studentInfoLinkMode} onClose={() => setStudentInfoLinkMode(undefined)}/>}
     <div className="lead-detail-hero">
       <Typography.Title level={4}>{lead.submittedName}</Typography.Title>
       {!studentContext && visibleTabs.includes('follow-ups') && lead.nextFollowUpAt && <div className="lead-hero-next-followup">

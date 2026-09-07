@@ -23,6 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 class FeedbackDynamicFormServiceTest {
@@ -101,6 +104,59 @@ class FeedbackDynamicFormServiceTest {
         List<?> files = (List<?>) result.values().get("files");
         assertEquals("网络截图.png", ((Map<?, ?>) files.getFirst()).get("name"));
         assertTrue(String.valueOf(((Map<?, ?>) files.getFirst()).get("url")).contains("network.png"));
+    }
+
+    @Test
+    void displayRefreshesExpiredUrlsOnEveryReadAndPreservesHistoricalMetadata() {
+        var fields = service.parse(form(List.of(
+                "{\"type\":\"image\",\"field\":\"images\",\"title\":\"Images\"}",
+                "{\"type\":\"upload\",\"field\":\"files\",\"title\":\"Files\"}"))).fields();
+        String json = "{\"images\":[{\"id\":3,\"name\":\"logo.png\",\"size\":128,\"url\":\"expired\"}],"
+                + "\"files\":[{\"id\":\"3\",\"name\":\"original.png\",\"url\":\"expired\"}],"
+                + "\"category\":{\"value\":\"old\",\"label\":\"Historical label\"}}";
+        when(fileApi.presignGetUrls(List.of(3L), null))
+                .thenReturn(Map.of(3L, "fresh-first"), Map.of(3L, "fresh-second"));
+
+        var first = service.readDisplayValues(json, fields);
+        var second = service.readDisplayValues(json, fields);
+
+        Map<?, ?> image = (Map<?, ?>) ((List<?>) first.get("images")).getFirst();
+        assertEquals("fresh-first", image.get("url"));
+        assertEquals("logo.png", image.get("name"));
+        assertEquals(128, ((Number) image.get("size")).intValue());
+        assertEquals("fresh-first", ((Map<?, ?>) ((List<?>) first.get("files")).getFirst()).get("url"));
+        assertEquals("fresh-second", ((Map<?, ?>) ((List<?>) second.get("images")).getFirst()).get("url"));
+        assertEquals("Historical label", ((Map<?, ?>) first.get("category")).get("label"));
+        assertEquals("expired", ((Map<?, ?>) ((List<?>) service.parseValueSnapshot(json).get("images"))
+                .getFirst()).get("url"));
+        verify(fileApi, times(2)).presignGetUrls(List.of(3L), null);
+        org.mockito.Mockito.verifyNoMoreInteractions(fileApi);
+        verifyNoInteractions(dictDataApi);
+    }
+
+    @Test
+    void displayKeepsOtherFilesReadableWhenOneFileCannotBeSigned() {
+        var fields = service.parse(form(List.of(
+                "{\"type\":\"image\",\"field\":\"images\",\"title\":\"Images\"}"))).fields();
+        when(fileApi.presignGetUrls(List.of(3L, 4L), null)).thenThrow(new IllegalStateException("Unavailable"));
+        when(fileApi.presignGetUrl(3L, null)).thenThrow(new IllegalStateException("Unavailable"));
+        when(fileApi.presignGetUrl(4L, null)).thenReturn("fresh");
+        var values = service.readDisplayValues("{\"images\":["
+                + "{\"id\":3,\"name\":\"missing.png\",\"url\":\"expired\"},"
+                + "{\"id\":4,\"url\":\"expired\"},{\"name\":\"legacy.png\",\"url\":\"expired\"}]}", fields);
+
+        List<?> images = (List<?>) values.get("images");
+        assertEquals(null, ((Map<?, ?>) images.get(0)).get("url"));
+        assertEquals("missing.png", ((Map<?, ?>) images.get(0)).get("name"));
+        assertEquals("fresh", ((Map<?, ?>) images.get(1)).get("url"));
+        assertEquals(null, ((Map<?, ?>) images.get(2)).get("url"));
+    }
+
+    @Test
+    void displayWithoutAttachmentsDoesNotContactStorage() {
+        assertTrue(service.readDisplayValues(null, List.of()).isEmpty());
+        assertEquals(Map.of("title", "Text"), service.readDisplayValues("{\"title\":\"Text\"}", List.of()));
+        verifyNoInteractions(fileApi);
     }
 
     private BpmFormMetadataRespDTO form(List<String> fields) {

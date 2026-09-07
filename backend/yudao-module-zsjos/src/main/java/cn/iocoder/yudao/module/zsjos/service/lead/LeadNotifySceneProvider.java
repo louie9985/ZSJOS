@@ -77,6 +77,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 scene(APPEAL_OVERTURNED, "客资申诉改判有效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(APPEAL_UPHELD, "客资申诉维持无效", ROLE_SUBMITTER, ROLE_OWNER),
                 scene(SUBMITTER_URGED, "提交人催促跟进", ROLE_OWNER),
+                scene(cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE, "销售回复提交人", ROLE_SUBMITTER),
                 scene(SUBMITTER_ASSIST_REQUESTED, "请求提交人协助", ROLE_SUBMITTER),
                 scene(PARTNER_ASSIST_REMINDER, "提醒兼职提交人协助", ROLE_PARTNER_OWNER),
                 scene(COMPLAINT_FOUNDED, "销售投诉成立", ROLE_COMPLAINANT, ROLE_OWNER, ROLE_DIRECT_LEADER),
@@ -106,6 +107,13 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
     public Set<NotifyRecipientDTO> resolveRecipients(NotifyBusinessEvent event, Set<String> recipientRoles) {
         Set<Long> users = new LinkedHashSet<>();
         Map<String, Object> payload = event.getPayload() == null ? Map.of() : event.getPayload();
+        // Feedback notifications retain the recipient selected when the immutable reply was created.
+        if (cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE.equals(event.getSceneCode())) {
+            Long recipientId = longValue(payload.get("feedback.recipientId"));
+            if (!recipientRoles.contains(ROLE_SUBMITTER) || recipientId == null) return Set.of();
+            return Set.of("PARTNER".equals(payload.get("feedback.recipientType"))
+                    ? NotifyRecipientDTO.partner(recipientId) : NotifyRecipientDTO.admin(recipientId));
+        }
         LeadDO lead = leadMapper.selectById(event.getBizId());
         for (String role : recipientRoles) {
             if (ROLE_QUALIFICATION_MANAGERS.equals(role)) {
@@ -139,9 +147,10 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
                 continue;
             }
             Long id = switch (role) {
-                case ROLE_SUBMITTER, ROLE_NEW_MEDIA_PROVIDER -> lead != null
+                case ROLE_SUBMITTER -> lead != null
                         && PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
                         ? lead.getProviderOwnerId() : null;
+                case ROLE_NEW_MEDIA_PROVIDER -> resolveNewMediaProvider(lead, event.getOperatorUserId());
                 case ROLE_PENDING_SALES -> longValue(payload.get("pendingSalesUserId"));
                 case ROLE_OWNER -> longValue(payload.get("ownerUserId"));
                 case ROLE_OPERATOR -> event.getOperatorUserId();
@@ -158,7 +167,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
         }
         Set<NotifyRecipientDTO> recipients = users.stream().map(NotifyRecipientDTO::admin)
                 .collect(Collectors.toCollection(LinkedHashSet::new));
-        if ((recipientRoles.contains(ROLE_SUBMITTER) || recipientRoles.contains(ROLE_NEW_MEDIA_PROVIDER))
+        if (recipientRoles.contains(ROLE_SUBMITTER)
                 && lead != null && PROVIDER_OWNER_PARTNER.equals(lead.getProviderOwnerType())) {
             PartnerAccountDO account = partnerAccountMapper.selectByPartnerId(lead.getProviderOwnerId());
             if (account != null) recipients.add(NotifyRecipientDTO.partner(account.getId()));
@@ -168,6 +177,18 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             if (account != null) recipients.add(NotifyRecipientDTO.partner(account.getId()));
         }
         return recipients;
+    }
+
+    private Long resolveNewMediaProvider(LeadDO lead, Long operatorUserId) {
+        if (lead == null || !SOURCE_SALES_SELF.equals(lead.getSourceType())
+                || !Boolean.TRUE.equals(lead.getSourceProviderRecorded())
+                || lead.getSourceProviderUserId() == null
+                || !PROVIDER_OWNER_SYSTEM_USER.equals(lead.getProviderOwnerType())
+                || !Objects.equals(lead.getSourceProviderUserId(), lead.getProviderOwnerId())
+                || Objects.equals(lead.getProviderOwnerId(), operatorUserId)) {
+            return null;
+        }
+        return lead.getProviderOwnerId();
     }
 
     @Override
@@ -234,6 +255,7 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             copyContext(values, event.getPayload(), "reminder.stage", "reminder.dueAt");
             copyContext(values, event.getPayload(), "urge.reason", "complaint.result",
                     "complaint.handlerUserId", "complaint.handlerOpinion");
+            copyContext(values, event.getPayload(), "feedback.id", "feedback.summary");
             copyContext(values, event.getPayload(), "assist.requestId", "assist.problem",
                     "assist.expectedAssistance", "assist.remark", "assist.attachmentNames");
             copyContext(values, event.getPayload(), "agingPool.cycleId", "agingPool.dueAt");
@@ -306,6 +328,9 @@ public class LeadNotifySceneProvider implements NotifySceneProvider {
             variables.add(variable("appeal.decisionReason", "裁决理由"));
         } else if (SUBMITTER_URGED.equals(sceneCode)) {
             variables.add(variable("urge.reason", "催促原因"));
+        } else if (cn.iocoder.yudao.module.zsjos.enums.LeadSubmitterFeedbackConstants.SCENE.equals(sceneCode)) {
+            variables.add(variable("feedback.id", "反馈记录ID"));
+            variables.add(variable("feedback.summary", "反馈摘要"));
         } else if (Set.of(SUBMITTER_ASSIST_REQUESTED, PARTNER_ASSIST_REMINDER).contains(sceneCode)) {
             variables.add(variable("assist.requestId", "协助请求编号"));
             variables.add(variable("assist.problem", "遇到的问题"));

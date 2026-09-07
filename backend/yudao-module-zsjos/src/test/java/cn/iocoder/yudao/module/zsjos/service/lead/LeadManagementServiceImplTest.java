@@ -62,6 +62,8 @@ class LeadManagementServiceImplTest {
 
     @InjectMocks
     private LeadManagementServiceImpl service;
+    @Mock private LeadSubmitterFeedbackPermissionProvider submitterFeedbackPermission;
+    @Mock private cn.iocoder.yudao.module.zsjos.dal.mysql.studentinfo.StudentInfoFormMapper studentInfoForms;
     @Mock
     private LeadMapper leadMapper;
     @Mock
@@ -117,8 +119,13 @@ class LeadManagementServiceImplTest {
         assertEquals("CREATE_APPEAL", actions.get(0).getCode());
     }
 
+    @Mock private LeadRemarkHistoryService remarkHistoryService;
+
     @BeforeEach
     void setUp() {
+        org.mockito.Mockito.lenient().when(remarkHistoryService.get(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.anyBoolean()))
+                .thenReturn(new LeadRemarkHistoryService.History(java.util.List.of(), false, false, java.util.Map.of()));
         org.mockito.Mockito.lenient().when(advancedFilterService.matchLeadIds(org.mockito.ArgumentMatchers.any())).thenReturn(null);
         org.mockito.Mockito.lenient().when(securityFrameworkService.hasPermission(
                 org.mockito.ArgumentMatchers.anyString())).thenReturn(false);
@@ -494,6 +501,16 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
+    void studentInformationEntryRequiresWonOwnershipAndHidesAfterSubmission() {
+        LeadDO lead = actionLead("won", "owned", false);
+        when(securityFrameworkService.hasPermission("zsjos:student-info-form:create")).thenReturn(true);
+        when(leadObjectPermissionService.canReadAsOwnerOrManager(lead, 20L)).thenReturn(true);
+        assertActions(lead, null, "GENERATE_STUDENT_INFO_FORM", "ENTER_REPURCHASE");
+        when(studentInfoForms.submitted(1L)).thenReturn(new cn.iocoder.yudao.module.zsjos.dal.dataobject.studentinfo.StudentInfoFormDO());
+        assertActions(lead, null, "ENTER_REPURCHASE");
+    }
+
+    @Test
     void detailProjectsRecyclePendingSupervisorActionsFromSharedPolicy() {
         LeadDO lead = actionLead("submitted", "recycle_pending", true);
         lead.setOwnerUserId(null);
@@ -829,6 +846,20 @@ class LeadManagementServiceImplTest {
         lead.setStatus(status); lead.setAssignmentStatus(assignmentStatus);
         lead.setQualificationDeadlineAt(qualificationPending ? java.time.LocalDateTime.now().plusHours(1) : null);
         return lead;
+    }
+
+    @Test
+    void overviewRemarksDoNotRequireFlowPermissionAndRespectIdentityMask() {
+        LeadDO lead = actionLead("submitted", "owned", false);
+        var item = new cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.management.LeadRemarkRespVO(
+                "event:1", "supplement", "remark", null, "masked");
+        when(remarkHistoryService.get(org.mockito.ArgumentMatchers.eq(lead),
+                org.mockito.ArgumentMatchers.nullable(String.class), org.mockito.ArgumentMatchers.eq(true)))
+                .thenReturn(new LeadRemarkHistoryService.History(List.of(item), true, false, Map.of()));
+        LeadManagementRespVO result = assertActions(lead, null);
+        assertEquals(List.of(item), result.getRemarkHistory());
+        assertEquals(true, result.getRemarkHistoryIncomplete());
+        assertEquals(false, result.getVisibleTabs().contains("flow-history"));
     }
 
     private LeadManagementRespVO assertActions(LeadDO lead, OpportunityDO opportunity, String... expected) {

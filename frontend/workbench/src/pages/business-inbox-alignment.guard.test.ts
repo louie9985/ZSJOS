@@ -55,9 +55,24 @@ describe('business inbox alignment', () => {
     expect(approvalCenter).toContain('new IntersectionObserver')
     expect(approvalCenter).toContain('rootMargin: "240px 0px"')
     expect(approvalCenter).toContain('bpm-approval-load-sentinel')
-    expect(approvalCenter).toContain('api.bpmTaskPage(view, { pageNo: nextPage, pageSize: PAGE_SIZE })')
+    expect(approvalCenter).toContain('api.bpmTaskPage(view, {')
+    expect(approvalCenter).toContain('pageNo: nextPage')
+    expect(approvalCenter).toContain('name: keyword.trim() || undefined')
     expect(approvalCenter).toContain('setTasks(current => appendTasks(current, result.list))')
     expect(approvalCenter).not.toContain('<Pagination')
+  })
+
+  it('keeps table layouts out of inbox append loading', () => {
+    const messageInbox = readFileSync('src/pages/MessageInboxPage.tsx', 'utf8')
+    const announcements = readFileSync('src/pages/AnnouncementCenterPage.tsx', 'utf8')
+    const appeals = readFileSync('src/pages/LeadAppealPage.tsx', 'utf8')
+    const duplicateReviews = readFileSync('src/pages/LeadDuplicateReviewPage.tsx', 'utf8')
+
+    expect(messageInbox).toContain('if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
+    expect(announcements).toContain('if (useTableLayout || !node || !hasMore || loading || loadingMore) return')
+    expect(appeals).toContain('if (useTableLayout || !node || !hasMore || loading || loadingMore || !cursor) return')
+    expect(duplicateReviews).toContain('loadedPageRef.current + 1')
+    expect(duplicateReviews).toContain('setItems(current => useTableLayout || !append')
   })
 
   it('exposes refresh actions on confirmed business inboxes', () => {
@@ -74,14 +89,20 @@ describe('business inbox alignment', () => {
     expect(personnel).not.toMatch(/>刷新<\/Button>/)
   })
 
+  it('keeps finance export available in both approval layouts', () => {
+    const approval = readFileSync('src/pages/SalesOrderApprovalPage.tsx', 'utf8')
+    expect(approval.match(/exportFinanceOrders/g)?.length).toBeGreaterThanOrEqual(3)
+    expect(approval).toContain("permissions.includes('zsjos:export:finance-order')")
+  })
+
   it('contains long message content and aligns message metadata', () => {
     const messageInbox = readFileSync('src/pages/MessageInboxPage.tsx', 'utf8')
     const styles = readFileSync('src/styles/pages/message-inbox.css', 'utf8')
 
     expect(messageInbox).toContain('IntersectionObserver')
-    expect(messageInbox).toContain('buildNotifyMessageCursorParams(view, append ? cursor : undefined, CURSOR_LIMIT)')
-    expect(messageInbox).toContain('buildNotifyMessagePageParams(view, nextPage, PAGE_SIZE)')
+    expect(messageInbox).toContain('buildNotifyMessageCursorParams')
     expect(messageInbox).toContain('api.myNotifyMessagePage')
+    expect(messageInbox).toContain('pagination={{ current: tablePage')
     expect(messageInbox).toContain('message-inbox-table-shell')
     expect(messageInbox).toContain('message-inbox-table-drawer')
     expect(messageInbox).toContain('message-inbox-load-more')

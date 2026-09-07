@@ -9,6 +9,7 @@ import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadComplaintMapper;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.LeadMapper;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.LeadComplaintDecisionReqVO;
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.complaint.LeadComplaintCreateReqVO;
 import cn.iocoder.yudao.module.zsjos.framework.permission.ZsjosPermission;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -91,6 +92,25 @@ class LeadComplaintServiceTest {
         assertDecisionNotification("unfounded", COMPLAINT_UNFOUNDED, null, 70L);
     }
 
+    @Test
+    void successfulComplaintCreationAdvancesLeadActivityButReplayDoesNot() {
+        LeadDO lead = new LeadDO().setId(1L);
+        lead.setStatus("valid"); lead.setOwnerUserId(20L);
+        lead.setProviderOwnerType("system_user"); lead.setProviderOwnerId(10L);
+        when(leadMapper.selectByIdForUpdate(1L, 1L)).thenReturn(lead);
+        when(attachmentService.validateReferences(anyList(), eq(10L))).thenReturn(Map.of());
+        LeadComplaintCreateReqVO request = new LeadComplaintCreateReqVO();
+        request.setReason("跟进不及时"); request.setIdempotencyKey("create-key");
+
+        service.create(1L, 10L, request);
+
+        verify(leadMapper).touchActivity(eq(1L), any(java.time.LocalDateTime.class));
+        LeadComplaintDO replay = new LeadComplaintDO(); replay.setId(11L);
+        when(complaintMapper.selectByCreateKey("create-key")).thenReturn(replay);
+        assertEquals(11L, service.create(1L, 10L, request));
+        verify(leadMapper, times(1)).touchActivity(eq(1L), any(java.time.LocalDateTime.class));
+    }
+
     @SuppressWarnings("unchecked")
     private void assertDecisionNotification(String result, String sceneCode, Long complainantUserId, Long partnerId) {
         LeadComplaintDO row = new LeadComplaintDO();
@@ -106,6 +126,7 @@ class LeadComplaintServiceTest {
         org.mockito.ArgumentCaptor<Map<String, Object>> context = org.mockito.ArgumentCaptor.forClass(Map.class);
         verify(notifyPublisher).publish(eq(sceneCode), eq(1L), eq("lead-complaint-" + result + ":11"),
                 eq(30L), any(), context.capture());
+        verify(leadMapper).touchActivity(eq(1L), any(java.time.LocalDateTime.class));
         assertEquals(result, context.getValue().get("complaint.result"));
         assertEquals("处理意见", context.getValue().get("complaint.handlerOpinion"));
         assertEquals(complainantUserId, context.getValue().get("complaint.complainantUserId"));

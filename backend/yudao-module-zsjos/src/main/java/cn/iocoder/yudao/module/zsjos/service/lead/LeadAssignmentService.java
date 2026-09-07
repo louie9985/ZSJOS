@@ -7,6 +7,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.userrelation.vo.relation.U
 import cn.iocoder.yudao.module.zsjos.controller.admin.userrelation.vo.relation.UserRelationSaveReqVO;
 
 import java.util.List;
+import java.util.Set;
 
 public interface LeadAssignmentService {
 
@@ -27,6 +28,7 @@ public interface LeadAssignmentService {
     List<LeadAssignmentUserRespVO> getAdminEligibleTargetUsers(String sceneCode);
 
     List<LeadAssignmentUserRespVO> getConfiguredTargetUsers(String sceneCode, Long sourceUserId);
+    Set<Long> getActiveTargetUserIds(String sceneCode, Long sourceUserId);
 
     void saveAdminRelations(UserRelationSaveReqVO reqVO, Long operatorUserId);
 

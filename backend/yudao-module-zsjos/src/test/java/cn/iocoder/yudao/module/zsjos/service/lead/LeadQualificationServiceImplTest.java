@@ -229,6 +229,41 @@ class LeadQualificationServiceImplTest {
     }
 
     @Test
+    void dispositionTransitionsAdvanceLeadActivityTime() {
+        LeadDO suspended = pendingLead();
+        suspended.setId(11L); suspended.setStatus("suspended");
+        LeadDO recycled = pendingLead();
+        recycled.setId(12L); recycled.setAssignmentStatus("recycle_pending");
+        recycled.setOwnerUserId(null); recycled.setRecycleSourceOwnerUserId(20L);
+        LeadDO ownedForRecycle = pendingLead();
+        ownedForRecycle.setId(13L);
+        LeadDO ownedForRelease = pendingLead();
+        ownedForRelease.setId(14L);
+        when(leadMapper.selectByIdForUpdate(11L, 9L)).thenReturn(suspended);
+        when(leadMapper.selectByIdForUpdate(12L, 9L)).thenReturn(recycled);
+        when(leadMapper.selectByIdForUpdate(13L, 9L)).thenReturn(ownedForRecycle);
+        when(leadMapper.selectByIdForUpdate(14L, 9L)).thenReturn(ownedForRelease);
+        doAnswer(invocation -> {
+            invocation.<cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO>
+                    getArgument(0).setId(77L);
+            return 1;
+        }).when(historyMapper).insert(any(
+                cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class));
+
+        withTenant(() -> service.recycle(11L, 99L, disposition("recycle")));
+        withTenant(() -> service.releaseToClaimPool(12L, 99L, disposition("release")));
+        withTenant(() -> service.supervisorRecycleOwned(13L, 99L, disposition("supervisor-recycle")));
+        withTenant(() -> service.supervisorReleaseOwnedToClaimPool(14L, 99L,
+                disposition("supervisor-release")));
+
+        assertAll(
+                () -> assertNotNull(suspended.getLastActivityAt()),
+                () -> assertNotNull(recycled.getLastActivityAt()),
+                () -> assertNotNull(ownedForRecycle.getLastActivityAt()),
+                () -> assertNotNull(ownedForRelease.getLastActivityAt()));
+    }
+
+    @Test
     void repeatedJudgmentReturnsWithoutSecondMutation() {
         LeadDO lead = pendingLead();
         BusinessEventDO event = new BusinessEventDO();
@@ -267,6 +302,13 @@ class LeadQualificationServiceImplTest {
         LeadJudgeValidReqVO request = new LeadJudgeValidReqVO();
         request.setIdempotencyKey(key);
         request.setRemark("已确认有明确学习意向");
+        return request;
+    }
+
+    private LeadDispositionReqVO disposition(String key) {
+        LeadDispositionReqVO request = new LeadDispositionReqVO();
+        request.setIdempotencyKey(key);
+        request.setReason("主管处置");
         return request;
     }
 

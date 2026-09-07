@@ -17,6 +17,11 @@ GET /admin-api/zsjos/lead/{leadId}/flow-history
 
 ## 响应字段
 
+新版 `lead_submitter_supplemented` 节点从 `append_v1` 事件快照展示本次补充备注。
+旧版节点的 `before.remark` 不代表当次填写内容，不展示为当次备注。存在旧版补充事件时，
+“客资提交”节点不再以当前 Lead 备注冒充首次备注；有依据的旧文本统一在详情 `remarkHistory` 中展示为历史备注。
+新版补充节点的操作人显示为“提交人”，来源由快照的主体类型确定；Partner 操作不会因 ADMIN 用户 ID 为空而被标为系统操作。
+
 接口返回按 `occurredAt DESC`、原始数值记录 ID 倒序排列的数组：
 
 | 字段 | 说明 |

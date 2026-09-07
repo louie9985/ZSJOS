@@ -1,5 +1,13 @@
 # ZSJOS 全角色目标权限矩阵
 
+## 客资销售反馈权限（V182）
+
+新增 `zsjos:lead:submitter-feedback:read`（查看）与
+`zsjos:lead:submitter-feedback:create`（发送），由管理员配置。销售应同时配置两项；
+员工提交人只配置查看。权限不能替代当前负责人或提交方关系，不自动授权主管/管理员
+读取所有反馈。Partner 使用独立账号/归属验证，不消费 ADMIN 权限列表。
+迁移只创建菜单配置，不自动修改角色或真实账号授权。
+
 本矩阵覆盖当前 34 个稳定角色编码。授权只按 `system_role.code` 和 `system_menu.permission` 处理；菜单 ID、显示名、部门名和岗位名都不是授权依据。BPM 任务候选人与 ZSJOS 功能权限分别校验，个人站内消息按登录身份和消息所有权提供，不复制 ZSJOS 菜单权限。
 
 ## V071 精确权限集

@@ -50,6 +50,7 @@ const FOLLOW_UP_TAB_SCENES = new Set([
 ])
 
 export const leadTabForNotifyScene = (sceneCode?: string): LeadDetailTab => {
+  if (sceneCode === 'zsjos.lead.submitter_feedback_created') return 'submitter-feedback'
   if (sceneCode && APPEAL_TAB_SCENES.has(sceneCode)) return 'appeals'
   if (sceneCode && COMPLAINT_TAB_SCENES.has(sceneCode)) return 'complaints'
   if (sceneCode && FOLLOW_UP_TAB_SCENES.has(sceneCode)) return 'follow-ups'

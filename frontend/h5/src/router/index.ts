@@ -6,6 +6,12 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
+      path: '/student-info-form',
+      name: 'StudentInfoCollection',
+      component: () => import('@/pages/studentInfo/index.vue'),
+      meta: { requiresAuth: false }
+    },
+    {
       path: '/login',
       name: 'Login',
       component: () => import('@/pages/login/index.vue'),

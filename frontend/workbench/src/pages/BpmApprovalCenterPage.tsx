@@ -7,6 +7,7 @@ import {
   Button,
   Empty,
   Grid,
+  Input,
   Result,
   Skeleton,
   Space,
@@ -183,6 +184,9 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   const [selectedId, setSelectedId] = useState<string>()
   const [total, setTotal] = useState(0)
   const [loadedPage, setLoadedPage] = useState(0)
+  const [tablePage, setTablePage] = useState(1)
+  const [tablePageSize, setTablePageSize] = useState(PAGE_SIZE)
+  const [keyword, setKeyword] = useState('')
   const [counts, setCounts] = useState<Record<BpmTaskView, number>>({ todo: 0, done: 0 })
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -242,11 +246,11 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     setLoadMoreError('')
     setUnauthorized(false)
     try {
-      const result = await api.bpmTaskPage(view, { pageNo: 1, pageSize: PAGE_SIZE })
+      const result = await api.bpmTaskPage(view, { pageNo: useTableLayout ? tablePage : 1, pageSize: useTableLayout ? tablePageSize : PAGE_SIZE, name: keyword.trim() || undefined })
       if (seq !== requestSeq.current) return
       setTasks(result.list)
       setTotal(result.total)
-      setLoadedPage(1)
+      setLoadedPage(useTableLayout ? tablePage : 1)
       setCounts(current => ({ ...current, [view]: result.total }))
       setSelectedId(current => preserveSelection && result.list.some(item => item.id === current) ? current : result.list[0]?.id)
     } catch (loadError) {
@@ -260,7 +264,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
-  }, [canQuery, view])
+  }, [canQuery, keyword, tablePage, tablePageSize, useTableLayout, view])
 
   const loadMore = useCallback(async () => {
     if (!canQuery || loading || loadingMoreRef.current || tasks.length >= total) return
@@ -270,7 +274,11 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
     const seq = requestSeq.current
     const nextPage = loadedPage + 1
     try {
-      const result = await api.bpmTaskPage(view, { pageNo: nextPage, pageSize: PAGE_SIZE })
+      const result = await api.bpmTaskPage(view, {
+        pageNo: nextPage,
+        pageSize: PAGE_SIZE,
+        name: keyword.trim() || undefined,
+      })
       if (seq !== requestSeq.current) return
       setTasks(current => appendTasks(current, result.list))
       setTotal(result.total)
@@ -283,7 +291,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
       loadingMoreRef.current = false
       if (seq === requestSeq.current) setLoadingMore(false)
     }
-  }, [canQuery, loadedPage, loading, tasks.length, total, view])
+  }, [canQuery, keyword, loadedPage, loading, tasks.length, total, view])
 
   useEffect(() => {
     const nextView = location.pathname === APP_ROUTES.BPM_DONE ? 'done' : 'todo'
@@ -302,13 +310,13 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
   useEffect(() => {
     const sentinel = sentinelRef.current
     const root = listRef.current
-    if (!sentinel || !root || loading || loadMoreError || tasks.length >= total) return
+    if (useTableLayout || !sentinel || !root || loading || loadMoreError || tasks.length >= total) return
     const observer = new IntersectionObserver(entries => {
       if (entries.some(entry => entry.isIntersecting)) void loadMore()
     }, { root, rootMargin: "240px 0px" })
     observer.observe(sentinel)
     return () => observer.disconnect()
-  }, [loadMore, loadMoreError, loading, tasks.length, total])
+  }, [loadMore, loadMoreError, loading, tasks.length, total, useTableLayout])
   useEffect(() => {
     if (screens.md) setDrawerOpen(false)
   }, [screens.md])
@@ -397,6 +405,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         message={countError}
         action={<Button type="link" size="small" onClick={() => void loadCounts()}>重试</Button>}
       />}
+      <Input.Search allowClear value={keyword} placeholder="搜索任务名称" onSearch={value => { setKeyword(value); setTablePage(1) }} onChange={event => { if (!event.target.value) { setKeyword(''); setTablePage(1) } }} style={{ width: 260 }}/>
       <Tabs
         className="bpm-approval-tabs"
         activeKey={view}
@@ -418,7 +427,7 @@ export default function BpmApprovalCenterPage({ permissions, initialView }: {
         columnsState={{ persistenceKey: 'crm-bpm-approval-table-columns', persistenceType: 'localStorage' }}
         loading={loading}
         dataSource={tasks}
-        pagination={false}
+        pagination={{ current: tablePage, pageSize: tablePageSize, total, showSizeChanger: true, pageSizeOptions: [20, 50, 100], showQuickJumper: true, onChange: (page, size) => { setTablePage(page); setTablePageSize(size) } }}
         scroll={{ x: 2300 }}
         locale={{ emptyText: <Empty description={view === 'todo' ? '暂无待办审批' : '暂无已办审批'} /> }}
         columns={[

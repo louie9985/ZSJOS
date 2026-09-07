@@ -64,6 +64,8 @@ Ordinary submission identity and dispatch restrictions, submitter actions, and t
 
 统一客资分页接口支持成对提交 `sortField` 与 `sortOrder=ascend|descend`，排序作用于完整筛选结果后再分页。`sortField` 只接受 Lead 根表的持久化字段白名单：`leadNo`、`submittedName`、`submittedMobile`、`submittedWechatId`、`sourceType`、`leadCategory`、`sourceChannelId`、`assignmentStatus`、`dispatchMode`、`assignmentAttemptCount`、`publicPoolAt`、`countedAt`、`currentAssignmentFirstFollowUpAt`、`currentAssignmentFirstFollowUpDeadlineAt`、`qualificationStartedAt`、`qualificationDeadlineAt`、`suspendedAt`、`validDescription`、`invalidDescription`、`appealDeadlineAt`、`closedAt`、`closeReason`、`nextFollowUpAt`、`submittedAt`、`lastActivityAt`、`qualifiedAt`、`convertedAt`、`remark`、`updateTime`。每种显式排序均追加 `id DESC` 作为并列值的稳定次序；未提交完整排序参数时仍使用 `lastActivityAt DESC, id DESC`。提交人、所属销售、产品等关联投影名称不在排序白名单中，前端不得将当前页投影值伪装为全量排序。游标接口的令牌固定编码 `lastActivityAt + id`，即使请求携带排序参数也继续使用默认游标顺序；自定义排序只适用于普通分页接口。
 
+`lastActivityAt` 只表示已成功提交的客资业务变化，并在同一事务中按事件实际发生时间单调推进。基本资料、归属与分配、跟进、资格判定、申诉/投诉、公海协作、正式销售反馈及直接改变非复购 Lead 的订单结果属于业务变化；查看、选中、已读、临时附件上传和提醒发送不属于。较早事件、失败请求、权限拒绝、幂等重放和版本冲突不得覆盖较新的活动时间。
+
 复核队列不绑定管理员角色，迁移也不自动授权角色。具备独立查询权限的租户用户共享待处理列表；这是租户级中央复核。决定事务对任务加行锁，第一位提交者成功。结论固定为 `allow_flow` 和 `close_duplicate`，意见必填、附件可选。`allow_flow` 按首次待复核提交的快照创建正式 Lead，后续进入普通自动分配、指定销售或销售自拓归属流程；`close_duplicate` 只关闭本次复核，永久不创建 Lead、不分配、不计入业绩。联系方式修改调用同一查重规则，任何强或弱命中都拒绝且不创建复核任务。
 
 ## 管理接口与权限

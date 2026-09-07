@@ -6,6 +6,7 @@ import { showToast, showConfirmDialog, showImagePreview } from 'vant'
 import { getLeadAppeals, getLeadDetail, getPartnerLeadActivity, urgeLead, type LeadAppealItem, type LeadListItem, type LeadTimelineItem, type PartnerLeadActivity, type PartnerLeadActivityTone } from '@/api/lead'
 import { formatAmount, formatDateTime, formatLeadNo, formatLeadStatus } from '@/utils/format'
 import type { ApiDateValue } from '@/utils/format'
+import LeadSubmitterFeedback from '@/components/LeadSubmitterFeedback.vue'
 
 defineOptions({ name: 'LeadDetail' })
 
@@ -14,6 +15,8 @@ const router = useRouter()
 const leadId = Number(route.params.id)
 
 const lead = ref<LeadListItem>()
+const remarks = computed(() => lead.value?.remarkHistory ?? (lead.value?.remark
+  ? [{ id: 'legacy-current', kind: 'legacy', content: lead.value.remark, occurredAt: undefined, operatorName: undefined }] : []))
 const activity = ref<PartnerLeadActivity>()
 const loading = ref(true)
 const loadError = ref('')
@@ -285,6 +288,17 @@ function goAppeal() {
           </van-cell-group>
         </div>
 
+        <div class="card">
+          <div class="section-title">备注信息</div>
+          <van-notice-bar v-if="lead.remarkHistoryIncomplete" text="部分历史备注无法还原" />
+          <div v-for="item in remarks" :key="item.id" class="record-item">
+            <div class="record-head"><strong>{{ item.kind === 'submission' ? '提交备注' : item.kind === 'supplement' ? '补充备注' : '历史备注' }}</strong></div>
+            <div v-if="item.operatorName || item.occurredAt">{{ item.operatorName }} {{ item.occurredAt ? formatDateTime(typeof item.occurredAt === 'number' ? new Date(item.occurredAt).toISOString() : item.occurredAt) : '' }}</div>
+            <p style="white-space: pre-wrap; overflow-wrap: anywhere">{{ item.content }}</p>
+          </div>
+          <van-empty v-if="!remarks.length" description="暂无备注" :image-size="64" />
+        </div>
+
         <!-- 意向课程 -->
         <div v-if="detailProducts.length > 0" class="card">
           <div class="section-title">意向课程</div>
@@ -421,6 +435,7 @@ function goAppeal() {
         </div>
 
         <!-- 底部操作栏 -->
+        <LeadSubmitterFeedback v-if="lead.visibleTabs?.includes('submitter-feedback')" :key="leadId" :lead-id="leadId" />
         <div v-if="actions.size > 0" class="detail-actions safe-area-bottom">
           <van-button
             v-if="actions.has('SUBMITTER_SUPPLEMENT')"

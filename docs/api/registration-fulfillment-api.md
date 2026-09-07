@@ -111,6 +111,8 @@ Each service keeps the internal `productSnapshot` compatibility field and additi
 `courseName`, `skuName`, `categoryPath`, and `attributeValues` for user-facing display. Clients
 must render these structured fields and must not display the raw JSON snapshot.
 Registration notifications identify the business object with `leadNo` or `orderNo`; planner assignment messages use the student name and `personNo` because the recipient is being assigned a student, not a Lead. Newly created student numbers use `XYyyyyMMddHHmmss` plus a four-digit sequence that resets daily per tenant in Beijing time and wraps from `9999` to `0001`; existing `P + UUID` values are preserved. Historical delivered-message snapshots remain unchanged.
+
+规划师 Workbench 详情固定以当前 `serviceRelationId` 的 Person 与课程服务为主体。最近联系、联系任务时效和服务阶段只读取学员联系上下文与服务任务；不能因存在 Lead 而切换为销售跟进、客资时效或销售统计。Lead 仅作为获准的只读客资历史补充。无 Lead、字段为空、没有联系记录或没有待处理任务时，保留对应组件并显示明确空态，不隐藏页面结构，也不得借用同一 Person 下其他服务的 Lead。
 For databases where V085 was already applied, V087 forward-repairs missing registration business-number parameters and any safely resolvable residual `student.name` snapshot. V087 never substitutes an internal Lead ID and blocks when the tenant-scoped order/Lead relation cannot provide a stable business number.
 
 ## Student acceptance and contact chain
@@ -224,6 +226,9 @@ an item. The V129 seed is repeatable and is not executed by application startup.
 `/admin-api/zsjos/positioning-template/**` 和 `/admin-api/zsjos/director-config`。定位卡业务端通过
 `GET /admin-api/zsjos/positioning-card/published-template` 获取当前发布模板，创建草稿时保存
 `personId + accountId + serviceRelationId + templateVersionId` 及完整快照。
+模板字段的可选 `description`（最多 500 字）是管理员维护的填写备注，随模板版本保存；Vue
+配置预览以及 Workbench 的采访、定位卡填写控件在字段下方展示该备注，空备注不占位。备注
+仅用于填写指导，不参与字段值校验，也不显示在历史定位卡、拍剪快照或学员确认页。
 
 定位卡复用导入使用以下接口，并同时要求 `zsjos:positioning-card:create` 与
 `zsjos:positioning-card:query`：

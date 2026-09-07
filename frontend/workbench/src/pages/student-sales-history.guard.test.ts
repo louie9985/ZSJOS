@@ -15,8 +15,8 @@ describe('study planner student sales history', () => {
     expect(page).toContain('const leadId = service?.leadId;')
     expect(page).not.toContain('service?.leadId || student.leadId')
     expect(page).toContain('mode="student-readonly"')
-    expect(page).toContain('<LeadDetail')
-    expect(page).toContain("key: 'student-contact'")
+    expect(page).not.toContain('<LeadDetail\n      lead={{')
+    expect(page).toContain("key: 'lead-history'")
     expect(page).toContain('<StudentDetail')
     expect(page).toContain('contactContext={studentContactContext}')
   })
@@ -26,7 +26,7 @@ describe('study planner student sales history', () => {
     expect(detail).toContain("const readOnly = mode === 'student-readonly'")
     expect(detail).toContain("item.code.startsWith('SUPERVISOR_')")
     expect(detail).toContain('const actions = readOnly ? new Map')
-    expect(detail).toContain("mode !== 'student-readonly' || tab !== 'follow-ups'")
+    expect(detail).toContain('const visibleTabs = baseTabs || detailTabsFromProjection(lead.visibleTabs)')
   })
 
   it('uses service contact and order snapshots in the planner overview', () => {
@@ -66,8 +66,8 @@ describe('study planner student sales history', () => {
 
   it('uses Person identity and keeps the contact history tab free of commands', () => {
     const page = readFileSync('src/pages/RegistrationPages.tsx', 'utf8')
-    expect(page).toContain('submittedName: selected.name ?? leadDetail.submittedName')
-    expect(page).toContain('submittedMobile: selected.mobile ?? leadDetail.submittedMobile')
+    expect(page).toContain('student={selected}')
+    expect(page).toContain('contactRecords={studentContactRecords}')
     const historyDetail = page.slice(page.indexOf('function StudentContactDetail'), page.indexOf('export function StudentContactConfigPage'))
     expect(historyDetail).not.toContain('<StudentContactForm')
     expect(historyDetail).not.toContain('studentAssignCollaborator')

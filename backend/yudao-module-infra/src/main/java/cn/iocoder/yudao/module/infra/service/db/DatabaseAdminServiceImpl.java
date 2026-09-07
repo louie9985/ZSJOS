@@ -2,6 +2,7 @@ package cn.iocoder.yudao.module.infra.service.db;
 
 import cn.hutool.core.util.StrUtil;
 import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.util.monitor.TracerUtils;
 import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminColumnRespVO;
 import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminDataPageReqVO;
 import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminRowCreateReqVO;
@@ -13,6 +14,7 @@ import cn.iocoder.yudao.module.infra.controller.admin.db.vo.DatabaseAdminTableRe
 import cn.iocoder.yudao.module.infra.dal.dataobject.db.DataSourceConfigDO;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import jakarta.annotation.Resource;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
@@ -37,16 +39,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static cn.iocoder.yudao.framework.common.exception.util.ServiceExceptionUtil.exception;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATA_SOURCE_CONFIG_NOT_EXISTS;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_COLUMN_NOT_EXISTS;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_COLUMN_READONLY;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_CONNECTION_FAIL;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_EXECUTE_FAIL;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_ROW_AFFECTED_INVALID;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_SENSITIVE_COLUMN;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_TABLE_NOT_EXISTS;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_TABLE_READONLY;
-import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.DATABASE_ADMIN_UNSUPPORTED_DATABASE;
+import static cn.iocoder.yudao.module.infra.enums.ErrorCodeConstants.*;
 import static cn.iocoder.yudao.module.infra.enums.LogRecordConstants.INFRA_DATABASE_ADMIN_CREATE_SUB_TYPE;
 import static cn.iocoder.yudao.module.infra.enums.LogRecordConstants.INFRA_DATABASE_ADMIN_CREATE_SUCCESS;
 import static cn.iocoder.yudao.module.infra.enums.LogRecordConstants.INFRA_DATABASE_ADMIN_DELETE_SUB_TYPE;
@@ -57,6 +50,7 @@ import static cn.iocoder.yudao.module.infra.enums.LogRecordConstants.INFRA_DATAB
 
 @Service
 @Validated
+@Slf4j
 public class DatabaseAdminServiceImpl implements DatabaseAdminService {
 
     private static final Set<String> SENSITIVE_COLUMN_TOKENS = Set.of(
@@ -68,7 +62,7 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
 
     @Override
     public List<DatabaseAdminTableRespVO> getTableList(Long dataSourceConfigId, String name, String comment) {
-        return execute(dataSourceConfigId, connection -> {
+        return execute(dataSourceConfigId, "table-list", null, connection -> {
             DatabaseMetaData metaData = connection.getMetaData();
             List<DatabaseAdminTableRespVO> tables = new ArrayList<>();
             try (ResultSet rs = metaData.getTables(connection.getCatalog(), getSchemaPattern(connection), null, new String[]{"TABLE"})) {
@@ -91,12 +85,12 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
 
     @Override
     public DatabaseAdminTableDetailRespVO getTableDetail(Long dataSourceConfigId, String tableName) {
-        return execute(dataSourceConfigId, connection -> getTableDetail(connection, tableName));
+        return execute(dataSourceConfigId, "table-detail", tableName, connection -> getTableDetail(connection, tableName));
     }
 
     @Override
     public DatabaseAdminTableDataRespVO getTableDataPage(DatabaseAdminDataPageReqVO reqVO) {
-        return execute(reqVO.getDataSourceConfigId(), connection -> {
+        return execute(reqVO.getDataSourceConfigId(), "data-page", reqVO.getTableName(), connection -> {
             DatabaseAdminTableDetailRespVO table = getTableDetail(connection, reqVO.getTableName());
             String tableIdentifier = quoteIdentifier(connection, table.getName());
             QueryClause where = buildKeywordWhere(connection, table.getColumns(), reqVO.getKeyword());
@@ -138,7 +132,7 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
     @LogRecord(type = INFRA_DATABASE_ADMIN_TYPE, subType = INFRA_DATABASE_ADMIN_CREATE_SUB_TYPE,
             bizNo = "{{#reqVO.dataSourceConfigId}}", success = INFRA_DATABASE_ADMIN_CREATE_SUCCESS)
     public void createRow(DatabaseAdminRowCreateReqVO reqVO) {
-        execute(reqVO.getDataSourceConfigId(), connection -> {
+        execute(reqVO.getDataSourceConfigId(), "create", reqVO.getTableName(), connection -> {
             DatabaseAdminTableDetailRespVO table = getWritableTable(connection, reqVO.getTableName());
             Map<String, Object> values = validateValues(table, reqVO.getValues(), true);
             List<String> quotedColumns = new ArrayList<>();
@@ -148,8 +142,11 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
             String columns = String.join(", ", quotedColumns);
             String placeholders = values.keySet().stream().map(column -> "?").collect(Collectors.joining(", "));
             String sql = "INSERT INTO " + quoteIdentifier(connection, table.getName()) + " (" + columns + ") VALUES (" + placeholders + ")";
+            if (values.isEmpty() && connection.getMetaData().getDatabaseProductName().equalsIgnoreCase("H2")) {
+                sql = "INSERT INTO " + quoteIdentifier(connection, table.getName()) + " DEFAULT VALUES";
+            }
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                bindParameters(ps, values.values().stream().toList());
+                bindValues(ps, table, values);
                 int affected = ps.executeUpdate();
                 if (affected != 1) {
                     throw exception(DATABASE_ADMIN_ROW_AFFECTED_INVALID);
@@ -163,7 +160,7 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
     @LogRecord(type = INFRA_DATABASE_ADMIN_TYPE, subType = INFRA_DATABASE_ADMIN_UPDATE_SUB_TYPE,
             bizNo = "{{#reqVO.dataSourceConfigId}}", success = INFRA_DATABASE_ADMIN_UPDATE_SUCCESS)
     public void updateRow(DatabaseAdminRowUpdateReqVO reqVO) {
-        execute(reqVO.getDataSourceConfigId(), connection -> {
+        execute(reqVO.getDataSourceConfigId(), "update", reqVO.getTableName(), connection -> {
             DatabaseAdminTableDetailRespVO table = getWritableTable(connection, reqVO.getTableName());
             Map<String, Object> values = validateValues(table, reqVO.getValues(), false);
             List<String> setExpressions = new ArrayList<>();
@@ -173,11 +170,15 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
             String sets = String.join(", ", setExpressions);
             String sql = "UPDATE " + quoteIdentifier(connection, table.getName()) + " SET " + sets
                     + " WHERE " + quoteIdentifier(connection, table.getPrimaryKeyColumn()) + " = ?";
+            DatabaseAdminColumnRespVO primaryKey = primaryKey(table);
+            Object key = DatabaseAdminValueCodec.convert(primaryKey, reqVO.getPrimaryKeyValue());
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                int index = bindParameters(ps, values.values().stream().toList());
-                ps.setObject(index, reqVO.getPrimaryKeyValue());
+                int index = bindValues(ps, table, values);
+                DatabaseAdminValueCodec.bind(ps, index, primaryKey, key);
                 int affected = ps.executeUpdate();
-                if (affected != 1) {
+                if (affected == 0) {
+                    assertRowExists(connection, table, primaryKey, key);
+                } else if (affected != 1) {
                     throw exception(DATABASE_ADMIN_ROW_AFFECTED_INVALID);
                 }
             }
@@ -189,14 +190,18 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
     @LogRecord(type = INFRA_DATABASE_ADMIN_TYPE, subType = INFRA_DATABASE_ADMIN_DELETE_SUB_TYPE,
             bizNo = "{{#reqVO.dataSourceConfigId}}", success = INFRA_DATABASE_ADMIN_DELETE_SUCCESS)
     public void deleteRow(DatabaseAdminRowDeleteReqVO reqVO) {
-        execute(reqVO.getDataSourceConfigId(), connection -> {
+        execute(reqVO.getDataSourceConfigId(), "delete", reqVO.getTableName(), connection -> {
             DatabaseAdminTableDetailRespVO table = getWritableTable(connection, reqVO.getTableName());
             String sql = "DELETE FROM " + quoteIdentifier(connection, table.getName())
                     + " WHERE " + quoteIdentifier(connection, table.getPrimaryKeyColumn()) + " = ?";
             try (PreparedStatement ps = connection.prepareStatement(sql)) {
-                ps.setObject(1, reqVO.getPrimaryKeyValue());
+                DatabaseAdminColumnRespVO primaryKey = primaryKey(table);
+                DatabaseAdminValueCodec.bind(ps, 1, primaryKey,
+                        DatabaseAdminValueCodec.convert(primaryKey, reqVO.getPrimaryKeyValue()));
                 int affected = ps.executeUpdate();
-                if (affected != 1) {
+                if (affected == 0) {
+                    throw exception(DATABASE_ADMIN_ROW_NOT_EXISTS);
+                } else if (affected != 1) {
                     throw exception(DATABASE_ADMIN_ROW_AFFECTED_INVALID);
                 }
             }
@@ -212,11 +217,41 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
         return table;
     }
 
+    private static DatabaseAdminColumnRespVO primaryKey(DatabaseAdminTableDetailRespVO table) {
+        return table.getColumns().stream().filter(column -> column.getName().equals(table.getPrimaryKeyColumn()))
+                .findFirst().orElseThrow(() -> exception(DATABASE_ADMIN_TABLE_READONLY));
+    }
+
+    private static int bindValues(PreparedStatement ps, DatabaseAdminTableDetailRespVO table,
+                                  Map<String, Object> values) throws SQLException {
+        Map<String, DatabaseAdminColumnRespVO> columns = table.getColumns().stream()
+                .collect(Collectors.toMap(DatabaseAdminColumnRespVO::getName, column -> column));
+        int index = 1;
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
+            DatabaseAdminValueCodec.bind(ps, index++, columns.get(entry.getKey()), entry.getValue());
+        }
+        return index;
+    }
+
+    private static void assertRowExists(Connection connection, DatabaseAdminTableDetailRespVO table,
+                                        DatabaseAdminColumnRespVO primaryKey, Object key) throws SQLException {
+        String sql = "SELECT 1 FROM " + quoteIdentifier(connection, table.getName())
+                + " WHERE " + quoteIdentifier(connection, primaryKey.getName()) + " = ?";
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+            DatabaseAdminValueCodec.bind(ps, 1, primaryKey, key);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    throw exception(DATABASE_ADMIN_ROW_NOT_EXISTS);
+                }
+            }
+        }
+    }
+
     private DatabaseAdminTableDetailRespVO getTableDetail(Connection connection, String tableName) throws SQLException {
         DatabaseMetaData metaData = connection.getMetaData();
         String actualTableName = findActualTableName(metaData, connection, tableName);
         String remarks = "";
-        try (ResultSet rs = metaData.getTables(connection.getCatalog(), getSchemaPattern(connection), actualTableName, new String[]{"TABLE"})) {
+        try (ResultSet rs = metaData.getTables(connection.getCatalog(), getSchemaPattern(connection), literalPattern(metaData, actualTableName), new String[]{"TABLE"})) {
             if (rs.next()) {
                 remarks = normalizeRemark(rs.getString("REMARKS"));
             }
@@ -229,6 +264,9 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
         detail.setPrimaryKeyColumn(table.getPrimaryKeyColumn());
         detail.setWritable(table.getWritable());
         detail.setColumns(columns);
+        if (detail.getPrimaryKeyColumn() != null && "readonly".equals(primaryKey(detail).getValueKind())) {
+            detail.setWritable(false);
+        }
         return detail;
     }
 
@@ -247,7 +285,7 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
                                                       String tableName) throws SQLException {
         Set<String> primaryKeys = new HashSet<>(getPrimaryKeys(metaData, connection, tableName));
         List<DatabaseAdminColumnRespVO> columns = new ArrayList<>();
-        try (ResultSet rs = metaData.getColumns(connection.getCatalog(), getSchemaPattern(connection), tableName, null)) {
+        try (ResultSet rs = metaData.getColumns(connection.getCatalog(), getSchemaPattern(connection), literalPattern(metaData, tableName), null)) {
             while (rs.next()) {
                 String columnName = rs.getString("COLUMN_NAME");
                 boolean primaryKey = primaryKeys.contains(columnName);
@@ -257,6 +295,10 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
                         .setName(columnName)
                         .setTypeName(rs.getString("TYPE_NAME"))
                         .setJdbcType(rs.getInt("DATA_TYPE"))
+                        .setColumnSize(rs.getLong("COLUMN_SIZE"))
+                        .setDecimalDigits(rs.getObject("DECIMAL_DIGITS") == null ? null : rs.getInt("DECIMAL_DIGITS"))
+                        .setDefaultValue(sensitive ? null : rs.getString("COLUMN_DEF"))
+                        .setGenerated("YES".equalsIgnoreCase(rs.getString("IS_GENERATEDCOLUMN")))
                         .setRemarks(normalizeRemark(rs.getString("REMARKS")))
                         .setNullable(rs.getInt("NULLABLE") == DatabaseMetaData.columnNullable)
                         .setPrimaryKey(primaryKey)
@@ -265,6 +307,46 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
                         .setEditable(!primaryKey && !autoIncrement && !sensitive));
             }
         }
+        String product = metaData.getDatabaseProductName().toLowerCase(Locale.ROOT);
+        if (product.contains("mysql") || product.contains("mariadb")) {
+            // Connector/J may report TINYINT(1) as BIT. Native metadata preserves numeric semantics.
+            try (PreparedStatement ps = connection.prepareStatement("SELECT COLUMN_NAME,COLUMN_TYPE,DATA_TYPE,"
+                    + "CHARACTER_MAXIMUM_LENGTH,NUMERIC_PRECISION,NUMERIC_SCALE,DATETIME_PRECISION "
+                    + "FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=?")) {
+                ps.setString(1, connection.getCatalog());
+                ps.setString(2, tableName);
+                Map<String, DatabaseAdminColumnRespVO> byName = columns.stream()
+                        .collect(Collectors.toMap(DatabaseAdminColumnRespVO::getName, column -> column));
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        DatabaseAdminColumnRespVO column = byName.get(rs.getString("COLUMN_NAME"));
+                        if (column == null) {
+                            continue;
+                        }
+                        String type = rs.getString("DATA_TYPE");
+                        column.setTypeName(rs.getString("COLUMN_TYPE"));
+                        if ("tinyint".equals(type)) {
+                            column.setJdbcType(Types.TINYINT);
+                        }
+                        if (rs.getObject("CHARACTER_MAXIMUM_LENGTH") != null) {
+                            column.setColumnSize(rs.getLong("CHARACTER_MAXIMUM_LENGTH"));
+                        } else if (rs.getObject("NUMERIC_PRECISION") != null) {
+                            column.setColumnSize(rs.getLong("NUMERIC_PRECISION"));
+                        }
+                        if (rs.getObject("NUMERIC_SCALE") != null) {
+                            column.setDecimalDigits(rs.getInt("NUMERIC_SCALE"));
+                        } else if (rs.getObject("DATETIME_PRECISION") != null) {
+                            column.setDecimalDigits(rs.getInt("DATETIME_PRECISION"));
+                        }
+                    }
+                }
+            }
+        }
+        columns.forEach(column -> {
+            column.setValueKind(DatabaseAdminValueCodec.kind(column));
+            column.setEditable(Boolean.TRUE.equals(column.getEditable())
+                    && !Boolean.TRUE.equals(column.getGenerated()) && !"readonly".equals(column.getValueKind()));
+        });
         return columns;
     }
 
@@ -279,9 +361,11 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
     }
 
     private String findActualTableName(DatabaseMetaData metaData, Connection connection, String tableName) throws SQLException {
-        try (ResultSet rs = metaData.getTables(connection.getCatalog(), getSchemaPattern(connection), tableName, new String[]{"TABLE"})) {
-            if (rs.next()) {
-                return rs.getString("TABLE_NAME");
+        try (ResultSet rs = metaData.getTables(connection.getCatalog(), getSchemaPattern(connection), literalPattern(metaData, tableName), new String[]{"TABLE"})) {
+            while (rs.next()) {
+                if (tableName.equalsIgnoreCase(rs.getString("TABLE_NAME"))) {
+                    return rs.getString("TABLE_NAME");
+                }
             }
         }
         try (ResultSet rs = metaData.getTables(connection.getCatalog(), getSchemaPattern(connection), null, new String[]{"TABLE"})) {
@@ -314,9 +398,9 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
                 }
                 throw exception(DATABASE_ADMIN_COLUMN_READONLY, columnName);
             }
-            values.put(columnName, value);
+            values.put(columnName, DatabaseAdminValueCodec.convert(column, value));
         });
-        if (values.isEmpty()) {
+        if (!create && values.isEmpty()) {
             throw exception(DATABASE_ADMIN_COLUMN_NOT_EXISTS);
         }
         return values;
@@ -350,7 +434,7 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
         for (int i = 1; i <= metaData.getColumnCount(); i++) {
             String columnName = metaData.getColumnLabel(i);
             DatabaseAdminColumnRespVO column = columnMap.get(columnName);
-            Object value = rs.getObject(i);
+            Object value = column == null ? rs.getString(i) : DatabaseAdminValueCodec.read(rs, i, column);
             row.put(columnName, column != null && Boolean.TRUE.equals(column.getSensitive()) && value != null ? "******" : value);
         }
         return row;
@@ -386,6 +470,11 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
             return identifier;
         }
         return quote + identifier.replace(quote, quote + quote) + quote;
+    }
+
+    private static String literalPattern(DatabaseMetaData metadata, String name) throws SQLException {
+        String escape = metadata.getSearchStringEscape();
+        return name.replace(escape, escape + escape).replace("_", escape + "_").replace("%", escape + "%");
     }
 
     private static boolean isSensitiveColumn(String columnName) {
@@ -436,7 +525,7 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
         return count;
     }
 
-    private <T> T execute(Long dataSourceConfigId, SqlCallback<T> callback) {
+    private <T> T execute(Long dataSourceConfigId, String operation, String tableName, SqlCallback<T> callback) {
         DataSourceConfigDO config = dataSourceConfigService.getDataSourceConfig(dataSourceConfigId);
         if (config == null) {
             throw exception(DATA_SOURCE_CONFIG_NOT_EXISTS);
@@ -448,11 +537,53 @@ public class DatabaseAdminServiceImpl implements DatabaseAdminService {
             } catch (ServiceException ex) {
                 throw ex;
             } catch (SQLException ex) {
-                throw exception(DATABASE_ADMIN_EXECUTE_FAIL);
+                logSqlFailure(dataSourceConfigId, operation, tableName, ex);
+                throw sqlFailure(ex);
             }
         } catch (SQLException ex) {
+            logSqlFailure(dataSourceConfigId, operation, tableName, ex);
+            if (isAccessDenied(ex)) {
+                throw exception(DATABASE_ADMIN_ACCESS_DENIED);
+            }
             throw exception(DATABASE_ADMIN_CONNECTION_FAIL);
         }
+    }
+
+    private static void logSqlFailure(Long configId, String operation, String table, SQLException ex) {
+        String safeTable = table != null && table.matches("[\\p{L}\\p{N}_$]{1,64}") ? table : "-";
+        log.warn("[databaseAdmin] operation={} dataSource={} table={} sqlState={} vendorCode={} traceId={}",
+                operation, configId, safeTable, ex.getSQLState(), ex.getErrorCode(), TracerUtils.getTraceId());
+    }
+
+    private static boolean isAccessDenied(SQLException ex) {
+        return "28000".equals(ex.getSQLState()) || Set.of(1044, 1045, 1142, 1143, 1227).contains(ex.getErrorCode());
+    }
+
+    static ServiceException sqlFailure(SQLException ex) {
+        String state = StrUtil.nullToEmpty(ex.getSQLState());
+        int code = ex.getErrorCode();
+        if (isAccessDenied(ex)) {
+            return exception(DATABASE_ADMIN_ACCESS_DENIED);
+        }
+        if (code == 1062 || state.equals("23505")) {
+            return exception(DATABASE_ADMIN_DUPLICATE);
+        }
+        if (Set.of(1048, 1364).contains(code) || state.equals("23502")) {
+            return exception(DATABASE_ADMIN_NOT_NULL);
+        }
+        if (Set.of(1451, 1452).contains(code) || Set.of("23503", "23506").contains(state)) {
+            return exception(DATABASE_ADMIN_REFERENCE);
+        }
+        if (Set.of(1264, 1265, 1406).contains(code) || Set.of("22001", "22003").contains(state)) {
+            return exception(DATABASE_ADMIN_DATA_LIMIT);
+        }
+        if (Set.of(1292, 1366, 3140, 3141).contains(code) || state.startsWith("22")) {
+            return exception(DATABASE_ADMIN_VALUE_INVALID, "输入字段");
+        }
+        if (state.startsWith("23") || code == 3819) {
+            return exception(DATABASE_ADMIN_CONSTRAINT);
+        }
+        return exception(DATABASE_ADMIN_EXECUTE_FAIL);
     }
 
     private static void validateSupportedDatabase(String url) {

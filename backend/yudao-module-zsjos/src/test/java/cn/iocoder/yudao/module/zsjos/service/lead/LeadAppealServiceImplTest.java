@@ -252,6 +252,7 @@ class LeadAppealServiceImplTest {
         assertEquals(100L, appeal.getOwnerDeptIdSnapshot());
         assertEquals(100L, appeal.getReviewerDeptIdSnapshot());
         assertEquals("[30]", appeal.getReviewerUserIdsSnapshot());
+        verify(leadMapper).touchActivity(8L, appeal.getSubmittedAt());
         assertNull(appeal.getInvalidReasonSnapshot());
         ArgumentCaptor<BpmProcessInstanceCreateReqDTO> processCaptor = ArgumentCaptor.forClass(BpmProcessInstanceCreateReqDTO.class);
         verify(processInstanceApi).createProcessInstance(eq(7L), processCaptor.capture());
@@ -364,7 +365,30 @@ class LeadAppealServiceImplTest {
         assertEquals(1_900_003_043, error.getCode());
         verify(appealMapper).insert(any(LeadAppealDO.class));
         verify(appealMapper, never()).updateById(any(LeadAppealDO.class));
+        verify(leadMapper, never()).touchActivity(anyLong(), any());
         verifyNoInteractions(eventMapper, notifyEventPublisher);
+    }
+
+    @Test
+    void upheldAppealAdvancesLeadActivityAtDecisionTime() {
+        LeadAppealDO appeal = appeal(1L, 8L, 1, LeadConstants.APPEAL_STAGE_SALES_MANAGER, "[40]");
+        appeal.setStatus(LeadConstants.APPEAL_STATUS_SALES_MANAGER_REVIEWING);
+        appeal.setProcessInstanceId("process-1");
+        when(appealMapper.selectByIdForUpdate(1L, 1L)).thenReturn(appeal);
+        when(leadMapper.selectByIdForUpdate(8L, 1L)).thenReturn(invalidLead(20L));
+        when(permissionApi.hasAnyPermissions(40L,
+                LeadConstants.PERMISSION_APPEAL_REVIEW_SALES_MANAGER)).thenReturn(true);
+        when(adminUserApi.getUser(40L)).thenReturn(user(40L, 10L));
+        BpmTaskRespDTO task = new BpmTaskRespDTO();
+        task.setId("task-1"); task.setProcessInstanceId("process-1"); task.setBusinessKey("lead-appeal:1");
+        when(processTaskApi.getTodoTask(40L, "task-1")).thenReturn(task);
+        LeadAppealDecisionReqVO request = new LeadAppealDecisionReqVO();
+        request.setTaskId("task-1"); request.setReason("维持原判"); request.setIdempotencyKey("decision-upheld");
+
+        service.uphold(1L, 40L, request);
+
+        assertEquals(LeadConstants.APPEAL_STATUS_UPHELD, appeal.getStatus());
+        verify(leadMapper).touchActivity(8L, appeal.getDecidedAt());
     }
 
     @Test

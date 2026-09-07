@@ -981,6 +981,8 @@ export type AdvancedFilterField = {
   optionSource?: string;
   options: Array<{ value: string | number; label: string }>;
   optionsLoading?: boolean;
+  optionsState?: 'ready' | 'empty' | 'loading' | 'error';
+  optionsErrorCode?: string;
   optionsError?: boolean;
   retryOptions?: () => void;
 };
@@ -1180,6 +1182,7 @@ export type ManagedLeadAttachment = {
   fileSize: number;
 };
 export type ManagedLead = {
+  version?: number;
   id: number;
   leadNo: string;
   personId: number;
@@ -1209,6 +1212,8 @@ export type ManagedLead = {
   cityName?: string;
   leadCategory?: string;
   leadCategoryLabelSnapshot?: string;
+  remarkHistory?: Array<{ id: string; kind: 'submission' | 'supplement' | 'legacy'; content: string; occurredAt?: Timestamp; operatorName?: string }>;
+  remarkHistoryIncomplete?: boolean;
   remark?: string;
   status: string;
   assignmentStatus: string;
@@ -1278,6 +1283,7 @@ export type ManagedLead = {
       | "SUBMITTER_URGE"
       | "SUBMITTER_COMPLAINT"
       | "REQUEST_SUBMITTER_ASSIST"
+      | "REPLY_SUBMITTER"
       | "QUALIFICATION_RESTORE"
       | "QUALIFICATION_TRANSFER"
       | "QUALIFICATION_RECYCLE"
@@ -1407,6 +1413,8 @@ export type ManagedLeadPageParams = {
   advancedFilter?: AdvancedFilterGroup;
 };
 export type LeadDetailTab =
+  | "student-info"
+  | "submitter-feedback"
   | "overview"
   | "follow-ups"
   | "orders"
@@ -2461,6 +2469,10 @@ export type NotifyMessagePageParams = {
   pageNo: number;
   pageSize: number;
   readStatus?: boolean;
+  keyword?: string;
+  category?: string;
+  bizType?: string;
+  createTime?: [string, string];
 };
 
 export const http = axios.create({
@@ -2495,6 +2507,23 @@ export class ApiError extends Error {
     this.name = "ApiError";
   }
 }
+
+export const SERVER_CONNECTION_ERROR_MESSAGE = "服务器连接错误，请联系管理员";
+
+export const normalizeRequestError = (error: unknown): unknown => {
+  if (
+    axios.isAxiosError(error) &&
+    !axios.isCancel(error) &&
+    (!error.response || error.response.status >= 500)
+  ) {
+    return new ApiError(
+      error.response?.status ?? 0,
+      SERVER_CONNECTION_ERROR_MESSAGE,
+    );
+  }
+  return error;
+};
+export type AnnouncementCursorParams = { cursor?: string; limit?: number };
 
 export const FORCED_FORM_REQUIRED_CODE = 1_900_004_006;
 
@@ -2670,6 +2699,10 @@ export type NotifyMessageCursorParams = {
   cursor?: string;
   limit?: number;
   readStatus?: boolean;
+  keyword?: string;
+  category?: string;
+  bizType?: string;
+  createTime?: [string, string];
 };
 
 const isAuthEndpoint = (url?: string) =>
@@ -2752,7 +2785,7 @@ http.interceptors.response.use(
       (AxiosRequestConfig & { _retry?: boolean }) | undefined;
     clearRejectedImpersonation(error.response?.data?.code, original);
     if (error.response?.status !== 401 || !original)
-      return Promise.reject(error);
+      return Promise.reject(normalizeRequestError(error));
     return retryAfterRefresh(original, error);
   },
 );
@@ -3847,7 +3880,7 @@ export const api = {
     ),
   leadFollowUpPage: async (
     leadId: number,
-    params: { pageNo: number; pageSize: number },
+    params: { pageNo: number; pageSize: number; name?: string; category?: string; status?: number; createTime?: [string, string] },
   ) =>
     unwrap<PageResult<LeadFollowUp>>(
       await http.get(`/zsjos/lead/${leadId}/follow-ups/page`, { params }),
@@ -4063,6 +4096,20 @@ export const api = {
     unwrap<SalesOrderStatusCounts>(
       await http.get("/zsjos/sales-order/my-status-counts"),
     ),
+  teamSalesOrderPage: async (params: {
+    pageNo: number;
+    pageSize: number;
+    status?: SalesOrder["status"];
+    keyword?: string;
+    advancedFilter?: AdvancedFilterGroup;
+  }) =>
+    params.advancedFilter
+      ? unwrap<PageResult<SalesOrderListItem>>(
+          await http.post("/zsjos/sales-order/team-search-page", params),
+        )
+      : unwrap<PageResult<SalesOrderListItem>>(
+          await http.get("/zsjos/sales-order/team-page", { params }),
+        ),
   teamSalesOrderCursor: async (params: {
     cursor?: string;
     limit?: number;
@@ -4346,7 +4393,7 @@ export const api = {
     unwrap<string>(await http.get(`/zsjos/export-task/${id}/download-url`)),
   bpmTaskPage: async (
     view: "todo" | "done",
-    params: { pageNo: number; pageSize: number },
+    params: { pageNo: number; pageSize: number; name?: string; category?: string; status?: number; createTime?: [string, string] },
   ) =>
     unwrap<PageResult<BpmTask>>(
       await http.get(`/bpm/task/${view}-page`, { params }),
@@ -4817,9 +4864,13 @@ export const api = {
   },
   markAllNotifyMessagesRead: async () =>
     unwrap<boolean>(await http.put("/system/notify-message/update-all-read")),
-  announcementPage: async (params: { pageNo: number; pageSize: number }) =>
+  announcementPage: async (params: { pageNo: number; pageSize: number; keyword?: string; type?: number; readStatus?: boolean; highlighted?: boolean; publishTime?: [string, string] }) =>
     unwrap<PageResult<Announcement>>(
       await http.get("/system/notice/my-page", { params }),
+    ),
+  announcementCursor: async (params: AnnouncementCursorParams & { keyword?: string; type?: number; readStatus?: boolean; highlighted?: boolean; publishTime?: [string, string] }) =>
+    unwrap<CursorPageResult<Announcement>>(
+      await http.get("/system/notice/my-cursor", { params }),
     ),
   announcement: async (id: number) =>
     unwrap<Announcement>(

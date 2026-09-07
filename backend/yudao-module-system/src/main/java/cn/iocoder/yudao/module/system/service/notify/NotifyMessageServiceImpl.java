@@ -89,7 +89,8 @@ public class NotifyMessageServiceImpl implements NotifyMessageService {
         NotifyCursor cursor = decodeCursor(reqVO.getCursor(), userId, userType, reqVO.getReadStatus());
         int limit = reqVO.getLimit() == null ? 20 : reqVO.getLimit();
         List<NotifyMessageDO> rows = notifyMessageMapper.selectCursorList(userId, userType, reqVO.getReadStatus(),
-                reqVO.getCreateTime(), cursor == null ? null : cursor.createTime(),
+                reqVO.getCreateTime(), reqVO.getKeyword(), reqVO.getCategory(), reqVO.getBizType(),
+                cursor == null ? null : cursor.createTime(),
                 cursor == null ? null : cursor.id(), limit + 1);
         boolean hasMore = rows.size() > limit;
         List<NotifyMessageDO> list = hasMore ? new ArrayList<>(rows.subList(0, limit)) : rows;

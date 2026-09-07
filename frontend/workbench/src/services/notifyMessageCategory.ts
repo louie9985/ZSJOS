@@ -53,6 +53,7 @@ export function notifyMessageCategoryOf(message: NotifyMessageCategorySource): E
     includesAny(sceneCode, ['appeal', 'complaint'])
     || includesAny(sourceEventKey, ['appeal', 'complaint'])
     || bizType === 'appeal'
+    || bizType === 'complaint'
   ) return 'appeal'
 
   if (

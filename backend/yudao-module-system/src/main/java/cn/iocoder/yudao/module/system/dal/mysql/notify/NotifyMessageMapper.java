@@ -39,6 +39,12 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                 .eqIfPresent(NotifyMessageDO::getReadStatus, reqVO.getReadStatus())
                 .eqIfPresent(NotifyMessageDO::getBizType, reqVO.getBizType())
                 .betweenIfPresent(NotifyMessageDO::getCreateTime, reqVO.getCreateTime())
+                .and(reqVO.getKeyword() != null && !reqVO.getKeyword().isBlank(), w -> w
+                        .like(NotifyMessageDO::getTemplateTitle, reqVO.getKeyword())
+                        .or().like(NotifyMessageDO::getTemplateSummary, reqVO.getKeyword())
+                        .or().like(NotifyMessageDO::getTemplateContent, reqVO.getKeyword())
+                        .or().like(NotifyMessageDO::getTemplateNickname, reqVO.getKeyword()))
+                .apply(messageCategoryCondition(reqVO.getCategory()))
                 .eq(NotifyMessageDO::getUserId, userId)
                 .eq(NotifyMessageDO::getUserType, userType)
                 .orderByDesc(NotifyMessageDO::getCreateTime)
@@ -46,13 +52,32 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
     }
 
     default List<NotifyMessageDO> selectCursorList(Long userId, Integer userType, Boolean readStatus,
-                                                    LocalDateTime[] createTime, LocalDateTime cursorCreateTime,
+                                                    LocalDateTime[] createTime, String keyword, String category,
+                                                    String bizType,
+                                                    LocalDateTime cursorCreateTime,
                                                     Long cursorId, int limit) {
         LambdaQueryWrapperX<NotifyMessageDO> query = new LambdaQueryWrapperX<NotifyMessageDO>()
                 .eqIfPresent(NotifyMessageDO::getReadStatus, readStatus)
                 .betweenIfPresent(NotifyMessageDO::getCreateTime, createTime)
                 .eq(NotifyMessageDO::getUserId, userId)
                 .eq(NotifyMessageDO::getUserType, userType);
+        query.eqIfPresent(NotifyMessageDO::getBizType, bizType);
+        if (keyword != null && !keyword.isBlank()) {
+            query.and(w -> w.like(NotifyMessageDO::getTemplateTitle, keyword)
+                    .or().like(NotifyMessageDO::getTemplateSummary, keyword)
+                    .or().like(NotifyMessageDO::getTemplateContent, keyword)
+                    .or().like(NotifyMessageDO::getTemplateNickname, keyword));
+        }
+        if (category != null && !category.isBlank()) {
+            String categoryCondition = switch (category) {
+                case "lead" -> "(biz_type IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket') OR scene_code LIKE '%lead%' OR scene_code LIKE '%registration%' OR scene_code LIKE '%payment%' OR source_event_key LIKE '%lead%' OR source_event_key LIKE '%registration%' OR source_event_key LIKE '%payment%')";
+                case "withdrawal" -> "(biz_type = 'withdrawal' OR scene_code LIKE '%withdrawal%' OR source_event_key LIKE '%withdrawal%')";
+                case "reward" -> "(biz_type IN ('reward','cashback','commission') OR scene_code LIKE '%reward%' OR source_event_key LIKE '%reward%')";
+                case "appeal" -> "(biz_type IN ('appeal','complaint') OR scene_code LIKE '%appeal%' OR scene_code LIKE '%complaint%' OR source_event_key LIKE '%appeal%' OR source_event_key LIKE '%complaint%')";
+                default -> "(biz_type NOT IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket','withdrawal','reward','cashback','commission','appeal','complaint') OR biz_type IS NULL)";
+            };
+            query.apply(categoryCondition);
+        }
         if (cursorCreateTime != null && cursorId != null) {
             query.and(wrapper -> wrapper.lt(NotifyMessageDO::getCreateTime, cursorCreateTime)
                     .or(nested -> nested.eq(NotifyMessageDO::getCreateTime, cursorCreateTime)
@@ -69,6 +94,17 @@ public interface NotifyMessageMapper extends BaseMapperX<NotifyMessageDO> {
                         .eq(NotifyMessageDO::getUserId, userId)
                         .eq(NotifyMessageDO::getUserType, userType)
                         .eq(NotifyMessageDO::getReadStatus, false));
+    }
+
+    static String messageCategoryCondition(String category) {
+        if (category == null || category.isBlank() || "all".equals(category)) return "1=1";
+        return switch (category) {
+            case "lead" -> "(biz_type IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket') OR scene_code LIKE '%lead%' OR scene_code LIKE '%registration%' OR scene_code LIKE '%payment%' OR source_event_key LIKE '%lead%' OR source_event_key LIKE '%registration%' OR source_event_key LIKE '%payment%')";
+            case "withdrawal" -> "(biz_type = 'withdrawal' OR scene_code LIKE '%withdrawal%' OR source_event_key LIKE '%withdrawal%')";
+            case "reward" -> "(biz_type IN ('reward','cashback','commission') OR scene_code LIKE '%reward%' OR source_event_key LIKE '%reward%')";
+            case "appeal" -> "(biz_type IN ('appeal','complaint') OR scene_code LIKE '%appeal%' OR scene_code LIKE '%complaint%' OR source_event_key LIKE '%appeal%' OR source_event_key LIKE '%complaint%')";
+            default -> "(biz_type NOT IN ('lead','sales_order','student','student_service','media-account','content','positioning-card','production-ticket','withdrawal','reward','cashback','commission','appeal','complaint') OR biz_type IS NULL)";
+        };
     }
 
     default int updateListRead(Long userId, Integer userType) {

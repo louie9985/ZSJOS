@@ -1,6 +1,17 @@
 # Ownership and Change Boundaries
 
+Lead sales-to-submitter feedback belongs to the ZSJOS Lead domain, with immutable reply
+records and tenant-owned file bindings. Infra stores files; System owns configurable
+notifications and their delivery/read state. Workbench composes replies; Partner H5 reads
+its own replies. This feature does not reuse the generic feedback work-order lifecycle.
+See [the API contract](../api/lead-submitter-feedback.md).
+
 ## Ownership matrix
+
+Student information collection is owned by the ZSJOS Lead domain, with Admin-only
+configuration, Workbench Lead/student projections and public H5 token access. It consumes
+System dictionary/area APIs and framework encryption; it does not change Lead or order
+master data. See [the collection contract](../api/student-information-collection.md).
 
 | Change | Primary owner | Required checks | Prohibited shortcut |
 | --- | --- | --- | --- |

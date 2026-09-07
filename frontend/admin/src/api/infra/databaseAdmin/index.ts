@@ -4,6 +4,21 @@ export interface DatabaseAdminColumnVO {
   name: string
   typeName: string
   jdbcType: number
+  columnSize?: number
+  decimalDigits?: number
+  defaultValue?: string
+  generated: boolean
+  valueKind:
+    | 'boolean'
+    | 'integer'
+    | 'decimal'
+    | 'float'
+    | 'date'
+    | 'time'
+    | 'datetime'
+    | 'text'
+    | 'json'
+    | 'readonly'
   remarks?: string
   nullable: boolean
   primaryKey: boolean

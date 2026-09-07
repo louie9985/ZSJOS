@@ -18,6 +18,7 @@ import cn.iocoder.yudao.framework.websocket.core.sender.rocketmq.RocketMQWebSock
 import cn.iocoder.yudao.framework.websocket.core.session.WebSocketSessionHandlerDecorator;
 import cn.iocoder.yudao.framework.websocket.core.session.WebSocketSessionManager;
 import cn.iocoder.yudao.framework.websocket.core.session.WebSocketSessionManagerImpl;
+import cn.iocoder.yudao.framework.websocket.core.session.WebSocketSessionLifecycleListener;
 import org.apache.rocketmq.spring.core.RocketMQTemplate;
 import org.springframework.amqp.core.TopicExchange;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -65,11 +66,13 @@ public class YudaoWebSocketAutoConfiguration {
 
     @Bean
     public WebSocketHandler webSocketHandler(WebSocketSessionManager sessionManager,
-                                             List<? extends WebSocketMessageListener<?>> messageListeners) {
+                                             List<? extends WebSocketMessageListener<?>> messageListeners,
+                                             List<? extends WebSocketSessionLifecycleListener> lifecycleListeners) {
         // 1. 创建 JsonWebSocketMessageHandler 对象，处理消息
-        JsonWebSocketMessageHandler messageHandler = new JsonWebSocketMessageHandler(messageListeners);
+        JsonWebSocketMessageHandler messageHandler = new JsonWebSocketMessageHandler(messageListeners,
+                lifecycleListeners);
         // 2. 创建 WebSocketSessionHandlerDecorator 对象，处理连接
-        return new WebSocketSessionHandlerDecorator(messageHandler, sessionManager);
+        return new WebSocketSessionHandlerDecorator(messageHandler, sessionManager, lifecycleListeners);
     }
 
     @Bean

@@ -51,6 +51,8 @@ public class LeadSubmitterActionService {
     @Resource private LeadObjectPermissionService objectPermissionService;
     @Resource private PartnerOwnershipService partnerOwnershipService;
     @Resource private BusinessTaskCommandService businessTaskCommandService;
+    @Resource private cn.iocoder.yudao.module.system.api.user.AdminUserApi adminUserApi;
+    @Resource private PartnerMapper partnerMapper;
 
     @Transactional(rollbackFor = Exception.class)
     public void supplement(Long leadId, Long userId, LeadSubmitterSupplementReqVO req) {
@@ -63,8 +65,22 @@ public class LeadSubmitterActionService {
     }
 
     private void supplementInternal(Long leadId, Long userId, Long partnerId, LeadSubmitterSupplementReqVO req) {
-        if (eventMapper.selectByIdempotencyKey(req.getIdempotencyKey()) != null) return;
         LeadDO lead = requireSubmitterLeadForUpdate(leadId, userId, partnerId);
+        String digest = supplementDigest(req);
+        String subjectType = partnerId == null ? PROVIDER_OWNER_SYSTEM_USER : PROVIDER_OWNER_PARTNER;
+        Long subjectId = partnerId == null ? userId : partnerId;
+        BusinessEventDO replay = eventMapper.selectByIdempotencyKeyForUpdate(req.getIdempotencyKey());
+        if (replay != null) {
+            Map<?, ?> payload = LeadRemarkHistoryService.payload(replay);
+            if (!LeadSupplementSnapshot.EVENT.equals(replay.getEventType())
+                    || !BIZ_TYPE_LEAD.equals(replay.getAggregateType()) || !leadId.equals(replay.getAggregateId())
+                    || payload == null || !digest.equals(payload.get("requestDigest"))
+                    || !subjectType.equals(payload.get("submitterType"))
+                    || !(payload.get("submitterId") instanceof Number id) || id.longValue() != subjectId) {
+                throw exception(LEAD_SUPPLEMENT_IDEMPOTENCY_CONFLICT);
+            }
+            return;
+        }
         requireActionable(lead);
         Region region = region(req.getProvinceCode(), req.getCityCode());
         LeadCategorySnapshotService.Selection category = Objects.equals(lead.getLeadCategory(), req.getLeadCategory())
@@ -79,12 +95,36 @@ public class LeadSubmitterActionService {
             lead.setLeadCategory(category.value());
             lead.setLeadCategoryLabelSnapshot(category.labelSnapshot());
         }
-        lead.setRemark(StrUtil.trimToNull(req.getRemark())); leadMapper.updateById(lead);
+        LocalDateTime now = LocalDateTime.now();
+        LeadMapper.advanceActivity(lead, now);
+        leadMapper.updateById(lead);
         productMapper.deleteByLeadId(leadId); insertProducts(leadId, req.getIntendedProducts(), snapshots);
         BusinessEventDO event = new BusinessEventDO(); event.setEventType("lead_submitter_supplemented");
         event.setAggregateType(BIZ_TYPE_LEAD); event.setAggregateId(leadId); event.setOperatorUserId(userId);
-        event.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("before", before))); event.setOccurredAt(LocalDateTime.now());
-        event.setIdempotencyKey(req.getIdempotencyKey()); eventMapper.insert(event);
+        String subjectName;
+        if (partnerId != null) {
+            var partner = partnerMapper.selectById(partnerId);
+            subjectName = partner == null ? null : partner.getName();
+        } else {
+            var user = adminUserApi.getUser(userId);
+            subjectName = user == null ? null : user.getNickname();
+        }
+        event.setRelatedObjectRefs(JsonUtils.toJsonString(new LeadSupplementSnapshot(before,
+                LeadSupplementSnapshot.MODE, Objects.toString(StrUtil.trimToNull(req.getRemark()), ""),
+                subjectType, subjectId, subjectName, digest)));
+        event.setOccurredAt(now);
+        event.setIdempotencyKey(req.getIdempotencyKey());
+        try { eventMapper.insert(event); }
+        catch (DuplicateKeyException ex) { throw exception(LEAD_SUPPLEMENT_IDEMPOTENCY_CONFLICT); }
+    }
+
+    static String supplementDigest(LeadSubmitterSupplementReqVO req) {
+        List<List<Object>> products = req.getIntendedProducts() == null ? List.of() : req.getIntendedProducts().stream()
+                .map(p -> List.<Object>of(Objects.toString(p.effectiveSpuRef(), ""), Objects.toString(p.getSkuRef(), ""),
+                        Boolean.TRUE.equals(p.getSpuUnknown()), Boolean.TRUE.equals(p.getSkuUnknown()), Boolean.TRUE.equals(p.getPrimary())))
+                .toList();
+        return DigestUtil.sha256Hex(JsonUtils.toJsonString(Arrays.asList(req.getProvinceCode(), req.getCityCode(),
+                req.getLeadCategory(), products, StrUtil.trimToNull(req.getRemark()))));
     }
 
     @Transactional(rollbackFor = Exception.class)

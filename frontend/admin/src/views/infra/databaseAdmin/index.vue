@@ -57,7 +57,9 @@
           :title="tableError"
           class="mb-12px"
           type="error"
-        />
+        >
+          <el-button link type="primary" @click="getTableList">重试</el-button>
+        </el-alert>
         <el-table
           v-loading="tableLoading || dataSourceLoading"
           :data="tableList"
@@ -119,7 +121,7 @@
           v-if="selectedTable && !selectedTable.writable"
           :closable="false"
           class="mb-12px"
-          title="该表没有单列主键，仅支持查看数据和字段结构。"
+          title="该表不支持单列主键写入，仅支持查看数据和字段结构。"
           type="warning"
         />
         <el-alert
@@ -128,7 +130,9 @@
           :title="dataError"
           class="mb-12px"
           type="error"
-        />
+        >
+          <el-button link type="primary" @click="getTableData">重试</el-button>
+        </el-alert>
 
         <el-tabs v-model="activeTab">
           <el-tab-pane label="数据" name="data">
@@ -223,28 +227,54 @@
     </el-col>
   </el-row>
 
-  <Dialog v-model="rowDialogVisible" :title="rowDialogTitle" width="720px">
-    <el-form label-width="150px">
+  <Dialog v-model="rowDialogVisible" :title="rowDialogTitle" width="min(720px, calc(100vw - 32px))">
+    <el-form label-position="top" class="database-admin__row-form">
       <el-form-item
         v-for="column in editableColumns"
         :key="column.name"
         :label="formatColumnLabel(column)"
+        :error="rowErrors[column.name]"
       >
-        <el-input
-          v-model="rowForm[column.name]"
-          :placeholder="column.nullable ? '留空表示空值' : '请输入字段值'"
-          clearable
-        />
+        <div class="database-admin__field">
+          <div class="database-admin__field-mode">
+            <el-checkbox
+              v-if="rowDialogMode === 'create'"
+              :model-value="rowModes[column.name] === 'default'"
+              @change="setFieldMode(column, $event ? 'default' : 'value')"
+              >数据库默认值</el-checkbox
+            >
+            <el-checkbox
+              v-if="column.nullable"
+              :model-value="rowModes[column.name] === 'null'"
+              @change="setFieldMode(column, $event ? 'null' : 'value')"
+              >NULL</el-checkbox
+            >
+          </div>
+          <el-switch
+            v-if="column.valueKind === 'boolean'"
+            :model-value="rowForm[column.name] === true"
+            :disabled="rowModes[column.name] !== 'value'"
+            @change="rowForm[column.name] = Boolean($event)"
+          />
+          <el-input
+            v-else
+            :model-value="String(rowForm[column.name] ?? '')"
+            :disabled="rowModes[column.name] !== 'value'"
+            :type="
+              column.valueKind === 'json' || /text|clob/i.test(column.typeName)
+                ? 'textarea'
+                : 'text'
+            "
+            :autosize="{ minRows: 3, maxRows: 12 }"
+            :placeholder="column.typeName"
+            @update:model-value="rowForm[column.name] = $event"
+          />
+        </div>
       </el-form-item>
     </el-form>
     <el-empty v-if="editableColumns.length === 0" description="该表没有可编辑字段" />
     <template #footer>
-      <el-button
-        :disabled="editableColumns.length === 0"
-        :loading="rowSaving"
-        type="primary"
-        @click="submitRow"
-      >
+      <el-button :disabled="!canSaveRow" :loading="rowSaving" type="primary" @click="submitRow">
         确定
       </el-button>
       <el-button @click="rowDialogVisible = false">取消</el-button>
@@ -255,11 +285,12 @@
 <script lang="ts" setup>
 import * as DatabaseAdminApi from '@/api/infra/databaseAdmin'
 import * as DataSourceConfigApi from '@/api/infra/dataSourceConfig'
+import { changedValues, editorValue, fieldError } from './rowEditor'
+import type { EditorRow, FieldMode } from './rowEditor'
 
 defineOptions({ name: 'InfraDatabaseAdmin' })
 
 type RowData = Record<string, unknown>
-type RowFormData = Record<string, string | number | null | undefined>
 
 const message = useMessage()
 const { t } = useI18n()
@@ -294,7 +325,32 @@ const dataQuery = reactive<DatabaseAdminApi.DatabaseAdminDataPageQuery>({
 const rowDialogVisible = ref(false)
 const rowDialogMode = ref<'create' | 'update'>('create')
 const rowPrimaryKeyValue = ref<unknown>()
-const rowForm = reactive<RowFormData>({})
+const rowForm = reactive<EditorRow>({})
+const rowOriginal = ref<EditorRow>({})
+const rowModes = reactive<Record<string, FieldMode>>({})
+const rowErrors = reactive<Record<string, string>>({})
+const pendingValues = computed(() =>
+  changedValues(
+    editableColumns.value,
+    rowOriginal.value,
+    rowForm,
+    rowModes,
+    rowDialogMode.value === 'create'
+  )
+)
+const canSaveRow = computed(() =>
+  rowDialogMode.value === 'create'
+    ? Boolean(selectedTable.value?.writable)
+    : Object.keys(pendingValues.value).length > 0
+)
+
+const setFieldMode = (column: DatabaseAdminApi.DatabaseAdminColumnVO, mode: FieldMode) => {
+  rowModes[column.name] = mode
+  if (mode === 'value' && rowForm[column.name] == null) {
+    rowForm[column.name] = column.valueKind === 'boolean' ? false : ''
+  }
+  delete rowErrors[column.name]
+}
 
 const editableColumns = computed(
   () => selectedTable.value?.columns.filter((column) => column.editable) || []
@@ -394,23 +450,35 @@ const openRowDialog = (mode: 'create' | 'update', row?: RowData) => {
     : undefined
   Object.keys(rowForm).forEach((key) => {
     delete rowForm[key]
+    delete rowModes[key]
+    delete rowErrors[key]
   })
-  editableColumns.value.forEach((column) => {
-    rowForm[column.name] =
-      mode === 'update' && row ? normalizeFormValue(row[column.name]) : undefined
-  })
+  try {
+    editableColumns.value.forEach((column) => {
+      const value = mode === 'update' && row ? editorValue(column, row[column.name]) : undefined
+      rowForm[column.name] = value
+      rowModes[column.name] = mode === 'create' ? 'default' : value == null ? 'null' : 'value'
+    })
+  } catch (error) {
+    message.error((error as Error).message)
+    return
+  }
+  rowOriginal.value = { ...rowForm }
   rowDialogVisible.value = true
 }
 
 const submitRow = async () => {
-  if (!selectedTable.value) {
+  if (!selectedTable.value || !canSaveRow.value) {
     return
   }
-  const values: RowData = {}
+  const values = pendingValues.value
+  Object.keys(rowErrors).forEach((key) => delete rowErrors[key])
   editableColumns.value.forEach((column) => {
-    values[column.name] =
-      rowForm[column.name] === '' && column.nullable ? null : rowForm[column.name]
+    if (!Object.hasOwn(values, column.name)) return
+    const error = fieldError(column, values[column.name])
+    if (error) rowErrors[column.name] = error
   })
+  if (Object.keys(rowErrors).length) return
   rowSaving.value = true
   try {
     if (rowDialogMode.value === 'create') {
@@ -432,6 +500,8 @@ const submitRow = async () => {
     )
     rowDialogVisible.value = false
     await getTableData()
+  } catch {
+    // The shared HTTP client presents the safe API error; preserve the draft for retry.
   } finally {
     rowSaving.value = false
   }
@@ -474,22 +544,28 @@ const formatValue = (value: unknown) => {
   return String(value)
 }
 
-const normalizeFormValue = (value: unknown) => {
-  if (value === null || value === undefined) {
-    return undefined
-  }
-  if (typeof value === 'number') {
-    return value
-  }
-  return formatValue(value)
-}
-
 onMounted(() => {
   getDataSourceList()
 })
 </script>
 
 <style scoped>
+.database-admin__field {
+  width: 100%;
+  min-width: 0;
+}
+
+.database-admin__field-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.database-admin__row-form :deep(.el-form-item__label) {
+  height: auto;
+  overflow-wrap: anywhere;
+}
+
 .database-admin__panel-title {
   margin-bottom: 12px;
   font-size: 16px;
@@ -498,6 +574,7 @@ onMounted(() => {
 
 .database-admin__toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   align-items: flex-start;
   justify-content: space-between;
@@ -508,6 +585,7 @@ onMounted(() => {
   font-size: 18px;
   font-weight: 600;
   line-height: 28px;
+  overflow-wrap: anywhere;
 }
 
 .database-admin__meta {

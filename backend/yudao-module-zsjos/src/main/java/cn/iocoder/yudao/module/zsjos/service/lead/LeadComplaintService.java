@@ -92,7 +92,9 @@ public class LeadComplaintService {
         row.setStatus("pending");
         row.setCreateIdempotencyKey(req.getIdempotencyKey());
         row.setVersion(0);
+        LocalDateTime now = LocalDateTime.now();
         complaintMapper.insert(row);
+        leadMapper.touchActivity(leadId, now);
         return row.getId();
     }
 
@@ -159,6 +161,7 @@ public class LeadComplaintService {
         row.setHandledAt(now);
         row.setDecisionIdempotencyKey(req.getIdempotencyKey());
         complaintMapper.updateById(row);
+        leadMapper.touchActivity(row.getLeadId(), now);
         String sceneCode = "founded".equals(row.getResult()) ? COMPLAINT_FOUNDED : COMPLAINT_UNFOUNDED;
         Map<String, Object> context = new java.util.LinkedHashMap<>();
         if (row.getComplainantUserId() != null) context.put("complaint.complainantUserId", row.getComplainantUserId());

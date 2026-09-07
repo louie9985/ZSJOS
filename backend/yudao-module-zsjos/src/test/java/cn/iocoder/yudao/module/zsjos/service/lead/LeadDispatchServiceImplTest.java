@@ -99,7 +99,7 @@ class LeadDispatchServiceImplTest {
         lead.setPendingAssigneeUserId(10L);
         lead.setAssignmentAttemptCount(2);
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(leadMapper.updatePendingResult(1L, 10L, "owned", 10L)).thenReturn(1);
+        when(leadMapper.updatePendingResult(eq(1L), eq(10L), eq("owned"), eq(10L), any())).thenReturn(1);
         doAnswer(invocation -> {
             var history = invocation.getArgument(0, cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class);
             history.setId(88L);
@@ -179,13 +179,13 @@ class LeadDispatchServiceImplTest {
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(leadMapper.selectById(1L)).thenReturn(lead());
-        when(leadMapper.updatePublicPoolToOwned(1L, 10L)).thenReturn(1);
+        when(leadMapper.updatePublicPoolToOwned(eq(1L), eq(10L), any())).thenReturn(1);
         when(claimDailyCounterMapper.reserve(eq(1L), eq(10L), any(), eq(5))).thenReturn(0);
 
         ServiceException error = assertThrows(ServiceException.class, () -> service.claim(1L, 10L));
 
         assertEquals(LEAD_CLAIM_DAILY_LIMIT_REACHED.getCode(), error.getCode());
-        verify(leadMapper).updatePublicPoolToOwned(1L, 10L);
+        verify(leadMapper).updatePublicPoolToOwned(eq(1L), eq(10L), any());
     }
 
     @Test
@@ -195,7 +195,7 @@ class LeadDispatchServiceImplTest {
         when(assignmentService.getEligibleSalesUsers()).thenReturn(List.of(salesUser(10L)));
         when(ruleMapper.selectByCode("default")).thenReturn(rule());
         when(leadMapper.selectById(1L)).thenReturn(lead);
-        when(leadMapper.updatePublicPoolToOwned(1L, 10L)).thenReturn(1);
+        when(leadMapper.updatePublicPoolToOwned(eq(1L), eq(10L), any())).thenReturn(1);
         when(claimDailyCounterMapper.reserve(eq(1L), eq(10L), any(), eq(5))).thenReturn(1);
         doAnswer(invocation -> {
             var history = invocation.getArgument(0,
@@ -223,7 +223,7 @@ class LeadDispatchServiceImplTest {
         when(dispatchRedisRepository.isOnline(10L)).thenReturn(true);
         when(dispatchRedisRepository.isAccepting(10L)).thenReturn(true);
         when(dispatchRedisRepository.tryReserve(1L, 10L, 120)).thenReturn(true);
-        when(leadMapper.updateUnassignedToPending(eq(1L), eq(10L), any(), eq(1))).thenReturn(1);
+        when(leadMapper.updateUnassignedToPending(eq(1L), eq(10L), any(), eq(1), any())).thenReturn(1);
         doAnswer(invocation -> {
             var history = invocation.getArgument(0, cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadAssignmentHistoryDO.class);
             history.setId(88L);

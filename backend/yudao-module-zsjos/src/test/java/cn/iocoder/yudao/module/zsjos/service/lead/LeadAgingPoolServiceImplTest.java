@@ -38,7 +38,9 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import org.mockito.ArgumentCaptor;
 
 @ExtendWith(MockitoExtension.class)
@@ -129,6 +131,9 @@ class LeadAgingPoolServiceImplTest {
         assertEquals(AGING_POOL_CONVERTED, cycle.getStatus());
         verify(leadMapper, never()).updateById(lead);
         verify(opportunityMapper, never()).updateById(opportunity);
+        verify(leadMapper).touchActivity(1L, now);
+        verify(leadMapper).touchActivity(1L, now.plusMinutes(1));
+        verify(leadMapper).touchActivity(1L, now.plusMinutes(2));
     }
 
     @Test
@@ -188,6 +193,7 @@ class LeadAgingPoolServiceImplTest {
         assertFalse(service.tryEnterDueLead(1L, now));
 
         verify(cycleMapper, never()).insert(org.mockito.ArgumentMatchers.any(LeadAgingPoolCycleDO.class));
+        verify(leadMapper, never()).touchActivity(anyLong(), any());
     }
 
     @Test
@@ -217,6 +223,7 @@ class LeadAgingPoolServiceImplTest {
         assertEquals(AGING_POOL_ASSIGNED, captor.getValue().getStatus());
         assertEquals(10L, lead.getOwnerUserId());
         verify(leadMapper, never()).updateById(any(LeadDO.class));
+        verify(leadMapper).touchActivity(eq(1L), any(LocalDateTime.class));
     }
 
     private static LeadAgingPoolCycleDO cycle(String status, Long collaboratorUserId) {

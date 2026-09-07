@@ -1,5 +1,17 @@
 # Database migration operations
 
+## V182 Lead Submitter Feedback
+
+Apply `V182__lead_submitter_feedback.sql` after V181 using an utf8mb4 client.
+It creates two empty Lead feedback/file-binding tables, two menu permissions and one
+in-app notification default per existing tenant. It changes no real account grants or business data.
+The matching empty tables are included in the fresh baseline and desired schema.
+Run `script/sql/mysql/verify-lead-submitter-feedback.sql` and compare schema and scoped
+configuration with the fresh installation; inspect the returned Chinese HEX values.
+Preserve historical rows on rollback; disable entry permissions/notification rules forward-only.
+The full API, permission assignment and attachment lifecycle are in
+[the feedback contract](../api/lead-submitter-feedback.md).
+
 ## Contract
 
 ZSJ-OS uses one MySQL schema for the enabled runtime modules. The desired Core
@@ -582,8 +594,9 @@ execution; rollback requires a forward permission migration.
 
  V181 adds non-destructive announcement audience metadata and the immutable `system_notice_recipient`
  snapshot table. It runs after V180, defaults historical notices to `ALL`, and is repeatable through guarded
- DDL and version checks. Recipient snapshots are historical authorization facts and are not rolled back by
- deleting rows.
+ DDL and version checks. Its three `system_notice` columns use `information_schema` guards for compatibility
+ with MySQL versions that reject `ADD COLUMN IF NOT EXISTS`. Recipient snapshots are historical authorization
+ facts and are not rolled back by deleting rows.
 
 V148 and V150 use a single stored-procedure call as the failure boundary. This is required because GUI
 statement-batch clients may report a failed `CALL` and still execute later top-level statements. V148 uses

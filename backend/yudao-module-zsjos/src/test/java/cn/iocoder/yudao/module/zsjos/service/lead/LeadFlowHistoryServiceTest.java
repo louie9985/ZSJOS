@@ -85,6 +85,24 @@ class LeadFlowHistoryServiceTest {
     }
 
     @Test
+    void oldSnapshotDoesNotBecomeSubmissionOrSupplementRemark() {
+        LeadDO lead = new LeadDO(); lead.setId(7L); lead.setRemark("overwritten"); lead.setSubmittedAt(submittedAt);
+        when(leadMapper.selectById(7L)).thenReturn(lead);
+        BusinessEventDO old = event(1L, LeadSupplementSnapshot.EVENT, submittedAt.plusMinutes(1), null, null);
+        old.setRelatedObjectRefs(JsonUtils.toJsonString(Map.of("before", Map.of("remark", "original"))));
+        BusinessEventDO added = event(2L, LeadSupplementSnapshot.EVENT, submittedAt.plusMinutes(2), null, null);
+        added.setRelatedObjectRefs(JsonUtils.toJsonString(new LeadSupplementSnapshot(Map.of(), LeadSupplementSnapshot.MODE,
+                "new-note", "partner", 70L, "partner-name", "digest")));
+        when(eventMapper.selectByLeadId(7L)).thenReturn(List.of(old, added));
+        var history = service.getHistory(7L);
+        assertNull(history.stream().filter(r -> r.getId().equals("lead:7")).findFirst().orElseThrow().getRemark());
+        assertNull(history.stream().filter(r -> r.getId().equals("event:1")).findFirst().orElseThrow().getRemark());
+        var note = history.stream().filter(r -> r.getId().equals("event:2")).findFirst().orElseThrow();
+        assertEquals("new-note", note.getRemark()); assertEquals("兼职端", note.getSource());
+        assertEquals("提交人", note.getOperator());
+    }
+
+    @Test
     void mapsMixedTransferStatusesIntoLeadAndAssignmentTransitions() {
         BusinessEventDO transfer = event(1L, "lead_transferred", submittedAt.plusMinutes(1),
                 "suspended", "submitted");

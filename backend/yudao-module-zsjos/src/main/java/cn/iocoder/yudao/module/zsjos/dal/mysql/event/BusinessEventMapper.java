@@ -8,6 +8,10 @@ import java.util.List;
 
 @Mapper
 public interface BusinessEventMapper extends BaseMapperX<BusinessEventDO> {
+    default BusinessEventDO selectByIdempotencyKeyForUpdate(String key) {
+        return selectOne(new LambdaQueryWrapperX<BusinessEventDO>()
+                .eq(BusinessEventDO::getIdempotencyKey, key).last("FOR UPDATE"));
+    }
     default BusinessEventDO selectByIdempotencyKey(String key) {
         return selectOne(new LambdaQueryWrapperX<BusinessEventDO>()
                 .eq(BusinessEventDO::getIdempotencyKey, key));
