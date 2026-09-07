@@ -900,6 +900,19 @@ V183 tables and idempotently backfills the V183 markers before recording V184. M
 incompatible tables/columns abort before any V184 marker is written. Rollback is forward-only
 because restoring `NOT NULL` would reintroduce the insert failure for the current template API.
 
+### V185 Partner permission scope split
+
+V185 follows V184 and turns Partner page `6852` into a permission-free route container. It moves the
+existing query identity to button `79996`, creates strict self-only read permission
+`zsjos:partner:manage` on button `79997`, and changes stable former management button `79920` to
+`zsjos:partner:manage-all`. Existing page holders retain query access and existing management holders retain
+tenant-wide management; no role receives the new self-only permission automatically. Tenant packages that
+contain the page receive all three configurable permission buttons.
+
+The migration changes only menu metadata, role-menu grants, tenant-package menu IDs and version records. It
+does not modify Partner, ownership, employee, Lead or user-relation rows. Reruns do not copy later page grants
+into query grants. Recovery is forward-only through a reviewed permission migration.
+
 ### V167 WeCom login and push preference closed loop
 
 V167 follows V166 and adds user-level `wecom_enabled` flags to `system_users` and

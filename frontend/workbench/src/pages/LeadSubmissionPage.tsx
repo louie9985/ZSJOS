@@ -20,14 +20,13 @@ type FormValues = {
   newMediaProviderUserId?: number
 }
 type RemoteState = { loading: boolean; error?: string }
-type StepKey = 'customer' | 'product' | 'source' | 'dispatch'
+type StepKey = 'info' | 'product' | 'confirm'
 
 /** 每一步负责校验的字段，进入下一步前只校验本步字段，最后提交再整表校验。 */
 const STEP_FIELDS: Record<StepKey, Array<keyof FormValues>> = {
-  customer: ['name', 'mobile', 'wechatId', 'regionPath'],
+  info: ['name', 'mobile', 'wechatId', 'regionPath', 'sourceChannel', 'leadCategory', 'remark'],
   product: [],
-  source: ['sourceChannel', 'leadCategory', 'remark'],
-  dispatch: ['dispatchMode', 'specifiedSalesUserId', 'newMediaProviderUserId']
+  confirm: ['dispatchMode', 'specifiedSalesUserId', 'newMediaProviderUserId']
 }
 
 /** 两种派单模式的后果说明，写在选项卡片里让提交人选之前就知道区别。 */
@@ -122,10 +121,9 @@ export default function LeadSubmissionPage({
   const unavailable = Boolean(remote.error || areaState.error) || !areas.length || !sources.length || !categories.length
 
   const steps: Array<{ key: StepKey; title: string; description: string }> = [
-    { key: 'customer', title: '客户信息', description: '姓名、联系方式、地区' },
-    { key: 'product', title: '意向课程', description: '至少一条并指定主意向' },
-    { key: 'source', title: '来源与备注', description: '渠道、分类、附件' },
-    { key: 'dispatch', title: selfSourced ? '提供方与确认' : '派单与确认', description: '核对信息后提交' }
+    { key: 'info', title: '客资信息', description: '客户、来源、备注' },
+    { key: 'product', title: '意向课程', description: '选择课程与规格' },
+    { key: 'confirm', title: '提交确认', description: '核对信息后提交' }
   ]
   const lastIndex = steps.length - 1
   const markStep = (key: StepKey, invalid: boolean) =>
@@ -145,7 +143,7 @@ export default function LeadSubmissionPage({
     if (key === 'product') {
       if (!intentions.length || !primaryKey) { extraOk = false; if (notify) message.error('请先添加至少一条意向课程，（点击蓝色按钮）') }
     }
-    if (key === 'source' && (hasUploading || hasUploadError)) {
+    if (key === 'info' && (hasUploading || hasUploadError)) {
       extraOk = false
       if (notify) message.error(hasUploading ? '图片仍在上传，请稍候' : '请删除或重试上传失败的图片')
     }
@@ -279,6 +277,12 @@ export default function LeadSubmissionPage({
             <Col xs={24} md={12}><Form.Item name="wechatId" label="微信号" required={!mobile?.trim()} dependencies={['mobile']} rules={[{ validator: validateContact }]}><Input maxLength={64} /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="regionPath" label="客户地区" rules={[{ required: true, message: '请选择客户省市' }]}><Cascader options={areaOptions} showSearch placeholder="请选择省 / 市，如果不清楚可填写【其他】" /></Form.Item></Col>
           </Row>
+          <Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
+            <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true, message: '请选择来源渠道' }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
+            <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true, message: '请选择客资分类' }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
+            <Col xs={24}><Form.Item name="remark" label="备注信息"><Input.TextArea rows={4} maxLength={1000} showCount /></Form.Item></Col>
+            <Col xs={24}><Form.Item label={`附件图片${hasUploading ? '（上传中）' : ''}`} extra="确认提交后上传；最多 9 张，JPG、PNG、WebP"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" /></Form.Item></Col>
+          </Row>
         </div>
         <div className="lead-form-step" hidden={current !== 1}>
           <Title level={5}><span className="required-section-title">意向课程</span></Title>
@@ -287,14 +291,6 @@ export default function LeadSubmissionPage({
             onPrimaryChange={key => { setPrimaryKey(key); if (key) markStep('product', false) }} />
         </div>
         <div className="lead-form-step" hidden={current !== 2}>
-          <Title level={5}>来源与备注</Title><Row gutter={[24, 0]}>
-            <Col xs={24} md={12}><Form.Item name="sourceChannel" label="来源渠道" rules={[{ required: true, message: '请选择来源渠道' }]}><Select options={sources} notFoundContent="来源渠道未配置" /></Form.Item></Col>
-            <Col xs={24} md={12}><Form.Item name="leadCategory" label="客资分类" rules={[{ required: true, message: '请选择客资分类' }]}><Select options={categories} notFoundContent="客资分类未配置" /></Form.Item></Col>
-            <Col xs={24}><Form.Item name="remark" label="备注信息"><Input.TextArea rows={4} maxLength={1000} showCount /></Form.Item></Col>
-            <Col xs={24}><Form.Item label={`附件图片${hasUploading ? '（上传中）' : ''}`} extra="确认提交后上传；最多 9 张，JPG、PNG、WebP"><DeferredAttachmentPicker value={files} onChange={setFiles} accept="image/jpeg,image/png,image/webp" /></Form.Item></Col>
-          </Row>
-        </div>
-        <div className="lead-form-step" hidden={current !== 3}>
           {!selfSourced && <><Title level={5}>派单方式</Title>
             {/* 卡片式单选：Radio 仍是真正的控件（键盘可达），整卡 onClick 只是放大鼠标命中区。 */}
             <Form.Item name="dispatchMode" rules={[{ required: true, message: '请选择派单模式' }]}>

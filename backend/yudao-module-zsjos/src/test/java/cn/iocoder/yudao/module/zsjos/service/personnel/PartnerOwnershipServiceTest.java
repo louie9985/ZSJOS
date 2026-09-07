@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import java.util.List;
 import java.util.Set;
 
 @ExtendWith(MockitoExtension.class)
@@ -30,13 +31,15 @@ class PartnerOwnershipServiceTest {
     @Mock private PartnerMapper partnerMapper;
     @Mock private PermissionApi permissionApi;
     @Mock private AdminUserApi adminUserApi;
+    @Mock private cn.iocoder.yudao.module.zsjos.service.lead.LeadAssignmentService leadAssignmentService;
 
     @Test
     void permissionLossImmediatelyInvalidatesRetainedOwnership() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(20L));
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
-                PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
+                PartnerOwnershipService.MANAGE_PERMISSION,
+                PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
 
         assertFalse(service.canRead(20L, 10L));
         verify(ownershipMapper, never()).deleteByIdAndVersion(anyLong(), anyInt(), anyLong());
@@ -45,9 +48,12 @@ class PartnerOwnershipServiceTest {
     @Test
     void enabledPermissionHolderCanReadCurrentPartner() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(20L));
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
-                PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
+                PartnerOwnershipService.MANAGE_PERMISSION,
+                PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
         when(permissionApi.getDeptDataPermission(20L)).thenReturn(new DeptDataPermissionRespDTO()
                 .setAll(false).setDeptIds(Set.of()));
@@ -57,8 +63,8 @@ class PartnerOwnershipServiceTest {
     }
 
     @Test
-    void managerCanReadAnyExistingTenantPartner() {
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
+    void manageAllHolderCanReadAnyExistingTenantPartner() {
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Manager"));
         when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L));
 
@@ -69,9 +75,12 @@ class PartnerOwnershipServiceTest {
     @Test
     void departmentScopeCanReadPartnersAssignedToDepartmentEmployees() {
         when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(21L));
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
         when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
-                PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
+                PartnerOwnershipService.MANAGE_PERMISSION,
+                PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Manager"));
         when(permissionApi.getDeptDataPermission(20L)).thenReturn(new DeptDataPermissionRespDTO()
                 .setAll(false).setDeptIds(Set.of(30L, 31L)));
@@ -84,16 +93,65 @@ class PartnerOwnershipServiceTest {
     @Test
     void nullEmployeeUserIdCannotResolveSystemPermissions() {
         assertFalse(service.canQuery(null));
-        assertFalse(service.canManage(null));
+        assertFalse(service.canManageAll(null));
         assertFalse(service.canRead(null, 10L));
         verifyNoInteractions(permissionApi, adminUserApi, ownershipMapper, partnerMapper);
+    }
+
+    @Test
+    void managePermissionReadsOnlyDirectOwnershipWithoutDepartmentOrRelationExpansion() {
+        when(ownershipMapper.selectByPartnerId(10L)).thenReturn(ownership(20L));
+        when(ownershipMapper.selectByPartnerId(11L)).thenReturn(
+                new PartnerOwnershipDO().setPartnerId(11L).setEmployeeUserId(21L));
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
+                PartnerOwnershipService.MANAGE_PERMISSION,
+                PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(false);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
+
+        assertTrue(service.canRead(20L, 10L));
+        assertFalse(service.canRead(20L, 11L));
+        verify(permissionApi, never()).getDeptDataPermission(20L);
+        verifyNoInteractions(leadAssignmentService);
+    }
+
+    @Test
+    void queryAndManagePermissionsUseExpandedQueryScope() {
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
+                PartnerOwnershipService.MANAGE_PERMISSION,
+                PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
+        when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
+        when(leadAssignmentService.getActiveTargetUserIds("content_director_partner_visibility", 20L))
+                .thenReturn(Set.of(22L));
+        when(permissionApi.getDeptDataPermission(20L)).thenReturn(new DeptDataPermissionRespDTO()
+                .setAll(false).setDeptIds(Set.of(30L)));
+        when(adminUserApi.getUserListByDeptIds(Set.of(30L))).thenReturn(List.of(user(21L, "Employee")));
+
+        assertEquals(Set.of(20L, 21L, 22L), service.getReadableEmployeeUserIds(20L));
+    }
+
+    @Test
+    void managePermissionCannotReadUnassignedPartner() {
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(false);
+        when(ownershipMapper.selectByPartnerId(10L)).thenReturn(null);
+
+        assertFalse(service.canRead(20L, 10L));
+        verify(permissionApi, never()).getDeptDataPermission(anyLong());
+        verifyNoInteractions(leadAssignmentService);
     }
 
     @Test
     void assignmentRequiresPermissionAndWritesAudit() {
         when(partnerMapper.selectById(10L)).thenReturn(new PartnerDO().setId(10L));
         when(adminUserApi.getUser(20L)).thenReturn(user(20L, "Owner"));
-        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION)).thenReturn(true);
+        when(permissionApi.hasAnyPermissions(20L, PartnerOwnershipService.QUERY_PERMISSION,
+                PartnerOwnershipService.MANAGE_PERMISSION,
+                PartnerOwnershipService.MANAGE_ALL_PERMISSION)).thenReturn(true);
         doAnswer(invocation -> { invocation.<PartnerOwnershipDO>getArgument(0).setId(1L); return 1; })
                 .when(ownershipMapper).insert(any(PartnerOwnershipDO.class));
         PartnerOwnershipUpdateReqVO request = new PartnerOwnershipUpdateReqVO();

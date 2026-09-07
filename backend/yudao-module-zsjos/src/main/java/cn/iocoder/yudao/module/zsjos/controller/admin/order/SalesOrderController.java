@@ -68,14 +68,14 @@ public class SalesOrderController {
 
     @GetMapping("/lead/{leadId}/customer-orders")
     @Operation(summary = "按客资客户聚合全部首购和复购订单")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:order-read','zsjos:partner:query','zsjos:partner:manage')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:order-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")
     public CommonResult<java.util.List<SalesOrderListItemRespVO>> getCustomerOrders(@PathVariable Long leadId) {
         return success(orderService.getCustomerOrders(leadId, WebFrameworkUtils.getLoginUserId()));
     }
 
     @GetMapping("/lead/{leadId}/customer-orders/{orderId}")
     @Operation(summary = "获得客资客户的完整订单详情")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:order-read','zsjos:partner:query','zsjos:partner:manage')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:order-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")
     public CommonResult<SalesOrderRespVO> getCustomerOrder(@PathVariable Long leadId,
                                                             @PathVariable Long orderId) {
         return success(orderService.getCustomerOrder(leadId, orderId, WebFrameworkUtils.getLoginUserId()));

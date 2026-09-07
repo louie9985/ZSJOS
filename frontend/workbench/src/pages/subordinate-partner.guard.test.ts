@@ -19,7 +19,8 @@ describe('subordinate Partner surface', () => {
     expect(api).toContain('/zsjos/partner/leads/${leadId}')
     expect(page).toContain('mode="manager-readonly"')
     expectSourceToContainTokens(page, "lead.partnerOwnerNameSnapshot || '未记录'")
-    expect(page).toContain("zsjos:partner:manage")
+    expect(page).toContain("zsjos:partner:manage-all")
+    expect(page).toContain("zsjos:partner:query")
     expect(page).not.toContain('转为员工')
   })
 

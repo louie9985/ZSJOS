@@ -44,7 +44,7 @@ class LeadSubmissionIdentityServiceTest {
     }
 
     @Test
-    void ordinarySubmissionAllowsEnabledInternalUserWithoutPost() {
+    void ordinarySubmissionAllowsSelfScopedEnabledInternalUserWithoutPost() {
         allowEnabledPersonnel(1L);
         AdminUserRespDTO user = user(1L, 10L, Set.of());
         when(adminUserApi.getUser(1L)).thenReturn(user);
@@ -53,6 +53,46 @@ class LeadSubmissionIdentityServiceTest {
 
         assertEquals(LeadSubmissionIdentityService.Identity.NEW_MEDIA,
                 service.requireOrdinarySubmitter(1L).identity());
+    }
+
+    @Test
+    void ordinarySubmissionRejectsDisabledAccount() {
+        AdminUserRespDTO user = user(2L, 10L, Set.of());
+        user.setStatus(CommonStatusEnum.DISABLE.getStatus());
+        when(adminUserApi.getUser(2L)).thenReturn(user);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.requireOrdinarySubmitter(2L));
+
+        assertEquals(LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void ordinarySubmissionRejectsDisabledDepartment() {
+        allowEnabledPersonnel(3L);
+        when(adminUserApi.getUser(3L)).thenReturn(user(3L, 10L, Set.of()));
+        DeptRespDTO dept = new DeptRespDTO();
+        dept.setId(10L); dept.setStatus(CommonStatusEnum.DISABLE.getStatus());
+        when(deptApi.getDept(10L)).thenReturn(dept);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.requireOrdinarySubmitter(3L));
+
+        assertEquals(LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());
+    }
+
+    @Test
+    void ordinarySubmissionRejectsDisabledPersonnel() {
+        when(adminUserApi.getUser(8L)).thenReturn(user(8L, 10L, Set.of()));
+        DeptRespDTO dept = new DeptRespDTO();
+        dept.setId(10L); dept.setStatus(CommonStatusEnum.ENABLE.getStatus());
+        when(deptApi.getDept(10L)).thenReturn(dept);
+        when(personnelStateService.isEnabled(8L)).thenReturn(false);
+
+        ServiceException error = assertThrows(ServiceException.class,
+                () -> service.requireOrdinarySubmitter(8L));
+
+        assertEquals(LEAD_SUBMITTER_IDENTITY_INVALID.getCode(), error.getCode());
     }
 
     @Test

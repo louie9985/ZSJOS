@@ -32,6 +32,7 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.*;
 public class PartnerOwnershipService {
     public static final String QUERY_PERMISSION = "zsjos:partner:query";
     public static final String MANAGE_PERMISSION = "zsjos:partner:manage";
+    public static final String MANAGE_ALL_PERMISSION = "zsjos:partner:manage-all";
 
     @Resource private PartnerOwnershipMapper ownershipMapper;
     @Resource private PartnerOwnershipLogMapper logMapper;
@@ -52,19 +53,21 @@ public class PartnerOwnershipService {
 
     public boolean canQuery(Long employeeUserId) {
         if (employeeUserId == null) return false;
-        if (!permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION, MANAGE_PERMISSION)) return false;
+        if (!permissionApi.hasAnyPermissions(employeeUserId,
+                QUERY_PERMISSION, MANAGE_PERMISSION, MANAGE_ALL_PERMISSION)) return false;
         AdminUserRespDTO user = adminUserApi.getUser(employeeUserId);
         return user != null && CommonStatusEnum.ENABLE.getStatus().equals(user.getStatus());
     }
 
-    public boolean canManage(Long employeeUserId) {
+    public boolean canManageAll(Long employeeUserId) {
         if (employeeUserId == null) return false;
-        return permissionApi.hasAnyPermissions(employeeUserId, MANAGE_PERMISSION) && isEnabledUser(employeeUserId);
+        return permissionApi.hasAnyPermissions(employeeUserId, MANAGE_ALL_PERMISSION)
+                && isEnabledUser(employeeUserId);
     }
 
     public boolean canRead(Long employeeUserId, Long partnerId) {
         if (employeeUserId == null || partnerId == null) return false;
-        if (canManage(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
+        if (canManageAll(employeeUserId)) return partnerMapper.selectById(partnerId) != null;
         PartnerOwnershipDO ownership = getByPartnerId(partnerId);
         return ownership != null && getReadableEmployeeUserIds(employeeUserId).contains(ownership.getEmployeeUserId());
     }
@@ -73,11 +76,15 @@ public class PartnerOwnershipService {
      * 将 System 数据权限投影为可查看的当前员工集合。未分配兼职不会进入该集合。
      */
     public Set<Long> getReadableEmployeeUserIds(Long employeeUserId) {
-        if (!canQuery(employeeUserId) || canManage(employeeUserId)) return Set.of();
-        var scope = permissionApi.getDeptDataPermission(employeeUserId);
+        if (!canQuery(employeeUserId) || canManageAll(employeeUserId)) return Set.of();
         Set<Long> userIds = new HashSet<>();
+        if (permissionApi.hasAnyPermissions(employeeUserId, MANAGE_PERMISSION)) {
+            userIds.add(employeeUserId);
+        }
+        if (!permissionApi.hasAnyPermissions(employeeUserId, QUERY_PERMISSION)) return userIds;
         userIds.add(employeeUserId);
         userIds.addAll(leadAssignmentService.getActiveTargetUserIds(DIRECTOR_VISIBILITY_SCENE, employeeUserId));
+        var scope = permissionApi.getDeptDataPermission(employeeUserId);
         if (scope == null) return userIds;
         List<AdminUserRespDTO> scopedUsers;
         if (Boolean.TRUE.equals(scope.getAll())) {
@@ -98,7 +105,11 @@ public class PartnerOwnershipService {
     }
 
     public List<LeadAssignmentUserRespVO> getCandidates() {
-        return adminUserApi.getUserList(permissionApi.getEnabledUserIdsByPermission(QUERY_PERMISSION)).stream()
+        Set<Long> userIds = new HashSet<>();
+        userIds.addAll(permissionApi.getEnabledUserIdsByPermission(QUERY_PERMISSION));
+        userIds.addAll(permissionApi.getEnabledUserIdsByPermission(MANAGE_PERMISSION));
+        userIds.addAll(permissionApi.getEnabledUserIdsByPermission(MANAGE_ALL_PERMISSION));
+        return adminUserApi.getUserList(userIds).stream()
                 .map(user -> new LeadAssignmentUserRespVO().setId(user.getId()).setNickname(user.getNickname())
                         .setDeptId(user.getDeptId()).setStatus(user.getStatus())).toList();
     }
@@ -116,7 +127,8 @@ public class PartnerOwnershipService {
         if (reqVO.getAssignedUserId() != null) {
             target = adminUserApi.getUser(reqVO.getAssignedUserId());
             if (target == null || !CommonStatusEnum.ENABLE.getStatus().equals(target.getStatus())
-                    || !permissionApi.hasAnyPermissions(target.getId(), QUERY_PERMISSION)) {
+                    || !permissionApi.hasAnyPermissions(target.getId(),
+                            QUERY_PERMISSION, MANAGE_PERMISSION, MANAGE_ALL_PERMISSION)) {
                 throw exception(PARTNER_OWNERSHIP_TARGET_INVALID);
             }
         }

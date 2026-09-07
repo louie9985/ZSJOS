@@ -1,11 +1,21 @@
 package cn.iocoder.yudao.module.zsjos.controller.admin.lead;
 
+import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCreateReqVO;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.access.prepost.PreAuthorize;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class LeadSubmissionControllerPermissionTest {
+
+    @Test
+    void ordinaryCreateRequiresSubmitPermission() throws NoSuchMethodException {
+        PreAuthorize authorization = LeadSubmissionController.class
+                .getMethod("create", LeadCreateReqVO.class)
+                .getAnnotation(PreAuthorize.class);
+
+        assertEquals("@ss.hasPermission('zsjos:lead:submit')", authorization.value());
+    }
 
     @Test
     void productCatalogAllowsAllLeadFormEntryPermissions() throws NoSuchMethodException {

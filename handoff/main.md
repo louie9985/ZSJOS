@@ -21570,6 +21570,76 @@ equestAttachments。
 - Remaining work: 未启动或重启后端，故真实 HTTP 拒绝结果和桌面/移动真实页面入口尚未做运行时验收；外部服务启停需另行确认。全量后端既有失败需由对应模块工作流处理。
 - Status: `implemented; focused backend and Workbench verification passed; full backend baseline and runtime acceptance pending`。
 
+## Workstream Registration - 2026-09-07 14:03:00 +08:00
+
+- Workstream ID: `main-workbench-lead-submission-three-steps`
+- Goal: 将提交客资与销售自拓录入从四步调整为客资信息、意向课程、提交确认三步，并将课程规格改为独立的具体规格/未明确规格栏目。
+- Non-goals: 不修改后端接口、数据库、菜单、权限、Vue Admin、兼职 H5、历史快照或外部服务；保留当前工作树其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `4a818fbab993b8096afb98e80a7fff1c161c3829`；Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/workbench/src/pages/LeadSubmissionPage.tsx`; `frontend/workbench/src/components/LeadIntendedProductEditor.tsx`; `frontend/workbench/src/styles/components/lead-product.css`; 相关 Workbench 守卫测试；`handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 React/Vite/TypeScript/Ant Design 6、后端课程目录 API 与既有 intendedProducts 契约；无新增依赖。
+- Integration order: 三步表单与校验 -> 课程规格独立分区 -> CSS 与守卫测试 -> Workbench 测试、类型检查和构建 -> 追加交付记录。
+- Verification plan: `npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`；浏览器验收若环境可用。
+
+## Delivery Entry - 2026-09-07 14:10:00 +08:00
+
+- Workstream ID: `main-workbench-lead-submission-three-steps`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `4a818fbab993b8096afb98e80a7fff1c161c3829` (uncommitted worktree)。
+- User goal: 将提交客资与销售自拓录入压缩为三步，并把课程规格改为独立的具体规格/未明确规格栏目。
+- Key decisions: 两个入口继续共用 `LeadSubmissionPage`；第一步合并客户信息与来源备注，第三步统一为“提交确认”；共享 `LeadIntendedProductEditor` 使用课程规格分区和 Segmented 二选一，保持既有 `spuUnknown`/`skuUnknown` 接口与多意向主意向能力；同步修改基础信息编辑场景；不改后端、数据库、权限、菜单、Admin 或 H5。
+- Execution or analysis result: 已完成三步步骤条、三组校验、首步连续分区、规格独立分区、具体规格/未明确规格切换、旧复选框移除及相关样式守卫更新。历史快照展示与接口字段保持兼容。
+- Changed files: `frontend/workbench/src/pages/LeadSubmissionPage.tsx`; `frontend/workbench/src/components/LeadIntendedProductEditor.tsx`; `frontend/workbench/src/styles/components/lead-product.css`; `frontend/workbench/src/pages/lead-submission-steps.guard.test.ts`; `frontend/workbench/src/styles/styles.guard.test.ts`; `handoff/main.md`。
+- Verification evidence: Workbench `npm test` 通过 102/102 文件、566/566 测试；`npm run typecheck` 通过；`npm run build` 通过（仅既有 Vite large-chunk warning）；scoped `git diff --check` 无错误，仅有 LF/CRLF 转换提示。
+- Dependency or integration impact: 无新增依赖、API、SQL、数据库、权限、菜单、分支、提交、推送或外部服务变更；未执行真实浏览器登录验收，保留现有无关工作树变更。
+- Remaining work: 真实课程目录和登录态下的桌面/移动浏览器视觉验收待运行环境可用时执行。
+- Status: `implemented; full Workbench tests, typecheck and build passed; browser acceptance pending`。
+
+## Workstream Registration - 2026-09-07 14:18:00 +08:00
+
+- Workstream ID: `main-workbench-lead-spec-layout-followup`
+- Goal: 将共享课程编辑器的“课程规格”标题与具体/未明确规格分段控件固定为和“意向课程”一致的上下布局。
+- Non-goals: 不修改课程选择逻辑、接口、数据库、权限、菜单、其他前端或历史快照；保留当前工作树其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `4a818fbab993b8096afb98e80a7fff1c161c3829`；Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/workbench/src/styles/components/lead-product.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `handoff/main.md`。
+- Owner: Codex `/root`; Dependencies: 现有 Workbench CSS token 与 Ant Design Segmented；无新增依赖。
+- Integration order: 规格分区强制纵向布局 -> 更新样式守卫 -> Workbench 测试、类型检查和构建 -> 追加交付记录。
+- Verification plan: `npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-07 14:34:00 +08:00
+
+- Workstream ID: `main-workbench-lead-spec-width-followup`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `4a818fbab993b8096afb98e80a7fff1c161c3829` (uncommitted worktree)。
+- User goal: 修复课程规格下拉框过窄，要求初始宽度按比例固定并支持响应式布局。
+- Key decisions: 为 `.lead-product-secondary-grid` 增加 `width: 100%`，桌面端保持三等分网格，沿用现有移动端断点切换单列；不改业务逻辑、数据契约或其他前端。
+- Execution or analysis result: 规格下拉框不再按内容收缩，父容器宽度可用后各字段按比例铺开，移动端仍为单列。
+- Changed files: `frontend/workbench/src/styles/components/lead-product.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `handoff/main.md`。
+- Verification evidence: `npm test -- src/styles/styles.guard.test.ts` 通过 28/28；`npm run typecheck` 通过；`npm run build` 通过（仅既有 Vite large-chunk warning）；scoped `git diff --check` 未见错误（仅 LF/CRLF 提示）。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、菜单、分支、提交、推送或外部服务变更；未执行真实浏览器验收。
+- Remaining work: 真实登录态下桌面/移动视觉验收待运行环境可用时执行。
+- Status: `implemented; focused style test, typecheck and build passed`。
+
+## Delivery Entry - 2026-09-07 14:22:00 +08:00
+
+- Workstream ID: `main-workbench-lead-spec-layout-followup`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `4a818fbab993b8096afb98e80a7fff1c161c3829` (uncommitted worktree)。
+- User goal: 让“是否明确规格”的布局与意向课程保持一致，标题和分段选择采用上下排列。
+- Key decisions: 将共享规格分区明确设为纵向 Flex、左对齐并占满可用宽度；不修改组件状态、课程/SKU 数据或提交契约；样式守卫直接约束纵向排列。
+- Execution or analysis result: “课程规格”标题固定显示在“选择具体规格 / 未明确规格”分段控件上方，提交客资、销售自拓和修改基础信息三个复用场景同步生效。
+- Changed files: `frontend/workbench/src/styles/components/lead-product.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `handoff/main.md`。
+- Verification evidence: Workbench `npm test` 通过 102/102 文件、566/566 测试；`npm run typecheck` 通过；`npm run build` 通过（仅既有 Vite large-chunk warning）。
+- Dependency or integration impact: 无新增依赖、接口、数据库、权限、菜单、分支、提交、推送或外部状态变更；保留其他未提交修改。
+- Remaining work: 未执行真实登录浏览器视觉验收。
+- Status: `implemented; full Workbench tests, typecheck and build passed`。
+
+## Workstream Registration - 2026-09-07 14:30:00 +08:00
+
+- Workstream ID: `main-workbench-lead-spec-width-followup`
+- Goal: 修复课程规格下拉框因父级纵向布局收缩导致的过窄问题，恢复按比例占宽并保持响应式。
+- Non-goals: 不修改课程/SKU 状态逻辑、接口、数据库、权限、菜单或其他前端；保留现有未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `4a818fbab993b8096afb98e80a7fff1c161c3829`；Target branch: 当前本地 `main`。
+- Ownership scope: `frontend/workbench/src/styles/components/lead-product.css`; `frontend/workbench/src/styles/styles.guard.test.ts`; `handoff/main.md`。
+- Owner: Codex `/root`; Dependencies: 现有 Workbench CSS token 与 Ant Design Select；无新增依赖。
+- Integration order: 规格网格占满父容器并按比例分列 -> 更新样式守卫 -> Workbench 测试、类型检查和构建 -> 追加交付记录。
+- Verification plan: `npm test`; `npm run typecheck`; `npm run build`; scoped `git diff --check`。
+
 ## Delivery Verification Correction - 2026-09-07 12:21:20 +08:00
 
 - Workstream ID: `main-lead-owner-transfer-deal-gate`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `0f5734a73506259660e6286c11bae7c016c6a423` (uncommitted worktree)。
@@ -21577,3 +21647,51 @@ equestAttachments。
 - Changed files: `backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/LeadOwnerCommandServiceTest.java`; `handoff/main.md`。
 - Dependency or integration impact: None。
 - Remaining work: 与上一交付条目一致。
+
+## Workstream Registration - 2026-09-07 14:30:00 +08:00
+
+- Workstream ID: `main-partner-permission-split`
+- Goal: 将兼职页面权限拆为现有范围查看、严格本人范围和全租户管理三档，并保持旧全量管理员能力。
+- Non-goals: 不修改兼职、归属、用户或客资业务数据；不修改 API 路径/响应结构、用户关系场景、指定销售逻辑、邀请码权限、依赖、分支、提交或外部服务；不执行真实数据库迁移。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `4a818fbab993b8096afb98e80a7fff1c161c3829`; Target branch: 当前本地 `main`。
+- Ownership scope: ZSJOS Partner 权限服务、兼职及关联 Lead 读取 Controller 与测试；Vue Admin 和 React Workbench 兼职页面及守卫测试；`script/sql/mysql` 的 V185/bootstrap/验证与迁移说明；直接受影响的权限、API、菜单文档；`handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 System 菜单权限、部门数据权限、ZSJOS Partner ownership、Admin Vue/pnpm、Workbench React/npm；无新增依赖。
+- Integration order: V185 菜单身份和授权兼容 -> 后端权限范围与接口门禁 -> Admin/Workbench 权限展示 -> 测试与文档 -> 比例验证 -> 追加交付记录。
+- Verification plan: ZSJOS 聚焦权限测试及模块编译；Admin `pnpm ts:check`、相关测试、`pnpm build:local`；Workbench `npm test`、`npm run typecheck`、`npm run build`；SQL 静态身份/顺序/重复性检查和受控数据库验证（若环境可用且另获数据库执行确认）；桌面/移动浏览器检查（若运行环境可用）；scoped `git diff --check`。
+
+## Delivery Entry - 2026-09-07 14:43:21 +08:00
+
+- Workstream ID: `main-partner-permission-split`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `4a818fbab993b8096afb98e80a7fff1c161c3829` (uncommitted worktree)。
+- User goal: 将兼职管理拆为现有扩展范围只读、严格本人范围只读和全租户管理三档，允许运营仅管理直接归属本人的兼职，同时保持原管理员能力。
+- Key decisions: `zsjos:partner:query` 保持 System 数据权限和 `content_director_partner_visibility` 扩展范围；`zsjos:partner:manage` 仅提供当前直接归属本人的只读范围；`zsjos:partner:manage-all` 提供全租户范围和全部既有修改操作；多权限按并集，严格本人角色不得同时授予 `query`；邀请码和指定销售关系保持独立。
+- Execution or analysis result: 已完成 V185 菜单及授权兼容迁移、三档后端范围判断、兼职与关联客资读取门禁、全部修改接口 `manage-all` 收口、Admin/Workbench 按权限展示和直接受影响文档。旧页面授权首次迁移到“查看兼职”，旧 `79920` 授权原位升级为“管理全部兼职”，新“管理兼职”不自动授予角色。
+- Changed files: `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/controller/admin/{lead/LeadAppealController.java,lead/LeadComplaintController.java,lead/LeadFollowUpController.java,lead/LeadManagementController.java,order/SalesOrderController.java,personnel/PartnerManagementController.java,personnel/PartnerStudentLinkController.java,personnel/SubordinatePartnerController.java}`; `backend/yudao-module-zsjos/src/main/java/cn/iocoder/yudao/module/zsjos/service/personnel/{PartnerOwnershipService.java,SubordinatePartnerService.java}`; corresponding Partner permission/service tests and `LeadFlowHistoryPermissionContractTest.java`; `frontend/admin/src/views/zsjos/partner/index.vue`; `frontend/workbench/src/pages/{SubordinatePartnerPage.tsx,subordinate-partner.guard.test.ts}`; `script/sql/mysql/{bootstrap.sql,verify-bootstrap.sql,migrations/README.md,migrations/V185__partner_permission_scope_split.sql}`; `docs/api/zsjos-subordinate-partners.md`; `docs/architecture/{data-and-permission-flow.md,zsjos-role-permission-matrix.md}`; `docs/frontend/zsjos-menu-coverage.md`; `handoff/main.md`。
+- Verification evidence: 后端聚焦权限测试 17/17 通过，ZSJOS 依赖 reactor 模块编译通过；Workbench `npm test -- --run` 通过 102/102 文件、566/566 测试，`npm run typecheck` 和 `npm run build` 通过（仅既有大 chunk 警告）；Admin 兼职页面定向 ESLint 和 `pnpm build:local` 通过（仅既有 `*zoom` CSS 警告）；Admin 全量 `pnpm ts:check` 中本次页面错误已清除，仍有 20 项位于 BPM、EAM、MES、System、ExportTask 等本次范围外的既有错误；V185 已完成菜单 ID、前置版本、授权保留、套餐覆盖、禁止业务删除及重复执行静态检查；scoped `git diff --check` 无空白错误，仅有 LF/CRLF 提示。
+- Dependency or integration impact: 无新增依赖、API 路径、响应结构、业务数据、分支、提交、推送或外部服务变更。V185 需要在 V184 后执行；上线后角色配置必须通过 System 菜单权限完成。
+- Remaining work: 未执行真实数据库迁移、UTF-8 持久化 `HEX()` 检查、真实 HTTP 403/租户隔离验证或登录态桌面/移动浏览器验收；这些操作涉及当前确认范围之外的共享外部状态或可用运行环境。指定销售候选未按关系过滤的问题仍是独立缺陷。
+- Status: `implemented; focused backend, full Workbench, Admin build and SQL static verification passed; live database/runtime acceptance pending`。
+
+## Workstream Registration - 2026-09-07 15:22:18 +08:00
+
+- Workstream ID: `main-lead-submit-self-data-scope`
+- Goal: 修复“仅本人数据权限”误伤客资提交身份所需组织基础资料查询的问题，使具备提交功能权限且业务身份有效的新媒体运营可以提交，同时保持客资列表和操作的数据可见范围不扩大。
+- Non-goals: 不修改客资列表、统计、导出或对象操作权限算法；不改前端、数据库、菜单配置、租户规则、提交资格规则或外部服务；保留当前工作树其他未提交修改。
+- Branch: `main`; Worktree: `D:\ZSJ-OS`; Base commit: `4a818fbab993b8096afb98e80a7fff1c161c3829`; Target branch: 当前本地 `main`。
+- Ownership scope: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/api/dept/{DeptApiImpl.java,PostApiImpl.java}`；对应 System API 测试；`backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/{LeadSubmissionIdentityServiceTest.java,LeadSubmissionServiceImplTest.java,LeadManagementServiceImplTest.java}`（仅本目标所需聚焦补充）；`docs/architecture/data-and-permission-flow.md`；`handoff/main.md`。
+- Owner: Codex `/root`。
+- Dependencies: 现有 Yudao `@DataPermission`、System 组织公共 API、ZSJOS 提交身份与客资可见性实现；无新增依赖。
+- Integration order: System 基础资料 API 数据权限边界 -> 身份/提交/可见性回归测试 -> 直接受影响文档 -> 聚焦与模块级验证 -> 追加交付记录。
+- Verification plan: System API 聚焦测试；ZSJOS 身份、提交和客资范围聚焦测试；`mvn -f backend/pom.xml -pl yudao-module-zsjos,yudao-module-system -am test`；`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package`；scoped `git diff --check`；真实 HTTP/账号验收仅在无需启停外部服务且环境已可用时执行。
+
+## Delivery Entry - 2026-09-07 15:35:01 +08:00
+
+- Workstream ID: `main-lead-submit-self-data-scope`; Branch: `main`; Worktree: `D:\ZSJ-OS`; HEAD commit: `4a818fbab993b8096afb98e80a7fff1c161c3829` (uncommitted worktree)。
+- User goal: 使配置为“仅本人数据权限”的新媒体运营在具备 `zsjos:lead:submit` 且业务身份有效时仍可提交客资，提交后只能查看和操作本人有权处理的客资。
+- Key decisions: 仅在 System 公共 API 的精确部门、明确部门集合、负责人部门和岗位编码基础资料查询上声明 `@DataPermission(enable = false)`；沿用已有精确部门花名册豁免；不包裹提交事务、不修改 Lead 列表/统计/导出范围；功能权限、业务身份资格和数据可见性保持独立。
+- Execution or analysis result: 已消除调用方“仅本人”数据范围对提交身份组织资料查询的干扰；普通提交仍写入当前用户 `source_user_id` 和其当前部门 `source_dept_id`；禁用账号、部门和人员仍被拒绝；创建接口仍严格要求 `zsjos:lead:submit`；本人列表继续仅向 Mapper 传入本人提交人/负责人范围。`ruoyi-vue-pro` 技能用于约束 System 公共 API 与 ZSJOS 服务边界，未引入新依赖或跨模块 DAL 访问。
+- Changed files: `backend/yudao-module-system/src/main/java/cn/iocoder/yudao/module/system/api/dept/{DeptApiImpl.java,PostApiImpl.java}`；`backend/yudao-module-system/src/test/java/cn/iocoder/yudao/module/system/api/dept/{DeptApiImplTest.java,PostApiImplTest.java}`；`backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/controller/admin/lead/LeadSubmissionControllerPermissionTest.java`；`backend/yudao-module-zsjos/src/test/java/cn/iocoder/yudao/module/zsjos/service/lead/{LeadManagementServiceImplTest.java,LeadSubmissionIdentityServiceTest.java,LeadSubmissionServiceImplTest.java}`；`docs/architecture/data-and-permission-flow.md`；`handoff/main.md`。
+- Verification evidence: System API 聚焦测试 3/3 通过；ZSJOS 身份、提交、控制器权限和本人可见性聚焦测试 74/74 通过；`mvn -f backend/pom.xml -pl yudao-server -am -DskipTests package` 的 25 个 reactor 模块全部成功并生成服务端 jar；scoped `git diff --check` 无空白错误，仅有 Git 的 LF/CRLF 转换提示。组合全量测试在 Infra 的既有 `CodegenEngineUniappTest.testExecute_treeSearch` 失败后中止；System 单模块执行 565 项，因既有 H2 `system_menu.workbench_render_mode` 缺列及 OAuth2 时间精度等共 5 个失败、14 个错误；ZSJOS 单模块执行 843 项，因既有 SQL 文本、审计计数、字典/租户测试准备和 Partner 状态等共 5 个失败、4 个错误，均不涉及本次修改路径。
+- Dependency or integration impact: 无新增依赖、API 路径、响应结构、SQL、数据库、菜单、前端、分支、提交、推送或外部服务变更；System 基础资料 API 调用方不再继承当前账号的数据范围，但租户、逻辑删除、精确条件与消费方业务校验保持有效。
+- Remaining work: 未执行真实账号 HTTP 验收，当前未确认已有可用服务、测试账号及租户数据；发布前仍需以“新媒体运营 + `zsjos:lead:submit` + 仅本人数据权限”验证提交成功、本人可见、他人不可见和未授权直接调用被拒绝。仓库全量测试基线失败需由对应 Infra/System/ZSJOS 工作流分别修复。
+- Status: `implemented; focused permission and submission regressions passed; server assembly passed; live account acceptance and unrelated baseline failures remain`。

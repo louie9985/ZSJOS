@@ -20,7 +20,8 @@ const passwordRule = /^(?=.*[A-Za-z])(?=.*\d).{8,20}$/
 
 export default function SubordinatePartnerPage({ permissions }: { permissions: string[] }) {
   const { message } = App.useApp()
-  const canManage = hasPermission(permissions, 'zsjos:partner:manage')
+  const canManageAll = hasPermission(permissions, 'zsjos:partner:manage-all')
+  const hasExpandedQuery = hasPermission(permissions, 'zsjos:partner:query')
   const [partners, setPartners] = useState<Partner[]>([])
   const [selected, setSelected] = useState<Partner>()
   const [leads, setLeads] = useState<ManagedLead[]>([])
@@ -168,8 +169,8 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
 
   return <section className="workspace-page subordinate-partner-page">
     <div className="page-heading">
-      <div><Typography.Title level={4}>兼职管理</Typography.Title><Typography.Text type="secondary">{canManage ? '管理全部兼职账号及其提交客资' : '查看归属给我的兼职及其全部提交客资'}</Typography.Text></div>
-      {canManage && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setCreateOpen(true)}>新增兼职</Button>}
+      <div><Typography.Title level={4}>兼职管理</Typography.Title><Typography.Text type="secondary">{canManageAll ? '管理当前租户全部兼职账号及其提交客资' : hasExpandedQuery ? '查看当前授权范围内的兼职及其提交客资' : '查看直接归属给我的兼职及其提交客资'}</Typography.Text></div>
+      {canManageAll && <Button type="primary" icon={<PlusOutlined/>} onClick={() => setCreateOpen(true)}>新增兼职</Button>}
     </div>
     <div className="subordinate-partner-layout">
       <aside className="subordinate-partner-list">
@@ -185,7 +186,7 @@ export default function SubordinatePartnerPage({ permissions }: { permissions: s
             <div><Typography.Title level={4}>{selected.name}</Typography.Title><Typography.Text type="secondary">{selected.partnerNo} · {selected.mobile} · 当前归属：{selected.assignedEmployeeName || '未分配'}</Typography.Text></div>
             <Space wrap>
               <Button title="刷新客资" icon={<ReloadOutlined/>} onClick={() => void loadLeads()}/>
-              {canManage && <><Button icon={<MobileOutlined/>} onClick={() => { setMobilePartner(selected); mobileForm.setFieldsValue({ mobile: selected.mobile }) }}>手机号</Button>
+              {canManageAll && <><Button icon={<MobileOutlined/>} onClick={() => { setMobilePartner(selected); mobileForm.setFieldsValue({ mobile: selected.mobile }) }}>手机号</Button>
                 <Button icon={<KeyOutlined/>} onClick={() => setPasswordPartner(selected)}>密码</Button>
                 <Button icon={<EditOutlined/>} onClick={() => void openAssignment(selected)}>归属</Button>
                 <Button icon={<HistoryOutlined/>} onClick={() => void openLogs(selected)}>归属历史</Button>

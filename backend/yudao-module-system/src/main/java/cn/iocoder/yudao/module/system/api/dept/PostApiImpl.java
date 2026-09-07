@@ -1,6 +1,7 @@
 package cn.iocoder.yudao.module.system.api.dept;
 
 import cn.iocoder.yudao.framework.common.util.object.BeanUtils;
+import cn.iocoder.yudao.framework.datapermission.core.annotation.DataPermission;
 import cn.iocoder.yudao.module.system.api.dept.dto.PostRespDTO;
 import cn.iocoder.yudao.module.system.dal.dataobject.dept.PostDO;
 import cn.iocoder.yudao.module.system.service.dept.PostService;
@@ -33,6 +34,7 @@ public class PostApiImpl implements PostApi {
     }
 
     @Override
+    @DataPermission(enable = false) // 岗位编码用于跨模块业务资格判断，不继承调用方的数据范围
     public PostRespDTO getPostByCode(String code) {
         PostDO post = postService.getPost(code);
         return BeanUtils.toBean(post, PostRespDTO.class);

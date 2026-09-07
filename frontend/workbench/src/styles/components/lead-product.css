@@ -16,10 +16,22 @@
 
 .lead-product-secondary-grid {
   display: grid;
+  width: 100%;
   min-width: 0;
   grid-template-columns: repeat(3,minmax(0,1fr));
   align-items: end;
   gap: var(--crm-sp-4);
+}
+
+.lead-product-spec-section {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--crm-sp-3);
+  padding-top: var(--crm-sp-2);
+  border-top: 1px solid var(--crm-border);
 }
 
 .lead-product-field {
@@ -72,18 +84,6 @@
   padding: 0 var(--crm-sp-4);
   border: 1px dashed var(--crm-border-strong);
   border-radius: var(--crm-radius-md);
-}
-
-/* 与同行表单控件垂直对齐，故跟随 antd controlHeight */
-.lead-product-checkbox {
-  display: flex;
-  min-height: var(--crm-control-h);
-  align-items: center;
-}
-
-.lead-product-checkbox-control {
-  width: fit-content;
-  justify-self: start;
 }
 
 .lead-product-list,.lead-product-list>.ant-card,.lead-product-list>.ant-space-item,.lead-product-card {

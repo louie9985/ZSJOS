@@ -194,7 +194,7 @@ describe('spacing and sizing anchors', () => {
     // would desynchronise the moment density changes
     expect(joined).toMatch(/\.dispatch-status-tag \{[^}]*height: var\(--crm-control-h\)/)
     expect(joined).toMatch(/\.dispatch-mode-button \{[^}]*height: var\(--crm-control-h\)/)
-    expect(joined).toMatch(/\.lead-product-checkbox \{[^}]*min-height: var\(--crm-control-h\)/)
+    expect(joined).toMatch(/\.lead-product-control[^\{]*\{[^}]*width: 100%/)
   })
 
   it('keeps semantic detail fields responsive and token driven', () => {
@@ -245,13 +245,14 @@ describe('spacing and sizing anchors', () => {
     expect(base).not.toContain('bg-sunken')
   })
 
-  it('keeps intended-product checkbox hit areas on the control and label', () => {
-    expect(joined).toMatch(/\.lead-product-checkbox-control \{[^}]*width: fit-content;[^}]*justify-self: start/)
+  it('keeps intended-product specification as an independent section', () => {
+    expect(joined).toMatch(/\.lead-product-spec-section \{[^}]*display: flex;[^}]*flex-direction: column;[^}]*align-items: flex-start;[^}]*border-top: 1px solid var\(--crm-border\)/)
+    expect(joined).toMatch(/\.lead-product-secondary-grid \{[^}]*width: 100%;[^}]*grid-template-columns: repeat\(3,minmax\(0,1fr\)\)/)
+    expect(joined).not.toContain('.lead-product-checkbox')
   })
 
   it('keeps the intended-product add button ready-state and unknown-mode placeholder', () => {
-    // 「未明确课程」是模式切换（会让两个选择器整体失效），曾做成标签行里的小勾选框，
-    // 被推到列右缘后看起来像在标注隔壁的「课程」字段，且视觉权重远低于其影响范围。
+    // “未明确课程”仍是模式切换，规格也使用同等权重的分段控件。
     const leadProduct = readFileSync(join(ROOT, 'components/lead-product.css'), 'utf8')
     expect(leadProduct).toMatch(/\.lead-product-add\.ready \{[^}]*box-shadow: 0 0 0 3px var\(--crm-color-primary-border\)/)
     expect(leadProduct).not.toContain('.lead-product-field-label')

@@ -907,9 +907,13 @@ SELECT 'dual_frontend_workbench_menu_components' AS check_name,
 SELECT 'account_personnel_partner_permissions' AS check_name,
        IF(EXISTS (SELECT 1 FROM system_menu WHERE id=6850 AND permission='zsjos:personnel:query' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=6851 AND permission='zsjos:personnel:update-state' AND deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6852 AND permission='zsjos:partner:query' AND deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6852 AND permission='' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79996 AND parent_id=6852
+                      AND permission='zsjos:partner:query' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79997 AND parent_id=6852
                       AND permission='zsjos:partner:manage' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+                      AND permission='zsjos:partner:manage-all' AND type=3 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_menu WHERE deleted=b'0' AND permission IN (
             'zsjos:partner:create','zsjos:partner:update-state','zsjos:partner:assign-owner',
             'zsjos:partner:convert','zsjos:subordinate-partner:query')),
@@ -1910,9 +1914,13 @@ SELECT 'V150 claim-pool read and Partner permissions' AS check_name,
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=6749
             AND permission='zsjos:lead:claim-pool:query' AND deleted=b'0')
           AND EXISTS (SELECT 1 FROM system_menu WHERE id=6852
-            AND permission='zsjos:partner:query' AND deleted=b'0')
-          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+            AND permission='' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79996 AND parent_id=6852
+            AND permission='zsjos:partner:query' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79997 AND parent_id=6852
             AND permission='zsjos:partner:manage' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+            AND permission='zsjos:partner:manage-all' AND type=3 AND deleted=b'0')
           AND NOT EXISTS (SELECT 1 FROM system_role role_row
             WHERE role_row.code='sales_manager' AND role_row.status=0 AND role_row.deleted=b'0'
               AND NOT EXISTS (SELECT 1 FROM system_role_menu grant_row
@@ -1997,6 +2005,25 @@ SELECT 'V184 work-order scene legacy columns nullable' AS check_name,
                  AND is_nullable='YES'
                  AND ((column_name IN ('source_post_code','target_post_code') AND data_type='varchar' AND character_maximum_length=64)
                    OR (column_name='assignment_mode' AND data_type='varchar' AND character_maximum_length=32)))=3,
+          'PASS','FAIL') AS result;
+
+SELECT 'V185 Partner permission scope split' AS check_name,
+       IF(EXISTS (SELECT 1 FROM zsjos_schema_version WHERE version='V185')
+          AND EXISTS (SELECT 1 FROM zsjos_module_schema_version
+            WHERE module_code='core' AND version='V185')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=6852 AND type=2
+            AND permission='' AND path='partner' AND component='zsjos/partner/index' AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79996 AND parent_id=6852
+            AND name='查看兼职' AND permission='zsjos:partner:query' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79997 AND parent_id=6852
+            AND name='管理兼职' AND permission='zsjos:partner:manage' AND type=3 AND deleted=b'0')
+          AND EXISTS (SELECT 1 FROM system_menu WHERE id=79920 AND parent_id=6852
+            AND name='管理全部兼职' AND permission='zsjos:partner:manage-all' AND type=3 AND deleted=b'0')
+          AND NOT EXISTS (SELECT 1 FROM system_tenant_package package_row
+            WHERE package_row.deleted=b'0' AND JSON_CONTAINS(package_row.menu_ids,'6852','$')
+              AND (NOT JSON_CONTAINS(package_row.menu_ids,'79996','$')
+                OR NOT JSON_CONTAINS(package_row.menu_ids,'79997','$')
+                OR NOT JSON_CONTAINS(package_row.menu_ids,'79920','$'))),
           'PASS','FAIL') AS result;
 
 SELECT 'V160 registration close-service button' AS check_name,

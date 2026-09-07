@@ -79,7 +79,7 @@ class SubordinatePartnerServiceTest {
     @Test
     void managerUsesTenantWidePage() {
         when(ownershipService.canQuery(20L)).thenReturn(true);
-        when(ownershipService.canManage(20L)).thenReturn(true);
+        when(ownershipService.canManageAll(20L)).thenReturn(true);
         when(ownershipMapper.selectManagedCount(9L, null, null)).thenReturn(1L);
         SubordinatePartnerRow row = new SubordinatePartnerRow();
         row.setId(10L); row.setPartnerNo("P-10"); row.setName("兼职甲"); row.setStatus("enabled");

@@ -1,5 +1,5 @@
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons'
-import { App, Button, Card, Cascader, Checkbox, Empty, Radio, Segmented, Select, Tag, Typography } from 'antd'
+import { App, Button, Card, Cascader, Empty, Radio, Segmented, Select, Tag, Typography } from 'antd'
 import { useMemo, useState } from 'react'
 import type { LeadCatalog, LeadCategoryNode, ManagedLeadProduct } from '../services/api'
 
@@ -13,7 +13,7 @@ export function selectionFromManagedProduct(product: ManagedLeadProduct): Intend
   return {
     key, spuRef: product.spuRef, skuRef: product.skuRef, spuUnknown: !product.spuRef,
     skuUnknown: !product.skuRef, spuName: product.spuName || '未明确课程',
-    skuName: product.skuName || '未明确具体班次/方案', path: product.categoryName || '未明确课程',
+    skuName: product.skuName || '未明确规格', path: product.categoryName || '未明确课程',
     price: product.price
   }
 }
@@ -48,10 +48,10 @@ export default function LeadIntendedProductEditor({ catalog, value, primaryKey, 
     const key = spuUnknown ? 'UNKNOWN' : `${selectedSpu!.spuRef}|${skuUnknown ? 'UNKNOWN' : selectedSku!.skuRef}`
     if (value.some(item => item.key === key)) return void message.warning('该意向课程已经添加')
     const next = spuUnknown
-      ? { key, spuUnknown: true, skuUnknown: true, spuName: '未明确课程', skuName: '未明确具体班次/方案', path: '未明确课程' }
+      ? { key, spuUnknown: true, skuUnknown: true, spuName: '未明确课程', skuName: '未明确规格', path: '未明确课程' }
       : { key, spuRef: selectedSpu!.spuRef, skuRef: skuUnknown ? undefined : selectedSku!.skuRef,
           spuUnknown: false, skuUnknown, spuName: selectedSpu!.spuName,
-          skuName: skuUnknown ? '未明确具体班次/方案' : selectedSku!.skuName,
+          skuName: skuUnknown ? '未明确规格' : selectedSku!.skuName,
           path: selectedSpu!.categoryPath.map(node => node.name).join(' / '), price: skuUnknown ? undefined : selectedSku!.price }
     onChange([...value, next]); if (!primaryKey) onPrimaryChange(key); resetDraft()
   }
@@ -80,20 +80,25 @@ export default function LeadIntendedProductEditor({ catalog, value, primaryKey, 
           <div className="lead-product-field" title={selectedSpu?.spuName}><Typography.Text type="secondary">课程</Typography.Text><Select className="lead-product-control" popupClassName="lead-product-dropdown" popupMatchSelectWidth disabled={disabled || !selectedCategoryId} value={spuRef}
             options={spuOptions} placeholder="请选择课程" onChange={next => { setSpuRef(next); setAttrValues({}); setSkuRef(undefined); setSkuUnknown(false) }}/></div>
         </>}
-      {/* 选好但未加入列表是这个编辑器最容易漏的一步，故按钮文案随选择变化并常驻高亮。 */}
-      <Button className={`lead-product-add${canAdd ? ' ready' : ''}`} type="primary" icon={<PlusOutlined/>} disabled={disabled || !canAdd} onClick={add}>{spuUnknown ? '添加未明确课程' : '添加意向课程'}</Button>
     </div>
-    {selectedSpu && <div className="lead-product-secondary-grid">
+    {selectedSpu && <div className="lead-product-spec-section">
+      <Typography.Text strong>课程规格</Typography.Text>
+      <Segmented className="lead-product-mode" disabled={disabled} value={skuUnknown ? 'unknown' : 'select'}
+        onChange={next => { const unknown = next === 'unknown'; setSkuUnknown(unknown); setSkuRef(undefined); setAttrValues({}) }}
+        options={[{ label: '选择具体规格', value: 'select' }, { label: '未明确规格', value: 'unknown' }]}/>
+      <div className="lead-product-secondary-grid">
       {selectedSpu.attrs.map(attr => {
         const selectedAttr = attr.values.find(item => item.value === attrValues[attr.attrKey])
         return <div className="lead-product-field" title={selectedAttr?.label} key={attr.attrKey}><Typography.Text type="secondary">{attr.attrName}</Typography.Text><Select className="lead-product-control" popupClassName="lead-product-dropdown" popupMatchSelectWidth disabled={disabled || skuUnknown}
           placeholder={attr.attrName} value={attrValues[attr.attrKey]} options={attr.values.map(item => ({ label: item.label, value: item.value }))}
           onChange={next => setAttrValues(current => ({ ...current, [attr.attrKey]: next }))}/></div>
       })}
-      {!selectedSpu.attrs.length && <div className="lead-product-field" title={selectedSku?.skuName}><Typography.Text type="secondary">具体班次/方案</Typography.Text><Select className="lead-product-control" popupClassName="lead-product-dropdown" popupMatchSelectWidth disabled={disabled || skuUnknown}
-        placeholder="请选择具体班次/方案" value={skuRef} options={selectedSpuSkus.map(sku => ({ label: `${sku.skuName}（¥${sku.price}）`, value: sku.skuRef }))} onChange={setSkuRef}/></div>}
-      <div className="lead-product-checkbox"><Checkbox className="lead-product-checkbox-control" disabled={disabled} checked={skuUnknown} onChange={event => { setSkuUnknown(event.target.checked); if (event.target.checked) { setSkuRef(undefined); setAttrValues({}) } }}>未明确具体班次/方案</Checkbox></div>
+      {!selectedSpu.attrs.length && <div className="lead-product-field" title={selectedSku?.skuName}><Typography.Text type="secondary">具体规格</Typography.Text><Select className="lead-product-control" popupClassName="lead-product-dropdown" popupMatchSelectWidth disabled={disabled || skuUnknown}
+        placeholder="请选择具体规格" value={skuRef} options={selectedSpuSkus.map(sku => ({ label: `${sku.skuName}（¥${sku.price}）`, value: sku.skuRef }))} onChange={setSkuRef}/></div>}
+      </div>
     </div>}
+    {/* 选好课程与规格后再明确加入列表，避免误选直接写入意向。 */}
+    <Button className={`lead-product-add${canAdd ? ' ready' : ''}`} type="primary" icon={<PlusOutlined/>} disabled={disabled || !canAdd} onClick={add}>{spuUnknown ? '添加未明确课程' : '添加意向课程'}</Button>
     {!value.length ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE}
       description={canAdd ? `已选好，点上方「${spuUnknown ? '添加未明确课程' : '添加意向课程'}」加入列表` : '请添加至少一条意向课程'}/> :
       <Radio.Group value={primaryKey} onChange={event => onPrimaryChange(event.target.value)} className="w-full">

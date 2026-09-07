@@ -20,7 +20,7 @@
         <el-button type="primary" @click="handleQuery"><Icon icon="ep:search" />查询</el-button>
         <el-button @click="resetQuery"><Icon icon="ep:refresh" />重置</el-button>
         <el-button
-          v-hasPermi="['zsjos:partner:manage']"
+          v-hasPermi="['zsjos:partner:manage-all']"
           type="primary"
           @click="createVisible = true"
         >
@@ -35,6 +35,7 @@
         </el-button>
       </el-form-item>
     </el-form>
+    <el-text class="mb-12px block" type="info">{{ scopeDescription }}</el-text>
     <el-table v-loading="loading" :data="partners" class="table">
       <el-table-column prop="partnerNo" label="兼职编号" />
       <el-table-column prop="name" label="姓名" />
@@ -53,7 +54,7 @@
       <el-table-column label="状态"
         ><template #default="scope">{{ statusLabels[scope.row.status] }}</template></el-table-column
       >
-      <el-table-column v-hasPermi="['zsjos:partner:manage']" label="操作" width="420">
+      <el-table-column v-hasPermi="['zsjos:partner:manage-all']" label="操作" width="420">
         <template #default="scope">
           <el-button link type="primary" @click="openAssignment(scope.row)">归属</el-button>
           <el-button link @click="openAssignmentLogs(scope.row)">历史</el-button>
@@ -324,11 +325,23 @@
 <script lang="ts" setup>
 import * as PartnerApi from '@/api/zsjos/partner'
 import * as DeptApi from '@/api/system/dept'
+import { useUserStore } from '@/store/modules/user'
 import { defaultProps, handleTree } from '@/utils/tree'
 import { useClipboard } from '@vueuse/core'
 
 defineOptions({ name: 'ZsjosPartner' })
 const message = useMessage()
+const userStore = useUserStore()
+const canManageAll = computed(
+  () =>
+    userStore.getPermissions.has('*:*:*') ||
+    userStore.getPermissions.has('zsjos:partner:manage-all')
+)
+const scopeDescription = computed(() => {
+  if (canManageAll.value) return '管理当前租户全部兼职账号及其提交客资'
+  if (userStore.getPermissions.has('zsjos:partner:query')) return '查看当前授权范围内的兼职及其提交客资'
+  return '查看直接归属给我的兼职及其提交客资'
+})
 const loading = ref(false)
 const partners = ref<PartnerApi.PartnerVO[]>([])
 const total = ref(0)

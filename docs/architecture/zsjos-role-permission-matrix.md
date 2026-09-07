@@ -35,6 +35,13 @@ account and ownership commands. Only roles that held the former create, state-up
 permissions together are upgraded to manage. V150 also assigns the independent
 `zsjos:lead:claim-pool:query` page to enabled `sales_manager` roles without granting `zsjos:lead:claim`.
 
+V185 turns the Partner page into a permission-free route container and moves its former query identity to
+the `查看兼职` button. `zsjos:partner:query` keeps the existing department/relationship-expanded read scope;
+`zsjos:partner:manage` becomes strict self-only read scope; `zsjos:partner:manage-all` receives the former
+tenant-wide management semantics. Existing V150 management grants retain full capability through the stable
+menu ID `79920`; V185 grants no role the new self-only permission automatically. Permissions are additive,
+so a strict self-only role must not also receive `zsjos:partner:query`.
+
 V146 inherits media-account capabilities by existing permission relationships rather than role names:
 holders of `zsjos:media-account:query` receive `zsjos:media-calendar:query`, holders of account edit
 receive `zsjos:media-account:maintenance`, and holders of account `query-all` receive

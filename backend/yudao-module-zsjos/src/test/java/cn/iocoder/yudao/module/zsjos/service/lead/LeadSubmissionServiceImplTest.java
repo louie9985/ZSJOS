@@ -1,13 +1,15 @@
 package cn.iocoder.yudao.module.zsjos.service.lead;
 
-import cn.iocoder.yudao.framework.common.exception.ServiceException;
+import cn.iocoder.yudao.framework.common.biz.system.dict.dto.DictDataRespDTO;
 import cn.iocoder.yudao.framework.common.enums.CommonStatusEnum;
+import cn.iocoder.yudao.framework.common.exception.ServiceException;
 import cn.iocoder.yudao.module.system.api.dict.DictDataApi;
 import cn.iocoder.yudao.module.system.api.dept.DeptApi;
 import cn.iocoder.yudao.module.system.api.dept.dto.DeptRespDTO;
 import cn.iocoder.yudao.module.system.api.ip.AreaApi;
 import cn.iocoder.yudao.module.system.api.ip.dto.AreaRespDTO;
 import cn.iocoder.yudao.module.system.api.permission.PermissionApi;
+import cn.iocoder.yudao.module.system.api.user.AdminUserApi;
 import cn.iocoder.yudao.module.system.api.user.dto.AdminUserRespDTO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.assignment.LeadAssignmentUserRespVO;
 import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadCreateReqVO;
@@ -16,6 +18,7 @@ import cn.iocoder.yudao.module.zsjos.controller.admin.lead.vo.submission.LeadPro
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadDuplicateReviewDO;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.LeadFollowUpRuleDO;
+import cn.iocoder.yudao.module.zsjos.dal.dataobject.lead.PersonDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.lead.*;
 import cn.iocoder.yudao.module.zsjos.dal.dataobject.personnel.PartnerAccountDO;
 import cn.iocoder.yudao.module.zsjos.dal.mysql.personnel.PartnerAccountMapper;
@@ -40,6 +43,8 @@ import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_D
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_MOBILE_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_REGION_INVALID;
 import static cn.iocoder.yudao.module.zsjos.enums.ZsjosErrorCodeConstants.LEAD_SUBMISSION_DUPLICATE;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.DICT_SOURCE_CHANNEL;
+import static cn.iocoder.yudao.module.zsjos.enums.LeadConstants.SOURCE_INTERNAL_NEW_MEDIA;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -65,6 +70,7 @@ class LeadSubmissionServiceImplTest {
     @Mock private AreaApi areaApi;
     @Mock private DictDataApi dictDataApi;
     @Mock private DeptApi deptApi;
+    @Mock private AdminUserApi adminUserApi;
     @Mock private PermissionApi permissionApi;
     @Mock private LeadProductCatalogPort productCatalogPort;
     @Mock private LeadDispatchService dispatchService;
@@ -76,6 +82,8 @@ class LeadSubmissionServiceImplTest {
     @Mock private LeadDuplicateReviewService duplicateReviewService;
     @Mock private ZsjosProductSkuService productSkuService;
     @Mock private LeadCategorySnapshotService categorySnapshotService;
+    @Mock private LeadNumberService leadNumberService;
+    @Mock private LeadProviderAttributionService providerAttributionService;
     @Mock private PartnerAccountMapper partnerAccountMapper;
     @Mock private cn.iocoder.yudao.module.zsjos.service.personnel.PartnerOwnershipService partnerOwnershipService;
 
@@ -365,6 +373,27 @@ class LeadSubmissionServiceImplTest {
     }
 
     @Test
+    void ordinarySubmissionPersistsCurrentUserAsSource() {
+        LeadCreateReqVO req = baseRequest();
+        AdminUserRespDTO submitter = user(1L, 100L, "13800138000");
+        when(adminUserApi.getUser(1L)).thenReturn(submitter);
+        when(leadNumberService.next(any())).thenReturn("L202609070001");
+        LeadSubmissionServiceImpl.RegionSnapshot region = new LeadSubmissionServiceImpl.RegionSnapshot(
+                "110000", "北京市", "110100", "北京市");
+
+        LeadDO lead = ReflectionTestUtils.invokeMethod(service, "createLead", new PersonDO().setId(50L), req,
+                "13800138000", null, region, 1L,
+                new LeadSubmissionIdentityService.Resolution(LeadSubmissionIdentityService.Identity.NEW_MEDIA, null),
+                LocalDateTime.of(2026, 9, 7, 15, 0),
+                new LeadCategorySnapshotService.Selection("test", "提交时分类"), "线上渠道");
+
+        assertEquals(1L, lead.getSourceUserId());
+        assertEquals(100L, lead.getSourceDeptId());
+        assertEquals(SOURCE_INTERNAL_NEW_MEDIA, lead.getSourceType());
+        verify(leadMapper).insert(lead);
+    }
+
+    @Test
     void newMediaProvidersMaskMobileAndLoadDepartmentsInBatch() {
         AdminUserRespDTO first = user(10L, 100L, "13800138000");
         AdminUserRespDTO second = user(20L, 100L, "13900139000");
@@ -425,6 +454,10 @@ class LeadSubmissionServiceImplTest {
         when(areaApi.getAreaByParentIdAndSelectionCode(990000000, "OTHER")).thenReturn(otherCity);
         when(productSkuService.validateLeadProduct(null, true, null, true)).thenReturn(LeadProductSnapshot.unknown());
         when(attachmentService.validateReferences(req.getAttachments(), 1L)).thenReturn(Map.of());
+        DictDataRespDTO sourceChannel = new DictDataRespDTO();
+        sourceChannel.setValue(req.getSourceChannel()); sourceChannel.setLabel("线上渠道");
+        org.mockito.Mockito.lenient().when(dictDataApi.getDictDataList(DICT_SOURCE_CHANNEL))
+                .thenReturn(List.of(sourceChannel));
     }
 
     private void assignReviewId() {

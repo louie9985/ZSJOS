@@ -16,7 +16,7 @@ class LeadFlowHistoryPermissionContractTest {
         ZsjosPermission object = LeadFlowHistoryService.class.getMethod("getHistory", Long.class)
                 .getAnnotation(ZsjosPermission.class);
 
-        assertEquals("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage')",
+        assertEquals("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')",
                 feature.value());
         assertEquals("lead", object.bizType());
         assertEquals("#leadId", object.bizId());

@@ -165,6 +165,7 @@ SOURCE script/sql/mysql/migrations/V181__notice_recipient_targeting.sql;
 SOURCE script/sql/mysql/migrations/V182__lead_submitter_feedback.sql;
 SOURCE script/sql/mysql/migrations/V183__student_information_collection.sql;
 SOURCE script/sql/mysql/migrations/V184__repair_work_order_scene_legacy_columns.sql;
+SOURCE script/sql/mysql/migrations/V185__partner_permission_scope_split.sql;
 
 
 INSERT IGNORE INTO `zsjos_module_schema_version`

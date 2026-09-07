@@ -146,21 +146,29 @@ public class LeadManagementController {
     @GetMapping("/get")
     @Operation(summary = "获得客资详情")
     @Parameter(name = "id", description = "内部客资ID", required = true)
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query','zsjos:partner:query','zsjos:partner:manage','zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query','zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read','zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query',"
+            + "'zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all',"
+            + "'zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query',"
+            + "'zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read',"
+            + "'zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
     public CommonResult<LeadManagementRespVO> getLead(@RequestParam("id") Long id) {
         return success(leadManagementService.getLead(id, getLoginUserId()));
     }
 
     @GetMapping("/get-by-no")
     @Operation(summary = "按客资编号获得客资详情")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query','zsjos:partner:query','zsjos:partner:manage','zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query','zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read','zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead:query','zsjos:subordinate-sales:query',"
+            + "'zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all',"
+            + "'zsjos:student:query-my','zsjos:media-student:query-my','zsjos:sales-order:query',"
+            + "'zsjos:sales-order:review','zsjos:lead-detail:follow-up-read','zsjos:lead-detail:appeal-read',"
+            + "'zsjos:lead-detail:complaint-read','zsjos:lead-detail:order-read','zsjos:lead-detail:flow-read')")
     public CommonResult<LeadManagementRespVO> getLeadByLeadNo(@RequestParam("leadNo") String leadNo) {
         return success(leadManagementService.getLeadByLeadNo(leadNo, getLoginUserId()));
     }
 
     @GetMapping("/{id}/flow-history")
     @Operation(summary = "获得客资流转记录")
-    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage')")
+    @PreAuthorize("@ss.hasAnyPermissions('zsjos:lead-detail:flow-read','zsjos:partner:query','zsjos:partner:manage','zsjos:partner:manage-all')")
     public CommonResult<List<LeadFlowHistoryRespVO>> getFlowHistory(@PathVariable("id") Long id) {
         return success(leadFlowHistoryService.getHistory(id));
     }

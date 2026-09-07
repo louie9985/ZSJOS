@@ -70,6 +70,10 @@ H5 的 `zsjos:partner:self-query` 等纯权限节点不是后台页面，不计�
 | 51 | 通知公告 | `/messages/notice` | `AnnouncementCenterPage` | `system/notice/index`（公告管理，原菜单 107；员工只读权限为子按钮 `79913` / `system:notice:read`） |
 | 52 | 强制表单 | `/zsjos/forced-form` | 不注册（全局强制填写 Provider） | `zsjos/forcedForm/index`（Admin 配置页，`workbenchRenderMode=admin_only`） |
 
+兼职管理页面节点本身不携带权限标识。其子权限 `zsjos:partner:query`、
+`zsjos:partner:manage`、`zsjos:partner:manage-all` 分别提供现有扩展只读范围、严格本人只读范围和
+全租户管理范围；两端仅对 `manage-all` 展示修改操作。
+
 “我的学员”按 Person 聚合并按服务关系切换。规划师页与媒体学员页共享 Person/课程服务详情壳，但业务投影不同：规划师可在真实 Lead 存在时追加获准的客资历史；媒体学员页始终以 Person、课程服务和账号为主体，不加载或展示 Lead、客资编号、联系历史或沟通记录。学习规划师确认接收后，可按服务端动作投影分配编导或职业规划师。媒体页只消费 `contact-context` 中的负责人、编导阶段、预约时间和 `availableActions`，账号、定位、内容和拍剪操作继续由各自接口及对象权限控制。
 
 Vue Admin 的 `zsjos/registration-pool` 与 `zsjos/my-students` 组件分别落地为 `src/views/zsjos/registration-pool.vue` 和 `src/views/zsjos/my-students.vue`，与服务端菜单的 `component` 值直接对应。

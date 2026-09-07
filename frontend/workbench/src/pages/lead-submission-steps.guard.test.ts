@@ -8,7 +8,9 @@ describe('lead submission stepped form', () => {
     expect(pageSource).toContain('STEP_FIELDS')
     // hidden 而不是条件卸载：卸载会丢已填值与校验状态
     expectSourceToContainTokens(pageSource, 'className="lead-form-step" hidden={current !== 0}')
-    expectSourceToContainTokens(pageSource, 'className="lead-form-step" hidden={current !== 3}')
+    expectSourceToContainTokens(pageSource, 'className="lead-form-step" hidden={current !== 2}')
+    expect(pageSource).toContain("title: '客资信息'")
+    expect(pageSource).toContain("title: '提交确认'")
     expectSourceNotToContainTokens(pageSource, 'current === 0 &&')
   })
 

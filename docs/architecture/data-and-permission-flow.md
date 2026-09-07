@@ -453,6 +453,10 @@ feature permission
 - `@ZsjosPermission` answers whether the current account may read, write, own, transfer, submit, or otherwise act on the identified ZSJOS object.
 - All applicable layers must pass. Feature permission does not grant access to every object, row visibility does not grant mutation rights, and object ownership does not bypass feature permission.
 - Object checks run at the Service boundary so alternate controllers, internal callers, and crafted requests cannot bypass them. Batch commands validate every target and make no mutation when any target is unauthorized.
+
+Cross-module System organization lookups used as exact business facts are not business-row list queries. Exact department lookup, an explicitly identified department set, departments led by an identified user, an explicitly identified department roster, and post-code lookup ignore the caller's Yudao data scope at their public API boundary. Tenant isolation, logical deletion, exact identifiers, System status fields, and the consuming service's business-qualification checks remain in force. Callers must not wrap a whole business transaction in a data-permission bypass; Lead list, search, statistics, export, batch, and object-operation authorization continue to use their own visibility boundaries.
+
+For ordinary Lead submission, `zsjos:lead:submit` controls the command while account, department, personnel, and applicable post rules establish submitter eligibility. A role configured with self-only data scope can therefore create a Lead attributed to its current user and department. The stored `source_user_id` is used only when the caller also has the submitted-Lead query permission, while `owner_user_id` is used only with the owned-Lead query permission; neither relationship exposes another operator's unrelated Lead, public-pool data, or another tenant's data.
 - ZSJOS object-permission relationships are ZSJOS-owned data. CRM permission tables and CRM-specific public-pool or subordinate behavior are not a source of truth.
 - Administrator bypass and hierarchy behavior must use confirmed system permission APIs and explicit ZSJOS relationships, never role, post, department, or user display names.
 - `@ZsjosPermission` resolves a registered provider by business type. Unknown or duplicate provider types fail closed; existing lead behavior is retained through its provider adapter.
@@ -635,19 +639,24 @@ The independent `zsjos:subordinate-sales:pause-all` command resolves that same l
 
 Partner ownership is an explicit ZSJOS relationship because Partner is an independent `PARTNER`
 subject and has no System department or post. One Partner has at most one current employee owner; an
-employee may own multiple Partners. `zsjos:partner:query` grants the consolidated Partner page. Its object
-scope always includes the current employee and also includes enabled employees returned by the current
-System department data-permission projection, including configured child departments; no role or department
-name is interpreted as a supervisor. Unassigned Partners remain invisible to query-only users.
-`zsjos:partner:manage` grants the
-same page with tenant-wide Partner scope and the create, enable/disable, mobile, password and ownership
-commands. `zsjos:partner-invitation:*` grants the invitation list, generation and voiding controls on the
+employee may own multiple Partners. The consolidated Partner route is a permission-free menu container.
+`zsjos:partner:query` retains the existing read scope: the current employee, enabled employees returned by
+the current System department data-permission projection, and employees configured through
+`content_director_partner_visibility`; no role or department name is interpreted as a supervisor.
+`zsjos:partner:manage` is a read-only, strict-self scope that includes only Partners whose current ownership
+row points to the logged-in employee and does not consume the department or relationship projections.
+`zsjos:partner:manage-all` provides tenant-wide Partner scope and the create, enable/disable, mobile,
+password, conversion, student-link and ownership commands. The three read scopes are additive, so strict
+self-only configuration must not also grant `zsjos:partner:query`. Unassigned Partners remain visible only
+to `manage-all`. `zsjos:partner-invitation:*` grants the invitation list, generation and voiding controls on the
 same Vue Admin Partner page; these permissions do not create Partner accounts until H5 activation succeeds.
 Every Partner and Partner-Lead detail request independently checks that scope. Reassignment
 moves all historical and future Partner Lead visibility to the new employee, while each new Partner Lead
 continues to snapshot the configured employee ID and name at submission time. Historical null snapshots
 remain `未记录` and are never inferred from the current relationship. The former subordinate-Partner
 permission and separate page are retired; their endpoints remain temporary rolling-release aliases.
+The `lead_specified_assignment` user-relation scene and specified-sales permission are independent of this
+Partner visibility split. Correcting any candidate-filtering deviation in that flow is outside V185.
 
 ### BPM related-approval authorization
 

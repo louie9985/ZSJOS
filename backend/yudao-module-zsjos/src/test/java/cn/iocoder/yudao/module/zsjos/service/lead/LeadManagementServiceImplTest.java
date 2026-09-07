@@ -137,7 +137,7 @@ class LeadManagementServiceImplTest {
     }
 
     @Test
-    void pageRestrictsOrdinaryUserToRelatedLeads() {
+    void pageRestrictsSelfOnlyUserToOwnSubmittedAndOwnedLeads() {
         LeadManagementPageReqVO reqVO = new LeadManagementPageReqVO();
         LeadDO lead = lead(1L, 10L, 20L);
         when(securityFrameworkService.hasPermission(PERMISSION_QUERY_SUBMITTED)).thenReturn(true);
